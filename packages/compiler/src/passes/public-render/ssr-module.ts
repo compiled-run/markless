@@ -60,7 +60,9 @@ import {
 	callbackSymbolIds,
 	componentEdgeInstanceSegment,
 	componentEdgesFor,
+	componentReferenceKey,
 	componentReferences,
+	edgeReferenceKey,
 	destructureProps,
 	emitComponentImport,
 	emitValueImport,
@@ -531,7 +533,7 @@ function childSurfaceArgs(
 	edge: { readonly childComponentName: string; readonly importKind?: string; readonly importSource?: string; readonly importedName?: string },
 	referenceByName: ReadonlyMap<string, string>,
 ): string | undefined {
-	const reference = referenceByName.get(edge.childComponentName);
+	const reference = referenceByName.get(edgeReferenceKey(edge));
 	if (!reference) return undefined;
 	const declaredName = edgeDeclaredComponentName(edge);
 	return `${reference},${declaredName ? JSON.stringify(declaredName) : 'undefined'}`;
@@ -540,10 +542,16 @@ function childSurfaceArgs(
 // One marker per component whose own `children` land inside its composition.
 function childrenWidgetRootMarkerLines(
 	input: PublicRenderModuleInput,
-	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
+	references: ReadonlyArray<{
+		readonly componentName: string;
+		readonly importSource?: string;
+		readonly localName: string;
+	}>,
 	components: ReadonlyArray<readonly [string, string]>,
 ): string[] {
-	const referenceByName = new Map(references.map((entry) => [entry.componentName, entry.localName]));
+	const referenceByName = new Map(
+		references.map((entry) => [componentReferenceKey(entry.componentName, entry.importSource), entry.localName]),
+	);
 	const edgeById = new Map(input.semanticGraph.componentEdges.map((edge) => [edge.id, edge]));
 	return components.flatMap(([componentName, functionName]) => {
 		const chain = childrenProjectionChain(input.renderData.chunks, componentName, (edgeId) =>
@@ -735,7 +743,11 @@ function bodyComputedReadsSharedInstance(
 function emitSsrDataLines(
 	input: PublicRenderModuleInput,
 	componentName: string,
-	references: ReadonlyArray<{ readonly componentName: string; readonly localName: string }>,
+	references: ReadonlyArray<{
+		readonly componentName: string;
+		readonly importSource?: string;
+		readonly localName: string;
+	}>,
 ): SsrDataLines {
 	const rowScopedEdges = rowScopedEdgeIds(input.renderData.chunks);
 	const chunks = input.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
@@ -917,7 +929,12 @@ function emitSsrDataLines(
 			];
 		});
 	const edges = componentEdgesFor(input, componentName);
-	const referenceByName = new Map(references.map((reference) => [reference.componentName, reference.localName]));
+	const referenceByName = new Map(
+		references.map((reference) => [
+			componentReferenceKey(reference.componentName, reference.importSource),
+			reference.localName,
+		]),
+	);
 	const callbacks = callbackSymbolIds(input);
 	// An edge whose slot sits inside another edge's projection chunk is PROJECTED
 	// into that component: it renders from what that component's body seeded. A
@@ -1005,7 +1022,7 @@ function emitSsrDataLines(
 	// instance paths its compose children carry.
 	const placementByEdgeId = new Map<string, { readonly path: string; readonly args: string }>();
 	for (const edge of edges) {
-		const component = referenceByName.get(edge.childComponentName);
+		const component = referenceByName.get(edgeReferenceKey(edge));
 		if (!component) continue;
 		const declaredName = edgeDeclaredComponentName(edge);
 		placementByEdgeId.set(edge.id, {
@@ -1044,7 +1061,7 @@ function emitSsrDataLines(
 	// declared, exactly as the render and seed calls spell them.
 	const childSurfaceArgsByEdgeId = new Map<string, string>();
 	const childCases = edges.flatMap((edge, index) => {
-		const component = referenceByName.get(edge.childComponentName);
+		const component = referenceByName.get(edgeReferenceKey(edge));
 		if (!component) return [];
 		const props = edge.props.flatMap((prop) => {
 			if (prop.kind === 'callback') return [];

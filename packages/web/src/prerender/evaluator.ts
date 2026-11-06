@@ -102,6 +102,10 @@ export type PrerenderDataDefinition = {
 	readonly edges?: ReadonlyArray<{
 		readonly id: string;
 		readonly childComponentName: string;
+		// Present only when this edge crosses a module boundary: which import
+		// answers for it in `surface.imports`, since two modules may declare a
+		// same-named component and `childComponentName` alone cannot tell them apart.
+		readonly importSource?: string;
 		readonly asyncBoundaryId?: string;
 		readonly hostPrefix: string;
 		readonly symbolPrefix: string;
@@ -191,6 +195,29 @@ export type PrerenderDataSurface = {
 	readonly components: Readonly<Record<string, PrerenderDataDefinition>>;
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
 };
+
+/**
+ * The key an edge that crosses a module boundary answers through in
+ * `surface.imports`. Two modules may declare a component of the same name, so
+ * the lookup is keyed by the edge's import rather than by that name.
+ */
+export function surfaceImportKey(edge: {
+	readonly childComponentName: string;
+	readonly importSource?: string;
+}): string {
+	return edge.importSource ?? edge.childComponentName;
+}
+
+/** The surface that publishes a composed edge's child: its own module when
+ * declared there, otherwise the module its import names. */
+export function childEdgeSurface(
+	surface: PrerenderDataSurface,
+	edge: { readonly childComponentName: string; readonly importSource?: string },
+): PrerenderDataSurface | undefined {
+	return surface.components[edge.childComponentName]
+		? surface
+		: surface.imports[surfaceImportKey(edge)];
+}
 
 export type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
 
@@ -1501,9 +1528,7 @@ export function evaluatePrerenderDataComponent(input: {
 							}
 							if (Object.keys(callbacks).length > 0)
 								childProps.__marklessSsrCallbacks = callbacks;
-							const childSurface = input.surface.components[edge.childComponentName]
-								? input.surface
-								: input.surface.imports[edge.childComponentName];
+							const childSurface = childEdgeSurface(input.surface, edge);
 							if (!childSurface) {
 								throw new Error(
 									`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`,

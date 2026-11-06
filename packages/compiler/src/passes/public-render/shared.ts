@@ -424,6 +424,21 @@ export type ComponentReference = {
 	readonly localName: string;
 };
 
+// Two edges share one import only when they name the same component of the
+// same module: a name alone can repeat across unrelated modules (two files
+// each declaring a component called the same thing), and the import that
+// answers for an edge is chosen by its source, not by that name.
+export function componentReferenceKey(componentName: string, importSource?: string): string {
+	return `${importSource ?? ''}\0${componentName}`;
+}
+
+export function edgeReferenceKey(edge: {
+	readonly childComponentName: string;
+	readonly importSource?: string;
+}): string {
+	return componentReferenceKey(edge.childComponentName, edge.importSource);
+}
+
 export function componentReferences(
 	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
 	localPrefix: string,
@@ -431,7 +446,12 @@ export function componentReferences(
 	const references: ComponentReference[] = [];
 
 	for (const edge of componentEdges) {
-		if (references.some((item) => item.componentName === edge.childComponentName)) continue;
+		if (
+			references.some(
+				(item) => componentReferenceKey(item.componentName, item.importSource) === edgeReferenceKey(edge),
+			)
+		)
+			continue;
 		references.push({
 			componentName: edge.childComponentName,
 			...(edge.importSource ? { importSource: edge.importSource } : {}),

@@ -1,0 +1,38 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 163,
+			"reason": "export-collision fix: edges crossing a module boundary now carry importSource, so surface.imports lookups route by import identity instead of by a declared name two modules can share",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "export-collision fix: edges crossing a module boundary now carry importSource, so surface.imports lookups route by import identity instead of by a declared name two modules can share",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 163,
+			"reason": "export-collision fix: edges crossing a module boundary now carry importSource, so surface.imports lookups route by import identity instead of by a declared name two modules can share",
+			"date": "2026-11-06"
+		}
+	]
+}

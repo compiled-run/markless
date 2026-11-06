@@ -26,6 +26,7 @@ import {
 import { marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
 import { marklessRosterSeedPass, sharedSeedPass } from './shared-seed-slot.ts';
 import {
+	childEdgeSurface,
 	evaluatePrerenderDataComponent,
 	marklessBoundGraphValues,
 	readPath,
@@ -243,9 +244,7 @@ function renderRowComponentEdge(
 		);
 		if (!projectedEdge)
 			throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
-		const partSurface = input.surface.components[projectedEdge.childComponentName]
-			? input.surface
-			: input.surface.imports[projectedEdge.childComponentName];
+		const partSurface = childEdgeSurface(input.surface, projectedEdge);
 		if (!partSurface)
 			throw new Error(
 				`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
@@ -375,9 +374,7 @@ function renderRowComponentEdge(
 		undefined,
 		input.itemPropName,
 	);
-	const childSurface = input.surface.components[edge.childComponentName]
-		? input.surface
-		: input.surface.imports[edge.childComponentName];
+	const childSurface = childEdgeSurface(input.surface, edge);
 	if (!childSurface)
 		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`);
 	return marklessThen(

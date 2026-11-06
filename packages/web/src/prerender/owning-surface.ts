@@ -1,4 +1,4 @@
-import type { PrerenderDataSurface } from './evaluator.ts';
+import { childEdgeSurface, type PrerenderDataSurface } from './evaluator.ts';
 
 export type OwningSurfaceReach = {
 	readonly surface: PrerenderDataSurface;
@@ -33,9 +33,10 @@ export function marklessOwningSurface(
 			seen.add(reach.surface);
 			for (const definition of Object.values(reach.surface.components))
 				for (const edge of definition.edges ?? []) {
-					const imported = reach.surface.components[edge.childComponentName]
-						? undefined
-						: reach.surface.imports[edge.childComponentName];
+					const imported =
+						childEdgeSurface(reach.surface, edge) !== reach.surface
+							? childEdgeSurface(reach.surface, edge)
+							: undefined;
 					if (imported)
 						next.push({
 							surface: imported,

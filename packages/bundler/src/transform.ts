@@ -1046,6 +1046,26 @@ function servedDefinition(
 	);
 }
 
+// The first edge to declare a given component name claims that name in
+// `imports`, matching the name a module with several components already
+// answers by (`Root`/`Trigger`/`Lab` from one import share one entry, however
+// many edges place them). A LATER edge whose own module happens to declare a
+// same-named component keeps its own import-source entry as the only way in:
+// giving it the name too would make a bare-name lookup answer for whichever
+// edge iterated first, exactly the collision this module's own key is for.
+function bareNameImportAliases(
+	edges: ReadonlyArray<{ readonly childComponentName: string; readonly importSource?: string }>,
+	importedComponents: ReadonlyMap<string, { readonly source: string; readonly local: string }>,
+): ReadonlyArray<readonly [string, { readonly source: string; readonly local: string }]> {
+	const claimed = new Map<string, { readonly source: string; readonly local: string }>();
+	for (const edge of edges) {
+		if (!edge.importSource || claimed.has(edge.childComponentName)) continue;
+		const entry = importedComponents.get(edge.importSource);
+		if (entry) claimed.set(edge.childComponentName, entry);
+	}
+	return [...claimed];
+}
+
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	environment: TransformTsrxModuleInput['environment'],
@@ -1056,6 +1076,9 @@ async function prerenderDataModuleSource(
 	moduleId: string,
 	served?: ServedRenderDataArtifact,
 ): Promise<string> {
+	// Keyed by import source, not by the imported component's declared name:
+	// two different modules can declare a same-named component, and the name
+	// alone cannot tell their imports apart.
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
@@ -1064,12 +1087,14 @@ async function prerenderDataModuleSource(
 	const browserRenderedChildren = served
 		? new Set(
 				compiled.semanticGraph.componentEdges.flatMap((edge) =>
-					served.browserRenderedEdgeIds.includes(edge.id) ? [edge.childComponentName] : [],
+					served.browserRenderedEdgeIds.includes(edge.id) && edge.importSource
+						? [edge.importSource]
+						: [],
 				),
 			)
 		: undefined;
 	for (const edge of compiled.semanticGraph.componentEdges) {
-		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		if (!edge.importSource || importedComponents.has(edge.importSource)) continue;
 		if (artifactChildMaterializations?.[edge.id]) continue;
 		const linked = importedModuleInterfaces?.[edge.importSource];
 		if (!linked) {
@@ -1080,9 +1105,9 @@ async function prerenderDataModuleSource(
 		const full =
 			renderDataImportSources?.[edge.importSource] ??
 			`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`;
-		importedComponents.set(edge.childComponentName, {
+		importedComponents.set(edge.importSource, {
 			source:
-				browserRenderedChildren && !browserRenderedChildren.has(edge.childComponentName)
+				browserRenderedChildren && !browserRenderedChildren.has(edge.importSource)
 					? servedRenderDataReference(full)
 					: full,
 			local: `marklessPrerenderImport${importedComponents.size}`,
@@ -1257,7 +1282,12 @@ async function prerenderDataModuleSource(
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',
 		'\tcomponents: marklessPrerenderComponents,',
-		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
+		// Keyed by import source first, so two edges whose modules declare a
+		// same-named component resolve to their own import rather than each
+		// other's. Also keyed by the first edge's declared name claiming it, for
+		// callers that still look an import up by name alone - the walks that have
+		// not yet learned an edge's import source and so cannot disambiguate.
+		`\timports: {${[...importedComponents, ...bareNameImportAliases(compiled.semanticGraph.componentEdges, importedComponents)].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
 }
