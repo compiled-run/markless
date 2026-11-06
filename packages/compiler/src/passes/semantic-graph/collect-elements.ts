@@ -199,6 +199,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			isHostElement && isTemplateExpressionChild(child)
 				? textExpressionTarget(node, child)
 				: null;
+		if (isHostElement && child.type === 'JSXTryExpression') placeAsyncBoundary(node, child);
 		walk(child, state);
 	}
 	state.currentProjectionScope = previousProjectionScope;
@@ -236,8 +237,10 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+	const armText = asyncArmTextTargets.get(expression);
 	const asyncArmScoped =
 		!armScoped &&
+		!armText &&
 		!!state.currentAsyncBoundaryId &&
 		!!state.currentHostNodeId &&
 		state.currentAsyncArmHostNodeId === state.currentHostNodeId;
@@ -253,7 +256,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
 		sourceSpan: sourceSpan(expression, state.filename),
-		target: state.currentTextTarget ?? { kind: 'text' },
+		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
 		...(asyncArmScoped ? { armScopeBoundaryId: state.currentAsyncBoundaryId! } : {}),
@@ -592,6 +595,73 @@ function staticNodeCount(shapes: ReadonlyArray<HostChildShape>): number | null {
 		previous = shape;
 	}
 	return count;
+}
+
+// Static nodes before and after a @try among its host's children; null where only the render knows the count.
+const asyncBoundaryPlacements = new WeakMap<
+	AnyNode,
+	{ readonly before: number | null; readonly after: number | null }
+>();
+
+const asyncArmTextTargets = new WeakMap<AnyNode, SemanticTemplateBindingTarget>();
+
+function placeAsyncBoundary(host: AnyNode, boundary: AnyNode): void {
+	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const at = children.indexOf(boundary);
+	if (at < 0) return;
+	const shapes = children.map(hostChildShape);
+	asyncBoundaryPlacements.set(boundary, {
+		before: staticNodeCount(shapes.slice(0, at)),
+		after: staticNodeCount(shapes.slice(at + 1)),
+	});
+}
+
+/**
+ * Text written straight into a @try arm's fragment owns its one text node in the host, counted
+ * past the boundary's anchor comment, so a refresh rewrites that node in place. Call inside the arm.
+ */
+export function placeAsyncArmText(boundary: AnyNode, arm: AnyNode, state: WalkState): void {
+	const placement = asyncBoundaryPlacements.get(boundary);
+	const body = asNodes(arm.body).filter((child) => !isIgnorableJsxTextNode(child));
+	const fragment = body.length === 1 ? body[0] : undefined;
+	if (!placement || fragment?.type !== 'JSXFragment') return;
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const shapes = children.map(hostChildShape);
+	for (const run of textRuns(shapes)) {
+		const armBefore = staticNodeCount(shapes.slice(0, run.start));
+		const armAfter = staticNodeCount(shapes.slice(run.end));
+		const textNode =
+			placement.before !== null && armBefore !== null
+				? placement.before + 1 + armBefore
+				: placement.after !== null && armAfter !== null
+					? -(placement.after + armAfter + 2)
+					: null;
+		if (textNode === null) continue;
+		const parts = children
+			.slice(run.start, run.end)
+			.filter((_, at) => shapes[run.start + at] !== 'none');
+		const holes = parts.filter(isTemplateExpressionChild);
+		if (run.holes > 1) {
+			if (!joinTextParts(parts, state)) continue;
+			asyncArmTextTargets.set(holes[0]!.expression as AnyNode, { kind: 'text', textNode });
+			continue;
+		}
+		const hole = holes[0]!;
+		let prefix = '';
+		let suffix = '';
+		let seen = false;
+		for (const part of parts) {
+			if (part === hole) seen = true;
+			else if (seen) suffix += textPartValue(part);
+			else prefix += textPartValue(part);
+		}
+		asyncArmTextTargets.set(hole.expression as AnyNode, {
+			kind: 'text',
+			...(prefix ? { prefix } : {}),
+			...(suffix ? { suffix } : {}),
+			textNode,
+		});
+	}
 }
 
 // A text hole beside other children owns only its text node; the whole-element write would delete them.

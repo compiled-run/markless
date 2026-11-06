@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
+import { placeAsyncArmText } from './collect-elements.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -73,6 +74,7 @@ export function collectAsyncBoundary(
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
+		placeAsyncArmText(node, child, state);
 		walk(child, state);
 	}
 
