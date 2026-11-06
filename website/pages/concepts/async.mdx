@@ -52,7 +52,7 @@ Press a key. The city flips at once; only the temperature flaps wait.
 
 <BoardAnatomy />
 
-<Code steps={[{ label: 'Press Boston. The heading changes at once, and the forecast follows.', shows: 'Cloudy, 12°' }, { label: 'In forecast.ts, change `1200` to `4000`. Press Austin: only the forecast line waits.', source: '4000' }, { label: 'Try breaking it: move `<p>{forecast.summary}</p>` above `@try`. The build stops, because an async value can only be shown inside `@try`.', fails: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED' }]}>
+<Code steps={[{ label: 'Press Boston. The heading changes at once, and the forecast follows.', shows: 'Cloudy, 12°' }, { label: 'In forecast.ts, change `1200` to `4000`. Press Austin, then Boston: only the forecast line waits.', source: '4000' }, { label: 'Try breaking it: move `<p>{forecast.summary}</p>` above `@try`. The build stops, because an async value can only be shown inside `@try`.', fails: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED' }]}>
 ```tsrx title="forecast.tsrx"
 import { computed, state } from '@markless/core';
 import { loadForecast } from './forecast.ts';
@@ -83,19 +83,23 @@ export default function Forecast() @{
 ```
 
 ```ts title="forecast.ts"
-const skies: Record<string, string> = {
-	Austin: 'Sunny, 31°',
-	Boston: 'Cloudy, 12°',
+const skies: Record<string, [string, number]> = {
+	Austin: ['Sunny, 31°', 0],
+	Boston: ['Cloudy, 12°', 1200],
 };
 
 export function loadForecast(city: string) {
+	const sky = skies[city];
 	return new Promise<{ summary: string }>(
 		(resolve, reject) => {
+			if (!sky) {
+				reject(new Error('Unknown ' + city));
+				return;
+			}
+			const [summary, wait] = sky;
 			setTimeout(() => {
-				const summary = skies[city];
-				if (summary) resolve({ summary });
-				else reject(new Error('Unknown ' + city));
-			}, 1200);
+				resolve({ summary });
+			}, wait);
 		},
 	);
 }
@@ -151,12 +155,12 @@ export function loadForecast(
 ) {
 	return new Promise<{ summary: string }>(
 		(resolve, reject) => {
+			if (attempt === 0) {
+				reject(new Error('Service timed out.'));
+				return;
+			}
 			setTimeout(() => {
-				if (attempt === 0) {
-					reject(new Error('Service timed out.'));
-				} else {
-					resolve({ summary: 'Sunny, 31°' });
-				}
+				resolve({ summary: 'Sunny, 31°' });
 			}, 1200);
 		},
 	);
@@ -209,7 +213,7 @@ export default function Race() @{
 
 ```ts title="forecast.ts"
 const skies: Record<string, [string, number]> = {
-	Austin: ['Sunny, 31°', 300],
+	Austin: ['Sunny, 31°', 0],
 	Boston: ['Cloudy, 12°', 3000],
 	Denver: ['Snow, -3°', 800],
 };
@@ -284,16 +288,17 @@ function after<T>(ms: number, value: T) {
 }
 
 export function loadForecast(city: string) {
-	const sunny = city === 'Austin';
-	return after(800, {
-		summary: sunny ? 'Sunny, 31°' : 'Cloudy, 12°',
-	});
+	if (city === 'Austin') {
+		return after(0, { summary: 'Sunny, 31°' });
+	}
+	return after(800, { summary: 'Cloudy, 12°' });
 }
 
 export function loadAir(city: string) {
-	return after(2000, {
-		quality: city === 'Austin' ? 'fair' : 'good',
-	});
+	if (city === 'Austin') {
+		return after(0, { quality: 'fair' });
+	}
+	return after(2000, { quality: 'good' });
 }
 ```
 </Code>
@@ -343,11 +348,13 @@ const cities = [
 		id: 'atx',
 		name: 'Austin',
 		sky: 'Sunny, 31°',
+		wait: 0,
 	},
 	{
 		id: 'bos',
 		name: 'Boston',
 		sky: 'Cloudy, 12°',
+		wait: 600,
 	},
 ];
 
@@ -358,7 +365,6 @@ function after<T>(ms: number, value: T) {
 }
 
 export async function findCity(query: string) {
-	await after(600, null);
 	const q = query.toLowerCase();
 	const city = cities.find((c) =>
 		c.name.toLowerCase().startsWith(q),
@@ -366,13 +372,12 @@ export async function findCity(query: string) {
 	if (!city) {
 		throw new Error('No city matches ' + query);
 	}
-	return { id: city.id };
+	return after(city.wait, { id: city.id });
 }
 
 export async function loadForecast(id: string) {
-	await after(600, null);
 	const city = cities.find((c) => c.id === id)!;
-	return { summary: city.sky };
+	return after(city.wait, { summary: city.sky });
 }
 ```
 </Code>
@@ -416,12 +421,9 @@ export default function Units() @{
 ```ts title="forecast.ts"
 type Sky = { summary: string; high: number };
 
-export function loadForecast(city: string) {
-	return new Promise<Sky>((resolve) => {
-		setTimeout(() => {
-			resolve({ summary: 'Sunny', high: 31 });
-		}, 800);
-	});
+export async function loadForecast(city: string) {
+	const sky: Sky = { summary: 'Sunny', high: 31 };
+	return sky;
 }
 ```
 </Code>
