@@ -270,7 +270,6 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_REPEAT_ROW_COMPONENT_RENDERER_MISSING: 'A list row has nothing to render with',
 	MARKLESS_REPEAT_ROW_COMPONENT_SLOT_MISSING: 'A list row has no place for its component',
 	MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING: 'A list row has no build data',
-	MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED: 'A new list row holds @try',
 	MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_COLLISION: 'Two list rows claim one widget',
 	MARKLESS_REPEAT_ROW_COMPONENT_WIDGET_UNRESOLVED: 'A list row reads a widget no one owns',
 	MARKLESS_REPEAT_ROW_MINT_EMPTY: 'A new list row is empty',
