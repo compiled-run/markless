@@ -266,6 +266,9 @@ export type SemanticGraphBinding = {
 	// element() only: the declared type argument was written as an array, so this
 	// handle names an ordered SET of elements rather than one.
 	readonly plural?: boolean;
+	// state() declared in an @if/@switch arm body: the cell is written back to
+	// `initialValue` each time that arm opens (spec 01, "Conditional identity").
+	readonly armScope?: SemanticBranchArm;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {

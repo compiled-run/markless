@@ -177,6 +177,12 @@ export type ResumeBranchRecord = {
 	// Reads the arm renders with no element of its own; they refresh its range.
 	readonly contentReads?: ResumeBranchRecord['testReads'];
 	readonly armTests?: ReadonlyArray<unknown>;
+	// State cells an arm declares: written back to `value` each time that arm opens.
+	readonly armSeeds?: ReadonlyArray<{
+		readonly arm: number;
+		readonly graphNodeId: string;
+		readonly value: unknown;
+	}>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 	// A branch whose arm holds a component that has to run: flips commit a range.

@@ -11772,7 +11772,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		stage: 'compile',
 		severity: 'error',
 		description:
-			'state() or computed() is created inside an @if, a loop, a handler, or another computed.',
+			'state() or computed() is created in a loop, a handler, another computed, or an @if arm it cannot start from.',
 		printed: [
 			'MARKLESS_STATE_CREATION_SITE_UNSTABLE: <apiName>() creates "<name>" <message>. That would ship a graph cell whose identity does not match when this code runs.',
 			'<why> Graph cells are planned into the payload before rendering, so each authored declaration needs one stable component-body or shared owner.',
@@ -11782,7 +11782,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		why: '<why> Graph cells are planned into the payload before rendering, so each authored declaration needs one stable component-body or shared owner.',
 		guide: {
 			summary:
-				'state() or computed() is created inside an @if, a loop, a handler, or another computed.',
+				'state() or computed() is created in a loop, a handler, another computed, or an @if arm it cannot start from.',
 			what: [
 				{
 					id: 's0',
@@ -11804,7 +11804,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: ' needs one fixed place in the component. This one sits inside a branch, a loop, an event handler, or another ',
+					text: ' needs one fixed place in the component. This one sits inside a loop, an event handler, another ',
 				},
 				{
 					id: 's5',
@@ -11813,13 +11813,58 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's6',
-					text: '.',
+					text: ', or an ',
+				},
+				{
+					id: 's7',
+					text: '@if',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: '/',
+				},
+				{
+					id: 's9',
+					text: '@switch',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ' arm with a starting value the compiler cannot read. A ',
+				},
+				{
+					id: 's11',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ' in an arm is allowed when its starting value is a literal: it starts fresh each time the arm opens.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Declare the value once, at the top level of the component body. Branch around the markup that uses it, not around the declaration. Write to it from the handler instead of creating it there.',
+					text: 'Give the arm state a literal starting value, such as ',
+				},
+				{
+					id: 's1',
+					text: 'state(0)',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' or ',
+				},
+				{
+					id: 's3',
+					text: 'state("")',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', or declare the value once at the top level of the component body and branch around the markup that uses it. Write to it from the handler instead of creating it there.',
 				},
 			],
 			example: [],

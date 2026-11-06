@@ -165,6 +165,14 @@ export function Panel() @{
 }
 ```
 
+Today the starting value of a `state()` declared in an arm must be one the
+compiler can read (a literal, or an object or array of literals): the arm's flip
+writes it back when the arm opens, without running the component. A starting
+value only the component could compute (`state(count * 2)`) is the build error
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE`, whose fix names the two ways out:
+a literal starting value, or declaring the state above the `@if`. `computed()`
+and `storage()` are not arm-local yet and keep the same refusal.
+
 The compiler should be able to explain this rule when local state appears inside
 a conditional branch:
 
