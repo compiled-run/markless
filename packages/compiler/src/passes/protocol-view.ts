@@ -361,15 +361,15 @@ function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: 
 		: {};
 }
 
-// State cells declared in an arm body, written back to their starting value each time that arm opens.
+// State cells declared in an arm body, or in a branch nested in it, written back to their starting value each time that arm opens.
 function branchArmSeedsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
-	const armSeeds = (input.semanticGraph?.graphBindings ?? []).flatMap((binding) =>
-		binding.kind === 'state' &&
-		binding.armScope?.branchSiteId === branchSiteId &&
-		binding.initialValueKnown === true
-			? [{ arm: binding.armScope.arm, graphNodeId: binding.id, value: binding.initialValue }]
-			: [],
-	);
+	const armSeeds = (input.semanticGraph?.graphBindings ?? []).flatMap((binding) => {
+		if (binding.kind !== 'state' || !binding.armScope || binding.initialValueKnown !== true) return [];
+		const owner = [binding.armScope, ...(binding.enclosingArms ?? [])].find(
+			(scope) => scope.branchSiteId === branchSiteId,
+		);
+		return owner ? [{ arm: owner.arm, graphNodeId: binding.id, value: binding.initialValue }] : [];
+	});
 	return armSeeds.length > 0 ? { armSeeds } : {};
 }
 

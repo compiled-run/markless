@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import OpenPanel from './branch-state/open-panel.tsrx';
+import NestedPanel from './branch-state/nested-panel.tsrx';
 import Panel from './branch-state/panel.tsrx';
 
 // Spec 01 "Conditional identity": state() declared inside an @if arm is disposed with the arm
@@ -60,4 +61,28 @@ test('CSR: an arm open at load serves its state and resets it on reopen', async 
 
 test('SSR: an arm open at load serves its state and resets it on reopen', async () => {
 	await openArmStateIsServedThenReset((await renderSSR(OpenPanel)).container);
+});
+
+const likes = (root: ParentNode) => root.querySelector('[data-likes]')?.textContent ?? null;
+
+// The inner arm is rebuilt by the outer arm's flip, not by its own, so the outer opening restarts it too.
+async function innerArmStateStartsFreshWhenTheOuterArmReopens(root: ParentNode) {
+	const expand = root.querySelector<HTMLElement>('[data-expand]')!;
+	expect(likes(root)).toBe('0');
+	root.querySelector<HTMLElement>('[data-likes]')!.click();
+	await expect.poll(() => likes(root)).toBe('1');
+	expand.click();
+	await expect.poll(() => likes(root)).toBeNull();
+	expand.click();
+	await expect.poll(() => likes(root)).toBe('0');
+	root.querySelector<HTMLElement>('[data-likes]')!.click();
+	await expect.poll(() => likes(root)).toBe('1');
+}
+
+test('CSR: state() in an @if nested in another @if arm starts fresh when the outer arm reopens', async () => {
+	await innerArmStateStartsFreshWhenTheOuterArmReopens((await render(NestedPanel)).container);
+});
+
+test('SSR: state() in an @if nested in another @if arm starts fresh when the outer arm reopens', async () => {
+	await innerArmStateStartsFreshWhenTheOuterArmReopens((await renderSSR(NestedPanel)).container);
 });

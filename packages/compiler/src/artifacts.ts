@@ -269,6 +269,8 @@ export type SemanticGraphBinding = {
 	// state() declared in an @if/@switch arm body: the cell is written back to
 	// `initialValue` each time that arm opens (spec 01, "Conditional identity").
 	readonly armScope?: SemanticBranchArm;
+	// The arms around `armScope`'s site, outermost first: opening any of them rebuilds this arm, so it restarts the cell too.
+	readonly enclosingArms?: ReadonlyArray<SemanticBranchArm>;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {

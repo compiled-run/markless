@@ -183,3 +183,34 @@ export function Panel() @{
 	expect(refusal?.message).toContain('computed() creates "doubled" inside an @if or @switch arm');
 	expect(refusal?.suggestions?.[0]?.message).toContain('Declare the computed() in the component body');
 });
+
+test('a state() in an @if nested in another arm is also seeded by the outer arm, which rebuilds it', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Thread.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Thread() @{
+	let unfolded = state(false);
+	let mode = state('reply');
+	<ol>
+		@if (unfolded) {
+			<li>
+				@switch (mode) {
+					@case 'reply': {
+						let words = state('');
+						<textarea onInput={(event) => (words = event.currentTarget.value)}>{words}</textarea>
+					}
+					@default: { <p>read only</p> }
+				}
+			</li>
+		}
+	</ol>
+}
+`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics).toEqual([]);
+	const seeds = (result.protocolView.branches ?? []).map((branch) => branch.armSeeds ?? []);
+	expect(seeds).toContainEqual([{ arm: 0, graphNodeId: 'state:words', value: '' }]);
+	expect(seeds.filter((armSeeds) => armSeeds.length > 0)).toHaveLength(2);
+});
