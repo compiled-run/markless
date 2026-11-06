@@ -1,89 +1,92 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import FeedSteps from '../../components/demos/router/feed-steps.tsrx';
 import Collapsible from '../../components/docs/collapsible.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import StreamAnatomy from '../../components/figures/stream/stream-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Page data arrives in the same response
+# Load data for a page
 
 <PageMeta time="2 min" assumes="async, routes" />
 
-A page needs data from somewhere slow, like a database. You don't want the whole page to wait for
-it. You also don't want the browser to make a second trip to fetch it.
+<Subtitle text="A page loads its data with async values inside @try, and the slow part arrives later in the same response." terms="values" />
 
-There is no special loader function for this. A page loads data the way any component does: with an
-async `computed()` inside `@try`.
-
-Think of a restaurant that brings the bread first. The main dish comes later, to the same table.
-That is an analogy. In the router, the bread is everything fast, and the main dish is the `@try`
-content.
-
-Press **Next** to see the second part of one page response. Then pick **quick** data.
-
-<FeedSteps />
-
-With slow data, the reader sees the heading and **Loading...** first. The data comes later, in the
-same response. The browser never asks a second time.
-
-## The code
-
-```tsrx
+```tsrx title="pages/recipes/[name].tsrx"
 import { computed } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { slowGreeting } from '../lib/slow.ts';
+import { reviews } from '../../src/db.ts';
 
-export default function Feed({ url }: PageProps) @{
-	const data = computed(async () => slowGreeting(url.pathname));
+export default function Recipe({ params }: PageProps<{ name: string }>) @{
+	const list = computed(async () => reviews(params.name));
 
 	<main>
-		<h1>Feed</h1>
+		<h1>{params.name}</h1>
 		@try {
-			<p>{data.text}</p>
+			<p>{list.length} reviews</p>
 		} @pending {
-			<p>Loading...</p>
+			<p>Loading reviews…</p>
 		} @catch {
-			<p>Failed</p>
+			<p>Couldn't load the reviews.</p>
 		}
 	</main>
 }
 ```
 
-`slowGreeting` stands for any slow call that returns `{ text }`. If it is slow, one response comes in
-two parts:
+**`computed(async …)`** asks the database for the reviews. **`@try`** shows them when they arrive, and **`@pending`** holds their place until then. There is no loader function.
 
-1. The heading and the `@pending` content come first.
-2. When the data is ready, the same response adds the `@try` content. The page puts it in place, and
-   the response ends.
+## The slow part arrives in the same response
 
-If the data is ready quickly, it goes in the first part, and the server never sends `Loading...`. You turn
-nothing on. For the rules of async values, see [async](/concepts/async).
+The server sends a page as a *stream*: one response that keeps arriving in parts.
 
-The call can use the page's props before or after an `await`. Here the page reads the address's
-`tag` after the slow call returns. Markless tracks both reads, the one before the `await` and the one
-after it:
+- Everything outside `@try` goes out at once.
+- `@pending` holds the slow part's place.
+- When the data is ready, the same response carries the `@try` content.
 
-```tsrx
-const data = computed(async () => {
-	const greeting = await slowGreeting(url.pathname);
-	return { text: greeting.text + ' ' + (url.searchParams.get('tag') ?? '') };
-});
+Reload the recipe, then turn the database dial towards the snail and reload again.
+
+<StreamAnatomy />
+
+<Code steps={[{ label: 'Wait for the review to replace Loading reviews…', shows: 'Lovely and lemony' }, { label: 'Change `1500` to `4000`. Loading reviews… stays for four seconds, and the heading never waits.', source: 'slowReview(4000)' }]}>
+```tsrx title="reviews.tsrx"
+import { computed } from '@markless/core';
+import { slowReview } from './slow.ts';
+
+export default function Reviews() @{
+	const text = computed(async () =>
+		slowReview(1500),
+	);
+
+	<section>
+		<h2>Reviews</h2>
+		@try {
+			<p>{text}</p>
+		} @pending {
+			<p>Loading reviews…</p>
+		} @catch {
+			<p>Couldn't load them.</p>
+		}
+	</section>
+}
 ```
 
-<Callout
-	sprite="cross"
-	title="Why does fetch fail on the server?"
-	text="On the server, fetch needs a full address with a host. A path like /api/feed is not enough. Build the full address from the url.href prop, for example new URL('/api/feed', url.href)."
-/>
+```ts title="slow.ts"
+export function slowReview(ms: number) {
+	return new Promise<string>((done) => {
+		const review = 'Lovely and lemony';
+		setTimeout(() => done(review), ms);
+	});
+}
+```
+</Code>
 
-<Callout
-	sprite="speech-bubble"
-	title="Can the server wait for all the data first?"
-	text="Not with router(). It has no option for that. A slow @try always sends its @pending content first."
-/>
+Keep in mind:
+
+- Data that is ready within a few milliseconds goes out with the rest, and `@pending` is never sent.
+- The router can't wait for all the data first. A slow `@try` always sends its `@pending` content first.
+- On the server, `fetch` needs a full address. Build it from the `url` prop: `new URL('/api/reviews', url.href)`.
 
 <Collapsible
 	sprite="star-badge"
@@ -91,9 +94,4 @@ const data = computed(async () => {
 	text="The router has no loader or action export. A page gets only params, url, status and http as props. Data comes from async values inside the page, and slow parts arrive later in the same response."
 />
 
-## Try it yourself
-
-Give the feed page a second `@try` block with its own slow call. Make one call slower than the
-other, and watch which part shows up first.
-
-Next: [answer requests with API routes](/router/api-routes).
+Some requests want JSON, not a page. [Answer them with API routes](/router/api-routes).

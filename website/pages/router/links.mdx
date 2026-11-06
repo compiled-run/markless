@@ -1,154 +1,83 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import LinkCheck from '../../components/demos/router/link-check.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import LinkAnatomy from '../../components/figures/links/link-anatomy.tsrx';
+import RouteKey from '../../components/figures/route-key/route-key.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Links the build can check
+# Links
 
-<PageMeta time="3 min" assumes="routes" />
+<PageMeta time="2 min" assumes="routes" />
 
-A link with a typo hides until somebody clicks it. Then they get a 404, and you get an email.
+<Subtitle text="A link points at a route in your app, and the build checks that the route exists." terms="route" />
 
-The router knows every file in `pages/`. Link to a route pattern, like `/blog/[slug]`, and the
-build checks it. The route must exist, and you must pass its params. A wrong pattern stops the
-build, and the bad link never ships.
-
-Pick what happened to the link.
-
-<LinkCheck />
-
-The right link turns into a plain `<a href="/blog/hello">`. The other two stop the build with the
-message shown.
-
-## Link to a page
-
-```tsrx
+```tsrx title="pages/index.tsrx"
 import { Link } from '@markless/router';
 
 export default function Home() @{
 	<nav>
 		<Link href="/about">About</Link>
-		<Link href="/blog/[slug]" params={{ slug: 'hello' }}>First post</Link>
+		<Link href="/blog/[slug]" params={{ slug: 'hello' }}>
+			First post
+		</Link>
 	</nav>
 }
 ```
 
-`Link` renders a real `<a href>`. For the second link, the build writes `href="/blog/hello"` and
-drops `params`. A plain `<a>` with a pattern and `params` works the same way.
+**`Link`** renders a real `<a>`. **`params`** fills the brackets, so the build writes the second link as `href="/blog/hello"`.
 
-## What the build checks
+## The build checks every link
 
-| You wrote | What happens |
-| --- | --- |
-| `href="/blog/[slug]"` with `params={{ slug }}` | the build passes, and `href` becomes the real address |
-| `href="/blog/[id]"`, and no such route exists | the build stops: `Typed route error: /blog/[id] does not match any route in pages/.` |
-| `href="/blog/[slug]"` with no `params` | the build stops: `Typed route error: /blog/[slug] requires params:` |
-| `<Link href="/abuot">` | the build passes, and your editor flags the typo |
+`/blog/[slug]` is a *route pattern*: a file path in `pages/`, with brackets for the parts that change.
 
-A plain address like `/about` has no brackets, so the build does not check it. On a `Link`, your
-editor does.
-The router writes your route types to `.output/markless/router/types/routes.d.ts`. The file
-`markless-router-env.d.ts` in your app root points TypeScript at them.
+- A pattern that matches no file in `pages/` stops the build.
+- A pattern without its `params` stops the build and names them.
+- A plain address like `/about` isn't checked by the build. Your editor flags its typos.
 
-## What a click does
+Try both keys in the door.
 
-When someone clicks a link to one of your pages, the browser keeps the page it has. The router asks
-the server for the next page and swaps in only the page area. The address bar changes, and Back and
-Forward bring back each page and its scroll position.
-A scrolled box such as a sidebar keeps its scroll too. If the next page puts that box inside a
-different element, give the box an `id` so the router can find it there.
+<RouteKey />
 
-If `document.tsrx` reads a prop other than `children`, such as the URL, a click loads the whole new
-page instead.
+The typo key is the build error you'd see:
 
-The router also starts that request a little early. A pointer over a link, a focus, or a press
-starts it. When the browser is idle, a few visible links start too, on a fast connection with data
-saver off. If the request fails, the browser loads the address the normal way.
-
-Plain `<a>` links to your pages navigate the same way.
-
-<Callout
-	sprite="cross"
-	title="Does visiting the page change something?"
-	text="An early request is a real GET to your server, so it counts as a visit. A log-out link, a one-time token, a view counter: any of them runs when the visitor only looked at the link. Put prefetch={false} on the link to such a page, and only a real click asks for it."
-/>
-
-The router never requests these early:
-
-| Link | Why |
-| --- | --- |
-| another site's address | the router only fetches your own pages |
-| a path under `/api/` | an endpoint can do anything on a GET |
-| `download`, `target="_blank"` (any `target` but `_self`), or `rel="external"` | the click leaves this tab or this app |
-| `prefetch={false}` on the link | you said so |
-
-Everything else that names one of your pages is fair game, plain `<a>` included. `rel="nofollow"`
-does not stop it: that tells search engines what to trust, not browsers what to fetch. Next.js,
-Nuxt, SvelteKit and Turbo prefetch the same way, and opt out the same way, per link.
-
-Each early request carries the header `Purpose: prefetch`, so your server can tell it from a click.
-A page with a side effect can answer an early request without doing the work. Safer still, make the
-action a form that posts: the router never requests a `POST` early.
-
-```tsrx
-import { Link } from '@markless/router';
-
-export default function Header() @{
-	<nav>
-		<Link href="/settings">Settings</Link>
-		<Link href="/logout" prefetch={false}>Log out</Link>
-	</nav>
-}
+```txt
+Typed route error: /blgo/[slug] does not match any route in pages/.
 ```
 
-A page fetched early is shown for up to 30 seconds, and only while it can still match what the
-server would send:
+## A click swaps in only the page
 
-- After a write from this page, every page fetched early is dropped and the next click asks the
-  server again. A write is a submitted form, or a `fetch` to your own site that is not a `GET` or
-  `HEAD`. Back and Forward ask again too. To see these writes, the router wraps `window.fetch` once
-  it starts. The wrapper passes your arguments to the browser's `fetch` unchanged and returns its
-  promise as is.
-- A page that answers `Cache-Control: no-store` is fetched again at the click, unless the early
-  request is still arriving. One that answers `max-age=N` with `N` above 0 is shown for at most `N`
-  seconds. `max-age=0`, `no-cache` and `must-revalidate` change nothing here: they ask a cache to
-  check with the server, and hosts such as Vercel send them on every page by default.
+An *in-place navigation* keeps the page you're on and swaps in only its middle.
 
-In a built app, the code that handles these clicks is one small file the browser downloads once and
-caches for every page. It starts when the browser finishes reading the page. A link clicked before
-that, while a long page is still loading, loads the whole new page the normal way. Nothing is lost;
-only that one click skips the swap.
+- The address changes when the new middle lands, not at the click.
+- Back and Forward bring back each page and its scroll.
+- Plain `<a>` links to your pages do the same.
 
-## Props that change a click
+Swap the sheet, then try to pull the clip off.
 
-| Prop | What it does |
-| --- | --- |
-| `prefetch={false}` | the router requests nothing before the click |
-| `replace` | replaces the current history entry instead of adding one |
-| `scroll={false}` | keeps the scroll position |
+<LinkAnatomy />
 
-`prefetch={false}` works on a `<Link>`, on a plain `<a>`, and on a component that passes its props
-on to an `<a>`, such as a navbar's link part. Anywhere else nothing would act on it, so the build
-stops with `MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED` and names the element.
+## Early fetches are real requests
 
-To turn early requests off for every link, write `router({ prefetch: false })` in `vite.config.ts`.
-Links still work.
-
-## Navigate from code
-
-To change pages from code, such as after an order is placed, call `navigate`. It does exactly what a
-click on a `Link` to the same address does.
+A pointer resting on a link, a focus or a press starts fetching the next page before the click. That fetch is a real `GET`, so turn it off for a link that does something:
 
 ```tsrx
+<Link href="/logout" prefetch={false}>Log out</Link>
+```
+
+- The router never fetches other sites or `/api/` paths early.
+- Links with `download`, a `target` or `rel="external"` aren't fetched early either.
+- `router({ prefetch: false })` in `vite.config.ts` turns early fetches off everywhere.
+
+## `navigate()` is a click from code
+
+```tsrx title="checkout.tsrx"
 import { navigate } from '@markless/router';
 
 export default function Checkout() @{
 	<button
-		type="button"
 		onClick={async () => {
 			await fetch('/api/orders', { method: 'POST' });
 			await navigate('/orders', { replace: true });
@@ -159,19 +88,8 @@ export default function Checkout() @{
 }
 ```
 
-| Option | What it does |
-| --- | --- |
-| `replace: true` | replaces the current history entry instead of adding one |
-| `scroll: false` | keeps the scroll position |
+**`navigate()`** resolves once the new page is in place. **`replace`** swaps the current history entry instead of adding one, on `navigate()` and on `Link`.
 
-`navigate` returns a promise that resolves once the new page is in place. If the address is not one
-of your pages, the browser loads it the normal way, and the promise never resolves because this page
-is gone. `navigate` runs in the browser only, so call it from an event handler, not while the page
-renders.
+`prefetch={false}` belongs on a link, or on a component that passes it to one ([why anywhere else stops the build](/errors/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED)).
 
-## Try it yourself
-
-Add a link to `/blog/[slug]` with `params={{ slug: 'second' }}`. Start the app, open the page, and
-view its source. Find the `href` the build wrote.
-
-Next: [load data for a page](/router/data).
+Pages often need data from somewhere slow. [Load it in the page](/router/data).

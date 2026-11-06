@@ -399,22 +399,20 @@ try {
 
 		// --- the island still resumes -----------------------------------------
 		const stage = page.locator('.code-block [data-code-stage]').first();
-		const button = stage.getByRole('button', { name: 'Dark' });
-		const themeLine = stage.locator('h2').first();
+		const button = stage.getByRole('button', { name: 'Switch user' });
+		const nameLine = stage.locator('h2').first();
 		await button.waitFor();
 		await page.screenshot({ path: `${shotsDir}/T004-state-before.png`, fullPage: true });
 
-		const readTheme = async () => ((await themeLine.textContent()) ?? '').trim();
-		const before = await readTheme();
-		check(before === 'Theme: light', 'the settings demo renders its light theme from the server', before);
+		const readName = async () => ((await nameLine.textContent()) ?? '').trim();
+		const before = await readName();
+		check(before === 'Hello, Jack', 'the profile renders Jack from the server', before);
 
-		// The first click both wakes the island and assigns; wait for the text to settle before the next click.
+		// The first click both wakes the island and assigns; wait for the text to settle.
 		await button.click();
-		await settleText(themeLine, (text) => text === 'Theme: dark', 'the settings demo turns dark on the first click');
-		await stage.getByRole('button', { name: 'Light' }).click();
-		await settleText(themeLine, (text) => text === 'Theme: light', 'the settings demo turns light again');
-		const after = await readTheme();
-		check(after === 'Theme: light', 'the settings demo answers both buttons (island resumed)', after);
+		await settleText(nameLine, (text) => text === 'Hello, Ada', 'the profile switches to Ada on the first click');
+		const after = await readName();
+		check(after === 'Hello, Ada', 'the profile answers its button (island resumed)', after);
 		await page.screenshot({ path: `${shotsDir}/T004-state-after.png`, fullPage: true });
 
 		const heads: { href: string; title: string; description: string }[] = [];
@@ -569,16 +567,16 @@ try {
 			fullPage: true,
 		});
 
-		// --- widget: every spot that shows theme on the state page ----------------
+		// --- widget: the player on the state page ---------------------------------
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const themeStage = page.locator('.code-block [data-code-stage]').first();
-		await themeStage.getByRole('button', { name: 'Dark' }).waitFor();
-		await themeStage.getByRole('button', { name: 'Dark' }).click();
-		await settleText(themeStage.locator('h2').first(), (text) => text === 'Theme: dark', 'theme heading turns dark');
+		const playerStage = page.locator('.code-block [data-code-stage]').nth(1);
+		await playerStage.getByRole('button', { name: 'Skip 10s' }).waitFor();
+		await playerStage.getByRole('button', { name: 'Skip 10s' }).click();
+		await playerStage.getByRole('button', { name: 'Play or pause' }).click();
+		await settleText(playerStage.locator('p').first(), (text) => text === '10s, playing', 'player skips and plays');
 		check(
-			(await themeStage.locator('main').first().getAttribute('class'))?.split(/\s+/).includes('dark') === true &&
-				((await themeStage.locator('main p').first().textContent()) ?? '').includes('🌙'),
-			'one click changes the class and the picture along with the heading',
+			((await playerStage.locator('p').first().textContent()) ?? '').trim() === '10s, playing',
+			'a += and a ! assignment both reach the same line',
 		);
 		await page.screenshot({ path: `${shotsDir}/T005-theme-after.png`, fullPage: true });
 
@@ -797,29 +795,22 @@ try {
 		}
 
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const orderStage = page.locator('.code-block [data-code-stage]').first();
-		const totalLine = orderStage.locator('p').nth(2);
-		const addMug = orderStage.getByRole('button', { name: 'Add a mug' });
-		const addCoaster = orderStage.getByRole('button', { name: 'Add a coaster' });
-		await addMug.waitFor();
+		const paceStage = page.locator('.code-block [data-code-stage]').first();
+		const paceLine = paceStage.locator('p').nth(1);
+		const faster = paceStage.getByRole('button', { name: 'Run faster' });
+		await faster.waitFor();
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 12',
-			'mug order total renders 12 from the server',
-			((await totalLine.textContent()) ?? '').trim(),
+			((await paceLine.textContent()) ?? '').trim() === 'Pace: 5 min/km',
+			'pace renders 5 from the server',
+			((await paceLine.textContent()) ?? '').trim(),
 		);
-		await addMug.click();
-		await settleText(totalLine, (text) => text === 'Total: 24', 'mug order total reaches 24');
+		await faster.click();
+		await settleText(paceLine, (text) => text === 'Pace: 4.8 min/km', 'pace reaches 4.8');
 		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 24',
-			'adding a mug re-derives the total with no line updating it',
+			((await paceLine.textContent()) ?? '').trim() === 'Pace: 4.8 min/km',
+			'running faster re-derives the pace with no line updating it',
 		);
-		await addCoaster.click();
-		await settleText(totalLine, (text) => text === 'Total: 27', 'mug order total reaches 27');
-		check(
-			((await totalLine.textContent()) ?? '').trim() === 'Total: 27',
-			'adding a coaster re-derives the same total',
-		);
-		await page.screenshot({ path: `${shotsDir}/T005-mug-order-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T005-pace-after.png`, fullPage: true });
 
 		// --- widgets on the reading-tsrx page ------------------------------------
 		await page.goto(`${origin}/start/reading-tsrx`, { waitUntil: 'load' });
@@ -1719,60 +1710,34 @@ try {
 			});
 		}
 
-		// --- widget: the mug label on the events page ---------------------------
+		// --- widget: the sign-up form on the events page ---------------------------
 		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const echoStage = page.locator('.code-block [data-code-stage]').first();
-		const echoField = echoStage.locator('input').first();
-		const echoLine = echoStage.locator('p').first();
-		const printedLine = echoStage.locator('p').nth(1);
-		await echoField.waitFor();
-		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Preview:',
-			'mug label renders its empty preview from the server',
-			((await echoLine.textContent()) ?? '').trim(),
-		);
-		await echoField.click();
-		await echoField.pressSequentially('Ada', { delay: 40 });
-		await settleText(
-			echoLine,
-			(text) => text === 'Preview: Ada',
-			'mug label preview follows the keystrokes',
-		);
-		check(
-			((await echoLine.textContent()) ?? '').trim() === 'Preview: Ada',
-			'typing into the field moves the preview under it',
-		);
+		const signupStage = page.locator('.code-block [data-code-stage]').nth(3);
+		const emailField = signupStage.locator('input[name="email"]').first();
+		const joinedLine = signupStage.locator('p').first();
+		await emailField.waitFor();
+		await emailField.fill('ada@example.com');
 		const urlBeforeSubmit = page.url();
-		await echoField.press('Enter');
-		await settleText(
-			printedLine,
-			(text) => text === 'Printed: Ada',
-			'pressing Enter runs the submit handler',
-		);
+		await emailField.press('Enter');
+		await settleText(joinedLine, (text) => text === 'ada@example.com', 'pressing Enter runs the submit handler');
 		check(
 			page.url() === urlBeforeSubmit,
 			'pressing Enter does not navigate, because the handler calls preventDefault',
 			`${urlBeforeSubmit} then ${page.url()}`,
 		);
 		check(
-			(await echoField.inputValue()) === 'Ada',
+			(await emailField.inputValue()) === 'ada@example.com',
 			'the field still holds what was typed after the submit',
-			await echoField.inputValue(),
+			await emailField.inputValue(),
 		);
-		await echoField.press('Escape');
-		await settleText(echoLine, (text) => text === 'Preview:', 'Escape clears the name');
-		await page.screenshot({ path: `${shotsDir}/T013-mug-label-after.png`, fullPage: true });
+		await page.screenshot({ path: `${shotsDir}/T013-signup-after.png`, fullPage: true });
 
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const conditionalsTitles = await page
-			.locator('.callout-title')
-			.evaluateAll((nodes) => nodes.map((node) => (node.textContent ?? '').trim()));
-		check(
-			conditionalsTitles.includes("Why can't I put an @if inside another @if?"),
-			'/concepts/conditionals answers the nested @if question',
-			conditionalsTitles.join(' | '),
-		);
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
+		check(
+			conditionalsText.includes("can't sit inside another"),
+			'/concepts/conditionals answers the nested @if question',
+		);
 		check(
 			conditionalsText.includes('MARKLESS_STATE_CREATION_SITE_UNSTABLE'),
 			'/concepts/conditionals names the error the build stops with',
@@ -1814,88 +1779,18 @@ try {
 		await page.screenshot({ path: `${shotsDir}/T013-note-panel-after.png`, fullPage: true });
 
 		// --- concept previews: each one reports what the reader's action really did ---
-		const ledgerText = async (card: Locator) =>
-			((await card.getByRole('list').innerText()) ?? '').replace(/\s+/g, ' ').trim();
-		const watchText = async (card: Locator) =>
-			((await card.locator('.pv-watch-text').innerText()) ?? '').replace(/\s+/g, ' ').trim();
-		const settleWatch = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
-			for (let attempt = 0; attempt < 40; attempt += 1) {
-				if (wanted(await watchText(card))) return;
-				await new Promise((done) => setTimeout(done, 100));
-			}
-			check(false, label, `never settled, last read "${await watchText(card)}"`);
-		};
-
 		await page.goto(`${origin}/concepts/state`, { waitUntil: 'load' });
-		const settings = page.locator('.settings-demo').first();
-		await settings.getByRole('button', { name: 'Dark' }).focus();
+		const idCard = page.locator('figure.idcard').first();
+		await idCard.getByRole('button', { name: 'Birthday: person.age++' }).focus();
 		await page.keyboard.press('Enter');
-		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: dark', 'state preview turns dark by key');
-		await settings.getByRole('button', { name: 'Light' }).click();
-		await settleText(settings.locator('.heading span'), (text) => text === 'Theme: light', 'state preview turns light by click');
+		await settleText(idCard.locator('.age-spot'), (text) => text === 'Age 25', 'state preview: the birthday reaches the page by key');
+		await idCard.getByRole('button', { name: 'Birthday: person.age++' }).click();
+		await settleText(idCard.locator('.age-spot'), (text) => text === 'Age 26', 'state preview: the birthday reaches the page by click');
 		check(
-			((await settings.locator('.tally').textContent()) ?? '').replace(/\s+/g, ' ').includes('The click handler ran 2 times'),
-			'state preview: the handler ran twice while Settings() ran once',
-			(await settings.locator('.tally').textContent()) ?? '',
+			((await idCard.locator('.name-spot').textContent()) ?? '').trim() === 'Jack',
+			'state preview: the name spot is untouched by the age change',
+			(await idCard.locator('.name-spot').textContent()) ?? '',
 		);
-
-		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
-		const basketCard = page.locator('section[data-preview="computed-basket"]');
-		const basketSlot = () => basketCard.locator('.slot:not([hidden])');
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).waitFor();
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
-		await settleWatch(basketCard, (text) => text.includes('total is now 15'), 'computed preview: the recipe reruns for a coaster');
-		check(
-			(await ledgerText(basketCard)).includes('ran again, because it reads coasters'),
-			'computed preview: the recipe row says it ran again',
-			await ledgerText(basketCard),
-		);
-		await basketCard.getByRole('switch', { name: 'Recipe reads coasters' }).click();
-		await basketSlot().getByRole('button', { name: 'One more coaster' }).click();
-		await settleWatch(basketCard, (text) => text.includes('stayed 12'), 'computed preview: a recipe that skips coasters leaves the total');
-		check(
-			(await basketSlot().locator('p').nth(2).textContent())?.trim() === 'Total: 12',
-			'computed preview: the mugs-only total really stayed 12',
-		);
-
-		await page.goto(`${origin}/concepts/events`, { waitUntil: 'load' });
-		const eventsCard = page.locator('section[data-preview="events-mug"]');
-		const mugField = eventsCard.getByLabel('Name for the mug');
-		await mugField.waitFor();
-		await mugField.focus();
-		await page.keyboard.type('Ada', { delay: 40 });
-		await settleWatch(eventsCard, (text) => text.includes('set name to "Ada"'), 'events preview: onInput reports the value it got');
-		const eventsUrl = page.url();
-		await page.keyboard.press('Enter');
-		await settleWatch(eventsCard, (text) => text.includes('did not reload'), 'events preview: Enter runs onSubmit with preventDefault');
-		check(page.url() === eventsUrl, 'events preview: the submit does not navigate');
-		check(
-			(await ledgerText(eventsCard)).includes('set printed = "Ada"'),
-			'events preview: the onSubmit row shows what it printed',
-			await ledgerText(eventsCard),
-		);
-		await page.keyboard.press('Escape');
-		await settleWatch(eventsCard, (text) => text.startsWith('Escape fired keydown'), 'events preview: Escape runs onKeyDown');
-		check((await mugField.inputValue()) === '', 'events preview: Escape cleared the field', await mugField.inputValue());
-
-		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
-		const branchCard = page.locator('section[data-preview="conditionals-note"]');
-		const branchToggle = branchCard.getByRole('button', { name: 'Show or hide' });
-		await branchToggle.waitFor();
-		await branchToggle.focus();
-		await page.keyboard.press('Enter');
-		await branchCard.getByLabel('Note').waitFor();
-		await branchCard.getByLabel('Note').fill('buy milk');
-		await branchToggle.click();
-		await settleWatch(branchCard, (text) => text.includes('note still holds "buy milk"'), 'conditionals preview: the note outlives the branch');
-		check((await branchCard.getByLabel('Note').count()) === 0, 'conditionals preview: closing removes the field');
-		await branchToggle.click();
-		await settleWatch(branchCard, (text) => text.includes('built field number 2'), 'conditionals preview: reopening builds a new field');
-		check(
-			(await branchCard.getByLabel('Note').inputValue()) === 'buy milk',
-			'conditionals preview: the new field is filled from note',
-		);
-		await branchCard.screenshot({ path: `${shotsDir}/concepts-conditionals-preview.png` });
 
 		// --- widget: the shopping list on the lists page --------------------------
 		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
@@ -2039,98 +1934,6 @@ try {
 			'a Code block with several files switches to the file tab the reader clicks',
 		);
 
-		// --- previews: lists, async and styling concept cards --------------------
-		// Each card reads the live component, so these checks drive the card and read what it reports.
-		const watchSays = async (card: Locator, wanted: (text: string) => boolean, label: string) => {
-			const read = async () => (await card.locator('.pv-watch-text').innerText()).replace(/\s+/g, ' ').trim();
-			for (let attempt = 0; attempt < 40; attempt += 1) {
-				if (wanted(await read())) break;
-				await new Promise((done) => setTimeout(done, 100));
-			}
-			const text = await read();
-			check(wanted(text), label, text);
-			return text;
-		};
-
-		await page.goto(`${origin}/concepts/lists`, { waitUntil: 'load' });
-		const rowsCard = page.locator('section[data-preview="lists"]');
-		const rowNames = async () =>
-			(await rowsCard.locator('li.row').allTextContents()).map((text) => text.trim()).join('|');
-		await rowsCard.getByRole('checkbox', { name: 'Pears' }).check();
-		await watchSays(rowsCard, (text) => text.includes('Pears on row'), 'the lists card numbers the rows on the first tick');
-		const pearsRow = await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row');
-		await rowsCard.getByRole('button', { name: 'Reverse' }).click();
-		await watchSays(
-			rowsCard,
-			(text) => text.startsWith('Reverse: 2 moved, 0 made, 0 thrown away. The tick rode along with Pears.'),
-			'Reverse moves the keyed rows, makes none, and the tick rides with Pears',
-		);
-		check((await rowNames()) === 'Milk|Coffee|Pears', 'Reverse reorders the rows', await rowNames());
-		check(
-			(await rowsCard.locator('li.row', { hasText: 'Pears' }).getAttribute('data-row')) === pearsRow &&
-				(await rowsCard.getByRole('checkbox', { name: 'Pears' }).isChecked()),
-			'the Pears element keeps its number and its tick through the reverse',
-		);
-		for (let left = 2; left >= 0; left -= 1) {
-			await rowsCard.getByRole('button', { name: 'Remove top' }).click();
-			await watchSays(rowsCard, (text) => text.startsWith('Remove top: 0 moved, 0 made, 1 thrown away.'), `Remove top throws one row away (${left} left)`);
-		}
-		check(
-			((await rowsCard.locator('li.none').textContent()) ?? '').trim() === 'Nothing left to buy.',
-			'the empty list shows its @empty block',
-		);
-		await rowsCard.getByRole('button', { name: 'Reset' }).click();
-		await watchSays(rowsCard, (text) => text.startsWith('Reset: 0 moved, 3 made, 0 thrown away.'), 'Reset makes three new rows');
-
-		await page.goto(`${origin}/concepts/async`, { waitUntil: 'load' });
-		const blocksCard = page.locator('section[data-preview="async"]');
-		const onPage = () => blocksCard.locator('li.block[data-on="true"], li.block[data-on="held"]').innerText();
-		await blocksCard.getByRole('radio', { name: 'tall', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('The tall answer is ready'), 'the async card swaps in the tall answer');
-		await blocksCard.getByRole('radio', { name: 'small', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('Looking up the small mug.'), 'the async card reports the new lookup');
-		check(
-			((await blocksCard.locator('.answer').textContent()) ?? '').trim() === 'The tall mug holds a big coffee.' &&
-				(await blocksCard.locator('li.block[data-on="held"]').count()) === 1,
-			'while small is looked up, the tall answer stays and @try is marked as still showing',
-		);
-		await watchSays(blocksCard, (text) => text.startsWith('The small answer is ready'), 'the small answer replaces the tall one');
-		await blocksCard.getByRole('radio', { name: 'cracked', exact: true }).check({ force: true });
-		await watchSays(blocksCard, (text) => text.startsWith('The lookup failed'), 'the cracked mug lands in @catch');
-		check((await onPage()).includes('@catch'), 'the async card marks @catch as on the page', await onPage());
-
-		await page.goto(`${origin}/concepts/styling`, { waitUntil: 'load' });
-		const scopeCard = page.locator('section[data-preview="styling"]');
-		const groundOf = (index: number) =>
-			scopeCard.locator('.card').nth(index).evaluate((node) => getComputedStyle(node).backgroundColor);
-		const paperAtRest = await groundOf(0);
-		const chalkAtRest = await groundOf(1);
-		check(paperAtRest !== chalkAtRest, 'two files style .card, and the two cards look different', `${paperAtRest} vs ${chalkAtRest}`);
-		await scopeCard.getByRole('switch', { name: 'Chalk card lit' }).click();
-		await watchSays(scopeCard, (text) => text.startsWith("The chalk card's class is now card lit."), 'the lit switch reports the new class');
-		check(
-			(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.split(/\s+/).includes('lit') === true &&
-				(await groundOf(1)) !== chalkAtRest &&
-				(await groundOf(0)) === paperAtRest,
-			'lighting the chalk card restyles it and leaves the paper card alone',
-		);
-		await scopeCard.getByRole('radio', { name: 'big', exact: true }).check({ force: true });
-		await watchSays(scopeCard, (text) => text.includes('data-size is now big'), 'the size choice reports the new attribute');
-		check(
-			(await scopeCard.locator('.card').first().getAttribute('data-size')) === 'big',
-			'the paper card carries data-size="big"',
-		);
-		await scopeCard.getByRole('switch', { name: 'Show page classes' }).click();
-		const scopes = await watchSays(scopeCard, (text) => /mk-\w+ and mk-\w+/.test(text), 'the card reads each file class from the page');
-		const [paperScope, chalkScope] = scopes.match(/mk-\w+/g) ?? [];
-		check(
-			paperScope !== chalkScope &&
-				(await scopeCard.locator('.card').first().getAttribute('class'))?.includes(paperScope ?? '?') === true &&
-				(await scopeCard.locator('.card').nth(1).getAttribute('class'))?.includes(chalkScope ?? '?') === true,
-			'each card carries a different file class, the one the card reports',
-			`${paperScope} vs ${chalkScope}`,
-		);
-
 		// The first-app page carries the scaffold command and a starter home that runs.
 		await page.goto(`${origin}/start/new-app`, { waitUntil: 'load' });
 		const firstAppText = (await page.locator('.prose').first().innerText()).replace(
@@ -2173,189 +1976,75 @@ try {
 			});
 		}
 
-		// --- widgets: the badge and the picker on the components page -------------
+		// --- the live blocks on the Building an app pages ---------------------------
+		// Each check does what the page's steps tell the reader to do.
+		const liveBlock = (index: number) => page.locator('.code-block [data-code-stage]').nth(index);
+
 		// A prop is a live read of the parent's value, and the child body runs once.
 		await page.goto(`${origin}/build/components`, { waitUntil: 'load' });
-		const badgeDemo = page
-			.locator('.code-block [data-code-stage]')
-			.filter({ has: page.getByRole('button', { name: 'Add one' }) });
-		const badgeLine = badgeDemo.locator('p').first();
-		await badgeLine.waitFor();
-		const badgeDrawn = async () =>
-			((await badgeLine.textContent()) ?? '').match(/drew (\d+)/)?.[1] ?? '';
-		const drewAtRest = await badgeDrawn();
-		check(
-			((await badgeLine.locator('strong').textContent()) ?? '').trim() === '0' &&
-				drewAtRest !== '',
-			'the badge serves 0 clicks and the number it drew',
-			((await badgeLine.textContent()) ?? '').trim(),
-		);
-		await badgeDemo.getByRole('button', { name: 'Add one' }).click();
-		await settleText(
-			badgeLine.locator('strong'),
-			(text) => text === '1',
-			'the badge reads the parent count live',
-		);
-		check(
-			(await badgeDrawn()) === drewAtRest,
-			'the badge body did not run again, so its drawn number stayed',
-			`${drewAtRest} then ${await badgeDrawn()}`,
-		);
-		const pickerDemo = page.locator('section[data-preview="name-picker"]');
-		const pickedLine = pickerDemo.locator('.pg-stage p').first();
-		check(
-			((await pickedLine.textContent()) ?? '').trim() === 'Picked: nobody',
-			'the picker serves nobody picked',
-			((await pickedLine.textContent()) ?? '').trim(),
-		);
-		await pickerDemo.getByRole('button', { name: 'Pick Grace' }).click();
-		await settleText(
-			pickedLine,
-			(text) => text === 'Picked: Grace',
-			'a callback prop talks back to the parent',
-		);
+		const profileBlock = liveBlock(0);
+		const greeting = profileBlock.locator('p').first();
+		const tagLine = profileBlock.locator('p').nth(1);
+		await greeting.waitFor();
+		const tagAtRest = ((await tagLine.textContent()) ?? '').trim();
+		check(((await greeting.textContent()) ?? '').trim() === 'Hello, Ada', 'the name tag serves Ada', tagAtRest);
+		await profileBlock.getByRole('button', { name: 'Grace' }).click();
+		await settleText(greeting, (text) => text === 'Hello, Grace', 'the name tag reads the parent name live');
+		check(((await tagLine.textContent()) ?? '').trim() === tagAtRest, 'the tag body did not run again, so its tag number stayed', tagAtRest);
+		const hostBlock = liveBlock(1);
+		const hostLine = hostBlock.locator('p').first();
+		check(((await hostLine.textContent()) ?? '').trim() === 'Host: nobody', 'the host picker serves nobody');
+		await hostBlock.getByRole('button', { name: 'Grace' }).click();
+		await settleText(hostLine, (text) => text === 'Host: Grace', 'a callback prop talks back to the parent');
 		await page.screenshot({ path: `${shotsDir}/T006-components-after.png`, fullPage: true });
 
-		// --- widget: the focus counter on the elements page -----------------------
-		// The claim is that the handle is the real node, so what is checked is the
-		// browser's own idea of which element has the caret.
+		// The handle is the real node, so the check reads the browser's own focused element.
 		await page.goto(`${origin}/build/elements`, { waitUntil: 'load' });
-		const focusButton = page.getByRole('button', { name: 'Add one and focus' });
+		const searchBlock = liveBlock(0);
+		const focusButton = searchBlock.getByRole('button', { name: 'Focus search' });
 		await focusButton.waitFor();
 		const activeIsField = () =>
-			page.evaluate(() => {
-				const field = document.querySelector('.code-block [data-code-stage] input');
-				return Boolean(field) && document.activeElement === field;
-			});
+			searchBlock.locator('input').evaluate((field) => document.activeElement === field);
 		const settleFocus = async () => {
 			for (let attempt = 0; attempt < 40; attempt += 1) {
 				if (await activeIsField()) return;
 				await new Promise((done) => setTimeout(done, 100));
 			}
 		};
-		check(!(await activeIsField()), 'the field does not start out focused');
+		check(!(await activeIsField()), 'the search field does not start out focused');
 		await focusButton.click();
 		await settleFocus();
-		check(await activeIsField(), 'clicking the button puts the caret in the field');
-		check(
-			(await page.locator('.code-block [data-code-stage] input').inputValue()) === '1',
-			'the same click adds one to the count in the field',
-			await page.locator('.code-block [data-code-stage] input').inputValue(),
-		);
+		check(await activeIsField(), 'pressing Focus search puts the caret in the field');
 		await focusButton.focus();
-		await page.locator('.code-block [data-code-stage] label').click();
+		await searchBlock.locator('label').click();
 		await settleFocus();
-		check(
-			await activeIsField(),
-			'clicking the label focuses the field, because for={field} names it',
-		);
-		await page.screenshot({ path: `${shotsDir}/T006-focus-counter-after.png`, fullPage: true });
+		check(await activeIsField(), 'clicking the label focuses the field, because for={field} names it');
+		await page.screenshot({ path: `${shotsDir}/T006-elements-after.png`, fullPage: true });
 
-		// --- widget: the drink pick on the storage page ----------------------------
+		// A storage() value survives a reload, and is on <html> before the page shows.
 		await page.goto(`${origin}/build/storage`, { waitUntil: 'load' });
-		const drinkAttr = () =>
-			page.evaluate(() => document.documentElement.getAttribute('data-docs-drink'));
-		const drinkCard = page.locator('section[data-preview="drink-pick"]');
-		const watchedDrink = () =>
-			drinkCard.locator('.pv-watch mark:visible').allTextContents();
-		check(
-			(await watchedDrink()).join() === 'tea,tea',
-			'the drink card watches the starting value on <html>',
-			(await watchedDrink()).join(),
-		);
-		await drinkCard.locator('button.coffee').click();
-		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await drinkAttr()) === 'coffee') break;
-			await new Promise((done) => setTimeout(done, 100));
-		}
-		check(
-			(await drinkAttr()) === 'coffee',
-			'picking a drink writes it onto <html>',
-			String(await drinkAttr()),
-		);
-		check(
-			(await watchedDrink()).join() === 'coffee,coffee',
-			'the Watch line follows the pick',
-			(await watchedDrink()).join(),
-		);
-		await Promise.all([
-			page.waitForEvent('load'),
-			drinkCard.getByRole('button', { name: 'Reload page' }).click(),
-		]);
-		check(
-			(await drinkAttr()) === 'coffee',
-			'the pick survives the card\'s Reload page, applied before the page is shown',
-			String(await drinkAttr()),
-		);
-		check(
-			(await watchedDrink()).join() === 'coffee,coffee',
-			'after the reload the Watch line still shows the saved pick',
-			(await watchedDrink()).join(),
-		);
-		await page.screenshot({ path: `${shotsDir}/T006-drink-pick-after.png`, fullPage: true });
+		const modeButton = () => liveBlock(0).getByRole('button');
+		const modeAttr = () => page.evaluate(() => document.documentElement.getAttribute('data-mode'));
+		await modeButton().waitFor();
+		check(((await modeButton().textContent()) ?? '').trim() === 'Mode: light', 'the mode switch serves its starting value');
+		await modeButton().click();
+		await settleText(modeButton(), (text) => text === 'Mode: dark', 'pressing the switch shows dark');
+		check((await modeAttr()) === 'dark', 'the write lands on <html>', String(await modeAttr()));
+		await page.reload({ waitUntil: 'load' });
+		check((await modeAttr()) === 'dark', 'the value is on <html> again after a reload', String(await modeAttr()));
+		await settleText(modeButton(), (text) => text === 'Mode: dark', 'the value survives a reload');
+		await page.screenshot({ path: `${shotsDir}/T006-storage-after.png`, fullPage: true });
 		await page.evaluate(() => localStorage.clear());
+		await page.context().clearCookies({ name: 'markless-mode' });
 
-		// --- widget: the shared counter on the shared page --------------------------
+		// shared() reaches a component with no prop: a press in one component shows in another.
 		await page.goto(`${origin}/build/shared`, { waitUntil: 'load' });
-		const sharedDemo = page.locator('.code-block [data-code-stage]').first();
-		const sharedBadge = sharedDemo.locator('output').first();
-		await sharedBadge.waitFor();
-		check(
-			((await sharedBadge.textContent()) ?? '').trim() === '0',
-			'the shared badge serves 0',
-			((await sharedBadge.textContent()) ?? '').trim(),
-		);
-		await sharedDemo.getByRole('button', { name: 'Add one' }).click();
-		await settleText(
-			sharedBadge,
-			(text) => text === '1',
-			'a click in one component moves the badge in another through shared()',
-		);
-		const talliesCard = page.locator('section[data-preview="tallies"]');
-		const tallyCounts = async () =>
-			(await talliesCard.locator('.pg-stage output:visible').allTextContents())
-				.map((text) => text.trim())
-				.join();
-		check((await tallyCounts()) === '0,0', 'the tallies start at 0 and 0', await tallyCounts());
-		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
-		await settleText(
-			talliesCard.locator('.pg-stage output:visible').last(),
-			(text) => text === '1',
-			"with { scope: 'page' }, a click on Left moves Right too",
-		);
-		await talliesCard.getByRole('radio', { name: 'widget' }).check();
-		check(
-			(await tallyCounts()) === '0,0',
-			"the 'widget' tallies start with their own copies",
-			await tallyCounts(),
-		);
-		await talliesCard.locator('.pg-stage button:visible', { hasText: 'Add one' }).first().click();
-		await settleText(
-			talliesCard.locator('.pg-stage output:visible').first(),
-			(text) => text === '1',
-			"with { scope: 'widget' }, a click on Left moves Left",
-		);
-		check(
-			(await tallyCounts()) === '1,0',
-			"with { scope: 'widget' }, Right keeps its own number",
-			await tallyCounts(),
-		);
-		await talliesCard.getByRole('radio', { name: 'page' }).check();
-		check(
-			(await talliesCard.locator('.pv-watch-text span:visible').innerText()).includes("'page'"),
-			'switching Scope back shows the page-scope Watch line',
-		);
-		const talliesTab = talliesCard.locator('.pg-tab:visible', { hasText: 'tallies.tsrx' });
-		await talliesTab.click();
-		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await talliesTab.getAttribute('aria-selected')) === 'true') break;
-			await new Promise((done) => setTimeout(done, 100));
-		}
-		check(
-			(await talliesTab.getAttribute('aria-selected')) === 'true' &&
-				(await talliesCard.locator('.pg-pane:visible').innerText()).includes('<tally.Tally'),
-			"the tallies card's code switches to the file tab the reader clicks",
-		);
+		const playerBlock = liveBlock(0);
+		const miniLine = playerBlock.locator('p').first();
+		await miniLine.waitFor();
+		check(((await miniLine.textContent()) ?? '').trim() === 'Paused: Harbour Lights', 'the mini player serves paused');
+		await playerBlock.getByRole('button', { name: 'Play' }).click();
+		await settleText(miniLine, (text) => text === 'Playing: Harbour Lights', 'a press in NowPlaying shows in MiniPlayer');
 		await page.screenshot({ path: `${shotsDir}/T006-shared-after.png`, fullPage: true });
 
 		// --- batch 5: the Router section, how it works, and the reference -------
@@ -2381,128 +2070,6 @@ try {
 				fullPage: true,
 			});
 		}
-
-		// --- widget: the URL picker on the pages page -----------------------------
-		await page.goto(`${origin}/router/pages`, { waitUntil: 'load' });
-		const urlCard = page.locator('section[data-preview="url-picker"]');
-		const routeWatch = urlCard.locator('.pv-watch-text');
-		await routeWatch.waitFor();
-		check(
-			(await routeWatch.innerText()).startsWith('pages/blog/[slug].tsrx answers.') &&
-				(await urlCard.locator('.file.slug .param').innerText()) === 'slug = "hello"',
-			'the URL picker opens on the bracketed file and its parameter',
-			await routeWatch.innerText(),
-		);
-		await urlCard.getByRole('button', { name: '/docs/guide/intro' }).click();
-		await settleInner(
-			routeWatch,
-			(text) => text.startsWith('pages/docs/[...slug].mdx answers.'),
-			'the URL picker answers with the catch-all file',
-		);
-		check(
-			(await urlCard.locator('.file.rest .param').innerText()) === 'slug = "guide/intro"',
-			'the catch-all file row shows the whole rest of the path as one param',
-		);
-		await urlCard.getByRole('button', { name: '/docs', exact: true }).click();
-		await settleInner(
-			routeWatch,
-			(text) => text.startsWith('pages/404.tsrx answers.') && text.includes('at least one more part'),
-			'a catch-all with nothing to catch falls through to the 404 page, and the card says why',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-url-picker-after.png`, fullPage: true });
-
-		// --- widget: the link check on the links page -----------------------------
-		await page.goto(`${origin}/router/links`, { waitUntil: 'load' });
-		const linkCard = page.locator('section[data-preview="link-check"]');
-		const linkResult = linkCard.locator('.result');
-		await linkResult.waitFor();
-		check(
-			(await linkResult.innerText()).startsWith('The build passes'),
-			'the link card opens on the link that builds',
-			await linkResult.innerText(),
-		);
-		await linkCard.getByRole('radio', { name: 'renamed' }).check();
-		await settleInner(
-			linkResult,
-			(text) => text.startsWith('The build stops') && text.includes('does not match any route'),
-			'the link card stops the build after the rename, with the error',
-		);
-		check(
-			(await linkCard.locator('.wide .code').innerText()).includes('/blogs/[slug]'),
-			'the code line carries the renamed route',
-		);
-		await linkCard.getByRole('radio', { name: 'no params' }).check();
-		await settleInner(
-			linkResult,
-			(text) => text.includes('requires params'),
-			'the link card names the missing params',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-link-check-after.png`, fullPage: true });
-
-		// --- widget: the streamed feed on the data page ---------------------------
-		await page.goto(`${origin}/router/data`, { waitUntil: 'load' });
-		const feedCard = page.locator('section[data-preview="feed-steps"]');
-		const feedBody = feedCard.locator('.screen .text');
-		await feedBody.waitFor();
-		check(
-			(await feedBody.innerText()) === 'Loading...' &&
-				(await feedCard.locator('.end').innerText()) === 'The response stays open.',
-			'the first part of the response carries the @pending content and leaves it open',
-			await feedBody.innerText(),
-		);
-		await feedCard.getByRole('button', { name: 'Next', exact: true }).click();
-		await settleInner(
-			feedBody,
-			(text) => text === 'Loaded for /feed',
-			'the same response then sends the @try content',
-		);
-		check(
-			(await feedCard.locator('.end').innerText()) === 'The response ends.',
-			'after the second part the response ends',
-		);
-		await feedCard.getByRole('radio', { name: 'quick' }).check();
-		await settleInner(
-			feedCard.locator('.part.one'),
-			(text) => text.includes('Loaded for /feed') && !text.includes('Loading...'),
-			'quick data goes out in the first part, and Loading... is never sent',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-feed-steps-after.png`, fullPage: true });
-
-		// --- widget: the endpoint picker on the API routes page ---------------------
-		await page.goto(`${origin}/router/api-routes`, { waitUntil: 'load' });
-		const apiCard = page.locator('section[data-preview="api-answers"]');
-		const apiWatch = apiCard.locator('.pv-watch-text');
-		await apiWatch.waitFor();
-		check(
-			(await apiWatch.innerText()).startsWith('users/[id].get.ts answers') &&
-				(await apiCard.locator('.reply .body').innerText()) === '200 {"id":"42"}',
-			'a GET to the users endpoint answers with its params',
-			await apiWatch.innerText(),
-		);
-		await apiCard.getByRole('radio', { name: 'POST', exact: true }).check();
-		await settleInner(
-			apiWatch,
-			(text) => text.startsWith('The file name says get, so a POST'),
-			'a POST finds no endpoint, because the file name says get',
-		);
-		check(
-			(await apiCard.locator('.reply .body').innerText()) === '404 Not found',
-			'the response box answers the POST with 404',
-		);
-
-		// --- widget: the build targets on the deploying page ------------------------
-		await page.goto(`${origin}/router/deploying`, { waitUntil: 'load' });
-		const buildCard = page.locator('section[data-preview="build-targets"]');
-		await buildCard.getByRole('radio', { name: 'vercel' }).check();
-		await settleInner(
-			buildCard.locator('.pv-watch-text'),
-			(text) => text.includes('.vercel/output/'),
-			'the vercel preset writes .vercel/output/ from the same app folder',
-		);
-		check(
-			(await buildCard.locator('.command').innerText()).includes('NITRO_PRESET=vercel npm run build'),
-			'the command box shows the preset variable',
-		);
 
 		// --- preview cards on the home, start and UI pages ----
 		// Each card is driven the way its page tells the reader to drive it.
@@ -2595,248 +2162,56 @@ try {
 		check((await tipSide()) === 'right', 'your plain rule moves the tip right of Save', await tipSide());
 		await page.screenshot({ path: `${shotsDir}/T038-layer-wins-after.png`, fullPage: true });
 
-		// --- widget: the state graph demo ------------------------------------------
-		// One write moves the state and the computed that reads it, nothing else.
-		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
-		const graphStage = page.locator('.code-block [data-code-stage]').first();
-		const graphOutputs = graphStage.locator('p');
-		await graphOutputs.first().waitFor();
-		const graphValues = async () =>
-			(await graphOutputs.allTextContents()).map((text) => text.split(':').at(-1)!.trim()).join(',');
-		check(
-			(await graphValues()) === '2,4',
-			'the state graph demo serves count 2 and doubled 4',
-			await graphValues(),
-		);
-		await graphStage.getByRole('button', { name: 'Next', exact: true }).click();
-		for (let attempt = 0; attempt < 40; attempt += 1) {
-			if ((await graphValues()) === '3,6') break;
-			await new Promise((done) => setTimeout(done, 100));
-		}
-		check(
-			(await graphValues()) === '3,6',
-			'one write moves the state and the computed that reads it',
-			await graphValues(),
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
-
-		// --- previews in How it works ----------------------------------------------
-		// Each one is driven the way its card invites, and the check reads the part
-		// of the card that shows the mechanism, not only the demo.
+		// --- How it works ----------------------------------------------------------
+		// Each check does what the page tells the reader to do and reads the line it says changes.
 		const see = async (locator: Locator, wanted: (text: string) => boolean, label: string) => {
 			const text = await settleText(locator, wanted, label);
 			if (wanted(text)) check(true, label);
 		};
 
+		// Each How it works page opens on its ink figure; a press must change what its live line says.
+		for (const [path, said] of [
+			['', 'The Markless port answered its first click'],
+			['the-big-idea', 'got the same plan'],
+			['compiler', 'three pieces'],
+			['payload', 'Booked March'],
+			['resuming', 'the game did not start over'],
+			['state-graph', 'only the pieces with an edge changed'],
+			['lazy-chunks', 'open-photo.js ran now'],
+			['native-targets', 'No WKWebView anywhere'],
+		] as const) {
+			await page.goto(`${origin}/how-it-works/${path}`, { waitUntil: 'load' });
+			const figure = page.locator('figure.race, figure.anatomy, figure.explorer, figure.payload').first();
+			const stage = figure.locator('.stage').first();
+			if (await stage.count()) {
+				await stage.focus();
+				await page.keyboard.press('Escape');
+				await page.keyboard.press('Enter');
+			}
+			await see(figure.locator(':scope > [aria-live]').first(), (text) => text.includes(said), `the ${path} figure answers a press`);
+		}
+		await page.screenshot({ path: `${shotsDir}/T030-state-graph-after.png`, fullPage: true });
+
 		await page.goto(`${origin}/how-it-works/the-big-idea`, { waitUntil: 'load' });
-		const planCard = page.locator('section[data-preview="plan-anywhere"]');
-		const planWatch = planCard.locator('.pv-watch-text');
-		await planCard.waitFor();
-		const planLive = planCard.locator('.live');
-		await planLive.click();
-		await see(planLive, (text) => text === 'Count 1', 'the plan card counter counts in Browser');
+		const ideaStage = page.locator('.code-block [data-code-stage]').first();
 		await see(
-			planWatch,
-			(text) => text.includes('symbol:0 ran count++'),
-			'the plan card names the symbol and the text write the click used',
-		);
-		await planCard.getByRole('radio', { name: 'Server' }).check();
-		await see(
-			planCard.locator('.where').first(),
-			(text) => text === 'markless/state script',
-			'picking Server moves state:count into the markless/state script',
-		);
-		check(
-			(await planCard.locator('.rows .row').count()) === 3 &&
-				(await planCard.locator('.env:visible').innerText()).includes('renderToString(App)'),
-			'the same three plan rows stay while the place changes',
+			ideaStage.locator('p').first(),
+			(text) => text === 'Your seat: A2',
+			'the big idea seat map serves its starting seat',
 		);
 
 		await page.goto(`${origin}/how-it-works/compiler`, { waitUntil: 'load' });
-		const passCard = page.locator('section[data-preview="compiler-passes"]');
-		const passWhere = passCard.locator('.where');
-		const passTotal = defaultCompilerPasses.length;
-		const viewReaders = defaultCompilerPasses
-			.slice(9)
-			.filter((pass) => pass.consumes.includes('protocolView')).length;
-		await passWhere.waitFor();
+		const passItems = page.locator('.pass-list li code');
+		await passItems.first().waitFor();
+		const passIds = await passItems.allTextContents();
 		check(
-			((await passWhere.textContent()) ?? '').trim() === `Pass 1 of ${passTotal}`,
-			'the pass card opens on pass 1',
-			((await passWhere.textContent()) ?? '').trim(),
-		);
-		const passNext = passCard.getByRole('button', { name: 'Next →' });
-		await passNext.click();
-		await see(passWhere, (text) => text === `Pass 2 of ${passTotal}`, 'Next moves to pass 2');
-		check(
-			(await passCard.locator('.chip.read').allTextContents()).join() === 'semanticGraph' &&
-				(await passCard.locator('.chip.new').allTextContents()).join() === 'stateLowering',
-			'pass 2 reads the semantic graph and writes stateLowering',
-		);
-		for (let pass = 3; pass <= 9; pass += 1) await passNext.click();
-		await see(passWhere, (text) => text === `Pass 9 of ${passTotal}`, 'Next reaches pass 9');
-		await see(
-			passCard.locator('.pv-watch-text'),
-			(text) => text === `New: protocolView. ${viewReaders} later passes read it.`,
-			'the Watch line counts the later passes that read the view record',
+			passIds.join(',') === defaultCompilerPasses.map((pass) => pass.passId).join(','),
+			'the compiler page lists the registry passes in run order',
+			passIds.join(','),
 		);
 		check(
-			((await passCard.locator('.out').textContent()) ?? '').includes('"symbol:1"'),
-			'pass 9 shows the view record excerpt with its symbol IDs',
-		);
-		for (let pass = 10; pass <= passTotal; pass += 1) await passNext.click();
-		await see(
-			passWhere,
-			(text) => text === `Pass ${passTotal} of ${passTotal}`,
-			'Next steps through every pass to the last one',
-		);
-		await see(
-			passCard.locator('.pv-watch-text'),
-			(text) => text.endsWith('That is the last pass.'),
-			'the last pass says it is the last',
-		);
-
-		await page.goto(`${origin}/how-it-works/payload`, { waitUntil: 'load' });
-		const payloadCard = page.locator('section[data-preview="payload-card"]');
-		const payloadWatch = payloadCard.locator('.pv-watch-text');
-		await payloadWatch.waitFor();
-		check(
-			((await payloadWatch.textContent()) ?? '').includes('Locator h0 is element 1'),
-			'the payload card opens on the view record and its element',
-		);
-		await payloadCard.locator('[data-line="state"]').hover();
-		await see(
-			payloadWatch,
-			(text) => text.includes('"root":0'),
-			'hovering the state line explains the value',
-		);
-		check(
-			(await payloadCard.locator('.board').getAttribute('data-part')) === 'state',
-			'hovering the state line marks the text it fills',
-		);
-		await payloadCard.locator('[data-line="link"]').focus();
-		await see(
-			payloadWatch,
-			(text) => text.includes('Fetching it does not run it.'),
-			'focusing the link line explains the preload',
-		);
-
-		await page.goto(`${origin}/how-it-works/resuming`, { waitUntil: 'load' });
-		const clickCard = page.locator('section[data-preview="first-click"]');
-		const clickWatch = clickCard.locator('.pv-watch-text');
-		const clickLive = clickCard.locator('.live');
-		await clickLive.waitFor();
-		await clickLive.click();
-		await see(clickLive, (text) => text === 'Count 1', 'the first-click counter counts');
-		await see(
-			clickWatch,
-			(text) => text.includes("button's own listener imported symbol:0"),
-			'the direct path names the listener on the button',
-		);
-		await clickCard.getByRole('radio', { name: 'General' }).check();
-		await see(clickLive, (text) => text === 'Count 0', 'switching path starts the counter over');
-		await clickLive.hover();
-		await see(
-			clickWatch,
-			(text) => text.includes('symbol:0 was fetched before the press'),
-			'on the general path a hover fetches the symbol without running it',
-		);
-		await clickLive.click();
-		await see(
-			clickWatch,
-			(text) => text.includes('started the runtime'),
-			'on the general path the first click starts the full runtime',
-		);
-		await clickCard.getByRole('radio', { name: 'Server' }).check();
-		check(
-			(await clickCard.locator('.rows:visible .row.never').count()) === 2,
-			'the server path lists the full runtime and the body as never started',
-		);
-		await page.screenshot({ path: `${shotsDir}/T030-first-click-after.png`, fullPage: true });
-
-		await page.goto(`${origin}/how-it-works/state-graph`, { waitUntil: 'load' });
-		const wakeCard = page.locator('section[data-preview="state-graph"]');
-		const journal = () => wakeCard.locator('.entries li:visible').allTextContents();
-		await wakeCard.waitFor();
-		await wakeCard.getByRole('button', { name: 'count++' }).click();
-		await see(
-			wakeCard.locator('.slot.on-count').last(),
-			(text) => text === 'doubled 6',
-			'count++ moves the computed that reads count',
-		);
-		check(
-			(await journal()).join('|') === 'setText count → "3"|setText doubled → "6"',
-			'the journal lists the two text writes of that flush',
-			(await journal()).join('|'),
-		);
-		await wakeCard.getByRole('button', { name: "label = 'Cups'" }).click();
-		await see(
-			wakeCard.locator('.slot.on-label'),
-			(text) => text === 'Cups',
-			'the label write changes the heading',
-		);
-		check(
-			(await journal()).join('|') === 'setText heading → "Cups"',
-			'the label write leaves count and doubled out of the journal',
-			(await journal()).join('|'),
-		);
-		await wakeCard.getByRole('button', { name: 'count = 3' }).click();
-		await see(
-			wakeCard.locator('.entries li:visible').first(),
-			(text) => text === 'empty: no flush ran',
-			'writing the same value runs no flush',
-		);
-
-		await page.goto(`${origin}/how-it-works/lazy-chunks`, { waitUntil: 'load' });
-		const lanesCard = page.locator('section[data-preview="lazy-lanes"]');
-		const ranChips = () => lanesCard.locator('tbody td:nth-child(3)').allTextContents();
-		await lanesCard.waitFor();
-		check(
-			(await ranChips()).every((text) => text.trim() === 'not yet'),
-			'no handler has run at load',
-		);
-		await lanesCard.getByRole('button', { name: 'Like 0' }).click();
-		await see(
-			lanesCard.locator('tbody td:nth-child(3)').first(),
-			(text) => text === '×1',
-			'Like runs its handler',
-		);
-		check(
-			(await ranChips()).map((text) => text.trim()).join() === '×1,×1,not yet,not yet',
-			'Like runs its handler and its text update, and Save stays unrun',
-			(await ranChips()).join(),
-		);
-		await lanesCard.getByRole('button', { name: 'Load the page again' }).click();
-		await see(
-			lanesCard.locator('tbody td:nth-child(3)').first(),
-			(text) => text === 'not yet',
-			'loading again clears what ran',
-		);
-
-		await page.goto(`${origin}/how-it-works/native-targets`, { waitUntil: 'load' });
-		const hostCard = page.locator('section[data-preview="native-hosts"]');
-		const hostTrace = hostCard.locator('.trace li').last();
-		await hostCard.waitFor();
-		await hostCard.locator('.device.web .live').click();
-		await see(hostTrace, (text) => text === 'text: Count 1', 'the browser button writes its text');
-		await hostCard.getByRole('radio', { name: 'iOS' }).check();
-		await see(
-			hostCard.locator('.json:visible mark'),
-			(text) => text === '"touchUpInside"',
-			'the iOS proof record names touchUpInside',
-		);
-		await hostCard.locator('.device.phone .live').click();
-		await see(hostTrace, (text) => text === 'title: Count 1', 'the drawn UIButton sets its title');
-		await see(
-			hostCard.locator('.pv-watch-text'),
-			(text) => text.includes('touchUpInside ran symbol:counter.increment'),
-			'the Watch line follows the native event to the symbol',
-		);
-		await hostCard.getByRole('radio', { name: 'macOS' }).check();
-		await see(
-			hostCard.locator('.json:visible mark'),
-			(text) => text === '"action"',
-			'the macOS proof record names action',
+			(await page.locator('[data-preview]').count()) === 0,
+			'the compiler page carries no preview card',
 		);
 
 		// How it works is the one place the docs name semantic analysis, and it
@@ -2873,7 +2248,7 @@ try {
 		await page.goto(`${origin}/concepts/computed`, { waitUntil: 'load' });
 		const comparison = page
 			.locator('.collapsible details')
-			.filter({ has: page.locator('summary', { hasText: 'Coming from another framework?' }) });
+			.filter({ has: page.locator('summary', { hasText: 'How do existing tools handle this?' }) });
 		const comparisonTrigger = comparison.locator('summary');
 		const comparisonText = comparison.locator('p');
 		const comparisonOpen = () => comparison.evaluate((details) => (details as HTMLDetailsElement).open);
