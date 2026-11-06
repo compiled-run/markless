@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph as createGraph } from '@markless/runtime';
 import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
-import { marklessHandlerCatch } from '../src/fns/handler-catch.ts';
+import { marklessHandlerCatch, marklessHandlerCatchReturned } from '../src/fns/handler-catch.ts';
 import { marklessCatchReset } from '../src/fns/catch-reset.ts';
 
 const createRuntimeGraph: typeof createGraph = (input) =>
@@ -53,4 +53,17 @@ test("a handler's rejection fails only its boundary's gate, and reset clears it 
 
 test('without a graph that can fail a handler, marklessHandlerCatch is a no-op rather than throwing', () => {
 	expect(() => marklessHandlerCatch(undefined, 'computed:report', new Error('boom'))).not.toThrow();
+});
+
+test("a plain handler's returned promise fails the gate when it rejects; any other value passes through", async () => {
+	const failed: Array<[string, unknown]> = [];
+	const graph = { failHandler: (graphNodeId: string, error: unknown) => void failed.push([graphNodeId, error]) };
+	const error = new Error('could not save');
+
+	expect(marklessHandlerCatchReturned(graph, 'computed:gate', 3)).toBe(3);
+	await marklessHandlerCatchReturned(graph, 'computed:gate', Promise.resolve('saved'));
+	expect(failed).toEqual([]);
+
+	await expect(marklessHandlerCatchReturned(graph, 'computed:gate', Promise.reject(error))).resolves.toBeUndefined();
+	expect(failed).toEqual([['computed:gate', error]]);
 });

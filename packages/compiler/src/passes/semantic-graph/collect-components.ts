@@ -44,6 +44,7 @@ import {
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
+import { handlerMayReturnPromise } from './handler-returns-promise.ts';
 import { inlineHandlerRenderLocals, liftArmRenderLocalValue, resetRelay } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
@@ -167,6 +168,7 @@ export function collectComponentEdge(
 		parentComponentName: state.currentComponentName,
 		childComponentName,
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+		...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),
 		props,
@@ -310,8 +312,13 @@ function componentPropBindings(
 				sourceSpan: sourceSpan(callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
-				...(callback.async === true && state.currentCatchBoundaryId
-					? { catchBoundaryId: state.currentCatchBoundaryId }
+				...(handlerMayReturnPromise(callback)
+					? {
+							returnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { catchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
 					: {}),
 				...(inlined?.catchResets.size
 					? {

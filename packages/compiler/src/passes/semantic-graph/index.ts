@@ -88,6 +88,7 @@ import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
+import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './rejecting-handlers.ts';
 import { collectAsyncInputBesideValueDiagnostics } from './async-refresh-facts.ts';
 import { templateHasBareTryRoot } from '../row-mint.ts';
 
@@ -200,6 +201,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
+	keepRejectingChildCatches(graph, input.importedModuleInterfaces);
 	mintAsyncBoundaryGates(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
 	// Before the handle diagnostics: these decide which derive-time handle reads
@@ -258,6 +260,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
 	const handlerProps = moduleHandlerProps(state);
+	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
@@ -318,6 +321,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							rootChunkId: root.id,
 						}),
 						...armMaterialField(graph, component.name, chunks),
+						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),

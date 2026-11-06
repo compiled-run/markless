@@ -6251,11 +6251,18 @@ export function buildEventHandlerEmission(
 	// *body* text only, so this reads the same statements and no others.
 	const carried = eventHandlerModuleScopeCarry(input, symbol, projection, source, statementsFor);
 	const { declarationStatements } = carried;
-	const bodyStatements = catchRunner
-		? [handlerCatchNode(carried.bodyStatements, catchRunner)]
-		: carried.bodyStatements;
+	const isAsync =
+		!importedReference &&
+		(symbol.source.trimStart().startsWith('async ') ||
+			input.captureSlots.some(callbackCaptureSlot));
+	const bodyStatements = !catchRunner
+		? carried.bodyStatements
+		: isAsync
+			? [handlerCatchNode(carried.bodyStatements, catchRunner)]
+			: carried.bodyStatements.map((statement) => catchReturnedPromises(statement, catchRunner));
+	const catchFn = isAsync ? HANDLER_CATCH_FN : HANDLER_CATCH_RETURNED_FN;
 	const referenced = catchRunner
-		? new Set([...carried.referenced, HANDLER_CATCH_FN])
+		? new Set([...carried.referenced, catchFn])
 		: carried.referenced;
 	const imports = uniqueModuleImports(
 		[
@@ -6264,11 +6271,6 @@ export function buildEventHandlerEmission(
 			...(declarationStatements.length === 0 ? [] : (input.moduleImports ?? [])),
 		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
-
-	const isAsync =
-		!importedReference &&
-		(symbol.source.trimStart().startsWith('async ') ||
-			input.captureSlots.some(callbackCaptureSlot));
 
 	return {
 		program: moduleProgramNode([
@@ -6319,11 +6321,11 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
-			...(referenced.has(HANDLER_CATCH_FN)
+			...(catchRunner
 				? [
 						moduleImportNode({
 							kind: 'named' as const,
-							localName: HANDLER_CATCH_FN,
+							localName: catchFn,
 							source: '@markless/web/fns/handler-catch',
 						}),
 					]
@@ -7764,6 +7766,7 @@ const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
 const CHANGED_FN = 'marklessChanged';
 const CATCH_RESET_FN = 'marklessCatchReset';
 const HANDLER_CATCH_FN = 'marklessHandlerCatch';
+const HANDLER_CATCH_RETURNED_FN = 'marklessHandlerCatchReturned';
 const HANDLER_CATCH_ERROR_NAME = '__marklessHandlerError';
 
 // A value that reads an input beside async values changes in place between settles.
@@ -7874,6 +7877,29 @@ function handlerCatchNode(body: ReadonlyArray<EmissionNode>, runnerGraphNodeId: 
 		},
 		finalizer: null,
 	};
+}
+
+// A plain handler's returned promise rejects into its nearest `@catch`; one it only starts does not.
+function catchReturnedPromises(node: EmissionNode, runnerGraphNodeId: string): EmissionNode {
+	if (FUNCTION_NODE_TYPES.has(node.type)) return node;
+	if (node.type === 'ReturnStatement' && node.argument)
+		return {
+			...node,
+			argument: callNode(identifierNode(HANDLER_CATCH_RETURNED_FN), [
+				memberChainNode('context.graph'),
+				literalNode(runnerGraphNodeId),
+				node.argument as EmissionNode,
+			]),
+		};
+	const next: Record<string, unknown> = { ...node };
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value))
+			next[key] = value.map((item) =>
+				isEmissionNode(item) ? catchReturnedPromises(item, runnerGraphNodeId) : item,
+			);
+		else if (isEmissionNode(value)) next[key] = catchReturnedPromises(value, runnerGraphNodeId);
+	}
+	return next as EmissionNode;
 }
 
 // A returned promise rejects after the `try` it sits in has exited unless the return awaits it.

@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/enclosing-catch"
+			],
+			"set": 818,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 819,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 482,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 56,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 84,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/enclosing-catch"
+			],
+			"set": 818,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 819,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 482,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 56,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 72,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 89,
+			"reason": "handler rejections reach @catch from child components and plain promise-returning handlers; redrawn arms keep live child state",
+			"date": "2026-11-06"
+		}
+	]
+}

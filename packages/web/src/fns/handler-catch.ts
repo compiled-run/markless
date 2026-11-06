@@ -13,3 +13,15 @@ export function marklessHandlerCatch(
 	const qualify = graph.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
 	graph.failHandler(qualify(runnerGraphNodeId), error);
 }
+
+// A plain handler's returned promise: its rejection renders in the nearest `@catch` too.
+export function marklessHandlerCatchReturned<T>(
+	graph: HandlerCatchGraph | undefined,
+	runnerGraphNodeId: string,
+	value: T,
+): T | Promise<unknown> {
+	if (typeof (value as { readonly then?: unknown } | null)?.then !== 'function') return value;
+	return Promise.resolve(value).catch((error: unknown) =>
+		marklessHandlerCatch(graph, runnerGraphNodeId, error),
+	);
+}

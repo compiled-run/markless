@@ -84,7 +84,7 @@ export function mintAsyncBoundaryGates(
 	semanticGraph.asyncBoundaries = semanticGraph.asyncBoundaries.map((boundary) => {
 		const { reads } = gateReads.get(boundary.id)!;
 		// A handler's rejection fails the boundary's own gate, never a value other blocks read too.
-		const ownGate = handlerTargets.has(boundary.id) && reads.length > 0;
+		const ownGate = handlerTargets.has(boundary.id);
 		if (!ownGate && (reads.length < 2 || coveringGateRead(reads, bindingsById))) return boundary;
 		const gates = reads.flatMap((read) => {
 			const binding = bindingsById.get(read.graphNodeId);
@@ -92,7 +92,8 @@ export function mintAsyncBoundaryGates(
 		});
 		const index = boundary.id.slice(boundary.id.lastIndexOf(':') + 1);
 		const graphNodeId = `${ASYNC_GATE_GRAPH_NODE_PREFIX}${index}`;
-		const componentName = gates.find((gate) => gate.componentName)?.componentName;
+		const componentName =
+			gates.find((gate) => gate.componentName)?.componentName ?? boundary.componentName;
 		semanticGraph.graphBindings.push({
 			id: graphNodeId,
 			name: `marklessAsyncGate${index}`,
@@ -112,16 +113,18 @@ export function mintAsyncBoundaryGates(
 	});
 }
 
-/** Boundaries whose `@catch` an async event handler or callback prop inside their @try arm rejects into. */
+/** Boundaries whose `@catch` a handler, callback prop or child component inside their @try arm rejects into. */
 export function handlerCatchBoundaryIds(
 	semanticGraph: Pick<SemanticGraphArtifact, 'events' | 'componentEdges'>,
 ): ReadonlySet<string> {
 	const ids = new Set<string>();
 	for (const event of semanticGraph.events)
 		if (event.handlerCatchBoundaryId) ids.add(event.handlerCatchBoundaryId);
-	for (const edge of semanticGraph.componentEdges)
+	for (const edge of semanticGraph.componentEdges) {
+		if (edge.catchBoundaryId) ids.add(edge.catchBoundaryId);
 		for (const prop of edge.props)
 			if ('catchBoundaryId' in prop && prop.catchBoundaryId) ids.add(prop.catchBoundaryId);
+	}
 	return ids;
 }
 

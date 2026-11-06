@@ -137,6 +137,7 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly updateSymbolId?: string;
 	readonly rerendersOnRefresh?: true;
+	readonly catchesHandlers?: true;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];

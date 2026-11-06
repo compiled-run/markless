@@ -1,6 +1,7 @@
 import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { handlerMayReturnPromise } from './handler-returns-promise.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	getElementAttributes,
@@ -1227,8 +1228,13 @@ function collectAttribute(
 							})),
 						}
 					: {}),
-				...(handler && !relayed && handler.node.async === true && state.currentCatchBoundaryId
-					? { handlerCatchBoundaryId: state.currentCatchBoundaryId }
+				...(handler && !relayed && handlerMayReturnPromise(handler.node)
+					? {
+							handlerReturnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { handlerCatchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
 					: {}),
 				handlerParameters: relayed
 					? [relayed.parameter]

@@ -97,7 +97,7 @@ test('a handler inside a @try with no @catch anywhere up the chain is left unwra
 	expect(handlers.some((source) => source.includes(HANDLER_CATCH_IMPORT))).toBe(false);
 });
 
-test('a handler inside a @try whose @catch has no async value to fail is left unwrapped', async () => {
+test('a handler inside a @try that reads no async value fails the gate minted for that boundary', async () => {
 	const { codes, handlers } = await compile(`import { state } from '@markless/core';
 
 export function Page() @{
@@ -112,7 +112,8 @@ export function Page() @{
 	</div>
 }`);
 	expect(codes).toEqual([]);
-	expect(handlers.some((source) => source.includes(HANDLER_CATCH_IMPORT))).toBe(false);
+	const handler = handlers.find((source) => source.includes(HANDLER_CATCH_IMPORT));
+	expect(handler).toContain('"computed:asyncGate:0"');
 });
 
 test('a handler nested two @try levels deep targets its own nearest @catch, not the outer one', async () => {
@@ -152,4 +153,131 @@ export function Page() @{
 	expect(handler).toBeDefined();
 	expect(handler).toContain('"computed:asyncGate:1"');
 	expect(handler).not.toContain('"computed:asyncGate:0"');
+});
+
+test('a plain handler that returns a promise hands it to the catch; one that only starts a promise is left unwrapped', async () => {
+	const returning = await compile(
+		page('@catch (error) { <p>{error.message}</p> }').replace(
+			"async () => { note = 'saving'; await Promise.reject(new Error('boom')); }",
+			"() => { note = 'saving'; return Promise.reject(new Error('boom')); }",
+		),
+	);
+	const handler = returning.handlers.find((source) => source.includes(HANDLER_CATCH_IMPORT));
+	expect(handler).toMatch(/return marklessHandlerCatchReturned\(context\.graph, "computed:asyncGate:0", /);
+	expect(handler).not.toMatch(/async function/);
+
+	const concise = await compile(
+		page('@catch (error) { <p>{error.message}</p> }').replace(
+			"async () => { note = 'saving'; await Promise.reject(new Error('boom')); }",
+			'() => Promise.reject(new Error(note))',
+		),
+	);
+	expect(concise.handlers.some((source) => source.includes('marklessHandlerCatchReturned'))).toBe(true);
+
+	const floating = await compile(
+		page('@catch (error) { <p>{error.message}</p> }').replace(
+			"async () => { note = 'saving'; await Promise.reject(new Error('boom')); }",
+			"() => { note = 'saving'; Promise.reject(new Error('boom')); }",
+		),
+	);
+	expect(floating.handlers.some((source) => source.includes(HANDLER_CATCH_IMPORT))).toBe(false);
+});
+
+test("a component inside a @try with a @catch gives that boundary its own gate and marks it as catching its handlers", async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { computed, state } from '@markless/core';
+
+function Saver() @{
+	let note = state('idle');
+	<button type="button" onClick={async () => { note = 'saving'; await Promise.reject(new Error('boom')); }}>{note}</button>
+}
+
+export function Page() @{
+	const report = computed(async () => { await null; return { days: 7 }; });
+	<div>
+		@try {
+			<>
+				<output>{report.days}</output>
+				<Saver />
+			</>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+		@try {
+			<output>{report.days}</output>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</div>
+}`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([]);
+	const boundaries = result.protocolView.asyncBoundaries;
+	expect(boundaries.map((boundary) => boundary.catchesHandlers === true)).toEqual([true, false]);
+	expect(boundaries[0]!.runnerGraphNodeId).toBe('computed:asyncGate:0');
+	expect(boundaries[1]!.runnerGraphNodeId).toBe('computed:report');
+});
+
+test('a component whose handlers cannot reject leaves the boundary on its own value, and its module says which components can', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Children.tsrx',
+		source: `import { state } from '@markless/core';
+
+export function Quiet() @{
+	let count = state(0);
+	<button type="button" onClick={() => (count = count + 1)}>{count}</button>
+}
+
+export function Loud() @{
+	let note = state('idle');
+	<button type="button" onClick={() => { note = 'saving'; return Promise.reject(new Error('boom')); }}>{note}</button>
+}
+
+export function Wrapper() @{
+	<section><Loud /></section>
+}`,
+		symbols: [],
+	});
+	const published = child.moduleGraphInterface.render.components.map((component) => [
+		component.componentName,
+		component.rejectingHandlers === true,
+	]);
+	expect(published).toEqual([
+		['Quiet', false],
+		['Loud', true],
+		['Wrapper', true],
+	]);
+
+	const page = (tag: string) => `import { computed } from '@markless/core';
+import { ${tag} } from './Children.tsrx';
+
+export function Page() @{
+	const report = computed(async () => { await null; return { days: 7 }; });
+	<div>
+		@try {
+			<>
+				<output>{report.days}</output>
+				<${tag} />
+			</>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</div>
+}`;
+	const runners = async (tag: string) => {
+		const result = await compileTsrxModule({
+			filename: 'src/Page.tsrx',
+			source: page(tag),
+			symbols: [],
+			importedModuleInterfaces: { './Children.tsrx': child.moduleGraphInterface },
+		});
+		return result.protocolView.asyncBoundaries.map((boundary) => [
+			boundary.runnerGraphNodeId,
+			boundary.catchesHandlers === true,
+		]);
+	};
+	expect(await runners('Quiet')).toEqual([['computed:report', false]]);
+	expect(await runners('Wrapper')).toEqual([['computed:asyncGate:0', true]]);
 });

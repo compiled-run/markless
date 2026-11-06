@@ -132,6 +132,7 @@ export type SemanticComponentPropBinding =
 			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
 			readonly catchBoundaryId?: string;
+			readonly returnsPromise?: true;
 			// A callback the compiler wrote around a prop its composer received through a props spread: the read no authored span holds.
 			readonly relayedRead?: LoweredStateRead;
 			// An opaque prop that is plain constant data: the render still runs the
@@ -193,6 +194,8 @@ export type SemanticComponentEdge = {
 	// props are boundary reads (need 10 — the arm may touch the async computed
 	// only through child props).
 	readonly asyncBoundaryId?: string;
+	// The nearest `@try` with a `@catch` whose @try arm holds this component: its handlers' rejections render there.
+	readonly catchBoundaryId?: string;
 	readonly importSource?: string;
 	readonly importKind?: SemanticModuleImport['kind'];
 	readonly importedName?: string;
@@ -392,6 +395,8 @@ export type ModuleGraphInterfaceArtifact = {
 			/** Props this component files into a widget callback slot. */
 			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
+			/** A handler this component or one it renders can reject past every @catch of its own, into its parent's. */
+			readonly rejectingHandlers?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
@@ -852,6 +857,8 @@ export type SemanticEvent = {
 	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
 	readonly handlerCatchBoundaryId?: string;
+	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
+	readonly handlerReturnsPromise?: true;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
