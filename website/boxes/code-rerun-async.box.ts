@@ -55,12 +55,12 @@ export default box(
 			const runAgain = block.getByRole('button', { name: 'Run again' });
 			await runAgain.click();
 			const result = page.frameLocator('iframe.code-frame').first();
-			await expect(result.locator('body')).toContainText('Oslo: rain, 4°', { timeout: 60_000 });
+			await expect(result.locator('body')).toContainText('Sunny, 31°', { timeout: 60_000 });
 
 			await block.getByRole('tab', { name: 'forecast.ts', exact: true }).click();
 			await block.getByRole('textbox', { name: /^forecast\.ts,/ }).fill(SLOW_SOURCE);
-			await block.getByRole('tab', { name: 'forecast-card.tsrx', exact: true }).click();
-			await block.getByRole('textbox', { name: /^forecast-card\.tsrx,/ }).fill(REVIEWS);
+			await block.getByRole('tab', { name: 'forecast.tsrx', exact: true }).click();
+			await block.getByRole('textbox', { name: /^forecast\.tsrx,/ }).fill(REVIEWS);
 			await expect(result.locator('body')).toContainText('Lovely and lemony', { timeout: 30_000 });
 
 			for (const wait of [300, 400, 500]) {
