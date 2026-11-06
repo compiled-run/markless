@@ -334,7 +334,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 		// Resolve equal local names within the component that owns the branch.
 		const resolved = site.testComputedGraphNodeId
 			? { binding: { id: site.testComputedGraphNodeId }, path: [] as ReadonlyArray<string> }
-			: site.testReadsRowItem
+			: site.testReadsRowItem || site.armIndexSource !== undefined
 				? null
 				: resolveBranchTestRead(
 						site.testSource,

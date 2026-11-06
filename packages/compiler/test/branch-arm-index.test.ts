@@ -229,3 +229,34 @@ export function Plain() @{
 	expect(graph.branchSites[1]).toMatchObject({ kind: 'switch', armTests: ['a', null] });
 	expect(graph.branchSites[1]!.armIndexSource).toBeUndefined();
 });
+
+test('a @switch whose index computed cannot be minted never reads the bare discriminant against arm indexes', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Tabs.tsrx',
+		source: `
+import { state } from '@markless/core';
+export function Tabs() @{
+	let tab = state('b');
+	const first = () => 'a';
+	<nav>
+		@switch (tab) {
+			@case first(): { <i>first</i> }
+			@case 'b': { <b>second</b> }
+			@default: { <u>other</u> }
+		}
+	</nav>
+}
+`,
+		symbols: [],
+	});
+	const [site] = result.semanticGraph.branchSites;
+	expect(site).toMatchObject({ armTests: [0, 1, 2], testSource: 'tab' });
+	expect(site!.testComputedGraphNodeId).toBeUndefined();
+	expect(result.protocolView.branches?.[0]?.testReads ?? []).toEqual([]);
+	expect(result.renderData?.branches[0]).toEqual(
+		expect.objectContaining({
+			testReads: [],
+			armIndexSource: "(tab) === (first()) ? 0 : (tab) === ('b') ? 1 : 2",
+		}),
+	);
+});
