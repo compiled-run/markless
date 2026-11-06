@@ -57,6 +57,100 @@
 			"delta": 48,
 			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
 			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 203,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 38,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 38,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 38,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 527,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 540,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 167,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 51,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
 		}
 	]
 }
