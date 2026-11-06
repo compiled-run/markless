@@ -6,6 +6,18 @@ import { modeFor, sidebarFor, type SidebarEntry } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
 import { INK_MARKS } from './ink-marks.ts';
 
+const SLIDE = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
+
+// The storage write lands before the next frame; there the article, drawn live, is offset back from where it was.
+// An offset, not a transform: the article holds the fixed sidebar and outline, and a transform would carry them along.
+function glide(article: HTMLElement | null, from: number | undefined) {
+	if (article === null || from === undefined || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+	requestAnimationFrame(() => {
+		const shift = from - article.getBoundingClientRect().left;
+		if (shift !== 0) article.animate([{ left: `${shift}px` }, { left: '0px' }], SLIDE);
+	});
+}
+
 // The current page's mark is the link's own state, so two pages render the sidebar alike and a navigation keeps it.
 function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
 	const link = state({ current: entry.active });
@@ -139,21 +151,11 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			aria-expanded="false"
 			aria-controls="docs-sidebar"
 			onClick={() => {
-				const flip = () => {
-					shown = 'open';
-				};
-				const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-				const focus = () => document.getElementById('sidebar-close')?.focus();
-				if (still || document.startViewTransition === undefined) {
-					flip();
-					setTimeout(focus, 0);
-				} else {
-					const root = document.documentElement;
-					root.dataset.sidebarMoving = '';
-					const move = document.startViewTransition(flip);
-					void move.updateCallbackDone.then(focus);
-					void move.finished.finally(() => delete root.dataset.sidebarMoving);
-				}
+				const article = document.querySelector<HTMLElement>('.site-shell .prose');
+				const from = article?.getBoundingClientRect().left;
+				shown = 'open';
+				glide(article, from);
+				setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
 			}}
 		>
 			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -172,21 +174,11 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					aria-expanded="true"
 					aria-controls="docs-sidebar"
 					onClick={() => {
-						const flip = () => {
-							shown = 'closed';
-						};
-						const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-						const focus = () => document.getElementById('sidebar-open')?.focus();
-						if (still || document.startViewTransition === undefined) {
-							flip();
-							setTimeout(focus, 0);
-						} else {
-							const root = document.documentElement;
-							root.dataset.sidebarMoving = '';
-							const move = document.startViewTransition(flip);
-							void move.updateCallbackDone.then(focus);
-							void move.finished.finally(() => delete root.dataset.sidebarMoving);
-						}
+						const article = document.querySelector<HTMLElement>('.site-shell .prose');
+						const from = article?.getBoundingClientRect().left;
+						shown = 'closed';
+						glide(article, from);
+						setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
 					}}
 				>
 					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -509,14 +501,12 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				overflow: visible;
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; while it moves, the parts get view-transition names and the document animates them. */
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; the nav slides on a transition and the article glides back from its old spot, both by translate only. */
 			@media (min-width: 70.01rem) {
-				html[data-sidebar-moving] .sidebar {
-					view-transition-name: docs-sidebar;
-				}
-
-				html[data-sidebar-moving] .sidebar-open {
-					view-transition-name: docs-sidebar-open;
+				.sidebar {
+					transition:
+						translate 200ms cubic-bezier(0.2, 0, 0, 1),
+						visibility 0s;
 				}
 
 				.sidebar-close {
@@ -532,6 +522,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				html[data-sidebar='closed'] .sidebar {
 					translate: calc(-100% - var(--space-s-l)) 0;
 					visibility: hidden;
+					transition:
+						translate 200ms cubic-bezier(0.2, 0, 0, 1),
+						visibility 0s 200ms;
 				}
 
 				html[data-sidebar='closed'] .sidebar-open {
@@ -541,6 +534,11 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			}
 
 			@media (prefers-reduced-motion: reduce) {
+				.sidebar,
+				html[data-sidebar='closed'] .sidebar {
+					transition: none;
+				}
+
 				.node-chevron {
 					transition: none;
 				}

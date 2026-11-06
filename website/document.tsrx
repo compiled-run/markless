@@ -62,6 +62,10 @@ export default function Document({
 					padding-block-start: var(--navbar-clear);
 				}
 				.example-shell { width:100%; margin:0; padding:0; }
+				/* The sidebar toggle glides the article by its offset. */
+				.prose {
+					position: relative;
+				}
 
 				@media (max-width: 96rem) {
 					.site-shell {
@@ -77,10 +81,6 @@ export default function Document({
 						--rail-track: calc(11rem + var(--space-s-l));
 					}
 
-					html[data-sidebar-moving] .site-shell .prose {
-						view-transition-name: docs-main;
-					}
-
 					html[data-sidebar='closed'] .site-shell {
 						--sidebar-track: 3rem;
 						padding-left: calc(var(--space-s-l) + 3rem);
@@ -92,27 +92,6 @@ export default function Document({
 					.site-shell {
 						--rail-track: calc(16rem + var(--space-s-l));
 					}
-				}
-
-				/* Opening or closing the sidebar: it slides as one opaque image, and the article's final image glides into place, so nothing cross-fades. */
-				html::view-transition-group(docs-sidebar),
-				html::view-transition-group(docs-main),
-				html::view-transition-group(docs-sidebar-open) {
-					animation-duration: 200ms;
-					animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-				}
-
-				html::view-transition-old(docs-sidebar),
-				html::view-transition-new(docs-sidebar) {
-					animation: none;
-				}
-
-				html::view-transition-old(docs-main) {
-					display: none;
-				}
-
-				html::view-transition-new(docs-main) {
-					animation: none;
 				}
 
 				@media (max-width: 70rem) {
