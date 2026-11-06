@@ -279,6 +279,9 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				writable: true,
 				valueKind: initialValueKind(initial),
 				...(armScope ? { armScope } : {}),
+				...(armScope && state.currentBranchArms.length > 1
+					? { enclosingArms: state.currentBranchArms.slice(0, -1) }
+					: {}),
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
