@@ -77,7 +77,7 @@ export default function Document({
 						--rail-track: calc(11rem + var(--space-s-l));
 					}
 
-					.site-shell .prose {
+					html[data-sidebar-moving] .site-shell .prose {
 						view-transition-name: docs-main;
 					}
 

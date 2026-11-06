@@ -154,7 +154,10 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				box-shadow: 6px 6px 0 var(--muted-ink);
 				translate: -50% 0;
 				z-index: calc(var(--grain-z) + 1);
-				view-transition-name: docs-navbar;
+
+				html[data-sidebar-moving] & {
+					view-transition-name: docs-navbar;
+				}
 				transition:
 					translate 300ms ease,
 					opacity 300ms ease;

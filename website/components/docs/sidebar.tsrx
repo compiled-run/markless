@@ -147,7 +147,13 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				if (still || document.startViewTransition === undefined) {
 					flip();
 					setTimeout(focus, 0);
-				} else void document.startViewTransition(flip).updateCallbackDone.then(focus);
+				} else {
+					const root = document.documentElement;
+					root.dataset.sidebarMoving = '';
+					const move = document.startViewTransition(flip);
+					void move.updateCallbackDone.then(focus);
+					void move.finished.finally(() => delete root.dataset.sidebarMoving);
+				}
 			}}
 		>
 			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -174,7 +180,13 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 						if (still || document.startViewTransition === undefined) {
 							flip();
 							setTimeout(focus, 0);
-						} else void document.startViewTransition(flip).updateCallbackDone.then(focus);
+						} else {
+							const root = document.documentElement;
+							root.dataset.sidebarMoving = '';
+							const move = document.startViewTransition(flip);
+							void move.updateCallbackDone.then(focus);
+							void move.finished.finally(() => delete root.dataset.sidebarMoving);
+						}
 					}}
 				>
 					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -497,10 +509,14 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				overflow: visible;
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; the document's view transition animates it. */
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; while it moves, the parts get view-transition names and the document animates them. */
 			@media (min-width: 70.01rem) {
-				.sidebar {
+				html[data-sidebar-moving] .sidebar {
 					view-transition-name: docs-sidebar;
+				}
+
+				html[data-sidebar-moving] .sidebar-open {
+					view-transition-name: docs-sidebar-open;
 				}
 
 				.sidebar-close {
@@ -511,7 +527,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					position: absolute;
 					inset-inline-start: calc(100% + var(--space-s-l));
 					inset-block-start: 0.5rem;
-					view-transition-name: docs-sidebar-open;
 				}
 
 				html[data-sidebar='closed'] .sidebar {
