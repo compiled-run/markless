@@ -3,8 +3,11 @@ import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	type CompositeReadOptions,
 	collectCompositeTemplateExpression,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
 } from './composite-reads.ts';
 import { readsShadowingRowItem } from './collect-repeat.ts';
+import { ifChainOf, isElseIfLink } from './if-chain.ts';
 import { propTestOf } from './prop-test.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
@@ -68,6 +71,10 @@ function branchTest(
 export function collectBranchSite(node: AnyNode, state: WalkState): void {
 	if (node.type === 'JSXIfExpression') {
 		const test = node.test as AnyNode | undefined;
+		if (isElseIfLink(node.alternate as AnyNode | undefined)) {
+			collectIfChainSite(node, state);
+			return;
+		}
 		collectBranchConditionAssignments(
 			test,
 			`@if (${test ? expressionSource(test, state.source) : ''})`,
@@ -100,10 +107,14 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			`@switch (${discriminant ? expressionSource(discriminant, state.source) : ''})`,
 			state,
 		);
-		const switchTest = branchTest(discriminant, state);
-		const switchPropTest = switchTest.testReadsRowItem
-			? undefined
-			: propTestOf(discriminant, state);
+		const literalArmTests = switchArmTests(node);
+		const switchTest = literalArmTests
+			? branchTest(discriminant, state)
+			: switchArmIndexTest(node, state);
+		const switchPropTest =
+			switchTest.testReadsRowItem || !literalArmTests
+				? undefined
+				: propTestOf(discriminant, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'switch',
@@ -112,7 +123,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...(switchPropTest ? { propTest: switchPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
+			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
 			...(state.currentAsyncBoundaryId
 				? {
 						asyncBoundaryId: state.currentAsyncBoundaryId,
@@ -121,6 +132,102 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 				: {}),
 		});
 	}
+}
+
+/**
+ * An `@if ... @else if ... @else` chain is one site whose arm is an INDEX: one
+ * synthetic computed asks the tests in order and answers the first that holds,
+ * or the final arm's index (the `@else`, or the empty arm standing in for it).
+ * `armTests` lists every arm's index so the switch-site picker selects by it.
+ */
+function collectIfChainSite(node: AnyNode, state: WalkState): void {
+	const chain = ifChainOf(node);
+	for (const test of chain.tests)
+		collectBranchConditionAssignments(
+			test,
+			`@if (${expressionSource(test, state.source)})`,
+			state,
+		);
+	const sources = chain.tests.map((test) => expressionSource(test, state.source));
+	const indexSource = sources
+		.map((source, index) => `(${source}) ? ${index} : `)
+		.join('')
+		.concat(String(chain.tests.length));
+	state.graph.branchSites.push({
+		id: `branch-site:${state.nextBranchSiteId++}`,
+		kind: 'if',
+		armCount: chain.tests.length + (chain.arms[chain.arms.length - 1] ? 1 : 0),
+		testSource: sources.join(', '),
+		armIndexSource: indexSource,
+		...armIndexTest(chain.tests, indexSource, state),
+		armTests: chain.arms.map((_, index) => index),
+		anchorOrder: state.nextAnchorOrder++,
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		...(state.currentAsyncBoundaryId
+			? {
+					asyncBoundaryId: state.currentAsyncBoundaryId,
+					asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+				}
+			: {}),
+	});
+}
+
+/**
+ * A `@switch` whose case tests are not all literals (`@switch (true) { @case
+ * charge > 50: ... }`) also selects its arm by index: the computed compares the
+ * discriminant with each case test in order, the way `switch` does, and answers
+ * the `@default` arm's index (or one past the last arm) when none is equal.
+ */
+function switchArmIndexTest(
+	node: AnyNode,
+	state: WalkState,
+): {
+	readonly testSource: string;
+	readonly armIndexSource: string;
+	readonly testComputedGraphNodeId?: string;
+	readonly testReadsRowItem?: true;
+} {
+	const discriminant = node.discriminant as AnyNode | undefined;
+	const discriminantSource = discriminant ? expressionSource(discriminant, state.source) : '';
+	const cases = asNodes(node.cases);
+	const defaultIndex = cases.findIndex((switchCase) => !switchCase.test);
+	const fallback = defaultIndex === -1 ? cases.length : defaultIndex;
+	const tests = cases.flatMap((switchCase, index) =>
+		switchCase.test ? [{ index, test: switchCase.test as AnyNode }] : [],
+	);
+	const indexSource = tests
+		.map(
+			({ index, test }) =>
+				`(${discriminantSource}) === (${expressionSource(test, state.source)}) ? ${index} : `,
+		)
+		.join('')
+		.concat(String(fallback));
+	return {
+		testSource: discriminantSource,
+		armIndexSource: indexSource,
+		...armIndexTest(
+			[...(discriminant ? [discriminant] : []), ...tests.map(({ test }) => test)],
+			indexSource,
+			state,
+		),
+	};
+}
+
+// The index computed over every read the arm decision makes, or the row-item mark when a test reads the row.
+function armIndexTest(
+	reads: ReadonlyArray<AnyNode>,
+	indexSource: string,
+	state: WalkState,
+): { readonly testComputedGraphNodeId?: string; readonly testReadsRowItem?: true } {
+	if (reads.some((read) => readsShadowingRowItem(read, state))) return { testReadsRowItem: true };
+	const readSources: string[] = [];
+	for (const read of reads) {
+		const sources = pureCompositeReadSources(read, state, BRANCH_CONDITION_READ_OPTIONS);
+		if (!sources) return {};
+		readSources.push(...sources);
+	}
+	const minted = mintTemplateExpressionComputed(`() => ${indexSource}`, readSources, state);
+	return minted ? { testComputedGraphNodeId: minted.graphNodeId } : {};
 }
 
 function switchArmTests(node: AnyNode): ReadonlyArray<unknown> | null {

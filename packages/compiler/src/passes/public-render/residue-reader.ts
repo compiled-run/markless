@@ -123,7 +123,7 @@ export function renderDecisionSources(
 			branch.testReads.length !== 1 &&
 			branch.testSource
 		)
-			sources.add(branch.testSource);
+			sources.add(branch.armIndexSource ?? branch.testSource);
 	const placedEdgeIds = inChunk
 		? new Set(
 				chunks.flatMap((chunk) =>
@@ -246,7 +246,7 @@ export function branchArmIndexSource(
 	branch: PublicRenderModuleInput['renderData']['branches'][number],
 	testSource: string | undefined,
 ): string {
-	return branch.kind === 'switch' && branch.armTests
+	return branch.armTests
 		? `(()=>{const marklessArmValue=(${testSource});const marklessArmTests=${JSON.stringify(branch.armTests)};const marklessArmMatch=marklessArmTests.findIndex((marklessTest)=>marklessTest!==null&&Object.is(marklessTest,marklessArmValue));return marklessArmMatch===-1?Math.max(0,marklessArmTests.indexOf(null)):marklessArmMatch;})()`
 		: `((${testSource})?0:1)`;
 }

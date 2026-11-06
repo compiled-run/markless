@@ -1,5 +1,6 @@
 import { parseModule } from '../../js-ast.ts';
 import { childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { ifChainOf } from '../semantic-graph/if-chain.ts';
 import { getElementTagName, isHostTagName } from '../../ast/tsrx.ts';
 import type {
 	PublicRenderPlanArtifact,
@@ -103,9 +104,16 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 			];
 		},
 	);
+	// An `@else if` link is part of its chain's site, not a site of its own.
+	const chainLinks = new Set<AnyNode>();
 	const branchNodes: AnyNode[] = [];
 	walkNode(selectedRoot.root, (node) => {
-		if (node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression')
+		if (node.type === 'JSXIfExpression')
+			for (const link of ifChainOf(node).links) chainLinks.add(link);
+		if (
+			(node.type === 'JSXIfExpression' || node.type === 'JSXSwitchExpression') &&
+			!chainLinks.has(node)
+		)
 			branchNodes.push(node);
 	});
 	const armEscalationDiagnostics = input.semanticGraph.branchSites.flatMap((site, index) => {
