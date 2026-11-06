@@ -1,0 +1,992 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 296,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": -1485,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 1458,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-records"
+			],
+			"delta": 192,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 1264,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 348,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 328,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 854,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 162,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 407,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 14,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": -417,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 84,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 39,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 296,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": -1485,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 1458,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-records"
+			],
+			"delta": 192,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 1264,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 348,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 328,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 854,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 162,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 407,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 14,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": -417,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 84,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 41,
+			"reason": "async prototype branches (busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"counter",
+				"executedChars"
+			],
+			"delta": -37,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"counter",
+				"functions"
+			],
+			"delta": -2,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"tab",
+				"executedChars"
+			],
+			"delta": -37,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"tab",
+				"functions"
+			],
+			"delta": -2,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"search",
+				"executedChars"
+			],
+			"delta": 391,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"search",
+				"functions"
+			],
+			"delta": 6,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"executedChars"
+			],
+			"delta": -49,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"functions"
+			],
+			"delta": -4,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"settings",
+				"executedChars"
+			],
+			"delta": -9,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"settings",
+				"functions"
+			],
+			"delta": -1,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 296,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-reconcile"
+			],
+			"delta": 11,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-scheduler"
+			],
+			"delta": 117,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 2092,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-mint"
+			],
+			"delta": 285,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-slot-mint"
+			],
+			"delta": 75,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-graph-construct"
+			],
+			"delta": -1485,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 1458,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-records"
+			],
+			"delta": 192,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 1264,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 428,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 348,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 328,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 854,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-resettle-hold"
+			],
+			"delta": 162,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 407,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": 14,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-computed"
+			],
+			"delta": -417,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/ssr-data/renderer"
+			],
+			"delta": 84,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"constructGlue",
+				"async boundary"
+			],
+			"delta": 606,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /",
+				"raw"
+			],
+			"delta": 747,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /",
+				"gzip"
+			],
+			"delta": 189,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /concepts/state",
+				"raw"
+			],
+			"delta": 749,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /concepts/state",
+				"gzip"
+			],
+			"delta": 187,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /ui/accordion",
+				"raw"
+			],
+			"delta": 2640,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /ui/accordion",
+				"gzip"
+			],
+			"delta": 575,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 181,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 181,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 181,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 671,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 7292,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 579,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 21695,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 5144,
+			"reason": "async prototype branches merged for review (async planes, busy marks, refresh announcement, paint-atomic commits, row/async compile fixes, deep refresh, playground e2e, arm text in place), measured against the merge-base origin/main",
+			"date": "2026-11-06"
+		}
+	]
+}

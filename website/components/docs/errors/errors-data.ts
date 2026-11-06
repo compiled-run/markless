@@ -7841,7 +7841,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
-			'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING: built a row with no comment at row-relative index <index> for the <name> of <kind> <id>.',
+			'MARKLESS_REPEAT_ROW_COMPONENT_ANCHOR_MISSING: built a row with no comment at row-relative index <index> for the <name> of branch <id>.',
 		],
 		structured: false,
 		sources: [
