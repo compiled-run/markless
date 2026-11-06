@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 51492,
+			"reason": "app code, not framework: the State page's two new ink figures (ID card, J-card) initialize their frozen art at load (71.7K chars in one pack, measured per script with V8 coverage), and the neighbouring Concepts pages' heavier figure packs ride the idle link preload; Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 377485,
+			"reason": "app code, not framework: the State page's two new ink figures (ID card, J-card) initialize their frozen art at load (71.7K chars in one pack, measured per script with V8 coverage), and the neighbouring Concepts pages' heavier figure packs ride the idle link preload; Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 273,
+			"reason": "app code, not framework: the shared ink sheet and sidebar chunks the docs home prefetches repack around the Concepts figures (+273 chars run, +926 B gzip against main's own measurement); Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 926,
+			"reason": "app code, not framework: the shared ink sheet and sidebar chunks the docs home prefetches repack around the Concepts figures (+273 chars run, +926 B gzip against main's own measurement); Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
+		}
+	]
+}

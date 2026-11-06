@@ -764,6 +764,13 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	font-size: var(--step--2);
 }
 
+.code-problem-code {
+	color: inherit;
+	font-weight: 700;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
 .code-problem-detail {
 	margin-top: 0.25em;
 	font-size: var(--step--2);

@@ -39,6 +39,16 @@ export function bootLive(box: HTMLElement): void {
 		}
 	}
 
+	function checkFails(): void {
+		const problems = box.querySelector<HTMLElement>('[data-code-problems]');
+		if (!problems || problems.hidden) return;
+		const text = problems.textContent ?? '';
+		for (const step of steps) {
+			const code = step.dataset.stepFails;
+			if (code && text.includes(code)) tick(step);
+		}
+	}
+
 	function checkShows(root: Element): void {
 		const texts = [...root.querySelectorAll('*')].map((element) => element.textContent ?? '');
 		for (const step of steps) {
@@ -110,5 +120,8 @@ export function bootLive(box: HTMLElement): void {
 		else frame.addEventListener('load', attach, { once: true });
 	}
 	box.addEventListener('input', checkSource);
+	const problems = box.querySelector('[data-code-problems]');
+	if (problems) new MutationObserver(checkFails).observe(problems, { childList: true, subtree: true, attributes: true });
+	checkFails();
 	checkSource();
 }
