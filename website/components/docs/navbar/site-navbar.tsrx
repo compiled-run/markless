@@ -136,23 +136,24 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				opacity: 1;
 			}
 
+			/* Same edges as the prose column: the shell's side padding, then the prose measure centred in what is left. */
 			.nav-pill {
 				position: fixed;
 				top: 1.5rem;
-				left: 50%;
+				inset-inline: var(--shell-start, 0) var(--shell-end, 0);
 				box-sizing: border-box;
 				display: flex;
 				align-items: center;
 				justify-content: space-between;
-				inline-size: 100%;
-				max-inline-size: 37.5rem;
+				max-inline-size: var(--prose-measure);
+				margin-inline: auto;
 				block-size: 4.375rem;
 				padding-inline: 0.9rem;
 				border: 2px solid var(--ink);
 				border-radius: 1rem;
 				background: var(--raised);
-				box-shadow: 6px 6px 0 var(--muted-ink);
-				translate: -50% 0;
+				box-shadow: 0 6px 0 var(--muted-ink);
+				translate: 0 0;
 				z-index: calc(var(--grain-z) + 1);
 				transition:
 					translate 300ms ease,
@@ -161,7 +162,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 
 			/* public/navbar.js marks the page while the reader scrolls down it; focus brings the bar back. */
 			html[data-nav-away] .nav-pill:not([ui-open]) {
-				translate: -50% calc(-100% - 1.5rem);
+				translate: 0 calc(-100% - 1.5rem);
 				opacity: 0;
 			}
 
@@ -291,7 +292,7 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				z-index: 59;
 				display: none;
 				background: var(--raised);
-				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
+				box-shadow: 0 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
 				opacity: 0;
 				transition:
 					opacity 150ms ease,
