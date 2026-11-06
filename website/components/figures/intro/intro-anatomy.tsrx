@@ -1,4 +1,4 @@
-// A Beanshop takeaway cup: the barista writes the name when it scrolls into view; pressing it ticks a shot box and the lid sticker follows.
+// A Beanshop takeaway cup: the barista writes the name when it scrolls into view (CSS alone, no code runs at load); pressing it ticks a shot box and the lid sticker follows.
 import { computed, state } from '@markless/core';
 import { add, describe, flip, PRODUCT, SHOTS, SLOTS, START, STICKER } from './model.ts';
 import { art } from './wired.art.ts';
@@ -7,19 +7,13 @@ export default function IntroAnatomy() @{
 	let count = state(START);
 	let newest = state('');
 	let beat = state('rest');
-	let written = state('no');
 	const level = computed(() => '--count:' + count);
 	const latest = computed(() => art.shots.boxes[Math.max(0, count - 1)]!);
 	const tick = computed(() => latest.d);
 	const tickLength = computed(() => '--l:' + latest.length);
 	const said = computed(() => describe(count, beat !== 'rest'));
 
-	<figure
-		class="anatomy"
-		onVisible={() => {
-			written = 'yes';
-		}}
-	>
+	<figure class="anatomy">
 		<button
 			type="button"
 			class="stage"
@@ -37,7 +31,7 @@ export default function IntroAnatomy() @{
 				}
 			}}
 		>
-			<svg class="scene" data-beat={beat} data-written={written} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+			<svg class="scene" data-beat={beat} data-empty={count === 0 ? 'yes' : 'no'} style={level} viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
 				<path class="shadow-wash" d={art.cup.shadow.wash} />
 				<path class="hatch deep light" d={art.cup.shadow.hatch} />
 				<path class="hatch deep" d={art.cup.shadow.core} />
@@ -398,24 +392,42 @@ export default function IntroAnatomy() @{
 			}
 
 			@media (prefers-reduced-motion: no-preference) {
-				.scene[data-written='no'] .name {
-					opacity: 0;
-				}
-
-				.scene[data-written='yes'] .write {
+				.write {
 					animation: write-in 420ms var(--d) ease-out both;
 				}
 
-				.scene[data-written='yes'] .draw {
+				.draw {
 					animation: draw-on 300ms var(--d) ease-out both;
 				}
 
-				.scene[data-written='yes'] .eyes {
+				.eyes {
 					animation: pop-in 120ms 1560ms both;
+				}
+
+				/* The writing holds until the cup scrolls into view; without scroll timelines or style queries it writes at load. */
+				.stage {
+					--seen: 0;
+					animation: seen 1ms linear both;
+					animation-timeline: view();
+					animation-range: entry 0% entry 2%;
+				}
+
+				@container style(--seen: 0) {
+					.write,
+					.draw,
+					.eyes {
+						animation-play-state: paused;
+					}
 				}
 
 				.wisp {
 					animation: rise 4.8s calc(var(--w) * -1.6s) ease-in-out infinite;
+				}
+			}
+
+			@keyframes seen {
+				to {
+					--seen: 1;
 				}
 			}
 
