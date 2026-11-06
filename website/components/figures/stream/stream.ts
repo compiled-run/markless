@@ -1,7 +1,4 @@
-// Brief. Belief: the slow part arrives later in the same response, and the page never waits for it.
-// Objects: the browser showing a recipe, its network panel (one request), the database with a speed dial.
-// Action: reload. Change: title, photo and steps ink in at once; Reviews holds a pencil skeleton until the query ends, and the one bar ends with it.
-// Prevents: "the page waits for the slowest query" and "the reviews are a second request". Surprise: clicking Reviews while it loads adds no request.
+// What the figure shows: the slow part arrives later in the same response, and the page never waits for it.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, stroke, wash } from '../ink/ink.ts';
 

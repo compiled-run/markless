@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: a reload keeps a storage() value, and starts state() over.
-// Objects: the browser window with its reload arrow; the dark-mode switch (storage()); the sidebar (state()).
-// Action: press reload. Change: the page redraws, the switch stays where you left it, the sidebar closes. Unchanged: the switch.
-// Prevents: "every value is lost on reload". Surprise: drag the cookie out of the address bar, reload, and the switch resets too.
+// What the figure shows: a reload keeps a storage() value, and starts state() over.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, stroke, wash } from '../ink/ink.ts';
 

@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: the request's method and path pick the one file in api/ that answers.
-// Objects: the machine (each selection button is a file), the coin (the request), the tray (the answer).
-// Action: type an id, drop the coin in GET or POST. Change: that file's button lights, its coil turns, its card drops. Unchanged: the other file.
-// Prevents: "any request to the path runs the code". Surprise: a POST to /api/users/42 lights nothing; the coin rattles back with 404.
+// What the figure shows: the request's method and path pick the one file in api/ that answers.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, stroke, wash } from '../ink/ink.ts';
 

@@ -1,7 +1,4 @@
-// Brief (figure-research checklist passed). Belief: a file's path in pages/ is the address it answers.
-// Objects: the editor's file tree, the loose files, the browser. Each maps to code: pages/, a .tsrx file, the URL it serves.
-// Action: drag a file into pages/ (or out). Change: the address bar and the page follow; out of pages/, the address is a 404.
-// Prevents: "routes are configured somewhere else". Surprise: type a slug in the address bar and it is pencilled into [slug].
+// What the figure shows: a file's path in pages/ is the address it answers.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, stroke } from '../ink/ink.ts';
 

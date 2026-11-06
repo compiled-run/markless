@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: the build lets a link through only if its route exists.
-// Objects: the door (the route pages/blog/[slug]), the right key, the typo key.
-// Action: try a key in the lock (press, drag it there, or Enter). Change: the right key turns and the door opens. Unchanged: the lock.
-// Prevents: "a typo in a link ships and shows a 404". Surprise: the typo key stops at the lock and slides back, as the build stops.
+// What the figure shows: the build lets a link through only if its route exists.
 import { ellipse, roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, wash } from '../ink/ink.ts';
 

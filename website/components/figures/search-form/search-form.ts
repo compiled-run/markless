@@ -1,7 +1,4 @@
-// Brief (checklist passed). Belief: a handle is a name for the real input; a handler uses it to reach that element.
-// Objects: the search input (the element), the Focus search button (the handler), the pencilled field line between them (the handle).
-// Action: press the button. Change: the cursor blinks in the input and it gets its focus ring. Unchanged: the button and the line.
-// Prevents: "a handle is a copy of the element" and "the element is always there". Surprise: take the input off the page and press again: the line dangles to undefined, nothing is focused.
+// What the figure shows: a handle is a name for the real input; a handler uses it to reach that element.
 import { roundRect } from '../ink/desk.ts';
 import { hatch, line, outline, type P, pathOf, r1, resample, stroke, wash } from '../ink/ink.ts';
 

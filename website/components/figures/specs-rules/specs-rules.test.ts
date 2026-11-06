@@ -14,7 +14,7 @@ describe('specs and rules step-through', () => {
 		expect(spec).toContain(OPENED.line.replace(', …', ''));
 	});
 
-	// SAME_PR is #490 (5d9a4859d), which changed both files; CI checks out one commit, so only their existence is checked here.
+	// SAME_PR is a real pull request that changed both files; CI checks out one commit, so only their existence is checked here.
 	it('staples a code change to its spec change, both real files', () => {
 		expect(existsSync(at(SAME_PR.code))).toBe(true);
 		expect(existsSync(at(SAME_PR.spec))).toBe(true);
