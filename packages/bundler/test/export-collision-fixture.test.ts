@@ -9,14 +9,8 @@ import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
 
-// Two unrelated modules whose default export (and, separately, whose named
-// export) declare the SAME function name used to collide in the linker: the
-// second module's own markup never reached the page, because the childâs
-// template id was built from the declared component name alone
-// (`template:Demo`), not the importing edge's module identity, so both
-// `<First/>` and `<Second/>` pointed at whichever module's chunk table won the
-// id. A component from a DIFFERENT directory with the SAME declared name is
-// exactly this shape; nesting is not required to trigger it.
+// Two modules declaring a same-named component must each render their own markup: the linker keys a
+// composed child by the module it is imported from, not by its declared name.
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');

@@ -197,7 +197,7 @@ test('side-effect rule: the save never runs during server rendering, and runs ex
 	expect(saveCalls(id)).toHaveLength(1);
 });
 
-test('SSR: a draft row created after resume never appears in the served HTML', async () => {
+test('SSR: the served HTML carries no draft row', async () => {
 	resetSaveApi();
 	const screen = await renderSSR(TodoApp);
 	expect((screen.container as HTMLElement).querySelector('[data-saving-row]')).toBeNull();
