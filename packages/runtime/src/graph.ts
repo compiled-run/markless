@@ -57,6 +57,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly reconcile?: Pick<DerivedReconcilePlane, 'publishAsync'>;
 	/** No handler statement follows an async answer, so what it dirties lands in the pass, past the write observers. */
 	readonly landWithoutObservers: (land: () => void) => void;
+	/** True while an event handler's own synchronous turn (start through its awaited continuations) is running (submit-quiet-design.md Q2). */
+	readonly isUserAction?: () => boolean;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -120,12 +122,15 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly value?: unknown;
 			/** The key `value` was fetched for; present only when a settled value exists. */
 			readonly valueKey?: unknown;
+			/** This run started outside a user action: no busy mark, no announcement (submit-quiet-design.md Q2). */
+			readonly quiet?: boolean;
 	  }
 	| {
 			readonly status: 'fulfilled';
 			readonly version: number;
 			readonly key: unknown;
 			readonly value: unknown;
+			readonly quiet?: boolean;
 	  }
 	| {
 			readonly status: 'rejected';
@@ -135,6 +140,7 @@ export type RuntimeGraphAsyncSnapshot =
 			/** A failed refresh keeps the last good value, fetched for `valueKey`. */
 			readonly value?: unknown;
 			readonly valueKey?: unknown;
+			readonly quiet?: boolean;
 	  };
 
 export type RuntimeGraphAsyncComputed = {
@@ -352,6 +358,10 @@ export type RuntimeGraph = {
 	readonly markEntry?: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
 	readonly endEntry?: (graphNodeId: string) => void;
+	/** An event handler's own turn started: a write made before the matching `markUserActionEnd` starts a loud refresh (submit-quiet-design.md Q2). Nests, so a resumed continuation inside another handler's wait still counts. */
+	readonly markUserActionStart?: () => void;
+	/** Ends the turn `markUserActionStart` opened; a write made once every opener has ended starts a quiet refresh. */
+	readonly markUserActionEnd?: () => void;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -389,6 +399,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const journal: DomJournalEntry[] = [];
 	let flushScheduled = false;
 	let flushing = false;
+	// Nests: a handler whose own wait overlaps another handler's stays counted until both end.
+	let userActionDepth = 0;
 	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
 	let flushHolds = 0;
@@ -556,6 +568,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			asyncComputed: input.asyncComputed,
 			reconcile: plane,
 			landWithoutObservers,
+			isUserAction: () => userActionDepth > 0,
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
@@ -735,6 +748,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
 		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
 		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
+		markUserActionStart: () => void userActionDepth++,
+		markUserActionEnd: () => void (userActionDepth = Math.max(0, userActionDepth - 1)),
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;

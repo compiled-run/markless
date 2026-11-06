@@ -47,17 +47,24 @@ function armBindings(startAnchor: object | undefined): Array<readonly [BusyNode,
 const busyByRange = new WeakMap<object, BoundaryBusy>();
 
 // Marks follow the reads still running while the block shows settled content; a first load marks nothing.
+// A quiet refresh (submit-quiet-design.md Q2: a write outside a user action) never joins `busy.pending`,
+// so it never marks busy and never announces — except a failure, which always speaks (recommended default).
 function note(
 	boundary: BusyBoundary,
 	graphNodeId: string,
 	snapshot: unknown,
 	showsSettledContent: boolean,
 ): void {
-	const status = (snapshot as { readonly status?: unknown } | null)?.status;
+	const { status, quiet } =
+		(snapshot as { readonly status?: unknown; readonly quiet?: unknown } | null) ?? {};
 	const busy = busyOf(boundary);
-	if (status === 'rejected' && busy.pending.has(graphNodeId)) busy.failed = true;
-	if (status === 'pending' && showsSettledContent) busy.pending.add(graphNodeId);
-	else if (status !== 'fulfilled' && status !== 'rejected') return;
+	const wasPending = busy.pending.has(graphNodeId);
+	if (status === 'rejected' && wasPending) busy.failed = true;
+	if (status === 'pending' && showsSettledContent) {
+		if (quiet === true) return;
+		busy.pending.add(graphNodeId);
+	} else if (status !== 'fulfilled' && status !== 'rejected') return;
+	else if (status === 'rejected' && quiet === true && !wasPending) return announceQuietFailure(boundary);
 	// The last read to settle clears with the settle commit that shows it, not before.
 	else if (!busy.pending.delete(graphNodeId) || busy.pending.size === 0) return;
 	apply(boundary);
@@ -107,14 +114,21 @@ function apply(boundary: BusyBoundary): void {
 }
 
 let announcer: Promise<typeof import('./refresh-announcer.ts')> | undefined;
+function loadAnnouncer(): Promise<typeof import('./refresh-announcer.ts')> {
+	return (announcer ??= import('./refresh-announcer.ts'));
+}
+
 function announce(busy: BoundaryBusy, hosts: Set<BusyNode>): void {
 	const nowBusy = busy.marked.size === 0;
 	const failed = !nowBusy && busy.failed === true;
 	busy.failed = false;
 	const key = busy.pending;
-	void (announcer ??= import('./refresh-announcer.ts')).then((module) =>
-		module.refreshChanged(key, nowBusy, failed, hosts),
-	);
+	void loadAnnouncer().then((module) => module.refreshChanged(key, nowBusy, failed, hosts));
+}
+
+// A quiet refresh never joined `busy`, so its failure has no transition to ride; it speaks on its own.
+function announceQuietFailure(boundary: BusyBoundary): void {
+	void loadAnnouncer().then((module) => module.announceQuietFailure(boundaryBusyHosts(boundary)));
 }
 
 export const busyElements = { note, set, apply };

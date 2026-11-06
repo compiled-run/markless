@@ -12,6 +12,8 @@ type ScalarWriteGraph = {
 		readonly returnValue?: 'previous' | 'next';
 		readonly update: (value: unknown) => unknown;
 	}) => unknown;
+	readonly markUserActionStart?: () => void;
+	readonly markUserActionEnd?: () => void;
 };
 
 type ScalarWriteContext = {
@@ -40,16 +42,24 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}
 	context.graph.read?.(input.graphNodeId, []);
-	if ('update' in input) {
-		return context.graph.update({
-			graphNodeId: input.graphNodeId,
-			path: [],
-			returnValue: input.returnValue,
-			update: input.update,
-		});
+	// A scalar leaf is always the write of an event handler (symbol-modules.ts's scalar-leaf gate
+	// only takes callback-prop writes down the full, try/finally-wrapped path), so the one write
+	// it makes here is a user action (submit-quiet-design.md Q2).
+	context.graph.markUserActionStart?.();
+	try {
+		if ('update' in input) {
+			return context.graph.update({
+				graphNodeId: input.graphNodeId,
+				path: [],
+				returnValue: input.returnValue,
+				update: input.update,
+			});
+		}
+		context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
+		return input.value;
+	} finally {
+		context.graph.markUserActionEnd?.();
 	}
-	context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
-	return input.value;
 }
 
 function marklessScalarLeafError(code: string, site: string): Error {

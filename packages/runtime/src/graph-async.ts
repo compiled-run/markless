@@ -36,6 +36,8 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	waitingFor?: { readonly key: unknown };
 	/** A handler that writes one of this node's key inputs marked it busy before running; cleared on `endEntry`, or left for the real run to clear once it lands. */
 	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot };
+	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
+	quiet?: boolean;
 };
 
 /** What the async plane shares with the held-inputs plane. */
@@ -122,6 +124,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			key,
 			value: (node.snapshot as { readonly value?: unknown }).value,
 			...(kept && { valueKey: kept.valueKey }),
+			...(node.quiet && { quiet: true }),
 		};
 	};
 
@@ -156,6 +159,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		key: unknown,
 		read: RuntimeGraphRead = readGraph,
 		waiting?: boolean,
+		fromWrite?: boolean,
 	): void => {
 		node.controller?.abort();
 		node.gate = 0;
@@ -165,12 +169,22 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const controller = new AbortController();
 		const version = ++node.version;
 		node.controller = controller;
+		// Captured synchronously, in the same turn as the write that triggered this run
+		// (markDirtyComputedDependencies calls `invalidate` before the write returns). A run a
+		// plain read demanded — a first load, or a resumed boundary's server-deferred fetch
+		// continuing on the client — is never quiet: nothing a user did or didn't do triggered
+		// it, so the "a first load marks nothing" rule applies the same way. Nor is a run that
+		// starts while a handler's own entry hold on this node is still open: that hold only ever
+		// opens from a handler's entry (submit-quiet-design.md Q1), so it already proves a
+		// handler, not a timer, is why this node is refreshing.
+		node.quiet =
+			!node.entryHold && !!fromWrite && (context.isUserAction ? !context.isUserAction() : false);
 		// A re-run keeps the last good value addressable while pending and after a
 		// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
 		const kept = lastGood(node.snapshot);
 		publish(node, pendingSnapshot(node, version, key));
 
-		const land = (snapshot: RuntimeGraphAsyncSnapshot): void => {
+		const land = (snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>): void => {
 			if (node.version !== version) return;
 			const landed = snapshot.status !== 'rejected';
 			if (landed) {
@@ -186,7 +200,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 				node.servedKey = undefined;
 				if (waiting) node.gate = 2;
 			}
-			publish(node, snapshot, landed);
+			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
 		};
 		const commitRejected = (error: unknown): void =>
 			land({ status: 'rejected', version, key, error, ...kept });
@@ -205,7 +219,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		}
 	};
 
-	const advance = (node: RuntimeAsyncComputedNode): void => {
+	const advance = (node: RuntimeAsyncComputedNode, fromWrite?: boolean): void => {
 		// Sync computeds have no settlement state, so walk through them until the
 		// gate reaches the async nodes whose snapshots can block this runner.
 		const visited = new Set<string>([node.graphNodeId]);
@@ -219,7 +233,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 				if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
 					blocked = dependency;
 					if (!dependency.valueInputs) shown = false;
-					demand(dependency);
+					demand(dependency, fromWrite);
 				} else if (!blocked && dependency.snapshot.status === 'rejected') blocked = dependency;
 				return;
 			}
@@ -250,13 +264,15 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		)
 			return;
 
-		start(node, nextKey);
+		start(node, nextKey, readGraph, undefined, fromWrite);
 	};
 
 	// A payload-planned pending snapshot still needs its runner started on
-	// first demand; otherwise only idle computeds start.
-	const demand = (node: RuntimeAsyncComputedNode): void => {
-		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node);
+	// first demand; otherwise only idle computeds start. A demanded run is never
+	// write-triggered (submit-quiet-design.md Q2): `invalidate` passes its own
+	// `fromWrite` down for the node a write actually dirtied.
+	const demand = (node: RuntimeAsyncComputedNode, fromWrite?: boolean): void => {
+		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, fromWrite);
 	};
 
 	// Marks a settled node pending before the write that will really refresh it: the key is
@@ -268,6 +284,10 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const previous = node.snapshot;
 		const version = ++node.version;
 		node.entryHold = { version, previous };
+		// This hold only ever starts from a handler's own entry (submit-quiet-design.md Q1),
+		// which is always a user action; a stale `quiet` left by an earlier, unrelated run must
+		// not leak onto this one, or the busy mark it exists to show would never appear.
+		node.quiet = false;
 		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
 	};
 
@@ -288,7 +308,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			demand(node);
 			return peek(node, path);
 		},
-		invalidate: (node) => void (node.snapshot.status !== 'idle' && advance(node)),
+		invalidate: (node) => void (node.snapshot.status !== 'idle' && advance(node, true)),
 		markEntry(graphNodeId) {
 			const node = nodes.get(graphNodeId);
 			if (node) markEntry(node);

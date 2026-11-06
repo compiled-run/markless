@@ -1897,7 +1897,15 @@ export function App() @{
 		const childHandlerModule = child.virtualModules.find(
 			(module) => module.id === childHandlerManifest.virtualModuleId,
 		)!;
-		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerModule.source)}`;
+		// A `data:` URL import resolves no bare specifier, so the module-wide
+		// `@markless/web/fns/user-action` import every event-handler now carries
+		// (submit-quiet-design.md Q2) is stubbed rather than left to fail; this test
+		// only cares about the captured callback routing, not the user-action mark.
+		const childHandlerSource = `const marklessUserActionStart = () => {}, marklessUserActionEnd = () => {};\n${childHandlerModule.source.replace(
+			/^import \{[^}]*\} from ['"]@markless\/web\/fns\/user-action['"];\n?/gm,
+			'',
+		)}`;
+		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerSource)}`;
 		const resolverUrl = `data:text/javascript,${encodeURIComponent(
 			resolver.source.split(childHandlerModule.id).join(childHandlerUrl),
 		)}`;

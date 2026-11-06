@@ -205,12 +205,22 @@ test('a carried module-scope declaration brings its value import, not the type i
 
 	expect(errors(compiled)).toEqual([]);
 	// The declaration's annotation is stripped at emission, so the type name is
-	// gone from the text as well as from the import list.
-	for (const kind of ['event-handler', 'state-initializer']) {
+	// gone from the text as well as from the import list. An event-handler module
+	// also carries the user-action mark's own import (submit-quiet-design.md Q2);
+	// a state-initializer is not a DOM event, so it carries none of that.
+	for (const kind of ['event-handler', 'state-initializer'] as const) {
 		const emitted = moduleOfKind(compiled, kind);
 		expect(emitted).toContain('const BASE = WIDTH;');
 		expect(emitted).not.toContain('Limit');
-		expect(importLines(emitted)).toEqual(['import { WIDTH } from "./limits.ts";']);
+		expect(importLines(emitted)).toEqual(
+			kind === 'event-handler'
+				? [
+						'import { marklessUserActionStart } from "@markless/web/fns/user-action";',
+						'import { marklessUserActionEnd } from "@markless/web/fns/user-action";',
+						'import { WIDTH } from "./limits.ts";',
+					]
+				: ['import { WIDTH } from "./limits.ts";'],
+		);
 	}
 });
 

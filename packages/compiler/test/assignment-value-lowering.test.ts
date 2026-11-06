@@ -59,5 +59,7 @@ test('compound, nullish, chained and conditioned assignments each lower where th
 
 test('the updater parameter never shadows a local the assigned value reads', async () => {
 	const source = await handlerSources(`() => { const value = 4; keep('v', (count += value)); }`);
-	expect(source).toContain('update(value1) {\n    return value1 + value;');
+	// Nested one level deeper than before: the user-action mark (submit-quiet-design.md
+	// Q2) wraps the whole handler body in its own `try`.
+	expect(source).toContain('update(value1) {\n      return value1 + value;');
 });
