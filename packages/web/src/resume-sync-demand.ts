@@ -65,6 +65,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 					graphNodeId: dependency.graphNodeId,
 					path: dependency.path,
 					async run() {
+						const done = graph.startDerive?.(computed.graphNodeId);
 						const module = (syncComputedModule ??=
 							await import('./resume-sync-computed.ts'));
 						const refresh = {
@@ -77,7 +78,8 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 						};
 						await (batches && computed.deriveOnRead
 							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-							: module.refreshSyncComputed(refresh));
+							: module.refreshSyncComputed(refresh)
+						).finally(done);
 					},
 				}),
 			);

@@ -78,7 +78,14 @@ function asyncComputedFromPayload(
 		input.state.computed
 			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
 			.map((computed) =>
-				asyncComputedFromRecord(computed, runnerSymbols[computed.graphNodeId]!, input, graphRef, decode),
+				asyncComputedFromRecord(
+					computed,
+					runnerSymbols[computed.graphNodeId]!,
+					input,
+					graphRef,
+					decode,
+					input.state.computed,
+				),
 			),
 	);
 }
@@ -89,11 +96,19 @@ async function asyncComputedFromRecord(
 	input: Pick<ResumePayloadGraphInput, 'root' | 'loadSymbol'>,
 	graphRef: () => RuntimeGraph,
 	decode?: Decode,
+	records?: ProtocolStatePayload['computed'],
 ): Promise<RuntimeGraphAsyncComputed> {
 	const dependencies = computed.dependencies ?? [];
+	const syncHops = dependencies.flatMap(({ graphNodeId }) => {
+		const hop = records?.find((record) => record.graphNodeId === graphNodeId && record.async === false);
+		return hop?.asyncFrom
+			? [{ graphNodeId, dependencies: hop.dependencies ?? [], asyncFrom: hop.asyncFrom }]
+			: [];
+	});
 	return {
 		graphNodeId: computed.graphNodeId,
 		dependencies,
+		...(syncHops.length > 0 ? { syncHops } : {}),
 		initialSnapshot:
 			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot, decode)),
 		key: (read: RuntimeGraphRead) => {
