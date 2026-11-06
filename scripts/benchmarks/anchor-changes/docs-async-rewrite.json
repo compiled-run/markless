@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 14331,
+			"reason": "Async page rewrite (PR #515): the Async page's figure chunk, which the state page preloads for its sidebar link, grew from the pencil-spot weather card to two playable ink figures (flap board and postcard race with frozen ink art, 306 KB raw and 34.7 KB gzip in the chunk); measured on CI run 42184184976 against the anchor main carries (2126990)",
+			"date": "2026-11-06"
+		}
+	]
+}
