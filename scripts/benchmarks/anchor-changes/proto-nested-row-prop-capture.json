@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "rows minted inside an owner row: a bound derive's own leading rows are already placed, so only the rows past them are threaded (async and sync computed reading a prop got undefined)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -6,
+			"reason": "rows minted inside an owner row: a bound derive's own leading rows are already placed, so only the rows past them are threaded (async and sync computed reading a prop got undefined)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "rows minted inside an owner row: a bound derive's own leading rows are already placed, so only the rows past them are threaded (async and sync computed reading a prop got undefined)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "rows minted inside an owner row: a bound derive's own leading rows are already placed, so only the rows past them are threaded (async and sync computed reading a prop got undefined)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "rows minted inside an owner row: a bound derive's own leading rows are already placed, so only the rows past them are threaded (async and sync computed reading a prop got undefined)",
+			"date": "2026-11-06"
+		}
+	]
+}
