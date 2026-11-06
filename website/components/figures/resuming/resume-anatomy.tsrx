@@ -165,7 +165,7 @@ export default function ResumeAnatomy() @{
 				onPointerup={() => {
 					if (!held) return;
 					const id = held;
-					if (Math.hypot(dragX, dragY) > 6) {
+					if (pos[id] && Math.hypot(dragX, dragY) > 6) {
 						const [x, y] = art.squares[pos[id]!]!;
 						const square = nearestSquare(art.squares, x + dragX, y + dragY);
 						const [sx, sy] = art.squares[square]!;

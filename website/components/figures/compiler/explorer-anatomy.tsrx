@@ -350,6 +350,7 @@ export default function ExplorerAnatomy() @{
 			.code-edit {
 				position: absolute;
 				inset: var(--pad) calc(var(--pad) + 11px) var(--pad) var(--pad);
+				width: calc(100% - 2 * var(--pad) - 11px);
 				height: calc(var(--lh) * 12);
 				border: 0;
 				outline: none;
