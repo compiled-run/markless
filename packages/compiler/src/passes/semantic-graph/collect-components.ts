@@ -4,6 +4,7 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
 import {
+	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
 	isHostTagName,
@@ -42,6 +43,7 @@ import {
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
+import { propsRestSignature } from './spread-event-guard.ts';
 import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
@@ -173,6 +175,7 @@ export function collectComponentEdge(
 		},
 		branchScopeIds: [...state.currentBranchScopeIds],
 		branchSiteIds: [...state.currentBranchSiteIds],
+		...(state.currentBranchArms.length > 0 ? { branchArms: [...state.currentBranchArms] } : {}),
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
 	});
 
@@ -195,18 +198,7 @@ function componentPropBindings(
 ): ReadonlyArray<SemanticComponentPropBinding> {
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
-	const scope: GraphReadScope = {
-		bindings: graphBindingMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-		aliases: semanticAliasMap(
-			state.graph,
-			state.currentSharedDefinitionId ?? null,
-			state.currentComponentName,
-		),
-	};
+	const scope = componentBodyScope(state);
 	const { bindings, aliases } = scope;
 	const props: SemanticComponentPropBinding[] = [];
 
@@ -302,6 +294,22 @@ function componentPropBindings(
 				sourceSpan: sourceSpan(callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
+			});
+			continue;
+		}
+
+		// A received handler handed on as is (`onClick={onPress}`) runs as this instance's `(event) => onPress?.(event)` would.
+		const relayed =
+			expression && isEventAttribute(name)
+				? relayedHandlerSource(expression, scope, state)
+				: undefined;
+		if (relayed && childSpreadsProp(name, link, state, childComponentName)) {
+			props.push({
+				name,
+				source: relayed.source,
+				kind: 'callback',
+				parameters: [relayed.parameter],
+				sourceSpan: span,
 			});
 			continue;
 		}
@@ -656,6 +664,60 @@ function spreadForwardsProp(
 		(spread) =>
 			!spread.destructuredNames.includes(propName) && !spread.excludeNames.includes(propName),
 	);
+}
+
+/** A received prop handed to an event attribute as is (`onClick={onPress}`), rewritten as the instance's `(event) => onPress?.(event)`. */
+export function receivedHandlerRelay(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string } | undefined {
+	return relayedHandlerSource(expression, componentBodyScope(state), state);
+}
+
+function componentBodyScope(state: WalkState): GraphReadScope {
+	return {
+		bindings: graphBindingMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+		aliases: semanticAliasMap(
+			state.graph,
+			state.currentSharedDefinitionId ?? null,
+			state.currentComponentName,
+		),
+	};
+}
+
+function relayedHandlerSource(
+	expression: AnyNode,
+	scope: GraphReadScope,
+	state: WalkState,
+): { readonly source: string; readonly parameter: string } | undefined {
+	if (expression.type !== 'Identifier') return undefined;
+	const source = getIdentifierName(expression);
+	if (!source || repeatRowBindsName(source, state)) return undefined;
+	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
+	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
+	const parameter = source === 'event' ? 'domEvent' : 'event';
+	return { source: `(${parameter}) => ${source}?.(${parameter})`, parameter };
+}
+
+function childSpreadsProp(
+	propName: string,
+	link: { readonly childComponentName: string; readonly importSource?: string } | undefined,
+	state: WalkState,
+	fallbackChildName: string,
+): boolean {
+	if (link?.importSource) return spreadForwardsProp(propName, link, state, fallbackChildName);
+	const childName = link?.childComponentName || fallbackChildName;
+	for (const statement of asNodes(state.semantic().ast.body as unknown)) {
+		const component = getComponentFunction(statement);
+		if (component?.name !== childName) continue;
+		const signature = propsRestSignature(component.node);
+		return Boolean(signature && !signature.destructuredNames.has(propName));
+	}
+	return false;
 }
 
 function servedComponentNames(

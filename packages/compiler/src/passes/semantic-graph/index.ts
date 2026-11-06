@@ -26,9 +26,10 @@ import { collectComponentProps } from './collect-components.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
-import { componentConstructReach } from '../construct-reach.ts';
+import { componentConstructReach, componentRootBoundary } from '../construct-reach.ts';
 import {
 	chunkElementCount,
 	componentAddressSteps,
@@ -183,6 +184,12 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	}
 
 	collectSharedCallbackBindings(state);
+	relayWidgetCallbackProps({
+		componentEdges: graph.componentEdges,
+		componentPropBindings: graph.componentPropBindings,
+		sharedCallbackBindings: graph.sharedCallbackBindings,
+		importedModuleInterfaces: state.importedModuleInterfaces,
+	});
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
@@ -289,7 +296,11 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							}),
 						),
 						constructReach: componentConstructReach(constructReachInput, root.id),
+						...(componentRootBoundary(constructReachInput, root.id)
+							? { rootBoundary: true as const }
+							: {}),
 						...spreadHostsField(chunks),
+						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
 							branchSites: graph.branchSites,
@@ -529,11 +540,15 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			const site = lastBranchSiteId(state);
 			const test = node.test as AnyNode | undefined;
 			withArmScope(state, site, () => {
-				withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
-					walkBranch(node.consequent as AnyNode | undefined, state),
+				withArm(state, site, 0, () =>
+					withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
+						walkBranch(node.consequent as AnyNode | undefined, state),
+					),
 				);
-				withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
-					walkBranch(node.alternate as AnyNode | undefined, state),
+				withArm(state, site, 1, () =>
+					withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
+						walkBranch(node.alternate as AnyNode | undefined, state),
+					),
 				);
 			});
 			collectConditionalBranchText(node, state);
@@ -548,7 +563,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				switchCase.test ? [switchCase.test as AnyNode] : [],
 			);
 			withArmScope(state, site, () => {
-				for (const switchCase of asNodes(node.cases)) {
+				for (const [arm, switchCase] of asNodes(node.cases).entries()) {
 					walk(switchCase.test as AnyNode | undefined, state);
 					const caseBranchId = `branch:${state.nextBranchId++}`;
 					const caseTest = switchCase.test as AnyNode | undefined;
@@ -558,11 +573,13 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 							? { kind: 'case', discriminant, test: caseTest }
 							: { kind: 'default', discriminant, tests: caseTests });
 					state.currentBranchScopeIds.push(caseBranchId);
-					withArmGuard(state, guard, () => {
-						for (const caseChild of asNodes(switchCase.consequent)) {
-							walkMarkupStatement(caseChild, state);
-						}
-					});
+					withArm(state, site, arm, () =>
+						withArmGuard(state, guard, () => {
+							for (const caseChild of asNodes(switchCase.consequent)) {
+								walkMarkupStatement(caseChild, state);
+							}
+						}),
+					);
 					state.currentBranchScopeIds.pop();
 				}
 			});
@@ -582,7 +599,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			state.currentArmGuards = [];
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {
-					walk(child, state);
+					if (child === node.body)
+						withCreationSite(state, 'row', () => walk(child, state));
+					else walk(child, state);
 				}
 			});
 			state.currentArmGuards = outerGuards;
@@ -762,6 +781,12 @@ function withArmScope(state: WalkState, branchSiteId: string | null, run: () => 
 	run();
 	if (branchSiteId) state.currentBranchSiteIds.pop();
 	state.currentArmScope = previous;
+}
+
+function withArm(state: WalkState, branchSiteId: string | null, arm: number, run: () => void): void {
+	if (branchSiteId) state.currentBranchArms.push({ branchSiteId, arm });
+	run();
+	if (branchSiteId) state.currentBranchArms.pop();
 }
 
 function withArmGuard(state: WalkState, guard: ArmGuard | undefined, run: () => void): void {

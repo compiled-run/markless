@@ -21,6 +21,7 @@ import type {
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
 	SemanticGraphBinding,
+	SemanticKeyedRepeat,
 	SemanticSharedCallbackBinding,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
@@ -92,8 +93,8 @@ const ASYNC_BOUNDARY = [
 const BEHAVIOR = ['web/resume-behaviors'];
 // A shared() instance that outlives the page: its binding at wake.
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
-// The router's swap binder: no record demands it, so it stays off every page until a navigation imports it.
-const SHARED_SWAP = ['web/shared-swap'];
+// The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
+const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
@@ -187,6 +188,7 @@ export function createRuntimeDemandMap(
 		// This module's own components, so a same-module edge can name its child.
 		readonly components?: ReadonlyArray<SemanticComponent>;
 		readonly sharedCallbackBindings?: ReadonlyArray<SemanticSharedCallbackBinding>;
+		readonly keyedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
 	},
 	demandClass: RuntimeDemandClass,
 ): RuntimeDemandMapArtifact {
@@ -327,6 +329,7 @@ function firstUseComposition(
 	| 'components'
 	| 'sharedCallbackBindings'
 	| 'fixedBranchSymbolIds'
+	| 'staticRepeatIds'
 > {
 	return {
 		componentEdges: Array.isArray(input.componentEdges)
@@ -337,7 +340,18 @@ function firstUseComposition(
 		components: input.components ?? [],
 		sharedCallbackBindings: input.sharedCallbackBindings ?? [],
 		fixedBranchSymbolIds: fixedBranchSymbolIds(input.symbolModules),
+		staticRepeatIds: staticRepeatIds(input.keyedRepeats ?? []),
 	};
+}
+
+// A @for over a value no graph node holds renders its rows once, as does one over such a row's own items.
+function staticRepeatIds(repeats: ReadonlyArray<SemanticKeyedRepeat>): ReadonlySet<string> {
+	const byId = new Map(repeats.map((repeat) => [repeat.id, repeat]));
+	const isStatic = (repeat: SemanticKeyedRepeat | undefined): boolean =>
+		!!repeat &&
+		repeat.collectionGraphNodeId === undefined &&
+		(repeat.enclosingRepeatId === undefined || isStatic(byId.get(repeat.enclosingRepeatId)));
+	return new Set(repeats.filter(isStatic).map((repeat) => repeat.id));
 }
 
 // The build refuses every caller that can change a prop-decided branch's props, so its flip, which ships no code, never runs.
@@ -1441,6 +1455,7 @@ export type FirstUseScope = {
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
 	// Flip symbols of branches that never flip once built.
 	readonly fixedBranchSymbolIds: ReadonlySet<string>;
+	readonly staticRepeatIds: ReadonlySet<string>;
 };
 
 // Written paths per graph node; null when the whole node may have changed.
@@ -1483,7 +1498,7 @@ function firstUseDemand(
 			if (!read.graphNodeId.startsWith('prop:')) continue;
 			const prop = read.path[0];
 			if (prop === undefined) return 'unknown';
-			calls.push({ prop });
+			if (!rowDataRead(symbolId, read, scope.captureAnalysis)) calls.push({ prop });
 		}
 		const slots = composerSlotCalls(symbolId, scope.captureAnalysis);
 		if (slots === 'unknown') return 'unknown';
@@ -1495,6 +1510,30 @@ function firstUseDemand(
 		}
 	}
 	return consequenceReach(scope, symbolIds, new Set(ownRecordIds), affected, calls);
+}
+
+// A field of a row the page serves as data, never code a composing module passes.
+function rowDataRead(
+	symbolId: string,
+	read: { readonly componentName?: string; readonly path: ReadonlyArray<string> },
+	captureAnalysis: CaptureAnalysisArtifact | undefined,
+): boolean {
+	const slots = (
+		captureAnalysis?.extractedSymbols.find((symbol) => symbol.symbolId === symbolId)
+			?.captureSlots ?? []
+	).filter(
+		(slot) =>
+			slot.propName === read.path[0] &&
+			slot.owner.componentName === read.componentName &&
+			slot.path.join('\0') === read.path.slice(1).join('\0'),
+	);
+	return (
+		slots.length > 0 &&
+		slots.every(
+			(slot) =>
+				slot.routes.length > 0 && slot.routes.every((route) => route.kind === 'row-local'),
+		)
+	);
 }
 
 // Resume start derives every served repeat's unserved computed collection, whichever action woke
@@ -1666,6 +1705,7 @@ function consequenceReach(
 			return !branch || branchFlips(branch);
 		}) ||
 		edge.keyedRepeatScopeIds.some((id) => {
+			if (scope.staticRepeatIds.has(id)) return false;
 			const repeat = view.keyedRepeats?.find((candidate) => candidate.id === id);
 			return !repeat || repeatMoves(repeat);
 		}) ||
@@ -1673,6 +1713,10 @@ function consequenceReach(
 			(view.asyncBoundaries ?? []).some(
 				(boundary) => boundary.id === edge.asyncBoundaryId && reads(boundary.asyncReads),
 			));
+	// Rows a static @for renders once take constant props: the compiler refuses a reactive read in them.
+	const staticRow = (edge: SemanticComponentEdge) =>
+		edge.keyedRepeatScopeIds.length > 0 &&
+		edge.keyedRepeatScopeIds.every((id) => scope.staticRepeatIds.has(id));
 	let mountsLocalChild = false;
 	if (affected.size > 0) {
 		for (let grew = true; grew;) {
@@ -1689,6 +1733,7 @@ function consequenceReach(
 					mountsLocalChild = true;
 					continue;
 				}
+				if (staticRow(edge)) continue;
 				const names = changedPropNames(edge, affected, reads);
 				if (names.size === 0) continue;
 				for (const binding of scope.graphBindings) {
@@ -1715,7 +1760,8 @@ function consequenceReach(
 	for (const edge of scope.componentEdges) {
 		if (edge.importSource === undefined) continue;
 		const mounts = edgeMounts(edge);
-		const names = mounts ? new Set<string>() : changedPropNames(edge, affected, reads);
+		const names =
+			mounts || staticRow(edge) ? new Set<string>() : changedPropNames(edge, affected, reads);
 		if (!mounts && names.size === 0) continue;
 		const child = importedChildReach(scope, edge);
 		if (!child) return 'unknown';

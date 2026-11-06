@@ -30,7 +30,14 @@ export interface FragmentNavigationConfig {
 	readonly pageStartComment: string;
 	// The container's own attributes, never carried from the leaving page's element to the next one.
 	readonly containerAttributes: readonly [container: string, paths: string];
-	readonly keepAttributes: readonly [keep: string, own: string, vary: string];
+	// The keep, own, vary and instance marks, and the vary mark's name for an element's own text.
+	readonly keepAttributes: readonly [
+		keep: string,
+		own: string,
+		vary: string,
+		instance: string,
+		text: string,
+	];
 	// 'document' apps swap the whole body: their shell renders from the request URL.
 	readonly documentLoads: boolean;
 	// A mouse fetches after resting this long on a link; press, focus and touch fetch at once.
@@ -675,6 +682,10 @@ function morphRange(
 			if (after && after !== stop && sameKind(after, next)) {
 				cursor.remove();
 				cursor = after;
+				if (kept(d, cursor, next, fresh)) {
+					cursor = cursor.nextSibling;
+					continue;
+				}
 			}
 		}
 		if (cursor && cursor !== stop && sameKind(cursor, next)) {
@@ -694,16 +705,20 @@ function morphRange(
 	}
 }
 
-let keepAttributes: readonly [keep: string, own: string, vary: string] = ['', '', ''];
+let keepAttributes: FragmentNavigationConfig['keepAttributes'] = ['', '', '', '', ''];
+// Loaded by a navigation that leaves a kept part with state; without it such a part is morphed.
+let keptSwap: typeof import('@markless/web/kept-swap') | undefined;
 
 // Both pages render this element byte for byte but for its vary-marked attributes: it stays, with what scripts did to it.
 function keptSlots(
 	from: ChildNode,
 	to: ChildNode,
 ): [Element[], Element[], Element[][]] | undefined {
-	const [keep, own, vary] = keepAttributes;
+	const [keep, own, vary, instance] = keepAttributes;
 	const hash = keep && from.nodeType === 1 && (from as Element).getAttribute(keep);
 	if (!hash || to.nodeType !== 1 || hash !== (to as Element).getAttribute(keep)) return undefined;
+	if ((from as Element).hasAttribute(instance) && !keptSwap?.sameShape(from, to, own))
+		return undefined;
 	const slots = (root: Element) =>
 		root.hasAttribute(own)
 			? [root]
@@ -725,14 +740,41 @@ function keptSlots(
 	return before.length === after.length ? [leaving, arriving, [before, after]] : undefined;
 }
 
+// Each kept part with state on the leaving page, and the next page's part of the same hash the swap keeps it as.
+function keptPairs(
+	outgoing: Element,
+	incoming: Element,
+	keep: string,
+	instance: string,
+): Array<{ readonly from: string; readonly to: string }> {
+	const arriving = [...incoming.querySelectorAll(`[${instance}]`)];
+	const pairs: Array<{ readonly from: string; readonly to: string }> = [];
+	for (const element of outgoing.querySelectorAll(`[${instance}]`)) {
+		const at = arriving.findIndex(
+			(next) => next.getAttribute(keep) === element.getAttribute(keep) && !!keptSlots(element, next),
+		);
+		if (at === -1) continue;
+		const [next] = arriving.splice(at, 1);
+		pairs.push({ from: element.getAttribute(instance)!, to: next!.getAttribute(instance)! });
+	}
+	return pairs.filter((pair) => pair.from && pair.to);
+}
+
 function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): boolean {
 	const slots = keptSlots(from, to);
 	if (!slots) return false;
 	const [leaving, arriving, [before, after]] = slots;
-	const vary = keepAttributes[2];
+	const [, , vary, instance, text] = keepAttributes;
+	// The next page may place the part at another instance path; its next swap reads the cells under this one.
+	const path = (to as Element).getAttribute(instance);
+	if (path !== null) (from as Element).setAttribute(instance, path);
 	before.forEach((element, index) => {
 		const next = after[index]!;
 		for (const name of next.getAttribute(vary)!.split(' ')) {
+			if (name === text) {
+				keptSwap?.keptText(d, element, next);
+				continue;
+			}
 			const value = next.getAttribute(name);
 			if (value === null) element.removeAttribute(name);
 			else if (element.getAttribute(name) !== value) element.setAttribute(name, value);
@@ -780,6 +822,13 @@ function morphDrops([parent, start, stop, incoming, page]: MorphRange, node: Nod
 			if (after && after !== stop && sameKind(after, next)) {
 				if (cursor === own) return true;
 				cursor = after;
+				const slots = keptSlots(cursor, next);
+				if (slots) {
+					if (cursor === own)
+						return slots[0].some((slot) => slot !== node && slot.contains(node));
+					cursor = cursor.nextSibling;
+					continue;
+				}
 			}
 		}
 		if (sameKind(cursor, next)) {
@@ -1046,6 +1095,7 @@ export async function navigate(
 	const w = d.defaultView;
 	if (!state || !w) return;
 	containerAttribute = state.config.containerAttributes[0];
+	keepAttributes = state.config.keepAttributes ?? ['', '', '', '', ''];
 	const session = sessionFor(d);
 	const id = ++session.navigation;
 	// The address and history entry change only when the page swaps in, so Back before then goes back from the page still shown.
@@ -1071,6 +1121,14 @@ export async function navigate(
 		? import('@markless/web/shared-swap')
 		: undefined;
 	sharedSwap?.catch(() => {});
+	// A kept part with state hands its live values to the next page's instance, which only the swap binder knows how to read.
+	const [keepAttribute, , , instanceAttribute] = state.config.keepAttributes;
+	keptSwap = undefined;
+	const keptSwapping =
+		instanceAttribute && d.querySelector(`[${instanceAttribute}]`)
+			? import('@markless/web/kept-swap')
+			: undefined;
+	keptSwapping?.catch(() => {});
 	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
 	try {
@@ -1129,6 +1187,31 @@ export async function navigate(
 		}
 		if (stale()) return abandon();
 	}
+	let adoptKept: import('@markless/web/kept-swap').KeptCarry | undefined;
+	const swapping = await keptSwapping?.catch(() => undefined);
+	if (stale()) return abandon();
+	keptSwap = swapping;
+	const pairs = keptSwap ? keptPairs(outgoing, incoming, keepAttribute, instanceAttribute) : [];
+	if (keptSwap && pairs.length > 0) {
+		try {
+			for (let tries = 0; tries < 3; tries++) {
+				adoptKept?.restore();
+				adoptKept = await keptSwap.carryKeptParts({
+					outgoing,
+					incoming,
+					containerAttribute,
+					resumeAttribute,
+					pairs,
+				});
+				if (stale()) return abandon();
+				if (!adoptKept?.moved()) break;
+			}
+		} catch (error) {
+			reportAsync(error);
+		}
+		if (stale()) return abandon();
+		keptSwap = swapping;
+	}
 	let restore = scroll;
 	let region!: Element;
 	let end!: Comment;
@@ -1153,7 +1236,6 @@ export async function navigate(
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
 		session.streaming?.abort();
 		const settle = withoutTransitions(d);
-		keepAttributes = state.config.keepAttributes ?? ['', '', ''];
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
 			if (!element.isConnected || !scope.contains(element)) continue;
@@ -1232,6 +1314,10 @@ export async function navigate(
 		region = outgoing;
 		for (const [parent, cursor, stop, nodes, page] of ranges)
 			morphRange(d, parent, cursor, stop, nodes, fresh, page);
+		const container = isContainer(outgoing)
+			? outgoing
+			: outgoing.querySelector(`[${containerAttribute}]`);
+		if (adoptKept && container) adoptKept.install(container);
 		if (leavingEnd) end = leavingEnd;
 		else if (wholeBody) region.append((end = d.createComment('')));
 		else outgoing.after((end = d.createComment('')));

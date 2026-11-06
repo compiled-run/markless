@@ -414,6 +414,27 @@ export function childRepeatWithoutElementDiagnostic(input: {
 	});
 }
 
+export function rowValueLocalUnfollowedDiagnostic(input: {
+	readonly localName: string;
+	readonly expression: AnyNode;
+	readonly source: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const value = expressionSource(input.expression, input.source);
+	return {
+		...semanticGraphDiagnostic({
+			code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+			title: 'A @for row value reads a component-body local the compiler cannot follow',
+			message: `\`${value}\` in a @for row reads \`${input.localName}\`, and the compiler cannot find the definition that says which state it reads, so the row would keep the value it first rendered.`,
+			why: "A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+			span: sourceSpan(input.expression, input.filename),
+			suggestion: `Declare \`${input.localName}\` once as a \`const\` or a function in the component body, or read the state through a \`computed()\`.`,
+			docsUrl: 'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		}),
+		severity: 'warning',
+	};
+}
+
 function semanticGraphDiagnostic(input: {
 	readonly code: SemanticGraphDiagnostic['code'];
 	readonly title: string;
@@ -484,7 +505,7 @@ export function moduleScopeElementDiagnostic(
 export function unstableStateCreationSiteDiagnostic(input: {
 	readonly name: string;
 	readonly apiName: 'state' | 'computed' | 'storage';
-	readonly site: 'computed' | 'handler' | 'branch' | 'loop';
+	readonly site: 'computed' | 'handler' | 'branch' | 'loop' | 'row';
 	readonly init: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
@@ -635,7 +656,7 @@ function helperReturnUnsupportedDiagnostic(input: {
 }
 
 function unstableCreationSiteText(
-	site: 'computed' | 'handler' | 'branch' | 'loop',
+	site: 'computed' | 'handler' | 'branch' | 'loop' | 'row',
 	name: string,
 ): { readonly message: string; readonly why: string; readonly fix: string } {
 	return {
@@ -658,6 +679,11 @@ function unstableCreationSiteText(
 			message: 'inside a loop',
 			why: 'A loop body can run any number of times, so one authored declaration cannot map to one stable payload cell.',
 			fix: 'Declare component-level state outside the loop; use keyed repeat row graph scope when per-row state is supported.',
+		},
+		row: {
+			message: 'inside a @for row',
+			why: 'One declaration in a row body would be one cell for every row: pressing one row would change them all.',
+			fix: "Move the row into a component in its own file and declare the cell there, e.g. <BookRow book={book} />. Each row then gets its own value, and it stays with the row's key when the list reorders.",
 		},
 	}[site];
 }
@@ -1650,6 +1676,31 @@ export function repeatKeyUnstableDiagnostic(input: {
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_KEY_UNSTABLE',
+	} as SemanticGraphDiagnostic;
+}
+
+export function repeatItemPatternUnsupportedDiagnostic(input: {
+	readonly pattern: AnyNode;
+	readonly patternSource: string;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'This @for loop name cannot be destructured this way',
+		message: `@for (const ${input.patternSource} of ...) uses a default value, a rest element or a computed key. A destructured loop name may only pick array positions and named fields, so this list would render no rows.`,
+		why: 'Each name a destructured loop name binds is read straight off the row item at a fixed position or field; a default, a rest element or a computed key has no fixed place on the item.',
+		primarySpan: sourceSpan(input.pattern, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Loop with a plain name and read the fields off it, such as `@for (const row of rows; key row.id) { <li>{row.name ?? "none"}</li> }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
 	} as SemanticGraphDiagnostic;
 }
 

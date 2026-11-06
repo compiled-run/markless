@@ -26,12 +26,14 @@ import type {
 	SemanticLocalDeclaration,
 	SemanticMarkupArtifact,
 	SemanticOverlay,
+	SemanticBranchArm,
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
 	ModuleFunctionWrites,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
+	SemanticRowLocalReads,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
@@ -76,6 +78,7 @@ export type MutableSemanticGraphArtifact = {
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
+	rowLocalReads?: SemanticRowLocalReads[];
 	stateWrites: SemanticStateWrite[];
 	importedFunctionWriteRequests?: string[];
 	asyncBoundaries: Array<{
@@ -139,6 +142,7 @@ export type WalkState = {
 	currentBranchScopeIds: string[];
 	/** The `branch-site:` ids of the @if/@switch blocks enclosing the walk, outermost first. */
 	currentBranchSiteIds: string[];
+	currentBranchArms: SemanticBranchArm[];
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
@@ -160,7 +164,7 @@ export type WalkState = {
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	currentAsyncBoundaryArm: number | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
@@ -294,6 +298,7 @@ export function createWalkState(input: {
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentBranchSiteIds: [],
+		currentBranchArms: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,

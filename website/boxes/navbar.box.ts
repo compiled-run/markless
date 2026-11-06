@@ -1,5 +1,6 @@
 import { box } from '@async/witness';
 import { chromium, expect, type Page } from '@playwright/test';
+import { github, panels } from '../components/docs/navbar/sections.ts';
 import { SEARCH_INDEX_FILE } from '../components/docs/search/search-load.ts';
 import { pagerFor } from '../nav.ts';
 import { asset } from '../site-base.ts';
@@ -231,6 +232,7 @@ export default box(
 			for (let k = 0; k < 4; k++) {
 				await page.locator('.nav-pill .theme-toggle:visible').click();
 				await page.waitForTimeout(800);
+				await expect(search, 'the theme toggle leaves the search closed').toBeHidden();
 				const next = page.locator('nav[aria-label="Page navigation"] a', { hasText: 'NEXT' });
 				const nextPath = new URL((await next.getAttribute('href'))!, server.url).pathname;
 				await navigateBy(page, () => next.click(), nextPath);
@@ -252,6 +254,19 @@ export default box(
 				await landed(mobile, path);
 				await expect(mobile.locator('.menu-panel')).toBeHidden(POLL);
 			}
+			// Each menu link draws its desktop card's picture from the same sprite, and Escape hands focus back to the menu button.
+			await mobile.locator('.mobile-bar [aria-label="Open menu"]').click();
+			await expect(mobile.locator('.menu-panel')).toBeVisible(POLL);
+			const drawn = await mobile.locator('.menu-panel .menu-body a').evaluateAll((links) =>
+				links.map((link) => {
+					const art = link.querySelector('svg.nav-art');
+					return [link.getAttribute('href'), art?.querySelector('use')?.getAttribute('href')?.split('#')[1] ?? null, (art?.getBoundingClientRect().width ?? 0) > 0];
+				}),
+			);
+			expect(drawn).toEqual([...panels.flatMap((panel) => panel.cards.map((card) => [card.href, card.art, true])), [github, null, false]]);
+			await mobile.keyboard.press('Escape');
+			await expect(mobile.locator('.menu-panel')).toBeHidden(POLL);
+			await expect.poll(() => focused(mobile), POLL).toBe('Open menu');
 			expect(errors).toEqual([]);
 			await receipt.capture('navbar works after seven in-place navigations, scroll-away matches on every page, the theme toggle never shows the wrong drawing, and the paper grain inside the bars stays put while the page scrolls');
 		} finally {

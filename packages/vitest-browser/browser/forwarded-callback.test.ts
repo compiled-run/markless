@@ -2,9 +2,14 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import Deep from './forwarded-callback/deep.tsrx';
 import Handed from './forwarded-callback/handed.tsrx';
+import HandedDirect from './forwarded-callback/handed-direct.tsrx';
+import HandedDirectPage from './forwarded-callback/handed-direct-page.tsrx';
+import LocalStatePage from './forwarded-callback/local-state-page.tsrx';
 import Forwarded from './forwarded-callback/page.tsrx';
 import Repeated from './forwarded-callback/repeated.tsrx';
 import SameModule from './forwarded-callback/same-module.tsrx';
+import WidgetShared from './forwarded-callback/widget-shared.tsrx';
+import WidgetSharedPage from './forwarded-callback/widget-shared-page.tsrx';
 
 afterEach(() => cleanup());
 
@@ -115,4 +120,88 @@ test('CSR: one spreading call site with a callback in some instances and none in
 });
 test('SSR resume: one spreading call site with a callback in some instances and none in others', async () => {
 	await anInstanceHandedNoCallbackRunsNone((await renderSSR(Handed)).container as HTMLElement);
+});
+
+// A handler handed on as the prop itself (`onClick={onPress}`), to a part that spreads it
+// (imported or same-module) and to one that declares `onClick` and calls it.
+async function eachRelayRunsItsOwnCallback(container: HTMLElement) {
+	const last = () => container.querySelector('[data-last]')!.textContent;
+	const press = (selector: string) => container.querySelector<HTMLButtonElement>(selector)!.click();
+	await withoutPageErrors(async () => {
+		press('[data-relay="none"]');
+		press('[data-turn="idle"]');
+		await settle();
+		expect(last()).toBe('');
+		for (const [selector, to] of [
+			['[data-relay="light"]', 'light'],
+			['[data-turn="right"]', 'right'],
+			['[data-relay="dark"]', 'dark'],
+			['[data-pass="up"] button', 'up'],
+			['[data-turn="left"]', 'left'],
+			['[data-pass="down"] button', 'down'],
+		]) {
+			press(selector!);
+			await expect.poll(last).toBe(to);
+		}
+		press('[data-relay="none"]');
+		press('[data-turn="idle"]');
+		await settle();
+		expect(last()).toBe('down');
+	});
+}
+
+test('CSR: a received callback handed straight to a part runs for its own instance', async () => {
+	await eachRelayRunsItsOwnCallback((await render(HandedDirect)).container as HTMLElement);
+});
+test('SSR resume: a received callback handed straight to a part runs for its own instance', async () => {
+	await eachRelayRunsItsOwnCallback((await renderSSR(HandedDirect)).container as HTMLElement);
+});
+test('CSR: a received callback handed straight to a part, one module below the page', async () => {
+	await eachRelayRunsItsOwnCallback((await render(HandedDirectPage)).container as HTMLElement);
+});
+test('SSR resume: a received callback handed straight to a part, one module below the page', async () => {
+	await eachRelayRunsItsOwnCallback((await renderSSR(HandedDirectPage)).container as HTMLElement);
+});
+
+// A callback prop to an imported button, from a component rendered one module below the page:
+// the callback runs on the page graph once, not under the composing module's path twice.
+async function eachStallCountsItsOwnPresses(container: HTMLElement, total?: () => string | null | undefined) {
+	const sold = (name: string) => container.querySelector(`[data-sold="${name}"]`)?.textContent;
+	const sell = (name: string) =>
+		container.querySelector(`[data-sold="${name}"]`)!.parentElement!.querySelector('button')!.click();
+	await withoutPageErrors(async () => {
+		sell('cookies');
+		await expect.poll(() => sold('cookies')).toBe('1');
+		expect(sold('lemonade')).toBe('0');
+		sell('lemonade');
+		sell('lemonade');
+		await expect.poll(() => sold('lemonade')).toBe('2');
+		expect(sold('cookies')).toBe('1');
+		if (total) expect(total()).toBe('3');
+	});
+}
+
+const pageTotal = (container: HTMLElement) => () => container.querySelector('[data-total]')?.textContent;
+
+test('CSR: a callback prop writing widget-scoped shared() state reaches its own widget', async () => {
+	const { container } = await render(WidgetShared);
+	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
+});
+test('SSR resume: a callback prop writing widget-scoped shared() state reaches its own widget', async () => {
+	const { container } = await renderSSR(WidgetShared);
+	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
+});
+test('CSR: a callback prop writing widget-scoped shared() state, one module below the page', async () => {
+	const { container } = await render(WidgetSharedPage);
+	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
+});
+test('SSR resume: a callback prop writing widget-scoped shared() state, one module below the page', async () => {
+	const { container } = await renderSSR(WidgetSharedPage);
+	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
+});
+test('CSR: a callback prop writing its own state(), one module below the page', async () => {
+	await eachStallCountsItsOwnPresses((await render(LocalStatePage)).container as HTMLElement);
+});
+test('SSR resume: a callback prop writing its own state(), one module below the page', async () => {
+	await eachStallCountsItsOwnPresses((await renderSSR(LocalStatePage)).container as HTMLElement);
 });

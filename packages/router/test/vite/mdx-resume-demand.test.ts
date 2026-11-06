@@ -76,3 +76,34 @@ test('MDX retries a rejected fallback import and retains it after a dispatch err
 	expect(load).toHaveBeenCalledTimes(2);
 	expect(dispatch).toHaveBeenCalledTimes(2);
 });
+
+// The boot applies only the policies it can read off served markup; content the browser built carries none.
+test('MDX dispatches with the policy and the stop the boot actually applied', async () => {
+	const dispatch = vi.fn();
+	let handoffOptions: ((handoff: object) => unknown) | undefined;
+	const load = vi.fn().mockResolvedValue({
+		resumeFromPayloadDocument: (input: {
+			handoffDispatchOptions: (handoff: object) => unknown;
+		}) => {
+			handoffOptions = input.handoffDispatchOptions;
+			return { runtime: { dispatch } };
+		},
+	});
+	const resume = await entry("import Control from './Control.tsrx';\n\n<Control />", load);
+	const event = {};
+	await resume({
+		root: {},
+		event,
+		syncPolicyAlreadyApplied: false,
+		propagationStopped: false,
+	} as never);
+	expect(dispatch).toHaveBeenCalledWith(
+		event,
+		expect.objectContaining({ syncPolicyAlreadyApplied: false, propagationStopped: false }),
+	);
+	expect(
+		handoffOptions?.({ event, syncPolicyAlreadyApplied: true, propagationStopped: true }),
+	).toEqual(
+		expect.objectContaining({ syncPolicyAlreadyApplied: true, propagationStopped: true }),
+	);
+});

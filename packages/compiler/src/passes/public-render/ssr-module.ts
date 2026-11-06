@@ -642,7 +642,7 @@ function repeatLocalLines(
 							'marklessSsrDataContext',
 							outerRowNameSource(input, componentName, binding.name),
 						)
-					: repeatLocalSource(repeats, binding.name, binding.field, 'marklessSsrDataContext')
+					: repeatLocalSource(repeats, binding, 'marklessSsrDataContext')
 			};`,
 	);
 }
@@ -1125,7 +1125,7 @@ function emitSsrDataLines(
 				// A widget rooted per row is one instance per row, so the token its
 				// parts mint ids from names the row as well as the edge.
 				rowScopedEdges.has(edge.id)
-					? 'marklessSsrRowSegment(marklessSsrDataContext.repeatKey)+'
+					? '(marklessSsrRowSegment(marklessSsrDataContext)??\'\')+'
 					: ''
 			}${JSON.stringify(child.symbolPrefix)}+marklessSsrChildrenWidgetRoot(${surfaceArgs}));`;
 			// The same token filed PER family this child roots, which is what a
@@ -1169,10 +1169,10 @@ function emitSsrDataLines(
 		// no identity to carry, so its interactive output still refuses.
 		const rowScoped = rowScopedEdges.has(edge.id);
 		const placement = rowScoped
-			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext.repeatKey)`
+			? `marklessSsrRowPlacement(${childLiteral},marklessSsrDataContext)`
 			: childLiteral;
 		const refusal = rowScoped
-			? `if(marklessSsrDataContext.repeatKey===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
+			? `if(marklessSsrRowSegment(marklessSsrDataContext)===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`;
 		return [
 			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix${

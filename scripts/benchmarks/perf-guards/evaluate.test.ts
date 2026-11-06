@@ -106,6 +106,24 @@ function measurement(): Json {
 			short: { shippedBytes: 330_000, executedChars: 55_000, answered: true, errors: [] },
 			long: { shippedBytes: 355_000, executedChars: 55_001, answered: true, errors: [] },
 		},
+		staticPropArms: {
+			short: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 19_439 },
+				},
+				answered: true,
+			},
+			long: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 22_929 },
+				},
+				answered: true,
+			},
+		},
 		serverStylesheets: {
 			small: {
 				workerBytes: 498_145,
@@ -370,6 +388,37 @@ describe('performance guards', () => {
 			expect.stringContaining(
 				'[G14] the hidden-panel fixture did not answer its date panel or help button: boom',
 			),
+		]);
+	});
+
+	test('G18 fails a page that loads code for an arm its literal props rule out', () => {
+		expect(failures(measurement())).toEqual([]);
+
+		const leaking = measurement();
+		leaking.staticPropArms.long.routes.tsrx.jsGzipBytes += 3_677;
+		expect(failures(leaking)).toEqual([
+			expect.stringContaining(
+				'[G18] a page passing Caption only text loads 20.2 KB of JS and runs 3820 chars at load with the short Gloss, 23.8 KB and 3820 with the long one: +3677 B and +0 chars for a Gloss its literal props never show (budget +512 B, +512 chars)',
+			),
+		]);
+
+		const running = measurement();
+		running.staticPropArms.long.routes.mdx.executedChars += 1_500;
+		expect(failures(running)).toEqual([
+			expect.stringContaining('[G18] an MDX page passing Caption only text'),
+		]);
+
+		const toothless = measurement();
+		toothless.staticPropArms.long.routes.shown.jsGzipBytes =
+			toothless.staticPropArms.short.routes.shown.jsGzipBytes;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('it must load at least 2.0 KB more'),
+		]);
+
+		const broken = measurement();
+		broken.staticPropArms.long.answered = false;
+		expect(failures(broken)).toEqual([
+			expect.stringContaining("[G18] the static-prop fixture's /glossary did not open its Gloss"),
 		]);
 	});
 

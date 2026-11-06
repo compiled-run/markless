@@ -49,6 +49,26 @@ export function marklessRowSegment(key: unknown): string {
 	return `r:${encodeURIComponent(String(key))}:`;
 }
 
+type RowContext = {
+	readonly repeatId?: string;
+	readonly repeatKey?: unknown;
+	readonly repeatOuter?: RowContext;
+};
+
+/** The segments of every row a render sits in, outermost first; undefined when one of those rows has no key to name it. */
+export function marklessRowPath(context: RowContext | undefined): string | undefined {
+	let path = '';
+	for (
+		let row = context;
+		row && (row.repeatId !== undefined || row.repeatKey !== undefined);
+		row = row.repeatOuter
+	) {
+		if (row.repeatKey === undefined) return undefined;
+		path = marklessRowSegment(row.repeatKey) + path;
+	}
+	return path;
+}
+
 // Row segments are runtime identity, so no route literal or symbol table holds one.
 export function marklessRowFreeSymbolId(symbolId: string, instancePath?: string): string {
 	const path = instancePath ?? INSTANCE_PATH.exec(symbolId)?.[0] ?? '';
@@ -482,6 +502,18 @@ export function marklessWidgetHandleId(
 	return marklessComposedGraphNodeId(handleId, instancePath, registry);
 }
 
+// Host space drops a segment a projection collapses: symbol `c0:p1:` is host `c1:`.
+export function marklessHostScopePath(instancePath: string): string {
+	const segments = instancePath.match(INSTANCE_SEGMENT) ?? [];
+	let scope = '';
+	for (let at = 0; at < segments.length; at++) {
+		const segment = segments[at]!;
+		if (!segment.startsWith('m') && segments[at + 1]?.startsWith('p')) continue;
+		scope += segment.startsWith('p') ? 'c' + segment.slice(1) : segment;
+	}
+	return scope;
+}
+
 type ScopedHandleReader = ResumeSymbolContext['getElementHandle'] & {
 	marklessHandleScope?: string;
 };
@@ -507,7 +539,8 @@ export function marklessInstanceScopedElementHandle(
 	// first already resolved onto its root, which no registration is filed under.
 	if ((getElementHandle as ScopedHandleReader).marklessHandleScope === instancePath)
 		return getElementHandle;
-	const scopedReader = (handleIdOrName: string) => {
+	const hostScope = marklessHostScopePath(instancePath);
+	const scopedReader = (handleIdOrName: string, ownScope?: string) => {
 		// Resolved per read, not per symbol: the widget registry is filled by the
 		// scoped graph this same context builds, so the answer exists only once the
 		// symbol body runs.
@@ -519,8 +552,8 @@ export function marklessInstanceScopedElementHandle(
 		// The qualified key alone: the compiled id names every instance on the page,
 		// and `scoped === handleIdOrName` is exactly the id no rendered widget owns.
 		return scoped === handleIdOrName
-			? getElementHandle(handleIdOrName)
-			: getElementHandle(scoped);
+			? getElementHandle(handleIdOrName, ownScope ?? hostScope)
+			: getElementHandle(scoped, ownScope ?? hostScope);
 	};
 	(scopedReader as ScopedHandleReader).marklessHandleScope = instancePath;
 	return scopedReader;

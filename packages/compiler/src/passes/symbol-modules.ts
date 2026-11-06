@@ -34,9 +34,9 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
+import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
-import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
@@ -288,7 +288,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
-		...(branchArms.propDecided.length > 0 ? { propDecidedBranches: branchArms.propDecided } : {}),
+		...(branchArms.propDecided.length > 0
+			? { propDecidedBranches: branchArms.propDecided }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
@@ -1396,7 +1398,12 @@ function renderBranchArms(
 } {
 	const renderData = input.renderData;
 	if (!renderData)
-		return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [], propDecided: [] };
+		return {
+			armsBySite: new Map(),
+			diagnostics: [],
+			escalationCandidates: [],
+			propDecided: [],
+		};
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
@@ -1478,7 +1485,9 @@ function renderBranchArms(
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
 					});
-					diagnostics.push(branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id));
+					diagnostics.push(
+						branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id),
+					);
 				}
 			}
 			continue;
@@ -1519,7 +1528,9 @@ function rowListDeciders(
 	const row = semanticGraph.markup.chunks.find(
 		(chunk) =>
 			/^repeat:.*:row$/.test(chunk.id) &&
-			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+			chunk.slots.some(
+				(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
+			),
 	);
 	const repeat = row
 		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
@@ -1623,7 +1634,10 @@ function renderBoundaryArms(
 				(candidate): candidate is string => candidate !== undefined,
 			);
 			const arms = chunkIds.map((chunkId) =>
-				renderChunkParts({ renderData, asyncComputedNodeIds, rowAttributes: true }, chunkId),
+				renderChunkParts(
+					{ renderData, asyncComputedNodeIds, rowAttributes: true },
+					chunkId,
+				),
 			);
 			if (arms.some((arm) => arm === null)) return [];
 			return [
@@ -1762,7 +1776,8 @@ function renderChunkParts(
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
-							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
+							(rowSlot.residue.kind === 'repeat-item' ||
+								rowSlot.residue.kind === 'graph-read')
 						) {
 							rowParts.push({
 								attribute: {
@@ -1779,7 +1794,9 @@ function renderChunkParts(
 													),
 												},
 											}),
-									...(rowSlot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+									...(rowSlot.alwaysPresent
+										? { alwaysPresent: true as const }
+										: {}),
 								},
 							});
 							continue;
@@ -2008,7 +2025,7 @@ function scopedPropConstant(
 }
 
 function constantAttributeHtml(name: string, value: unknown, alwaysPresent: boolean): string {
-	const text = staticAttributeText(name, value);
+	const text = attributeText(name, value);
 	if (text === null) return '';
 	const escaped = armTextEscape(text).replaceAll('"', '&quot;');
 	return alwaysPresent ? escaped : ` ${name}="${escaped}"`;
@@ -2137,31 +2154,59 @@ function componentEdgeSpan(
 
 const emptyLocalNames = new Set<string>();
 
+// A name a destructured @for binds is a row local read at its path on the row item.
+type RowLocalNames = ReadonlySet<string> & {
+	readonly itemPaths?: ReadonlyMap<string, ReadonlyArray<string>>;
+};
+
+function rowLocalPath(localNames: ReadonlySet<string>, name: string): ReadonlyArray<string> {
+	return (localNames as RowLocalNames).itemPaths?.get(name) ?? [name];
+}
+
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
 	semanticGraph?: SemanticGraphArtifact,
 	symbolResolver?: SymbolResolverPlan,
 ): ReadonlyMap<string, ReadonlySet<string>> {
-	const localNamesBySymbol = new Map<string, Set<string>>();
-	const addLocal = (symbolId: string, itemName: string): void => {
+	const localNamesBySymbol = new Map<
+		string,
+		Set<string> & { itemPaths?: Map<string, ReadonlyArray<string>> }
+	>();
+	const addLocal = (
+		symbolId: string,
+		itemName: string,
+		aliases: SemanticGraphArtifact['keyedRepeats'][number]['itemAliases'] = [],
+	): void => {
 		let localNames = localNamesBySymbol.get(symbolId);
 		if (!localNames) {
 			localNames = new Set();
 			localNamesBySymbol.set(symbolId, localNames);
 		}
 		localNames.add(itemName);
+		localNames.itemPaths?.delete(itemName);
+		for (const alias of aliases) {
+			localNames.add(alias.name);
+			(localNames.itemPaths ??= new Map()).set(alias.name, [itemName, ...alias.path]);
+		}
+	};
+	// Outer rows first, so an inner row's names win over an outer row's of the same spelling.
+	const depth = (repeatId: string): number => {
+		const repeat = semanticGraph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		return repeat?.enclosingRepeatId ? 1 + depth(repeat.enclosingRepeatId) : 0;
 	};
 	if (renderData) {
-		for (const repeat of renderData.repeats) {
+		for (const repeat of [...renderData.repeats].sort(
+			(left, right) => depth(left.repeatId) - depth(right.repeatId),
+		)) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
-			const indexName = semanticGraph?.keyedRepeats.find(
+			const semanticRepeat = semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === repeat.repeatId,
-			)?.indexName;
+			);
 			for (const interaction of renderData.interactions) {
 				if (!rowHostIds.has(interaction.hostNodeId)) continue;
 				for (const symbolId of interaction.symbolIds) {
-					addLocal(symbolId, repeat.itemName);
-					if (indexName) addLocal(symbolId, indexName);
+					addLocal(symbolId, repeat.itemName, semanticRepeat?.itemAliases);
+					if (semanticRepeat?.indexName) addLocal(symbolId, semanticRepeat.indexName);
 				}
 			}
 		}
@@ -2173,7 +2218,8 @@ function rowLocalNamesBySymbol(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		for (const repeat of semanticGraph?.keyedRepeats ?? [])
-			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) addLocal(symbol.id, repeat.itemName);
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id))
+				addLocal(symbol.id, repeat.itemName, repeat.itemAliases);
 	}
 	return localNamesBySymbol;
 }
@@ -4639,7 +4685,13 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBranchText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 	];
 
@@ -4779,7 +4831,13 @@ export function buildAsyncBoundaryUpdateEmission(
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBoundaryText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
@@ -4920,7 +4978,9 @@ function armsHaveRowAttributeParts(
 	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArms['arms'][number][number]>>,
 ): boolean {
 	return arms.some((arm) =>
-		arm.some((part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row)),
+		arm.some(
+			(part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row),
+		),
 	);
 }
 
@@ -5132,7 +5192,11 @@ function branchRowsFunctionNode(
 				callNode(identifierNode('marklessAttributeHtml'), [
 					memberChainNode('row.attribute.name'),
 					conditionalNode(
-						binaryNode('!==', memberChainNode('row.attribute.itemPath'), identifierNode('undefined')),
+						binaryNode(
+							'!==',
+							memberChainNode('row.attribute.itemPath'),
+							identifierNode('undefined'),
+						),
 						walkItem('row.attribute.itemPath'),
 						callNode(memberChainNode('graph.read'), [
 							memberChainNode('row.attribute.read.graphNodeId'),
@@ -5519,7 +5583,10 @@ function localValueNode(text: string, localNames: ReadonlySet<string>): Emission
 	if (!path || path.length < 2) return null;
 	if (!localNames.has(path[0] ?? '')) return null;
 
-	return optionalPathNode(memberChainNode('context.locals'), path);
+	return optionalPathNode(memberChainNode('context.locals'), [
+		...rowLocalPath(localNames, path[0]!),
+		...path.slice(1),
+	]);
 }
 
 /** The band-local twin of `staticSourcePath`, which reaches the scanner band. */
@@ -5542,11 +5609,12 @@ function staticDottedPath(text: string): ReadonlyArray<string> | null {
 function optionalPathNode(base: EmissionNode, path: ReadonlyArray<string>): EmissionNode {
 	let expression = base;
 	for (const part of path) {
+		const named = VALUE_IDENTIFIER_PATTERN.test(part);
 		expression = {
 			type: 'MemberExpression',
 			object: expression,
-			property: identifierNode(part),
-			computed: false,
+			property: named ? identifierNode(part) : literalNode(part),
+			computed: !named,
 			optional: true,
 		};
 	}
@@ -5829,7 +5897,10 @@ function rewriteGraphReadsAndLocals(
 		typeof node.name === 'string' &&
 		input.localNames.has(node.name)
 	) {
-		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
+		return optionalPathNode(
+			memberChainNode('context.locals'),
+			rowLocalPath(input.localNames, node.name),
+		);
 	}
 
 	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
@@ -6689,10 +6760,12 @@ function localNamesVisibleIn(fn: AnyNode, localNames: ReadonlySet<string>): Read
 	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, bound);
 	if (bound.size === 0) return localNames;
 
-	const visible = new Set<string>();
+	const visible: Set<string> & { itemPaths?: RowLocalNames['itemPaths'] } = new Set<string>();
 	for (const name of localNames) {
 		if (!bound.has(name)) visible.add(name);
 	}
+	const itemPaths = (localNames as RowLocalNames).itemPaths;
+	if (itemPaths) visible.itemPaths = itemPaths;
 
 	return visible.size === localNames.size ? localNames : visible;
 }

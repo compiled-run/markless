@@ -253,9 +253,23 @@ export function collectSsrPropEvents(
 		readonly wraps?: true;
 	}> = collectCsrPropEvents(root, propNames, source).flatMap((event) => {
 		const hostNodeId = hostNodeIdByPath.get(JSON.stringify(event.hostPath));
-		return hostNodeId
-			? [{ hostNodeId, eventName: event.eventName, propName: event.propName }]
-			: [];
+		if (!hostNodeId) return [];
+		// The semantic graph relays `onClick={onPress}` as `(event) => onPress?.(event)`, which hands the callback its event.
+		const relayed = semanticEvents.some(
+			(candidate) =>
+				candidate.hostNodeId === hostNodeId &&
+				candidate.eventName === event.eventName &&
+				candidate.handlerSource !== undefined &&
+				candidate.handlerSource.trim() !== event.propName,
+		);
+		return [
+			{
+				hostNodeId,
+				eventName: event.eventName,
+				propName: event.propName,
+				...(relayed ? { wraps: true as const } : {}),
+			},
+		];
 	});
 	const propNameSet = new Set(propNames);
 	for (const event of semanticEvents) {

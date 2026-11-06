@@ -164,7 +164,7 @@ export function AccordionItemTrigger({
 		type="button"
 		aria-expanded={isOpen ? 'true' : 'false'}
 		aria-controls={item.contentEl}
-		aria-disabled={isHeldOpen ? 'true' : false}
+		aria-disabled={isHeldOpen ? 'true' : undefined}
 		disabled={isLocked}
 		ui-open={isOpen}
 		ui-closed={isOpen !== true}

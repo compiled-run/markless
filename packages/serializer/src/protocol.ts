@@ -619,11 +619,21 @@ export type ProtocolViewPayload = {
 			/** The component whose render-data reader answers `source` slots; present exactly when one is. */
 			readonly componentName?: string;
 			readonly textSlots?: ReadonlyArray<
-				{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
+				{
+					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
+				} & ProtocolRowTemplateSlotValue
 			>;
+			/**
+			 * `fromEnd` lists the depths in `path` whose element follows a nested
+			 * list's rows in its parent: on a live row those rows sit in front of it,
+			 * so a patch counts that step from the parent's last element. Omitted when
+			 * no nested list stands before the slot.
+			 */
 			readonly attributeSlots?: ReadonlyArray<
 				{
 					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
 					readonly name: string;
 				} & ProtocolRowTemplateSlotValue
 			>;

@@ -129,6 +129,7 @@ export const runtimeDemandMap = {
 		"web/dom-update",
 		"web/fns/shared-instances",
 		"web/inline/sync-policy-core",
+		"web/kept-swap",
 		"web/payload-full-storage-free",
 		"web/payload-graph-construct",
 		"web/payload-resume",
@@ -219,7 +220,7 @@ async function marklessFullResumeHandoff(handoff) {
 		root: handoff.root,
 		loadSymbol: loadSymbol,
 	});
-	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, ignoreUnmatched: true });
+	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });
 }
 async function marklessResumeContainerEvent(input) {
 	await marklessFullResumeHandoff({ ...input, document: input.root });

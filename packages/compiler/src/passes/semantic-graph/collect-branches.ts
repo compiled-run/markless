@@ -5,6 +5,7 @@ import {
 	collectCompositeTemplateExpression,
 } from './composite-reads.ts';
 import { readsShadowingRowItem } from './collect-repeat.ts';
+import { propTestOf } from './prop-test.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 
@@ -73,11 +74,13 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			state,
 		);
 		const ifTest = branchTest(test, state);
+		const ifPropTest = ifTest.testReadsRowItem ? undefined : propTestOf(test, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
+			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...(state.currentAsyncBoundaryId
@@ -98,11 +101,15 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			state,
 		);
 		const switchTest = branchTest(discriminant, state);
+		const switchPropTest = switchTest.testReadsRowItem
+			? undefined
+			: propTestOf(discriminant, state);
 		state.graph.branchSites.push({
 			id: `branch-site:${state.nextBranchSiteId++}`,
 			kind: 'switch',
 			armCount: asNodes(node.cases).length,
 			...switchTest,
+			...(switchPropTest ? { propTest: switchPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),

@@ -1592,7 +1592,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'Lazy handler prop capture is not resumable: a Markless build error.',
+		description: 'An event handler uses a prop whose value the browser cannot get back.',
 		printed: [
 			'MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "<symbolId>" on component edge "<componentEdgeId>" because prop "<propName>" is not passed by the parent that renders "<componentName>", and this call site invokes it unconditionally.',
 			'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.',
@@ -1600,6 +1600,243 @@ export const errorEntries: readonly ErrorEntry[] = [
 			'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
 		],
 		structured: true,
+		guide: {
+			summary: 'An event handler uses a prop whose value the browser cannot get back.',
+			what: [
+				{
+					id: 's0',
+					text: 'An event handler runs in the browser after the page loads, so every prop it uses needs a value the build can hand it there: state, a constant, or a callback the parent passed. A received callback works anywhere, even straight on an element: ',
+				},
+				{
+					id: 's1',
+					text: '<button onClick={onPress}>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' runs the callback this instance was given, with the event, and runs nothing if it was given none. The build stops when the prop is something else, like the result of a function call or a ',
+				},
+				{
+					id: 's3',
+					text: 'let',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', or when a handler calls a prop the parent never passes without ',
+				},
+				{
+					id: 's5',
+					text: '?.',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: '.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Pass a callback, a literal, or plain constant data, or hold the value in ',
+				},
+				{
+					id: 's1',
+					text: 'state()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' in the parent. For a callback the parent may leave out, call it as ',
+				},
+				{
+					id: 's3',
+					text: 'onPress?.()',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'function',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'Key',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r3',
+							text: '({ ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'onPress',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r5',
+							text: ' }',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' { ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'readonly',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: 'onPress',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r11',
+							text: '?:',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r12',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r13',
+							text: 'event',
+							style: 'color:#e36209;--shiki-dark:#ffab70',
+						},
+						{
+							id: 'r14',
+							text: ':',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r15',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: 'MouseEvent',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r17',
+							text: ') ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r18',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r19',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r20',
+							text: 'void',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r21',
+							text: ' }) ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r22',
+							text: '@{',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'onClick',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: '{onPress}>Go</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'button',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r7',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+					],
+				},
+			],
+		},
 		sources: [
 			{
 				id: 'f0',
@@ -5335,6 +5572,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This value in a @for row never updates in the browser: a Markless build error.',
+		printed: [
+			"MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED: This @for row over <itemName> <value>, which reads page state, but the row has a value on an element that stands between two nested @for lists in one parent element. After the page loads, the browser finds that element by counting from one end of its parent, and the nested lists' rows on both sides leave no count, so the row ships no markup to patch and keeps every value the server rendered.",
+			'The browser updates a @for row from one row of markup the payload carries. A row this cannot address or rebuild ships no markup, so every value in it stays as the server rendered it.',
+			'Wrap one of the two nested @for lists in its own element, so every element with a value in the row has nested rows on one side only.',
+			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
 		packageName: '@markless/compiler',
 		stage: 'compile',
@@ -6466,6 +6726,28 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'This @for loop name cannot be destructured this way: a Markless build error.',
+		printed: [
+			'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED: @for (const <patternSource> of ...) uses a default value, a rest element or a computed key. A destructured loop name may only pick array positions and named fields, so this list would render no rows.',
+			'Each name a destructured loop name binds is read straight off the row item at a fixed position or field; a default, a rest element or a computed key has no fixed place on the item.',
+			'Loop with a plain name and read the fields off it, such as `@for (const row of rows; key row.id) { <li>{row.name ?? "none"}</li> }`.',
+			'https://markless.dev/errors/MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_REPEAT_KEY_DUPLICATE',
 		packageName: '@markless/web',
 		stage: 'runtime',
@@ -7012,25 +7294,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
 			'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING: names a component row, but this container was resumed with no render-data surface to render it against.',
-		],
-		structured: false,
-		sources: [
-			{
-				id: 'f0',
-				file: 'packages/web/src/fns/row-component-mint.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-component-mint.ts',
-			},
-		],
-		moreSources: 0,
-	},
-	{
-		code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
-		packageName: '@markless/web',
-		stage: 'runtime',
-		severity: 'error',
-		description: 'A Markless runtime error from @markless/web.',
-		printed: [
-			'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED: builds a row containing @try, which a minted row cannot register yet.',
 		],
 		structured: false,
 		sources: [
@@ -7831,6 +8094,29 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/web/src/fns/row-item-path.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/row-item-path.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'A @for row value reads a component-body local the compiler cannot follow: a Markless build error.',
+		printed: [
+			'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED: `<value>` in a @for row reads `<localName>`, and the compiler cannot find the definition that says which state it reads, so the row would keep the value it first rendered.',
+			"A row value repaints when a state or computed it reads changes. Reads through a helper are followed into the helper's definition; a local with no single definition the compiler can read has no reads to follow.",
+			'Declare `<localName>` once as a `const` or a function in the component body, or read the state through a `computed()`.',
+			'https://markless.dev/errors/MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
+		],
+		structured: true,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

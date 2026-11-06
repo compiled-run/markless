@@ -145,7 +145,7 @@ test('non-numeric strings in numeric attributes and misspelled events still fail
 	expect(result.output).toContain("Property 'onKeyDwn' does not exist");
 });
 
-test('prefetch is a boolean on an <a> and on a component whose props are an <a>', () => {
+test('prefetch is a boolean on an <a> and on a component whose props are an <a>, and an <a> takes route params', () => {
 	const result = runMarklessTsc('anchor-prefetch');
 	expect(result.output).toBe('');
 	expect(result.status).toBe(0);

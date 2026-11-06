@@ -25,11 +25,11 @@ export function marklessReboundSymbol(
 				const outer = instancePath.endsWith(prefix)
 					? instancePath.slice(0, instancePath.length - prefix.length)
 					: undefined;
-				// A keyed row's bound symbol finds its row from the dispatching record, which a callback invoked by path does not carry.
-				if (outer === undefined || outer.includes('r:'))
+				if (outer === undefined)
 					return (context) =>
 						marklessThen(loadUnbound(), (raw) => scope(raw, instancePath)(context));
-				const scoped = outer ? scope(run, outer) : run;
+				// Scoping `run` itself would re-enter this rescope and drop the bound row.
+				const scoped = outer ? scope((context) => bound(context), outer) : run;
 				return (context) =>
 					scoped({
 						...context,

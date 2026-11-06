@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 303,
-	guided: 46,
+	total: 305,
+	guided: 47,
 	groups: [
 		{
 			packageName: '@markless/compiler',
@@ -126,7 +126,7 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_CAPTURE_OPAQUE_PROP',
 					kind: 'compile error',
-					guided: false,
+					guided: true,
 				},
 				{
 					code: 'MARKLESS_CAPTURE_SLOT_UNBINDABLE',
@@ -379,6 +379,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_KEYED_REPEAT_ROW_VALUE_UNPAINTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_KEYED_REPEAT_ROWS_UNPLACED',
 					kind: 'compile error',
 					guided: false,
@@ -449,6 +454,11 @@ export const errorIndex: ErrorIndex = {
 					guided: false,
 				},
 				{
+					code: 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
 					code: 'MARKLESS_REPEAT_KEY_IS_INDEX',
 					kind: 'compile warning',
 					guided: true,
@@ -495,6 +505,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ROW_ELEMENT_HANDLE_UNSUPPORTED',
+					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_ROW_VALUE_LOCAL_UNFOLLOWED',
 					kind: 'compile error',
 					guided: false,
 				},
@@ -1325,11 +1340,6 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_REPEAT_ROW_COMPONENT_SURFACE_MISSING',
-					kind: 'runtime error',
-					guided: false,
-				},
-				{
-					code: 'MARKLESS_REPEAT_ROW_COMPONENT_UNSUPPORTED',
 					kind: 'runtime error',
 					guided: false,
 				},

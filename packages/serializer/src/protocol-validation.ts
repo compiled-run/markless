@@ -580,7 +580,8 @@ function assertOptionalRowComponent(record: Record<string, unknown>, context: st
 	const rowComponent = record.rowComponent;
 	if (rowComponent === undefined) return;
 	assertRecordShape(rowComponent, context);
-	if (rowComponent.rowChunkId === undefined) assertStringField(rowComponent, 'componentEdgeId', context);
+	if (rowComponent.rowChunkId === undefined)
+		assertStringField(rowComponent, 'componentEdgeId', context);
 	else assertStringField(rowComponent, 'rowChunkId', context);
 	assertStringField(rowComponent, 'componentName', context);
 	assertOptionalStringField(rowComponent, 'itemPropName', context);
@@ -647,16 +648,16 @@ function assertOptionalRowTemplateBranchSlots(slots: unknown, context: string): 
 			assertRecordShape(arm, armContext);
 			assertStringField(arm, 'html', armContext);
 			assertOptionalRowTemplateSlots(arm.textSlots, `${armContext}.textSlots`);
-			assertOptionalRowTemplateSlots(arm.attributeSlots, `${armContext}.attributeSlots`, true);
+			assertOptionalRowTemplateSlots(
+				arm.attributeSlots,
+				`${armContext}.attributeSlots`,
+				true,
+			);
 		}
 	}
 }
 
-function assertOptionalRowTemplateSlots(
-	slots: unknown,
-	context: string,
-	named = false,
-): void {
+function assertOptionalRowTemplateSlots(slots: unknown, context: string, named = false): void {
 	if (slots === undefined) return;
 	if (!Array.isArray(slots)) {
 		throw invalidPayloadShapeError(
@@ -668,6 +669,8 @@ function assertOptionalRowTemplateSlots(
 		const slotContext = `${context}[${index}]`;
 		assertRecordShape(slot, slotContext);
 		assertNonNegativeIntegerArrayField(slot, 'path', slotContext);
+		if (slot.fromEnd !== undefined)
+			assertNonNegativeIntegerArrayField(slot, 'fromEnd', slotContext);
 		if (named) assertStringField(slot, 'name', slotContext);
 		assertRowTemplateSlotValue(slot, slotContext);
 	}
@@ -723,10 +726,7 @@ function assertOptionalEmptyArm(record: Record<string, unknown>, context: string
 	assertStringField(arm, 'html', context);
 }
 
-function assertOptionalRowElementHandles(
-	record: Record<string, unknown>,
-	context: string,
-): void {
+function assertOptionalRowElementHandles(record: Record<string, unknown>, context: string): void {
 	const handles = record.rowElementHandles;
 	if (handles === undefined) return;
 	if (!Array.isArray(handles)) {
@@ -958,7 +958,12 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 
 function assertOptionalSharedScope(record: Record<string, unknown>, context: string): void {
 	if (record.scope === undefined) return;
-	if (record.scope === 'widget' || record.scope === 'request' || record.scope === 'container' || record.scope === 'page') {
+	if (
+		record.scope === 'widget' ||
+		record.scope === 'request' ||
+		record.scope === 'container' ||
+		record.scope === 'page'
+	) {
 		return;
 	}
 

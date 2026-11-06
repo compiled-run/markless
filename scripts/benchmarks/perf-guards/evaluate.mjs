@@ -60,6 +60,7 @@ export function evaluate(measurement, anchors) {
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
 	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
 	if (measurement.routeTable) checkRouteTable(measurement.routeTable, fail, note);
+	if (measurement.staticPropArms) checkStaticPropArms(measurement.staticPropArms, fail, note);
 	if (measurement.serverStylesheets)
 		checkServerStylesheets(measurement.serverStylesheets, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
@@ -501,6 +502,30 @@ function checkRouteTable({ few, many }, fail, note) {
 			`${line}: +${grown} chars run at load for links nobody touched (budget +${BUDGETS.routeTableLoadChars}). A page's route table must stay inert until idle or a link intent: the shadcn port's docs pages evaluated a 109 kB table of their 136 linked routes at load, 63% of all JavaScript they ran by the load event. ${INVARIANT}`,
 		);
 	note('G15', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
+}
+
+function checkStaticPropArms({ short, long }, fail, note) {
+	if (!short.answered || !long.answered)
+		return fail('G18', `the static-prop fixture's /glossary did not open its Gloss on click. ${INVARIANT}`);
+	const shown = long.routes.shown.jsGzipBytes - short.routes.shown.jsGzipBytes;
+	if (shown < BUDGETS.staticPropArmMinShownGrowth)
+		return fail(
+			'G18',
+			`/glossary loads ${kb(shown)} more with the long Gloss: it must load at least ${kb(BUDGETS.staticPropArmMinShownGrowth)} more, or this guard compares two equal builds. Grow the fixture's long Gloss.`,
+		);
+	for (const name of ['tsrx', 'mdx']) {
+		const before = short.routes[name];
+		const after = long.routes[name];
+		const bytes = after.jsGzipBytes - before.jsGzipBytes;
+		const chars = after.executedChars - before.executedChars;
+		const line = `${name === 'mdx' ? 'an MDX' : 'a'} page passing Caption only text loads ${kb(before.jsGzipBytes)} of JS and runs ${before.executedChars} chars at load with the short Gloss, ${kb(after.jsGzipBytes)} and ${after.executedChars} with the long one`;
+		if (bytes > BUDGETS.staticPropArmLoadBytes || chars > BUDGETS.staticPropArmLoadChars)
+			return fail(
+				'G18',
+				`${line}: +${bytes} B and +${chars} chars for a Gloss its literal props never show (budget +${BUDGETS.staticPropArmLoadBytes} B, +${BUDGETS.staticPropArmLoadChars} chars). A component whose literal props rule out an arm must not load the code that arm renders: a docs page passing Subtitle only text ran its glossary Term's tooltip code at load. ${INVARIANT}`,
+			);
+		note('G18', `${line}: ${bytes >= 0 ? '+' : ''}${bytes} B, ${chars >= 0 ? '+' : ''}${chars} chars`);
+	}
 }
 
 function checkServerStylesheets({ small, large }, fail, note) {
