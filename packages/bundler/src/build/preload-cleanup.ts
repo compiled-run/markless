@@ -1,22 +1,104 @@
 import {
 	callsImportedOrFreeName,
 	importedOrFreeNameCalls,
+	moduleCallFacts,
+	type AnalyzedNode,
+	type ModuleCallFacts,
 	parseJavaScriptModule,
 	type ImportedOrFreeNameCall,
 	type JavaScriptAstNode,
 } from '@markless/compiler';
 import { calleeOffsets, parseChunkCode, spansAnyOffset } from './chunk-ast.ts';
-import { PACK_LOADER_PREFIX } from './pack-loader-names.ts';
+import { applyCodeEdits, type CodeEdit } from './code-edits.ts';
 
-export function stripEmptyVitePreloadWrappers(code: string): string {
-	return stripImportedVitePreloadHelper(stripEmptyVitePreloadWrapperCalls(code));
+/** Where a bundle defines Vite's preload helper, and the names that chunk exports it under. */
+export type PreloadHelperExports = {
+	readonly fileName: string;
+	/** The module-scope names the helper has in that chunk. */
+	readonly locals: readonly string[];
+	/** The names that chunk exports it under. */
+	readonly exports: readonly string[];
+};
+
+export type PreloadWrapperContext = {
+	readonly fileName: string;
+	readonly helpers: readonly PreloadHelperExports[];
+};
+
+export function stripEmptyVitePreloadWrappers(
+	code: string,
+	context?: PreloadWrapperContext,
+): string {
+	return stripImportedVitePreloadHelper(stripEmptyVitePreloadWrapperCalls(code, context));
 }
 
-// The text-only half of the strip; what is left needs a parse.
-export function stripEmptyVitePreloadWrapperCalls(code: string): string {
-	const withoutDirectImports = stripDirectEmptyPreloadWrappers(code);
-	const withoutAsyncLoaders = stripAsyncEmptyPreloadWrappers(withoutDirectImports);
-	return stripUnusedVitePreloadHelper(withoutAsyncLoaders);
+export function stripEmptyVitePreloadWrapperCalls(
+	code: string,
+	context?: PreloadWrapperContext,
+): string {
+	return stripUnusedVitePreloadHelper(unwrapEmptyPreloadCalls(code, context));
+}
+
+/**
+ * The module-scope functions a chunk defines as Vite's preload helper: one taking the import thunk and its
+ * deps whose body raises `vite:preloadError`, itself or through the handler it reads.
+ */
+export function definedPreloadHelpers(
+	code: string,
+	facts = moduleCallFacts(code),
+): readonly string[] {
+	if (!facts || !code.includes('vite:preloadError')) return [];
+	const functionOf = (name: string) =>
+		facts
+			.writesOf(name)
+			.find(
+				(value) =>
+					value.type === 'FunctionExpression' ||
+					value.type === 'ArrowFunctionExpression' ||
+					value.type === 'FunctionDeclaration',
+			);
+	const raising = facts.moduleNames().filter((name) => {
+		const value = functionOf(name);
+		return (
+			value !== undefined && code.slice(value.start, value.end).includes('vite:preloadError')
+		);
+	});
+	return facts.moduleNames().filter((name) => {
+		const value = functionOf(name);
+		if (!value || (value.params as readonly unknown[]).length < 2) return false;
+		if (raising.includes(name)) return true;
+		return raising.some((handler) =>
+			facts
+				.readsOf(handler)
+				.some((read) => read.start >= value.start && read.end <= value.end),
+		);
+	});
+}
+
+// A chunk's relative import specifier as the bundle file it names.
+function relativeFile(importer: string, specifier: string): string {
+	const parts = importer.split('/').slice(0, -1);
+	for (const part of specifier.split('/')) {
+		if (part === '..') parts.pop();
+		else if (part !== '.') parts.push(part);
+	}
+	return parts.join('/');
+}
+
+function importedPreloadHelpers(
+	facts: ModuleCallFacts,
+	context: PreloadWrapperContext | undefined,
+): readonly string[] {
+	return facts.imports().flatMap((entry) => {
+		if (entry.imported === '__vitePreload') return [entry.local];
+		if (!context || !entry.specifier.startsWith('.')) return [];
+		const source = relativeFile(context.fileName, entry.specifier);
+		return context.helpers.some(
+			(helper) => helper.fileName === source && helper.exports.includes(entry.imported),
+		)
+			? [entry.local]
+			: [];
+	});
 }
 
 type ImportedVitePreloadHelper = {
@@ -28,153 +110,58 @@ type ImportedVitePreloadHelper = {
 	readonly keptSpecifiers: ReadonlySet<number>;
 };
 
-const PRELOADED_IMPORT_BODIES = ['import(', 'Promise.resolve().then(', '(async()=>'];
-
-// A registry pack load: `load("./pack.js","<loader>",()=>import("./pack.js"))`.
-const PACK_LOAD_BODY_RE = new RegExp(
-	`[$A-Z_a-z][$\\w]*\\(\\s*(["'\`])[^"'\`]+\\1\\s*,\\s*(["'\`])${PACK_LOADER_PREFIX.replaceAll('$', '\\$')}[$\\w]+\\2\\s*,\\s*\\(\\)\\s*=>\\s*import\\(`,
-	'y',
-);
-
-function startsWithPackLoad(code: string, start: number): boolean {
-	PACK_LOAD_BODY_RE.lastIndex = start;
-	return PACK_LOAD_BODY_RE.test(code);
-}
-
 const IMPORT_DECLARATION_CANDIDATE_RE = /\bimport\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g;
 
-function stripDirectEmptyPreloadWrappers(code: string): string {
-	let next = '';
-	let cursor = 0;
-	let changed = false;
-	const wrapperRE = /\b[$A-Z_a-z][$\w]*\(\(\)\s*=>\s*/g;
-
-	for (let match = wrapperRE.exec(code); match; match = wrapperRE.exec(code)) {
-		const callStart = match.index;
-		const bodyStart = match.index + match[0]!.length;
-		// Packing rewrites a same-chunk import() into a resolved promise or an async loader call.
-		if (
-			!PRELOADED_IMPORT_BODIES.some((body) => code.startsWith(body, bodyStart)) &&
-			!startsWithPackLoad(code, bodyStart)
-		)
-			continue;
-
-		const wrapper = findEmptyPreloadWrapper(code, callStart, bodyStart);
-		if (!wrapper) continue;
-
-		next += code.slice(cursor, callStart);
-		next += code.slice(bodyStart, wrapper.firstArgumentEnd);
-		cursor = wrapper.callEnd + 1;
-		wrapperRE.lastIndex = cursor;
-		changed = true;
-	}
-
-	if (!changed) return code;
-	return next + code.slice(cursor);
+// Vite wraps each dynamic import as `__vitePreload(() => import(...), deps)`; with no deps the wrapper only defers.
+// A call goes only when its callee resolves to the helper, imported by name or defined in this chunk.
+function unwrapEmptyPreloadCalls(code: string, context?: PreloadWrapperContext): string {
+	const helperFiles =
+		context?.helpers.map((helper) =>
+			helper.fileName.slice(helper.fileName.lastIndexOf('/') + 1),
+		) ?? [];
+	if (
+		!code.includes('__vitePreload') &&
+		!code.includes('vite:preloadError') &&
+		!helperFiles.some((file) => code.includes(file))
+	)
+		return code;
+	const facts = moduleCallFacts(code);
+	if (!facts) return code;
+	const own = context?.helpers.find((helper) => helper.fileName === context.fileName);
+	const helpers = new Set([...importedPreloadHelpers(facts, context), ...(own?.locals ?? [])]);
+	const edits: CodeEdit[] = [];
+	for (const helper of helpers)
+		for (const { call } of facts.callsTo(helper)) {
+			const edit = emptyPreloadUnwrap(code, call);
+			if (edit) edits.push(edit);
+		}
+	return applyCodeEdits(code, edits) ?? code;
 }
 
-function stripAsyncEmptyPreloadWrappers(code: string): string {
-	let next = '';
-	let cursor = 0;
-	let changed = false;
-	const wrapperRE = /\b[$A-Z_a-z][$\w]*\(\s*async\s*\(\)\s*=>\s*\{/g;
-
-	for (let match = wrapperRE.exec(code); match; match = wrapperRE.exec(code)) {
-		const callStart = match.index;
-		const callOpen = code.indexOf('(', callStart);
-		if (callOpen < 0) continue;
-
-		const firstArgumentEnd = findTopLevelComma(code, callOpen + 1);
-		if (firstArgumentEnd < 0) continue;
-
-		const wrapper = findEmptyPreloadWrapper(code, callStart, callOpen + 1);
-		if (!wrapper) continue;
-
-		const loader = code.slice(callOpen + 1, firstArgumentEnd);
-		next += code.slice(cursor, callStart);
-		next += `(${loader})()`;
-		cursor = wrapper.callEnd + 1;
-		wrapperRE.lastIndex = cursor;
-		changed = true;
-	}
-
-	if (!changed) return code;
-	return next + code.slice(cursor);
-}
-
-function findEmptyPreloadWrapper(
-	code: string,
-	callStart: number,
-	bodyStart: number,
-): { readonly firstArgumentEnd: number; readonly callEnd: number } | undefined {
-	const callOpen = code.indexOf('(', callStart);
-	if (callOpen < 0 || callOpen >= bodyStart) return undefined;
-
-	const firstArgumentEnd = findTopLevelComma(code, callOpen + 1);
-	if (firstArgumentEnd < 0) return undefined;
-
-	let cursor = skipSpaces(code, firstArgumentEnd + 1);
-	if (code.startsWith('void 0', cursor)) cursor = skipSpaces(code, cursor + 'void 0'.length);
-	else if (code[cursor] === '[' && code[cursor + 1] === ']')
-		cursor = skipSpaces(code, cursor + 2);
-	else return undefined;
-
-	if (code[cursor] === ')') {
-		return { firstArgumentEnd, callEnd: cursor };
-	}
-
-	if (code[cursor] !== ',') return undefined;
-	cursor = skipSpaces(code, cursor + 1);
-	if (!code.startsWith('import.meta.url', cursor)) return undefined;
-	cursor = skipSpaces(code, cursor + 'import.meta.url'.length);
-	if (code[cursor] !== ')') return undefined;
-
-	return { firstArgumentEnd, callEnd: cursor };
-}
-
-function findTopLevelComma(code: string, start: number): number {
-	let depth = 1;
-	let quote: string | null = null;
-	let escaped = false;
-
-	for (let index = start; index < code.length; index++) {
-		const char = code[index]!;
-		if (quote) {
-			if (escaped) {
-				escaped = false;
-				continue;
-			}
-			if (char === '\\') {
-				escaped = true;
-				continue;
-			}
-			if (char === quote) quote = null;
-			continue;
-		}
-
-		if (char === '"' || char === "'" || char === '`') {
-			quote = char;
-			continue;
-		}
-		if (char === '(' || char === '[' || char === '{') {
-			depth++;
-			continue;
-		}
-		if (char === ')' || char === ']' || char === '}') {
-			depth--;
-			if (depth === 0) return -1;
-			continue;
-		}
-		if (char === ',' && depth === 1) return index;
-	}
-
-	return -1;
-}
-
-function skipSpaces(code: string, start: number): number {
-	let cursor = start;
-	while (/\s/.test(code[cursor] ?? '')) cursor++;
-	return cursor;
+function emptyPreloadUnwrap(code: string, call: AnalyzedNode): CodeEdit | undefined {
+	const [loader, deps, base, ...rest] = call.arguments as readonly AnalyzedNode[];
+	if (!loader || !deps || rest.length > 0) return undefined;
+	const noDeps =
+		(deps.type === 'UnaryExpression' &&
+			deps.operator === 'void' &&
+			(deps.argument as AnalyzedNode).type === 'Literal') ||
+		(deps.type === 'ArrayExpression' && (deps.elements as readonly unknown[]).length === 0);
+	if (!noDeps || (base && code.slice(base.start, base.end) !== 'import.meta.url'))
+		return undefined;
+	if (
+		loader.type !== 'ArrowFunctionExpression' ||
+		(loader.params as readonly unknown[]).length > 0
+	)
+		return undefined;
+	const body = loader.body as AnalyzedNode;
+	const { start, end } = call;
+	if (loader.async) return { start, end, before: '(', keep: loader, after: ')()' };
+	if (body.type === 'BlockStatement') return undefined;
+	const tight =
+		body.type === 'CallExpression' ||
+		body.type === 'ImportExpression' ||
+		body.type === 'ParenthesizedExpression';
+	return { start, end, before: tight ? '' : '(', keep: body, after: tight ? '' : ')' };
 }
 
 export function stripImportedVitePreloadHelper(code: string): string {

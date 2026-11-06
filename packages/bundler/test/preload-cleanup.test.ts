@@ -1,13 +1,22 @@
 import { describe, expect, test } from 'vitest';
-import { stripEmptyVitePreloadWrappers } from '../src/build/preload-cleanup.ts';
+import {
+	definedPreloadHelpers,
+	stripEmptyVitePreloadWrappers,
+} from '../src/build/preload-cleanup.ts';
+
+// The bundle pass names the helper its own chunk defines from the chunk that renders Vite's helper module.
+const definesHelper = (local: string) => ({
+	fileName: 'build/chunk-a.js',
+	helpers: [{ fileName: 'build/chunk-a.js', locals: [local], exports: [] }],
+});
 
 describe('Vite preload cleanup', () => {
 	test('removes empty dynamic import preload wrappers without touching the import', () => {
 		const code =
-			'async function load(id){switch(id){case"symbol:0":return p(()=>import("./chunk-a.js").then((mod)=>mod.symbol_0),[]);case"symbol:1":return p(()=>import("./chunk-b.js").then((mod)=>mod.symbol_1),[],import.meta.url)}}';
+			'import{__vitePreload as p}from"./preload.js";async function load(id){switch(id){case"symbol:0":return p(()=>import("./chunk-a.js").then((mod)=>mod.symbol_0),[]);case"symbol:1":return p(()=>import("./chunk-b.js").then((mod)=>mod.symbol_1),[],import.meta.url)}}';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
-			'async function load(id){switch(id){case"symbol:0":return import("./chunk-a.js").then((mod)=>mod.symbol_0);case"symbol:1":return import("./chunk-b.js").then((mod)=>mod.symbol_1)}}',
+			'import{__vitePreload as p}from"./preload.js";async function load(id){switch(id){case"symbol:0":return import("./chunk-a.js").then((mod)=>mod.symbol_0);case"symbol:1":return import("./chunk-b.js").then((mod)=>mod.symbol_1)}}',
 		);
 	});
 
@@ -15,19 +24,19 @@ describe('Vite preload cleanup', () => {
 	// writes no dependencies as `void 0`.
 	test('removes empty preload wrappers around packed same-chunk imports', () => {
 		const code =
-			'const a=()=>p(()=>Promise.resolve().then(()=>(init(),ns)),void 0);const b=()=>p(()=>(async()=>(await 0,__marklessPackedAb12()))(),void 0);const c=()=>p(()=>import("./pack.js").then(m=>m.__marklessPackedCd34()),[]);';
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>Promise.resolve().then(()=>(init(),ns)),void 0);const b=()=>p(()=>(async()=>(await 0,__marklessPackedAb12()))(),void 0);const c=()=>p(()=>import("./pack.js").then(m=>m.__marklessPackedCd34()),[]);';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
-			'const a=()=>Promise.resolve().then(()=>(init(),ns));const b=()=>(async()=>(await 0,__marklessPackedAb12()))();const c=()=>import("./pack.js").then(m=>m.__marklessPackedCd34());',
+			'import{__vitePreload as p}from"./preload.js";const a=()=>Promise.resolve().then(()=>(init(),ns));const b=()=>(async()=>(await 0,__marklessPackedAb12()))();const c=()=>import("./pack.js").then(m=>m.__marklessPackedCd34());',
 		);
 	});
 
 	test('removes empty preload wrappers around registry pack loads', () => {
 		const code =
-			'const a=()=>i(()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`)),[]);const b=()=>i(()=>load("./b.js","$mlW8LC",()=>import("./b.js")),void 0);';
+			'import{__vitePreload as i}from"./preload.js";const a=()=>i(()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`)),[]);const b=()=>i(()=>load("./b.js","$mlW8LC",()=>import("./b.js")),void 0);';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
-			'const a=()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`));const b=()=>load("./b.js","$mlW8LC",()=>import("./b.js"));',
+			'import{__vitePreload as i}from"./preload.js";const a=()=>$(`./chunk-a.js`,`$mlLNhe`,()=>import(`./chunk-a.js`));const b=()=>load("./b.js","$mlW8LC",()=>import("./b.js"));',
 		);
 	});
 
@@ -45,7 +54,7 @@ describe('Vite preload cleanup', () => {
 
 	test('keeps non-empty preload wrappers so dependency preloading still works', () => {
 		const code =
-			'const route=()=>p(()=>import("./route.js").then((mod)=>mod.default),["route.css"],import.meta.url);';
+			'import{__vitePreload as p}from"./preload.js";const route=()=>p(()=>import("./route.js").then((mod)=>mod.default),["route.css"],import.meta.url);';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
 	});
@@ -54,7 +63,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var A=e((()=>{})),O,k,S,p,M=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(id){return p(()=>import("./chunk.js").then(e=>e.symbol),[],import.meta.url)}var F=e((()=>{M()})),I=e((()=>{F()}));e((()=>{A(),I()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var A=e((()=>{}));async function load(id){return import("./chunk.js").then(e=>e.symbol)}e((()=>{A()}))();',
 		);
 	});
@@ -152,7 +161,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var O,k,S,p,M=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(){let{createRuntimeGraph:e}=await p(async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}},[]);return e({cells:[]})}var F=e((()=>{M()})),I=e((()=>{F()}));e((()=>{I()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";async function load(){let{createRuntimeGraph:e}=await (async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}})();return e({cells:[]})}e((()=>{}))();',
 		);
 	});
@@ -161,7 +170,7 @@ describe('Vite preload cleanup', () => {
 		const code =
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{})),O,k,S,p,A=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}));async function load(){let{createRuntimeGraph:e}=await p(async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}},[]);return e({cells:[]})}var z=e((()=>{T(),A()})),B=e((()=>{z()})),H=e((()=>{})),G=e((()=>{A()})),K=e((()=>{H(),G()}));e((()=>{B(),K()}))();';
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{createRuntimeGraph:e}=await (async()=>{let{createRuntimeGraph:e}=await import("./graph.js");return{createRuntimeGraph:e}})();return e({cells:[]})}var z=e((()=>{T()})),B=e((()=>{z()})),H=e((()=>{})),G=e((()=>{})),K=e((()=>{H(),G()}));e((()=>{B(),K()}))();',
 		);
 	});
@@ -192,7 +201,7 @@ describe('Vite preload cleanup', () => {
 			'A=e((()=>{O=(function(){let e=typeof document<`u`&&document.createElement(`link`).relList;return e&&e.supports&&e.supports(`modulepreload`)?`modulepreload`:`preload`})(),k=function(e){return`/`+e},S={},p=function(e,t,n){let r=Promise.resolve();function i(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}return r.then(t=>e().catch(i))}}))';
 		const code = `import{__esmMin as e}from"./shared.js";var T=e((()=>{})),O,k,S,p,${helper};async function load(){let{run:e}=await p(async()=>{let{run:e}=await import("./graph.js");return{run:e}},[]);return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T(),A()}));e((()=>{z()}))();`;
 
-		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+		expect(stripEmptyVitePreloadWrappers(code, definesHelper('p'))).toBe(
 			'import{__esmMin as e}from"./shared.js";var T=e((()=>{}));async function load(){let{run:e}=await (async()=>{let{run:e}=await import("./graph.js");return{run:e}})();return e()}function close(d){let A=d.undo;d.cleanup=()=>{d.x(),A(),d.y()}}var z=e((()=>{T()}));e((()=>{z()}))();',
 		);
 	});
@@ -256,5 +265,56 @@ describe('Vite preload cleanup', () => {
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
 			'import{__esmMin as e}from"./shared.js";var A=e((()=>{k=typeof(0,maybeGlobal)}));e((()=>{A()}))();',
 		);
+	});
+
+	// Only a call to Vite's helper is a preload wrapper; a user's call of the same shape keeps running.
+	test('keeps a call shaped like an empty preload wrapper whose callee is not the helper', () => {
+		const code =
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js"),[]);function f(m){return m(()=>import("./b.js"),[])}const c=useMemo(()=>import("./c.js"),void 0);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__vitePreload as p}from"./preload.js";const a=()=>import("./a.js");function f(m){return m(()=>import("./b.js"),[])}const c=useMemo(()=>import("./c.js"),void 0);',
+		);
+	});
+
+	// Without native packing Rolldown minifies the names chunks export, so the helper arrives as `{E as i}`.
+	test('unwraps calls to the helper another chunk exports under a minified name', () => {
+		const helperChunk =
+			'function l(e){let t=new Event(`vite:preloadError`,{cancelable:!0});if(t.payload=e,window.dispatchEvent(t),!t.defaultPrevented)throw e}function s(e,t,n){let r=Promise.resolve();return r.then(t=>e().catch(l))}function c(e){return e}export{c as D,s as E};';
+		expect(definedPreloadHelpers(helperChunk)).toEqual(['s']);
+		const code =
+			'import{D as r,E as i}from"./chunk-h.js";const a=()=>i(()=>import(`./a.js`),[]);const b=()=>r(()=>import(`./b.js`),[]);';
+
+		expect(
+			stripEmptyVitePreloadWrappers(code, {
+				fileName: 'build/chunk-u.js',
+				helpers: [{ fileName: 'build/chunk-h.js', locals: ['s'], exports: ['E'] }],
+			}),
+		).toBe(
+			'import{D as r,E as i}from"./chunk-h.js";const a=()=>import(`./a.js`);const b=()=>r(()=>import(`./b.js`),[]);',
+		);
+	});
+
+	test('unwraps an empty wrapper inside another, and the rest of the chunk with them', () => {
+		const code =
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js").then(m=>m.boot(()=>p(()=>import("./b.js"),[]))),[]);const c=()=>p(()=>import("./c.js"),void 0);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(
+			'import{__vitePreload as p}from"./preload.js";const a=()=>import("./a.js").then(m=>m.boot(()=>import("./b.js")));const c=()=>import("./c.js");',
+		);
+	});
+
+	test('keeps a wrapper whose deps argument runs code', () => {
+		const code =
+			'import{__vitePreload as p}from"./preload.js";const a=()=>p(()=>import("./a.js"),void recordLoad());';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
+	});
+
+	test('leaves a function that only resembles the helper alone without the chunk rendering Vite’s helper module', () => {
+		const code =
+			'function recover(e,t){window.dispatchEvent(new Event(`vite:preloadError`));return e()}const a=()=>recover(()=>import("./a.js"),[]);';
+
+		expect(stripEmptyVitePreloadWrappers(code)).toBe(code);
 	});
 });
