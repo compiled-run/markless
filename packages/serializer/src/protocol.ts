@@ -304,6 +304,13 @@ export type ProtocolBranchIdrefSite = {
 	readonly armIndex: number;
 };
 
+/** A state cell an arm declares: written back to `value` each time arm `arm` opens. */
+export type ProtocolBranchArmSeed = {
+	readonly arm: number;
+	readonly graphNodeId: string;
+	readonly value: unknown;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -314,6 +321,7 @@ export type ProtocolArmBranchRecord = {
 	readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch inside the arm keeps the `dom-order-comment`
 	// anchors its own module counted; they name its comment text, not an index
@@ -725,6 +733,7 @@ export type ProtocolViewPayload = {
 		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly symbolId?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
+		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 		readonly armRecords?: ReadonlyArray<{
 			readonly events: ReadonlyArray<{
 				readonly hostPath: ProtocolElementAddress;

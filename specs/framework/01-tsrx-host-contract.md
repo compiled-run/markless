@@ -46,6 +46,16 @@ was unavailable):
   must come before the rendered output", with the fix as the suggestion.
 - A plain `} else {` after an `@if` body is a parse error (TSRX1009), which
   Markless reports as `MARKLESS_BRANCH_ELSE_SPELLING`.
+- `@if (a) { … } @else if (b) { … } @else { … }` is one conditional with one arm
+  per test plus the final `@else`; the parser nests each `@else if` in the
+  previous arm's `alternate`, and Markless flattens that nesting into a single
+  branch site (see `12-arm-rendering.md`, "Arms picked by index"). An `@if`
+  written inside another `@if`'s arm, with or without an element around it, is
+  its own nested branch site.
+- `@switch (value) { @case test: … @default: … }` compares `value` with each
+  case test in order using `===`, as JavaScript's `switch` does. Case tests may
+  be literals or any expression, so `@switch (true) { @case charge > 50: … }`
+  is a valid way to pick the first condition that holds.
 - An `@try`'s arms go in the order `@try`, `@pending`, `@catch`. An `@pending`
   written after `@catch` is not part of the `@try`: TSRX ends the `@try` at its
   `@catch` and reads `@pending` as text. Markless reports it as
@@ -154,6 +164,14 @@ export function Panel() @{
   </section>
 }
 ```
+
+Today the starting value of a `state()` declared in an arm must be one the
+compiler can read (a literal, or an object or array of literals): the arm's flip
+writes it back when the arm opens, without running the component. A starting
+value only the component could compute (`state(count * 2)`) is the build error
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE`, whose fix names the two ways out:
+a literal starting value, or declaring the state above the `@if`. `computed()`
+and `storage()` are not arm-local yet and keep the same refusal.
 
 The compiler should be able to explain this rule when local state appears inside
 a conditional branch:

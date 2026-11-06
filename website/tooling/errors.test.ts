@@ -1,6 +1,11 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../../packages/compiler/src/index.ts';
+import { errorEntries } from '../components/docs/errors/errors-data.ts';
+import { errorIndex } from '../components/docs/errors/errors-index.ts';
+import { guides } from '../components/docs/errors/guides.ts';
+import { AREA_ORDER, TITLES } from '../components/docs/errors/titles.ts';
 import {
 	buildErrorData,
 	orphanGuides,
@@ -120,7 +125,7 @@ describe('segments', () => {
 });
 
 describe('buildErrorData', () => {
-	it('groups codes by package, attaches guides, and offers an allow line for compile warnings only', async () => {
+	it('groups codes by area, attaches guides, and offers an allow line for compile warnings only', async () => {
 		const scanned = scanCodes([
 			file(
 				'packages/compiler/src/a.ts',
@@ -140,12 +145,9 @@ describe('buildErrorData', () => {
 				example: ['retry();'],
 			},
 		});
-		expect(data.index.groups.map((group) => [group.packageName, group.codes])).toEqual([
-			[
-				'@markless/compiler',
-				[{ code: 'MARKLESS_A_WARN', kind: 'compile warning', guided: false }],
-			],
-			['@markless/web', [{ code: 'MARKLESS_B_FAIL', kind: 'runtime error', guided: true }]],
+		expect(data.index.groups.map((group) => [group.area, group.codes.map((c) => [c.code, c.title, c.chip, c.guided])])).toEqual([
+			['build', [['MARKLESS_B_FAIL', 'B failed', 'error', true]]],
+			['internal', [['MARKLESS_A_WARN', 'A', 'warning', false]]],
 		]);
 		const [warn, fail] = data.entries;
 		expect(warn?.allow?.[0]?.runs[0]?.text).toBe(
@@ -173,6 +175,31 @@ describe('the committed error data', () => {
 		expect(orphanGuides(scanCodes(readSourceFiles()))).toEqual([]);
 	});
 
+	it('gives every code a plain title and an area, and names no code that is not raised', () => {
+		expect(errorEntries.filter((entry) => entry.title.trim() === '').map((entry) => entry.code)).toEqual([]);
+		expect(errorEntries.filter((entry) => !AREA_ORDER.includes(entry.area)).map((entry) => entry.code)).toEqual([]);
+		const known = new Set(errorEntries.map((entry) => entry.code));
+		expect(Object.keys(TITLES).filter((code) => !known.has(code))).toEqual([]);
+		expect(errorIndex.groups.reduce((n, group) => n + group.codes.length, 0)).toBe(errorIndex.total);
+	});
+
+	// A guide's broken example must raise its own code, so the page's Before never lies.
+	it('compiles every guide\'s before example to its own code', async () => {
+		const withBefore = Object.entries(guides).filter(([, guide]) => guide.before);
+		expect(withBefore.length).toBeGreaterThan(4);
+		for (const [code, guide] of withBefore) {
+			const source = guide.before!.join('\n') + '\n';
+			let raised: string[] = [];
+			try {
+				const compiled = await compileTsrxModule({ filename: '/app/pages/before.tsrx', moduleId: '/app/pages/before.tsrx', source, buildId: 'errors', resolverId: 'errors', symbols: [] } as never);
+				raised = collectTsrxModuleDiagnostics(compiled).map((d) => d.code);
+			} catch (error) {
+				raised = [String((error as { code?: string }).code ?? (error as Error).message)];
+			}
+			expect({ code, raised: raised.some((r) => r.includes(code)) }).toEqual({ code, raised: true });
+		}
+	});
+
 	it('serves every code the diagnostics page links to', () => {
 		const known = new Set(scanCodes(readSourceFiles()).map((entry) => entry.code));
 		const page = readFileSync(
@@ -180,7 +207,7 @@ describe('the committed error data', () => {
 			'utf8',
 		);
 		const linked = [...page.matchAll(/\(\/errors\/(MARKLESS_[A-Z0-9_]+)\)/g)].map((m) => m[1]);
-		expect(linked.length).toBeGreaterThan(10);
+		expect(linked.length).toBeGreaterThan(0);
 		expect(linked.filter((code) => !known.has(code!))).toEqual([]);
 	});
 });

@@ -505,11 +505,11 @@ export function moduleScopeElementDiagnostic(
 export function unstableStateCreationSiteDiagnostic(input: {
 	readonly name: string;
 	readonly apiName: 'state' | 'computed' | 'storage';
-	readonly site: 'computed' | 'handler' | 'branch' | 'loop' | 'row';
+	readonly site: 'computed' | 'handler' | 'branch' | 'arm' | 'loop' | 'row';
 	readonly init: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
-	const siteText = unstableCreationSiteText(input.site, input.name);
+	const siteText = unstableCreationSiteText(input.site, input.name, input.apiName);
 	return {
 		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
 		severity: 'error',
@@ -656,9 +656,22 @@ function helperReturnUnsupportedDiagnostic(input: {
 }
 
 function unstableCreationSiteText(
-	site: 'computed' | 'handler' | 'branch' | 'loop' | 'row',
+	site: 'computed' | 'handler' | 'branch' | 'arm' | 'loop' | 'row',
 	name: string,
+	apiName: 'state' | 'computed' | 'storage',
 ): { readonly message: string; readonly why: string; readonly fix: string } {
+	if (site === 'arm')
+		return apiName === 'state'
+			? {
+					message: 'inside an @if or @switch arm where the compiled arm cannot start it',
+					why: 'A state() written directly in an arm body with a literal starting value starts fresh each time the arm opens. Anything else there, a starting value the component computes or a declaration nested in another statement, has no value the compiled arm could write without running the component.',
+					fix: 'Write it directly in the arm body with a literal starting value, such as state(0) or state(""), or declare it above the @if if it should keep its value while the arm is hidden.',
+				}
+			: {
+					message: 'inside an @if or @switch arm',
+					why: `Only state() can belong to an arm today; a ${apiName}() declared there would need a cell the payload plans before rendering, and the arm may not be shown.`,
+					fix: `Declare the ${apiName}() in the component body and read it from inside the arm.`,
+				};
 	return {
 		computed: {
 			message: `inside the computed that derives "${name}"`,

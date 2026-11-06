@@ -18,6 +18,7 @@ import type {
 	SemanticLocalBinding,
 	SemanticModuleImport,
 	SourceSpan,
+	SemanticBranchArm,
 } from '../../artifacts.ts';
 import {
 	getFrameworkApiForCall,
@@ -210,7 +211,8 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'state') {
-			if (state.currentCreationSite) {
+			const armScope = armLocalStateScope(node, init, state);
+			if (state.currentCreationSite && !armScope) {
 				reportUnstableCreationSite(name, 'state', init, state.currentCreationSite, state);
 				continue;
 			}
@@ -276,6 +278,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				declarationKind: state.currentHelperCall ? 'let' : declarationKind,
 				writable: true,
 				valueKind: initialValueKind(initial),
+				...(armScope ? { armScope } : {}),
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
@@ -680,6 +683,25 @@ function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefine
 	}
 
 	return undefined;
+}
+
+/**
+ * The arm a state() belongs to when it is written directly in an @if/@switch
+ * arm body with a starting value the compiler can read. The arm's flip writes
+ * that value back each time the arm opens, so the cell starts fresh (spec 01,
+ * "Conditional identity"). Any other site, or a starting value only the
+ * component could compute, keeps the creation-site refusal.
+ */
+function armLocalStateScope(
+	declaration: AnyNode,
+	init: AnyNode,
+	state: WalkState,
+): SemanticBranchArm | null {
+	if (state.currentCreationSite !== 'arm' || !state.armBodyStatements.has(declaration))
+		return null;
+	const arm = state.currentBranchArms[state.currentBranchArms.length - 1];
+	if (!arm || !evaluateInitialStateValue(firstArgument(init), state).ok) return null;
+	return arm;
 }
 
 function reportUnstableCreationSite(

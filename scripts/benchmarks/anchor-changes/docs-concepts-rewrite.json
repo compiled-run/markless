@@ -9,7 +9,7 @@
 				"executedChars"
 			],
 			"delta": 51492,
-			"reason": "app code, not framework: the State page's two new ink figures (ID card, J-card) initialize their frozen art at load (71.7K chars in one pack, measured per script with V8 coverage), and the neighbouring Concepts pages' heavier figure packs ride the idle link preload; Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"reason": "app code, not framework: the rewritten State page carries ten playground Code blocks whose idle prefetch dispatched inside the load window, waking the runtime and initialising ten resolver tables (about 53K chars) and fetching the compile worker; the neighbouring Concepts pages' heavier figure packs ride the idle link preload. Not the figures' art: V8 coverage showed no art module initialised at load (corrected after measuring per lazy module wrapper). Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
 			"date": "2026-11-06"
 		},
 		{
@@ -21,7 +21,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 377485,
-			"reason": "app code, not framework: the State page's two new ink figures (ID card, J-card) initialize their frozen art at load (71.7K chars in one pack, measured per script with V8 coverage), and the neighbouring Concepts pages' heavier figure packs ride the idle link preload; Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
+			"reason": "app code, not framework: the rewritten State page carries ten playground Code blocks whose idle prefetch dispatched inside the load window, waking the runtime and initialising ten resolver tables (about 53K chars) and fetching the compile worker; the neighbouring Concepts pages' heavier figure packs ride the idle link preload. Not the figures' art: V8 coverage showed no art module initialised at load (corrected after measuring per lazy module wrapper). Linux numbers from PR #462 run 42158444061 against main 600961093's merge-queue run 42121100289",
 			"date": "2026-11-06"
 		},
 		{

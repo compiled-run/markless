@@ -72,6 +72,7 @@ import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.t
 import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
+import { ifChainOf } from './if-chain.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
 import { moduleHandlerProps } from './handler-props.ts';
 import {
@@ -538,20 +539,19 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXIfExpression': {
 			collectBranchSite(node, state);
 			const site = lastBranchSiteId(state);
-			const test = node.test as AnyNode | undefined;
+			const chain = ifChainOf(node);
 			withArmScope(state, site, () => {
-				withArm(state, site, 0, () =>
-					withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
-						walkBranch(node.consequent as AnyNode | undefined, state),
-					),
-				);
-				withArm(state, site, 1, () =>
-					withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
-						walkBranch(node.alternate as AnyNode | undefined, state),
-					),
-				);
+				for (const [arm, body] of chain.arms.entries()) {
+					// Arm N holds when its own test does and every earlier test did not.
+					const guards: ArmGuard[] = chain.tests
+						.slice(0, Math.min(arm + 1, chain.tests.length))
+						.flatMap((test, index) => (test ? [{ kind: 'if', test, holds: index === arm }] : []));
+					withArm(state, site, arm, () =>
+						withArmGuards(state, guards, () => walkBranch(body, state)),
+					);
+				}
 			});
-			collectConditionalBranchText(node, state);
+			if (chain.links.length === 0) collectConditionalBranchText(node, state);
 			return;
 		}
 		case 'JSXSwitchExpression': {
@@ -574,11 +574,14 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 							: { kind: 'default', discriminant, tests: caseTests });
 					state.currentBranchScopeIds.push(caseBranchId);
 					withArm(state, site, arm, () =>
-						withArmGuard(state, guard, () => {
-							for (const caseChild of asNodes(switchCase.consequent)) {
-								walkMarkupStatement(caseChild, state);
-							}
-						}),
+						withArmGuard(state, guard, () =>
+							withCreationSite(state, 'arm', () => {
+								for (const caseChild of asNodes(switchCase.consequent)) {
+									state.armBodyStatements.add(caseChild);
+									walkMarkupStatement(caseChild, state);
+								}
+							}),
+						),
 					);
 					state.currentBranchScopeIds.pop();
 				}
@@ -736,9 +739,12 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const branchId = `branch:${state.nextBranchId++}`;
 	state.currentBranchScopeIds.push(branchId);
-	withCreationSite(state, 'branch', () => {
+	withCreationSite(state, 'arm', () => {
 		if (node.type === 'BlockStatement') {
-			for (const statement of asNodes(node.body)) walkMarkupStatement(statement, state);
+			for (const statement of asNodes(node.body)) {
+				state.armBodyStatements.add(statement);
+				walkMarkupStatement(statement, state);
+			}
 			return;
 		}
 		walkMarkupStatement(node, state);
@@ -787,6 +793,12 @@ function withArm(state: WalkState, branchSiteId: string | null, arm: number, run
 	if (branchSiteId) state.currentBranchArms.push({ branchSiteId, arm });
 	run();
 	if (branchSiteId) state.currentBranchArms.pop();
+}
+
+function withArmGuards(state: WalkState, guards: ReadonlyArray<ArmGuard>, run: () => void): void {
+	state.currentArmGuards.push(...guards);
+	run();
+	state.currentArmGuards.length -= guards.length;
 }
 
 function withArmGuard(state: WalkState, guard: ArmGuard | undefined, run: () => void): void {

@@ -76,7 +76,9 @@ describe('Term', () => {
 	});
 
 	it('draws with filled ink only: no filters, patterns, hrefs or dy', () => {
-		expect(source).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
+		const drawing = source.slice(source.indexOf('<svg'), source.indexOf('</svg>'));
+		expect(drawing.length).toBeGreaterThan(100);
+		expect(drawing).not.toMatch(/<(filter|pattern|use)\b|\bhref=|\bdy=/);
 		for (const sketch of [sketches.elements, sketches.events]) {
 			expect(sketch.ink.length).toBeGreaterThan(500);
 			expect(sketch.pink).toMatch(/^M/);

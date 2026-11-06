@@ -50,7 +50,7 @@ let parser: ParseModule | undefined;
  * is reached through the package that owns it — the same route
  * `packages/headless/components/api-extract/analyzer.ts` takes.
  */
-async function houseParser(): Promise<ParseModule> {
+export async function houseParser(): Promise<ParseModule> {
 	if (parser) return parser;
 	const fromHere = createRequire(import.meta.url);
 	const compiler = createRequire(fromHere.resolve('@markless/core')).resolve(

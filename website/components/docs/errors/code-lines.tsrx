@@ -15,7 +15,10 @@ export default function CodeLines({ lines }: { readonly lines: readonly CodeLine
 			.line {
 				display: block;
 				min-height: 1lh;
-				white-space: pre;
+				white-space: pre-wrap;
+				overflow-wrap: anywhere;
+				padding-left: 2ch;
+				text-indent: -2ch;
 			}
 		</style>
 	</pre>;

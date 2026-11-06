@@ -1,6 +1,6 @@
 import { tooltip } from '@markless/ui';
 import { art } from './term-art.ts';
-import { captionOf } from './term-glossary.ts';
+import { captionOf, glossaryHref } from './term-glossary.ts';
 
 /** A word in running text that shows what it means: its one-line caption, with a small ink sketch for the words that have one. `word` must be a key of the glossary in term-glossary.ts. */
 export default function Term({ word }: { readonly word: string }) @{
@@ -24,6 +24,9 @@ export default function Term({ word }: { readonly word: string }) @{
 				</svg>
 			}
 			<span class="caption">{caption}</span>
+			<a class="more" href={glossaryHref(word)}>
+				In the glossary
+			</a>
 		</tooltip.content>
 		<style>
 			.term {
@@ -136,6 +139,16 @@ export default function Term({ word }: { readonly word: string }) @{
 			.caption {
 				margin: 0.4rem 0 0;
 				color: var(--ink);
+			}
+
+			.more {
+				display: block;
+				margin-top: 0.35rem;
+				color: var(--ink);
+				font-size: 0.9em;
+				text-decoration-color: var(--pink);
+				text-decoration-thickness: 0.12em;
+				text-underline-offset: 0.16em;
 			}
 		</style>
 	</tooltip.root>
