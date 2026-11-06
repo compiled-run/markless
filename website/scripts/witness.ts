@@ -585,7 +585,7 @@ try {
 			const codePage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 			await codePage.goto(`${origin}/concepts/state`, { waitUntil: 'networkidle' });
 			const block = codePage.locator('.code-block');
-			// A block downloads its boot when it scrolls into view or the page goes idle; none of it runs before the reader touches it.
+			// A block runs nothing at load: prefetch links in the page download its boot, the first press or focus boots it.
 			const states = await codePage
 				.locator('[data-code]')
 				.evaluateAll((boxes) => boxes.map((box) => (box as HTMLElement).dataset.code));
@@ -635,10 +635,11 @@ try {
 				.first()
 				.evaluate((node) => getComputedStyle(node).fontSize);
 			await block.hover();
+			await block.locator('.title').click();
 			await block.and(codePage.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
 			check(
 				(await input.getAttribute('readonly')) === null,
-				'Code: pointing at the block makes the code editable',
+				'Code: pressing the block makes the code editable',
 			);
 			await retype(codePage, block, '<h2>Theme: {theme}</h2>', '<h2>Mode: {theme}</h2>');
 			const frame = codePage.frameLocator('.code-frame');
@@ -718,7 +719,7 @@ try {
 			const blocks = proof.locator('.code-block');
 			const editLine = async (index: number, find: string, replacement: string) => {
 				const block = blocks.nth(index);
-				await block.hover();
+				await block.locator('.title').click();
 				await block.and(proof.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
 				await retype(proof, block, find, replacement);
 				await block
@@ -2087,7 +2088,7 @@ try {
 			'the home Try this list serves three steps, none ticked',
 			JSON.stringify(await doneSteps()),
 		);
-		await tryBlock.hover();
+		await tryBlock.locator('.title').click();
 		await tryBlock.and(page.locator('[data-code="ready"]')).waitFor({ timeout: 20000 });
 		await retype(page, tryBlock, 'Mark ready 🔔', 'Done 🎉');
 		await tryBlock

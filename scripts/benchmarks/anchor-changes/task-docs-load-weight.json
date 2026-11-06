@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -91164,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -929,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -147357,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -1660,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -167,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "app code, not framework: Code blocks no longer dispatch an idle prefetch inside the load window and the home hero's ink-in is CSS-only, so no page with playground blocks or the hero wakes the runtime at load (/concepts/state runs 24.4K chars instead of 171.8K, / 24.4K instead of 115.5K); the editor, compile worker and block runtime modules download through prefetch links at idle instead, so downloaded bytes move only by the shared chunks repacking around the changed block handlers; Linux numbers from PR #517 run 42192418006 (its merge with main e8e9cff95) against main e8e9cff95's merge-queue run 42181884299",
+			"date": "2026-11-06"
+		}
+	]
+}
