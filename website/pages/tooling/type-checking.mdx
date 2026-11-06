@@ -2,45 +2,61 @@ import Subtitle from '../../components/docs/subtitle.tsrx';
 import PageMeta from '../../components/page-meta.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import EditorFigure from '../../components/figures/type-checking/editor-figure.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# TypeScript checks a copy of each `.tsrx` file
+# Type checking
 
-<PageMeta time="2 min" assumes="components" />
+<PageMeta time="2 min" assumes="components,state" />
 
-<Subtitle text="Markless hands TypeScript a TSX copy of each .tsrx file. TypeScript checks the copy, and every error points back to the line you wrote." />
+<Subtitle text="Type checking is TypeScript reading each component as you type, and marking every mistake on your line." terms="component" />
 
-```tsrx title="app.tsrx"
-import { Nav } from './nav.tsrx';
+```tsrx title="card.tsrx"
+import Avatar from './avatar.tsrx';
 
-export function App() @{
-	<Nav label={42} />
+export default function Card() @{
+	<article>
+		<Avatar size="large" />
+	</article>
 }
 ```
 
-`Nav` takes `label: string`, so the checker reports the wrong type at `label`, on line 4, column 7:
+`Avatar` takes a **`size`** that is a number, and this file passes the **string** `"large"`. Your editor draws a red line under `size`: `Type 'string' is not assignable to type 'number'.`
 
-```text
-app.tsrx(4,7): error TS2322: Type 'number' is not assignable to type 'string'.
+## Type errors show up as squiggles
+
+A *squiggle* is the red wavy line your editor draws under a mistake, with TypeScript's message on hover. Click an error in the terminal to jump to it, then click the wrong value to fix it:
+
+<EditorFigure />
+
+- Each fix clears its own squiggle.
+- Its line leaves the terminal, until only the `pass` lines remain.
+- The check runs on every file you open, once [your editor is set up](/tooling/editor-setup).
+
+## The check catches real mistakes
+
+These are the messages TypeScript gives in a `.tsrx` file:
+
+- **A prop of the wrong type.** `<Avatar size="large" />` gets `Type 'string' is not assignable to type 'number'.`
+- **A misspelt name.** `{titel}`, when the state is called `title`, gets `Cannot find name 'titel'. Did you mean 'title'?`
+- **A misspelt event handler.** `<button onClik={...}>` gets `Property 'onClik' does not exist on type '…'. Did you mean 'onClick'?` The type it names is long, so it's cut here.
+- **An attribute HTML doesn't have**, like `className` (write `class`).
+- **A handler whose code doesn't type-check.**
+
+## `npm run check` checks the whole app
+
+From the next Markless release, `npm run check` type-checks every `.tsrx` file too, so CI can run the same check on each pull request:
+
+```text title="terminal"
+$ npm run check
+pass: All 8 files are correctly formatted (346ms, 18 threads)
+pass: Found no warnings or lint errors in 2 files (299ms, 18 threads)
+pages/card.tsrx(8,11): error TS2322: Type 'string' is not assignable to type 'number'.
+pages/card.tsrx(9,8): error TS2552: Cannot find name 'titel'. Did you mean 'title'?
 ```
 
-TSX is the file type TypeScript already understands: TypeScript with HTML-like tags. The copy exists only for the checker. Your own file stays exactly as you wrote it.
+Each error gives the file, the line and the column. It exits with code 2 until you fix them, then prints only the two `pass` lines. `npm run build` still stops only on Markless errors, so a wrong prop builds.
 
-## What gets checked
-
-The copy keeps your real types, so a mistake shows at the exact spot:
-
-- a prop of the wrong type, or one the component doesn't take
-- an attribute HTML elements don't have, like `className` (write `class`)
-- a misspelt event handler, like `onClik`
-- a handler whose code doesn't type-check
-
-## Where the check runs today
-
-- **In your editor**, on every file you open. [Editor setup](/tooling/editor-setup) turns it on.
-- **Not in the build.** `npm run build` stops on Markless errors, but a wrong prop still builds. `npm run check` doesn't check `.tsrx` types either.
-- **Not from the command line, yet.** The published `@markless/typescript-plugin` is the editor plugin only, with no command to check every file at once.
-
-Working on Markless itself? The repo has that command: [Dev setup](/contributing/dev-setup) shows `pnpm typecheck`.
+[Editor setup](/tooling/editor-setup) turns the check on.

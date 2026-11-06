@@ -25,3 +25,9 @@ export const GLOSSARY = {
 export type TermWord = keyof typeof GLOSSARY;
 
 export const captionOf = (word: string): string => (GLOSSARY as Record<string, string>)[word] ?? '';
+
+/** Term words whose glossary card has another id. */
+const ALIASES: Readonly<Record<string, string>> = { handle: 'element-handle' };
+
+/** The glossary card a term tooltip links to. */
+export const glossaryHref = (word: string) => '/reference/glossary#' + (ALIASES[word] ?? word);

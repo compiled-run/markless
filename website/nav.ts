@@ -232,7 +232,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'typecheck',
 				number: '2',
 				description:
-					'TypeScript checks a TSX copy of each .tsrx file, and every error points back to the line you wrote.',
+					'Your editor checks each .tsrx file with TypeScript as you type, and marks each mistake on the line you wrote.',
 			},
 			{
 				title: 'Testing',

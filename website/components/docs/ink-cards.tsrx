@@ -82,7 +82,7 @@ export default function InkCards({ cards, label }: { readonly cards: readonly In
 				grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
 				gap: var(--space-m) var(--space-s);
 				margin: var(--space-m) 0;
-				padding: 0;
+				padding: 0 0.5rem 0.5rem 0;
 				list-style: none;
 			}
 
