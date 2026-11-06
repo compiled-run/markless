@@ -143,3 +143,62 @@ export function App() @{
 `);
 	expect(symbols).toEqual([{ propName: 'onClick', entryMarks: undefined }]);
 });
+
+// A write inside a function the handler only hands to someone else runs on that callee's turn,
+// whichever API takes it; only a write in the handler's own body earns the mark.
+const deferredShapes = {
+	setInterval: 'setInterval(() => { reload++; }, 1000)',
+	requestAnimationFrame: 'requestAnimationFrame(() => { reload++; })',
+	queueMicrotask: 'queueMicrotask(() => { reload++; })',
+	promiseThen: 'Promise.resolve().then(() => { reload++; })',
+	socketProperty: 'socket.onmessage = function () { reload++; }',
+};
+
+for (const [name, deferred] of Object.entries(deferredShapes)) {
+	test(`a write only inside a deferred callback (${name}) gets no entry mark`, async () => {
+		const symbols = await entryMarksOf(`
+import { state, computed } from '@markless/core';
+const socket = {};
+export function App() @{
+	let reload = state(0);
+	const balance = computed(async () => { reload; return 1; });
+	<>
+		<button onClick={() => { ${deferred}; }}>Later</button>
+		<p>{balance}</p>
+	</>
+}
+`);
+		expect(symbols).toEqual([{ eventName: 'click', entryMarks: undefined }]);
+	});
+}
+
+test('a write in the handler body still marks when the same handler also defers one', async () => {
+	const symbols = await entryMarksOf(`
+import { state, computed } from '@markless/core';
+export function App() @{
+	let reload = state(0);
+	const balance = computed(async () => { reload; return 1; });
+	<>
+		<button onClick={async () => { requestAnimationFrame(() => { reload++; }); await Promise.resolve(); reload = reload + 1; }}>Both</button>
+		<p>{balance}</p>
+	</>
+}
+`);
+	expect(symbols).toEqual([{ eventName: 'click', entryMarks: ['computed:balance'] }]);
+});
+
+test('a handler declared as a local async function still marks its own write', async () => {
+	const symbols = await entryMarksOf(`
+import { state, computed } from '@markless/core';
+export function App() @{
+	let reload = state(0);
+	const balance = computed(async () => { reload; return 1; });
+	async function save() { await Promise.resolve(); reload++; }
+	<>
+		<button onClick={save}>Save</button>
+		<p>{balance}</p>
+	</>
+}
+`);
+	expect(symbols).toEqual([{ eventName: 'click', entryMarks: ['computed:balance'] }]);
+});

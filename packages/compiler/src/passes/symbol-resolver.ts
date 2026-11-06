@@ -115,7 +115,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(event.handlerDefinitionSpans ?? []),
 		]);
 		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
-		const entryMarks = entryMarksOf(ownTurnWrites(source, writes));
+		const entryMarks = entryMarksOf(ownTurnWrites(source, writes, semanticsReader));
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -186,7 +186,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...inlined.spans,
 				...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
 			]);
-			const callbackEntryMarks = entryMarksOf(ownTurnWrites(source, callbackWrites));
+			const callbackEntryMarks = entryMarksOf(ownTurnWrites(source, callbackWrites, semanticsReader));
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -1159,35 +1159,17 @@ function eventWrites(
 	});
 }
 
-// Deferred-scheduling APIs whose callback argument runs on its own later turn, not as part of
-// the call site's own handler.
-const DEFERRED_CALLBACK_CALLS = /\b(?:setInterval|setTimeout|addEventListener)\s*\(/g;
-
-// A write textually inside the handler but inside a callback a deferred-scheduling call owns
-// (setInterval/setTimeout/addEventListener) is not one the handler's own turn ever reaches: that
-// callback runs on its own later turn, so submit-quiet-design.md Q1/Q2's entry mark and
-// user-action wrap must not credit this handler with it. `writes` itself (the symbol's own
-// field, which the emitter rewrites state reads against) is untouched — only entryMarksOf's input is.
+// A write only a nested callback makes runs on whichever turn its callee picks, not the handler's own.
 function ownTurnWrites(
 	handlerSource: string,
 	writes: ReadonlyArray<LoweredStateWrite>,
+	semanticsReader: SymbolSourceSemanticsReader,
 ): ReadonlyArray<LoweredStateWrite> {
-	return writes.filter((write) => !writeInsideDeferredCallback(handlerSource, write));
-}
-
-function writeInsideDeferredCallback(handlerSource: string, write: LoweredStateWrite): boolean {
-	for (const match of handlerSource.matchAll(DEFERRED_CALLBACK_CALLS)) {
-		const argumentsStart = match.index + match[0].length;
-		let depth = 1;
-		for (let at = argumentsStart; at < handlerSource.length; at++) {
-			if (handlerSource[at] === '(') depth++;
-			else if (handlerSource[at] === ')' && --depth === 0) {
-				if (handlerContainsWrite(handlerSource.slice(argumentsStart, at), write)) return true;
-				break;
-			}
-		}
-	}
-	return false;
+	const own = semanticsReader.read(handlerSource).ownTurnSource;
+	if (own === undefined || own === handlerSource) return writes;
+	return writes.filter(
+		(write) => !handlerContainsWrite(handlerSource, write) || handlerContainsWrite(own, write),
+	);
 }
 
 function eventReads(

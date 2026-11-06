@@ -47,6 +47,12 @@ export type SymbolSourceSemantics = {
 	 * passes, spreads, writes or indexes it dynamically.
 	 */
 	staticMemberKeys(name: string): ReadonlySet<string> | null;
+	/**
+	 * The source with every function nested inside the outermost one blanked out: what runs on the
+	 * source's own turn, not on whichever turn a callee later invokes a nested callback. Absent when
+	 * the source is not itself a function or could not be analyzed.
+	 */
+	readonly ownTurnSource?: string;
 };
 
 /**
@@ -110,7 +116,24 @@ function symbolSourceSemantics(source: string): SymbolSourceSemantics {
 		analysisFailed: false,
 		invokes: (expression) => calleeSources.has(expression),
 		staticMemberKeys: (name) => staticMemberKeys(module, name),
+		ownTurnSource: ownTurnSource(module, source),
 	};
+}
+
+const FUNCTION_NODES = ['ArrowFunctionExpression', 'FunctionExpression', 'FunctionDeclaration'] as const;
+
+function ownTurnSource(module: Module, source: string): string | undefined {
+	const outer = module.findAll('VariableDeclarator')[0]?.init as
+		| { readonly type?: string; readonly start: number; readonly end: number }
+		| null
+		| undefined;
+	if (!outer || !(FUNCTION_NODES as ReadonlyArray<string>).includes(outer.type ?? '')) return undefined;
+	let own = module.source;
+	for (const nested of module.findAll(FUNCTION_NODES)) {
+		if (nested.start <= outer.start || nested.end > outer.end) continue;
+		own = own.slice(0, nested.start) + ' '.repeat(nested.end - nested.start) + own.slice(nested.end);
+	}
+	return own.slice(SYMBOL_SOURCE_PREFIX.length, SYMBOL_SOURCE_PREFIX.length + source.length);
 }
 
 function analyzeSymbolSource(source: string): Module | undefined {
