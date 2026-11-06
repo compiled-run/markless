@@ -1,5 +1,6 @@
 import type { AsyncPlaneContext, RuntimeAsyncComputedNode, RuntimeAsyncInput } from './graph-async.ts';
 import { readPath } from './graph-core.ts';
+import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncComputed,
 	RuntimeGraphComputedDependency,
@@ -67,6 +68,73 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		return inputs;
 	};
 
+	// Every ancestor's inputs, stepping back through its kept answers where another ancestor's
+	// current answer disagrees, until every ancestor agrees on one answer each: the newest inputs
+	// they have all answered (Kept answers). `false` when no such answer exists, even with history.
+	const resolveAncestors = (
+		ancestors: ReadonlySet<RuntimeAsyncComputedNode>,
+	):
+		| {
+				readonly pins: ReadonlyMap<string, RuntimeAsyncInput>;
+				readonly chosen: ReadonlyMap<RuntimeAsyncComputedNode, unknown>;
+				readonly rejectedOnly: ReadonlySet<string>;
+		  }
+		| false => {
+		const list = [...ancestors];
+		type Candidate = { readonly inputs: ReadonlyArray<RuntimeAsyncInput>; readonly keptValue?: { readonly v: unknown } };
+		const candidatesOf = (ancestor: RuntimeAsyncComputedNode): Candidate[] => [
+			{ inputs: ancestor.valueInputs ?? [] },
+			...(ancestor.priorAnswers ?? []).map((answer) => ({ inputs: answer.inputs, keptValue: { v: answer.value } })),
+		];
+		const agrees = (pins: ReadonlyMap<string, RuntimeAsyncInput>, inputs: ReadonlyArray<RuntimeAsyncInput>) =>
+			inputs.every((input) => {
+				const held = pins.get(inputId(input));
+				return !held || Object.is(held.value, input.value);
+			});
+		const assign = (
+			index: number,
+			pins: Map<string, RuntimeAsyncInput>,
+			chosen: Map<RuntimeAsyncComputedNode, unknown>,
+			contributedBy: Map<string, RuntimeAsyncComputedNode[]>,
+		): boolean => {
+			if (index === list.length) return true;
+			const ancestor = list[index]!;
+			for (const candidate of candidatesOf(ancestor)) {
+				if (!agrees(pins, candidate.inputs)) continue;
+				const nextPins = new Map(pins);
+				const nextContributedBy = new Map(contributedBy);
+				for (const input of candidate.inputs) {
+					nextPins.set(inputId(input), input);
+					nextContributedBy.set(inputId(input), [...(nextContributedBy.get(inputId(input)) ?? []), ancestor]);
+				}
+				const nextChosen = new Map(chosen);
+				if (candidate.keptValue) nextChosen.set(ancestor, candidate.keptValue.v);
+				if (assign(index + 1, nextPins, nextChosen, nextContributedBy)) {
+					pins.clear();
+					for (const [k, v] of nextPins) pins.set(k, v);
+					chosen.clear();
+					for (const [k, v] of nextChosen) chosen.set(k, v);
+					contributedBy.clear();
+					for (const [k, v] of nextContributedBy) contributedBy.set(k, v);
+					return true;
+				}
+			}
+			return false;
+		};
+		const pins = new Map<string, RuntimeAsyncInput>();
+		const chosen = new Map<RuntimeAsyncComputedNode, unknown>();
+		const contributedBy = new Map<string, RuntimeAsyncComputedNode[]>();
+		if (!assign(0, pins, chosen, contributedBy)) return false;
+		// A failed refresh that is over keeps the pin for a reader that reads it exactly, but
+		// justifies no broader, conservative hold on its own: a sibling still in flight or kept does.
+		const rejectedOnly = new Set(
+			[...contributedBy]
+				.filter(([, contributors]) => contributors.every((ancestor) => ancestor.snapshot.status === 'rejected'))
+				.map(([id]) => id),
+		);
+		return { pins, chosen, rejectedOnly };
+	};
+
 	// Inputs of a refreshing value's key answer as its shown value was fetched; `false` means the reader would mix.
 	const shownRead: HeldInputsPlane['shownRead'] = (dependencies) => {
 		const ancestors = new Set<RuntimeAsyncComputedNode>();
@@ -75,44 +143,52 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 			if (seen.has(graphNodeId)) return;
 			seen.add(graphNodeId);
 			const asyncNode = asyncComputedNodes.get(graphNodeId);
-			// A failed refresh is over: its kept value holds no reader at the inputs it was fetched with.
-			if (asyncNode) {
-				if (asyncNode.snapshot.status !== 'rejected') ancestors.add(asyncNode);
-			} else for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
+			if (asyncNode) ancestors.add(asyncNode);
+			else for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) visit(dependency.graphNodeId);
 		};
 		for (const dependency of dependencies) visit(dependency.graphNodeId);
 
-		const pins = new Map<string, RuntimeAsyncInput>();
-		for (const ancestor of ancestors)
-			for (const input of ancestor.valueInputs ?? []) {
-				const held = pins.get(inputId(input));
-				if (held && !Object.is(held.value, input.value)) return false;
-				pins.set(inputId(input), input);
-			}
+		const resolution = resolveAncestors(ancestors);
+		if (!resolution) return false;
+		const { pins, chosen, rejectedOnly } = resolution;
+
 		const moved = [...pins.values()].filter((pin) => !Object.is(pin.value, readGraph(pin.graphNodeId, pin.path)));
-		if (moved.length === 0) return undefined;
+		if (moved.length === 0 && chosen.size === 0) return undefined;
 		for (const ancestor of ancestors)
-			if (ancestor.valueInputs?.some((input) => moved.includes(input))) ancestor.pinned = true;
+			if (ancestor.valueInputs?.some((input) => moved.includes(input)) || chosen.has(ancestor)) ancestor.pinned = true;
 
 		const movedIds = new Set(moved.map(inputId));
+		// A conservative, coarse hold needs a sibling still live to justify it; a rejected one alone does not.
+		const heldWorthy = moved.filter((pin) => !rejectedOnly.has(inputId(pin)));
+		const heldWorthyIds = new Set(heldWorthy.map(inputId));
 		// A plain derived value over a held input cannot be re-derived with it here.
 		const derivesFromMoved = (graphNodeId: string, visited: Set<string>): boolean => {
 			const reads = visited.has(graphNodeId) ? [] : (computedNodes.get(graphNodeId)?.dependencies ?? []);
 			visited.add(graphNodeId);
 			return (
 				!reads.some((read) => asyncComputedNodes.has(read.graphNodeId)) &&
-				reads.some((read) => movedIds.has(inputId(read)) || derivesFromMoved(read.graphNodeId, visited))
+				reads.some((read) => heldWorthyIds.has(inputId(read)) || derivesFromMoved(read.graphNodeId, visited))
 			);
 		};
 		for (const dependency of dependencies) {
 			if (movedIds.has(inputId(dependency)) || asyncComputedNodes.has(dependency.graphNodeId)) continue;
 			const path = dependency.path ?? [];
-			const wholeOfHeld = moved.some(
+			const wholeOfHeld = heldWorthy.some(
 				(pin) => pin.graphNodeId === dependency.graphNodeId && pin.path.length > path.length && startsWith(pin.path, path),
 			);
 			if (wholeOfHeld || derivesFromMoved(dependency.graphNodeId, new Set())) return false;
 		}
 		return (graphNodeId, path = []) => {
+			for (const [ancestor, value] of chosen) {
+				if (ancestor.graphNodeId !== graphNodeId) continue;
+				// Reading an async node goes through its snapshot's meta keys; a kept answer stands in as a fulfilled one.
+				const head = path[0];
+				if (head === undefined || !isAsyncSnapshotMetaKey(head)) return readPath(value, path);
+				if (head === 'value') return readPath(value, path.slice(1));
+				if (head === 'status') return 'fulfilled';
+				if (head === 'pending') return false;
+				return undefined;
+			}
 			const pin = moved.find((held) => held.graphNodeId === graphNodeId && startsWith(path, held.path));
 			return pin ? readPath(pin.value, path.slice(pin.path.length)) : readGraph(graphNodeId, path);
 		};
