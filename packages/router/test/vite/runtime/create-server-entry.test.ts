@@ -779,13 +779,53 @@ describe('server entry rendering', () => {
 		const html = await response.text();
 
 		expect(response.status).toBe(200);
-		expect(html).toContain(
-			'<!doctype html><html lang="en" data-status="200"><head><link rel="modulepreload" href="/build/docs-current.js" crossorigin="anonymous" fetchpriority="low"><title>/docs</title>',
+		expect(html).toMatch(
+			/^<!doctype html><html lang="en" data-status="200"><head><script>[\s\S]*?__marklessEarlyCapture[\s\S]*?<\/script><link rel="modulepreload" href="\/build\/docs-current.js" crossorigin="anonymous" fetchpriority="low"><title>\/docs<\/title>/,
 		);
 		expect(html).toContain('</head><body class="docs" data-async-container');
 		expect(html).toContain('<main><button m:on="click:0">Docs</button></main>');
 		expect(html).not.toContain('<script type="module"');
 		expect(html).toContain('</body></html>');
+	});
+
+	// A classic inline script waits for every stylesheet above it, and Gecko stops parsing and painting until it runs.
+	it('serves the early-event capture script ahead of every head stylesheet', async () => {
+		for (const documentModule of [true, false]) {
+			const entry = createServerEntry({
+				resumeEntryPath: '/@id/virtual:markless-router/resume-entry',
+				documentModuleLoader: documentModule
+					? async () => ({
+							default: {
+								renderSsr(props: { readonly children?: __MarklessTypeService.Child }) {
+									return {
+										html: `<head><meta charset="utf-8"><link rel="stylesheet" href="/site.css"><title>Docs</title><link rel="stylesheet" href="/theme.css"></head><body>${props.children}</body>`,
+									};
+								},
+							},
+						})
+					: undefined,
+				routeModulePreloads: { 'pages/docs/index.tsrx': [] },
+				routeSsrModulePreloads: { 'pages/docs/index.tsrx': ['/build/docs-current.js'] },
+				routeStylesheets: { 'pages/docs/index.tsrx': ['/assets/page.css'] },
+				pageModuleLoaders: {
+					'pages/docs/index.tsrx': async () => ({
+						default: page('<main><button>Docs</button></main>', clickPayload()),
+					}),
+				},
+				routeFileIds: ['/pages/docs/index.tsrx'],
+			});
+
+			const html = await (await entry.fetch(new Request('http://markless-router.test/docs'))).text();
+			const head = html.slice(0, html.indexOf('</head>'));
+			const capture = head.indexOf('__marklessEarlyCapture');
+			const stylesheets = [...head.matchAll(/<link rel="stylesheet"[^>]*>/g)];
+
+			expect(capture).toBeGreaterThan(-1);
+			expect(stylesheets.length).toBe(documentModule ? 3 : 1);
+			for (const stylesheet of stylesheets) expect(capture).toBeLessThan(stylesheet.index);
+			const preload = head.indexOf('<link rel="modulepreload" href="/build/docs-current.js"');
+			if (documentModule) expect(preload).toBeGreaterThan(head.indexOf('/theme.css'));
+		}
 	});
 
 	it('inserts rendered page html through compiled document children without escaping it', async () => {
