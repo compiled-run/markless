@@ -31,8 +31,8 @@ describe('the playground split', () => {
 		expect(panels[0] ?? '').toMatch(/class="[^"]*\bsource\b/);
 		expect(panels[1] ?? '').toMatch(/class="[^"]*\bresult\b/);
 		expect(panels[1] ?? '').toContain('data-code-result');
-		expect(panels[0] ?? '').toContain('--size: 64');
-		expect(panels[1] ?? '').toContain('--size: 36');
+		expect(panels[0] ?? '').toContain('--size: 70');
+		expect(panels[1] ?? '').toContain('--size: 30');
 
 		const divider = all(html, /<div[^>]*role="separator"[^>]*>/g);
 		expect(divider).toHaveLength(1);
@@ -40,7 +40,7 @@ describe('the playground split', () => {
 		expect(codeId).toBeTruthy();
 		expect(accessibleName(html, divider[0] ?? '')).toBe('Resize code and preview');
 		expect(divider[0] ?? '').toContain(`aria-controls="${codeId}"`);
-		expect(divider[0] ?? '').toContain('aria-valuenow="64"');
+		expect(divider[0] ?? '').toContain('aria-valuenow="70"');
 		expect(divider[0] ?? '').toContain('aria-valuemin="25"');
 		expect(divider[0] ?? '').toContain('aria-valuemax="80"');
 		expect(divider[0] ?? '').toContain('tabindex="0"');

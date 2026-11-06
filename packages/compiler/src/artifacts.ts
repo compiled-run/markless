@@ -377,6 +377,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly addressSteps?: ModuleGraphInterfaceElementCount;
 			// Absent on an interface built before this field existed, which reads as 'unknown'.
 			readonly constructReach?: ModuleGraphInterfaceConstructReach;
+			/** A @try stands at the component's top level, outside every element it renders. */
+			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
 			/** Props this component files into a widget callback slot. */
@@ -729,6 +731,13 @@ export type SemanticKeyedRepeat = {
 	readonly asyncBoundaryId?: string;
 	readonly rowHostNodeId?: string;
 	readonly itemName: string;
+	// A destructured header (`const [key, value]`): each name it binds and its path on the item `itemName` names.
+	readonly itemAliases?: ReadonlyArray<{
+		readonly name: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	// The destructuring as written, which diagnostics show in place of the compiler's item name.
+	readonly itemPattern?: string;
 	readonly indexName?: string;
 	readonly collectionSource: string;
 	readonly collectionGraphNodeId?: string;
@@ -901,6 +910,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_KEY_REQUIRED'
 		| 'MARKLESS_REPEAT_KEY_IS_INDEX'
 		| 'MARKLESS_REPEAT_KEY_UNSTABLE'
+		| 'MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED'
 		| 'MARKLESS_REPEAT_COLLECTION_UNREADABLE'
 		| 'MARKLESS_REPEAT_ROWS_FROZEN'
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'

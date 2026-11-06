@@ -33,6 +33,7 @@ import {
 	soleLoopRoot,
 	supportedFragmentRoot,
 } from './template.ts';
+import { repeatItemBinding } from '../semantic-graph/repeat-item-binding.ts';
 
 export function emptyPlan(
 	diagnostics: ReadonlyArray<PublicRenderPlanArtifact['diagnostics'][number]> = [],
@@ -348,11 +349,14 @@ export function collectRepeatBindingConflictDiagnostics(input: {
 			// Only `@for` heads: a plain JS for-of in module code declares no index and
 			// contributes no row binding to the emitted readers.
 			if (node.type !== 'JSXForExpression') return;
-			const itemName = getIdentifierName(
-				asNodes((node.left as AnyNode | undefined)?.declarations)[0]?.id as AnyNode | undefined,
-			);
+			const binding = repeatItemBinding(node);
+			const itemNames = binding?.aliases.length
+				? binding.aliases.map((alias) => alias.name)
+				: binding
+					? [binding.itemName]
+					: [];
 			const indexName = getIdentifierName(node.index as AnyNode | undefined);
-			if (itemName) {
+			for (const itemName of itemNames) {
 				if (asIndex.has(itemName)) conflicts.push({ name: itemName, node });
 				asItem.add(itemName);
 			}

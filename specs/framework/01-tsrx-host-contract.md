@@ -67,10 +67,30 @@ TSRX already gives `@for` optional `index` and `key` clauses:
 }
 ```
 
+A loop renders one row for each value a `for...of` over the collection would
+visit: each element of an array, each member of a `Set`, each `[key, value]`
+entry of a `Map`. The first render shows those rows, on the server and in the
+browser alike.
+
+The loop name may be destructured: `@for (const [dish, votes] of tally; key dish)`
+or `@for (const { id, name: { first } } of people; key id)`. Each name reads the
+row item at its array position or field, in markup, keys, child props, handlers,
+`@if` tests and nested loops alike. A default value, a rest element or a computed
+key has no fixed place on the item and is the build error
+`MARKLESS_REPEAT_ITEM_PATTERN_UNSUPPORTED`; writing to a destructured name is a
+build error too, since it would not change the item.
+
 This framework uses the `key` clause as the stable identity root for repeated
 local graph scopes. A keyed loop item keeps its component instances, local
 `state()`, `computed()` nodes, async nodes, DOM updates, and event wiring
 attached to the same logical item across reorder, insert, and delete operations.
+
+Today a row gets its own `state()` through a component: `state()`,
+`computed()` or `storage()` written directly in a `@for` body is the build error
+`MARKLESS_STATE_CREATION_SITE_UNSTABLE` ("inside a @for row"), because one
+declaration there would be one cell shared by every row. The fix is a row
+component in its own file (`<BookRow book={book} />`) that declares the state;
+each instance keeps it with the row's key.
 
 Unkeyed `@for` is positional. That is acceptable for static/stateless output,
 but any loop body that creates resumable graph identity must either provide a
