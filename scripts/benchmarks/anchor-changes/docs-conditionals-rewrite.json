@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "the Conditionals page teaches the whole topic: five live blocks and two ink figures (player.art.ts) instead of one and one, and neighbouring docs pages prefetch its chunks, so /concepts/state downloads 26260 B gzip more at load than the #516 merge-queue run 42181884299 (22670 B over its anchor) while running the same 171765 chars; the 1 B moves on the home and /ui/accordion are gzip noise; measured on PR run 42192404860",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 26260,
+			"reason": "the Conditionals page teaches the whole topic: five live blocks and two ink figures (player.art.ts) instead of one and one, and neighbouring docs pages prefetch its chunks, so /concepts/state downloads 26260 B gzip more at load than the #516 merge-queue run 42181884299 (22670 B over its anchor) while running the same 171765 chars; the 1 B moves on the home and /ui/accordion are gzip noise; measured on PR run 42192404860",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "the Conditionals page teaches the whole topic: five live blocks and two ink figures (player.art.ts) instead of one and one, and neighbouring docs pages prefetch its chunks, so /concepts/state downloads 26260 B gzip more at load than the #516 merge-queue run 42181884299 (22670 B over its anchor) while running the same 171765 chars; the 1 B moves on the home and /ui/accordion are gzip noise; measured on PR run 42192404860",
+			"date": "2026-11-06"
+		}
+	]
+}
