@@ -462,13 +462,12 @@ test('both paths choose the same module shape for every fixture', async () => {
 
 	// Stated rather than derived, so a shape that moves shows up as a failure
 	// here instead of quietly passing the equality above.
-	// Every `general` event-handler shape carries two more imports than before:
+	// Every `general` event-handler and callback-prop shape carries two more imports than before:
 	// `marklessUserActionStart`/`marklessUserActionEnd` from `@markless/web/fns/user-action`
 	// (submit-quiet-design.md Q2), which mark the handler's own turn so a write it makes — sync
-	// or after an `await` in the same handler — starts a loud refresh. The scalar-leaf shape marks
-	// its one write in `write-scalar.ts` instead, so its import count is unchanged. `callback-prop`
-	// (a function passed to a child component, not bound to a DOM event) gets none of this: it
-	// inherits whatever user-action context its caller is already running in.
+	// or after an `await` in the same handler, or forwarded through a callback prop — starts a
+	// loud refresh. The scalar-leaf shape marks its one write in `write-scalar.ts` instead, so its
+	// import count is unchanged.
 	expect(shapes).toEqual({
 		'scalar-leaf-step': 'scalar-leaf/sync/imports:1',
 		'scalar-leaf-local': 'scalar-leaf/sync/imports:1',
@@ -478,7 +477,7 @@ test('both paths choose the same module shape for every fixture', async () => {
 		'method-call-write': 'general/sync/imports:2',
 		'commented-body': 'general/sync/imports:2',
 		'capture-child-handler': 'general/async/imports:2',
-		'capture-callback-prop': 'general/sync/imports:0',
+		'capture-callback-prop': 'general/sync/imports:2',
 		'empty-body': 'general/sync/imports:2',
 	});
 });

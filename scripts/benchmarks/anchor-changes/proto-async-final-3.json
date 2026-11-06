@@ -1,0 +1,108 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 564,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/write-scalar"
+			],
+			"delta": 114,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-ssr",
+				"web/fns/write-scalar"
+			],
+			"delta": 114,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 564,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 7,
+			"reason": "submit-quiet-design.md Q2: callback-prop symbols now also wrap marklessUserActionStart/End (Part 2A fix for W38 wrapper shapes being loud), adding to runtime/graph",
+			"date": "2026-11-06"
+		}
+	]
+}

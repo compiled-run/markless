@@ -6210,12 +6210,10 @@ export function buildEventHandlerEmission(
 	// handler (a forwarded attribute, a spread, or a call from the component's own handler body),
 	// the mark belongs to the symbol module that owns the body doing the writing.
 	const entryMarks = symbol.entryMarks;
-	// Only a real DOM event binds here (`callback-prop` is a plain function passed to a child
-	// component, so it inherits whatever user-action context its caller is already running in;
-	// marking it again here would double-count or wrongly force it loud). `attach` is a synthetic
-	// eventName for element-lifecycle setup code, not a user gesture, so it is excluded too. The
-	// scalar-leaf shape below marks its own one write in `write-scalar.ts` instead of building this wrap.
-	const markUserAction = symbol.kind === 'event-handler' && symbol.eventName !== 'attach';
+	// A callback-prop symbol gets the same wrap as an event-handler, for the same reason as
+	// `entryMarks` above: its own open/close around its own body tags its write loud regardless
+	// of forwarding hops or module-load timing. Only a real `attach` lifecycle call is excluded.
+	const markUserAction = symbol.kind !== 'event-handler' || symbol.eventName !== 'attach';
 	const scalarLeaf =
 		input.captureSlots.length === 0 && !shownReads && !entryMarks
 			? eventHandlerScalarLeafStatements(input, projection)

@@ -303,6 +303,16 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 	const endEntry = (node: RuntimeAsyncComputedNode): void => {
 		const hold = node.entryHold;
 		if (!hold) return;
+		// A write this handler made may still be cascading through a flush a cell-backed
+		// computed's own deferred recompute needs (graph.ts's `markUserActionEnd` latches
+		// `isUserAction()` across that same flush): `node.version` has not moved yet, but it is
+		// not safe to conclude the write never reached anything until that flush drains.
+		if (node.version === hold.version && internals.hasPendingFlush?.()) {
+			void internals.flush?.().then(() => {
+				if (node.entryHold === hold) endEntry(node);
+			});
+			return;
+		}
 		node.entryHold = undefined;
 		if (node.version !== hold.version) return;
 		publish(node, hold.previous);

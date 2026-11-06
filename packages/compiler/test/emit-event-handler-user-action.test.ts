@@ -1,12 +1,11 @@
 /**
  * The event-handler emitter (`symbol-modules.ts`'s `buildEventHandlerEmission`) marks every
- * event-handler module's own turn as a user action (submit-quiet-design.md Q2), so a write it
- * makes — including one after an `await` in the same handler — starts a loud refresh, and a
- * write anything else makes (a timer, a socket callback) stays quiet by default.
- *
- * A `callback-prop` symbol (a function passed to a child component, not bound to a DOM event)
- * gets none of this: it inherits whatever user-action context the caller that actually invokes
- * it is running in, so marking it here would double-count or wrongly force it loud.
+ * event-handler and callback-prop module's own turn as a user action (submit-quiet-design.md
+ * Q2), so a write it makes — including one after an `await` in the same handler, or one made by
+ * a forwarded prop several components away from the native listener — starts a loud refresh,
+ * and a write anything else makes (a timer, a socket callback) stays quiet by default. The mark
+ * this opens is nesting-safe (a shared depth counter on the graph), so a callback-prop symbol
+ * marking itself does not double-count with an outer handler that is also marking itself.
  */
 import { expect, test } from 'vitest';
 import type { GeneratedSymbolModule, PlannedSymbol } from '../src/artifacts.ts';
@@ -107,7 +106,7 @@ export function App() @{
 	expect(endIndex).toBeGreaterThan(finallyIndex);
 });
 
-test('a callback prop passed to a child component is not marked here', async () => {
+test('a callback prop passed to a child component is marked here too', async () => {
 	const code = await printedHandler(
 		'/workspace/app/src/Captures.tsrx',
 		`function Child({ label, onTrace }: { label: string; onTrace: (payload: { value: number }, reason: string) => void }) @{
@@ -119,9 +118,9 @@ export function App() @{
 		(module) => module.kind === 'callback-prop',
 	);
 
-	expect(code).not.toContain('marklessUserActionStart');
-	expect(code).not.toContain('marklessUserActionEnd');
-	expect(code).not.toContain("from '@markless/web/fns/user-action'");
+	expect(code).toContain('@markless/web/fns/user-action');
+	expect(code).toContain('marklessUserActionStart(context)');
+	expect(code).toContain('marklessUserActionEnd(context)');
 });
 
 test('a scalar-leaf handler is not wrapped here: write-scalar.ts marks it at the write itself', async () => {

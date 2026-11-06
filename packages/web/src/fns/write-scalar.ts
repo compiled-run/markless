@@ -42,9 +42,8 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}
 	context.graph.read?.(input.graphNodeId, []);
-	// A scalar leaf is always the write of an event handler (symbol-modules.ts's scalar-leaf gate
-	// only takes callback-prop writes down the full, try/finally-wrapped path), so the one write
-	// it makes here is a user action (submit-quiet-design.md Q2).
+	// A scalar leaf's one write is still a user action (submit-quiet-design.md Q2), whichever
+	// symbol kind it belongs to.
 	context.graph.markUserActionStart?.();
 	try {
 		if ('update' in input) {

@@ -115,7 +115,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(event.handlerDefinitionSpans ?? []),
 		]);
 		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
-		const entryMarks = entryMarksOf(writes);
+		const entryMarks = entryMarksOf(ownTurnWrites(source, writes));
 
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
@@ -186,7 +186,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...inlined.spans,
 				...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
 			]);
-			const callbackEntryMarks = entryMarksOf(callbackWrites);
+			const callbackEntryMarks = entryMarksOf(ownTurnWrites(source, callbackWrites));
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -1157,6 +1157,37 @@ function eventWrites(
 		}
 		return handlerContainsWrite(handlerSource, write);
 	});
+}
+
+// Deferred-scheduling APIs whose callback argument runs on its own later turn, not as part of
+// the call site's own handler.
+const DEFERRED_CALLBACK_CALLS = /\b(?:setInterval|setTimeout|addEventListener)\s*\(/g;
+
+// A write textually inside the handler but inside a callback a deferred-scheduling call owns
+// (setInterval/setTimeout/addEventListener) is not one the handler's own turn ever reaches: that
+// callback runs on its own later turn, so submit-quiet-design.md Q1/Q2's entry mark and
+// user-action wrap must not credit this handler with it. `writes` itself (the symbol's own
+// field, which the emitter rewrites state reads against) is untouched — only entryMarksOf's input is.
+function ownTurnWrites(
+	handlerSource: string,
+	writes: ReadonlyArray<LoweredStateWrite>,
+): ReadonlyArray<LoweredStateWrite> {
+	return writes.filter((write) => !writeInsideDeferredCallback(handlerSource, write));
+}
+
+function writeInsideDeferredCallback(handlerSource: string, write: LoweredStateWrite): boolean {
+	for (const match of handlerSource.matchAll(DEFERRED_CALLBACK_CALLS)) {
+		const argumentsStart = match.index + match[0].length;
+		let depth = 1;
+		for (let at = argumentsStart; at < handlerSource.length; at++) {
+			if (handlerSource[at] === '(') depth++;
+			else if (handlerSource[at] === ')' && --depth === 0) {
+				if (handlerContainsWrite(handlerSource.slice(argumentsStart, at), write)) return true;
+				break;
+			}
+		}
+	}
+	return false;
 }
 
 function eventReads(

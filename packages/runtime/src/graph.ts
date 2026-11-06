@@ -61,6 +61,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly flush?: () => Promise<void>;
 	/** True while an event handler's own synchronous turn (start through its awaited continuations) is running (submit-quiet-design.md Q2). */
 	readonly isUserAction?: () => boolean;
+	/** True while a write's dirty paths are still queued or being processed; `endEntry` waits on this before concluding a handler's write never reached anything. */
+	readonly hasPendingFlush?: () => boolean;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -403,6 +405,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	let flushing = false;
 	// Nests: a handler whose own wait overlaps another handler's stays counted until both end.
 	let userActionDepth = 0;
+	// Set only when a handler's own end finds its own write still unprocessed (a cell-backed
+	// computed's cascade a reconcile plane defers to `recomputeSubscribed`, not synchronous with
+	// the write); cleared once that one flush pass resolves, so an unrelated later write never
+	// inherits it once that bounded grace period ends.
+	let flushUserAction = false;
 	let notifyingWrite = false;
 	let activeFlush: Promise<void> | undefined;
 	let flushHolds = 0;
@@ -575,7 +582,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			// even while a held dispatch (a callback prop invoked through capture-slot
 			// dispatch) is batching everything else.
 			flush: () => flush(),
-			isUserAction: () => userActionDepth > 0,
+			isUserAction: () => userActionDepth > 0 || flushUserAction,
+			hasPendingFlush: () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined,
 		});
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
@@ -756,7 +764,18 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
 		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
 		markUserActionStart: () => void userActionDepth++,
-		markUserActionEnd: () => void (userActionDepth = Math.max(0, userActionDepth - 1)),
+		markUserActionEnd: () => {
+			userActionDepth = Math.max(0, userActionDepth - 1);
+			// The handler's own write(s) may still be queued (or mid-cascade) for a cell-backed
+			// computed's deferred recompute; keep `isUserAction()` true only for that one flush
+			// pass, not indefinitely, so a later, unrelated write never rides along.
+			if (userActionDepth === 0 && (flushScheduled || flushing || dirtyPaths.length > 0)) {
+				flushUserAction = true;
+				void flush().then(() => {
+					flushUserAction = false;
+				});
+			}
+		},
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;
