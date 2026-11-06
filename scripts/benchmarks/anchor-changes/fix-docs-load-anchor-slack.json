@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -6219,
+			"reason": "re-anchor to the measurement: #461 and #463 accepted +4,684 B and +3,048 B for docs / against stale mains while their own effect was about +170 B, and #471 added about +913 B unrecorded, leaving the 0 B download ceiling 6,272 B loose (main e38f0077b's merge-queue run 42260913018: 1,673,262 B against the anchor 1,679,534 B); the compiler fixes #520 and #521 then added +6 B and +47 B through the playground compile worker the page prefetches, measured 1,673,315 B in #521's merge-queue run 42273631151",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -600,
+			"reason": "re-anchor to the measurement: #461 and #463 accepted +284 and +401 chars for docs / that the page never ran; main e38f0077b's merge-queue run 42260913018 measured 24,376 chars against the anchor 24,976",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -1640,
+			"reason": "re-anchor to the measurement: #462 cut the accordion page's download by about 2,514 B without re-anchoring and #460 then accepted its own growth against an older main, leaving the ceiling 1,640 B loose; main e38f0077b's merge-queue run 42260913018 measured 495,903 B against the anchor 497,543 B",
+			"date": "2026-11-06"
+		}
+	]
+}
