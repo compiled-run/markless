@@ -1736,8 +1736,8 @@ try {
 		await page.goto(`${origin}/concepts/conditionals`, { waitUntil: 'load' });
 		const conditionalsText = (await page.locator('body').textContent()) ?? '';
 		check(
-			conditionalsText.includes('Put them side by side for now'),
-			'/concepts/conditionals says what to do instead of nesting an @if',
+			conditionalsText.includes('starts over each time the side opens'),
+			'/concepts/conditionals says state written inside a side starts over',
 		);
 		check(
 			conditionalsText.includes('Where you declare a value decides how long it lives'),

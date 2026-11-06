@@ -170,7 +170,7 @@ export function loadForecast(
 
 ## The old answer stays until the new one is ready
 
-Once a forecast is on the page, picking another city keeps it there while the new one loads. The element around the block gets `aria-busy="true"` meanwhile, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds.
+Once a forecast is on the page, picking another city keeps it there while the new one loads. The element showing the old answer gets `aria-busy="true"` meanwhile, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds.
 
 When two requests are in flight, the latest one wins. An older answer that lands late is dropped, so the page never shows the wrong city.
 
