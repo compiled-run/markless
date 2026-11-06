@@ -783,3 +783,13 @@ test.each([
 	expect(errors).toEqual([]);
 	await page.close();
 });
+
+test('a behaviour and the text it updates read their component props', async () => {
+	const { page, errors } = await open('/attach-props');
+	await expect.poll(() => text(page, '[data-label-probe]')).toBe('apples 3');
+	await expect.poll(() => text(page, '[data-region-probe]')).toBe('attach read id /attach-props');
+	await page.click('[data-region-click]');
+	await expect.poll(() => text(page, '[data-region-click]')).toBe('click read plum');
+	expect(errors).toEqual([]);
+	await page.close();
+});
