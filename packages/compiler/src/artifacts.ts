@@ -1055,6 +1055,9 @@ export type SemanticTemplateRead = {
 	// The branch site whose arm body holds this read directly, with no host of
 	// its own. Such a read drives the arm's range, never the enclosing element.
 	readonly armScopeBranchSiteId?: string;
+	// The async boundary whose arm body holds this read directly, with no host of
+	// its own; the arm re-renders on refresh instead of writing the enclosing element.
+	readonly armScopeBoundaryId?: string;
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;

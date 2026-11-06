@@ -232,9 +232,15 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+	const asyncArmScoped =
+		!armScoped &&
+		!!state.currentAsyncBoundaryId &&
+		!!state.currentHostNodeId &&
+		state.currentAsyncArmHostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
 	const projected =
 		!armScoped &&
+		!asyncArmScoped &&
 		!!state.currentProjectionScope &&
 		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
@@ -246,6 +252,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		target: state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
+		...(asyncArmScoped ? { armScopeBoundaryId: state.currentAsyncBoundaryId! } : {}),
 		...(projected
 			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
 			: {}),

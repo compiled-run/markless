@@ -6,10 +6,14 @@ import IfSyncDeriveThree from './async-playground/if-sync-derive-three.tsrx';
 import RowsCatchOne from './async-playground/rows-catch-one.tsrx';
 import RowsCatchTwo from './async-playground/rows-catch-two.tsrx';
 import RowsCatchThree from './async-playground/rows-catch-three.tsrx';
+import ArmTextOne from './async-playground/arm-text-one.tsrx';
+import ArmTextTwo from './async-playground/arm-text-two.tsrx';
+import ArmTextThree from './async-playground/arm-text-three.tsrx';
 import { userEvent } from 'vitest/browser';
 
 // The converted TanStack Query playground's shapes: an @if arm holding a component with a sync computed over
-// its own state, and rows whose @try settles by re-rendering the page, at one to three components deep.
+// its own state, rows whose @try settles by re-rendering the page, and a @try arm of bare text beside a sibling,
+// at one to three components deep.
 
 function click(container: HTMLElement, selector: string) {
 	const element = container.querySelector<HTMLElement>(selector);
@@ -95,4 +99,40 @@ test("CSR: rows two components below the page whose @try has a @catch settle, re
 
 test("SSR: rows two components below the page whose @try has a @catch settle, refresh and fail", async () => {
 	await rowsCycle((await renderSSR(RowsCatchThree)).container as HTMLElement);
+});
+
+const head = (container: HTMLElement) => container.querySelector('.edit .head')?.textContent?.replace(/\s+/g, ' ').trim();
+
+async function armTextCycle(container: HTMLElement) {
+	click(container, 'button[data-open]');
+	await expect.poll(() => container.querySelector('[data-edit-name]')?.textContent).toBe('todo-1');
+	const shown = head(container);
+	expect(shown).toMatch(/^Editing "todo-1" #\d+Back$/);
+	click(container, 'button[data-refresh]');
+	await expect.poll(() => head(container)).not.toBe(shown);
+	expect(head(container)).toMatch(/^Editing "todo-1" #\d+Back$/);
+}
+
+test("CSR: a @try arm of bare text under a page @if renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await render(ArmTextOne)).container as HTMLElement);
+});
+
+test("SSR: a @try arm of bare text under a page @if renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await renderSSR(ArmTextOne)).container as HTMLElement);
+});
+
+test("CSR: a @try arm of bare text under an @if in the page's child renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await render(ArmTextTwo)).container as HTMLElement);
+});
+
+test("SSR: a @try arm of bare text under an @if in the page's child renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await renderSSR(ArmTextTwo)).container as HTMLElement);
+});
+
+test("CSR: a @try arm of bare text two components below the page renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await render(ArmTextThree)).container as HTMLElement);
+});
+
+test("SSR: a @try arm of bare text two components below the page renders beside its sibling and refreshes", async () => {
+	await armTextCycle((await renderSSR(ArmTextThree)).container as HTMLElement);
 });
