@@ -6,11 +6,23 @@
 				"loadWeight",
 				"linux-x64",
 				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -593,
+			"reason": "app code, not framework: the accordion page's ink preview on the notebook binder and the taken-apart parts figure add to the chunks the page prefetches at idle; JS executed at load is unchanged; Linux numbers from PR #460 run 42162968708 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 8,
-			"reason": "the UI preview's binder skin and the inked keyboard add a few rules to the page's playground CSS: +8 B gzip downloaded at load, measured on the PR #460 CI run; no more JS is executed",
-			"date": "2026-11-04"
+			"delta": 5384,
+			"reason": "app code, not framework: the accordion page's ink preview on the notebook binder and the taken-apart parts figure add to the chunks the page prefetches at idle; JS executed at load is unchanged; Linux numbers from PR #460 run 42162968708 against main 600961093's merge-queue run 42121100289",
+			"date": "2026-11-06"
 		}
 	]
 }
