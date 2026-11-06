@@ -201,6 +201,7 @@ export function wireKeyedRepeats(
 				ready: !repeat.rowTemplate?.componentName && !repeat.rowTemplate?.branchSlots,
 			};
 		const registerRowEvents = (rowRoot: ResumeDomElement, rowKey: unknown, arms?: true): void => {
+			rowRoot.__marklessRowLocals = () => rowLocals(input.graph, repeat, rowKey);
 			for (const rowEvent of repeat.rowEvents) {
 				if (arms && !rowEvent.arm) continue;
 				const host = rowEvent.arm

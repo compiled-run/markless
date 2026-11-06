@@ -140,7 +140,10 @@ const resumeOnDemandEntries = [
 // 2026-11-05: merge of the two changes above with the row-value repaint: 33,152 -> 33,417 raw.
 // 2026-11-05: the row slot read helpers return to resume-keyed-repeats.ts, which an arm settle with rows loads lazily to
 // record the state its rows were painted from: 33,417 -> 33,433 raw.
-const sourceByteLimit = 33433;
+// 2026-11-05: a row wired under a component built in the browser tags its own root with its locals at wire time, so a
+// handler reads its prop/item/index without depending on the page's static keyed-repeat view: 33,433 -> 33,512 raw,
+// one line in resume-keyed-repeats.ts.
+const sourceByteLimit = 33512;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

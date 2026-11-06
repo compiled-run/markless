@@ -10,7 +10,7 @@ export function marklessRowLocals(
 	},
 	element: ResumeDomElement,
 ): Record<string, unknown> | undefined {
-	let locals: Record<string, unknown> | undefined;
+	const served = new Map<ResumeDomElement, Record<string, unknown>>();
 	for (const repeat of input.view.keyedRepeats ?? []) {
 		const parent = input.elementsByHostId.get(repeat.parentHostNodeId);
 		let child: ResumeDomElement | null | undefined = element;
@@ -28,7 +28,11 @@ export function marklessRowLocals(
 				: rows.length - repeat.rowEndOffset - items.length;
 		const position = rows.indexOf(child) - first;
 		const item = position < 0 ? undefined : items[position];
-		if (item !== undefined) (locals ??= {})[repeat.itemName] = item;
+		if (item !== undefined) served.set(child, { ...served.get(child), [repeat.itemName]: item });
 	}
-	return locals;
+	// A row a repeat wired names its own items, including a repeat built in the browser that the page view never listed.
+	let locals: Record<string, unknown> = {};
+	for (let row: ResumeDomElement | null | undefined = element; row; row = row.parentElement)
+		locals = { ...served.get(row), ...row.__marklessRowLocals?.(), ...locals };
+	return Object.keys(locals).length ? locals : undefined;
 }
