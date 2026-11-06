@@ -20,7 +20,9 @@ import { loadForecast } from './forecast.ts';
 
 export default function Forecast() @{
 	let city = state('Austin');
-	const forecast = computed(async () => loadForecast(city));
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
 
 	<section>
 		<h2>{city}</h2>
@@ -57,7 +59,9 @@ import { loadForecast } from './forecast.ts';
 
 export default function Forecast() @{
 	let city = state('Austin');
-	const forecast = computed(async () => loadForecast(city));
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
 
 	<section>
 		<h2>{city}</h2>
@@ -90,7 +94,7 @@ export function loadForecast(city: string) {
 			setTimeout(() => {
 				const summary = skies[city];
 				if (summary) resolve({ summary });
-				else reject(new Error(`No forecast for ${city}`));
+				else reject(new Error('Unknown ' + city));
 			}, 1200);
 		},
 	);
@@ -149,7 +153,7 @@ export function loadForecast(
 		(resolve, reject) => {
 			setTimeout(() => {
 				if (attempt === 0) {
-					reject(new Error('The weather service timed out.'));
+					reject(new Error('Service timed out.'));
 				} else {
 					resolve({ summary: 'Sunny, 31°' });
 				}
@@ -177,7 +181,9 @@ import { loadForecast } from './forecast.ts';
 
 export default function Race() @{
 	let city = state('Austin');
-	const forecast = computed(async () => loadForecast(city));
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
 
 	<section>
 		<style>
@@ -210,9 +216,13 @@ const skies: Record<string, [string, number]> = {
 
 export function loadForecast(city: string) {
 	const [summary, wait] = skies[city]!;
-	return new Promise<{ summary: string }>((resolve) => {
-		setTimeout(() => resolve({ summary }), wait);
-	});
+	return new Promise<{ summary: string }>(
+		(resolve) => {
+			setTimeout(() => {
+				resolve({ summary });
+			}, wait);
+		},
+	);
 }
 ```
 </Code>
@@ -235,11 +245,16 @@ Each `@try` settles by itself. Give every slow value its own block, and the fast
 <Code steps={[{ label: 'Press Boston. The sky lands first, the air a second later.', shows: 'Air: good' }]}>
 ```tsrx title="two-spots.tsrx"
 import { computed, state } from '@markless/core';
-import { loadAir, loadForecast } from './forecast.ts';
+import {
+	loadAir,
+	loadForecast,
+} from './forecast.ts';
 
 export default function TwoSpots() @{
 	let city = state('Austin');
-	const forecast = computed(async () => loadForecast(city));
+	const forecast = computed(async () =>
+		loadForecast(city),
+	);
 	const air = computed(async () => loadAir(city));
 
 	<section>
@@ -269,8 +284,9 @@ function after<T>(ms: number, value: T) {
 }
 
 export function loadForecast(city: string) {
+	const sunny = city === 'Austin';
 	return after(800, {
-		summary: city === 'Austin' ? 'Sunny, 31°' : 'Cloudy, 12°',
+		summary: sunny ? 'Sunny, 31°' : 'Cloudy, 12°',
 	});
 }
 
@@ -289,11 +305,16 @@ An async computed can read another one. The second waits for the first, and if t
 <Code steps={[{ label: 'Type `bos` and wait. The city is found first, then its forecast.', shows: 'Cloudy, 12°' }, { label: 'Type `zzz`. Finding the city fails, so the forecast fails too.', shows: 'No city matches zzz' }]}>
 ```tsrx title="lookup.tsrx"
 import { computed, state } from '@markless/core';
-import { findCity, loadForecast } from './forecast.ts';
+import {
+	findCity,
+	loadForecast,
+} from './forecast.ts';
 
 export default function Lookup() @{
 	let query = state('aus');
-	const place = computed(async () => findCity(query));
+	const place = computed(async () =>
+		findCity(query),
+	);
 	const forecast = computed(async () =>
 		loadForecast(place.id),
 	);
@@ -318,8 +339,16 @@ export default function Lookup() @{
 
 ```ts title="forecast.ts"
 const cities = [
-	{ id: 'atx', name: 'Austin', summary: 'Sunny, 31°' },
-	{ id: 'bos', name: 'Boston', summary: 'Cloudy, 12°' },
+	{
+		id: 'atx',
+		name: 'Austin',
+		sky: 'Sunny, 31°',
+	},
+	{
+		id: 'bos',
+		name: 'Boston',
+		sky: 'Cloudy, 12°',
+	},
 ];
 
 function after<T>(ms: number, value: T) {
@@ -330,17 +359,20 @@ function after<T>(ms: number, value: T) {
 
 export async function findCity(query: string) {
 	await after(600, null);
+	const q = query.toLowerCase();
 	const city = cities.find((c) =>
-		c.name.toLowerCase().startsWith(query.toLowerCase()),
+		c.name.toLowerCase().startsWith(q),
 	);
-	if (!city) throw new Error(`No city matches ${query}`);
+	if (!city) {
+		throw new Error('No city matches ' + query);
+	}
 	return { id: city.id };
 }
 
 export async function loadForecast(id: string) {
 	await after(600, null);
 	const city = cities.find((c) => c.id === id)!;
-	return { summary: city.summary };
+	return { summary: city.sky };
 }
 ```
 </Code>
@@ -359,8 +391,8 @@ export default function Units() @{
 	const forecast = computed(async () => {
 		const sky = await loadForecast('Austin');
 		if (unit === 'F') {
-			const high = Math.round(sky.high * 1.8 + 32);
-			return `${sky.summary}, ${high}°F`;
+			const f = Math.round(sky.high * 1.8 + 32);
+			return `${sky.summary}, ${f}°F`;
 		}
 		return `${sky.summary}, ${sky.high}°C`;
 	});
@@ -371,21 +403,25 @@ export default function Units() @{
 		} @pending {
 			<p>Checking the sky</p>
 		}
-		<button onClick={() => (unit = 'C')}>°C</button>
-		<button onClick={() => (unit = 'F')}>°F</button>
+		<button onClick={() => (unit = 'C')}>
+			°C
+		</button>
+		<button onClick={() => (unit = 'F')}>
+			°F
+		</button>
 	</section>
 }
 ```
 
 ```ts title="forecast.ts"
+type Sky = { summary: string; high: number };
+
 export function loadForecast(city: string) {
-	return new Promise<{ summary: string; high: number }>(
-		(resolve) => {
-			setTimeout(() => {
-				resolve({ summary: 'Sunny', high: 31 });
-			}, 800);
-		},
-	);
+	return new Promise<Sky>((resolve) => {
+		setTimeout(() => {
+			resolve({ summary: 'Sunny', high: 31 });
+		}, 800);
+	});
 }
 ```
 </Code>
