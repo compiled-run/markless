@@ -139,8 +139,15 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			aria-expanded="false"
 			aria-controls="docs-sidebar"
 			onClick={() => {
-				shown = 'open';
-				setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
+				const flip = () => {
+					shown = 'open';
+				};
+				const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+				const focus = () => document.getElementById('sidebar-close')?.focus();
+				if (still || document.startViewTransition === undefined) {
+					flip();
+					setTimeout(focus, 0);
+				} else void document.startViewTransition(flip).updateCallbackDone.then(focus);
 			}}
 		>
 			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -159,8 +166,15 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					aria-expanded="true"
 					aria-controls="docs-sidebar"
 					onClick={() => {
-						shown = 'closed';
-						setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
+						const flip = () => {
+							shown = 'closed';
+						};
+						const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+						const focus = () => document.getElementById('sidebar-open')?.focus();
+						if (still || document.startViewTransition === undefined) {
+							flip();
+							setTimeout(focus, 0);
+						} else void document.startViewTransition(flip).updateCallbackDone.then(focus);
 					}}
 				>
 					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -483,42 +497,31 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				overflow: visible;
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The reopen button rides the nav's right edge out and stays at the page edge. */
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; the document's view transition animates it. */
 			@media (min-width: 70.01rem) {
-				.sidebar-close {
-					display: inline-flex;
+				.sidebar {
+					view-transition-name: docs-sidebar;
 				}
 
-				.sidebar {
-					transition:
-						translate var(--sidebar-slide),
-						visibility 0s;
+				.sidebar-close {
+					display: inline-flex;
 				}
 
 				.sidebar-open {
 					position: absolute;
 					inset-inline-start: calc(100% + var(--space-s-l));
 					inset-block-start: 0.5rem;
+					view-transition-name: docs-sidebar-open;
 				}
 
 				html[data-sidebar='closed'] .sidebar {
 					translate: calc(-100% - var(--space-s-l)) 0;
 					visibility: hidden;
-					transition:
-						translate var(--sidebar-slide),
-						visibility 0s var(--sidebar-slide-ms);
 				}
 
 				html[data-sidebar='closed'] .sidebar-open {
 					display: inline-flex;
 					visibility: visible;
-				}
-			}
-
-			@media (prefers-reduced-motion: reduce) {
-				.sidebar,
-				html[data-sidebar='closed'] .sidebar {
-					transition: none;
 				}
 			}
 

@@ -57,15 +57,7 @@ export default function Document({
 		<body>
 			<style>
 				/* Unconditional rules first, the narrow-viewport media queries last: a query adds no specificity. */
-				@property --sidebar-track {
-					syntax: '<length>';
-					inherits: true;
-					initial-value: 0px;
-				}
-
 				.site-shell {
-					--sidebar-slide-ms: 220ms;
-					--sidebar-slide: var(--sidebar-slide-ms) cubic-bezier(0.2, 0, 0, 1);
 					padding-inline: var(--space-s-l);
 					padding-block-start: var(--navbar-clear);
 				}
@@ -78,31 +70,49 @@ export default function Document({
 					}
 				}
 
-				/* A docs page lays out in three tracks: the sidebar, the article, the outline rail. Closing the sidebar takes its track to a button's width, on the sidebar's own slide. */
+				/* The tracks beside the article, for what grows into its width. A closed sidebar leaves a button's width; the attribute is painted before content, so the first frame is already right. */
 				@media (min-width: 70.01rem) {
-					.site-shell:has(#docs-sidebar) {
+					.site-shell {
 						--sidebar-track: calc(16rem + var(--space-s-l));
 						--rail-track: calc(11rem + var(--space-s-l));
-						padding-left: calc(var(--space-s-l) + var(--sidebar-track));
-						padding-right: calc(var(--space-s-l) + var(--rail-track));
-						transition: --sidebar-track var(--sidebar-slide);
 					}
 
-					html[data-sidebar='closed'] .site-shell:has(#docs-sidebar) {
+					.site-shell .prose {
+						view-transition-name: docs-main;
+					}
+
+					html[data-sidebar='closed'] .site-shell {
 						--sidebar-track: 3rem;
+						padding-left: calc(var(--space-s-l) + 3rem);
+						padding-right: calc(11rem + 2 * var(--space-s-l));
 					}
 				}
 
 				@media (min-width: 96.01rem) {
-					.site-shell:has(#docs-sidebar) {
+					.site-shell {
 						--rail-track: calc(16rem + var(--space-s-l));
 					}
 				}
 
-				@media (prefers-reduced-motion: reduce) {
-					.site-shell:has(#docs-sidebar) {
-						transition: none;
-					}
+				/* Opening or closing the sidebar: it slides as one opaque image, and the article's final image glides into place, so nothing cross-fades. */
+				html::view-transition-group(docs-sidebar),
+				html::view-transition-group(docs-main),
+				html::view-transition-group(docs-sidebar-open) {
+					animation-duration: 200ms;
+					animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+				}
+
+				html::view-transition-old(docs-sidebar),
+				html::view-transition-new(docs-sidebar) {
+					animation: none;
+				}
+
+				html::view-transition-old(docs-main) {
+					display: none;
+				}
+
+				html::view-transition-new(docs-main) {
+					animation: none;
 				}
 
 				@media (max-width: 70rem) {

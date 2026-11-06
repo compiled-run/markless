@@ -328,6 +328,7 @@ markless-outline { display: contents; }
 	scrollbar-width: thin;
 	font-size: 0.875rem;
 	z-index: 10;
+	view-transition-name: docs-rail;
 }
 
 .prose .on-this-page-title {
