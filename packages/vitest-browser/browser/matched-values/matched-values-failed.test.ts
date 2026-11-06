@@ -82,15 +82,13 @@ each(
 		// The outage holds, even past the point a success would have landed.
 		await settle();
 		expect(text(container, '[data-per-day]')).toBe('1000');
-		{
-			const seen = painted();
-			expect(seen.every((frame) => !frame.includes('500') || frame.includes('1000'))).toBe(true);
-		}
+		const seen = painted();
+		expect(seen.filter((frame) => frame !== '1000|5000'), seen.join('\n')).toEqual([]);
 	},
 );
 
 each(
-	'Errors UC18: a retry after a failure lands like a re-ask, not a wipe',
+	'Errors UC18: a re-ask after a failure lands from the pinned pair, never a wipe or a torn figure',
 	{ csr: () => render(Revenue), ssr: () => renderSSR(Revenue) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
@@ -103,6 +101,17 @@ each(
 		await settle();
 		expect(text(container, '[data-per-day]')).toBe('1000');
 		expect(container.querySelector('[data-error]')).toBe(null);
+		const painted = paintedPairs(container);
+		click(container, '[data-ten]');
+		await expect.poll(() => text(container, '[data-range]')).toBe('10d');
+		await settle();
+		expect(text(container, '[data-per-day]')).toBe('1000');
+		click(container, '[data-twenty]');
+		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1500');
+		await expect.poll(() => text(container, '[data-profit]')).toBe('20000');
+		const seen = painted();
+		const valid = new Set(['1000|5000', '1500|20000']);
+		expect(seen.filter((frame) => !valid.has(frame)), seen.join('\n')).toEqual([]);
 	},
 );
 

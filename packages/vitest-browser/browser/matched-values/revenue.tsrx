@@ -13,6 +13,7 @@ export function Revenue() @{
 	const profit = computed(() => revenue.total - costs.total);
 
 	<main>
+		<button type="button" data-ten onClick={() => (range = '10d')}>10 days</button>
 		<button type="button" data-twenty onClick={() => (range = '20d')}>20 days</button>
 		<span data-range>{range}</span>
 		@try {
