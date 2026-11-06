@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 203,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 47,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 203,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 48,
+			"reason": "measured: a flip into an arm writes the starting values of the state() cells that arm declares (spec 01 conditional identity)",
+			"date": "2026-11-06"
+		}
+	]
+}

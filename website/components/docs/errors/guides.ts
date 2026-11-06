@@ -76,9 +76,9 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	},
 	MARKLESS_STATE_CREATION_SITE_UNSTABLE: {
 		summary:
-			'state() or computed() is created inside an @if, a loop, a handler, or another computed.',
-		what: 'Each `state()` and `computed()` needs one fixed place in the component. This one sits inside a branch, a loop, an event handler, or another `computed()`.',
-		how: 'Declare the value once, at the top level of the component body. Branch around the markup that uses it, not around the declaration. Write to it from the handler instead of creating it there.',
+			'state() or computed() is created in a loop, a handler, another computed, or an @if arm it cannot start from.',
+		what: 'Each `state()` and `computed()` needs one fixed place in the component. This one sits inside a loop, an event handler, another `computed()`, or an `@if`/`@switch` arm with a starting value the compiler cannot read. A `state()` in an arm is allowed when its starting value is a literal: it starts fresh each time the arm opens.',
+		how: 'Give the arm state a literal starting value, such as `state(0)` or `state("")`, or declare the value once at the top level of the component body and branch around the markup that uses it. Write to it from the handler instead of creating it there.',
 	},
 	MARKLESS_STATE_STALE_LOCAL_WRITE: {
 		summary:
