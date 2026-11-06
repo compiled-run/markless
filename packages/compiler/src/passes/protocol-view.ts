@@ -839,7 +839,10 @@ function rowBranchSlot(
 				}
 			: slotValue({
 					kind: 'text',
-					residue: { kind: 'authored-expression', source: branch.testSource },
+					residue: {
+						kind: 'authored-expression',
+						source: branch.armIndexSource ?? branch.testSource,
+					},
 					coordinate: slot.coordinate,
 				} as SemanticMarkupSlot);
 	if (!test) return null;

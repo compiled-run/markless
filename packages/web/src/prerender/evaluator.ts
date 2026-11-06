@@ -1126,7 +1126,7 @@ export function evaluatePrerenderDataComponent(input: {
 								branch?.testReads?.length === 1 ? branch.testReads[0] : undefined;
 							const value = testRead
 								? read(testRead.graphNodeId, testRead.path)
-								: readDecision(branch?.testSource, context);
+								: readDecision(branch?.armIndexSource ?? branch?.testSource, context);
 							let arm = value ? 0 : 1;
 							if (branch?.armTests) {
 								const match = branch.armTests.findIndex(
