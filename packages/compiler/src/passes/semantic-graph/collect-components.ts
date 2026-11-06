@@ -44,7 +44,11 @@ import {
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
-import { inlineHandlerRenderLocals, liftArmRenderLocalValue } from './render-local-inline.ts';
+import {
+	collectDefinitionReads,
+	inlineHandlerRenderLocals,
+	liftArmRenderLocalValue,
+} from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -281,6 +285,8 @@ function componentPropBindings(
 			}
 
 			const inlined = inlineHandlerRenderLocals(callback, state, name);
+			// A callback named by a body function reads at its definition, which the prop walk never visits.
+			if (callback !== expression) collectDefinitionReads(callback, state);
 			props.push({
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),

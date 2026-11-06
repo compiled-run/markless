@@ -25,6 +25,7 @@ import {
 import { protocolInstanceQualifies, valueAlongPaths } from '@markless/serializer';
 import { componentEdgeInstancePath } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
+import { isEventAttribute } from '../ast/events.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
@@ -1625,7 +1626,9 @@ function opaqueSlotDiagnostics(symbol: {
 						{
 							message: route.absentProp
 								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-								: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
+								: isEventAttribute(propName)
+									? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared once in the component body (${propName}={add}); a function from a call, a reassigned let or another local's alias has no route. Inside "${componentName}", destructure it ({ ${propName} }) instead of reading it off the props object.`
+									: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
