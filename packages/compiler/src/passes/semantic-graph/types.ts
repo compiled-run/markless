@@ -171,6 +171,8 @@ export type WalkState = {
 	currentAsyncBoundaryArm: number | null;
 	// The enclosing host at the current boundary's entry, the async twin of `currentArmScope.hostNodeId`.
 	currentAsyncArmHostNodeId: string | null;
+	// The nearest `@try` with a `@catch` whose @try arm holds the current node.
+	currentCatchBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
@@ -319,6 +321,7 @@ export function createWalkState(input: {
 		currentAsyncBoundaryId: null,
 		currentAsyncBoundaryArm: null,
 		currentAsyncArmHostNodeId: null,
+		currentCatchBoundaryId: null,
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,

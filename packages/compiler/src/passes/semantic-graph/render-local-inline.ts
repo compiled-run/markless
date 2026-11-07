@@ -249,6 +249,21 @@ function declarationStartOf(semantic: ReturnType<WalkState['semantic']>, symbolI
 	return semantic.bindings[symbolId]!.declarations[0]?.start ?? -1;
 }
 
+// The `@catch (error, reset)` reset a bare prop value such as `onRetry={reset}` names, if any.
+export function resetRelay(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly name: string; readonly boundaryId: string } | undefined {
+	if (expression.type !== 'Identifier' || typeof expression.start !== 'number') return undefined;
+	const name = getIdentifierName(expression);
+	if (!name) return undefined;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, expression.start);
+	if (symbolId === null) return undefined;
+	const boundaryId = state.catchResetBoundaries.get(declarationStartOf(semantic, symbolId));
+	return boundaryId !== undefined ? { name, boundaryId } : undefined;
+}
+
 // A row, an arm and a nested `@{ ... }` have no body of their own in the render, so a slot
 // reading a `const` declared in one carries that const's definition instead.
 export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): string | null {
@@ -307,8 +322,6 @@ export function inlineHandlerRenderLocals(
 	node: AnyNode,
 	state: WalkState,
 	handlerLabel: string,
-	// Only a DOM event handler runs where the boundary's reset can be lowered.
-	allowCatchReset = false,
 ): {
 	readonly source: string;
 	readonly definitionSpans: ReadonlyArray<SourceSpan>;
@@ -333,13 +346,11 @@ export function inlineHandlerRenderLocals(
 		);
 		return null;
 	}
-	const refusedReset =
-		inlined.kind === 'inlined' && !allowCatchReset ? [...inlined.catchResets.keys()][0] : undefined;
-	if (inlined.kind !== 'inlined' || refusedReset !== undefined) {
+	if (inlined.kind !== 'inlined') {
 		state.graph.diagnostics.push(
 			handlerReadsRenderLocalDiagnostic({
 				handlerLabel,
-				localName: refusedReset ?? (inlined as { readonly name: string }).name,
+				localName: inlined.name,
 				handler: node,
 				filename: state.filename,
 			}),
@@ -362,9 +373,8 @@ export function factoryHandlerSource(
 	parameterCount: number,
 	state: WalkState,
 	handlerLabel: string,
-	allowCatchReset = false,
 ): (NonNullable<ReturnType<typeof inlineHandlerRenderLocals>> & { readonly parameters: string[] }) | null {
-	const inlined = inlineHandlerRenderLocals(name, state, handlerLabel, allowCatchReset);
+	const inlined = inlineHandlerRenderLocals(name, state, handlerLabel);
 	if (!inlined) return null;
 	const parameter = parameterCount === 0 ? '' : /\bevent\b/.test(inlined.source) ? 'domEvent' : 'event';
 	return {

@@ -6208,8 +6208,9 @@ export function buildEventHandlerEmission(
 	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
 	const entryMarks = symbol.entryMarks;
 	const markUserAction = symbol.kind !== 'event-handler' || symbol.eventName !== 'attach';
+	const catchRunner = symbol.catchRunnerGraphNodeId;
 	const scalarLeaf =
-		input.captureSlots.length === 0 && !shownReads && !entryMarks
+		input.captureSlots.length === 0 && !shownReads && !entryMarks && !catchRunner
 			? eventHandlerScalarLeafStatements(input, projection)
 			: null;
 	if (scalarLeaf) {
@@ -6243,8 +6244,20 @@ export function buildEventHandlerEmission(
 	// The string path decides which imports survive by scanning the emitted
 	// *body* text only, so this reads the same statements and no others.
 	const carried = eventHandlerModuleScopeCarry(input, symbol, projection, source, statementsFor);
-	const { bodyStatements, declarationStatements } = carried;
-	const referenced = carried.referenced;
+	const { declarationStatements } = carried;
+	const isAsync =
+		!importedReference &&
+		(symbol.source.trimStart().startsWith('async ') ||
+			input.captureSlots.some(callbackCaptureSlot));
+	const bodyStatements = !catchRunner
+		? carried.bodyStatements
+		: isAsync
+			? [handlerCatchNode(carried.bodyStatements, catchRunner)]
+			: carried.bodyStatements.map((statement) => catchReturnedPromises(statement, catchRunner));
+	const catchFn = isAsync ? HANDLER_CATCH_FN : HANDLER_CATCH_RETURNED_FN;
+	const referenced = catchRunner
+		? new Set([...carried.referenced, catchFn])
+		: carried.referenced;
 	const imports = uniqueModuleImports(
 		[
 			...(symbol.moduleImports ?? []),
@@ -6252,11 +6265,6 @@ export function buildEventHandlerEmission(
 			...(declarationStatements.length === 0 ? [] : (input.moduleImports ?? [])),
 		].filter((moduleImport) => referenced.has(moduleImport.localName)),
 	);
-
-	const isAsync =
-		!importedReference &&
-		(symbol.source.trimStart().startsWith('async ') ||
-			input.captureSlots.some(callbackCaptureSlot));
 
 	return {
 		program: moduleProgramNode([
@@ -6304,6 +6312,15 @@ export function buildEventHandlerEmission(
 							kind: 'named' as const,
 							localName: CATCH_RESET_FN,
 							source: '@markless/web/fns/catch-reset',
+						}),
+					]
+				: []),
+			...(catchRunner
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: catchFn,
+							source: '@markless/web/fns/handler-catch',
 						}),
 					]
 				: []),
@@ -6772,7 +6789,7 @@ function eventHandlerAuthoredStatements(
 	}
 
 	const directReset =
-		symbol.kind === 'event-handler'
+		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
 			? symbol.catchResets?.find((reset) => reset.name === trimmed)
 			: undefined;
 	if (directReset) return [returnStatementNode(catchResetCall(directReset))];
@@ -7742,6 +7759,9 @@ const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
 const CHANGED_FN = 'marklessChanged';
 const CATCH_RESET_FN = 'marklessCatchReset';
+const HANDLER_CATCH_FN = 'marklessHandlerCatch';
+const HANDLER_CATCH_RETURNED_FN = 'marklessHandlerCatchReturned';
+const HANDLER_CATCH_ERROR_NAME = '__marklessHandlerError';
 
 // A value that reads an input beside async values changes in place between settles.
 function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanticGraph']): ReadonlySet<string> {
@@ -7825,9 +7845,84 @@ function catchResetCall(reset: {
 	]);
 }
 
+// An async handler's rejection renders in its nearest `@catch` instead of reaching the page uncaught.
+function handlerCatchNode(body: ReadonlyArray<EmissionNode>, runnerGraphNodeId: string): EmissionNode {
+	return {
+		type: 'TryStatement',
+		block: { type: 'BlockStatement', body: body.map(awaitReturns) },
+		handler: {
+			type: 'CatchClause',
+			param: identifierNode(HANDLER_CATCH_ERROR_NAME),
+			body: {
+				type: 'BlockStatement',
+				body: [
+					{
+						type: 'ExpressionStatement',
+						expression: callNode(identifierNode(HANDLER_CATCH_FN), [
+							identifierNode('context'),
+							literalNode(runnerGraphNodeId),
+							identifierNode(HANDLER_CATCH_ERROR_NAME),
+						]),
+					},
+				],
+			},
+		},
+		finalizer: null,
+	};
+}
+
+// A plain handler's returned promise rejects into its nearest `@catch`; one it only starts does not.
+function catchReturnedPromises(node: EmissionNode, runnerGraphNodeId: string): EmissionNode {
+	if (FUNCTION_NODE_TYPES.has(node.type)) return node;
+	if (node.type === 'ReturnStatement' && node.argument)
+		return {
+			...node,
+			argument: callNode(identifierNode(HANDLER_CATCH_RETURNED_FN), [
+				identifierNode('context'),
+				literalNode(runnerGraphNodeId),
+				node.argument as EmissionNode,
+			]),
+		};
+	const next: Record<string, unknown> = { ...node };
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value))
+			next[key] = value.map((item) =>
+				isEmissionNode(item) ? catchReturnedPromises(item, runnerGraphNodeId) : item,
+			);
+		else if (isEmissionNode(value)) next[key] = catchReturnedPromises(value, runnerGraphNodeId);
+	}
+	return next as EmissionNode;
+}
+
+// A returned promise rejects after the `try` it sits in has exited unless the return awaits it.
+function awaitReturns(node: EmissionNode): EmissionNode {
+	if (FUNCTION_NODE_TYPES.has(node.type)) return node;
+	if (node.type === 'ReturnStatement')
+		return node.argument
+			? { ...node, argument: { type: 'AwaitExpression', argument: node.argument } }
+			: node;
+	const next: Record<string, unknown> = { ...node };
+	for (const [key, value] of Object.entries(node)) {
+		if (Array.isArray(value))
+			next[key] = value.map((item) => (isEmissionNode(item) ? awaitReturns(item) : item));
+		else if (isEmissionNode(value)) next[key] = awaitReturns(value);
+	}
+	return next as EmissionNode;
+}
+
+const FUNCTION_NODE_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
+
+function isEmissionNode(value: unknown): value is EmissionNode {
+	return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string';
+}
+
 // A `@catch (error, reset)` reset the handler names, unless one of its own bindings shadows it.
 function catchResetNamed(node: AnyNode, rewrite: EventHandlerRewrite) {
-	if (node.type !== 'Identifier' || rewrite.symbol.kind !== 'event-handler') return undefined;
+	if (
+		node.type !== 'Identifier' ||
+		(rewrite.symbol.kind !== 'event-handler' && rewrite.symbol.kind !== 'callback-prop')
+	)
+		return undefined;
 	const name = getIdentifierName(node);
 	if (!name || rewrite.boundHandleNames.has(name)) return undefined;
 	return rewrite.symbol.catchResets?.find((reset) => reset.name === name);

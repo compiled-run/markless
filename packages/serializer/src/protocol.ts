@@ -812,6 +812,8 @@ export type ProtocolViewPayload = {
 		readonly updateSymbolId?: string;
 		/** The @try arm holds keyed rows the browser cannot build, so a refresh that lands re-renders the arm. */
 		readonly rerendersOnRefresh?: true;
+		/** A handler inside the @try arm that rejects fails this boundary's own runner, so its @catch shows the error. */
+		readonly catchesHandlers?: true;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's
 		// per-arm plan (index 0 = @try, 1 = @pending, 2 = @catch), which is not

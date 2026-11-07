@@ -1,6 +1,7 @@
 import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { handlerMayReturnPromise, isFunctionNode } from './handler-returns-promise.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	getElementAttributes,
@@ -1236,13 +1237,12 @@ function collectAttribute(
 						asNodes(handler!.node.params).length,
 						state,
 						attributeName,
-						true,
 					)
 				: null;
 			const inlined = factoryCall
 				? factory
 				: handler && !relayed
-					? inlineHandlerRenderLocals(handler.node, state, attributeName, true)
+					? inlineHandlerRenderLocals(handler.node, state, attributeName)
 					: null;
 			// A handler named by a body function reads at its definition, which the attribute walk never visits.
 			if (handler && !relayed && !factoryCall && handler.node !== entry)
@@ -1267,6 +1267,22 @@ function collectAttribute(
 								name,
 								boundaryId,
 							})),
+						}
+					: {}),
+				...(handler && !relayed && handlerMayReturnPromise(handler.node)
+					? {
+							handlerReturnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { handlerCatchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
+					: {}),
+				...(handler && (relayed || !isFunctionNode(handler.node))
+					? {
+							handlerMayReject: true as const,
+							...(state.currentCatchBoundaryId
+								? { dispatchCatchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
 						}
 					: {}),
 				handlerParameters: relayed

@@ -1107,6 +1107,7 @@ async function commitMintedRow(
 		if (gone.some((node) => node === element || (node as ResumeDomElement).contains?.(element)))
 			deps.disposeHost(hostNodeId);
 	await seedMintedGraphNodes(deps, rendered.state);
+	if (deps.graph) evaluatorModule?.marklessNoteMintedRow(deps.graph, row.rowSegment);
 	await mergeMintedWidgetRoots(deps, rendered.state, repeat, row.rowSegment);
 	const { registerArmRecordSet } = await import('../resume-commit-arm.ts');
 	await registerArmRecordSet(

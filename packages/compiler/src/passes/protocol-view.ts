@@ -32,6 +32,7 @@ import { forwardedSpreadViewRecords } from './spread-forwarding.ts';
 import { addressedHostNodeIds } from '../artifact-helpers/addressed-hosts.ts';
 import { armEscalationCandidateSiteIds } from './symbol-modules.ts';
 import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
+import { handlerCatchBoundaryIds } from './public-render/boundary-runner.ts';
 
 function renderDataOf(input: ProtocolViewPayloadInput): RenderDataArtifact {
 	if (!input.renderData) {
@@ -48,6 +49,9 @@ export function createProtocolViewPayload(
 	const eventSymbols = new Map<string, string[]>();
 	const domUpdateSymbols = new Map<string, string>();
 	const asyncRunnerSymbols = new Map<string, string>();
+	const catchTargets = input.semanticGraph
+		? handlerCatchBoundaryIds(input.semanticGraph)
+		: new Set<string>();
 
 	for (const symbol of input.symbolResolver.symbols) {
 		if (symbol.kind === 'event-handler') {
@@ -145,6 +149,7 @@ export function createProtocolViewPayload(
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				...rerendersOnRefreshField(input, boundary.id, keyedRepeats),
+				...(catchTargets.has(boundary.id) && { catchesHandlers: true as const }),
 				startAnchor: {
 					...boundary.startAnchor,
 					index: emittedPairRank(input, boundary.id) * 2,

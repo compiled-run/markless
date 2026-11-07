@@ -73,6 +73,8 @@ export type AsyncComputedPlane = {
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
 	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
 	readonly rerun: (graphNodeId: string) => boolean;
+	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run; a no-op when the node does not exist. */
+	readonly failHandler: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */
 	readonly markEntry: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
@@ -372,6 +374,8 @@ export type RuntimeGraph = {
 	) => boolean;
 	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
 	readonly rerun?: (graphNodeId: string) => boolean | undefined;
+	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run. */
+	readonly failHandler?: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */
 	readonly markEntry?: (graphNodeId: string) => void;
 	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
@@ -774,6 +778,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
 		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
+		failHandler: (graphNodeId, error) => asyncPlane?.failHandler(graphNodeId, error),
 		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
 		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
 		markUserActionStart: () => void userActionDepth++,

@@ -46,11 +46,13 @@ import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import { namedHandler } from './named-handler.ts';
+import { handlerMayReturnPromise } from './handler-returns-promise.ts';
 import {
 	collectDefinitionReads,
 	factoryHandlerSource,
 	inlineHandlerRenderLocals,
 	liftArmRenderLocalValue,
+	resetRelay,
 } from './render-local-inline.ts';
 import {
 	extractSyncPolicy,
@@ -174,6 +176,7 @@ export function collectComponentEdge(
 		parentComponentName: state.currentComponentName,
 		childComponentName,
 		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+		...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),
 		props,
@@ -273,6 +276,22 @@ function componentPropBindings(
 						? named.returned
 						: undefined;
 
+		// `onRetry={reset}` names no local function, so it becomes a callback whose source is `reset`.
+		if (!callback && expression) {
+			const relayedReset = resetRelay(expression, state);
+			if (relayedReset) {
+				props.push({
+					name,
+					source: relayedReset.name,
+					kind: 'callback',
+					parameters: [],
+					sourceSpan: span,
+					catchResets: [{ name: relayedReset.name, boundaryId: relayedReset.boundaryId }],
+				});
+				continue;
+			}
+		}
+
 		if (callback && isCallbackExpression(callback)) {
 			const parameterNodes = asNodes(callback.params);
 			const unsupportedParameterReason = callbackParameterUnsupportedReason(parameterNodes);
@@ -336,6 +355,22 @@ function componentPropBindings(
 				sourceSpan: sourceSpan(factoryCall ?? callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
+				...(handlerMayReturnPromise(callback)
+					? {
+							returnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { catchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
+					: {}),
+				...(inlined?.catchResets.size
+					? {
+							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
+								name: resetName,
+								boundaryId,
+							})),
+						}
+					: {}),
 			});
 			continue;
 		}

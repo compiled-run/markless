@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/enclosing-catch"
+			],
+			"delta": 148,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 696,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 146,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 307,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 31,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/enclosing-catch"
+			],
+			"delta": 148,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 696,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 146,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 307,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 31,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 28,
+			"reason": "handler rejections pick the nearest @catch by the element's nesting; nested and browser-built row children keep live state",
+			"date": "2026-11-07"
+		}
+	]
+}

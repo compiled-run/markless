@@ -354,7 +354,7 @@ export async function renderPrerenderDataSurface(
 export async function renderPrerenderBoundary(
 	page: SsrRenderable | PrerenderDataSurface,
 	boundaryId: string,
-	_status: 'fulfilled' | 'rejected',
+	status: 'fulfilled' | 'rejected',
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
 	pageBoundaryId?: string,
@@ -379,6 +379,7 @@ export async function renderPrerenderBoundary(
 			servedPageProps(moduleGraph),
 			{
 				cellIds: freshCellIds,
+				...(status === 'rejected' && { keepsShown: true as const }),
 				...(pageBoundaryId && {
 					settling: {
 						boundaryId,
@@ -646,6 +647,8 @@ async function evaluatePrerenderDataSurface(
 		readonly owner?: BranchOwnerPlacement;
 		readonly cellIds: Set<string>;
 		readonly settling?: PrerenderSettling;
+		// A @catch drawn after shown @try content: the instances that content placed stay on the page.
+		readonly keepsShown?: true;
 	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
@@ -669,7 +672,14 @@ async function evaluatePrerenderDataSurface(
 		...(fresh ? { freshCellIds: fresh.cellIds, mountedInstances: mountedNow } : {}),
 		...(fresh?.settling && { settling: fresh.settling }),
 	});
-	if (fresh && graph) mountedInstances.set(graph, mountedNow);
+	if (fresh && graph) {
+		const shown = mountedInstances.get(graph);
+		if (!fresh.keepsShown) {
+			mountedInstances.set(graph, mountedNow);
+			mintedRows.delete(pageGraphOf(graph));
+		}
+		else if (shown) for (const instance of mountedNow) shown.add(instance);
+	}
 	// A count is asked before the members it counts have rendered, so the page
 	// this render produced is where it becomes a number.
 	const positions = marklessRosterPositions(sharedSeeds);
@@ -865,21 +875,65 @@ function marklessPlacedInstanceRead(
 
 // Per live graph, the component instances its last re-render placed on the page.
 const mountedInstances = new WeakMap<RuntimeGraph, Set<string>>();
+// Rows the browser built after the last re-render, by page-space row path: what they hold is on the page too.
+const mintedRows = new WeakMap<RuntimeGraph, Set<string>>();
+const pageGraphOf = (graph: RuntimeGraph) =>
+	(graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+
+export function marklessNoteMintedRow(graph: RuntimeGraph, rowSegment: string): void {
+	const page = pageGraphOf(graph);
+	let rows = mintedRows.get(page);
+	if (!rows) mintedRows.set(page, (rows = new Set()));
+	rows.add(rowSegment);
+}
+
+function inMintedRow(graph: RuntimeGraph, instancePrefix: string): boolean {
+	const rows = mintedRows.get(pageGraphOf(graph));
+	if (!rows) return false;
+	const qualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
+	const pagePrefix = qualify ? qualify(instancePrefix) : instancePrefix;
+	for (const row of rows) if (pagePrefix.startsWith(row)) return true;
+	return false;
+}
 
 // An instance the last re-render did not place (or, before any, whose cells the graph holds nothing for) starts fresh.
 function marklessChildNotYetLive(
 	graph: RuntimeGraph | undefined | false,
+	surface: PrerenderDataSurface,
 	definition: PrerenderDataDefinition | undefined,
 	instancePrefix: string,
 ): boolean {
 	if (!graph || !definition) return false;
 	const mounted = mountedInstances.get(graph);
-	if (mounted) return !mounted.has(instancePrefix);
+	if (mounted && (mounted.has(instancePrefix) || !inMintedRow(graph, instancePrefix)))
+		return !mounted.has(instancePrefix);
+	const ids = instanceCellIds(surface, definition, instancePrefix, new Set());
+	return ids.length > 0 && ids.every((id) => graph.read(id) === undefined);
+}
+
+// An instance's own cells and those of the components it renders: one with no state of its own is live while a child's is.
+function instanceCellIds(
+	surface: PrerenderDataSurface,
+	definition: PrerenderDataDefinition,
+	instancePrefix: string,
+	visiting: Set<PrerenderDataDefinition>,
+): string[] {
 	const ids = [
-		...ownedStateCells(definition).map((cell) => cell.graphNodeId),
-		...(definition.propCellId ? [definition.propCellId] : []),
+		...ownedStateCells(definition).map((cell) => instancePrefix + cell.graphNodeId),
+		...(definition.propCellId ? [instancePrefix + definition.propCellId] : []),
 	];
-	return ids.length > 0 && ids.every((id) => graph.read(instancePrefix + id) === undefined);
+	if (visiting.has(definition)) return ids;
+	visiting.add(definition);
+	for (const edge of definition.edges ?? []) {
+		const childSurface = surface.components[edge.childComponentName]
+			? surface
+			: surface.imports[edge.childComponentName];
+		const child = childSurface?.components[edge.childComponentName];
+		if (child)
+			ids.push(...instanceCellIds(childSurface, child, instancePrefix + edge.symbolPrefix, visiting));
+	}
+	visiting.delete(definition);
+	return ids;
 }
 
 // The boundary a settle renders, and the page path of the instance holding it.
@@ -890,10 +944,12 @@ function settlesInside(
 	settling: PrerenderSettling | undefined,
 	edge: { readonly asyncBoundaryId?: string },
 	parentPath: string,
+	enclosingBoundaryIds: ReadonlyArray<string> | undefined,
 ): boolean {
 	return (
 		!settling ||
-		(edge.asyncBoundaryId === settling.boundaryId &&
+		((edge.asyncBoundaryId === settling.boundaryId ||
+			!!enclosingBoundaryIds?.includes(settling.boundaryId)) &&
 			(!parentPath || settling.ownerPath.endsWith(parentPath)))
 	);
 }
@@ -1563,10 +1619,16 @@ export function evaluatePrerenderDataComponent(input: {
 									context.freshInstances ||
 									(marklessChildNotYetLive(
 										input.freshCellIds && input.graph,
+										childSurface,
 										childSurface.components[edge.childComponentName],
 										input.symbolPrefix + symbolPrefix,
 									) &&
-										settlesInside(input.settling, edge, input.symbolPrefix))
+										settlesInside(
+											input.settling,
+											edge,
+											input.symbolPrefix,
+											context.enclosingBoundaryIds,
+										))
 										? { freshInstance: true as const }
 										: {}),
 									...(input.settling && { settling: input.settling }),

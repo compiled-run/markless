@@ -29,8 +29,13 @@ export default function HandlerReject() @{
 				</button>
 				<p data-note>{note}</p>
 			</section>
-		} @catch (error) {
-			<p data-failed>{error.message}</p>
+		} @catch (error, reset) {
+			<>
+				<p data-failed>{error.message}</p>
+				<button type="button" data-retry onClick={() => reset()}>
+					Retry
+				</button>
+			</>
 		}
 	</main>
 }

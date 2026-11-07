@@ -155,6 +155,7 @@ export function createResumeRuntime(
 				behaviorRuntime?.behaviorHostIdsForAncestors(element) ??
 				pendingBehaviorHostIdsForAncestors(element),
 			delegatedTriggers: input.delegatedTriggers,
+			asyncBoundaries: () => asyncBoundariesById.values(),
 		});
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;

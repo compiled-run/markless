@@ -179,9 +179,12 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	if (!armChunkId) throw new SettleKernelUnsupportedError(`arm missing: ${input.boundaryId}`);
 
 	const chunks = new Map(surface.renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	// A state cell answers from the live graph: a redrawn arm shows what handlers wrote, not its initial value.
+	const liveCellIds = new Set((definition.state.cells ?? []).map((cell) => String(cell.graphNodeId)));
 	const constants = new Map<string, unknown>();
 	for (const initial of definition.initialValues ?? [])
-		constants.set(initial.graphNodeId, initial.value.value);
+		if (!liveCellIds.has(initial.graphNodeId))
+			constants.set(initial.graphNodeId, initial.value.value);
 	const read: SettleKernelRead = (graphNodeId, path = []) =>
 		constants.has(graphNodeId)
 			? readPath(constants.get(graphNodeId), path)

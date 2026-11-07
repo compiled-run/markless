@@ -142,6 +142,7 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly updateSymbolId?: string;
 	readonly rerendersOnRefresh?: true;
+	readonly catchesHandlers?: true;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
@@ -348,6 +349,11 @@ export type ResumeSymbolContext = {
 	readonly domUpdate?: ProtocolViewPayload['domUpdates'][number];
 	readonly value?: unknown;
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord;
+	/** The page's @try blocks and the page graph, so a handler's rejection finds the nearest @catch around its element. */
+	readonly catchScope?: {
+		readonly graph: Pick<RuntimeGraph, 'read'>;
+		readonly boundaries: () => Iterable<ResumeAsyncBoundaryRecord>;
+	};
 	readonly asyncRead?: ResumeAsyncBoundaryRead;
 	readonly status?: 'fulfilled' | 'rejected';
 	readonly args?: ReadonlyArray<unknown>;

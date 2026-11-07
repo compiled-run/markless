@@ -18,6 +18,7 @@ import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
+	ResumeAsyncBoundaryRecord,
 	ResumeDispatchOptions,
 	ResumeDomElement,
 	ResumeDomEvent,
@@ -303,9 +304,11 @@ export function createEventWiring(input: {
 	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined;
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 	readonly delegatedTriggers?: ResumeRuntimeInput['delegatedTriggers'];
+	readonly asyncBoundaries?: () => Iterable<ResumeAsyncBoundaryRecord>;
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
+	const catchScope = input.asyncBoundaries && { graph: input.graph, boundaries: input.asyncBoundaries };
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
 	// The detached subtree's own top is the row the repeat took out, and it carries
 	// where it hung. That is what lets a dispatch several microtasks behind its
@@ -731,13 +734,19 @@ export function createEventWiring(input: {
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
 				try {
 					const symbol = await input.loadSymbol(symbolId);
-					return await marklessRunAtCurrentTarget(context.event, element, symbol, {
+					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && marklessIsBoundSymbolId(symbolId)
 							? marklessRowScopedSymbolContext(context, rowScope)
 							: {}),
 						invokeCallback,
 						invokeSymbol,
+					});
+					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
+					return await Promise.resolve(result).catch(async (error: unknown) => {
+						const { marklessFailEnclosingCatch } = await import('./fns/enclosing-catch.ts');
+						if (!marklessFailEnclosingCatch(input.asyncBoundaries?.(), input.graph, element, error))
+							throw error;
 					});
 				} finally {
 					releaseFlush?.();
@@ -773,6 +782,7 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: readHandle,
+				...(catchScope && { catchScope }),
 				...(locals ? { locals } : {}),
 				releaseQueue: options.releaseQueue,
 				userActionToken,
@@ -1024,3 +1034,4 @@ function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefi
 		},
 	);
 }
+
