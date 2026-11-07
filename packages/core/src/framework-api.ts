@@ -57,7 +57,15 @@ export function state<T>(initial: T): T {
 	return frameworkApi<T>('state', initial);
 }
 
-export function computed<T>(derive: () => T): AsyncComputedValue<T> {
+/** What an async computed's function receives on each run. */
+export type AsyncComputedRecipe = {
+	/** Aborts when a newer run starts or this run's answer will no longer be used. */
+	readonly signal: AbortSignal;
+};
+
+export function computed<T>(derive: (recipe: AsyncComputedRecipe) => Promise<T>): Awaited<T>;
+export function computed<T>(derive: () => T): AsyncComputedValue<T>;
+export function computed<T>(derive: (recipe: AsyncComputedRecipe) => T): AsyncComputedValue<T> {
 	return frameworkApi<AsyncComputedValue<T>>('computed', derive);
 }
 

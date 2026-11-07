@@ -96,7 +96,7 @@ test('M1 real tsserver completes and hovers Markless framework APIs', async () =
 	expect(
 		displayText(computedInfo),
 		'M1 missing capability: computed hover must preserve its generic derived-value type.',
-	).toMatch(/computed<T>\(derive: \(\) => T\).*AsyncComputedValue<T>/);
+	).toMatch(/computed<T>\(derive: \(recipe: AsyncComputedRecipe\) => Promise<T>\): Awaited<T> \(\+1 overload\)/);
 }, 20_000);
 
 test('M2 real tsserver completes members through state() and computed() inference', async () => {
