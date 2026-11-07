@@ -1,4 +1,21 @@
-import { childEdgeSurface, type PrerenderDataSurface } from './evaluator.ts';
+import type { PrerenderDataSurface } from './evaluator.ts';
+
+// Lives here, not in evaluator.ts, so a browser row mint never loads the evaluator.
+export function surfaceImportKey(edge: {
+	readonly childComponentName: string;
+	readonly importSource?: string;
+}): string {
+	return edge.importSource ?? edge.childComponentName;
+}
+
+export function childEdgeSurface(
+	surface: PrerenderDataSurface,
+	edge: { readonly childComponentName: string; readonly importSource?: string },
+): PrerenderDataSurface | undefined {
+	return surface.components[edge.childComponentName]
+		? surface
+		: surface.imports[surfaceImportKey(edge)];
+}
 
 export type OwningSurfaceReach = {
 	readonly surface: PrerenderDataSurface;

@@ -28,6 +28,7 @@ import {
 } from '../fns/ssr.ts';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
+import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
@@ -194,21 +195,7 @@ export type PrerenderDataSurface = {
 	readonly imports: Readonly<Record<string, PrerenderDataSurface>>;
 };
 
-export function surfaceImportKey(edge: {
-	readonly childComponentName: string;
-	readonly importSource?: string;
-}): string {
-	return edge.importSource ?? edge.childComponentName;
-}
-
-export function childEdgeSurface(
-	surface: PrerenderDataSurface,
-	edge: { readonly childComponentName: string; readonly importSource?: string },
-): PrerenderDataSurface | undefined {
-	return surface.components[edge.childComponentName]
-		? surface
-		: surface.imports[surfaceImportKey(edge)];
-}
+export { childEdgeSurface, surfaceImportKey } from './owning-surface.ts';
 
 export type PrerenderLoadSymbol = (symbolId: string) => unknown | Promise<unknown>;
 
