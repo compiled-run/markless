@@ -18,6 +18,7 @@ import type {
 	SemanticLocalBinding,
 	SemanticModuleImport,
 	SourceSpan,
+	SemanticBranchArm,
 } from '../../artifacts.ts';
 import {
 	getFrameworkApiForCall,
@@ -210,7 +211,8 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'state') {
-			if (state.currentCreationSite) {
+			const armScope = armLocalStateScope(node, init, state);
+			if (state.currentCreationSite && !armScope) {
 				reportUnstableCreationSite(name, 'state', init, state.currentCreationSite, state);
 				continue;
 			}
@@ -276,6 +278,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				declarationKind: state.currentHelperCall ? 'let' : declarationKind,
 				writable: true,
 				valueKind: initialValueKind(initial),
+				...(armScope ? { armScope } : {}),
+				...(armScope && state.currentBranchArms.length > 1
+					? { enclosingArms: state.currentBranchArms.slice(0, -1) }
+					: {}),
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
@@ -680,6 +686,19 @@ function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefine
 	}
 
 	return undefined;
+}
+
+// A state() written directly in an arm body with a starting value the compiler can read restarts each time the arm opens.
+function armLocalStateScope(
+	declaration: AnyNode,
+	init: AnyNode,
+	state: WalkState,
+): SemanticBranchArm | null {
+	if (state.currentCreationSite !== 'arm' || !state.armBodyStatements.has(declaration))
+		return null;
+	const arm = state.currentBranchArms[state.currentBranchArms.length - 1];
+	if (!arm || !evaluateInitialStateValue(firstArgument(init), state).ok) return null;
+	return arm;
 }
 
 function reportUnstableCreationSite(

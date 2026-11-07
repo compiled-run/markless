@@ -381,6 +381,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 			symbolId: branchSymbols.get(site.id)?.id,
 			testReads: branchSymbols.get(site.id)?.testReads ?? [],
 			...branchContentReadsField(input, site.id),
+			...branchArmSeedsField(input, site.id),
 			...(escalatingIds.has(site.id)
 				? { escalates: true as const }
 				: { armRecords: branchArmRecords(input, site.id) }),
@@ -408,6 +409,18 @@ function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: 
 				})),
 			}
 		: {};
+}
+
+// State cells declared in an arm body, or in a branch nested in it, written back to their starting value each time that arm opens.
+function branchArmSeedsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	const armSeeds = (input.semanticGraph?.graphBindings ?? []).flatMap((binding) => {
+		if (binding.kind !== 'state' || !binding.armScope || binding.initialValueKnown !== true) return [];
+		const owner = [binding.armScope, ...(binding.enclosingArms ?? [])].find(
+			(scope) => scope.branchSiteId === branchSiteId,
+		);
+		return owner ? [{ arm: owner.arm, graphNodeId: binding.id, value: binding.initialValue }] : [];
+	});
+	return armSeeds.length > 0 ? { armSeeds } : {};
 }
 
 // Row event symbols already exist on the row host nodes; the record maps
@@ -933,7 +946,10 @@ function rowBranchSlot(
 				}
 			: slotValue({
 					kind: 'text',
-					residue: { kind: 'authored-expression', source: branch.testSource },
+					residue: {
+						kind: 'authored-expression',
+						source: branch.armIndexSource ?? branch.testSource,
+					},
 					coordinate: slot.coordinate,
 				} as SemanticMarkupSlot);
 	if (!test) return null;
@@ -1457,6 +1473,7 @@ function armScopedBranchRecords(
 					startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
 					endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
 					...branchContentReadsField(input, branch.branchSiteId),
+					...branchArmSeedsField(input, branch.branchSiteId),
 					armRecords: branchArmRecords(input, branch.branchSiteId),
 					...(branch.armTests ? { armTests: branch.armTests } : {}),
 					...(branch.declaredEmptyArms

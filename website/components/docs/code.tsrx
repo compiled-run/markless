@@ -1,17 +1,19 @@
 import type { Children } from '@markless/core';
 import type { CodePane } from '../../tooling/code-blocks.ts';
 import type { CodeFile } from './code/protocol.ts';
-import { prefetchCodeBlock } from './code/prefetch.ts';
+import { codeBlockKey } from './code/prefetch-key.ts';
 import { labelPieces, type CodeStep } from './playground/checklist.ts';
 import { lucide, resizable } from '@markless/ui';
 import sessionUrl from 'virtual:code-session-url';
 import liveUrl from 'virtual:code-live-url';
+import prefetchManifest from 'virtual:code-prefetch';
 import CodeFiles, { CodeTabs } from './code-files.tsrx';
 
+// A block runs nothing at load: no idle or on-sight trigger. Prefetch links in the served page download what boot needs; the first press or focus boots.
 // A URL the bundler cannot follow keeps the editor out of preloads.
-function boot(event: { readonly target: unknown }, files: readonly CodeFile[], onSight = false): void {
+function boot(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
 	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (!box || (onSight && !bootsOnSight(box))) return;
+	if (!box) return;
 	// Keys typed before the editor attaches stay in the textarea; the session compiles them.
 	for (const input of box.querySelectorAll<HTMLTextAreaElement>('[data-code-input]')) input.readOnly = false;
 	void (import(/* @vite-ignore */ sessionUrl) as Promise<typeof import('./code/session.ts')>).then(
@@ -23,22 +25,6 @@ function boot(event: { readonly target: unknown }, files: readonly CodeFile[], o
 				).then((live) => live.bootLive(box));
 		},
 	);
-}
-
-function prefetch(event: { readonly target: unknown }, files: readonly CodeFile[]): void {
-	const box = (event.target as Element | null)?.closest<HTMLElement>('.code-block');
-	if (box) prefetchCodeBlock(box, files);
-}
-
-// Mirrors session.ts: `markless-code:editor` and `markless-code:<path>:<block index>:<hash>`.
-function bootsOnSight(box: HTMLElement): boolean {
-	try {
-		const connection = (navigator as { connection?: { saveData?: boolean } }).connection;
-		if (localStorage.getItem('markless-code:editor') && !connection?.saveData) return true;
-		const prefix = `markless-code:${location.pathname}:${[...document.querySelectorAll('.code-block')].indexOf(box)}:`;
-		for (let i = 0; i < localStorage.length; i++) if (localStorage.key(i)?.startsWith(prefix)) return true;
-	} catch {}
-	return false;
 }
 
 export default function Code({
@@ -75,6 +61,7 @@ export default function Code({
 		shows: step.shows,
 		source: step.source,
 		rewrites: step.rewrites === undefined ? undefined : String(step.rewrites),
+		fails: step.fails,
 	}));
 	// Panel names become element ids, so each block names its panes after its own files.
 	const key = (
@@ -85,20 +72,25 @@ export default function Code({
 	).toString(36);
 	const codePane = `code-pane-${key}`;
 	const resultPane = `result-pane-${key}`;
+	const prefetches = [
+		...new Set([
+			...prefetchManifest.session,
+			...(live ? prefetchManifest.live : []),
+			...prefetchManifest.cache,
+			...(prefetchManifest.blocks[codeBlockKey(files)] ?? []),
+		]),
+	];
 
 	<figure
 		class="code-block"
 		data-code="idle"
 		data-code-live={live ? '' : undefined}
-		onVisible={(event) => {
-			prefetch(event, files);
-			boot(event, files, true);
-		}}
-		onIdle={(event) => prefetch(event, files)}
-		onPointerenter={(event) => boot(event, files)}
-		onTouchstart={(event) => boot(event, files)}
+		onPointerdown={(event) => boot(event, files)}
 		onFocusin={(event) => boot(event, files)}
 	>
+		@for (const href of prefetches; key href) {
+			<link rel="prefetch" as={href.endsWith('.html') ? 'document' : undefined} href={href} />
+		}
 		<header class="bar">
 			<span class="title">{title ?? 'Playground'}</span>
 			<span class="restored">
@@ -159,6 +151,7 @@ export default function Code({
 							data-step-shows={step.shows}
 							data-step-source={step.source}
 							data-step-rewrites={step.rewrites}
+							data-step-fails={step.fails}
 						>
 							<span class="tick" aria-hidden="true"></span>
 							<span class="said" data-step-state>To do: </span>

@@ -5,11 +5,11 @@
 import { execFile } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
-import { CODE_PREFETCH_FILE, type CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
+import type { CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
 import { codePrefetchManifest, type PrefetchBundle } from './code-prefetch.ts';
 
 const RUNTIME_SOURCES_SCRIPT = fileURLToPath(new URL('./code-runtime-sources.ts', import.meta.url));
@@ -47,6 +47,11 @@ const BROWSER_ENTRIES: Readonly<Record<string, { readonly file: string; readonly
 		name: 'code-live',
 	},
 };
+/** The server render reads the prefetch lists from this module; the browser gets empty lists. */
+export const CODE_PREFETCH_MODULE = 'virtual:code-prefetch';
+/** Where the browser build writes the lists, in its output dir; the server build, which follows it, reads them from there. */
+export const CODE_PREFETCH_FILE = '_code-prefetch.json';
+const EMPTY_MANIFEST: CodePrefetchManifest = { session: [], live: [], cache: [], blocks: {} };
 const FONT_DIR = fileURLToPath(new URL('../styles/fonts/', import.meta.url));
 const FRAME_FONTS = ['ShantellSans-latin-variable.woff2', 'JoyElia-Regular.woff2', 'JoyElia-Bold.woff2'] as const;
 type FrameFonts = Readonly<Record<(typeof FRAME_FONTS)[number], string>>;
@@ -128,10 +133,12 @@ function devPrefetchManifest(base: string): CodePrefetchManifest {
 
 export function codeClient(): Plugin[] {
 	let base = '/';
+	let command = 'serve';
 	let frameRef = '';
 	const fontRefs = new Map<(typeof FRAME_FONTS)[number], string>();
 	let runtimeSources: Promise<Record<string, string[]>> | undefined;
 	const entryRefs = new Map<string, string>();
+	let clientOutDir = '';
 	return [
 		codeCompilerSwaps(),
 		{
@@ -143,15 +150,14 @@ export function codeClient(): Plugin[] {
 			},
 			configResolved(config) {
 				base = config.base;
+				command = config.command;
+				// Each environment resolves its own config; the browser's output dir is the same in every one.
+				const client = config.environments?.client?.build?.outDir ?? config.build.outDir;
+				clientOutDir = isAbsolute(client) ? client : join(config.root, client);
 			},
 			configureServer(server) {
 				server.middlewares.use((req, res, next) => {
 					const path = (req.url ?? '').split('?', 1)[0];
-					if (path === `${base}${CODE_PREFETCH_FILE}`) {
-						res.setHeader('content-type', 'application/json; charset=utf-8');
-						res.end(JSON.stringify(devPrefetchManifest(base)));
-						return;
-					}
 					if (path !== `${base}${CODE_FRAME_FILE}`) return next();
 					res.setHeader('content-type', 'text/html; charset=utf-8');
 					res.end(
@@ -182,13 +188,21 @@ export function codeClient(): Plugin[] {
 			resolveId: {
 				filter: { id: /^virtual:code-/ },
 				handler(source) {
-					return Object.hasOwn(BROWSER_ENTRIES, source) ? `\0${source}` : null;
+					return Object.hasOwn(BROWSER_ENTRIES, source) || source === CODE_PREFETCH_MODULE ? `\0${source}` : null;
 				},
 			},
 			load: {
 				filter: { id: /^\0virtual:code-/ },
 				handler(id) {
 					const url = id.startsWith('\0') ? id.slice(1) : '';
+					if (url === CODE_PREFETCH_MODULE) {
+						if (this.environment?.config.consumer !== 'server') return `export default ${JSON.stringify(EMPTY_MANIFEST)};`;
+						if (command !== 'build') return `export default ${JSON.stringify(devPrefetchManifest(base))};`;
+						const listed = join(clientOutDir, CODE_PREFETCH_FILE);
+						if (!existsSync(listed))
+							throw new Error(`${CODE_PREFETCH_MODULE} is read before the browser build has listed what the blocks load (${listed} is missing)`);
+						return `export default ${readFileSync(listed, 'utf8')};`;
+					}
 					const entry = Object.hasOwn(BROWSER_ENTRIES, url) ? BROWSER_ENTRIES[url] : undefined;
 					if (!entry) return null;
 					if (this.environment?.config.consumer === 'server') return 'export default "";';

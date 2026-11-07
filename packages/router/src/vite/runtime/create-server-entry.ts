@@ -19,6 +19,7 @@ import {
 } from '../../route-manifest.ts';
 import {
 	renderToString,
+	splitEarlyEventCapture,
 	type ModulePreloadInput,
 	type RenderHeadInjection,
 	type SsrRenderArtifact,
@@ -893,16 +894,14 @@ async function renderDocumentShell(
 		written,
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
+	const { capture, rest } = splitEarlyEventCapture(headHtml);
+	const headStart = importMap + capture;
 	if (documentHtml !== undefined) {
 		const authoredRoot = AUTHORED_HTML_ROOT.test(documentHtml);
 		const { html, preloads } = takeHeadModulePreloads(
-			insertHeadHtml(authoredRoot ? documentHtml.trim() : documentHtml, headHtml),
+			insertHeadHtml(authoredRoot ? documentHtml.trim() : documentHtml, rest),
 		);
-		const content = insertHeadModulePreloads(
-			insertImportMap(html, importMap),
-			importMap,
-			preloads,
-		);
+		const content = insertHeadModulePreloads(insertImportMap(html, headStart), headStart, preloads);
 		if (authoredRoot) return `<!doctype html>${content}`;
 		return [
 			'<!doctype html>',
@@ -917,9 +916,9 @@ async function renderDocumentShell(
 		`<html${renderAttributes(attributes)}>`,
 		'<head>',
 		'<meta charset="utf-8">',
-		importMap,
+		headStart,
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
-		headHtml,
+		rest,
 		'</head>',
 		'<body>',
 		DOCUMENT_CHILDREN_PLACEHOLDER,

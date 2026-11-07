@@ -1,6 +1,6 @@
 // What a <Code> block's "Try this" steps and update marks read: pure checks over text and mutation records.
 
-/** One "Try this" step that ticks by itself once the reader has done it. Give one of `shows`, `source` or `rewrites`. */
+/** One "Try this" step that ticks by itself once the reader has done it. Give one of `shows`, `source`, `rewrites` or `fails`. */
 export type CodeStep = {
 	/** What to do. Text between backticks prints as code. */
 	readonly label: string;
@@ -10,6 +10,8 @@ export type CodeStep = {
 	readonly source?: string;
 	/** Done once one update rewrites at least this many places to the same text. */
 	readonly rewrites?: number;
+	/** Done once the build stops with this error code, for a "try breaking it" step. */
+	readonly fails?: string;
 };
 
 export type LabelPiece = { readonly id: number; readonly text: string; readonly code: boolean };

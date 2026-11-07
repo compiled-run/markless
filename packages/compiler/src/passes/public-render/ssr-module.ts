@@ -818,7 +818,7 @@ function emitSsrDataLines(
 				? `marklessSsrReadPublicPath(marklessSsrRenderStateValues.get(${JSON.stringify(testRead.graphNodeId)}),${JSON.stringify(testRead.path)})`
 				: branch.testSource === undefined
 					? undefined
-					: stripSpan('a branch arm test')(branch.testSource);
+					: stripSpan('a branch arm test')(branch.armIndexSource ?? branch.testSource);
 			return [
 				branch.branchSiteId,
 				{

@@ -159,6 +159,11 @@ function createBranchRegistration(
 				element: input.root,
 				getElementHandle: input.elementHandles.get,
 			};
+			// A state the incoming arm declares starts fresh: its starting value is written before the arm reads it.
+			if (arm !== painted)
+				for (const seed of branch.armSeeds ?? [])
+					if (seed.arm === arm)
+						input.graph.write({ graphNodeId: seed.graphNodeId, value: structuredClone(seed.value) });
 			// A computed only the incoming arm reads derives as the arm reads it.
 			await input.graph.settleWriteObservers?.();
 			let update = await symbol(context);

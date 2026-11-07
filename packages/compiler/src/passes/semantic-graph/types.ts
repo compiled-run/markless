@@ -159,6 +159,8 @@ export type WalkState = {
 	currentArmScope: { readonly branchSiteId: string; readonly hostNodeId: string | null } | null;
 	// The conditions every enclosing @if/@switch arm needs to hold, outermost first.
 	currentArmGuards: ArmGuard[];
+	/** Statements written directly in an @if/@switch arm body, where a state() is arm-local. */
+	readonly armBodyStatements: WeakSet<object>;
 	// Set while walking a component edge's children; `hostNodeId` is the enclosing
 	// host at entry. A read still seeing it is projected into the child.
 	currentProjectionScope: {
@@ -174,7 +176,8 @@ export type WalkState = {
 	// The nearest `@try` with a `@catch` whose @try arm holds the current node.
 	currentCatchBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | 'row' | null;
+	// 'branch' is a plain `if` statement in the body; 'arm' is an @if/@switch arm, where a state() can be arm-local.
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'arm' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
@@ -316,6 +319,7 @@ export function createWalkState(input: {
 		currentHostNodeId: null,
 		currentArmScope: null,
 		currentArmGuards: [],
+		armBodyStatements: new WeakSet<object>(),
 		currentProjectionScope: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,

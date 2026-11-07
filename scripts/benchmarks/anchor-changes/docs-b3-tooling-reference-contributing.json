@@ -23,6 +23,30 @@
 			"delta": 5274,
 			"reason": "app code, not framework: the docs home prefetches the rewritten Tooling, Reference and Contributing pages, whose text and Code panes ship as page data, and Improve the docs now runs a live MarginNotes example (TypoNotes); JS executed at load is unchanged; +5273 B gzip on PR #459 run 41915907744 over main b28c70088 (merge-queue run 41913031696)",
 			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -88,
+			"reason": "app code, not framework: the Tooling, Reference and Contributing pages' ink figures and the roomier InkCards repack the shared chunks the State page prefetches at idle (+14.6 KB gzip downloaded, JS executed at load within the swing); Linux numbers from PR #471 run 42165824767 against main a01312cea's merge-queue run 42163472202",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 14629,
+			"reason": "app code, not framework: the Tooling, Reference and Contributing pages' ink figures and the roomier InkCards repack the shared chunks the State page prefetches at idle (+14.6 KB gzip downloaded, JS executed at load within the swing); Linux numbers from PR #471 run 42165824767 against main a01312cea's merge-queue run 42163472202",
+			"date": "2026-11-06"
 		}
 	]
 }

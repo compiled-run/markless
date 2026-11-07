@@ -562,7 +562,10 @@ function renderRowChunk(
 				const branch = (definition.branches ?? []).find(
 					(candidate) => candidate.branchSiteId === slot.branchSiteId,
 				);
-				const value = scope.readDecision(branch?.testSource, context);
+				const value = scope.readDecision(
+					branch?.armIndexSource ?? branch?.testSource,
+					context,
+				);
 				if (!branch?.armTests) return value ? 0 : 1;
 				const match = branch.armTests.findIndex(
 					(candidate) => candidate !== null && Object.is(candidate, value),

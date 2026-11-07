@@ -277,6 +277,10 @@ export type SemanticGraphBinding = {
 	// element() only: the declared type argument was written as an array, so this
 	// handle names an ordered SET of elements rather than one.
 	readonly plural?: boolean;
+	// state() in an @if/@switch arm body: written back to `initialValue` each time that arm opens.
+	readonly armScope?: SemanticBranchArm;
+	// The arms around `armScope`'s site, outermost first: opening any of them rebuilds this arm, so it restarts the cell too.
+	readonly enclosingArms?: ReadonlyArray<SemanticBranchArm>;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {
@@ -786,6 +790,8 @@ export type SemanticBranchSite = {
 	// site tests THAT node; `testSource` stays the authored text so a diagnostic
 	// quotes what the file says rather than a generated name.
 	readonly testComputedGraphNodeId?: string;
+	// An `@else if` chain or a non-literal-case `@switch` answers its arm index here, evaluated in place of `testSource`.
+	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
 	readonly testReadsRowItem?: true;
 	readonly anchorOrder: number;
@@ -1528,6 +1534,7 @@ export type RenderDataBranch = {
 	readonly kind: SemanticBranchSite['kind'];
 	readonly testSource: string;
 	readonly testComputedGraphNodeId?: string;
+	readonly armIndexSource?: string;
 	readonly testReads: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;

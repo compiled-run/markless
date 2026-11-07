@@ -179,7 +179,15 @@ function rowContentIsMintable(
 				(candidate) => candidate.id === slot.branchSiteId,
 			);
 			if (!site || site.asyncBoundaryId || site.testComputedGraphNodeId) return false;
-			if (!readsOnlyTheRow(input, chunk.componentName, site.testSource, rowNames)) return false;
+			if (
+				!readsOnlyTheRow(
+					input,
+					chunk.componentName,
+					site.armIndexSource ?? site.testSource,
+					rowNames,
+				)
+			)
+				return false;
 			return slot.armTemplateIds.every((armChunkId) =>
 				rowContentIsMintable(input, armChunkId, seen, rowNames),
 			);
@@ -297,12 +305,13 @@ export function rowBranchMints(
 		) !== null;
 	const testReadable =
 		site.testComputedGraphNodeId !== undefined ||
-		resolveGraphPath(
-			site.testSource,
-			graphBindingMap(graph, null, componentName),
-			semanticAliasMap(graph, null, componentName),
-		) !== null ||
-		expression(site.testSource);
+		(site.armIndexSource === undefined &&
+			resolveGraphPath(
+				site.testSource,
+				graphBindingMap(graph, null, componentName),
+				semanticAliasMap(graph, null, componentName),
+			) !== null) ||
+		expression(site.armIndexSource ?? site.testSource);
 	if (!testReadable) return false;
 	return slot.armTemplateIds.every((chunkId) => {
 		const chunk = input.chunks.find((candidate) => candidate.id === chunkId);

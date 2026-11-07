@@ -87,7 +87,7 @@ export default function PrintoutAnatomy() @{
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
 			.anatomy {
-				margin: var(--space-m) 0;
+				margin: var(--flow-block, var(--space-m)) 0;
 
 				@media (max-width: 600px) {
 					margin-inline: calc(50% - 50vw + 0.4rem);

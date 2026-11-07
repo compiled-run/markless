@@ -104,6 +104,13 @@ export function collectWholeBindingAlias(
 	if (resolved.path.length > 0 && (declarationKind !== 'const' || state.currentFunctionSite)) {
 		return;
 	}
+	// Inside a handler, `let next = count; next = !next` changes that handler's copy, never count.
+	if (
+		declarationKind !== 'const' &&
+		state.currentFunctionSite &&
+		patternNameIsReassigned(local, state)
+	)
+		return;
 
 	state.graph.aliases.push({
 		name: local.name,

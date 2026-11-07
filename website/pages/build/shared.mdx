@@ -1,106 +1,107 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import TalliesDemo from '../../components/demos/build/tallies-demo.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import InkCards from '../../components/docs/ink-cards.tsrx';
+import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';
 
 <SiteNavbar />
 <Sidebar />
 
-# Share one piece of state with `shared()`
+# Shared state
 
 <PageMeta time="3 min" assumes="state, components" />
 
-A badge and a button live in two components. Both need the same `count`. You can pass it down as a
-prop, and pass a callback back up. That works, until five components want it.
+<Subtitle text="shared() is state with a name: every component that calls the name gets the same copy." terms="shared state" />
 
-`shared()` gives the state a name instead. You define it once. Each component that calls the
-definition gets the same `count`, and a change from one shows up in the other.
-
-Click **Add one**.
-
-<Code note="Add a decrement() method next to increment(), and a second button that calls it. Then add a third component that shows c.count * 2, and put it in the section.">
-```tsrx title="shared-counter.tsrx"
+```tsrx title="player.tsrx"
 import { shared, state } from '@markless/core';
 
-export const counter = shared(
+export const player = shared(() => {
+	const box = state({ track: 'Harbour Lights' });
+	return { ...box };
+});
+```
+
+**`shared()`** takes a function that makes the state, and names it `player`. Every component that calls **`player()`** gets the same `track`, with no props in between.
+
+## Two components read one copy
+
+A *shared definition* is the function you pass to `shared()`. Call it from any component, and:
+
+- every caller reads the same values
+- a change in one caller shows in all of them
+- no prop has to carry it
+
+Press play on either player, then turn one volume knob.
+
+<PlayerAnatomy />
+
+<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'page' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
+```tsrx title="player.tsrx"
+import { shared, state } from '@markless/core';
+
+export const player = shared(
 	() => {
-		const box = state({ count: 0 });
+		const box = state({
+			track: 'Harbour Lights',
+			playing: false,
+		});
 		return {
 			...box,
-			increment() {
-				box.count++;
+			toggle() {
+				box.playing = !box.playing;
 			},
 		};
 	},
 	{ scope: 'page' },
 );
 
-function Badge() @{
-	const c = counter();
+function MiniPlayer() @{
+	const p = player();
 
-	<output>{c.count}</output>
+	<p>
+		{p.playing ? 'Playing' : 'Paused'}: {p.track}
+	</p>
 }
 
-export default function SharedCounter() @{
-	const c = counter();
+export default function NowPlaying() @{
+	const p = player();
 
 	<section>
-		<p>Badge shows: <Badge /></p>
-		<button onClick={() => c.increment()}>
-			Add one
+		<MiniPlayer />
+		<h2>{p.track}</h2>
+		<button onClick={() => p.toggle()}>
+			{p.playing ? 'Pause' : 'Play'}
 		</button>
 	</section>
 }
 ```
 </Code>
 
-The click runs in `SharedCounter`, but the number changes inside `Badge`. No prop connects them.
+## The scope picks who shares a copy
 
-The function you pass to `shared()` creates the state. It returns the state plus any methods you
-want, like `increment()`. Each component calls `counter()` to get it.
+The second argument is the *scope*: who shares one copy.
 
-## Who gets the same copy
+<InkCards label="The four scopes" cards={[
+	{ icon: 'book', name: "'page'", line: 'Every component on the page shares one copy. This is the default.' },
+	{ icon: 'envelope', name: "'request'", line: "One copy per request on the server; the same as 'page' in the browser." },
+	{ icon: 'parcel', name: "'container'", line: 'One copy per Markless app on the page, not shared with the others.' },
+	{ icon: 'puzzle', name: "'widget'", line: 'One copy per rendered widget, like each player or each menu.' },
+]} />
 
-The second argument picks who shares one copy. Two of the choices matter here.
+The scope is one of these four words, and the player above shows what happens with any other. A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
 
-| Scope | Who shares one copy |
-| --- | --- |
-| `{ scope: 'page' }` | every component on the page that calls the definition |
-| `{ scope: 'widget' }` | the pieces inside one rendered widget, like one menu |
+## A copy lasts until a reload
 
-A widget is the first component that calls the definition, plus everything you put inside it. Here
-are two tallies, each a `Tally` with a `Badge` inside. With `'page'`, they share one copy. Click
-either button:
+- On the server, every request starts from the starting values.
+- In the browser, one copy lives as long as the document, through links, Back and Forward.
+- A reload starts again from the starting values.
 
-<TalliesDemo />
+## Two apps on one page share by name
 
-Both numbers move together. Now set **Scope** to `widget` and click again. Each tally keeps its own
-number. Inside one tally, the button and the badge still share.
+Two separately built apps on one page that call the same definition read and write one copy. The name is the file plus its export, like `lib/player.tsrx#player`, so both must import it from the same place.
 
-The card's code has two files. `tally.tsrx` holds the definition and both components.
-`tallies.tsrx` puts two tallies on the page. Only the `scope` line differs between the two settings.
+Both apps must also give the value the same shape: the same field names and types.
 
-The [UI components](/ui) use `'widget'`. That is how two menus on one page each stay open or closed
-on their own.
-
-<Callout
-	sprite="speech-bubble"
-	title="Why do I get a missing-scope warning?"
-	text="If two components in one file call the same definition and you gave no scope, Markless warns with MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT. With no scope, the copy is shared across the page. Write { scope: 'widget' } for one copy per widget, or { scope: 'page' } to say you meant it."
-/>
-
-<Callout
-	sprite="cross"
-	title="Can I call a method from another file?"
-	text="Keep the definition and the components that call its methods in one file, as these examples do. From another file, a call like c.increment() can stop the build with MARKLESS_SHARED_METHOD_CROSS_MODULE. In that file, change the field directly instead: c.count++."
-/>
-
-Use `state()` when one component owns the value. Use `shared()` when several components need it.
-
-## Try it yourself
-
-Copy both files from the card into your own app. Add a third tally with the label `Middle`, and try each scope. Before you
-click, predict which numbers will move.
-
-Next: [files become pages](/router/pages).
+Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).

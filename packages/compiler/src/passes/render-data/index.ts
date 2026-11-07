@@ -176,6 +176,7 @@ function branchRecord(
 		...(site.testComputedGraphNodeId
 			? { testComputedGraphNodeId: site.testComputedGraphNodeId }
 			: {}),
+		...(site.armIndexSource ? { armIndexSource: site.armIndexSource } : {}),
 		testReads:
 			symbol?.kind === 'branch-update'
 				? symbol.testReads.map((read) => ({

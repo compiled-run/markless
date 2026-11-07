@@ -43,6 +43,7 @@ import {
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
 import { isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
+import { armStatements, ifChainOf } from './if-chain.ts';
 import { OVERLAY_DOM_ATTRIBUTE, overlayLiteralValue } from './overlay-attribute.ts';
 import {
 	createStyleConstResolver,
@@ -1325,13 +1326,7 @@ function isFunctionNode(node: AnyNode): boolean {
 }
 
 function branchArms(node: AnyNode): AnyNode[][] {
-	if (node.type === 'JSXIfExpression') {
-		return [node.consequent, node.alternate].map((arm) => {
-			const candidate = arm as AnyNode | undefined;
-			if (!candidate) return [];
-			return candidate.type === 'BlockStatement' ? asNodes(candidate.body) : [candidate];
-		});
-	}
+	if (node.type === 'JSXIfExpression') return ifChainOf(node).arms.map(armStatements);
 	return asNodes(node.cases).map((switchCase) => asNodes(switchCase.consequent));
 }
 
