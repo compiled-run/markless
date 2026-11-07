@@ -18,9 +18,14 @@ async function reply(key: string) {
 	answer(key);
 }
 
+// Each @try reveals when its own arm code has loaded, so the Next pill can show a moment after the page number.
+const nextPill = () =>
+	document.querySelector<HTMLElement>('[data-tone="tone-next"]:not([disabled])');
+
 async function pages() {
 	errors.length = 0;
-	document.querySelector<HTMLElement>('[data-tone="tone-next"]')!.click();
+	await expect.poll(nextPill).not.toBeNull();
+	nextPill()!.click();
 	await reply('page:2');
 	await expect.poll(() => text('[data-shown]')).toBe('2');
 	await expect
@@ -34,6 +39,30 @@ test('CSR: a component in a row component @try arm runs its handler', async () =
 	await reply('page:1');
 	await expect.poll(() => text('[data-shown]')).toBe('1');
 	await pages();
+});
+
+test('CSR: the handler runs whichever arm symbol loads last', async () => {
+	const base = PagerPage as unknown as { readonly loadSymbol: (symbolId: string) => unknown };
+	const mount = async (late: (symbolId: string) => boolean) => {
+		const loaded: string[] = [];
+		await render({
+			...base,
+			loadSymbol: async (symbolId: string) => {
+				loaded.push(symbolId);
+				if (late(symbolId)) await new Promise((resolve) => setTimeout(resolve, 150));
+				return base.loadSymbol(symbolId);
+			},
+		} as typeof PagerPage);
+		await reply('page:1');
+		await expect.poll(() => text('[data-shown]')).toBe('1');
+		await pages();
+		cleanup();
+		forgetRequests();
+		return loaded;
+	};
+	const symbols = [...new Set(await mount(() => false))];
+	expect(symbols.length).toBeGreaterThan(1);
+	for (const symbol of symbols) await mount((symbolId) => symbolId === symbol);
 });
 
 test('SSR: a component in a row component @try arm runs its handler after resume', async () => {
