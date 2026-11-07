@@ -70,8 +70,8 @@ export type AsyncComputedPlane = {
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
-	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
-	readonly rerun: (graphNodeId: string) => boolean;
+	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set; false otherwise. */
+	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
 	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run; a no-op when the node does not exist. */
 	readonly failHandler: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */

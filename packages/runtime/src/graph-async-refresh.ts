@@ -93,8 +93,10 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const version = ++node.version;
 		node.controller = controller;
 		// Read in the writing turn: a demanded run is never quiet, nor one a handler's entry hold proves.
+		// A revalidation (a page shown again re-asking its values) is never something the user asked for.
 		node.quiet =
-			!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false);
+			cause === 'revalidate' ||
+			(!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false));
 		// A re-run keeps the last good value addressable while pending and after a
 		// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
 		const kept = lastGood(node.snapshot);

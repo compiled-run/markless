@@ -41,8 +41,8 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	quiet?: boolean;
 };
 
-/** What started a run: a graph write; nothing for a plain read. */
-export type RunCause = 'write';
+/** What started a run: a graph write, or a page shown again re-asking a settled value; neither for a plain read. */
+export type RunCause = 'write' | 'revalidate';
 
 /** What the async plane shares with the held-inputs plane. */
 export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
@@ -183,12 +183,12 @@ export function createAsyncPlane(
 			add(node);
 			state?.held?.seed(node);
 		},
-		rerun(graphNodeId) {
+		rerun(graphNodeId, revalidate) {
 			const node = nodes.get(graphNodeId);
-			if (node?.snapshot.status !== 'rejected') return false;
-			// A reset re-runs a rejected value even though its key has not changed.
+			if (node?.snapshot.status !== (revalidate ? 'fulfilled' : 'rejected')) return false;
+			// A reset re-runs a rejected value, and a page shown again re-asks a fulfilled one, though the key has not changed.
 			node.gate = 1;
-			withRefresh((loaded) => loaded.advance(node));
+			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
 			return true;
 		},
 		holdInputs(factory) {
