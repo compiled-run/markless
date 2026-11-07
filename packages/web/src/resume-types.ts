@@ -143,6 +143,8 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly updateSymbolId?: string;
 	readonly rerendersOnRefresh?: true;
 	readonly catchesHandlers?: true;
+	// Shows content the resume cache seeded, which revalidates once the runtime holds it.
+	readonly seeded?: true;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
@@ -312,6 +314,8 @@ export type ResumeAsyncBoundaryPayload = ProtocolViewPayload['asyncBoundaries'][
 	// A single armized set (SSR and CSR compose both armize live arms); a
 	// compile-time per-arm array is a stale payload and is never registrable.
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
+	// Set in the browser, never served: the resume cache seeded this boundary's settled arm.
+	readonly seeded?: true;
 };
 export type ResumeViewRecord = Pick<
 	ProtocolViewPayload,

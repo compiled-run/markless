@@ -1,3 +1,4 @@
+import type { ResumeCacheHost } from './fns/resume-cache.ts';
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer';
 import type { EventOnlyResumeContainer } from './event-only-resume.ts';
 import type { RuntimeGraph } from '@markless/runtime';
@@ -184,7 +185,10 @@ async function renderCsr(
 		return csrRenderSettlement(await startCsrRuntime(mounted), mounted.view);
 	}
 
+	// Set only by a compiled module serving async values: seeded boundaries settle before the root mounts.
+	const settleSeeds = await (globalThis as ResumeCacheHost).__mSeed?.(output);
 	const container = await startCsrRuntime(output);
+	await settleSeeds?.(container);
 	if ((await options.beforeMount?.(container)) === false) {
 		return { container: disposeCancelledMount(container), selfWake: false };
 	}

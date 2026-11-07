@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 309,
+	total: 310,
 	guided: 48,
 	groups: [
 		{
@@ -990,6 +990,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_RESOLVER_UNPUBLISHED',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
 					kind: 'build error',
 					guided: false,
 				},

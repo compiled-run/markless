@@ -98,6 +98,8 @@ export function createPluginState() {
 	// Every id this build injects a hook for, keyed to the module it was injected
 	// into: the size map owes an entry to each one the bundle actually carries.
 	const executionLogEmittedIds = new Map<string, string>();
+	// Every async computed name a transform compiled: a `resumeCache.exclude` entry naming none fails the build.
+	const asyncComputedNames = new Set<string>();
 	// Only an owner's transform registers its generated modules, and Vite reuses a
 	// soft-invalidated owner's cached result, so a fetch can miss with nothing left to
 	// re-register it; without regenerating here Vite reads the id off disk as a filename.
@@ -129,6 +131,7 @@ export function createPluginState() {
 		transformedClientPrimarySources,
 		executionLogEstimatedSizes,
 		executionLogEmittedIds,
+		asyncComputedNames,
 		regeneratingVirtualModules,
 		recoveringChildMetadata,
 		// Clears exactly what buildStart cleared inline; prerenderWakeCapabilities and the

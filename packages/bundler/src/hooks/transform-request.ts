@@ -121,6 +121,9 @@ export function planTransformHookRequest(
 			internalOptions.unimportedRouteModule?.(moduleIdFor(source, ctx.getRoot())) === true,
 		dev: plan.dev,
 		buildId: internalOptions.buildId,
+		...(internalOptions.resumeCache && {
+			resumeCache: internalOptions.resumeCache === true ? {} : internalOptions.resumeCache,
+		}),
 		executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 		executionLogModuleHooks:
 			currentEnvironment === 'client' &&

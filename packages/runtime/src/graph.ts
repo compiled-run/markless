@@ -71,8 +71,8 @@ export type AsyncComputedPlane = {
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
-	/** Re-runs a rejected async value with the key it already has; false when it is not rejected. */
-	readonly rerun: (graphNodeId: string) => boolean;
+	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set; false otherwise. */
+	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
 	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run; a no-op when the node does not exist. */
 	readonly failHandler: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */
@@ -133,6 +133,8 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly valueKey?: unknown;
 			/** This run started outside a user action: no busy mark, no announcement. */
 			readonly quiet?: boolean;
+			/** A user action started this run, or the value's first one: the resume cache never keeps it. */
+			readonly action?: boolean;
 	  }
 	| {
 			readonly status: 'fulfilled';
@@ -140,6 +142,7 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly key: unknown;
 			readonly value: unknown;
 			readonly quiet?: boolean;
+			readonly action?: boolean;
 	  }
 	| {
 			readonly status: 'rejected';
@@ -150,6 +153,7 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly value?: unknown;
 			readonly valueKey?: unknown;
 			readonly quiet?: boolean;
+			readonly action?: boolean;
 	  };
 
 export type RuntimeGraphAsyncComputed = {
@@ -372,8 +376,8 @@ export type RuntimeGraph = {
 		plane: AsyncComputedPlaneFactory,
 		held?: HeldInputsPlaneFactory,
 	) => boolean;
-	/** Re-runs a rejected async value with the key it already has; false or undefined when it is not rejected. */
-	readonly rerun?: (graphNodeId: string) => boolean | undefined;
+	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set. */
+	readonly rerun?: (graphNodeId: string, revalidate?: boolean) => boolean | undefined;
 	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run. */
 	readonly failHandler?: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */
@@ -777,7 +781,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
 		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
-		rerun: (graphNodeId) => asyncPlane?.rerun(graphNodeId),
+		rerun: (graphNodeId, revalidate) => asyncPlane?.rerun(graphNodeId, revalidate),
 		failHandler: (graphNodeId, error) => asyncPlane?.failHandler(graphNodeId, error),
 		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
 		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),

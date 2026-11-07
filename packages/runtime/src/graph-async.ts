@@ -39,7 +39,14 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot };
 	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
 	quiet?: boolean;
+	/** The run in flight started inside a user action, or the node's first run did; the resume cache never keeps such a value. */
+	action?: boolean;
+	/** The node's first run started inside a user action. */
+	createdByAction?: true;
 };
+
+// What started a run: a graph write, or the resume cache re-checking a value it seeded; neither for a plain read.
+type RunCause = 'write' | 'revalidate';
 
 /** What the async plane shares with the held-inputs plane. */
 export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
@@ -134,6 +141,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			value: (node.snapshot as { readonly value?: unknown }).value,
 			...(kept && { valueKey: kept.valueKey }),
 			...(node.quiet && { quiet: true }),
+			...(node.action && { action: true }),
 		};
 	};
 
@@ -168,7 +176,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		key: unknown,
 		read: RuntimeGraphRead = readGraph,
 		waiting?: boolean,
-		fromWrite?: boolean,
+		cause?: RunCause,
 	): void => {
 		node.controller?.abort();
 		node.gate = 0;
@@ -178,9 +186,12 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const controller = new AbortController();
 		const version = ++node.version;
 		node.controller = controller;
-		// Read in the writing turn: only a write outside a user action, with no entry hold open, is quiet.
-		node.quiet =
-			!node.entryHold && !!fromWrite && (context.isUserAction ? !context.isUserAction() : false);
+		// Read in the writing turn: a demanded run is never quiet, nor one a handler's entry hold proves.
+		const byAction = !!context.isUserAction?.();
+		if (byAction && node.snapshot.status === 'idle') node.createdByAction = true;
+		node.action = byAction || !!node.createdByAction;
+		// A revalidation (the resume cache re-checking content it seeded) is never something the user asked for.
+		node.quiet = cause === 'revalidate' || (!node.entryHold && cause === 'write' && !byAction && !!context.isUserAction);
 		// A re-run keeps the last good value addressable while pending and after a
 		// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
 		const kept = lastGood(node.snapshot);
@@ -201,7 +212,13 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 				node.servedKey = undefined;
 				if (waiting) node.gate = 2;
 			}
-			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
+			publish(
+				node,
+				node.quiet || node.action
+					? { ...snapshot, ...(node.quiet && { quiet: true }), ...(node.action && { action: true }) }
+					: snapshot,
+				landed,
+			);
 		};
 		const commitRejected = (error: unknown): void =>
 			land({ status: 'rejected', version, key, error, ...kept });
@@ -220,7 +237,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		}
 	};
 
-	const advance = (node: RuntimeAsyncComputedNode, fromWrite?: boolean): void => {
+	const advance = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
 		// Sync computeds have no settlement state, so walk through them until the
 		// gate reaches the async nodes whose snapshots can block this runner.
 		const visited = new Set<string>([node.graphNodeId]);
@@ -236,7 +253,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 				if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
 					blocked = dependency;
 					if (!dependency.valueInputs) shown = false;
-					demand(dependency, fromWrite);
+					demand(dependency, cause);
 				} else if (!blocked && dependency.snapshot.status === 'rejected') {
 					blocked = dependency;
 					if (!dependency.valueInputs) shown = false;
@@ -273,13 +290,13 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		)
 			return;
 
-		start(node, nextKey, readGraph, undefined, fromWrite);
+		start(node, nextKey, readGraph, undefined, cause);
 	};
 
 	// A payload-planned pending snapshot still needs its runner started on
 	// first demand; otherwise only idle computeds start.
-	const demand = (node: RuntimeAsyncComputedNode, fromWrite?: boolean): void => {
-		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, fromWrite);
+	const demand = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
+		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, cause);
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
@@ -317,7 +334,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			demand(node);
 			return peek(node, path);
 		},
-		invalidate: (node) => void (node.snapshot.status !== 'idle' && advance(node, true)),
+		invalidate: (node) => void (node.snapshot.status !== 'idle' && advance(node, 'write')),
 		markEntry(graphNodeId) {
 			const node = nodes.get(graphNodeId);
 			if (node) markEntry(node);
@@ -331,12 +348,12 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			add(node);
 			context.held?.seed(node);
 		},
-		rerun(graphNodeId) {
+		rerun(graphNodeId, revalidate) {
 			const node = nodes.get(graphNodeId);
-			if (node?.snapshot.status !== 'rejected') return false;
-			// A reset re-runs a rejected value even though its key has not changed.
+			if (node?.snapshot.status !== (revalidate ? 'fulfilled' : 'rejected')) return false;
+			// A reset re-runs a rejected value, and a seeded value revalidates, though the key has not changed.
 			node.gate = 1;
-			advance(node);
+			advance(node, revalidate ? 'revalidate' : undefined);
 			return true;
 		},
 		failHandler(graphNodeId, error) {

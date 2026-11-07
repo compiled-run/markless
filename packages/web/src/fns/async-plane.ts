@@ -175,4 +175,10 @@ export type AsyncPlaneSlot = {
 	awaits?: typeof awaitsAsyncValue;
 	awaitsAncestor?: typeof awaitsAsyncAncestor;
 	busy?: Pick<typeof import('./busy-marks.ts'), 'note' | 'set' | 'apply' | 'settleRange' | 'shown'>;
+	// Installed by `fns/resume-cache`: told when a boundary shows settled content.
+	cache?: (
+		wiring: Parameters<typeof import('../resume-async-wiring.ts').wireAsyncBoundariesWithoutLoadingCapability>[0],
+		boundary: import('../resume-types.ts').ResumeAsyncBoundaryRecord,
+		status: 'fulfilled' | 'rejected',
+	) => void;
 };

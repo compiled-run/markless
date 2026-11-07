@@ -183,6 +183,13 @@ export interface MarklessRouterOptions {
 	 * Prefetches only ever request page routes, with a `Purpose: prefetch` header; endpoints are never prefetched.
 	 */
 	prefetch?: boolean;
+	/**
+	 * A reload, or a client-rendered return to a page, shows the async content this tab last saw while it
+	 * revalidates, instead of `@pending`. On by default, kept per tab and per visitor session.
+	 * `exclude` names async values never kept (a trailing `*` matches every name it starts);
+	 * an entry that names nothing in the build fails the build. `false` emits no cache code at all.
+	 */
+	resumeCache?: false | { readonly exclude?: readonly string[] };
 }
 
 export function router(options: MarklessRouterOptions = {}): PluginOption[] {
@@ -197,6 +204,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			routeTypegenPlugin(),
 			anchorTransformPlugin(),
 			htmlTransformPlugin(),
+			resumeCachePlugin(options),
 			virtualModulesPlugin(undefined, undefined, undefined, undefined, options),
 		];
 	}
@@ -226,6 +234,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		devSourceModuleRequestPlugin(),
 		devPageForUrlPlugin(options),
 		pageServerOnlyPropsPlugin(),
+		resumeCachePlugin(options),
 		mdxTransformPlugin(),
 		requestFileTransformPlugin(),
 		routeTypegenPlugin(),
@@ -247,6 +256,36 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 		cloudflareWorkerTrimPlugin(),
 		nitroPlugins,
 	];
+}
+
+// The server entry mints no session scope token yet (spec 13: the default derivation awaits the owner), so no page could keep anything.
+const SERVER_MINTS_RESUME_SCOPE = false;
+
+// Client modules serving async values install the resume cache unless the app turned it off.
+function resumeCachePlugin(options: MarklessRouterOptions): Plugin {
+	return {
+		name: 'markless-router:resume-cache',
+		configResolved(config) {
+			const markless = config.plugins.find(
+				(plugin) =>
+					typeof (plugin as { api?: { declareResumeCache?: unknown } }).api?.declareResumeCache ===
+					'function',
+			) as
+				| {
+						api: {
+							declareResumeCache(
+								cache: { readonly exclude?: readonly string[] } | false,
+							): void;
+						};
+				  }
+				| undefined;
+			markless?.api.declareResumeCache(
+				options.resumeCache === false || !SERVER_MINTS_RESUME_SCOPE
+					? false
+					: { exclude: options.resumeCache?.exclude ?? [] },
+			);
+		},
+	};
 }
 
 function pageServerOnlyPropsPlugin(): Plugin {

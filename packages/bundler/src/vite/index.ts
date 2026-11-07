@@ -192,6 +192,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	}) as Plugin & {
 		api: {
 			declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+			declareResumeCache: MarklessRolldownPluginApi['declareResumeCache'];
 			declarePackOwnership: MarklessRolldownPluginApi['declarePackOwnership'];
 			invalidateGeneratedModules: typeof hmrOptions.invalidateGeneratedModules;
 			runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
@@ -829,6 +830,7 @@ type MarklessVitePluginApi = {
 	runtimeDemandMaps: MarklessRolldownPluginApi['runtimeDemandMaps'];
 	runtimeDemandSources: MarklessRolldownPluginApi['runtimeDemandSources'];
 	declareRouteModules: MarklessRolldownPluginApi['declareRouteModules'];
+	declareResumeCache: MarklessRolldownPluginApi['declareResumeCache'];
 	recordLiteralComponentInstances: MarklessRolldownPluginApi['recordLiteralComponentInstances'];
 	/** A host plugin names the root-relative page module it renders at a URL, so a dev edit reloads only the open pages it reached. */
 	declarePageForUrl: (pageForUrl: (url: string) => string | undefined) => void;

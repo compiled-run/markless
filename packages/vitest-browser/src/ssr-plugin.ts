@@ -44,7 +44,7 @@ const TSRX_MODULE = /\.tsrx$/;
 type SsrCommandResult = { readonly html: string };
 type StreamShellCommandResult = { readonly shell: string };
 type StreamCommandResult = { readonly shell: string; readonly appends: ReadonlyArray<string> };
-export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce' | 'cookie'>;
+export type SsrFixtureRenderOptions = Pick<RenderToStringOptions, 'nonce' | 'cookie' | 'resumeScope'>;
 
 /** One scenario root mounted as its own island on a composed test page. */
 export type SsrIslandInput = {
