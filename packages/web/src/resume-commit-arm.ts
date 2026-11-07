@@ -508,6 +508,8 @@ async function registerNestedAsyncBoundaries(
 				runnerSymbolId,
 				{ root: deps.root, loadSymbol: deps.loadSymbol as ResumeRuntimeInput['loadSymbol'] },
 				() => graph,
+				undefined,
+				computed,
 			),
 			planes.async,
 			planes.held,

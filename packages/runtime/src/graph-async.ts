@@ -5,7 +5,7 @@ import type {
 	RuntimeGraphAsyncSnapshot,
 	RuntimeGraphRead,
 } from './graph.ts';
-import { readPath } from './graph-core.ts';
+import { pathsIntersect, readPath } from './graph-core.ts';
 import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type { HeldInputsPlane } from './graph-held.ts';
 
@@ -86,8 +86,16 @@ function lastGood(
 /** Async computeds as an installable plane: a graph without one carries none of this module. */
 export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals): AsyncComputedPlane {
 	const nodes = new Map<string, RuntimeAsyncComputedNode>();
-	for (const asyncComputed of internals.asyncComputed ?? [])
-		nodes.set(asyncComputed.graphNodeId, createNode(asyncComputed));
+	// Per source: the derived cells reading it, at which path; a stale cell maps to the write count since its derive.
+	const derivedCells = new Map<string, Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>>();
+	const staleDerives = new Map<string, number>();
+	const add = (node: RuntimeAsyncComputedNode): void => {
+		nodes.set(node.graphNodeId, node);
+		for (const hop of node.syncHops ?? [])
+			for (const { graphNodeId: source, path = [] } of hop.dependencies)
+				derivedCells.set(source, [...(derivedCells.get(source) ?? []), { graphNodeId: hop.graphNodeId, path }]);
+	};
+	for (const asyncComputed of internals.asyncComputed ?? []) add(createNode(asyncComputed));
 	const { computedNodes, readGraph } = internals;
 	const context: AsyncPlaneContext = {
 		...internals,
@@ -217,9 +225,11 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		const visited = new Set<string>([node.graphNodeId]);
 		let blocked: RuntimeAsyncComputedNode | undefined;
 		let shown = true;
+		let staleDerive = false;
 		const visit = (graphNodeId: string): void => {
 			if (visited.has(graphNodeId)) return;
 			visited.add(graphNodeId);
+			if (staleDerives.has(graphNodeId)) staleDerive = true;
 			const dependency = nodes.get(graphNodeId);
 			if (dependency) {
 				if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
@@ -236,10 +246,15 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 				visit(dependency.graphNodeId);
 		};
 		for (const dependency of node.dependencies) visit(dependency.graphNodeId);
+		for (const hop of node.syncHops ?? []) for (const graphNodeId of hop.asyncFrom) visit(graphNodeId);
 		// A rejected blocker with a pinnable last-good value pins like a pending one (graph-held.ts `rejectedOnly`).
 		if (blocked && shown && context.held?.startOnShownInputs(node)) return;
 		// A sibling's failed refresh never rejects a reader whose pinned key did not move.
 		if (blocked?.snapshot.status === 'rejected' && shown) return;
+		if (!blocked && staleDerive) {
+			commitDependencyBlock(node, 'pending', undefined);
+			return;
+		}
 		if (blocked) {
 			commitDependencyBlock(
 				node,
@@ -312,7 +327,7 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		},
 		define(asyncComputed) {
 			const node = createNode(asyncComputed);
-			nodes.set(node.graphNodeId, node);
+			add(node);
 			context.held?.seed(node);
 		},
 		rerun(graphNodeId) {
@@ -329,5 +344,19 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 			for (const node of nodes.values()) context.held.seed(node);
 		},
 		shownRead: (dependencies) => context.held?.shownRead(dependencies),
+		wrote(graphNodeId, path) {
+			staleDerives.delete(graphNodeId);
+			for (const cell of derivedCells.get(graphNodeId) ?? [])
+				if (pathsIntersect(path, cell.path))
+					staleDerives.set(cell.graphNodeId, (staleDerives.get(cell.graphNodeId) ?? 0) + 1);
+		},
+		startDerive(graphNodeId) {
+			const stale = staleDerives.get(graphNodeId);
+			return () => {
+				if (stale === undefined || staleDerives.get(graphNodeId) !== stale) return;
+				staleDerives.delete(graphNodeId);
+				internals.markDirtyPath(graphNodeId, []);
+			};
+		},
 	};
 }

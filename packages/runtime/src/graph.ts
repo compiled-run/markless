@@ -82,6 +82,9 @@ export type AsyncComputedPlane = {
 	readonly shownRead: (
 		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
 	) => RuntimeGraphRead | false | undefined;
+	/** A node or path was written: a derived cell reading it is stale until written. */
+	readonly wrote: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly startDerive: NonNullable<RuntimeGraph['startDerive']>;
 };
 
 export type AsyncComputedPlaneFactory = (internals: AsyncComputedPlaneInternals) => AsyncComputedPlane;
@@ -150,6 +153,15 @@ export type RuntimeGraphAsyncSnapshot =
 export type RuntimeGraphAsyncComputed = {
 	readonly graphNodeId: string;
 	readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
+	/**
+	 * Sync computeds in the key this graph holds as cells their derives write: their async
+	 * sources gate a run, and a write to a source holds it until the derive answers.
+	 */
+	readonly syncHops?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
+		readonly asyncFrom: ReadonlyArray<string>;
+	}>;
 	readonly initialSnapshot?: RuntimeGraphAsyncSnapshot;
 	readonly key: (read: RuntimeGraphRead) => unknown;
 	/** How a fulfilled value reconciles against the previously published one. */
@@ -346,6 +358,8 @@ export type RuntimeGraph = {
 	 * answers, so a value derived on demand can write itself first.
 	 */
 	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
+	/** A derive of a sync hop's cell starts; the call it returns ends it, waking async readers it held when it wrote nothing. */
+	readonly startDerive?: (graphNodeId: string) => () => void;
 	/** While an async value refreshes, its key's inputs read as its shown value was fetched; `false`: the reader would mix. */
 	readonly shownRead?: (
 		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
@@ -450,6 +464,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
+		asyncPlane?.wrote(graphNodeId, path);
 		dirtyPaths.push({ graphNodeId, path });
 		plane?.recordWrite(graphNodeId, path);
 		markDirtyComputedDependencies(
@@ -795,6 +810,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			};
 		},
 		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
+		startDerive: (graphNodeId) => asyncPlane?.startDerive(graphNodeId) ?? (() => {}),
 		pullBeforeRead(graphNodeId, pull) {
 			// The pull writes the node itself, so the initializer answers what it held before.
 			readInitializers.set(graphNodeId, () => {

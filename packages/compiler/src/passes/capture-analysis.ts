@@ -25,6 +25,7 @@ import {
 import { protocolInstanceQualifies, valueAlongPaths } from '@markless/serializer';
 import { componentEdgeInstancePath } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
+import { isEventAttribute } from '../ast/events.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
@@ -1197,6 +1198,9 @@ function resolvePropCaptureRoute(
 		expression: prop.source,
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
 		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
+		...('unroutableHandler' in prop && prop.unroutableHandler
+			? { unroutableHandler: prop.unroutableHandler }
+			: {}),
 	};
 }
 
@@ -1611,7 +1615,9 @@ function opaqueSlotDiagnostics(symbol: {
 					message: route.absentProp
 						? `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" is not passed by the parent that renders "${componentName}", and this call site invokes it unconditionally.`
 						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
-					why: route.absentProp
+					why: route.unroutableHandler
+						? route.unroutableHandler.why
+						: route.absentProp
 						? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
 						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
 					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
@@ -1624,9 +1630,13 @@ function opaqueSlotDiagnostics(symbol: {
 					source: route.expression,
 					suggestions: [
 						{
-							message: route.absentProp
+							message: route.unroutableHandler
+								? route.unroutableHandler.rewrite
+								: route.absentProp
 								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-								: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
+								: isEventAttribute(propName)
+									? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
+									: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
