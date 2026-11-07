@@ -59,6 +59,12 @@ export type RenderLocalInline =
 			readonly name: string;
 			readonly write: string;
 			readonly call: boolean;
+	  }
+	| {
+			readonly kind: 'stateful-factory';
+			readonly name: string;
+			readonly why: string;
+			readonly rewrite: string;
 	  };
 
 type Replacement = { readonly start: number; readonly end: number; readonly text: string };
@@ -116,6 +122,7 @@ function inlineWithin(
 	const splicedNames = new Set<string>();
 	const boundInside = new Set<string>();
 	let refusal: Exclude<RenderLocalInline, { readonly kind: 'inlined' }> | null = null;
+	let stateful: { readonly why: string; readonly rewrite: string } | null = null;
 
 	const ancestors: AnyNode[] = [];
 	const visit = (candidate: AnyNode, parent: AnyNode | null): void => {
@@ -167,6 +174,11 @@ function inlineWithin(
 						refusal = { kind: 'row-item', name };
 					} else if (local.kind !== 'definition' || inlining.has(symbolId)) {
 						refusal = { kind: 'render-local', name };
+					} else if (
+						options.inlineFunctions &&
+						(stateful = statefulFactoryCall(name, local.init, candidate, parent, state))
+					) {
+						refusal = { kind: 'stateful-factory', name, ...stateful };
 					} else if (
 						options.inlineFunctions &&
 						!isFunctionNode(local.init) &&
@@ -342,6 +354,7 @@ export function inlineHandlerRenderLocals(
 				localName: refusedReset ?? (inlined as { readonly name: string }).name,
 				handler: node,
 				filename: state.filename,
+				...(inlined.kind === 'stateful-factory' && { unroutable: inlined }),
 			}),
 		);
 		return null;
@@ -698,4 +711,87 @@ function readsServerOnlyProp(
 				dependency.path[0] === propName) ||
 				dependency.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`),
 	);
+}
+
+/**
+ * A const holding what a factory call returned is rebuilt from that call on every event, so
+ * a factory that keeps state between calls would start fresh each time. Null when the
+ * rebuild is sound: the factory only returns a function, or the value is not a function.
+ */
+function statefulFactoryCall(
+	name: string,
+	init: AnyNode,
+	reference: AnyNode,
+	parent: AnyNode | null,
+	state: WalkState,
+): { readonly why: string; readonly rewrite: string } | null {
+	const call = unwrapTypeAssertion(init);
+	if (call?.type !== 'CallExpression') return null;
+	const callee = unwrapTypeAssertion(call.callee as AnyNode | undefined);
+	if (callee?.type !== 'Identifier' || typeof callee.start !== 'number') return null;
+	const calleeName = getIdentifierName(callee) ?? '';
+	const rewrite = `Write \`${name}\` as a const arrow in the component body that does the work itself, \`const ${name} = (event) => { … }\`, and keep anything it must remember between events in state().`;
+	const semantic = state.semantic();
+	const symbolId = resolvedSymbolAt(semantic, callee.start);
+	const factory = symbolId === null ? null : declaredFunction(declarationStartOf(semantic, symbolId), state);
+	if (!factory) {
+		const called = parent?.type === 'CallExpression' && parent.callee === reference;
+		if (!called || (symbolId !== null && semantic.bindings[symbolId]!.scope.kind !== 'module'))
+			return null;
+		return {
+			why: `\`${name}\` is what \`${calleeName}(…)\` returns, and that function is not declared in this file, so the compiler cannot see whether it keeps state between calls. The browser rebuilds \`${name}\` from its definition each time the event runs, so that call would run again on every event.`,
+			rewrite,
+		};
+	}
+	if (!returnsFunction(factory) || onlyReturnsFunction(factory)) return null;
+	return {
+		why: `\`${name}\` is what \`${calleeName}(…)\` returns, and \`${calleeName}\` does more than return a function. The browser rebuilds \`${name}\` from its definition each time the event runs, so that work would run again on every event and anything it remembers would start over.`,
+		rewrite,
+	};
+}
+
+function declaredFunction(declarationStart: number, state: WalkState): AnyNode | null {
+	let found: AnyNode | null = null;
+	walkNode(ownedModuleAst(state, state.source, state.filename), (candidate) => {
+		if (found) return;
+		if (candidate.type === 'FunctionDeclaration') {
+			if ((candidate.id as AnyNode | undefined)?.start === declarationStart) found = candidate;
+			return;
+		}
+		if (candidate.type !== 'VariableDeclaration' || candidate.kind !== 'const') return;
+		for (const declarator of (candidate.declarations as AnyNode[] | undefined) ?? []) {
+			const init = unwrapTypeAssertion(declarator.init as AnyNode | undefined);
+			if ((declarator.id as AnyNode | undefined)?.start === declarationStart && init && isFunctionNode(init))
+				found = init;
+		}
+	});
+	return found;
+}
+
+function returnsFunction(factory: AnyNode): boolean {
+	const body = factory.body as AnyNode | undefined;
+	if (!body) return false;
+	if (body.type !== 'BlockStatement') {
+		const value = unwrapTypeAssertion(body);
+		return !!value && isFunctionNode(value);
+	}
+	let found = false;
+	const visit = (node: AnyNode): void => {
+		if (found || (node !== body && isFunctionNode(node))) return;
+		if (node.type === 'ReturnStatement') {
+			const value = unwrapTypeAssertion(node.argument as AnyNode | undefined);
+			if (value && isFunctionNode(value)) found = true;
+		}
+		for (const child of childNodes(node)) visit(child);
+	};
+	visit(body);
+	return found;
+}
+
+function onlyReturnsFunction(factory: AnyNode): boolean {
+	if (factory.async === true || factory.generator === true) return false;
+	const body = factory.body as AnyNode | undefined;
+	if (body?.type !== 'BlockStatement') return true;
+	const statements = (body.body as AnyNode[] | undefined) ?? [];
+	return statements.length === 1 && statements[0]!.type === 'ReturnStatement';
 }
