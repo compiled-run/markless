@@ -842,9 +842,11 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 		...rendered,
 		state: {
 			...state,
-			computed: state.computed.map((computed) =>
-				computed.dependencies ? { ...computed, dependencies: computed.dependencies.map(route) } : computed,
-			),
+			computed: state.computed.map((computed) => ({
+				...computed,
+				...(computed.dependencies && { dependencies: computed.dependencies.map(route) }),
+				...(computed.deriveSymbolId && { deriveSymbolId: symbol(computed.deriveSymbolId) }),
+			})),
 		},
 		view: {
 			...view,
