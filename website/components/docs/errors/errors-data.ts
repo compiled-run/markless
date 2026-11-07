@@ -609,7 +609,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	{
 		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 		title: 'An `@catch` is written without an `@try` before it',
-		area: 'internal',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -641,7 +641,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	{
 		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
 		title: 'Text shows an input of an async value without the value',
-		area: 'build',
+		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'warning',
@@ -938,7 +938,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_PLANE_MISSING',
-		title: '',
+		title: 'A page reads an async value no compiled code set up',
 		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
@@ -1560,7 +1560,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	{
 		code: 'MARKLESS_BLOCK_SIBLING_NODES',
 		title: 'A block renders one node',
-		area: 'build',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
@@ -2935,7 +2935,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
-		title: '',
+		title: 'A @catch reset has no graph to re-run values in',
 		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',
@@ -9717,8 +9717,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
-		title: '',
-		area: 'internal',
+		title: 'A resumeCache exclude names no async value',
+		area: 'router',
 		packageName: '@markless/bundler',
 		stage: 'build',
 		severity: 'error',

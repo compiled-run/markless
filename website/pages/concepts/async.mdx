@@ -1,5 +1,6 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
+import Collapsible from '../../components/docs/collapsible.tsrx';
 import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import BoardAnatomy from '../../components/figures/async/board-anatomy.tsrx';
@@ -10,7 +11,7 @@ import PostcardsAnatomy from '../../components/figures/async/postcards-anatomy.t
 
 # Async values
 
-<PageMeta time="7 min" assumes="state, computed, conditionals" />
+<PageMeta time="14 min" assumes="state, computed, conditionals" />
 
 <Subtitle text="An async computed is a value that arrives later, and @try shows it once it's there." terms="computed" />
 
@@ -118,9 +119,30 @@ Name the error after `@catch`, and the block can show it:
 }
 ```
 
+`@catch` is optional. A `@try` needs a `@pending` or a `@catch` after it, and either one is enough. Without `@catch`, a first load that fails leaves that spot empty, and the rest of the page still shows.
+
+## Try again with `reset`
+
+Name a second value after `@catch`, and you get a function that runs the failed loads of that block again, with the same inputs:
+
+```tsrx
+@try {
+	<p>{forecast.summary}</p>
+} @catch (error, reset) {
+	<>
+		<p>{error.message}</p>
+		<button onClick={reset}>Try again</button>
+	</>
+}
+```
+
+- While it runs, the `@catch` content stays on the page, marked busy.
+- When an answer comes back, the `@try` content takes its place.
+- You can pass `reset` to a child component as a prop, and the child's own button can call it.
+
 ## Try again by changing what the computed reads
 
-There is no reload call. An async computed runs again when a value it reads changes, so keep one for the attempt and change it.
+An async computed also runs again when a value it reads changes, so you can keep one for the attempt and change it.
 
 <Code steps={[{ label: 'Press Try again. The second attempt answers.', shows: 'Sunny, 31°' }, { label: 'Change `attempt === 0` to `attempt < 2`. Now it takes two presses.', source: 'attempt < 2' }]}>
 ```tsrx title="retry.tsrx"
@@ -168,9 +190,48 @@ export function loadForecast(
 ```
 </Code>
 
+## Load it again after a save
+
+The same trick reloads data after a save, or from a Reload button. Give the recipe a counter to read, and add one to it:
+
+```tsrx
+let reload = state(0);
+const mugs = computed(async () => {
+	reload;
+	return loadMugs();
+});
+
+<button onClick={() => reload++}>Reload</button>
+<button
+	onClick={async () => {
+		await saveMug('tall');
+		reload++;
+	}}
+>
+	Add a tall mug
+</button>
+@try {
+	<ul>
+		@for (const mug of mugs; key mug.id) {
+			<li>{mug.name}</li>
+		}
+	</ul>
+} @pending {
+	<p>Counting mugs</p>
+}
+```
+
+The bare `reload;` line is the read. It is what makes a change to `reload` run the recipe again.
+
+The list is marked busy from the moment you press **Add a tall mug**, while the save is still running, not only once `reload++` runs. Markless sees before the page runs that this handler changes `reload`. If the handler ends without changing it, for example because the save failed, the mark goes away and nothing loads again.
+
 ## The old answer stays until the new one is ready
 
-Once a forecast is on the page, picking another city keeps it there while the new one loads. The element showing the old answer gets `aria-busy="true"` meanwhile, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds.
+Once a forecast is on the page, picking another city keeps it there while the new one loads. Meanwhile each element that shows the value gets `aria-busy="true"`, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds. Each new pick starts that wait over, so fast typing never brings it back.
+
+- Busy marks go on text, attributes, a list built from the value, a value passed to a child component, and values computed from it.
+- An element in the same block that shows only plain state, such as a picker, is never marked.
+- If a block shows two async values, each one marks its own elements, and each mark goes away when its own answer is on the page.
 
 When two requests are in flight, the latest one wins. An older answer that lands late is dropped, so the page never shows the wrong city.
 
@@ -230,6 +291,134 @@ export function loadForecast(city: string) {
 }
 ```
 </Code>
+
+## A failed refresh keeps the last answer
+
+When a new load fails after an answer is already on the page, the answer stays, its busy mark goes away, and the `@catch` content shows right after it. The next answer that arrives replaces both. On a first load there is nothing to keep, so `@catch` is all that shows.
+
+A block inside another block handles its own failures. If only the inner one fails, its `@catch` shows inside it, and the outer block keeps what it had.
+
+## Values shown together stay matched
+
+Say a figure divides a total by the number of days you picked. Pick a longer range, and until the new total arrives the figure keeps using the old range. It never shows the old total divided by the new days. When the new total lands, everything that reads it moves to the new range at once.
+
+- A setting the load doesn't read, such as a currency the page converts itself, applies at once.
+- An event handler reads the same pair the page shows, so a Share button shares the figure next to the range it was loaded for. State the handler itself changes stays current, so two clicks count as two.
+- Markless keeps an old answer only while something on the page still shows it next to its inputs.
+
+Text that reads only the setting, not the answer, doesn't wait. `<p>Sorted by {sort}</p>` next to a list loaded with `sort` shows the new order above the old list until the new list arrives. The build warns about this with [`MARKLESS_ASYNC_INPUT_BESIDE_VALUE`](/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE). Return the setting along with the data, and show it from there:
+
+```tsrx
+const posts = computed(async () => {
+	const by = sort;
+	return { sort: by, list: await loadPosts(by) };
+});
+
+<p>Sorted by {posts.sort}</p>
+```
+
+A picker or button that sets `sort` is fine as it is: it shows the choice the person just made.
+
+To compare the shown answer with what was just typed, keep two states, one the load reads and one it doesn't. The one it doesn't read always shows the latest value:
+
+```tsrx
+let typed = state('Austin');
+let asked = state('Austin');
+const forecast = computed(async () => {
+	const city = asked;
+	const sky = await loadForecast(city);
+	return { city, summary: sky.summary };
+});
+
+<input
+	value={typed}
+	onInput={(event) => {
+		typed = event.currentTarget.value;
+		asked = event.currentTarget.value;
+	}}
+/>
+@try {
+	<p class={forecast.city !== typed ? 'old' : ''}>{forecast.summary}</p>
+} @pending {
+	<p>Looking it up</p>
+}
+```
+
+`forecast.city !== typed` is true while a newer answer loads, because the load never reads `typed`.
+
+In the editor, hover `@try` or an async value to see what a refresh does there: which input starts it, which elements are marked busy, and which input the shown text stays matched to.
+
+## Screen readers hear about a refresh
+
+When a block keeps its content and marks it busy, Markless says "Updating…" through a hidden status message, then "Updated", or "Update failed" when `@catch` shows instead.
+
+- A first load says nothing.
+- A burst of quick changes, such as typing, is said once.
+- The message lives outside the page content, because some screen readers, NVDA in Firefox for one, stay silent about messages inside a busy element.
+
+To say something else, put the block inside an element with `aria-live` or `role="status"`, and write your own message there. Markless then leaves that block to you. `aria-live="off"` on that element turns the message off.
+
+## A background refresh stays quiet
+
+Not every refresh is something the person asked for. A page that checks for new orders every 30 seconds refreshes without anyone pressing anything. Markless tells the two apart by where the change came from:
+
+```tsrx
+let poll = state(0);
+const orders = computed(async () => {
+	poll;
+	return loadOrders();
+});
+
+<button onClick={() => setInterval(() => (poll = poll + 1), 30_000)}>
+	Watch for new orders
+</button>
+<button onClick={() => poll++}>Check now</button>
+```
+
+- **A change made in an event handler** marks the block busy and says "Updating…". That includes a change made after an `await` in the handler, and a change made by a function the handler calls.
+- **A change made anywhere else** refreshes quietly: no busy mark, no message. That means a timer, a socket or `EventSource` message, or a promise no handler started. The new answer still swaps in when it lands.
+
+A quiet refresh that fails still says "Update failed", because a check that stopped working without a word is worse than one that speaks up. The page follows the [failed-refresh rule](#a-failed-refresh-keeps-the-last-answer) either way.
+
+One gap is known. JavaScript doesn't carry this context across an `await` by itself, so a timer that changes state while a handler is still waiting on its own `await` is counted as the person's change too.
+
+<Collapsible sprite="star-badge" summary="How do existing tools handle this?">
+
+Some async designs make you declare a quiet refresh yourself, on the poll or on the call that reloads, and say that quiet should never be guessed. Markless chose differently: there is no quiet option, and it works out quiet from where the change was made. That is less to write, and the gap above is the price.
+
+</Collapsible>
+
+## A failing handler shows in `@catch`
+
+A handler inside a `@try` can fail too. If an `async` handler throws, or a handler returns a promise that rejects, the error goes to the nearest `@catch` around the element:
+
+```tsrx
+@try {
+	<section>
+		<p>{report.days} days</p>
+		<button
+			onClick={async () => {
+				note = 'Saving';
+				await saveReport(report.days);
+			}}
+		>
+			Save
+		</button>
+	</section>
+} @catch (error, reset) {
+	<>
+		<p>{error.message}</p>
+		<button onClick={reset}>Dismiss</button>
+	</>
+}
+```
+
+- The content stays, and `@catch` shows right after it. Other blocks that show the same value are not touched.
+- `reset` clears the `@catch` without loading anything again. It doesn't run the handler again.
+- State the handler changed before the failure keeps its new value.
+- This works for a handler inside a child component, and for a function passed down as a prop.
+
+A promise the handler starts but doesn't return or `await` is not watched. If no `@catch` is around the element, the error stays uncaught and the browser reports it.
 
 ## Cancel stale work with `signal`
 
@@ -427,5 +616,125 @@ export async function loadForecast(city: string) {
 }
 ```
 </Code>
+
+## One block per row
+
+To give each row of a list its own wait, put the async value in a component and render that component in the row. Each row then has its own `@try`, so one slow or failing row doesn't hold up the others:
+
+```tsrx
+@for (const list of lists; key list.id) {
+	<TodoList tag={list.tag} />
+}
+```
+
+A row added after the page loads gets its own copy of the component: its `@pending` shows, then its own answer.
+
+A row doesn't have to be one element. It can be a fragment, text, a bare `@try`, or a component whose whole body is one of those. The page marks where such a row starts and ends, and moves, adds and removes everything in between. A row that is not one element and also holds an `@if`, another `@for`, an `element()` handle or a behavior stops the build with [`MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`](/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT). Wrap it in one element.
+
+To start over when a choice changes, key a one-row list by the choice. A new value is a new key, so the old row goes away and the new one starts from its `@pending`:
+
+```tsrx
+@for (const topic of [subject]; key topic) {
+	<Feed topic={topic} />
+}
+```
+
+## Show a new row before it's saved
+
+To show a new item at once, keep the unsaved items in state, and give each one a row component whose async value does the save. Its `@pending` shows the draft, and its `@try` shows the saved row:
+
+```tsrx
+function SavingTodo({ draft }: { draft: Draft }) @{
+	const saved = computed(async () => saveTodo(draft));
+
+	<li>
+		@try {
+			<span>{saved.title}</span>
+		} @pending {
+			<span class="draft">{draft.title}</span>
+		} @catch (error, reset) {
+			<span>
+				{draft.title}: couldn't save
+				<button onClick={reset}>Retry</button>
+			</span>
+		}
+	</li>
+}
+```
+
+A form handler adds `{ id: crypto.randomUUID(), title }` to `drafts`, and the list renders `<SavingTodo draft={draft} />` for each one.
+
+- Each save runs once, in the browser. It never runs while the server renders the page.
+- A failed save shows `@catch` in that row only, and `reset` retries only that save.
+- Give each draft an id you make in the browser. When you load the whole list again, leave out the saved items that are still in `drafts`, so no item shows twice.
+- A draft row is a first load, not a refresh, so it gets no busy mark.
+
+Changing a row that is already saved is a refresh, not a first load: the row keeps its old content, marked busy, until the save answers.
+
+## A reload starts over, for now
+
+A reload starts every block over, so the page shows `@pending` again for answers the visitor saw a second ago. Markless has a built-in fix for this, but it is off.
+
+When it is on, each block's last answer is kept in the tab's session storage and painted straight away on the next load of that page, in that tab. The load still runs every time, and the new answer replaces the kept one as a quiet refresh. A failed load keeps the kept answer and shows `@catch` after it. An answer a click asked for, such as a save, is never kept or run again.
+
+It stays off because a kept answer is only safe to show to the same visitor session, and Markless hasn't settled how the server tells one session from the next. Until then no page keeps anything. `router({ resumeCache: false })` already makes sure no code for it ships.
+
+## Build errors inside `@try`
+
+These shapes stop the build:
+
+| Shape | Code |
+| --- | --- |
+| A read of the async value outside every `@try` | [`MARKLESS_ASYNC_BOUNDARY_REQUIRED`](/errors/MARKLESS_ASYNC_BOUNDARY_REQUIRED) |
+| Two nodes side by side in a `@try`, `@pending` or `@catch` block | [`MARKLESS_BLOCK_SIBLING_NODES`](/errors/MARKLESS_BLOCK_SIBLING_NODES) |
+| A `@try` with neither `@pending` nor `@catch` after it | `MARKLESS_PARSE_ERROR` |
+| `@pending` written after `@catch` | [`MARKLESS_ASYNC_ARM_ORDER`](/errors/MARKLESS_ASYNC_ARM_ORDER) |
+| `@catch` after an element instead of a `@try` | [`MARKLESS_ASYNC_CATCH_WITHOUT_TRY`](/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY) |
+| A row that is not one element and holds an `@if`, `@for`, `element()` handle or behavior | [`MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT`](/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT) |
+| A lookup keyed by the answer, like `shelf[(await loadPick()).id]` | [`MARKLESS_ASYNC_POST_AWAIT_READ`](/errors/MARKLESS_ASYNC_POST_AWAIT_READ) |
+
+[`MARKLESS_ASYNC_INPUT_BESIDE_VALUE`](/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE) is a warning, not an error. [Error codes](/errors) lists every other code.
+
+## Common questions
+
+### Is `@catch` required?
+
+No. A `@try` needs a `@pending` or a `@catch`, and either one is enough. Without `@catch`, a first load that fails leaves that spot empty.
+
+### Can `@catch` take only the error?
+
+Yes. `@catch` names nothing, `@catch (error)` names the error, and `@catch (error, reset)` also names the [try-again function](#try-again-with-reset).
+
+### What type does an async computed have?
+
+The value its promise resolves to, not a promise. `computed(async () => ({ text: '' }))` is typed `{ text: string }`.
+
+### How do I give state a wider type than its starting value?
+
+Pass the type: `state<Todo[]>([])`. See [State](/concepts/state#give-state-a-type).
+
+### Can a click handler read the async value?
+
+Yes. Put the button inside the `@try` and read the value as the page does: `onClick={() => save(report.days)}`. While a new answer loads, the handler reads the answer that is on the page.
+
+### What if an `await` inside a click handler fails?
+
+If the handler is inside a `@try` with a `@catch`, the error shows there, as in [a failing handler](#a-failing-handler-shows-in-catch). Otherwise the handler stops at that `await`, state it changed before keeps its new value, and the browser reports an uncaught error. To show a message without `@catch`, wrap the `await` in `try` and `catch`, and keep the message in state.
+
+### What if answers arrive out of order?
+
+The newest input wins. Only the run that started last can put its answer on the page. An older run that finishes later is dropped, whether it succeeds or fails. Pass [`signal`](#cancel-stale-work-with-signal) to `fetch` to cancel the older request too.
+
+### Can I add or remove an attribute without an `@if`?
+
+Yes. `undefined`, `null` and `false` leave it off, and `true` writes it. See [Conditionals](/concepts/conditionals#an-attribute-that-comes-and-goes). You rarely write `aria-busy` yourself: Markless marks elements while their value loads again.
+
+### Is there a mount hook or an effect?
+
+No. There is no `onMount`, no `useEffect` and no effect function. The component body runs once, to set up the page. To load data when the page opens, use `computed(async …)`. For code that needs the element itself, use [`attach`](/build/elements). For code that should wait until the page is idle, use [`onIdle`](/concepts/events). Work that follows a change goes in the handler that makes the change.
+
+### Is there an API reference or an example app?
+
+There is no separate API reference page. [Every Markless package](/reference) lists what each package exports, and the types ship with `@markless/core`. Each build error has a page in [Error codes](/errors). [Apps moved so far](/start/migrate) lists real apps ported to Markless.
 
 [Styling](/concepts/styling) shows how two components can both call something `.card`.

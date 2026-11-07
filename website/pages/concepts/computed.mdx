@@ -139,7 +139,7 @@ A computed works out a value. It never changes state. Saving or logging goes in 
 
 ## A computed can wait for data
 
-`computed(async () => ...)` waits for a fetch or any other promise. [Async values](/concepts/async) shows how the page looks while it waits.
+`computed(async () => ...)` waits for a fetch or any other promise. Its type is the value the promise resolves to, not a promise: `computed(async () => ({ text: '' }))` is typed `{ text: string }`. [Async values](/concepts/async) shows how the page looks while it waits.
 
 <Collapsible sprite="star-badge" summary="How do existing tools handle this?">
 
