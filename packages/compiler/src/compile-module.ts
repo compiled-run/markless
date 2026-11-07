@@ -14,6 +14,7 @@ import type {
 	RuntimeDemandMapsArtifact,
 	TriggerGroupArtifact,
 	SemanticGraphArtifact,
+	ProjectionArmsArtifact,
 	ServerOnlyPropsArtifact,
 	StateLoweringArtifact,
 	SymbolModulesArtifact,
@@ -49,6 +50,7 @@ import {
 	firstUseScope,
 	mergeFirstUseReach,
 } from './passes/runtime-demand-map.ts';
+import { planProjectionArms } from './passes/projection-arms.ts';
 import { checkServerOnlyProps } from './passes/server-only-props.ts';
 import { createTriggerGroups } from './passes/trigger-groups.ts';
 import { buildSemanticGraph } from './passes/semantic-graph/index.ts';
@@ -97,6 +99,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		readonly publicRenderPlan: PublicRenderPlanArtifact;
 		readonly publicRenderModule: PublicRenderModuleArtifact;
 		readonly serverOnlyProps: ServerOnlyPropsArtifact;
+		readonly projectionArms: ProjectionArmsArtifact;
 		readonly symbolModules: SymbolModulesArtifact;
 		readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 		readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;
@@ -189,6 +192,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 		publicRenderPlan: artifacts.publicRenderPlan,
 		publicRenderModule: artifacts.publicRenderModule,
 		serverOnlyProps: artifacts.serverOnlyProps,
+		projectionArms: artifacts.projectionArms,
 		symbolModules: artifacts.symbolModules,
 		runtimeDemandMap: artifacts.runtimeDemandMap,
 		runtimeDemandMaps: artifacts.runtimeDemandMaps,
@@ -350,6 +354,20 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
 							symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 							payloadArena: inputs.payloadArena as PayloadArenaArtifact,
+						}),
+					};
+				},
+			};
+		}
+
+		if (pass.passId === 'projection-arms') {
+			return {
+				...pass,
+				run({ inputs }) {
+					return {
+						projectionArms: planProjectionArms({
+							semanticGraph: inputs.semanticGraph as SemanticGraphArtifact,
+							renderData: inputs.renderData as RenderDataArtifact,
 						}),
 					};
 				},

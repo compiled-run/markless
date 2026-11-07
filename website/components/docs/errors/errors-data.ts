@@ -8224,13 +8224,32 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+		title: '',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/compiler.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/projection-arms.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/projection-arms.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
 		title: '',
 		area: 'internal',
-		packageName: '@markless/web',
-		stage: 'runtime',
+		packageName: '@markless/compiler',
+		stage: 'build',
 		severity: 'error',
-		description: 'A Markless runtime error from @markless/web.',
+		description: 'A Markless build tooling error from @markless/compiler.',
 		printed: [
 			'MARKLESS_PROJECTION_LIVE_IN_TRY: <<childComponentName>> renders its projected children inside a @try, and those children read state or handle events. The browser redraws a @try arm from static markup, so they would render but never update or respond. Keep `{children}` outside the @try in <<childComponentName>>, or write the @try in the component that owns the projected markup.',
 		],
@@ -8238,6 +8257,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 		sources: [
 			{
 				id: 'f0',
+				file: 'packages/compiler/src/passes/projection-arms.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/projection-arms.ts',
+			},
+			{
+				id: 'f1',
 				file: 'packages/web/src/ssr-data/renderer.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/ssr-data/renderer.ts',
 			},

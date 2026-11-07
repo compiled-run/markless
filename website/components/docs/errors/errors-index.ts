@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 311,
+	total: 312,
 	guided: 48,
 	groups: [
 		{
@@ -1444,12 +1444,20 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+					title: '',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: ' markless_projection_live_in_branch a markless build tooling error from @markless/compiler.',
+				},
+				{
 					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
 					title: '',
 					chip: 'error',
-					kind: 'runtime error',
+					kind: 'build error',
 					guided: false,
-					words: ' markless_projection_live_in_try a markless runtime error from @markless/web.',
+					words: ' markless_projection_live_in_try a markless build tooling error from @markless/compiler.',
 				},
 				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',

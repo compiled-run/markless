@@ -11,7 +11,7 @@ import Weather from './weather.tsrx';
 // same-file helper holding one: each loads, re-runs with its own props, and fails alone.
 afterEach(cleanup);
 
-// Each load waits on a timer-backed fetch, so a loaded machine gets room to answer.
+// Each load waits on a timer-backed fetch, and a first click with no hover fetches its handler code cold.
 const LOADS = { timeout: 5_000 };
 
 const texts = (selector: string) =>
@@ -121,9 +121,9 @@ test('SSR: an imported row child reads its whole row item, and a row added after
 async function settledHelperArmsHandleTheirOwnClicks() {
 	await expect.poll(() => texts('[data-tap]'), LOADS).toEqual(['Rent#1 x0', 'Food#1 x0']);
 	(document.querySelectorAll('[data-tap]')[1] as HTMLElement).click();
-	await expect.poll(() => texts('[data-tap]')).toEqual(['Rent#1 x0', 'Food#1 x1']);
+	await expect.poll(() => texts('[data-tap]'), LOADS).toEqual(['Rent#1 x0', 'Food#1 x1']);
 	(document.querySelectorAll('[data-tap]')[0] as HTMLElement).click();
-	await expect.poll(() => texts('[data-tap]')).toEqual(['Rent#1 x1', 'Food#1 x1']);
+	await expect.poll(() => texts('[data-tap]'), LOADS).toEqual(['Rent#1 x1', 'Food#1 x1']);
 }
 
 test("CSR: a same-file helper's settled @try content handles its own clicks", async () => {

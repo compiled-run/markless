@@ -21,6 +21,7 @@ test('compiler split modules expose their owning boundaries', () => {
 		'payload-arena',
 		'symbol-resolver',
 		'render-data',
+		'projection-arms',
 		'public-render-plan',
 		'capture-analysis',
 		'protocol-state',

@@ -193,6 +193,7 @@ export function SliderRoot({
 	// Two shapes: an IDREF cannot be conditional, and a name must not land on the roleless single-thumb box.
 	const isRange = computed(() => Array.isArray(slider.seed));
 
+	// markless-allow MARKLESS_PROJECTION_LIVE_IN_BRANCH: a slider is a range or a single thumb for its whole life, so the arm holding its children never changes
 	@if (isRange) {
 		// markless-allow MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER: a slider is a range or a single thumb for its whole life; the seed's shape never changes
 		<SliderGroup {...rest}>{children}</SliderGroup>

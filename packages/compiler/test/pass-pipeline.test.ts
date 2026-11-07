@@ -25,6 +25,7 @@ test('default compiler passes declare stable artifact boundaries', () => {
 		'payload-arena',
 		'symbol-resolver',
 		'render-data',
+		'projection-arms',
 		'public-render-plan',
 		'capture-analysis',
 		'protocol-state',
@@ -65,6 +66,12 @@ test('default compiler passes declare stable artifact boundaries', () => {
 				description: expect.stringContaining('markup chunks'),
 				consumes: ['semanticGraph', 'symbolResolver'],
 				produces: ['renderData'],
+			}),
+			expect.objectContaining({
+				passId: 'projection-arms',
+				description: expect.stringContaining('children'),
+				consumes: ['semanticGraph', 'renderData'],
+				produces: ['projectionArms'],
 			}),
 			expect.objectContaining({
 				passId: 'public-render-plan',
