@@ -6337,12 +6337,12 @@ export function buildEventHandlerEmission(
 						moduleImportNode({
 							kind: 'named' as const,
 							localName: ENTRY_MARK_START_FN,
-							source: '@markless/web/fns/entry-mark',
+							source: '@markless/web/fns/async-plane',
 						}),
 						moduleImportNode({
 							kind: 'named' as const,
 							localName: ENTRY_MARK_END_FN,
-							source: '@markless/web/fns/entry-mark',
+							source: '@markless/web/fns/async-plane',
 						}),
 					]
 				: []),

@@ -128,6 +128,7 @@ export const runtimeDemandMap = {
 		"web/dom-journal",
 		"web/dom-update",
 		"web/fns/async-plane",
+		"web/fns/async-refresh",
 		"web/fns/busy-elements",
 		"web/fns/held-inputs-plane",
 		"web/fns/refresh-announcer",

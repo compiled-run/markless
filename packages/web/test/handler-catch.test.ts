@@ -57,7 +57,7 @@ test('without a graph that can fail a handler, marklessHandlerCatch is a no-op r
 
 test("a plain handler's returned promise fails the gate when it rejects; any other value passes through", async () => {
 	const failed: Array<[string, unknown]> = [];
-	const graph = { failHandler: (graphNodeId: string, error: unknown) => void failed.push([graphNodeId, error]) };
+	const graph = { asyncPlane: () => ({ failHandler: (graphNodeId: string, error: unknown) => void failed.push([graphNodeId, error]) }) };
 	const error = new Error('could not save');
 
 	expect(marklessHandlerCatchReturned({ graph }, 'computed:gate', 3)).toBe(3);

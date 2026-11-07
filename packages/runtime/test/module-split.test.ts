@@ -21,6 +21,8 @@ test('runtime package exposes only host-agnostic graph modules', async () => {
 		'./graph': './src/graph.ts',
 		'./graph-reconcile': './src/graph-reconcile.ts',
 		'./graph-async': './src/graph-async.ts',
+		'./graph-async-load': './src/graph-async-load.ts',
+		'./graph-async-refresh': './src/graph-async-refresh.ts',
 		'./graph-held': './src/graph-held.ts',
 	});
 	expect(indexSource).toBe("export * from './graph.ts';\n");

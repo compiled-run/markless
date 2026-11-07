@@ -195,7 +195,7 @@ test('an async computed first read while its sync hop derive is still answering 
 	graph.read('computed:kilnSample', ['status']);
 	kiln.resolve({ tone: 'azurite-fired' });
 	await drainMicrotasks();
-	const done = graph.startDerive!('computed:catalogCard');
+	const done = graph.asyncPlane!()!.startDerive('computed:catalogCard');
 	expect(graph.read('computed:exhibitLabel', ['status'])).toBe('pending');
 	expect(runs.label).toBe(0);
 
@@ -213,7 +213,7 @@ test('a sync hop derive that answers without writing releases the async computed
 	graph.read('computed:kilnSample', ['status']);
 	kiln.resolve({ tone: 'azurite-fired' });
 	await drainMicrotasks();
-	const done = graph.startDerive!('computed:catalogCard');
+	const done = graph.asyncPlane!()!.startDerive('computed:catalogCard');
 	expect(graph.read('computed:exhibitLabel', ['status'])).toBe('pending');
 
 	done();

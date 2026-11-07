@@ -218,8 +218,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			releases.push(subscribed);
 		}
 		// Settled content shown at wake: a resume cache keeps it, or revalidates the content it seeded.
-		if (input.settleTracker?.hasSettledContent(boundary.id))
-			asyncPlanes.cache?.(input, boundary, 'fulfilled');
+		if (asyncPlanes.cache && input.settleTracker?.hasSettledContent(boundary.id))
+			asyncPlanes.cache(input, boundary, 'fulfilled');
 		if (!demand) return;
 		for (const asyncRead of boundary.asyncReads)
 			input.graph.read(asyncRead.graphNodeId, ['status']);
@@ -253,13 +253,14 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			const settled = input.settleTracker?.hasSettledContent(boundary.id) === true;
 			wire(boundary, !settled, !settled, settled && shown ? new Map(shown) : undefined);
 		},
-		failEnclosingCatch: async (element, error) =>
-			(await import('./fns/enclosing-catch.ts')).marklessFailEnclosingCatch(
+		async failEnclosingCatch(element, error) {
+			return (await import('./fns/enclosing-catch.ts')).marklessFailEnclosingCatch(
 				input.asyncBoundariesById.values(),
 				input.graph,
 				element,
 				error,
-			),
+			);
+		},
 	};
 }
 

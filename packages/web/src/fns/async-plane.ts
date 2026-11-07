@@ -1,5 +1,7 @@
-import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
+import { createAsyncPlane, type AsyncRefreshModule } from '@markless/runtime/graph-async-load';
 import type {
+	AsyncComputedPlane,
+	AsyncComputedPlaneFactory,
 	RuntimeGraph,
 	RuntimeGraphAsyncComputed,
 	RuntimeGraphAsyncSnapshot,
@@ -9,15 +11,71 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { ResumePayloadGraphInput } from '../payload-graph-construct.ts';
 import { asyncPlanes } from '../reconcile-plane-slot.ts';
-import { apply, note, set, settleRange, shown } from './busy-marks.ts';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
+import type {
+	ResumeArmRange,
+	ResumeAsyncBoundaryRecord,
+	ResumeDomComment,
+} from '../resume-types.ts';
+import type { BusyBoundary, busyElements } from './busy-elements.ts';
+
+// A page whose async values all arrived settled loads the refresh half with its first refresh, failure, handler rejection or entry mark.
+let refresh: AsyncRefreshModule | Promise<AsyncRefreshModule> | undefined;
+const loadRefresh = () =>
+	(refresh ??= import('./async-refresh.ts').then((module) => (refresh = module)));
+
+// Methods, not properties: what a page never calls costs it nothing to install.
+const parts = {
+	async(internals, asyncComputed) {
+		return createAsyncPlane(internals, asyncComputed, loadRefresh);
+	},
+	fromPayload(input: ResumePayloadGraphInput, graphRef: () => RuntimeGraph, decode: Decode) {
+		const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
+		return Promise.all(
+			input.state.computed
+				.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
+				.map((computed) =>
+					asyncComputedFromRecord(
+						computed,
+						runnerSymbols[computed.graphNodeId]!,
+						input,
+						graphRef,
+						decode,
+						input.state.computed,
+					),
+				),
+		);
+	},
+	fromRecord(...args: Parameters<typeof asyncComputedFromRecord>) {
+		return asyncComputedFromRecord(...args);
+	},
+	awaits(...args: Parameters<typeof awaitsAsyncValue>) {
+		return awaitsAsyncValue(...args);
+	},
+	awaitsAncestor(...args: Parameters<typeof awaitsAsyncAncestor>) {
+		return awaitsAsyncAncestor(...args);
+	},
+	busy: {
+		note(...args: Parameters<typeof note>) {
+			note(...args);
+		},
+		set(...args: Parameters<typeof set>) {
+			set(...args);
+		},
+		apply(...args: Parameters<typeof apply>) {
+			apply(...args);
+		},
+		settleRange(...args: Parameters<typeof settleRange>) {
+			return settleRange(...args);
+		},
+		shown(...args: Parameters<typeof shown>) {
+			shown(...args);
+		},
+	},
+} satisfies AsyncPlaneSlot;
 
 export function installMarklessAsyncPlane(): void {
-	asyncPlanes.async = createAsyncComputedPlane;
-	asyncPlanes.fromPayload = asyncComputedFromPayload;
-	asyncPlanes.fromRecord = asyncComputedFromRecord;
-	asyncPlanes.awaits = awaitsAsyncValue;
-	asyncPlanes.awaitsAncestor = awaitsAsyncAncestor;
-	asyncPlanes.busy = { note, set, apply, settleRange, shown };
+	Object.assign(asyncPlanes, parts);
 }
 
 type DependencyRecord = {
@@ -68,28 +126,6 @@ function awaitsAsyncValue(
 
 type Decode = (payload: SerializedGraphPayload) => Promise<unknown>;
 
-function asyncComputedFromPayload(
-	input: ResumePayloadGraphInput,
-	graphRef: () => RuntimeGraph,
-	decode: Decode,
-): Promise<RuntimeGraphAsyncComputed[]> {
-	const runnerSymbols = asyncRunnerSymbolsByGraphNode(input.view);
-	return Promise.all(
-		input.state.computed
-			.filter((computed) => computed.async === true && !!runnerSymbols[computed.graphNodeId])
-			.map((computed) =>
-				asyncComputedFromRecord(
-					computed,
-					runnerSymbols[computed.graphNodeId]!,
-					input,
-					graphRef,
-					decode,
-					input.state.computed,
-				),
-			),
-	);
-}
-
 async function asyncComputedFromRecord(
 	computed: ProtocolStatePayload['computed'][number],
 	runnerSymbolId: string,
@@ -99,19 +135,24 @@ async function asyncComputedFromRecord(
 	records?: ProtocolStatePayload['computed'],
 ): Promise<RuntimeGraphAsyncComputed> {
 	const dependencies = computed.dependencies ?? [];
-	const syncHops = dependencies.flatMap(({ graphNodeId }) => {
-		const hop = records?.find((record) => record.graphNodeId === graphNodeId && record.async === false);
-		return hop?.asyncFrom
-			? [{ graphNodeId, dependencies: hop.dependencies ?? [], asyncFrom: hop.asyncFrom }]
-			: [];
-	});
+	// A value with no settled answer runs as soon as it is read, so its refresh half is there before the graph is.
+	if (computed.snapshot?.status !== 'fulfilled' && computed.snapshot?.status !== 'rejected') await loadRefresh();
+	const syncHops =
+		records?.some((record) => record.asyncFrom) &&
+		dependencies.flatMap(({ graphNodeId }) => {
+			const hop = records.find((record) => record.graphNodeId === graphNodeId && record.async === false);
+			return hop?.asyncFrom
+				? [{ graphNodeId, dependencies: hop.dependencies ?? [], asyncFrom: hop.asyncFrom }]
+				: [];
+		});
+	const initialSnapshot =
+		computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot, decode));
 	return {
 		graphNodeId: computed.graphNodeId,
 		dependencies,
-		...(syncHops.length > 0 ? { syncHops } : {}),
-		...(computed.boundaryGate ? { boundaryGate: true as const } : {}),
-		initialSnapshot:
-			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot, decode)),
+		...(syncHops && syncHops.length > 0 && { syncHops }),
+		...(computed.boundaryGate && { boundaryGate: true as const }),
+		initialSnapshot,
 		key: (read: RuntimeGraphRead) => {
 			const values = dependencies.map((dependency) =>
 				read(dependency.graphNodeId, dependency.path),
@@ -169,13 +210,23 @@ async function deserializeAsyncComputedSnapshot(
 }
 
 export type AsyncPlaneSlot = {
-	async?: typeof createAsyncComputedPlane;
+	async?: AsyncComputedPlaneFactory;
 	held?: import('@markless/runtime').HeldInputsPlaneFactory;
-	fromPayload?: typeof asyncComputedFromPayload;
+	fromPayload?: (
+		input: ResumePayloadGraphInput,
+		graphRef: () => RuntimeGraph,
+		decode: Decode,
+	) => Promise<RuntimeGraphAsyncComputed[]>;
 	fromRecord?: typeof asyncComputedFromRecord;
 	awaits?: typeof awaitsAsyncValue;
 	awaitsAncestor?: typeof awaitsAsyncAncestor;
-	busy?: Pick<typeof import('./busy-marks.ts'), 'note' | 'set' | 'apply' | 'settleRange' | 'shown'>;
+	busy?: {
+		readonly note: typeof note;
+		readonly set: typeof set;
+		readonly apply: typeof apply;
+		readonly settleRange: typeof settleRange;
+		readonly shown: typeof shown;
+	};
 	// Installed by `fns/resume-cache`: told when a boundary shows settled content.
 	cache?: (
 		wiring: Parameters<typeof import('../resume-async-wiring.ts').wireAsyncBoundariesWithoutLoadingCapability>[0],
@@ -183,3 +234,105 @@ export type AsyncPlaneSlot = {
 		status: 'fulfilled' | 'rejected',
 	) => void;
 };
+
+// Busy marks: the per-element marks load with the first refresh over shown content.
+type Marks = typeof busyElements;
+type AfterAnchor = { __marklessAfter?: ResumeDomComment };
+
+let marks: Marks | undefined;
+let queued: Array<(marks: Marks) => void> | undefined;
+// The per-element marks load with the first refresh over shown content; until then nothing is marked, so other calls wait or drop.
+function withMarks(start: boolean, run: (marks: Marks) => void): void {
+	if (marks) return run(marks);
+	if (!queued) {
+		if (!start) return;
+		queued = [];
+		void import('./busy-elements.ts').then((module) => {
+			marks = module.busyElements;
+			for (const each of queued!) each(marks);
+		});
+	}
+	queued.push(run);
+}
+
+export function note(
+	boundary: BusyBoundary,
+	graphNodeId: string,
+	snapshot: unknown,
+	showsSettledContent: boolean,
+): void {
+	withMarks(
+		showsSettledContent && (snapshot as { readonly status?: unknown } | null)?.status === 'pending',
+		(loaded) => loaded.note(boundary, graphNodeId, snapshot, showsSettledContent),
+	);
+}
+
+export function set(boundary: BusyBoundary, busy: boolean): void {
+	withMarks(busy, (loaded) => loaded.set(boundary, busy));
+}
+
+export function apply(boundary: BusyBoundary): void {
+	withMarks(false, (loaded) => loaded.apply(boundary));
+}
+
+type ShownArm = { __marklessShownArm?: number };
+export function shown(boundary: ResumeAsyncBoundaryRecord, arm: number): void {
+	(boundary.endAnchor as ShownArm).__marklessShownArm = arm;
+}
+
+// A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
+export function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): ResumeArmRange | undefined {
+	const after =
+		arm === ASYNC_BOUNDARY_ARM.catch &&
+		((boundary.endAnchor as ShownArm).__marklessShownArm ?? boundary.initiallyServedArm) ===
+			ASYNC_BOUNDARY_ARM.try;
+	shown(boundary, after ? ASYNC_BOUNDARY_ARM.try : arm);
+	if (!after) return;
+	const end = boundary.endAnchor as unknown as ChildNode & AfterAnchor;
+	let start = end.__marklessAfter as unknown as ChildNode | undefined;
+	if (start?.parentNode !== end.parentNode) {
+		// The arm-branch prefix keeps page-level comment walks from counting it.
+		start = end.ownerDocument!.createComment('markless:arm-branch:after');
+		end.before(start);
+		end.__marklessAfter = start as unknown as ResumeDomComment;
+	}
+	return { id: `${boundary.id}:after`, startAnchor: end.__marklessAfter!, endAnchor: boundary.endAnchor };
+}
+
+
+// Entry marks, called by compiled handlers that write a key input of an async value.
+type EntryMarkContext = {
+	readonly graph?: {
+		readonly asyncPlane?: () => Pick<AsyncComputedPlane, 'markEntry' | 'endEntry'> | undefined;
+		readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
+	};
+	readonly userActionToken?: { readonly open: boolean };
+};
+
+// The end undoes what the start did, even when the token closed in between.
+const opened = new WeakSet<object>();
+
+/** Marks each async value busy from the handler's entry, ahead of the write that refreshes it; only inside a user action. */
+export function marklessEntryMarkStart(
+	context: EntryMarkContext,
+	graphNodeIds: ReadonlyArray<string>,
+): void {
+	const graph = context.graph;
+	const plane = graph?.asyncPlane?.();
+	if (!plane || context.userActionToken?.open !== true) return;
+	opened.add(context);
+	const qualify = graph!.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
+	for (const graphNodeId of graphNodeIds) plane.markEntry(qualify(graphNodeId));
+}
+
+/** Undoes `marklessEntryMarkStart` when the handler never reached the write; a no-op once the real refresh has started. */
+export function marklessEntryMarkEnd(
+	context: EntryMarkContext,
+	graphNodeIds: ReadonlyArray<string>,
+): void {
+	const graph = context.graph;
+	const plane = graph?.asyncPlane?.();
+	if (!plane || !opened.delete(context)) return;
+	const qualify = graph!.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
+	for (const graphNodeId of graphNodeIds) plane.endEntry(qualify(graphNodeId));
+}

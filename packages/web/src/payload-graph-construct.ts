@@ -39,9 +39,9 @@ export async function createRuntimeGraphFromResumePayload(
 ): Promise<RuntimeGraph> {
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
-	const asyncComputed = input.state.computed.some((computed) => computed.async)
-		? await asyncPlaneFactories().fromPayload(input, () => graph, deserializeGraphValue)
-		: [];
+	const asyncComputed = asyncPlanes.fromPayload
+		? await asyncPlanes.fromPayload(input, () => graph, deserializeGraphValue)
+		: withoutAsyncValues(input.state);
 	const cells = [
 		...(await decodeStateCells(input.state, input.root.__marklessEventOnlyGraph)),
 		...(await decodeServedComputedValues(input.state, input.root.__marklessEventOnlyGraph)),
@@ -117,6 +117,12 @@ export async function decodeServedComputedValues(
 					: await deserializeGraphValue(computed.value as SerializedGraphPayload),
 		})),
 	);
+}
+
+// No compiled module installed the async plane, so the payload must carry no async value.
+function withoutAsyncValues(state: ProtocolStatePayload): [] {
+	if (state.computed.some((computed) => computed.async)) asyncPlaneFactories();
+	return [];
 }
 
 export function asyncPlaneFactories() {

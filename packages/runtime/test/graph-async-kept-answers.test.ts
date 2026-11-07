@@ -5,8 +5,8 @@ import { createHeldInputsPlane } from '../src/graph-held.ts';
 
 function instrumentedAsyncPlane() {
 	let nodes: ReadonlyMap<string, RuntimeAsyncComputedNode> | undefined;
-	const factory: typeof createAsyncComputedPlane = (internals) => {
-		const plane = createAsyncComputedPlane(internals);
+	const factory: typeof createAsyncComputedPlane = (internals, asyncComputed) => {
+		const plane = createAsyncComputedPlane(internals, asyncComputed);
 		nodes = plane.nodes;
 		return plane;
 	};

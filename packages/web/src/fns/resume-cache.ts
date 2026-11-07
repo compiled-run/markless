@@ -45,7 +45,7 @@ export function installMarklessResumeCache(excluded?: ReadonlyArray<string>): vo
 		prune();
 		for (const wiring of live)
 			for (const boundary of wiring.asyncBoundariesById.values())
-				for (const read of boundary.asyncReads) wiring.graph.rerun?.(read.graphNodeId, true);
+				for (const read of boundary.asyncReads) wiring.graph.asyncPlane?.()?.rerun(read.graphNodeId, true);
 	});
 }
 
@@ -125,7 +125,7 @@ function settled(wiring: Wiring, boundary: Boundary, status: 'fulfilled' | 'reje
 			mark(boundary, true);
 			waiters.get(wiring.root)?.get(boundary.id)?.();
 			// A refresh always fetches: the seed changes what shows meanwhile, never whether it happens.
-			for (const read of boundary.asyncReads) wiring.graph.rerun?.(read.graphNodeId, true);
+			for (const read of boundary.asyncReads) wiring.graph.asyncPlane?.()?.rerun(read.graphNodeId, true);
 			return;
 		}
 	}

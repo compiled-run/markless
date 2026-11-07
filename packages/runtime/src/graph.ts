@@ -11,7 +11,7 @@ import {
 	collectionCallMutated,
 	collectionMutationSnapshot,
 } from './graph-collections.ts';
-import type { RuntimeAsyncComputedNode } from './graph-async.ts';
+import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 import type { HeldInputsPlaneFactory } from './graph-held.ts';
 import {
 	createRuntimeComputedNodes,
@@ -44,11 +44,10 @@ export type {
 	WriteTouchedRecord,
 } from './graph-reconcile.ts';
 export type { HeldInputsPlane, HeldInputsPlaneFactory } from './graph-held.ts';
-export type { RuntimeAsyncComputedNode } from './graph-async.ts';
+export type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 
 /** What a graph hands its async plane. */
 export type AsyncComputedPlaneInternals = {
-	readonly asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>;
 	readonly cells: ReadonlyMap<string, unknown>;
 	readonly computedNodes: ReadonlyMap<string, RuntimeComputedNode>;
 	readonly readGraph: RuntimeGraphRead;
@@ -86,10 +85,14 @@ export type AsyncComputedPlane = {
 	) => RuntimeGraphRead | false | undefined;
 	/** A node or path was written: a derived cell reading it is stale until written. */
 	readonly wrote: (graphNodeId: string, path: ReadonlyArray<string>) => void;
-	readonly startDerive: NonNullable<RuntimeGraph['startDerive']>;
+	/** A derive of a sync hop's cell starts; the call it returns ends it, waking async readers it held when it wrote nothing. */
+	readonly startDerive: (graphNodeId: string) => () => void;
 };
 
-export type AsyncComputedPlaneFactory = (internals: AsyncComputedPlaneInternals) => AsyncComputedPlane;
+export type AsyncComputedPlaneFactory = (
+	internals: AsyncComputedPlaneInternals,
+	asyncComputed?: ReadonlyArray<RuntimeGraphAsyncComputed>,
+) => AsyncComputedPlane;
 
 export type RuntimeGraphCell = {
 	readonly graphNodeId: string;
@@ -366,26 +369,14 @@ export type RuntimeGraph = {
 	 * answers, so a value derived on demand can write itself first.
 	 */
 	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
-	/** A derive of a sync hop's cell starts; the call it returns ends it, waking async readers it held when it wrote nothing. */
-	readonly startDerive?: (graphNodeId: string) => () => void;
-	/** While an async value refreshes, its key's inputs read as its shown value was fetched; `false`: the reader would mix. */
-	readonly shownRead?: (
-		dependencies: ReadonlyArray<RuntimeGraphComputedDependency>,
-	) => RuntimeGraphRead | false | undefined;
+	/** The async plane, when the graph has async values: re-runs, failures, entry marks, matched reads and derive marks go through it. */
+	readonly asyncPlane?: () => AsyncComputedPlane | undefined;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (
 		asyncComputed: RuntimeGraphAsyncComputed,
 		plane: AsyncComputedPlaneFactory,
 		held?: HeldInputsPlaneFactory,
 	) => boolean;
-	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set. */
-	readonly rerun?: (graphNodeId: string, revalidate?: boolean) => boolean | undefined;
-	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run. */
-	readonly failHandler?: (graphNodeId: string, error: unknown) => void;
-	/** Marks a settled value busy ahead of the write that will really refresh it. */
-	readonly markEntry?: (graphNodeId: string) => void;
-	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
-	readonly endEntry?: (graphNodeId: string) => void;
 	/** Code running inside a real DOM event's dispatch started: a write made before the matching `markUserActionEnd` starts a loud refresh. Nests. */
 	readonly markUserActionStart?: () => void;
 	/** Ends the turn `markUserActionStart` opened. */
@@ -545,16 +536,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 	};
 
-	const landWithoutObservers = (land: () => void): void => {
-		const was = notifyingWrite;
-		notifyingWrite = true;
-		try {
-			land();
-		} finally {
-			notifyingWrite = was;
-		}
-	};
-
 	const codeThePassWaitsOn = (): PromiseLike<unknown>[] =>
 		dirtyPaths.flatMap(({ graphNodeId, path }) =>
 			(subscriptionsByNode.get(graphNodeId) ?? []).flatMap((subscription) => {
@@ -576,7 +557,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (!flushHolds) void flush();
 	};
 
-	const internals: DerivedReconcileInternals = {
+	const internals: DerivedReconcileInternals & AsyncComputedPlaneInternals = {
 		cells,
 		computedNodes,
 		dirtyPaths,
@@ -590,6 +571,28 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			bucket.push(subscription);
 			subscriptionOrder.set(subscription, subscriptionSequence++);
 		},
+		// Read by the async plane only; as methods they cost a page without async values nothing at load.
+		get reconcile() {
+			return plane;
+		},
+		landWithoutObservers(land) {
+			const was = notifyingWrite;
+			notifyingWrite = true;
+			try {
+				land();
+			} finally {
+				notifyingWrite = was;
+			}
+		},
+		flush() {
+			return flush();
+		},
+		isUserAction() {
+			return quietDepth === 0 && (userActionDepth > 0 || flushUserAction);
+		},
+		hasPendingFlush() {
+			return hasPendingFlush();
+		},
 	};
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
@@ -599,15 +602,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		held?: HeldInputsPlaneFactory,
 		asyncComputed?: RuntimeGraphAsyncComputed,
 	) => {
-		asyncPlane ??= factory?.({
-			...internals,
-			asyncComputed: input.asyncComputed,
-			reconcile: plane,
-			landWithoutObservers,
-			flush: () => flush(),
-			isUserAction: () => quietDepth === 0 && (userActionDepth > 0 || flushUserAction),
-			hasPendingFlush,
-		});
+		asyncPlane ??= factory?.(internals, input.asyncComputed);
 		if (held) asyncPlane!.holdInputs(held);
 		if (asyncComputed) asyncPlane!.define(asyncComputed);
 		dependents = indexRuntimeDependents(computedNodes, asyncPlane?.nodes);
@@ -782,13 +777,13 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
-		shownRead: (dependencies) => asyncPlane?.shownRead(dependencies),
-		rerun: (graphNodeId, revalidate) => asyncPlane?.rerun(graphNodeId, revalidate),
-		failHandler: (graphNodeId, error) => asyncPlane?.failHandler(graphNodeId, error),
-		markEntry: (graphNodeId) => asyncPlane?.markEntry(graphNodeId),
-		endEntry: (graphNodeId) => asyncPlane?.endEntry(graphNodeId),
-		markUserActionStart: () => void userActionDepth++,
-		markUserActionEnd: () => {
+		asyncPlane() {
+			return asyncPlane;
+		},
+		markUserActionStart() {
+			userActionDepth++;
+		},
+		markUserActionEnd() {
 			userActionDepth = Math.max(0, userActionDepth - 1);
 			if (userActionDepth === 0 && (flushScheduled || flushing || dirtyPaths.length > 0)) {
 				flushUserAction = true;
@@ -797,8 +792,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				void flush().then(end, end);
 			}
 		},
-		markQuietStart: () => void quietDepth++,
-		markQuietEnd: () => void (quietDepth = Math.max(0, quietDepth - 1)),
+		markQuietStart() {
+			quietDepth++;
+		},
+		markQuietEnd() {
+			quietDepth = Math.max(0, quietDepth - 1);
+		},
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;
 			if (asyncPlane?.nodes.has(id) || cells.has(id)) return false;
@@ -821,7 +820,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			};
 		},
 		subscriptionCount: (graphNodeId) => subscriptionsByNode.get(graphNodeId)?.length ?? 0,
-		startDerive: (graphNodeId) => asyncPlane?.startDerive(graphNodeId) ?? (() => {}),
 		pullBeforeRead(graphNodeId, pull) {
 			// The pull writes the node itself, so the initializer answers what it held before.
 			readInitializers.set(graphNodeId, () => {

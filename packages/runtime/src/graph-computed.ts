@@ -5,7 +5,7 @@ import type {
 } from './graph.ts';
 import { pathsIntersect, readPath } from './graph-core.ts';
 import type { DirtyPath } from './graph-scheduler.ts';
-import type { RuntimeAsyncComputedNode } from './graph-async.ts';
+import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 
 export type RuntimeComputedNode = Omit<RuntimeGraphComputed, 'compute'> & {
 	readonly compute?: RuntimeGraphComputed['compute'];

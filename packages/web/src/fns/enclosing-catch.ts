@@ -46,12 +46,13 @@ export function marklessNearerCatch(
 // A handler the compiler could not place, such as a child component's own, rejects into the innermost `@try` around its element whose `@catch` takes handlers.
 export function marklessFailEnclosingCatch(
 	boundaries: Iterable<ResumeAsyncBoundaryRecord> | undefined,
-	graph: Pick<RuntimeGraph, 'read' | 'failHandler'>,
+	graph: Pick<RuntimeGraph, 'read' | 'asyncPlane'>,
 	element: ResumeDomElement,
 	error: unknown,
 ): boolean {
 	const target = marklessInnermostCatch(boundaries, graph, element);
-	if (!target || !graph.failHandler) return false;
-	graph.failHandler(target.runnerGraphNodeId!, error);
+	const plane = graph.asyncPlane?.();
+	if (!target || !plane) return false;
+	plane.failHandler(target.runnerGraphNodeId!, error);
 	return true;
 }

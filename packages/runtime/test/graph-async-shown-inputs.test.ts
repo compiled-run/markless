@@ -353,10 +353,10 @@ test('readers held at the old inputs move on when the new value lands equal to t
 
 test('a value that reads no async value is never held', async () => {
 	const { graph } = revenueGraph({ served: true });
-	const read = graph.shownRead!([{ graphNodeId: 'state:range', path: [] }]);
+	const read = graph.asyncPlane!()!.shownRead([{ graphNodeId: 'state:range', path: [] }]);
 	graph.write({ graphNodeId: 'state:range', value: '20d' });
 	expect(read).toBeUndefined();
-	expect(graph.shownRead!([{ graphNodeId: 'state:range', path: [] }])).toBeUndefined();
+	expect(graph.asyncPlane!()!.shownRead([{ graphNodeId: 'state:range', path: [] }])).toBeUndefined();
 });
 
 test('after a refresh fails, a value reading the whole input object follows it again', async () => {

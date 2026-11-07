@@ -92,8 +92,8 @@ const ASYNC_BOUNDARY = [
 	'web/resume-refresh-busy',
 	'web/fns/async-plane',
 ];
-// Per-element busy marks and their announcement: no record demands them, so they load on the first refresh over shown content.
-const REFRESH_MARKS = ['web/fns/busy-elements', 'web/fns/refresh-announcer'];
+// Per-element busy marks, their announcement and an async value's refresh half: no record demands them, so they load on the first refresh.
+const REFRESH_MARKS = ['web/fns/busy-elements', 'web/fns/refresh-announcer', 'web/fns/async-refresh'];
 // Matched values load only where a reader pairs an async value with an input of its key.
 const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];

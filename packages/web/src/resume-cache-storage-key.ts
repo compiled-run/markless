@@ -4,8 +4,7 @@ export const RESUME_CACHE_KEY_PREFIX = 'markless:resume';
 export const RESUME_CACHE_SCOPE_ATTRIBUTE = 'data-markless-scope';
 // Marks a region showing seeded content until its revalidation commits.
 export const RESUME_CACHE_SEEDED_ATTRIBUTE = 'data-markless-seeded';
-// Marks the arm and state-patch scripts a seed wrote: the tab's last answer, never the stream's.
-export const RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE = 'data-seeded';
+export { PROTOCOL_SEEDED_SCRIPT_ATTRIBUTE as RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE } from '../../serializer/src/protocol-seeded-script.ts';
 
 export function resumeCacheStorageKey(
 	scope: string,

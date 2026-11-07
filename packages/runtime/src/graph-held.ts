@@ -3,7 +3,7 @@ import type {
 	RuntimeAsyncAnswer,
 	RuntimeAsyncComputedNode,
 	RuntimeAsyncInput,
-} from './graph-async.ts';
+} from './graph-async-load.ts';
 import { readPath } from './graph-core.ts';
 import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type {

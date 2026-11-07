@@ -67,13 +67,13 @@ test('rerun re-runs a rejected value with its unchanged key, and leaves a settle
 	runs.settles[0]!.reject(new Error('rates down'));
 	await tick();
 
-	expect(graph.rerun!('computed:prices')).toBe(true);
+	expect(graph.asyncPlane!()!.rerun('computed:prices')).toBe(true);
 	expect(graph.read('computed:prices', ['status'])).toBe('pending');
 	expect(runs.settles).toHaveLength(2);
 	runs.settles[1]!.resolve({ total: 30 });
 	await tick();
 	expect(graph.read('computed:prices', ['total'])).toBe(30);
 
-	expect(graph.rerun!('computed:prices')).toBe(false);
+	expect(graph.asyncPlane!()!.rerun('computed:prices')).toBe(false);
 	expect(runs.settles).toHaveLength(2);
 });

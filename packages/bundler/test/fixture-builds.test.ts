@@ -219,6 +219,8 @@ async function expectNoMachinePathInOutput(directory: string): Promise<void> {
 
 const ASYNC_PLANES = [
 	'runtime/graph-async',
+	'runtime/graph-async-load',
+	'runtime/graph-async-refresh',
 	'runtime/graph-held',
 	'web/fns/async-plane',
 	'web/fns/held-inputs-plane',

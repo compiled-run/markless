@@ -11,12 +11,13 @@ export function marklessShownReads<T extends ShownReadsContext>(
 	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
 ): T {
 	const graph = context.graph as ScopedGraph | undefined;
-	if (!graph?.shownRead) return context;
-	const qualify = graph.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
-	const shown = graph.shownRead(
+	const plane = graph?.asyncPlane?.();
+	if (!plane) return context;
+	const qualify = graph!.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
+	const shown = plane.shownRead(
 		reads.map((read) => ({ graphNodeId: qualify(read.graphNodeId), path: read.path })),
 	);
 	if (!shown) return context;
 	const read: RuntimeGraph['read'] = (graphNodeId, path) => shown(qualify(graphNodeId), path);
-	return { ...context, graph: Object.assign(Object.create(graph) as RuntimeGraph, { read }) };
+	return { ...context, graph: Object.assign(Object.create(graph!) as RuntimeGraph, { read }) };
 }

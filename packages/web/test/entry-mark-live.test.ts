@@ -1,13 +1,14 @@
 import { expect, test } from 'vitest';
-import { marklessEntryMarkEnd, marklessEntryMarkStart } from '../src/fns/entry-mark.ts';
+import { marklessEntryMarkEnd, marklessEntryMarkStart } from '../src/fns/async-plane.ts';
 
 // The entry mark is always shown as a user action (submit-quiet-design.md Q1), so only a body
 // running inside a DOM dispatch may open it.
 function graph(order: string[]) {
-	return {
+	const plane = {
 		markEntry: (graphNodeId: string) => order.push(`markEntry:${graphNodeId}`),
 		endEntry: (graphNodeId: string) => order.push(`endEntry:${graphNodeId}`),
-	} as never;
+	};
+	return { asyncPlane: () => plane } as never;
 }
 
 function runBody(context: object, beforeEnd?: () => void) {

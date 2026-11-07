@@ -1,5 +1,5 @@
 import { expect, test, vi } from 'vitest';
-import * as busyMarks from '../src/fns/busy-marks.ts';
+import * as busyMarks from '../src/fns/async-plane.ts';
 
 // Same mock boundary shape as busy-marks-load.test.ts: a comment-anchored range
 // with one row host, marked through plain setAttribute/removeAttribute calls.

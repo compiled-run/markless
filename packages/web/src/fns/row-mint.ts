@@ -377,7 +377,7 @@ export function shownRowGraph(
 	repeat: ResumeKeyedRepeatRecord,
 	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path?: ReadonlyArray<string> }>,
 ): RuntimeGraph | false {
-	const read = graph.shownRead?.([
+	const read = graph.asyncPlane?.()?.shownRead([
 		{ graphNodeId: repeat.collectionGraphNodeId!, path: repeat.collectionPath },
 		...reads,
 	]);

@@ -3,7 +3,7 @@ import { marklessNearerCatch } from './enclosing-catch.ts';
 
 type HandlerCatchContext = {
 	readonly graph?: {
-		readonly failHandler?: (graphNodeId: string, error: unknown) => void;
+		readonly asyncPlane?: () => { readonly failHandler: (graphNodeId: string, error: unknown) => void } | undefined;
 		readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 	};
 	readonly element?: ResumeDomElement;
@@ -17,10 +17,11 @@ export function marklessHandlerCatch(
 	error: unknown,
 ): void {
 	const graph = context?.graph;
-	if (!context || !graph?.failHandler) return;
-	const qualify = graph.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
+	const plane = graph?.asyncPlane?.();
+	if (!context || !plane) return;
+	const qualify = graph!.marklessQualifyGraphNodeId ?? ((graphNodeId: string) => graphNodeId);
 	const own = qualify(runnerGraphNodeId);
-	graph.failHandler(
+	plane.failHandler(
 		(context.catchScope &&
 			marklessNearerCatch(
 				context.catchScope.boundaries(),

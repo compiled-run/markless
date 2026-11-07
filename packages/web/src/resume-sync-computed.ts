@@ -83,7 +83,7 @@ type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 const HELD = Symbol('held');
 
 function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined) {
-	const shown = input.graph.shownRead?.(input.computed.dependencies ?? []);
+	const shown = input.graph.asyncPlane?.()?.shownRead(input.computed.dependencies ?? []);
 	if (shown === false) return HELD;
 	const graph = seedSourceGraph(shown ? { ...input.graph, read: shown } : input.graph, input.computed);
 	return symbol({

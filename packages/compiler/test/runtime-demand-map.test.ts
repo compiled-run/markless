@@ -784,7 +784,7 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 	}
 });
 
-test('busy marks and the refresh announcement are known runtime no record or control demands, so they load on the first refresh', async () => {
+test('busy marks, the refresh announcement and the async refresh half are known runtime no record or control demands, so they load on the first refresh', async () => {
 	const { compileTsrxModule } = await import('../src/index.ts');
 	const result = await compileTsrxModule({
 		filename: '/workspace/src/Tide.tsrx',
@@ -803,7 +803,7 @@ test('busy marks and the refresh announcement are known runtime no record or con
 			</section>
 		}`,
 	});
-	const lazy = ['web/fns/busy-elements', 'web/fns/refresh-announcer'];
+	const lazy = ['web/fns/busy-elements', 'web/fns/refresh-announcer', 'web/fns/async-refresh'];
 	for (const map of Object.values(result.runtimeDemandMaps)) {
 		expect(map.payloadRecords.some((record) => record.kind === 'async-boundary')).toBe(true);
 		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining(lazy));

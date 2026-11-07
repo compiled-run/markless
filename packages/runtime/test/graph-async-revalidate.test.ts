@@ -36,7 +36,7 @@ test('revalidating a fulfilled value re-runs it with the same key, quietly', asy
 	runs.settles[0]!.resolve('first');
 	await tick();
 
-	expect(graph.rerun!('computed:quote', true)).toBe(true);
+	expect(graph.asyncPlane!()!.rerun('computed:quote', true)).toBe(true);
 	expect(runs.settles).toHaveLength(2);
 	expect(graph.read('computed:quote', []) as object).toMatchObject({ status: 'pending', key: 1, quiet: true });
 	runs.settles[1]!.resolve('second');
@@ -56,7 +56,7 @@ test('a revalidation started inside a user action is still quiet', async () => {
 	await tick();
 
 	graph.markUserActionStart!();
-	graph.rerun!('computed:quote', true);
+	graph.asyncPlane!()!.rerun('computed:quote', true);
 	graph.markUserActionEnd!();
 	expect(graph.read('computed:quote', []) as object).toMatchObject({ status: 'pending', quiet: true });
 });
@@ -65,11 +65,11 @@ test('revalidation refuses a value that is not fulfilled, and a reset still re-r
 	const runs = scriptedRuns();
 	const graph = quoteGraph(runs.run);
 	graph.read('computed:quote', ['status']);
-	expect(graph.rerun!('computed:quote', true)).toBe(false);
+	expect(graph.asyncPlane!()!.rerun('computed:quote', true)).toBe(false);
 	runs.settles[0]!.reject(new Error('down'));
 	await tick();
-	expect(graph.rerun!('computed:quote', true)).toBe(false);
-	expect(graph.rerun!('computed:quote')).toBe(true);
+	expect(graph.asyncPlane!()!.rerun('computed:quote', true)).toBe(false);
+	expect(graph.asyncPlane!()!.rerun('computed:quote')).toBe(true);
 	expect(runs.settles).toHaveLength(2);
 });
 
@@ -104,7 +104,7 @@ test('a value first fetched inside a user action stays marked through every late
 	await tick();
 	expect(graph.read('computed:quote', []) as object).toMatchObject({ status: 'fulfilled', action: true });
 
-	graph.rerun!('computed:quote', true);
+	graph.asyncPlane!()!.rerun('computed:quote', true);
 	runs.settles[1]!.resolve('saved');
 	await tick();
 	expect(graph.read('computed:quote', []) as object).toMatchObject({

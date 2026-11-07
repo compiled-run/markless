@@ -7,7 +7,7 @@ import {
 import type { ArmCommitUpdate } from '../src/resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
-import * as busyMarks from '../src/fns/busy-marks.ts';
+import * as busyMarks from '../src/fns/async-plane.ts';
 
 installMarklessAsyncPlane();
 
