@@ -30,7 +30,6 @@ let exclude: ReadonlyArray<string> = [];
 const routes = new WeakMap<object, string>();
 const queued = new Map<Boundary, Wiring>();
 const revalidating = new WeakSet<Boundary>();
-const live = new Set<Wiring>();
 const waiters = new WeakMap<object, Map<string, () => void>>();
 
 /** Installed by each compiled module that serves async values, unless the app turned the resume cache off. */
@@ -39,14 +38,6 @@ export function installMarklessResumeCache(excluded?: ReadonlyArray<string>): vo
 	if (asyncPlanes.cache) return;
 	asyncPlanes.cache = settled;
 	(globalThis as ResumeCacheHost).__mSeed = seed;
-	// A page the browser restores from its back-forward cache never boots again, so it revalidates here.
-	addEventListener('pageshow', (event) => {
-		if (!event.persisted) return;
-		prune();
-		for (const wiring of live)
-			for (const boundary of wiring.asyncBoundariesById.values())
-				for (const read of boundary.asyncReads) wiring.graph.asyncPlane?.()?.rerun(read.graphNodeId, true);
-	});
 }
 
 function storage(): Storage | undefined {
@@ -105,20 +96,10 @@ export function whenSeeded(root: object, boundaryId: string): Promise<void> {
 	});
 }
 
-// A page a navigation replaced keeps nothing alive here.
-function prune(): void {
-	for (const wiring of live)
-		if (!(wiring.root as { readonly isConnected?: boolean }).isConnected) live.delete(wiring);
-}
-
 function settled(wiring: Wiring, boundary: Boundary, status: 'fulfilled' | 'rejected'): void {
 	// A document without a scope token keeps nothing, and nothing in it was seeded.
 	const name = context.key(wiring, boundary.id);
 	if (!name) return;
-	if (!live.has(wiring)) {
-		prune();
-		live.add(wiring);
-	}
 	if (boundary.seeded && !revalidating.has(boundary)) {
 		revalidating.add(boundary);
 		if (status === 'fulfilled') {

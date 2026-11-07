@@ -40,6 +40,7 @@ import {
 	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
+	createInlineResumerReturnWakeSource,
 	createInlineResumerStorageWakeSource,
 	createInlineResumerSharedWakeSource,
 	renderPrerenderInlineResumerSource,
@@ -66,10 +67,12 @@ import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
 import { RESUME_CACHE_SCOPE_ATTRIBUTE } from './resume-cache-storage-key.ts';
+import { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
+export { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 
 type RosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
@@ -301,7 +304,8 @@ export async function assembleSsrContainer(
 					overlayPrimer,
 					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
-						sharedWakeSource(state),
+						sharedWakeSource(state) +
+						returnWakeSource(view, selectedResumeModuleUrl),
 					artifactSources?.defer,
 				)
 			: '';
@@ -396,7 +400,8 @@ export async function assemblePrerenderPageParts(
 					false,
 					deferredTriggerSource(view) +
 						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
-						sharedWakeSource(state),
+						sharedWakeSource(state) +
+						returnWakeSource(view, resumeModuleUrl),
 					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
@@ -588,6 +593,13 @@ function sharedWakeSource(state: ProtocolStatePayload): string {
 				PROTOCOL_SHARED_INSTANCES_VERSION,
 				CONTAINER_ATTRIBUTE,
 			)
+		: '';
+}
+
+function returnWakeSource(view: ProtocolViewPayload, resumeModuleUrl: string | undefined): string {
+	return Object.keys(view.asyncRunners ?? {}).length > 0 ||
+		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
+		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY)
 		: '';
 }
 
