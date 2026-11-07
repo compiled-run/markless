@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 310,
+	total: 311,
 	guided: 48,
 	groups: [
 		{
@@ -431,6 +431,16 @@ export const errorIndex: ErrorIndex = {
 				{
 					code: 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED',
 					kind: 'compile error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+					kind: 'build error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+					kind: 'build error',
 					guided: false,
 				},
 				{
@@ -1300,11 +1310,6 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PRERENDER_RESIDUE_MISSING',
-					kind: 'runtime error',
-					guided: false,
-				},
-				{
-					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
 					kind: 'runtime error',
 					guided: false,
 				},

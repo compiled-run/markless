@@ -32,6 +32,12 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 		produces: ['renderData'],
 	},
 	{
+		passId: 'projection-arms',
+		description: 'Record children rendered inside arms that redraw, and the call sites whose children stay live.',
+		consumes: ['semanticGraph', 'renderData'],
+		produces: ['projectionArms'],
+	},
+	{
 		passId: 'public-render-plan',
 		description: 'Plan compiler-proven direct DOM artifacts for public render().',
 		consumes: ['source', 'semanticGraph', 'payloadArena', 'symbolResolver'],

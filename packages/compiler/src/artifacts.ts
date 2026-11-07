@@ -78,6 +78,26 @@ export type ServerOnlyPropsArtifact = {
 	readonly diagnostics: ReadonlyArray<ServerOnlyPropsDiagnostic>;
 };
 
+/** What makes children written at a call site stop working when an arm redraws them from fixed HTML. */
+export type ProjectionLiveness = {
+	/** Live on their own, in words: what handles an event or shows changing state. */
+	readonly reason?: string;
+	/** Props of the component that wrote the children: live while a caller can change one. */
+	readonly props?: ReadonlyArray<string>;
+	/** They pass on the writer's own `children`, so they are live when its callers' children are. */
+	readonly forwardsChildren?: true;
+	/** Components rendered inside them, live when that component handles events or shows changing state. */
+	readonly componentEdgeIds?: ReadonlyArray<string>;
+};
+
+export type ProjectionArmsArtifact = {
+	readonly passId: 'projection-arms';
+	readonly liveChildren: ReadonlyArray<ProjectionLiveness & { readonly componentEdgeId: string }>;
+	/** Per component: whether its own markup handles events or shows changing state. */
+	readonly components: ReadonlyArray<ProjectionLiveness & { readonly componentName: string }>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
 export type ArtifactChildMaterialization = {
 	readonly html: string;
 	readonly elementCount: number;
@@ -788,6 +808,8 @@ export type SemanticBranchSite = {
 	// resolves module-wide and a bare instance local matches a same-named local
 	// declared in a sibling component (defect 46). Absent outside every component.
 	readonly componentName?: string;
+	/** Where the `@if` or `@switch` keyword is written. */
+	readonly keywordSpan?: SourceSpan;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -3014,6 +3036,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly serverOnlyProps: ServerOnlyPropsArtifact;
+	readonly projectionArms?: ProjectionArmsArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 	readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;

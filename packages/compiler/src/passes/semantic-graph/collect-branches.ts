@@ -75,6 +75,12 @@ function branchAsyncBoundary(
 	};
 }
 
+function branchKeywordSpan(node: AnyNode, keyword: string, state: WalkState) {
+	return typeof node.start === 'number'
+		? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + keyword.length } }
+		: {};
+}
+
 // Records @if/@switch sites as first-class branch records sharing the unified
 // document-order comment-anchor allocator with async boundaries. The
 // public-render plan gates which sites become reactive; ungated sites keep
@@ -97,6 +103,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+			...branchKeywordSpan(node, '@if', state),
 			...branchAsyncBoundary(state),
 		});
 		return;
@@ -122,6 +129,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...(switchArmTests(node) ? { armTests: switchArmTests(node)! } : {}),
+			...branchKeywordSpan(node, '@switch', state),
 			...branchAsyncBoundary(state),
 		});
 	}
