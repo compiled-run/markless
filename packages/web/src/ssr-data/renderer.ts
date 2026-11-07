@@ -192,6 +192,8 @@ export type SsrDataReadContext = {
 	// Inside an arm this render is bringing into the DOM for the first time, so
 	// the components it holds are new instances rather than live ones.
 	readonly freshInstances?: true;
+	// Inside a @try arm, which the browser redraws from its static markup.
+	readonly insideAsyncArm?: true;
 };
 
 export type SsrDataStructure = {
@@ -323,6 +325,7 @@ type ProjectionSpan = {
 	readonly mark: string;
 	readonly tokens: ReadonlyArray<StructureToken>;
 	consumed: boolean;
+	inAsyncArm: boolean;
 };
 
 // Keyed by a counter rather than by the projection HTML: two renders in flight at
@@ -338,6 +341,7 @@ function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSp
 		mark: `${PROJECTION_MARK_PREFIX}${key}-->`,
 		tokens,
 		consumed: false,
+		inAsyncArm: false,
 	};
 	projectionSpans.set(key, span);
 	return span;
@@ -352,6 +356,7 @@ function openProjectionSpan(tokens: ReadonlyArray<StructureToken>): ProjectionSp
 function claimProjectionSpans(
 	text: string,
 	inDocument: boolean,
+	inAsyncArm: boolean,
 ): { readonly text: string; readonly tokens: ReadonlyArray<StructureToken> } {
 	if (!text.includes(PROJECTION_MARK_PREFIX)) return { text, tokens: [] };
 	const tokens: StructureToken[] = [];
@@ -362,6 +367,7 @@ function claimProjectionSpans(
 		// places; the tokens are counted once, where the first copy landed.
 		if (inDocument && !span.consumed) tokens.push(...span.tokens);
 		span.consumed = true;
+		if (inAsyncArm) span.inAsyncArm = true;
 		return '';
 	});
 	return { text: stripped, tokens };
@@ -425,15 +431,32 @@ export function projectionNotRenderedError(
 	componentName: string,
 	edgeId: string,
 ): Error & Record<string, unknown> {
-	const message = `MARKLESS_PROJECTION_NOT_RENDERED: <${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` somewhere in <${componentName}>'s own markup, including inside an @if/@else arm.`;
-	const error = new Error(message) as Error & Record<string, unknown>;
-	error.code = 'MARKLESS_PROJECTION_NOT_RENDERED';
+	return projectionError(
+		'MARKLESS_PROJECTION_NOT_RENDERED',
+		`<${componentName}> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render \`{children}\` somewhere in <${componentName}>'s own markup, including inside an @if/@else arm.`,
+		componentName,
+		edgeId,
+	);
+}
+
+function projectionError(
+	code: string,
+	text: string,
+	componentName: string,
+	edgeId: string,
+): Error & Record<string, unknown> {
+	const error = new Error(`${code}: ${text}`) as Error & Record<string, unknown>;
+	error.code = code;
 	error.severity = 'error';
 	error.phase = 'runtime';
 	error.componentName = componentName;
 	error.componentEdgeId = edgeId;
-	error.docsUrl = 'https://markless.dev/errors/MARKLESS_PROJECTION_NOT_RENDERED';
+	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
+}
+
+function isLiveToken(token: StructureToken): boolean {
+	return token.kind === 'comment' || token.hostNodeId !== '';
 }
 
 export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDataOutput> {
@@ -508,6 +531,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			repeatOuter: repeat.repeatOuter,
 			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
+			...(repeat.insideAsyncArm ? { insideAsyncArm: repeat.insideAsyncArm } : {}),
 			hostSegment: repeat.hostSegment,
 			sharedSeeds: repeat.sharedSeeds,
 			...(repeat.asyncError !== undefined ? { asyncError: repeat.asyncError } : {}),
@@ -579,6 +603,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 	function releaseSkippedProjections(
 		chunkIds: ReadonlyArray<string | undefined>,
 		context: SsrDataReadContext,
+		inAsyncArm = context.insideAsyncArm === true,
 	): void {
 		for (const chunkId of chunkIds)
 			for (const slot of (chunkId && chunks.get(chunkId)?.slots) || []) {
@@ -587,17 +612,17 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 						slot.raw && slot.residue.kind === 'graph-read'
 							? input.read(slot.residue, context)
 							: 0;
-					if (typeof value === 'string') claimProjectionSpans(value, false);
+					if (typeof value === 'string') claimProjectionSpans(value, false, inAsyncArm);
 				} else if (slot.kind === 'branch')
-					releaseSkippedProjections(slot.armTemplateIds, context);
+					releaseSkippedProjections(slot.armTemplateIds, context, inAsyncArm);
 				else if (slot.kind === 'async')
-					releaseSkippedProjections(Object.values(slot.armTemplateIds), context);
+					releaseSkippedProjections(Object.values(slot.armTemplateIds), context, true);
 				else if (slot.kind === 'repeat')
-					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context);
+					releaseSkippedProjections([slot.rowTemplateId, slot.emptyTemplateId], context, inAsyncArm);
 				else if (slot.kind === 'child-component')
-					releaseSkippedProjections([slot.projectionChunkId], context);
+					releaseSkippedProjections([slot.projectionChunkId], context, inAsyncArm);
 				else if (slot.kind === 'dynamic-host')
-					releaseSkippedProjections([slot.childChunkId], context);
+					releaseSkippedProjections([slot.childChunkId], context, inAsyncArm);
 			}
 	}
 
@@ -608,7 +633,11 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					// The `{children}` of a projecting component is exactly this slot: it
 					// reports the projection's token span so `renderChunk` can sort it into
 					// the child's own stream by this slot's coordinate.
-					const claimed = claimProjectionSpans(String(value ?? ''), slot.raw === true);
+					const claimed = claimProjectionSpans(
+						String(value ?? ''),
+						slot.raw === true,
+						context.insideAsyncArm === true,
+					);
 					if (slot.raw) return { html: claimed.text, tokens: claimed.tokens };
 					return { html: value == null ? '' : escapeHtml(claimed.text), tokens: [] };
 				});
@@ -643,6 +672,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									repeatId: context.repeatId,
 									repeatOuter: context.repeatOuter,
 									sharedSeeds: childSeeds,
+									...(context.insideAsyncArm ? { insideAsyncArm: true as const } : {}),
 									...input.projectionSegment?.(context),
 								})
 							: undefined,
@@ -730,6 +760,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									: withoutProjectionMarks(child.html);
 								// Spliced: the child's own `{children}` slot already placed the projection
 								// where the HTML puts it, so appending it again would double-count it.
+								if (span?.inAsyncArm && span.tokens.some(isLiveToken))
+									throw projectionError(
+										'MARKLESS_PROJECTION_LIVE_IN_TRY',
+										`<${slot.childComponentName}> renders its projected children inside a @try, and those children read state or handle events. The browser redraws a @try arm from static markup, so they would render but never update or respond. Keep \`{children}\` outside the @try in <${slot.childComponentName}>, or write the @try in the component that owns the projected markup.`,
+										slot.childComponentName,
+										slot.componentEdgeId,
+									);
 								if (span?.consumed) return { html, tokens: baseTokens };
 								if (span) {
 									const markAt = child.html.indexOf(span.mark);
@@ -892,12 +929,18 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										item: context.repeatItem,
 										index: context.repeatIndex,
 										key: context.repeatKey,
+										insideAsyncArm: true,
 										...(typeof selected === 'number'
 											? {}
 											: { asyncError: selected.error }),
 									})
 								: ({ html: '', tokens: [] } as RenderedPart),
 							(body): RenderedPart => {
+								releaseSkippedProjections(
+									Object.values(slot.armTemplateIds).filter((chunkId) => chunkId !== armChunkId),
+									context,
+									true,
+								);
 								const id = `${idPrefix}${slot.boundaryId}`;
 								return {
 									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,

@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 309,
+	total: 310,
 	guided: 48,
 	groups: [
 		{
@@ -1300,6 +1300,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_PRERENDER_RESIDUE_MISSING',
+					kind: 'runtime error',
+					guided: false,
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
 					kind: 'runtime error',
 					guided: false,
 				},

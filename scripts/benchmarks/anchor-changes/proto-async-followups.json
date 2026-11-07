@@ -1,0 +1,26 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 1211,
+			"reason": "children projected into a @try: unserved arms spend the projection span, live projections there fail with a rewrite",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 1211,
+			"reason": "children projected into a @try: unserved arms spend the projection span, live projections there fail with a rewrite",
+			"date": "2026-11-07"
+		}
+	]
+}
