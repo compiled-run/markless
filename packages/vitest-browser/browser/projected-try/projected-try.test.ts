@@ -1,6 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
-import { LivePage } from './live-page.tsrx';
 import { StaticPage } from './static-page.tsrx';
 
 afterEach(() => cleanup());
@@ -31,13 +30,10 @@ test.each([
 	expect(text(container, '[data-body] [data-projected] em')).toBe('entry');
 });
 
-// A redrawn arm carries projected markup as static HTML, so projected handlers and state reads
-// inside a child's @try are refused rather than rendered dead.
-test.each([
-	['CSR', () => render(LivePage)],
-	['SSR', () => renderSSR(LivePage)],
-] as const)('live projected children inside a child @try are refused (%s)', async (_mode, mount) => {
-	await expect(Promise.resolve().then(mount)).rejects.toThrow(
-		/MARKLESS_PROJECTION_LIVE_IN_TRY: <Card> renders its projected children inside a @try/,
-	);
+// A redrawn arm carries projected markup as static HTML, so the dev server refuses a page that
+// projects handlers or state reads into a child's @try; bundler/test/dev-projection-live-arm.test.ts pins the message.
+test('live projected children inside a child @try are refused by the dev server', async () => {
+	const response = await fetch(`${new URL('./live-page.tsrx', import.meta.url).href}?import`);
+	expect(response.status).toBe(500);
+	await expect(import('./live-page.tsrx')).rejects.toThrow(/Failed to fetch dynamically imported module/);
 });

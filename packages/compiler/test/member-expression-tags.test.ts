@@ -319,12 +319,14 @@ export function App() @{
 test('a barrel module reports the re-exports a linker has to follow', async () => {
 	const barrel = await compile(
 		`export { default as root } from './checkbox-root.tsrx';
-export * as forms from './forms/index.ts';`,
+export * as forms from './forms/index.ts';
+export * from './checkbox-parts.tsrx';`,
 		'src/checkbox/index.ts',
 	);
 
 	expect(barrel.semanticGraph.moduleGraphInterface.reexports).toEqual([
 		{ exportName: 'root', source: './checkbox-root.tsrx', importedName: 'default' },
 		{ exportName: 'forms', source: './forms/index.ts', importedName: '*' },
+		{ exportName: '*', source: './checkbox-parts.tsrx', importedName: '*' },
 	]);
 });

@@ -267,3 +267,97 @@ export default function Page() @{
 		}),
 	).resolves.toBeUndefined();
 });
+
+const barrelCases: ReadonlyArray<readonly [string, Readonly<Record<string, string>>, string]> = [
+	['named', { 'index.ts': `export { Panel } from './panels.tsrx';\n` }, `import { Panel } from './index.ts';`],
+	['star', { 'index.ts': `export * from './panels.tsrx';\n` }, `import { Panel } from './index.ts';`],
+	[
+		'aliased',
+		{ 'index.ts': `export { Panel as Disclosure } from './panels.tsrx';\n` },
+		`import { Disclosure as Panel } from './index.ts';`,
+	],
+	[
+		'chained',
+		{
+			'index.ts': `export * from './inner.ts';\n`,
+			'inner.ts': `export { Counter, Panel as Panel } from './panels.tsrx';\n`,
+		},
+		`import { Panel } from './index.ts';`,
+	],
+	[
+		'directory',
+		{ 'index.ts': `export * from './panels.tsrx';\n` },
+		`import { Panel } from './';`,
+	],
+];
+
+test.each(barrelCases)('a relative .ts barrel (%s re-export) is followed to the component', async (name, files, imports) => {
+	await expect(
+		buildPage(`barrel-${name}`, { ...files, 'page.tsrx': page(imports, `<Panel>${button}</Panel>`) }),
+	).rejects.toThrow(
+		/MARKLESS_PROJECTION_LIVE_IN_BRANCH: <Page> in .*page\.tsrx passes <Panel> children .*and <Panel> in .*panels\.tsrx renders its children inside @if \(shown\)/,
+	);
+});
+
+test('a component reached through a relative .ts barrel inside the children counts as live', async () => {
+	await expect(
+		buildPage('barrel-nested', {
+			'index.ts': `export * from './panels.tsrx';\n`,
+			'page.tsrx': page(`import { Counter, Panel } from './index.ts';`, `<Panel><Counter /></Panel>`),
+		}),
+	).rejects.toThrow(/\(<Counter> inside them: its <button> handles click\)/);
+});
+
+test('static children through a relative .ts barrel still build', async () => {
+	await expect(
+		buildPage('barrel-static', {
+			'index.ts': `export * from './panels.tsrx';\n`,
+			'page.tsrx': page(`import { Check, Panel } from './index.ts';`, `<Panel><Check label="ticked" /></Panel>`),
+		}),
+	).resolves.toBeUndefined();
+});
+
+const pickRows = `
+		@for (const row of box.rows; key row.value) {
+			<li><button type="button" data-pick onClick={() => (box.picked = row.value)}>{row.value}</button></li>
+		}`;
+
+const rowsPage = (imports: string, body: string) => `
+import { state } from '@markless/core';
+${imports}
+
+export default function Page() @{
+	const box = state({ rows: [{ value: 'alpha' }], picked: 'none' });
+	<main>
+		<output>{box.picked}</output>
+		${body}
+	</main>
+}
+`;
+
+test('a keyed @for projected straight into an @if arm builds, because its rows follow the arm', async () => {
+	await expect(
+		buildPage('repeat-in-if', {
+			'page.tsrx': rowsPage(`import { Panel } from './panels.tsrx';`, `<Panel>${pickRows}</Panel>`),
+		}),
+	).resolves.toBeUndefined();
+});
+
+test('a projected keyed @for beside other live children still fails in an @if', async () => {
+	await expect(
+		buildPage('repeat-and-button-in-if', {
+			'page.tsrx': rowsPage(
+				`import { Panel } from './panels.tsrx';`,
+				`<Panel><button type="button" data-clear onClick={() => (box.picked = 'none')}>Clear</button>${pickRows}</Panel>`,
+			),
+		}),
+	).rejects.toThrow(/passes <Panel> children .*\(its <button> handles click\)/);
+});
+
+test('a keyed @for projected into a @try still fails', async () => {
+	await expect(
+		buildPage('repeat-in-try', {
+			'page.tsrx': rowsPage(`import { Card } from './panels.tsrx';`, `<Card>${pickRows}</Card>`),
+		}),
+	).rejects.toThrow(/MARKLESS_PROJECTION_LIVE_IN_TRY: <Page> in .*page\.tsrx passes <Card> children/);
+});

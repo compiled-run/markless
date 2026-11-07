@@ -1,5 +1,6 @@
 // A warning that holds only while some props never change is safe only if no caller this build compiled can change them.
-import { propDecidedArm, propsDeciding, rowsDecidedBy, type KnownPropValue } from '@markless/compiler';
+import { MarklessCompileError } from './dev-error/index.ts';
+import { PROJECTION_LIVE_IN_BRANCH_CODE, propDecidedArm, propsDeciding, rowsDecidedBy, type KnownPropValue } from '@markless/compiler';
 import type {
 	CompileTsrxModuleResult,
 	CompilerDiagnostic,
@@ -35,11 +36,11 @@ export type ModulePropFlow = {
 		readonly spread?: PassedProp;
 		readonly childCount?: number;
 		readonly branchArms?: ReadonlyArray<SemanticBranchArm>;
-		readonly liveChildren?: ProjectionLiveness;
+		readonly liveChildren?: ProjectionLiveness & { readonly inBranch?: ProjectionLiveness };
 	}>;
 	// Components rendering `{children}` inside an arm that redraws from fixed HTML.
 	readonly projectionArms?: ReadonlyArray<
-		NonNullable<CompilerDiagnostic['projectionArm']> & { readonly code: string }
+		NonNullable<CompilerDiagnostic['projectionArm']> & Pick<CompilerDiagnostic, 'code' | 'docsUrl'>
 	>;
 	// Components whose own markup handles events or shows changing state, or renders one that does.
 	readonly liveComponents?: ReadonlyArray<ProjectionLiveness & { readonly componentName: string }>;
@@ -71,7 +72,7 @@ export function modulePropFlow(
 	);
 	const projectionArms = diagnostics.flatMap((diagnostic) =>
 		diagnostic.projectionArm && diagnostic.suppressed !== true
-			? [{ code: diagnostic.code, ...diagnostic.projectionArm }]
+			? [{ code: diagnostic.code, docsUrl: diagnostic.docsUrl, ...diagnostic.projectionArm }]
 			: [],
 	);
 	return {
@@ -189,6 +190,16 @@ function rowValue(
 
 type FlowEdge = ModulePropFlow['edges'][number];
 
+export type ProjectionRefusal = {
+	readonly code: string;
+	readonly docsUrl: string;
+	/** The file whose component renders `{children}` inside the arm. */
+	readonly armSource: string;
+	readonly message: string;
+	/** Every file the verdict reads; an edit to any of them can change it. */
+	readonly sources: ReadonlySet<string>;
+};
+
 type Recorded = {
 	readonly flow: ModulePropFlow;
 	// A component edge's id to the file its child component lives in.
@@ -200,6 +211,26 @@ export class PropFlowRegistry {
 
 	record(source: string, flow: ModulePropFlow, childSources: ReadonlyMap<string, string>): void {
 		this.#modules.set(source, { flow, childSources });
+	}
+
+	/** Replaces only what the projection check reads with a later compile's reading of the same module. */
+	recordProjection(source: string, flow: ModulePropFlow): void {
+		const recorded = this.#modules.get(source);
+		if (!recorded) return;
+		const live = new Map(flow.edges.map((edge) => [edge.id, edge.liveChildren]));
+		const { projectionArms: _arms, liveComponents: _live, ...rest } = recorded.flow;
+		this.#modules.set(source, {
+			...recorded,
+			flow: {
+				...rest,
+				...(flow.projectionArms ? { projectionArms: flow.projectionArms } : {}),
+				...(flow.liveComponents ? { liveComponents: flow.liveComponents } : {}),
+				edges: recorded.flow.edges.map(({ liveChildren: _children, ...edge }) => {
+					const liveChildren = live.get(edge.id);
+					return liveChildren ? { ...edge, liveChildren } : edge;
+				}),
+			},
+		});
 	}
 
 	/** Records the components a page outside TSRX renders, each with props fixed at build time. */
@@ -304,46 +335,76 @@ export class PropFlowRegistry {
 					if (reason)
 						refusals.push(refusalMessage(decided, source, prop, reason));
 				}
+		for (const refusal of this.projectionRefusals()) refusals.push(refusal.message);
+		return refusals;
+	}
+
+	/** Live children projected into an arm that redraws, each with every file its verdict reads. */
+	projectionRefusals(): ReadonlyArray<ProjectionRefusal> {
+		const refusals: ProjectionRefusal[] = [];
 		for (const [source, { flow }] of this.#modules)
 			for (const arm of flow.projectionArms ?? [])
 				for (const caller of this.#callerSites(source, arm.componentName)) {
+					const sources = new Set([source, caller.source]);
 					// An arm a prop picks changes only where this caller can change that prop.
 					const changes = arm.props
-						?.map((prop) => [prop, this.#passedChanges(caller.source, caller.edge, prop, new Set())] as const)
+						?.map((prop) => [prop, this.#passedChanges(caller.source, caller.edge, prop, new Set(), sources)] as const)
 						.find(([, reason]) => reason);
 					if (arm.props && !changes) continue;
-					const live = this.#liveChildren(caller.source, caller.edge, new Set());
-					if (live) refusals.push(projectionRefusalMessage(arm, source, caller, live, changes));
+					const live = this.#liveChildren(
+						caller.source,
+						caller.edge,
+						new Set(),
+						sources,
+						arm.code === PROJECTION_LIVE_IN_BRANCH_CODE,
+					);
+					if (live)
+						refusals.push({
+							code: arm.code,
+							docsUrl: arm.docsUrl,
+							armSource: source,
+							message: projectionRefusalMessage(arm, source, caller, live, changes),
+							sources,
+						});
 				}
 		return refusals;
 	}
 
 	// What makes the children this edge projects stop working in a redrawn arm, in words; undefined when nothing does.
-	#liveChildren(source: string, edge: FlowEdge, seen: Set<string>): string | undefined {
+	#liveChildren(
+		source: string,
+		edge: FlowEdge,
+		seen: Set<string>,
+		sources: Set<string>,
+		inBranch = false,
+	): string | undefined {
 		const key = `${source}\0${edge.id}`;
-		const live = edge.liveChildren;
+		const live = inBranch ? (edge.liveChildren?.inBranch ?? edge.liveChildren) : edge.liveChildren;
 		if (!live || seen.has(key)) return undefined;
 		seen.add(key);
 		if (live.reason) return live.reason;
 		for (const prop of live.props ?? []) {
-			const reason = this.#changes(source, edge.parentComponentName, prop, new Set());
+			const reason = this.#changes(source, edge.parentComponentName, prop, new Set(), sources);
 			if (reason) return `they read the prop \`${prop}\` of <${edge.parentComponentName}>, and ${reason}`;
 		}
 		if (live.forwardsChildren)
 			for (const caller of this.#callerSites(source, edge.parentComponentName)) {
-				const reason = this.#liveChildren(caller.source, caller.edge, seen);
-				if (reason) return `they pass on the children <${caller.edge.parentComponentName}> gives <${edge.parentComponentName}>, and ${reason}`;
+				const reason = this.#liveChildren(caller.source, caller.edge, seen, sources);
+				if (reason) {
+					sources.add(caller.source);
+					return `they pass on the children <${caller.edge.parentComponentName}> gives <${edge.parentComponentName}>, and ${reason}`;
+				}
 			}
 		for (const nestedId of live.componentEdgeIds ?? []) {
 			const nested = this.#modules.get(source)?.flow.edges.find((candidate) => candidate.id === nestedId);
 			const target = nested && this.#resolve(source, nested);
-			const reason = target && this.#componentLive(target.source, target.componentName, new Set());
+			const reason = target && this.#componentLive(target.source, target.componentName, new Set(), sources);
 			if (reason) return `<${target.componentName}> inside them: ${reason}`;
 		}
 		return undefined;
 	}
 
-	#componentLive(source: string, componentName: string, seen: Set<string>): string | undefined {
+	#componentLive(source: string, componentName: string, seen: Set<string>, sources: Set<string>): string | undefined {
 		const key = `${source}\0${componentName}`;
 		if (seen.has(key)) return undefined;
 		seen.add(key);
@@ -351,12 +412,18 @@ export class PropFlowRegistry {
 			.get(source)
 			?.flow.liveComponents?.find((candidate) => candidate.componentName === componentName);
 		if (!live) return undefined;
-		if (live.reason) return live.reason;
+		if (live.reason) {
+			sources.add(source);
+			return live.reason;
+		}
 		for (const nestedId of live.componentEdgeIds ?? []) {
 			const nested = this.#modules.get(source)?.flow.edges.find((candidate) => candidate.id === nestedId);
 			const target = nested && this.#resolve(source, nested);
-			const reason = target && this.#componentLive(target.source, target.componentName, seen);
-			if (reason) return `<${target.componentName}> inside it: ${reason}`;
+			const reason = target && this.#componentLive(target.source, target.componentName, seen, sources);
+			if (reason) {
+				sources.add(source);
+				return `<${target.componentName}> inside it: ${reason}`;
+			}
 		}
 		return undefined;
 	}
@@ -389,6 +456,7 @@ export class PropFlowRegistry {
 		componentName: string,
 		prop: string,
 		seen: Set<string>,
+		sources?: Set<string>,
 	): string | undefined {
 		const key = `${source}\0${componentName}\0${prop}`;
 		if (seen.has(key)) return undefined;
@@ -396,24 +464,35 @@ export class PropFlowRegistry {
 		for (const [callerSource, { flow, childSources }] of this.#modules)
 			for (const edge of flow.edges) {
 				if (!this.#targets(callerSource, edge, childSources, source, componentName)) continue;
-				const reason = this.#passedChanges(callerSource, edge, prop, seen);
+				const reason = this.#passedChanges(callerSource, edge, prop, seen, sources);
 				if (reason) return reason;
 			}
 		return undefined;
 	}
 
-	#passedChanges(callerSource: string, edge: FlowEdge, prop: string, seen: Set<string>): string | undefined {
+	#passedChanges(
+		callerSource: string,
+		edge: FlowEdge,
+		prop: string,
+		seen: Set<string>,
+		sources?: Set<string>,
+	): string | undefined {
 		const passed = edge.props[prop] ?? edge.spread;
 		if (!passed || passed.kind === 'fixed') return undefined;
 		const where = `<${edge.parentComponentName}> in ${callerSource}`;
-		if (passed.kind === 'changing') return `${where} passes it \`${passed.source}\`, which changes.`;
-		if (passed.kind === 'unknown')
-			return `${where} passes it \`${passed.source}\`, which the build cannot prove never changes.`;
-		for (const forwarded of passed.props.length > 0 ? passed.props : [prop]) {
-			const deeper = this.#changes(callerSource, edge.parentComponentName, forwarded, seen);
-			if (deeper) return `${where} hands it its own prop \`${forwarded}\`; ${deeper}`;
-		}
-		return undefined;
+		const reason = (): string | undefined => {
+			if (passed.kind === 'changing') return `${where} passes it \`${passed.source}\`, which changes.`;
+			if (passed.kind === 'unknown')
+				return `${where} passes it \`${passed.source}\`, which the build cannot prove never changes.`;
+			for (const forwarded of passed.props.length > 0 ? passed.props : [prop]) {
+				const deeper = this.#changes(callerSource, edge.parentComponentName, forwarded, seen, sources);
+				if (deeper) return `${where} hands it its own prop \`${forwarded}\`; ${deeper}`;
+			}
+			return undefined;
+		};
+		const found = reason();
+		if (found) sources?.add(callerSource);
+		return found;
 	}
 
 	#targets(
@@ -491,4 +570,24 @@ function projectionRefusalMessage(
 		? ` Its test reads the prop \`${changes[0]}\`, and ${changes[1]}`
 		: '';
 	return `${arm.code}: <${caller.edge.parentComponentName}> in ${caller.source} passes <${arm.componentName}> children that respond to events or show changing state (${live}), and <${arm.componentName}> in ${source} renders its children inside ${arm.construct}.${why} When that arm changes, the browser redraws it from fixed HTML, and the children stop responding. Move the state into <${arm.componentName}>, or render {children} outside the ${arm.construct.split(' ')[0]} and hide it with an attribute. If the arm never changes after the page loads, write \`// markless-allow ${arm.code}: reason\` above it.`;
+}
+
+/** Throws the projection refusals whose verdict reads `source`, as a dev overlay error. */
+export function throwDevProjectionRefusals(registry: PropFlowRegistry, source: string): void {
+	const refusals = registry.projectionRefusals().filter((refusal) => refusal.sources.has(source));
+	if (refusals.length === 0) return;
+	const details = refusals.map((refusal) => refusal.message).join('\n\n');
+	throw new MarklessCompileError({
+		version: 1,
+		// Not a file id: no single file's own compile clears it, so the overlay's per-file recheck must not own it.
+		id: `markless-projection:${source}`,
+		kind: 'compile',
+		diagnostics: refusals.map((refusal) => ({
+			code: refusal.code,
+			message: refusal.message,
+			filename: refusal.armSource,
+			docsUrl: refusal.docsUrl,
+		})),
+		details,
+	});
 }

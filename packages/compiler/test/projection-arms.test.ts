@@ -94,3 +94,22 @@ export function Pick({ children }: { readonly children?: Children }) @{
 		suppressionReason: 'the layout is chosen once',
 	});
 });
+
+test('a keyed @for placed into the child hole is live for a @try but not for an @if arm, which re-grows its rows', async () => {
+	const { projectionArms } = await compile(`const box = state({ rows: [{ id: 'a' }] });
+	<main>
+		<Panel>
+			@for (const row of box.rows; key row.id) {
+				<button type="button" onClick={() => (count = count + 1)}>{row.id}</button>
+			}
+		</Panel>
+		<Panel>
+			<em>{count}</em>
+			@for (const row of box.rows; key row.id) { <i>{row.id}</i> }
+		</Panel>
+	</main>`);
+	expect(projectionArms.liveChildren.map(({ reason, inBranch }) => ({ reason, inBranch }))).toEqual([
+		{ reason: 'it lists `box.rows`, which changes', inBranch: {} },
+		{ reason: 'it shows `count`, which changes', inBranch: undefined },
+	]);
+});

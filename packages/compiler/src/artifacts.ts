@@ -92,7 +92,13 @@ export type ProjectionLiveness = {
 
 export type ProjectionArmsArtifact = {
 	readonly passId: 'projection-arms';
-	readonly liveChildren: ReadonlyArray<ProjectionLiveness & { readonly componentEdgeId: string }>;
+	readonly liveChildren: ReadonlyArray<
+		ProjectionLiveness & {
+			readonly componentEdgeId: string;
+			/** The verdict for an @if/@switch arm, when it differs: a keyed @for retargeted into the hole re-grows its rows there. Empty when nothing stays live. */
+			readonly inBranch?: ProjectionLiveness;
+		}
+	>;
 	/** Per component: whether its own markup handles events or shows changing state. */
 	readonly components: ReadonlyArray<ProjectionLiveness & { readonly componentName: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
@@ -323,6 +329,7 @@ export type ModuleGraphInterfaceExport =
 
 /** `export { default as root } from './x.tsrx'` as the module authored it. */
 export type ModuleGraphInterfaceReexport = {
+	/** The name this module exports it as, or `*` for `export * from`, which republishes every named export. */
 	readonly exportName: string;
 	readonly source: string;
 	/** `default`, a named export, or `*` for `export * as ns from`. */

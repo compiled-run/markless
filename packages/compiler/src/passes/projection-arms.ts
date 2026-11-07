@@ -6,6 +6,7 @@ import type {
 	ProjectionLiveness,
 	RenderDataArtifact,
 	SemanticGraphArtifact,
+	SemanticKeyedRepeat,
 	SemanticMarkupChunk,
 	SemanticMarkupResidue,
 	SemanticMarkupSlot,
@@ -38,7 +39,16 @@ export function planProjectionArms(input: Input): ProjectionArmsArtifact {
 			chunk.slots.flatMap((slot) => {
 				if (slot.kind !== 'child-component' || !slot.projectionChunkId) return [];
 				const live = liveness([slot.projectionChunkId], chunks, input);
-				return live ? [{ componentEdgeId: slot.componentEdgeId, ...live }] : [];
+				if (!live) return [];
+				// A keyed @for retargeted into the child's hole re-grows its rows when an @if/@switch arm redraws.
+				const inBranch = liveness([slot.projectionChunkId], chunks, input, undefined, true) ?? {};
+				return [
+					{
+						componentEdgeId: slot.componentEdgeId,
+						...live,
+						...(JSON.stringify(inBranch) === JSON.stringify(live) ? {} : { inBranch }),
+					},
+				];
 			}),
 		),
 		components: (graph.components ?? []).flatMap((component): ProjectionArmsArtifact['components'] => {
@@ -151,6 +161,7 @@ function liveness(
 	chunks: ReadonlyMap<string, SemanticMarkupChunk>,
 	input: Input,
 	ownerName?: string,
+	skipProjectedRepeats = false,
 ): ProjectionLiveness | undefined {
 	const graph = input.semanticGraph;
 	const props = new Set<string>();
@@ -207,6 +218,7 @@ function liveness(
 					break;
 				case 'repeat': {
 					const repeat = graph.keyedRepeats.find((candidate) => candidate.id === slot.repeatId);
+					if (skipProjectedRepeats && repeat && retargetedIntoChild(repeat, chunk, chunks)) continue;
 					const deciding = repeat ? rowsDecidedBy(repeat, graph) : [];
 					if (deciding) for (const prop of deciding) props.add(prop);
 					else reason ??= `it lists \`${repeat?.collectionSource ?? ''}\`, which changes`;
@@ -230,6 +242,23 @@ function liveness(
 		...(!reason && componentEdgeIds.length ? { componentEdgeIds } : {}),
 	};
 	return Object.keys(found).length ? found : undefined;
+}
+
+// The repeat sits straight in a caller's projection and renders into the child's own element.
+function retargetedIntoChild(
+	repeat: SemanticKeyedRepeat,
+	chunk: SemanticMarkupChunk,
+	chunks: ReadonlyMap<string, SemanticMarkupChunk>,
+): boolean {
+	if (chunk.kind !== 'component-projection') return false;
+	if (repeat.ownerHostNodeId !== undefined) return true;
+	for (const candidate of chunks.values())
+		if (
+			candidate.componentName === chunk.componentName &&
+			candidate.hosts.some((host) => host.hostNodeId === repeat.parentHostNodeId)
+		)
+			return false;
+	return repeat.parentHostNodeId !== '';
 }
 
 function branchReads(
