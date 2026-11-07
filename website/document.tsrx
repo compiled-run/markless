@@ -70,6 +70,26 @@ export default function Document({
 					}
 				}
 
+				/* The tracks beside the article, for what grows into its width. A closed sidebar leaves a button's width; the attribute is painted before content, so the first frame is already right. */
+				@media (min-width: 70.01rem) {
+					.site-shell {
+						--sidebar-track: calc(16rem + var(--space-s-l));
+						--rail-track: calc(11rem + var(--space-s-l));
+					}
+
+					html[data-sidebar='closed'] .site-shell {
+						--sidebar-track: 3rem;
+						padding-left: calc(var(--space-s-l) + 3rem);
+						padding-right: calc(11rem + 2 * var(--space-s-l));
+					}
+				}
+
+				@media (min-width: 96.01rem) {
+					.site-shell {
+						--rail-track: calc(16rem + var(--space-s-l));
+					}
+				}
+
 				@media (max-width: 70rem) {
 					.site-shell {
 						padding-inline: var(--space-s-l);

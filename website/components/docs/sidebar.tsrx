@@ -1,10 +1,25 @@
-import { computed, state } from '@markless/core';
+import { computed, state, storage } from '@markless/core';
 import { tree } from '@markless/ui';
 import { Link } from '@markless/core/router';
 import ModeSelect from './mode-select.tsrx';
 import { modeFor, sidebarFor, type SidebarEntry } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
 import { INK_MARKS } from './ink-marks.ts';
+
+const SLIDE = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
+
+// The storage write lands before the next frame; there the article, drawn live, is offset back from where it was.
+// An offset, not a transform: the article holds the fixed sidebar and outline, and a transform would carry them along.
+function glide(article: HTMLElement | null, from: number | undefined) {
+	if (article === null || from === undefined || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+	requestAnimationFrame(() => {
+		const shift = from - article.getBoundingClientRect().left;
+		if (shift === 0) return;
+		article.style.position = 'relative';
+		const move = article.animate([{ left: `${shift}px` }, { left: '0px' }], SLIDE);
+		void move.finished.finally(() => article.style.removeProperty('position'));
+	});
+}
 
 // The current page's mark is the link's own state, so two pages render the sidebar alike and a navigation keeps it.
 function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
@@ -89,6 +104,7 @@ function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
 			.page-link {
 				grid-template-columns: 1.8rem minmax(0, 1fr);
 				gap: 0.5rem;
+				box-sizing: border-box;
 				min-height: var(--page-height);
 				padding: 0.15rem 0.25rem;
 				border: 0;
@@ -115,6 +131,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 		...section,
 		expanded: section.entries.some((entry) => entry.active),
 	}));
+	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
+	let shown = storage('sidebar', 'open');
+	const marks = asset(INK_MARKS) + '#';
 
 	<nav
 		id="docs-sidebar"
@@ -126,53 +145,97 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
-		<ModeSelect mode={here.key} />
-		<details class="sidebar-disclosure">
-			<summary class="sidebar-summary">Browse pages</summary>
-			<tree.root class="page-tree" aria-label="Documentation pages">
-				<div role="none">
-					@for (const section of sections; key section.title) {
-						<tree.item
-							class={'branch stroke-' + (section.stroke ?? 'pink')}
-							open={section.expanded}
-							level={1}
-							aria-label={section.title}
-						>
-							<tree.itemtrigger class="branch-trigger">
-								<tree.itemindicator class="branch-indicator" aria-hidden="true">
-									<svg class="branch-node" viewBox="0 0 24 24" fill="none">
-										<circle cx="12" cy="12" r="9" fill="currentColor" />
-										<path class="node-chevron" d="m10 8 4 4-4 4" />
+		<button
+			id="sidebar-open"
+			type="button"
+			class="sidebar-toggle sidebar-open"
+			aria-label="Open sidebar"
+			title="Open sidebar"
+			aria-expanded="false"
+			aria-controls="docs-sidebar"
+			onClick={() => {
+				const article = document.querySelector<HTMLElement>('.site-shell .prose');
+				const from = article?.getBoundingClientRect().left;
+				shown = 'open';
+				glide(article, from);
+				setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
+			}}
+		>
+			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+				<use href={marks + 'sidebar-panel'} />
+			</svg>
+		</button>
+		<div class="sidebar-scroll">
+			<div class="sidebar-head">
+				<ModeSelect mode={here.key} />
+				<button
+					id="sidebar-close"
+					type="button"
+					class="sidebar-toggle sidebar-close"
+					aria-label="Close sidebar"
+					title="Close sidebar"
+					aria-expanded="true"
+					aria-controls="docs-sidebar"
+					onClick={() => {
+						const article = document.querySelector<HTMLElement>('.site-shell .prose');
+						const from = article?.getBoundingClientRect().left;
+						shown = 'closed';
+						glide(article, from);
+						setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
+					}}
+				>
+					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
+						<use href={marks + 'sidebar-panel'} />
+					</svg>
+				</button>
+			</div>
+			<details class="sidebar-disclosure">
+				<summary class="sidebar-summary">Browse pages</summary>
+				<tree.root class="page-tree" aria-label="Documentation pages">
+					<div role="none">
+						@for (const section of sections; key section.title) {
+							<tree.item
+								class={'branch stroke-' + (section.stroke ?? 'pink')}
+								open={section.expanded}
+								level={1}
+								aria-label={section.title}
+							>
+								<tree.itemtrigger class="branch-trigger">
+									<tree.itemindicator class="branch-indicator" aria-hidden="true">
+										<svg class="branch-node" viewBox="0 0 24 24" fill="none">
+											<circle cx="12" cy="12" r="9" fill="currentColor" />
+											<path class="node-chevron" d="m10 8 4 4-4 4" />
+										</svg>
+									</tree.itemindicator>
+									<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
+									<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M12 1 C11 14 13 34 12 47" />
 									</svg>
-								</tree.itemindicator>
-								<tree.itemlabel class="branch-title">{section.title}</tree.itemlabel>
-								<svg class="branch-connector path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M12 1 C11 14 13 34 12 47" />
-								</svg>
-							</tree.itemtrigger>
-							<tree.itemcontent class="branch-content">
-								<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M1 1 V28 Q1 47 23 47" />
-								</svg>
-								<div role="none">
-									@for (const entry of section.entries; key entry.href) {
-										<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
-											<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
-												<path d="M12 1 V23" />
-											</svg>
-											<PageLink entry={entry} />
-										</tree.item>
-									}
-								</div>
-								<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
-									<path d="M39 1 C39 26 1 6 1 31" />
-								</svg>
-							</tree.itemcontent>
-						</tree.item>
-					}
-				</div>
-			</tree.root>
-		</details>
+								</tree.itemtrigger>
+								<tree.itemcontent class="branch-content">
+									<svg class="branch-elbow path-line" viewBox="0 0 24 48" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M1 1 V28 Q1 47 23 47" />
+									</svg>
+									<div role="none">
+										@for (const entry of section.entries; key entry.href) {
+											<tree.item leaf level={2} class="page-node" aria-label={entry.title} data-page-href={entry.href}>
+												<svg class="page-connector path-line" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden="true">
+													<path d="M12 1 V23" />
+												</svg>
+												<PageLink entry={entry} />
+											</tree.item>
+										}
+									</div>
+									<svg class="branch-return path-line" viewBox="0 0 40 32" preserveAspectRatio="none" aria-hidden="true">
+										<path d="M39 1 C39 26 1 6 1 31" />
+									</svg>
+								</tree.itemcontent>
+							</tree.item>
+						}
+					</div>
+				</tree.root>
+			</details>
+		</div>
 
 		<style>
 			/* The nav list is inside a <details> with no `open` attribute, so a phone gets
@@ -218,58 +281,55 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
+			/* The nav slides as one piece; the list inside it scrolls, so nothing the slide moves is clipped. */
 			.sidebar {
 				position: fixed;
 				left: var(--space-s-l);
 				top: calc(var(--header-height) + var(--space-s));
 				width: 16rem;
-				max-height: calc(100vh - var(--header-height) - var(--space-s));
-				overflow-y: auto;
-				overscroll-behavior: contain;
-				/* The rail scrolls, but its track is not part of the drawing: the fade at the
-				   bottom (T017) is what says there is more list under the fold. */
-				scrollbar-width: none;
-				padding-block: var(--space-s);
 				font-size: var(--step--1);
 			}
 
-			.sidebar::-webkit-scrollbar {
-				display: none;
+			.sidebar-scroll {
+				max-height: calc(100vh - var(--header-height) - var(--space-s));
+				overflow-y: auto;
+				overscroll-behavior: contain;
+				scrollbar-width: none;
+				padding-block: 0.5rem 1rem;
 			}
 
-			@media (min-width: 70.01rem) and (max-height: 62rem) {
-				.sidebar {
-					mask-image: linear-gradient(to bottom, #000 calc(100% - 3rem), transparent 100%);
-				}
+			.sidebar-scroll::-webkit-scrollbar {
+				display: none;
 			}
 
 			@media (max-width: 70rem) {
 				.sidebar {
 					position: static;
 					width: auto;
-					max-height: none;
 					max-width: 68ch;
 					margin-inline: auto;
+				}
+
+				.sidebar-scroll {
+					max-height: none;
+					overflow: visible;
 					padding-block: var(--space-s) 0;
 				}
 			}
 
-			.sidebar {
-				padding-block: 0.5rem 1rem;
-				mask-image: none;
-			}
-
 			.page-tree {
-				--branch-height: 2.75rem;
+				--branch-height: 2.5rem;
+				--branch-gap: 0.375rem;
 				--page-height: 2.5rem;
 				--path-ink: var(--muted-ink);
 				font-size: 1rem;
+				line-height: 1.3;
 				padding: 0.2rem;
 			}
 
 			.branch {
 				position: relative;
-				padding-block-end: 0.5rem;
+				padding-block-end: var(--branch-gap);
 			}
 
 			.branch-trigger {
@@ -280,7 +340,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				gap: 0.65rem;
 				width: 100%;
 				min-height: var(--branch-height);
-				padding: 0.35rem 0.25rem;
+				padding: 0.2rem 0.25rem;
 				border: 0;
 				border-radius: 5px;
 				background: transparent;
@@ -338,7 +398,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				inset-inline-start: 0.25rem;
 				inset-block-start: calc(50% + 0.7rem);
 				width: 1.25rem;
-				height: calc(100% - 0.9rem);
+				height: calc(100% + var(--branch-gap) - 1.4rem);
 			}
 
 			.branch[ui-open] > .branch-trigger .branch-connector,
@@ -375,11 +435,12 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 
 			.branch-return {
 				position: relative;
+				display: block;
 				inset-inline-start: -0.625rem;
 				width: 1.775rem;
-				height: calc(1.05rem + var(--branch-height) / 2);
+				height: calc(1.7rem + var(--branch-height) / 2);
 				margin-block-start: 0.1rem;
-				margin-block-end: calc(0.2rem - var(--branch-height) / 2);
+				margin-block-end: calc(0.7rem - var(--branch-gap) - var(--branch-height) / 2);
 			}
 
 			.page-node {
@@ -388,9 +449,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 
 			.page-connector {
 				inset-inline-start: 0.25rem;
-				inset-block-start: calc(50% + 1rem);
+				inset-block-start: calc(50% + 0.8rem);
 				width: 1.8rem;
-				height: calc(100% - 2rem);
+				height: calc(100% - 1.6rem);
 			}
 
 			.branch-trigger:hover,
@@ -405,13 +466,82 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				outline: none;
 			}
 
-			@media (max-width: 70rem) {
-				.page-tree {
-					--page-height: 2.75rem;
+			.sidebar-head {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				margin-bottom: var(--space-s);
+				padding-inline-end: 0.5rem;
+			}
+
+			.sidebar-toggle {
+				display: none;
+				align-items: center;
+				justify-content: center;
+				flex: none;
+				inline-size: 2.25rem;
+				block-size: 2.25rem;
+				padding: 0;
+				color: var(--ink);
+				background: none;
+				border: 0;
+				border-radius: 6px;
+				cursor: pointer;
+			}
+
+			.sidebar-toggle:hover {
+				background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent);
+			}
+
+			.sidebar-toggle:focus-visible {
+				outline: 2px dashed var(--ink);
+				outline-offset: 2px;
+			}
+
+			.sidebar-toggle-icon {
+				inline-size: 1.5rem;
+				block-size: 1.5rem;
+				overflow: visible;
+			}
+
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; the nav slides on a transition and the article glides back from its old spot, both by translate only. */
+			@media (min-width: 70.01rem) {
+				.sidebar {
+					transition:
+						translate 200ms cubic-bezier(0.2, 0, 0, 1),
+						visibility 0s;
+				}
+
+				.sidebar-close {
+					display: inline-flex;
+				}
+
+				.sidebar-open {
+					position: absolute;
+					inset-inline-start: calc(100% + var(--space-s-l));
+					inset-block-start: 0.5rem;
+				}
+
+				html[data-sidebar='closed'] .sidebar {
+					translate: calc(-100% - var(--space-s-l)) 0;
+					visibility: hidden;
+					transition:
+						translate 200ms cubic-bezier(0.2, 0, 0, 1),
+						visibility 0s 200ms;
+				}
+
+				html[data-sidebar='closed'] .sidebar-open {
+					display: inline-flex;
+					visibility: visible;
 				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
+				.sidebar,
+				html[data-sidebar='closed'] .sidebar {
+					transition: none;
+				}
+
 				.node-chevron {
 					transition: none;
 				}

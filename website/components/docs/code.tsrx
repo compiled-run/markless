@@ -216,12 +216,18 @@ export default function Code({
 				}
 			}
 
-			@media (min-width: 96.01rem) {
+			/* On a docs page the block can grow to the article track, which widens when the sidebar closes. */
+			@media (min-width: 70.01rem) {
 				.code-block {
-					--code-wide: min(1100px, 100vw - 2 * (17rem + var(--space-s-l)));
-					--code-font-size: clamp(0.9rem, 1.8cqi, 1.2rem);
+					--code-wide: min(1100px, 100vw - 2 * var(--space-s-l) - var(--sidebar-track, 17rem) - var(--rail-track, 17rem));
 					width: max(calc(100% + var(--code-bleed)), var(--code-wide));
 					margin-inline-start: calc(50% - max(calc(100% + var(--code-bleed)), var(--code-wide)) / 2);
+				}
+			}
+
+			@media (min-width: 96.01rem) {
+				.code-block {
+					--code-font-size: clamp(0.9rem, 1.8cqi, 1.2rem);
 				}
 			}
 
