@@ -24,7 +24,7 @@ import EditorFigure from '../../components/figures/editor-setup/editor-figure.ts
 }
 ```
 
-The **TSRX extension** colours the file and knows `@if` and `@{ }`. The **Markless TypeScript plugin**, named here, adds hover types, suggestions and red lines.
+The **TSRX Syntax** extension colours the file and knows `@if` and `@{ }`. The **Markless TypeScript plugin**, named here, adds hover types, suggestions and red lines.
 
 ## The extension colours, the plugin understands
 
@@ -63,15 +63,15 @@ Not sure a line is right? Run `npm run doctor -- --no-build`. It prints the `tsr
 
 ## Each editor finds the pieces its own way
 
-- **VS Code, Cursor or Windsurf.** Install the TSRX extension. The app's `.vscode/extensions.json` recommends it, so the editor offers it when you open the folder.
+- **VS Code, Cursor or Windsurf.** Install [TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin) from the Marketplace. Cursor, Windsurf and other VS Code forks install it [from Open VSX](https://open-vsx.org/extension/TSRX/tsrx-vscode-plugin). The app's `.vscode/extensions.json` recommends it, so the editor offers it when you open the folder.
 - **Zed.** Nothing to install. The app's `.zed/settings.json` opens `.tsrx` files as TSX and loads the plugin.
 - **Any other editor** that runs TypeScript's own language server, such as WebStorm, reads the same `tsconfig.json` lines.
 
 ```bash
-code --install-extension ripple-ts.ripple-ts-vscode-plugin
+code --install-extension TSRX.tsrx-vscode-plugin
 ```
 
-That installs the extension from a terminal. Remove the old `markless.markless` extension if you have it, or the two fight over `.tsrx` files.
+That installs the extension from a terminal. If you have the older `ripple-ts.ripple-ts-vscode-plugin` installed, uninstall it, or the two fight over `.tsrx` files.
 
 ## Hints name the element
 
