@@ -10,6 +10,12 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.13.0
+
+No user-facing changes in the released packages.
+
+[All 2 commits since v0.12.0](https://github.com/compiled-run/markless/compare/44e2ecf53b88a7aad24541c3432fbe73e033c372...v0.13.0)
+
 ## 0.12.0
 
 ### General
