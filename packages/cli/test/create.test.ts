@@ -432,13 +432,13 @@ test('creates a minimal Markless Router app with TSRX pages and Nitro-backed dep
 	// longer exists is what silently kills syntax highlighting in a scaffolded app.
 	expect(vscodeSettings).toEqual({
 		'emmet.includeLanguages': {
-			ripple: 'html',
+			tsrx: 'html',
 		},
 	});
 	// Editor support comes from the upstream extension plus @markless/typescript-plugin.
 	// Recommending it (and never marking it unwanted) is the whole editor setup story.
 	expect(vscodeExtensions).toEqual({
-		recommendations: ['ripple-ts.ripple-ts-vscode-plugin'],
+		recommendations: ['TSRX.tsrx-vscode-plugin'],
 	});
 	await expect(exists(join(appRoot, '.zed'))).resolves.toBe(false);
 	await expect(exists(join(appRoot, 'AGENTS.md'))).resolves.toBe(false);

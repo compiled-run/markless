@@ -21,8 +21,9 @@ file with `markless-tsc`, the TypeScript command line with `.tsrx` support. Each
 `tsconfig.json` carries the editor wiring: the `plugins` entries load the Markless
 TypeScript plugin, and the top-level `tsrx` block tells it which compiler to use. Any editor
 built on TypeScript's own language server (`tsserver`) reads that file — VS Code with the
-upstream TSRX extension (`ripple-ts.ripple-ts-vscode-plugin`), WebStorm, and Zed all do — so
-completions, hover, and go-to-definition work in `.tsrx` files.
+[TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin) extension (`TSRX.tsrx-vscode-plugin`), WebStorm, and Zed all
+do — so completions, hover, and go-to-definition work in `.tsrx` files. Cursor, Windsurf and
+other VS Code forks install the same extension [from Open VSX](https://open-vsx.org/extension/TSRX/tsrx-vscode-plugin).
 
 {{editorNote}}
 

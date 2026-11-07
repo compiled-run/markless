@@ -1,11 +1,11 @@
 // A VS Code-style window: the Extensions sidebar with the TSRX extension and its Install button, and profile.tsrx in the editor, plain before the install and in colour after, with a hover on `name` and a squiggle once `name` is misspelt.
 import { roundRect } from '../ink/desk.ts';
-import { hatch, line, outline, type P, pathOf, stroke } from '../ink/ink.ts';
+import { hatch, line, outline, pathOf, stroke } from '../ink/ink.ts';
 import { desk, type Run, type SheetSpec } from '../ink/sheets.ts';
 import { ADV, boxOf, part, PITCH, squiggle } from './ui.ts';
 
-/** The extension as the Marketplace lists it: name, description and publisher from its package.json (2.0.75), installs from the Marketplace on 2026-11-05 (1,408, which VS Code's list shows as 1K). */
-export const EXTENSION = { name: 'TSRX for VS Code', description: 'TSRX JavaScript/TypeScript language support', publisher: 'ripple-ts', id: 'ripple-ts.ripple-ts-vscode-plugin', installs: '1K' };
+/** The extension as the Marketplace lists it: name, description and publisher from its package.json (2.2.4), installs from the Marketplace gallery API on 2026-11-07. */
+export const EXTENSION = { name: 'TSRX Syntax for VS Code', description: 'TSRX JavaScript/TypeScript language support', publisher: 'TSRX', id: 'TSRX.tsrx-vscode-plugin', installs: '134' };
 /** The words a search matches, as the Marketplace matches name, description and publisher. */
 export const MATCHES = (EXTENSION.name + ' ' + EXTENSION.description + ' ' + EXTENSION.publisher).toLowerCase();
 /** The steps the figure walks the reader through, and the pencil hint for each. */
@@ -46,18 +46,13 @@ const INSTALL = { u0: ACT + 1.9, v0: BAR + 4.5, u1: ACT + 5.1, v1: BAR + 5.5 };
 const SEARCH = { u0: ACT + 0.3, v0: BAR + 1.25, u1: ACT + SIDE - 0.3, v1: BAR + 2.05 };
 const LOGO = { u: ACT + 1.0, v: BAR + 3.25, size: 0.82 };
 
-/** The TSRX extension's icon (icons/logo.png, 512 px), traced as ink: an outer arc, a short arc across from it, a ring, an inner arc and a dot, all around one centre. */
+/** The TSRX extension's icon (icons/logo.png): a filled square with TSRX lettered in its bottom-right corner. */
 function logo(k: ReturnType<typeof scene>, seed: number) {
-	const c: P = [262, 268];
-	const at = (x: number, y: number): [number, number] => [LOGO.u + ((x - c[0]) / 512) * LOGO.size * 2, LOGO.v + ((y - c[1]) / 512) * LOGO.size * 2];
-	const arc = (r: number, a0: number, a1: number): [number, number][] => Array.from({ length: 28 }, (_, i) => {
-		const a = ((a0 + ((a1 - a0) * i) / 27) * Math.PI) / 180;
-		return at(c[0] + Math.cos(a) * r, c[1] + Math.sin(a) * r);
-	});
-	const w = 1.8;
-	const ink = [arc(220, 148, 301), arc(220, 16, 62), arc(150, 0, 360), arc(80, 150, 304)].map((pts, i) => stroke(k.raw.on('win', pts, 0.02), { w, seed: seed + i, over: 0, wobble: 0.2 })).join('');
-	const dot = k.raw.on('win', Array.from({ length: 16 }, (_, i) => at(c[0] + Math.cos((i / 16) * Math.PI * 2) * 30, c[1] + Math.sin((i / 16) * Math.PI * 2) * 30)), 0.02);
-	k.raw.path(ink + pathOf(dot, true), 'logo-ink');
+	const [u0, v0, u1, v1] = [LOGO.u - LOGO.size, LOGO.v - LOGO.size, LOGO.u + LOGO.size, LOGO.v + LOGO.size];
+	const [tu, tv] = [u1 - 1.3, v1 - 0.62];
+	k.raw.path(hatch(k.raw.on('win', [[u0, v0], [u1, v0], [u1, tv], [tu, tv], [tu, v1], [u0, v1]]), 0.9, 1.6, seed, { cluster: 4, skip: 0.1 }), 'sheet-hatch');
+	k.raw.path(outline(k.raw.on('win', [[u0, v0], [u1, v0], [u1, v1], [u0, v1]]), { w: 1.1, seed: seed + 1 }), 'sheet-ink');
+	k.row('win', tu + 0.12, v1 - 0.16, 'TSRX', 'bold small');
 }
 
 const scene = () => desk(680, [WIN], [], { elevation: 72 });
@@ -94,7 +89,7 @@ export function drawing() {
 		squiggle: draw((k) => squiggle(k, 'win', U, NAME_USE, NAME_USE + 4, row(H2), 3940)),
 		listing: draw((k) => {
 			logo(k, 3950);
-			k.row('win', ACT + 1.9, BAR + 2.85, EXTENSION.name, 'bold');
+			k.row('win', ACT + 1.9, BAR + 2.85, EXTENSION.name.slice(0, 15) + '…', 'bold');
 			k.row('win', ACT + 1.9, BAR + 3.45, EXTENSION.description.slice(0, 21) + '…', 'dim small');
 			k.row('win', ACT + 1.9, BAR + 4.05, EXTENSION.publisher, 'dim small');
 			const d: [number, number] = [ACT + 4.9, BAR + 3.8];
