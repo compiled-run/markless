@@ -128,6 +128,9 @@ const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 const NESTED_REPEATS = ['web/fns/nested-repeats'];
 // The per-row @if flip, folded only into a repeat whose row template carries one.
 const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
+// Rows that are comment ranges, and rows an @if arm renders, each wired only for a repeat that has them.
+const ROW_RANGES = ['web/fns/served-row-ranges'];
+const ARM_ROWS = ['web/resume-repeat-branch-arm'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -310,6 +313,8 @@ export function createRuntimeDemandMap(
 			'web/dom-update',
 			'web/dom-journal',
 			...KEYED_REPEAT,
+			...ROW_RANGES,
+			...ARM_ROWS,
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...HELD_INPUTS,
@@ -1016,6 +1021,8 @@ function payloadDemandRecords(
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
+				...(record.rowRange ? ROW_RANGES : []),
+				...(record.branchArm ? ARM_ROWS : []),
 				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
 		})),

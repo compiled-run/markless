@@ -253,7 +253,9 @@ export function wireKeyedRepeats(
 			}
 		};
 		const follow = repeat.branchArm
-			? armRows!.followBranchArm(parent, repeat, input, arm, adopt)
+			? armRows!.followBranchArm(parent, repeat, input, arm, adopt, () =>
+					readKeyedRepeatCollection(input.graph, repeat),
+				)
 			: undefined;
 		if (!follow) {
 			arm.mounted = items.length === 0;
@@ -454,7 +456,7 @@ function applyKeyedRepeatRowOrder(
 			if (!(repeat.rowTemplate ?? repeat.rowComponent) || !mint || !values) return;
 			if (repeat.emptyArm && arm.mounted && arm.nodes.length === 0)
 				arm.nodes = mint.servedEmptyArm(parent, repeat, rangeEnd);
-			rowRoot = mint.mintRow(parent, repeat, item, graph, values);
+			rowRoot = mint.mintRow(parent, repeat, item, graph, values, rowRanges?.wrapRowRange);
 			if (!rowRoot) return;
 			if (focus?.length && rowRoot.nodeType === 1) focused.push([rowRoot, focus]);
 			rowRootsByKey.set(rowKey, rowRoot);

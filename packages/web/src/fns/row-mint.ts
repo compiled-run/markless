@@ -9,10 +9,6 @@ import type {
 	ResumeKeyedRepeatRecord,
 	ResumeRowRoot,
 } from '../resume-types.ts';
-import {
-	PROTOCOL_ROW_END_COMMENT,
-	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-row-markers.ts';
 
 /**
  * The nodes a resumed client BUILDS for a keyed repeat, and nothing else.
@@ -119,14 +115,18 @@ export function mintRow(
 	item: unknown,
 	graph?: RowMintGraph,
 	values?: ReadonlyArray<unknown>,
+	// From `fns/served-row-ranges`, which a page loads only when a list's rows are not one element each.
+	wrapRange?: RowRangeWrap,
 ): ResumeRowRoot {
 	if (!repeat.rowRange) return mintRowNodes(parent, repeat, item, graph, values).rowRoot;
 	// A row that is not one element is placed between its own row comments; text alone is a row too.
-	return wrapRowRange(
-		parent,
-		buildRowNodes(parent, repeat, item, graph, values),
-	)[0] as ResumeRowRoot;
+	return wrapRange!(parent, buildRowNodes(parent, repeat, item, graph, values))[0] as ResumeRowRoot;
 }
+
+export type RowRangeWrap = (
+	parent: ResumeDomElement,
+	nodes: ReadonlyArray<ResumeDomNode>,
+) => ResumeDomNode[];
 
 /**
  * The same mint, answering with the whole fragment as well as the row root.
@@ -441,41 +441,4 @@ function repeatRuntimeError(repeat: ResumeKeyedRepeatRecord, code: string, detai
 	error.repeatId = repeat.id;
 	error.docsUrl = `https://markless.dev/errors/${code}`;
 	return error;
-}
-
-// A keyed row that is not one element lives between two row comments and is named by its start comment.
-type RowSibling = ResumeDomNode & {
-	readonly nextSibling?: RowSibling | null;
-	readonly data?: string;
-};
-
-/** The row's nodes in order, both of its comments included. */
-export function rowRangeNodes(start: ResumeDomNode): ResumeDomNode[] {
-	const nodes: ResumeDomNode[] = [start];
-	let depth = 0;
-	for (let at = (start as RowSibling).nextSibling; at; at = at.nextSibling) {
-		nodes.push(at);
-		if (at.nodeType !== 8) continue;
-		if (at.data === PROTOCOL_ROW_START_COMMENT) depth++;
-		else if (at.data === PROTOCOL_ROW_END_COMMENT && !depth--) break;
-	}
-	return nodes;
-}
-
-/** A built row's nodes between a fresh pair of row comments, siblings in a fragment until the row is placed. */
-export function wrapRowRange(
-	parent: ResumeDomElement,
-	nodes: ReadonlyArray<ResumeDomNode>,
-): ResumeDomNode[] {
-	const document = parent.ownerDocument as {
-		createComment?: (data: string) => ResumeDomNode;
-		createDocumentFragment?: () => { append: (...nodes: ResumeDomNode[]) => void };
-	};
-	const wrapped = [
-		document.createComment!(PROTOCOL_ROW_START_COMMENT),
-		...nodes,
-		document.createComment!(PROTOCOL_ROW_END_COMMENT),
-	];
-	document.createDocumentFragment!().append(...wrapped);
-	return wrapped;
 }

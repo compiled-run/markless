@@ -2,14 +2,14 @@ import { expect, test } from 'vitest';
 import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
+	PROTOCOL_ROW_COMMENT,
 	PROTOCOL_UNCOUNTED_COMMENT,
 } from '../src/protocol-page-markers.ts';
-import { PROTOCOL_ROW_END_COMMENT, PROTOCOL_ROW_START_COMMENT } from '../src/protocol-row-markers.ts';
 
 test('a page census skips row comments and arm-branch anchors, and counts every other comment', () => {
 	for (const skipped of [
-		PROTOCOL_ROW_START_COMMENT,
-		PROTOCOL_ROW_END_COMMENT,
+		PROTOCOL_ROW_COMMENT,
+		`/${PROTOCOL_ROW_COMMENT}`,
 		'markless:arm-branch:0',
 		'/markless:arm-branch:0:after',
 	])

@@ -1,5 +1,4 @@
 import type { RuntimeGraph } from '@markless/runtime';
-import { readKeyedRepeatCollection } from './resume-keyed-repeats.ts';
 import type {
 	ResumeBranchArmEntry,
 	ResumeDomElement,
@@ -19,6 +18,8 @@ export function followBranchArm(
 	},
 	arm: { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> },
 	adopt: (rows: ReadonlyArray<ResumeDomNode>, items: ReadonlyArray<unknown>) => void,
+	// The list's items, read by the caller so this module, loaded on its own, imports none of the repeat runtime.
+	readItems: () => ReadonlyArray<unknown>,
 ): {
 	readonly showing: (rows?: ReadonlyMap<unknown, ResumeRowRoot>) => boolean;
 	readonly end: () => ResumeDomNode | undefined;
@@ -49,7 +50,7 @@ export function followBranchArm(
 	const paint = () => {
 		if (shown.start) (shown.start as ArmRowsAnchor).__marklessArmRows = sources;
 		const nodes = showing() ? rowNodes(parent, shown, repeat) : [],
-			items = nodes.length ? readKeyedRepeatCollection(input.graph, repeat) : [],
+			items = nodes.length ? readItems() : [],
 			rows = nodes.filter((node) => node.nodeType === 1);
 		arm.mounted = nodes.length > 0 && items.length === 0;
 		arm.nodes = arm.mounted ? nodes : [];

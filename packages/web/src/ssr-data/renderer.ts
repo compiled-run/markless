@@ -1,10 +1,7 @@
 import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projection-html.ts';
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { KeepParts } from '../fns/keep-parts-hook.ts';
-import {
-	PROTOCOL_ROW_END_COMMENT,
-	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-row-markers.ts';
+import { PROTOCOL_ROW_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,
@@ -878,7 +875,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								html: rows
 									.map((row) =>
 										record?.rowRange
-											? `<!--${PROTOCOL_ROW_START_COMMENT}-->${row.html}<!--${PROTOCOL_ROW_END_COMMENT}-->`
+											? `<!--${PROTOCOL_ROW_COMMENT}-->${row.html}<!--/${PROTOCOL_ROW_COMMENT}-->`
 											: row.html,
 									)
 									.join(''),

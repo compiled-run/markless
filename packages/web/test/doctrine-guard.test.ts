@@ -56,8 +56,6 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		"The same claim collects that arm's own nodes up to its end anchor, never the page.",
 	'packages/web/src/fns/row-locals.ts :: const data = at.nodeType === 8 ? at.data : undefined;':
 		"A handler's row locals walk back from the row's own top-level node to its start comment, past whole sibling rows, never the page.",
-	'packages/web/src/fns/row-mint.ts :: if (at.nodeType !== 8) continue;':
-		"A ranged row's nodes are walked from its own start comment to its matching end comment, never the page.",
 	'packages/web/src/fns/served-row-ranges.ts :: if (at.nodeType !== 8) continue;':
 		"A ranged row's nodes are walked from its own start comment to its matching end comment, never the page.",
 	'packages/web/src/fns/served-row-ranges.ts :: const data = node.nodeType === 8 ? (node as ResumeDomComment).data : undefined;':

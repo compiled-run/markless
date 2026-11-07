@@ -219,702 +219,6 @@
 			"date": "2026-11-07"
 		},
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"serializer/protocol-row-markers"
-			],
-			"set": 327,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/enclosing-catch"
-			],
-			"set": 966,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/served-row-ranges"
-			],
-			"set": 1348,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/prerender/owning-surface"
-			],
-			"set": 399,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"runtime/graph"
-			],
-			"delta": 1350,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"runtime/graph-async"
-			],
-			"remove": true,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"runtime/graph-computed"
-			],
-			"delta": 97,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"serializer/protocol-page-markers"
-			],
-			"delta": 96,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/row-locals"
-			],
-			"delta": 631,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/row-placed-derive"
-			],
-			"delta": 266,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/payload-graph-construct"
-			],
-			"delta": -1485,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/prerender/evaluator"
-			],
-			"delta": 2937,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/reconcile-plane-slot"
-			],
-			"delta": 33,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/render"
-			],
-			"delta": 90,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume"
-			],
-			"delta": 81,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-anchor-census"
-			],
-			"delta": -71,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-arm-keyed-repeats"
-			],
-			"delta": 52,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-arm-records"
-			],
-			"delta": 389,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-async-wiring"
-			],
-			"delta": 2017,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-branches"
-			],
-			"delta": 422,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-commit-arm"
-			],
-			"delta": 360,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 887,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 1691,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-repeat-branch-arm"
-			],
-			"delta": 854,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-resettle-hold"
-			],
-			"delta": 181,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime"
-			],
-			"delta": 641,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime-start"
-			],
-			"delta": 44,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-sync-computed"
-			],
-			"delta": -417,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-sync-demand"
-			],
-			"delta": 681,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/ssr-data/renderer"
-			],
-			"delta": 527,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 332,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"serializer/protocol-row-markers"
-			],
-			"set": 327,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/enclosing-catch"
-			],
-			"set": 966,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/served-row-ranges"
-			],
-			"set": 1348,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/prerender/owning-surface"
-			],
-			"set": 399,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph"
-			],
-			"delta": 1350,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph-async"
-			],
-			"remove": true,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph-computed"
-			],
-			"delta": 97,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"serializer/protocol-page-markers"
-			],
-			"delta": 96,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/row-locals"
-			],
-			"delta": 631,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/row-placed-derive"
-			],
-			"delta": 266,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/payload-graph-construct"
-			],
-			"delta": -1485,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/prerender/evaluator"
-			],
-			"delta": 2937,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/reconcile-plane-slot"
-			],
-			"delta": 33,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/render"
-			],
-			"delta": 90,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume"
-			],
-			"delta": 81,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-anchor-census"
-			],
-			"delta": -71,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-arm-keyed-repeats"
-			],
-			"delta": 52,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-arm-records"
-			],
-			"delta": 389,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 2017,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-branches"
-			],
-			"delta": 422,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-commit-arm"
-			],
-			"delta": 360,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 887,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-keyed-repeats"
-			],
-			"delta": 1677,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-repeat-branch-arm"
-			],
-			"delta": 854,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-resettle-hold"
-			],
-			"delta": 181,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime"
-			],
-			"delta": 641,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime-start"
-			],
-			"delta": 44,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-sync-computed"
-			],
-			"delta": -417,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-sync-demand"
-			],
-			"delta": 681,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/ssr-data/renderer"
-			],
-			"delta": 527,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 167,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 331,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
-			"date": "2026-11-07"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -1364,6 +668,680 @@
 			],
 			"delta": 1085,
 			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row props, handler shapes, resume cache with the scope off); measured against origin/main on this Mac",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/enclosing-catch"
+			],
+			"set": 991,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1656,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/owning-surface"
+			],
+			"set": 399,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 960,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 159,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-locals"
+			],
+			"delta": 637,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": -1368,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 2937,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render"
+			],
+			"delta": 90,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-anchor-census"
+			],
+			"delta": -71,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-records"
+			],
+			"delta": 389,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 2051,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 360,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 887,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1756,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 797,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 181,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 669,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 44,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": -403,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 298,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 519,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 370,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/enclosing-catch"
+			],
+			"set": 991,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1656,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/owning-surface"
+			],
+			"set": 399,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 960,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 159,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-locals"
+			],
+			"delta": 637,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": -1368,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 2937,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render"
+			],
+			"delta": 90,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-anchor-census"
+			],
+			"delta": -71,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-records"
+			],
+			"delta": 389,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 2051,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 360,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 887,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1756,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 797,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 181,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 669,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 44,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": -403,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 298,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 519,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 169,
+			"reason": "Async chain merged for review (async planes with a refresh half loaded on first refresh, busy marks, quiet refreshes, the dispatcher marking user actions, handler rejections to @catch, keyed rows of any shape with ranged-row code loaded only for ranged rows, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 331,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		}
 	]

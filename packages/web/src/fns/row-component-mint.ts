@@ -24,13 +24,13 @@ import {
 	patchRow,
 	refocus,
 	renderEmptyArm,
-	rowRangeNodes,
 	servedEmptyArm,
 	shownRowGraph,
 	slotValue,
-	wrapRowRange,
 	type RowMintGraph,
+	type RowRangeWrap,
 } from './row-mint.ts';
+import { rowRangeNodes, wrapRowRange } from './served-row-ranges.ts';
 import { marklessRowSlotReader, type RowSlotReader } from './row-slot-mint.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP } from '../../../serializer/src/protocol-prop-prefix.ts';
@@ -98,6 +98,7 @@ export type RowComponentMintApi = {
 		item: unknown,
 		graph?: RowMintGraph,
 		values?: ReadonlyArray<unknown>,
+		wrapRange?: RowRangeWrap,
 	): ResumeRowRoot | undefined;
 	/** Answers a row's expression slots through the owning component's render-data reader. */
 	slotReader(
@@ -193,9 +194,9 @@ export function marklessRowComponentMint(
 		patchRow,
 		refocus,
 		shownRowGraph,
-		mintRow(parent, repeat, item, rowMintGraph, values) {
+		mintRow(parent, repeat, item, rowMintGraph, values, wrapRange) {
 			if (!repeat.rowComponent)
-				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph, values);
+				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph, values, wrapRange);
 			const rowKey = rowKeyOf(item, repeat),
 				row = prepared.get(repeat.id)?.get(rowKey);
 			if (row) renderedFor(repeat).set(rowKey, itemCopy(item));

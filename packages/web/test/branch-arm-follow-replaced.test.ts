@@ -27,6 +27,7 @@ function setUp() {
 		{ graph: { read: () => [] }, storeContainerSubscription: () => {} } as never,
 		{ mounted: false, nodes: [] },
 		() => {},
+		() => [],
 	)!;
 	const row = (attached: boolean): Row => ({ nodeType: 1, parentElement: attached ? parent : null });
 	return { parent, follow, row };

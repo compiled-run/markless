@@ -55,6 +55,25 @@ const parts = {
 	awaitsAncestor(...args: Parameters<typeof awaitsAsyncAncestor>) {
 		return awaitsAsyncAncestor(...args);
 	},
+	// A CSR mount serves no snapshot for a sync computed only an async value's key reads: nothing
+	// write-triggered has run yet, so its first demand would read it unresolved. Derive it once now.
+	async deriveAsyncKeys(
+		input: Omit<SyncRefresh, 'computed' | 'records'>,
+		records: ReadonlyArray<SyncRefresh['computed']>,
+		all: NonNullable<SyncRefresh['records']>,
+	) {
+		const keys = new Set(
+			all.flatMap((record) => (record.async ? (record.dependencies ?? []).map((d) => d.graphNodeId) : [])),
+		);
+		const unresolved = records.filter(
+			(computed) => keys.has(computed.graphNodeId) && input.graph.read(computed.graphNodeId, []) === undefined,
+		);
+		if (unresolved.length === 0) return;
+		const { refreshSyncComputed } = await import('../resume-sync-computed.ts');
+		await Promise.all(
+			unresolved.map((computed) => refreshSyncComputed({ ...input, computed, records: all })),
+		);
+	},
 	busy: {
 		note(...args: Parameters<typeof note>) {
 			note(...args);
@@ -125,6 +144,7 @@ function awaitsAsyncValue(
 }
 
 type Decode = (payload: SerializedGraphPayload) => Promise<unknown>;
+type SyncRefresh = Parameters<typeof import('../resume-sync-computed.ts').refreshSyncComputed>[0];
 
 async function asyncComputedFromRecord(
 	computed: ProtocolStatePayload['computed'][number],
@@ -220,6 +240,11 @@ export type AsyncPlaneSlot = {
 	fromRecord?: typeof asyncComputedFromRecord;
 	awaits?: typeof awaitsAsyncValue;
 	awaitsAncestor?: typeof awaitsAsyncAncestor;
+	deriveAsyncKeys?: (
+		input: Omit<SyncRefresh, 'computed' | 'records'>,
+		records: ReadonlyArray<SyncRefresh['computed']>,
+		all: NonNullable<SyncRefresh['records']>,
+	) => Promise<void>;
 	busy?: {
 		readonly note: typeof note;
 		readonly set: typeof set;

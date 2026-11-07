@@ -50,11 +50,8 @@ export function marklessOwningSurface(
 			seen.add(reach.surface);
 			for (const definition of Object.values(reach.surface.components))
 				for (const edge of definition.edges ?? []) {
-					const imported =
-						childEdgeSurface(reach.surface, edge) !== reach.surface
-							? childEdgeSurface(reach.surface, edge)
-							: undefined;
-					if (imported)
+					const imported = childEdgeSurface(reach.surface, edge);
+					if (imported && imported !== reach.surface)
 						next.push({
 							surface: imported,
 							hostPrefix: reach.hostPrefix + edge.hostPrefix,

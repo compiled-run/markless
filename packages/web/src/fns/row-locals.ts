@@ -1,9 +1,6 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ResumeDomElement, ResumeDomNode, ResumeViewRecord } from '../resume-types.ts';
-import {
-	PROTOCOL_ROW_END_COMMENT,
-	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-row-markers.ts';
+import { PROTOCOL_ROW_COMMENT } from '../../../serializer/src/protocol-page-markers.ts';
 
 // The items of the keyed rows an element sits in, for a callback a row passed the component it renders.
 export function marklessRowLocals(
@@ -51,8 +48,8 @@ function rangeLocals(node: ResumeDomNode): Record<string, unknown> | undefined {
 	let depth = 0;
 	for (let at = (node as Sibling).previousSibling; at; at = at.previousSibling) {
 		const data = at.nodeType === 8 ? at.data : undefined;
-		if (data === PROTOCOL_ROW_END_COMMENT) depth++;
-		else if (data === PROTOCOL_ROW_START_COMMENT && !depth--) return at.__marklessRowLocals?.();
+		if (data === `/${PROTOCOL_ROW_COMMENT}`) depth++;
+		else if (data === PROTOCOL_ROW_COMMENT && !depth--) return at.__marklessRowLocals?.();
 	}
 	return undefined;
 }
