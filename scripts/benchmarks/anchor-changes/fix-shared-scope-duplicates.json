@@ -1,0 +1,25 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 206,
+			"reason": "shared() scope rename (PR #533): the docs code blocks' in-browser compile worker carries the new error for the old names 'page', 'request' and 'widget' (+162 B gzip measured on the worker), and every compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (1673385)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 64,
+			"reason": "shared() scope rename (PR #533): the in-browser compile worker carries the new error for the old scope names, and each compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (2166082)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 30,
+			"reason": "shared() scope rename (PR #533): 'subtree' is one character longer than 'widget' in each family's compiled shared-definition record and in the web runtime's scope checks; no other content changed on this page; measured on CI run 42420722905 against the anchor main carries (495974)",
+			"date": "2026-11-07"
+		}
+	]
+}
