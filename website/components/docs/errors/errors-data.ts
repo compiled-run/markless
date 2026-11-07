@@ -8224,6 +8224,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+		title: '',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_PROJECTION_LIVE_IN_TRY: <<childComponentName>> renders its projected children inside a @try, and those children read state or handle events. The browser redraws a @try arm from static markup, so they would render but never update or respond. Keep `{children}` outside the @try in <<childComponentName>>, or write the @try in the component that owns the projected markup.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/ssr-data/renderer.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/ssr-data/renderer.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PROJECTION_NOT_RENDERED',
 		title: 'A component never rendered the children it was given',
 		area: 'components',
@@ -8233,7 +8254,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
 			"MARKLESS_PROJECTION_NOT_RENDERED: <<componentName>> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render `{children}` somewhere in <<componentName>>'s own markup, including inside an @if/@else arm.",
-			'https://markless.dev/errors/MARKLESS_PROJECTION_NOT_RENDERED',
 		],
 		structured: false,
 		sources: [

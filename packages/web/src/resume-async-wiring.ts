@@ -5,11 +5,15 @@ import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
+	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeDomElement,
+	ResumeSymbolContext,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
+
+declare const __MARKLESS_DEV_ENABLED__: boolean;
 
 // Spec D8 (12-arm-rendering): first appearances render @pending structurally,
 // navigations hold the outgoing page, and RE-settles hold the prior settled
@@ -205,6 +209,11 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							snapshot,
 						});
 					}
+					if (
+						(typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) &&
+						!isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)
+					)
+						preloadTryArm(input.loadSymbol, boundary.updateSymbolId);
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
@@ -267,6 +276,18 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 function settledCache(input: WiringInput, boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) {
 	const status = (snapshot as { readonly status?: unknown } | null)?.status;
 	if (isSettledStatus(status)) asyncPlanes.cache?.(input, boundary, status);
+}
+
+// Dev only, where symbols load on demand: a waiting block fetches its @try arm's code beside its data.
+function preloadTryArm(loadSymbol: WiringInput['loadSymbol'], updateSymbolId: string): void {
+	void Promise.resolve(loadSymbol(updateSymbolId))
+		.then(async (symbol) => {
+			const arms = (await symbol({ armRecordsOnly: true } as ResumeSymbolContext)) as unknown;
+			const records = Array.isArray(arms) ? (arms[0] as ResumeArmRecordSet | undefined) : undefined;
+			for (const update of records?.domUpdates ?? [])
+				if (update.symbolId) void Promise.resolve(loadSymbol(update.symbolId)).catch(() => {});
+		})
+		.catch(() => {});
 }
 
 // A settle heard twice (it landed in the task that started it) commits once, or the second commit replaces rows under a press.

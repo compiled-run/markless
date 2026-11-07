@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 310,
+	total: 311,
 	guided: 48,
 	groups: [
 		{
@@ -1443,6 +1443,14 @@ export const errorIndex: ErrorIndex = {
 			icon: 'gear',
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+					title: '',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: ' markless_projection_live_in_try a markless runtime error from @markless/web.',
+				},
 				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',

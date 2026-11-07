@@ -69,11 +69,13 @@ export function planPublicRender(input: PublicRenderPlanInput): PublicRenderPlan
 	}
 
 	const styles = collectModuleStyleScopes(ast, input.source.filename, moduleIdOf(input.source));
-	const boundaryNodes = collectAsyncBoundaryNodes(selectedRoot.root);
+	const boundaryNodesByStart = new Map(
+		collectAsyncBoundaryNodes(ast).map((found) => [found.node.start, found]),
+	);
 	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	const boundaryRunnerDiagnostics = input.semanticGraph.asyncBoundaries.flatMap(
-		(boundary, index) => {
-			const found = boundaryNodes[index];
+		(boundary) => {
+			const found = boundaryNodesByStart.get(boundary.keywordSpan?.start);
 			const resolution = boundaryRunners.get(boundary.id);
 			if (!found || !resolution) return [];
 			if (resolution.reads.length === 0 && resolution.unresolvedSources.length === 0)
