@@ -6,7 +6,6 @@ import type {
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticSharedDependency,
-	SemanticSharedScope,
 	SemanticStateRead,
 	SemanticTemplateRead,
 	SourceSpan,
@@ -955,25 +954,6 @@ export function sharedDefinitionCycleDiagnostic(input: {
 	};
 }
 
-const renamedSharedScopes: Readonly<
-	Record<string, { readonly scope: SemanticSharedScope; readonly meaning: string }>
-> = {
-	page: {
-		scope: 'app',
-		meaning:
-			'one copy per request on the server and per document in the browser, kept across in-place navigation',
-	},
-	request: {
-		scope: 'app',
-		meaning:
-			'one copy per request on the server and per document in the browser, kept across in-place navigation',
-	},
-	widget: {
-		scope: 'subtree',
-		meaning: 'one copy for the component that calls it first and everything inside it',
-	},
-};
-
 export function invalidSharedScopeDiagnostic(input: {
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
@@ -983,9 +963,7 @@ export function invalidSharedScopeDiagnostic(input: {
 	const name = literal ? input.valueSource!.slice(1, -1) : undefined;
 	const valueText = literal ? `"${name}"` : input.valueSource;
 	const renamed =
-		name !== undefined && Object.hasOwn(renamedSharedScopes, name)
-			? renamedSharedScopes[name]
-			: undefined;
+		name === 'widget' ? 'subtree' : name === 'page' || name === 'request' ? 'app' : undefined;
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_SHARED_SCOPE_INVALID',
 		title: 'shared() scope must be valid',
@@ -993,12 +971,16 @@ export function invalidSharedScopeDiagnostic(input: {
 			? literal
 				? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
 				: `shared() scope must be a string literal. Valid scopes are ${valid}.`
-			: `shared() scope ${valueText} is now "${renamed.scope}": ${renamed.meaning}.`,
+			: `shared() scope ${valueText} is now "${renamed}": ${
+					renamed === 'app'
+						? 'one copy per request on the server and per document in the browser, kept across in-place navigation'
+						: 'one copy for the component that calls it first and everything inside it'
+				}.`,
 		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is app, container, or subtree owned.',
 		span: input.valueSpan,
 		suggestion: !renamed
 			? 'Use `shared(factory, { scope: "app" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "subtree" })`.'
-			: `Write \`shared(factory, { scope: "${renamed.scope}" })\`.`,
+			: `Write \`shared(factory, { scope: "${renamed}" })\`.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 	});
 }
