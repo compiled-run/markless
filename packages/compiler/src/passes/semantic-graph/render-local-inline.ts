@@ -356,6 +356,24 @@ export function inlineHandlerRenderLocals(
 	};
 }
 
+/** A handler named by a const that a visible factory call returns: each run rebuilds it from that call, then calls it. */
+export function factoryHandlerSource(
+	name: AnyNode,
+	parameterCount: number,
+	state: WalkState,
+	handlerLabel: string,
+	allowCatchReset = false,
+): (NonNullable<ReturnType<typeof inlineHandlerRenderLocals>> & { readonly parameters: string[] }) | null {
+	const inlined = inlineHandlerRenderLocals(name, state, handlerLabel, allowCatchReset);
+	if (!inlined) return null;
+	const parameter = parameterCount === 0 ? '' : /\bevent\b/.test(inlined.source) ? 'domEvent' : 'event';
+	return {
+		...inlined,
+		source: `(${parameter}) => (${inlined.source})(${parameter})`,
+		parameters: parameter ? [parameter] : [],
+	};
+}
+
 // An expression combining graph reads with body consts derives from their definitions, so a write moves it.
 export function liftRenderLocalComposite(
 	expression: AnyNode,
@@ -600,7 +618,12 @@ function classifyLocal(
 	const semantic = state.semantic();
 	if (semantic.bindings[symbolId]!.declarations.length !== 1) return { kind: 'opaque' };
 	const declared = classifyDeclaration(symbolId, state, inlineFunctions);
-	if (declared.kind === 'definition' && isFunctionNode(declared.init)) return declared;
+	// A const alias of another local is spliced as that local, which is classified in turn.
+	if (
+		declared.kind === 'definition' &&
+		(isFunctionNode(declared.init) || (inlineFunctions && declared.init.type === 'Identifier'))
+	)
+		return declared;
 	if (state.graph.localBindings.some((binding) => binding.name === name))
 		return { kind: 'capture-owned' };
 	return declared;

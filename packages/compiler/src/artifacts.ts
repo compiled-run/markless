@@ -133,6 +133,8 @@ export type SemanticComponentPropBinding =
 			// An opaque prop that is plain constant data: the render still runs the
 			// expression, and browser code reads this value instead.
 			readonly buildTimeValue?: { readonly value: unknown };
+			// A body local named as a handler whose function the browser cannot rebuild, and the rewrite that it can.
+			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 			// Imported `const` values an opaque prop reads that this compile was not
 			// given; the bundler evaluates those modules and compiles again.
 			readonly importedConstants?: ReadonlyArray<{
@@ -2226,6 +2228,7 @@ export type CaptureSlotRoute =
 			readonly absentProp?: true;
 			// The expression reads only the keyed row's item or index: rendered with the row, never live.
 			readonly rowValue?: true;
+			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 	  };
 
 // A slot belongs to one authored binding in one component and may have one

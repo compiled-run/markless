@@ -32,6 +32,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
 import { collectComponentEdge, receivedHandlerRelay } from './collect-components.ts';
+import { namedHandler } from './named-handler.ts';
 import {
 	detachedContentMode,
 	isDeclarativeShadowRoot,
@@ -90,11 +91,13 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 	cssAnchorAttributeDiagnostic,
 	templateExpressionUnsupportedDiagnostic,
+	handlerReadsRenderLocalDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	collectDefinitionReads,
+	factoryHandlerSource,
 	inlineHandlerRenderLocals,
 	inlineRenderLocals,
 	liftRenderLocalComposite,
@@ -1176,7 +1179,34 @@ function collectAttribute(
 				continue;
 			}
 
-			const handler = eventHandlerExpression(entry, state);
+			const named = entry ? namedHandler(entry, state, attributeName) : null;
+			if (named?.kind === 'unroutable') {
+				state.graph.diagnostics.push(
+					handlerReadsRenderLocalDiagnostic({
+						handlerLabel: attributeName,
+						localName: expressionSource(entry!, state.source) ?? '',
+						handler: entry!,
+						filename: state.filename,
+						unroutable: named,
+					}),
+				);
+				continue;
+			}
+			const handler =
+				named?.kind === 'function'
+					? {
+							node: named.node,
+							source: expressionSource(named.node, state.source),
+							span: sourceSpan(named.node, state.filename),
+						}
+					: named?.kind === 'factory'
+						? {
+								node: named.returned,
+								source: expressionSource(entry!, state.source),
+								span: sourceSpan(entry!, state.filename),
+							}
+						: eventHandlerExpression(entry, state);
+			const factoryCall = named?.kind === 'factory' ? entry : undefined;
 			const syncPolicy = extractSyncPolicy(handler?.node, state);
 			const hasSyncPolicyCandidate = handler
 				? hasSyncEventPolicyCandidate(handler.node) ||
@@ -1198,13 +1228,25 @@ function collectAttribute(
 					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
-			const relayed = handler ? receivedHandlerRelay(handler.node, state) : undefined;
-			const inlined =
-				handler && !relayed
+			const relayed =
+				handler && !factoryCall ? receivedHandlerRelay(handler.node, state) : undefined;
+			const factory = factoryCall
+				? factoryHandlerSource(
+						factoryCall,
+						asNodes(handler!.node.params).length,
+						state,
+						attributeName,
+						true,
+					)
+				: null;
+			const inlined = factoryCall
+				? factory
+				: handler && !relayed
 					? inlineHandlerRenderLocals(handler.node, state, attributeName, true)
 					: null;
 			// A handler named by a body function reads at its definition, which the attribute walk never visits.
-			if (handler && !relayed && handler.node !== entry) collectDefinitionReads(handler.node, state);
+			if (handler && !relayed && !factoryCall && handler.node !== entry)
+				collectDefinitionReads(handler.node, state);
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
@@ -1229,6 +1271,8 @@ function collectAttribute(
 					: {}),
 				handlerParameters: relayed
 					? [relayed.parameter]
+					: factory
+						? factory.parameters
 					: handler
 						? handlerParameterNames(handler.node)
 						: [],

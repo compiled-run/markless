@@ -102,20 +102,19 @@ async function adviceOf(source: string) {
 		.flatMap((diagnostic) => diagnostic.suggestions?.map((suggestion) => suggestion.message) ?? []);
 }
 
-test('a handler prop with no route says which handler shapes do route', async () => {
+test('a handler prop with no route says why and how to rewrite it', async () => {
 	const shapes = [
 		page(`let add = () => { drafts = [...drafts, text]; };\n\tadd = () => { text = ''; };`, wrappers.one),
-		page(`const make = (value: string) => () => { drafts = [...drafts, value]; };\n\tconst add = make('x');`, wrappers.one),
-		page(handlers.arrow, wrappers.one).replace(
-			'function Button({ onClick, children }: { onClick: () => void; children?: unknown }) @{\n\t<button onClick={onClick}>{children}</button>',
-			'function Button(props: { onClick: () => void; children?: unknown }) @{\n\t<button onClick={props.onClick}>{props.children}</button>',
+		page(
+			`const make = (value: string) => { let runs = 0; return () => { runs += 1; drafts = [...drafts, value + runs]; }; };\n\tconst add = make('x');`,
+			wrappers.one,
 		),
 	];
 	for (const source of shapes) {
 		const advice = await adviceOf(source);
 		expect(advice.length).toBeGreaterThan(0);
 		for (const message of advice) {
-			expect(message).toContain('declared once in the component body');
+			expect(message).toMatch(/const/);
 			expect(message).not.toContain('constant data');
 		}
 	}

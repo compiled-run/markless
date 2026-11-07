@@ -37,6 +37,7 @@ import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
 	componentSpreadUnsupportedDiagnostic,
+	handlerReadsRenderLocalDiagnostic,
 	memberTagNestedPartDiagnostic,
 	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
@@ -44,8 +45,10 @@ import {
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
+import { namedHandler } from './named-handler.ts';
 import {
 	collectDefinitionReads,
+	factoryHandlerSource,
 	inlineHandlerRenderLocals,
 	liftArmRenderLocalValue,
 } from './render-local-inline.ts';
@@ -234,12 +237,41 @@ function componentPropBindings(
 		const localBinding = localBindingId
 			? state.componentLocalBindings.get(localBindingId)
 			: undefined;
-		// Deliberately bounded: only the declaration's direct function initializer
-		// is callable here. Identifier aliases do not inherit callback identity.
-		const namedCallback =
-			localBinding?.declaration.writeCount === 1 ? localBinding.initializerNode : undefined;
+		const named =
+			expression && localBinding && isEventAttribute(name)
+				? namedHandler(expression, state, name)
+				: localBinding?.declaration.writeCount === 1 && localBinding.initializerNode
+					? { kind: 'function' as const, node: localBinding.initializerNode }
+					: null;
+		if (named?.kind === 'unroutable') {
+			if (expression && childSpreadsProp(name, link, state, childComponentName))
+				state.graph.diagnostics.push(
+					handlerReadsRenderLocalDiagnostic({
+						handlerLabel: name,
+						localName: source,
+						handler: expression,
+						filename: state.filename,
+						unroutable: named,
+					}),
+				);
+			props.push({
+				name,
+				source,
+				kind: 'opaque',
+				sourceSpan: span,
+				unroutableHandler: { why: named.why, rewrite: named.rewrite },
+			});
+			continue;
+		}
+		const factoryCall = named?.kind === 'factory' ? expression : undefined;
 		const callback =
-			expression && isCallbackExpression(expression) ? expression : namedCallback;
+			expression && isCallbackExpression(expression)
+				? expression
+				: named?.kind === 'function'
+					? named.node
+					: named?.kind === 'factory'
+						? named.returned
+						: undefined;
 
 		if (callback && isCallbackExpression(callback)) {
 			const parameterNodes = asNodes(callback.params);
@@ -284,9 +316,13 @@ function componentPropBindings(
 				);
 			}
 
-			const inlined = inlineHandlerRenderLocals(callback, state, name);
+			const factory = factoryCall
+				? factoryHandlerSource(factoryCall, parameterNodes.length, state, name)
+				: null;
+			if (factoryCall && !factory) continue;
+			const inlined = factory ?? inlineHandlerRenderLocals(callback, state, name);
 			// A callback named by a body function reads at its definition, which the prop walk never visits.
-			if (callback !== expression) collectDefinitionReads(callback, state);
+			if (callback !== expression && !factoryCall) collectDefinitionReads(callback, state);
 			props.push({
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
@@ -294,10 +330,10 @@ function componentPropBindings(
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
-				parameters: parameterNodes.map((parameter) =>
-					expressionSource(parameter, state.source),
-				),
-				sourceSpan: sourceSpan(callback, state.filename),
+				parameters: factory
+					? factory.parameters
+					: parameterNodes.map((parameter) => expressionSource(parameter, state.source)),
+				sourceSpan: sourceSpan(factoryCall ?? callback, state.filename),
 				...(hasSyncPolicyCandidate ? { hasSyncPolicyCandidate } : {}),
 				...(syncPolicy ? { syncPolicy } : {}),
 			});
@@ -700,13 +736,24 @@ function relayedHandlerSource(
 	scope: GraphReadScope,
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string } | undefined {
-	if (expression.type !== 'Identifier') return undefined;
-	const source = getIdentifierName(expression);
-	if (!source || repeatRowBindsName(source, state)) return undefined;
+	const source =
+		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
+	if (!source) return undefined;
+	const root = source.split('.')[0]!;
+	if (repeatRowBindsName(root, state)) return undefined;
 	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
 	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
 	const parameter = source === 'event' ? 'domEvent' : 'event';
 	return { source: `(${parameter}) => ${source}?.(${parameter})`, parameter };
+}
+
+/** `props.onClick`: one static member read off an identifier, the props object read without destructuring. */
+function staticPropsMember(expression: AnyNode): string | undefined {
+	if (expression.type !== 'MemberExpression' || expression.computed || expression.optional)
+		return undefined;
+	const object = getIdentifierName(expression.object as AnyNode | undefined);
+	const property = getIdentifierName(expression.property as AnyNode | undefined);
+	return object && property ? `${object}.${property}` : undefined;
 }
 
 function childSpreadsProp(
