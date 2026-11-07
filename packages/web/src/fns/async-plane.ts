@@ -109,6 +109,7 @@ async function asyncComputedFromRecord(
 		graphNodeId: computed.graphNodeId,
 		dependencies,
 		...(syncHops.length > 0 ? { syncHops } : {}),
+		...(computed.boundaryGate ? { boundaryGate: true as const } : {}),
 		initialSnapshot:
 			computed.snapshot && (await deserializeAsyncComputedSnapshot(computed.snapshot, decode)),
 		key: (read: RuntimeGraphRead) => {

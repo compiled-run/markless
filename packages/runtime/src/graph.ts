@@ -169,6 +169,8 @@ export type RuntimeGraphAsyncComputed = {
 		readonly asyncFrom: ReadonlyArray<string>;
 	}>;
 	readonly initialSnapshot?: RuntimeGraphAsyncSnapshot;
+	/** A @try's own gate: it takes on a failed value it gates instead of pinning past it. */
+	readonly boundaryGate?: true;
 	readonly key: (read: RuntimeGraphRead) => unknown;
 	/** How a fulfilled value reconciles against the previously published one. */
 	readonly reconcile?: RuntimeGraphReconcileOptions;

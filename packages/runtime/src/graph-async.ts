@@ -265,10 +265,11 @@ export function createAsyncComputedPlane(internals: AsyncComputedPlaneInternals)
 		};
 		for (const dependency of node.dependencies) visit(dependency.graphNodeId);
 		for (const hop of node.syncHops ?? []) for (const graphNodeId of hop.asyncFrom) visit(graphNodeId);
+		const pinsPastFailure = blocked?.snapshot.status === 'rejected' && shown && !node.boundaryGate;
 		// A rejected blocker with a pinnable last-good value pins like a pending one (graph-held.ts `rejectedOnly`).
-		if (blocked && shown && context.held?.startOnShownInputs(node)) return;
+		if (blocked && shown && (blocked.snapshot.status !== 'rejected' || pinsPastFailure) && context.held?.startOnShownInputs(node)) return;
 		// A sibling's failed refresh never rejects a reader whose pinned key did not move.
-		if (blocked?.snapshot.status === 'rejected' && shown) return;
+		if (pinsPastFailure) return;
 		if (!blocked && staleDerive) {
 			commitDependencyBlock(node, 'pending', undefined);
 			return;

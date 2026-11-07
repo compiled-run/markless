@@ -223,6 +223,63 @@ test('a chained async value blocked by a rejected sibling still runs on its last
 	expect(graph.read('computed:heading')).toBe('7 in A');
 });
 
+test("a @try's own gate takes on a failed refresh that a reader of the same value pins past", async () => {
+	const items = scripted();
+	const gate = scripted();
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:filter', value: '' }],
+		computed: [
+			{
+				graphNodeId: 'computed:label',
+				dependencies: [
+					{ graphNodeId: 'computed:items', path: ['length'] },
+					{ graphNodeId: 'state:filter', path: [] },
+				],
+				compute: (read) => `${read('computed:items', ['length'])} for ${read('state:filter')}`,
+			},
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:items',
+				dependencies: [{ graphNodeId: 'state:filter', path: [] }],
+				key: (read) => read('state:filter'),
+				run: items.run,
+			},
+			{
+				graphNodeId: 'computed:gate',
+				boundaryGate: true,
+				dependencies: [{ graphNodeId: 'computed:items', path: [] }],
+				key: (read) => read('computed:items'),
+				run: gate.run,
+			},
+		],
+	} as never);
+	graph.read('computed:label');
+	graph.read('computed:gate');
+	items.runs[0]!.resolve(['apple', 'grape']);
+	await tick();
+	gate.runs[0]!.resolve([['apple', 'grape']]);
+	await tick();
+	expect(graph.read('computed:label')).toBe('2 for ');
+
+	graph.write({ graphNodeId: 'state:filter', value: 'pl' });
+	await graph.flush();
+	items.runs[1]!.resolve(['apple']);
+	await tick();
+	await graph.flush();
+	expect(graph.read('computed:label')).toBe('1 for pl');
+
+	graph.write({ graphNodeId: 'state:filter', value: 'x' });
+	await graph.flush();
+	items.runs[2]!.resolve(Promise.reject(new Error('offline')));
+	await tick();
+	await graph.flush();
+	expect(graph.read('computed:items', ['status'])).toBe('rejected');
+	expect(graph.read('computed:label')).toBe('1 for pl');
+	expect(graph.read('computed:gate', ['status'])).toBe('rejected');
+	expect(graph.read('computed:gate', ['error'])).toEqual(new Error('offline'));
+});
+
 test('a chained async value whose own input moved fetches at once on the inputs the screen shows', async () => {
 	const revenue = scripted();
 	const converted = scripted();

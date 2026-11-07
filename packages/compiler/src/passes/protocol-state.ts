@@ -24,6 +24,11 @@ export function createProtocolStatePayloadFromArena(
 	const readOnlyBySubscriptions = deriveOnReadGraphNodeIds(input, symbolResolver);
 	const held = heldAsyncGraphNodeIds(input, symbolResolver);
 	const asyncFrom = asyncAncestors(input.payloadArena.state.computed);
+	const boundaryGates = new Set(
+		input.semanticGraph.asyncBoundaries.flatMap((boundary) =>
+			boundary.gateGraphNodeId ? [boundary.gateGraphNodeId] : [],
+		),
+	);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
@@ -43,6 +48,9 @@ export function createProtocolStatePayloadFromArena(
 			? { deriveOnRead: true as const }
 			: {}),
 		...(held.has(computed.graphNodeId) ? { holds: true as const } : {}),
+		...(computed.async && boundaryGates.has(computed.graphNodeId)
+			? { boundaryGate: true as const }
+			: {}),
 		...(asyncFrom.get(computed.graphNodeId)?.length
 			? { asyncFrom: asyncFrom.get(computed.graphNodeId)! }
 			: {}),

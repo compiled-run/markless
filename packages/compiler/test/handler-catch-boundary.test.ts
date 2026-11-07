@@ -347,3 +347,14 @@ export function Page() @{
 		['Page', false],
 	]);
 });
+
+test("a boundary's own async gate is marked in the state payload, and the value it gates is not", async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: page('@catch (error) { <p>{error.message}</p> }'),
+		symbols: [],
+	});
+	const computed = result.protocolState.computed;
+	expect(computed.find((record) => record.graphNodeId === 'computed:asyncGate:0')?.boundaryGate).toBe(true);
+	expect(computed.find((record) => record.graphNodeId === 'computed:report')?.boundaryGate).toBeUndefined();
+});

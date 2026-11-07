@@ -202,6 +202,8 @@ export type ProtocolStatePayload = {
 		readonly holds?: true;
 		// Sync only: the nearest async values it derives from, through other sync computeds of its module.
 		readonly asyncFrom?: ReadonlyArray<string>;
+		// Async only: a @try's own gate over the values it shows, so it fails whenever one of them fails.
+		readonly boundaryGate?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which
