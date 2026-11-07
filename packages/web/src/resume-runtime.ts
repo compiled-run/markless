@@ -156,6 +156,10 @@ export function createResumeRuntime(
 				pendingBehaviorHostIdsForAncestors(element),
 			delegatedTriggers: input.delegatedTriggers,
 			asyncBoundaries: () => asyncBoundariesById.values(),
+			failEnclosingCatch: async (element, error) =>
+				asyncBoundariesById.size > 0 &&
+				!!asyncBoundaryWiring &&
+				(await asyncBoundaryWiring()).failEnclosingCatch(element, error),
 		});
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;

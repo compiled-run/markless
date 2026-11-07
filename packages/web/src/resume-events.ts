@@ -305,6 +305,7 @@ export function createEventWiring(input: {
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 	readonly delegatedTriggers?: ResumeRuntimeInput['delegatedTriggers'];
 	readonly asyncBoundaries?: () => Iterable<ResumeAsyncBoundaryRecord>;
+	readonly failEnclosingCatch?: (element: ResumeDomElement, error: unknown) => Promise<boolean>;
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
@@ -749,9 +750,7 @@ export function createEventWiring(input: {
 					});
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					return await Promise.resolve(result).catch(async (error: unknown) => {
-						const { marklessFailEnclosingCatch } = await import('./fns/enclosing-catch.ts');
-						if (!marklessFailEnclosingCatch(input.asyncBoundaries?.(), input.graph, element, error))
-							throw error;
+						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});
 				} finally {
 					if (loud) graph.markUserActionEnd?.();

@@ -849,8 +849,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 1687,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 2017,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -882,8 +882,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 1157,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 887,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -926,8 +926,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-runtime"
 			],
-			"delta": 469,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 641,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -982,8 +982,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 312,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 332,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -1191,8 +1191,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-async-wiring"
 			],
-			"delta": 1687,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 2017,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -1224,8 +1224,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 1157,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 887,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -1268,8 +1268,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-runtime"
 			],
-			"delta": 469,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, user action at the DOM event, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 641,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -1324,8 +1324,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 197,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 167,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		},
 		{
@@ -1336,8 +1336,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 300,
-			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
+			"delta": 331,
+			"reason": "Async chain merged for review (async planes, busy marks, quiet refreshes, the dispatcher marking user actions instead of a wrap in every handler, handler rejections to @catch through the async wiring, keyed rows of any shape, nested-row prop capture, handler shapes, resume cache code with the scope off), measured against origin/main",
 			"date": "2026-11-07"
 		}
 	]

@@ -6,6 +6,7 @@ import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
 	ResumeAsyncBoundaryRecord,
+	ResumeDomElement,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -104,6 +105,8 @@ export type AsyncBoundaryWiring = {
 	// A boundary an arm commit rendered: rewires it against its fresh anchors.
 	// `shown` names, per async read, the settled snapshot version the arm already shows.
 	readonly add: (boundary: ResumeAsyncBoundaryRecord, shown?: ReadonlyMap<string, unknown>) => void;
+	// A handler's rejection reaches the @catch around its element; false when none takes it.
+	readonly failEnclosingCatch: (element: ResumeDomElement, error: unknown) => Promise<boolean>;
 };
 
 export function wireAsyncBoundariesWithoutLoadingCapability(input: {
@@ -250,6 +253,13 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			const settled = input.settleTracker?.hasSettledContent(boundary.id) === true;
 			wire(boundary, !settled, !settled, settled && shown ? new Map(shown) : undefined);
 		},
+		failEnclosingCatch: async (element, error) =>
+			(await import('./fns/enclosing-catch.ts')).marklessFailEnclosingCatch(
+				input.asyncBoundariesById.values(),
+				input.graph,
+				element,
+				error,
+			),
 	};
 }
 
