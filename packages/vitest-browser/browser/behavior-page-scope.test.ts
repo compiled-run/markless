@@ -2,14 +2,14 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import App from './fixtures/behavior-page-scope.tsrx';
 
-// Defect 96: an `attach=` behavior on an element inside a PAGE-scoped shared
+// Defect 96: an `attach=` behavior on an element inside a APP-scoped shared
 // family's part killed the whole render with
 // `TypeError: Cannot read properties of undefined (reading 'listSharedDefinitions')`
 // out of `packages/web/src/fns/instance-scope.ts`. CSR activates authored
 // behaviors before the runtime graph is demand-loaded, so the instance-scope
 // adapter was handed no graph at all and read straight through it.
 //
-// A widget-scoped row rides along as the control: it must stay green, and both
+// A subtree-scoped row rides along as the control: it must stay green, and both
 // rows must still dispatch after the behavior pass.
 afterEach(() => cleanup());
 
@@ -30,7 +30,7 @@ async function expectBothAttached(container: ParentNode) {
 		.toBe('widget');
 }
 
-test('CSR: an attach behavior on a page-scoped family part runs, alongside a widget-scoped one', async () => {
+test('CSR: an attach behavior on an app-scoped family part runs, alongside a subtree-scoped one', async () => {
 	const screen = await render(App);
 	const container = screen.container as HTMLElement;
 

@@ -63,7 +63,7 @@ async function open(
 const text = (page: Page, selector: string) => page.locator(selector).textContent();
 const items = (page: Page) => page.locator('[data-list] li').allTextContents();
 
-test('an async value that reads a page-scoped shared field loads and reruns when it changes', async () => {
+test('an async value that reads an app-scoped shared field loads and reruns when it changes', async () => {
 	const { page, errors } = await open('/shared-async');
 	await expect.poll(() => text(page, 'main')).toContain('loaded v0');
 	await page.click('[data-bump]');
@@ -73,7 +73,7 @@ test('an async value that reads a page-scoped shared field loads and reruns when
 	await page.close();
 });
 
-test('a sync value over an async one that reads a page-scoped shared field updates', async () => {
+test('a sync value over an async one that reads an app-scoped shared field updates', async () => {
 	const { page, errors } = await open('/shared-sync');
 	await expect.poll(() => text(page, 'main')).toContain('loaded+one+two #1');
 	await page.click('[data-step]');

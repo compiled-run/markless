@@ -37,7 +37,7 @@ Press play on either player, then turn one volume knob.
 
 <PlayerAnatomy />
 
-<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'page' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
+<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'app' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
 ```tsrx title="player.tsrx"
 import { shared, state } from '@markless/core';
 
@@ -54,7 +54,7 @@ export const player = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 function MiniPlayer() @{

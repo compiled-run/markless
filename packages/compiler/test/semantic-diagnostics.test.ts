@@ -447,7 +447,7 @@ test('B919 reports unknown shared scope strings', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'Unknown shared() scope "session". Valid scopes are "request", "container", "page", and "widget".',
+				'Unknown shared() scope "session". Valid scopes are "app", "container", and "subtree".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,
@@ -457,8 +457,31 @@ test('B919 reports unknown shared scope strings', async () => {
 	]);
 });
 
+const appMeaning =
+	'one copy per request on the server and per document in the browser, kept across in-place navigation';
+
+test.each([
+	['page', 'app', appMeaning],
+	['request', 'app', appMeaning],
+	['widget', 'subtree', 'one copy for the component that calls it first and everything inside it'],
+])('the old shared() scope "%s" is refused and names "%s"', async (old, next, meaning) => {
+	const source = `import { shared } from '@markless/core'; export const session = shared(() => ({}), { scope: '${old}' });`;
+	const graph = await buildSemanticGraph({ filename: 'src/session.tsrx', source });
+
+	expect(graph.sharedDefinitions[0]).not.toHaveProperty('scope');
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_INVALID',
+			severity: 'error',
+			message: `shared() scope "${old}" is now "${next}": ${meaning}.`,
+			suggestions: [{ message: `Write \`shared(factory, { scope: "${next}" })\`.` }],
+			docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
+		}),
+	]);
+});
+
 test('B919 reports non-literal shared scope values', async () => {
-	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'request'; export const session = shared(() => ({}), { scope });`;
+	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'app'; export const session = shared(() => ({}), { scope });`;
 	const graph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',
 		source: dynamicScopeSource,
@@ -469,7 +492,7 @@ test('B919 reports non-literal shared scope values', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'shared() scope must be a string literal. Valid scopes are "request", "container", "page", and "widget".',
+				'shared() scope must be a string literal. Valid scopes are "app", "container", and "subtree".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,

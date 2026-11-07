@@ -1,6 +1,6 @@
 import { shared, state, computed } from '@markless/core';
 
-// Page-scoped sibling of the widget family: the factory returns one computed
+// App-scoped sibling of the widget family: the factory returns one computed
 // written INLINE in the returned object literal, keyed by its property name.
 export const tally = shared(() => {
 	const box = state({ marked: false });

@@ -4024,15 +4024,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'This shared() element() handle cannot be named by an IDREF here: a Markless build error.',
 		printed: [
-			'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT: Cannot resolve <attributeName>={<source>} because "<handleName>" is declared in a shared() factory that is not { scope: \'widget\' }.',
-			'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT: Cannot resolve <attributeName>={<source>} because "<handleName>" is declared in a shared() factory that is not { scope: \'subtree\' }.',
+			'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-scoped factory.',
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		],
 		structured: true,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
+		why: 'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-scoped factory.',
 		suggestion:
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 		sources: [
 			{
 				id: 'f0',
@@ -10462,13 +10462,13 @@ export const errorEntries: readonly ErrorEntry[] = [
 		printed: [
 			'MARKLESS_SHARED_CALL_UNRESOLVED: `<callSource>` reaches no shared() definition. <resolves>',
 			'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
-			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 			'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
 		],
 		structured: true,
 		why: 'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
 		suggestion:
-			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 		sources: [
 			{
 				id: 'f0',
@@ -10594,14 +10594,14 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'warning',
 		description: 'Several components share a shared() definition that has no scope.',
 		printed: [
-			'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: <length> components in this module resolve shared() "<definitionName>" (<components>), which is the shape of a widget family, but no scope is declared so it is page-scoped.',
-			'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
-			"Add { scope: 'widget' } to give each rendered widget its own graph.",
+			'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: <length> components in this module resolve shared() "<definitionName>" (<components>), which is the shape of a widget family, but no scope is declared so it is app-scoped.',
+			'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+			"Add { scope: 'subtree' } to give each rendered widget its own graph.",
 			'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
 		],
 		structured: true,
-		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
-		suggestion: "Add { scope: 'widget' } to give each rendered widget its own graph.",
+		why: 'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		suggestion: "Add { scope: 'subtree' } to give each rendered widget its own graph.",
 		guide: {
 			summary: 'Several components share a shared() definition that has no scope.',
 			what: [
@@ -10626,7 +10626,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's1',
-					text: "{ scope: 'widget' }",
+					text: "{ scope: 'subtree' }",
 					code: true,
 				},
 				{
@@ -10635,7 +10635,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's3',
-					text: "{ scope: 'page' }",
+					text: "{ scope: 'app' }",
 					code: true,
 				},
 				{
@@ -10786,14 +10786,14 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'shared() scope must be valid: a Markless build error.',
 		printed: [
 			'MARKLESS_SHARED_SCOPE_INVALID: Unknown shared() scope <valueText>. Valid scopes are <valid>.',
-			'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is app, container, or subtree owned.',
+			'Use `shared(factory, { scope: "app" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "subtree" })`.',
 			'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 		],
 		structured: true,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
+		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is app, container, or subtree owned.',
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'Use `shared(factory, { scope: "app" })`, `shared(factory, { scope: "container" })`, or `shared(factory, { scope: "subtree" })`.',
 		sources: [
 			{
 				id: 'f0',

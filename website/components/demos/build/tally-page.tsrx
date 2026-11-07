@@ -6,7 +6,7 @@ export const tally = shared(
 		const box = state({ count: 0 });
 		return { ...box, increment() { box.count++; } };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export function Tally({ label, children }: { label: string; children?: Children }) @{

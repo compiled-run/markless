@@ -101,7 +101,7 @@ test('SSR: a flat-sibling row removes itself and focus lands on the neighbour it
 	await expectLandedOnBlue(scope, blue);
 });
 
-// The @markless/ui shape, reduced: a widget-scope instance holds the collection
+// The @markless/ui shape, reduced: a subtree-scope instance holds the collection
 // and the plural close handle every row's button binds, each row roots its own
 // instance, and the consumer's onChange writes its own array back through the
 // root's prop. This is the shape that loses the focus - the two pages above keep

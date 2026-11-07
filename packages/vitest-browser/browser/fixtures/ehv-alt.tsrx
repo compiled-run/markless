@@ -12,7 +12,7 @@ export const altWidget = shared(
 
 		return { ...w, surfaceRef };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function AltRoot({ children }) @{

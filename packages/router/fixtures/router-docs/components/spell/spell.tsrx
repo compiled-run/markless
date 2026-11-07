@@ -7,7 +7,7 @@ export const spellState = shared(
 		const tiles = element<HTMLLIElement[]>();
 		return { ...spell, tiles };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function SpellRoot({ word = '', children }: { readonly word?: string; readonly children?: Children }) @{

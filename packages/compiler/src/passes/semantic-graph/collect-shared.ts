@@ -554,7 +554,7 @@ function unresolvedSharedCallDiagnostic(input: {
 		suggestions: [
 			{
 				message:
-					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
@@ -1711,10 +1711,9 @@ function sharedScopeFromOptions(
 			return undefined;
 		}
 		if (
-			value.value === 'request' ||
+			value.value === 'app' ||
 			value.value === 'container' ||
-			value.value === 'page' ||
-			value.value === 'widget'
+			value.value === 'subtree'
 		) {
 			return value.value;
 		}

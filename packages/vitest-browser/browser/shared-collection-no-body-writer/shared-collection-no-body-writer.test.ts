@@ -10,12 +10,12 @@ import RootlessPage from './rootless-page.tsrx';
 import SeededRootPage from './seeded-page.tsrx';
 
 /**
- * A widget-scope `shared()` collection no component body ever writes, pushed to
+ * A subtree-scope `shared()` collection no component body ever writes, pushed to
  * by a sibling part's handler.
  *
  * No body writer is not an ingredient, and neither is an empty seed. What used
  * to separate the rows was which component of the family module the page
- * renders outermost: the cells of a widget-scoped definition went to one
+ * renders outermost: the cells of a subtree-scoped definition went to one
  * component, and only a composed child carrying them registered a widget root,
  * so a page whose outermost part was some other component rooted the widget
  * nowhere and the handler's `[...box.items, 'gamma']` spread undefined.

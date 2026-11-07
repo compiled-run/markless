@@ -4,7 +4,7 @@ export const MINI = 'MiniPlayer';
 export const BIG = 'NowPlaying';
 /** How far the shared progress moves per tick (100 ms) while playing: one run of the track takes 20 s. */
 export const STEP = 0.005;
-/** Each player's own volume at the start: widget scope gives them separate copies. */
+/** Each player's own volume at the start: subtree scope gives them separate copies. */
 export const VOLUME = { mini: 0.4, big: 0.7 } as const;
 /** The knob turns through 270 degrees, from -135 to 135. */
 export const angleOf = (volume: number) => -135 + volume * 270;

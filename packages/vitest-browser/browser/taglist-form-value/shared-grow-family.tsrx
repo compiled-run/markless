@@ -6,7 +6,7 @@ type BoxInstanceState = {
 	name: string;
 };
 
-// @markless/ui's taglist reduced to its skeleton: a widget-scope spread-object
+// @markless/ui's taglist reduced to its skeleton: a subtree-scope spread-object
 // factory, a root that writes the collection from its own prop on every render,
 // one part holding a keyed repeat over that collection, and a sibling part that
 // writes it.
@@ -20,7 +20,7 @@ export const listBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxSeededRoot({ value = [], name = '', children }) @{

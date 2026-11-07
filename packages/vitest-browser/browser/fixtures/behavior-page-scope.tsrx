@@ -1,7 +1,7 @@
 import { shared, state } from '@markless/core';
 
-// A PAGE-scoped family and a WIDGET-scoped one, each with a part that carries an
-// authored `attach=` behavior. The page-scoped row is the defect: its behavior
+// A APP-scoped family and a SUBTREE-scoped one, each with a part that carries an
+// authored `attach=` behavior. The app-scoped row is the defect: its behavior
 // symbol carries an instance path, and the CSR behavior pass activates behaviors
 // before any runtime graph exists.
 export const pageCounter = shared(() => {
@@ -26,7 +26,7 @@ export const widgetCounter = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function PagePart() @{

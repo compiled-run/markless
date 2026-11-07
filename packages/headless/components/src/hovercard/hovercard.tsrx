@@ -44,7 +44,7 @@ export const hovercardState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function HovercardRoot({

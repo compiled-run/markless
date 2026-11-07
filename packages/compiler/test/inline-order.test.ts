@@ -40,7 +40,7 @@ export const counterState = shared(() => {
 			s.count = s.count + by;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 const INSIDE = `
@@ -111,7 +111,7 @@ function familyModules(): ReadonlyArray<{ readonly name: string; readonly source
 	return modules;
 }
 
-// The shipped families are the real corpus: widget-scoped shared() definitions,
+// The shipped families are the real corpus: subtree-scoped shared() definitions,
 // several components per module, methods called from the family's own parts.
 // One compile per shipped family: the budget scales with the catalog.
 test('no shipped family module changes what it emits when a function moves above its first component', async () => {

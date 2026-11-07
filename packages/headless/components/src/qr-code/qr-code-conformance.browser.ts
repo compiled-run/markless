@@ -14,8 +14,8 @@ import MultiEmbed from './scenarios/multi-embed.tsrx';
 //
 //   rovingKey — a code is a picture; it has no walk and takes no focus.
 //   disabled — it renders, it never refuses; there is no locked state to read.
-//   pageScoped — the family's only cell is widget-scoped, so this scenario reads
-//   no page-scoped `shared()` for the singular-cell half of the id rule.
+//   pageScoped — the family's only cell is subtree-scoped, so this scenario reads
+//   no app-scoped `shared()` for the singular-cell half of the id rule.
 //
 // What is left is the whole of what a display family owes: its value is its own.
 runMultiEmbedConformance({
@@ -40,7 +40,7 @@ runMultiEmbedConformance({
 				'island composition, not this family: a component nested under the widget root ' +
 				'that calls the family accessor mints a SECOND widget instance per embed, so the ' +
 				'payload carries four #qrCodeState definitions for two embeds. Owned by the ' +
-				'widget-scope instance path under the router island merge, not by qr-code — the ' +
+				'subtree-scope instance path under the router island merge, not by qr-code — the ' +
 				'same shape resolves to one instance on a single mount.',
 		},
 	],

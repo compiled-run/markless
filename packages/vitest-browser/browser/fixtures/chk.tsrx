@@ -14,7 +14,7 @@ export const chk = shared(() => {
 			c.checked = !c.checked;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ disabled, name, children }) @{
 	const c = chk();

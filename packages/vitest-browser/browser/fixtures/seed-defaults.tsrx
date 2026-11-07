@@ -9,7 +9,7 @@ export const sd = shared(
 		const cell = state({ tone: 'placeholder', level: -1 });
 		return { ...cell, bump() { cell.level = cell.level + 1; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ tone = 'quiet', level = 0, children }) @{

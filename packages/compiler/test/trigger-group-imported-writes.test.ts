@@ -91,12 +91,12 @@ test.each([
 	},
 );
 
-test('imported writes to page-scoped shared state retain their page identity', async () => {
+test('imported writes to app-scoped shared state retain their page identity', async () => {
 	const child = await compileTsrxModule({
 		filename: '/workspace/Shared.tsrx',
 		symbols: [],
 		source: `import {shared,state} from '@markless/core';
-	const model=shared(()=>{const value=state({count:0});return {...value};},{scope:'page'});
+	const model=shared(()=>{const value=state({count:0});return {...value};},{scope:'app'});
 	export function Child({onChange}) @{const value=model();<button onClick={()=>{value.count=5;onChange?.()}}>Set</button>}`,
 	});
 	const captured = child.captureAnalysis.extractedSymbols.find(

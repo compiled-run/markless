@@ -21,7 +21,7 @@ anywhere in the landmark, and `navbar.sr.ts` asserts a reader never says
 One widget family, `navbarState`, rooted by `navbar.root`: `value`, `hover`,
 `delay`, `clickGrace`, the consumer's `onChange`, and `show()`, `toggle()`,
 `closeAll()`. It is exported as `state` beside the parts, per the owner's
-namespace ruling. `navbarItemState` is a second widget-scoped family rooted by
+namespace ruling. `navbarItemState` is a second subtree-scoped family rooted by
 each `navbar.item`, holding that item's `value`, its `active` flag, the panel's
 minted id handle, and the three numbers a hover has to remember. It is
 deliberately **not** in `index.ts`: it is anatomy, not consumer surface.
@@ -389,7 +389,7 @@ retired all four, three of them by removing the thing that broke:
    the handler symbol's top level. `onDismiss` is now an ordinary event attribute
    on the element, so its body is a handler top level: `navbar.closeAll()` and
    `item.graceUntil = …` both compile and both run.
-2. **A widget-scoped `element()` handle answered for the wrong item.** The
+2. **A subtree-scoped `element()` handle answered for the wrong item.** The
    conversion no longer passes a handle to anything. The `dismiss` event is
    dispatched on the panel itself and routed to that panel's own handler, so a
    page with three entries reaches the entry that is showing. The suite row `CSR:

@@ -30,7 +30,7 @@ export const boxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxRoot({ checked = false, onChange, children }) @{

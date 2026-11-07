@@ -119,7 +119,7 @@ export const comboboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per option, rooted by `combobox.item`. */
@@ -129,7 +129,7 @@ export const comboboxItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ComboboxRoot({

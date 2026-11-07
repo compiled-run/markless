@@ -12,7 +12,7 @@ export const aeh = shared(
 
 		return { ...s, contentEl, optionEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function AehRoot({ children }) @{

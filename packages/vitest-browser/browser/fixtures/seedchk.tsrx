@@ -12,7 +12,7 @@ export const seedchk = shared(() => {
 			c.checked = !c.checked;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked = false, children }) @{
 	const c = seedchk();

@@ -4,7 +4,7 @@ type BoxInstanceState = { items: readonly string[]; atCall: string };
 type RowInstanceState = { value: string };
 
 // @markless/ui's taglist reduced to the parts a keyboard removal touches: a
-// widget-scope instance holding the collection and the plural handle every row's
+// subtree-scope instance holding the collection and the plural handle every row's
 // close button binds, a root that writes the collection from its own prop, a row
 // component that roots ITS OWN widget instance, and a close button whose handler
 // removes its own row and focuses the neighbour's button off the plural handle.
@@ -28,7 +28,7 @@ export const removalBox = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per row, as `taglist.item` roots one per tag. */
@@ -38,7 +38,7 @@ export const removalRow = shared(
 
 		return { ...row };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RemovalRoot({ value = [], onChange, children }) @{

@@ -41,7 +41,7 @@ export const toggleState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ToggleRoot({

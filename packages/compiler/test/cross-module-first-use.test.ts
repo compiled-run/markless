@@ -433,7 +433,7 @@ test('a widget part invoking a callback slot names the slot the root binds to it
 							},
 						};
 					},
-					{ scope: 'widget' },
+					{ scope: 'subtree' },
 				);
 				export function SwitchRoot({ onToggle, children }: { onToggle?: (on: boolean) => void; children?: unknown }) @{
 					const current = switchState();
@@ -593,7 +593,7 @@ test('a callback in a child a plain @for renders reads its row as data, not as a
 							},
 						};
 					},
-					{ scope: 'widget' },
+					{ scope: 'subtree' },
 				);
 				export function SwitchRoot({ onToggle, children }: { onToggle?: (on: boolean) => void; children?: unknown }) @{
 					const current = switchState();

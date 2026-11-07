@@ -7,43 +7,43 @@ import TalliesPage from './tallies-page.tsrx';
 import TalliesWidget from './tallies-widget.tsrx';
 
 export default function TalliesDemo() @{
-	let scope = state('page');
+	let scope = state('app');
 
 	<PreviewCard name="tallies" label="shared() scope">
 		<Controls title="Who shares one copy?">
 			<Choice
 				label="Scope"
-				hint="The second argument to shared(). 'page' gives the page one copy. 'widget' gives each Tally its own."
-				options={['page', 'widget']}
-				value="page"
+				hint="The second argument to shared(). 'app' gives the page one copy. 'subtree' gives each Tally its own."
+				options={['app', 'subtree']}
+				value="app"
 				onChange={(next: string) => (scope = next)}
 			/>
 		</Controls>
 		<Stage>
 			<div class="pin">
-				<div class="variant" hidden={scope !== 'page'}>
+				<div class="variant" hidden={scope !== 'app'}>
 					<TalliesPage />
 				</div>
-				<div class="variant" hidden={scope !== 'widget'}>
+				<div class="variant" hidden={scope !== 'subtree'}>
 					<TalliesWidget />
 				</div>
 				<Illustration name="tally-counter" size="3.4rem" spot="corner" />
 			</div>
 		</Stage>
 		<Watch>
-			<span hidden={scope !== 'page'}>
-				<Mono>{"{ scope: 'page' }"}</Mono>: both Tallies call <Mono>tally()</Mono> and get one copy, so
+			<span hidden={scope !== 'app'}>
+				<Mono>{"{ scope: 'app' }"}</Mono>: both Tallies call <Mono>tally()</Mono> and get one copy, so
 				either button moves both numbers.
 			</span>
-			<span hidden={scope !== 'widget'}>
-				<Mono>{"{ scope: 'widget' }"}</Mono>: each Tally starts its own copy. Its Badge reads that
+			<span hidden={scope !== 'subtree'}>
+				<Mono>{"{ scope: 'subtree' }"}</Mono>: each Tally starts its own copy. Its Badge reads that
 				copy, and the other number stays put.
 			</span>
 		</Watch>
-		<div class="variant" hidden={scope !== 'page'}>
+		<div class="variant" hidden={scope !== 'app'}>
 			<Code files={talliesPage} />
 		</div>
-		<div class="variant" hidden={scope !== 'widget'}>
+		<div class="variant" hidden={scope !== 'subtree'}>
 			<Code files={talliesWidget} />
 		</div>
 		<style>

@@ -314,7 +314,7 @@ export function App() @{
 // so this half stays refused - and the row is named by identity instead.
 test('a repeat whose row roots a widget ships identity, not markup', async () => {
 	const view = await viewOf(`import { shared, state } from '@markless/core';
-export const rowState = shared(() => ({ open: state(false) }), { scope: 'widget' });
+export const rowState = shared(() => ({ open: state(false) }), { scope: 'subtree' });
 function Row({ label }) @{
 	const own = rowState();
 	<span onClick={() => own.open = true}>{label}</span>

@@ -222,7 +222,7 @@ export type ProtocolStatePayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly exportedName: string;
-		readonly scope?: 'request' | 'container' | 'page' | 'widget';
+		readonly scope?: 'app' | 'container' | 'subtree';
 		readonly version: number;
 		readonly graphNodeIds: ReadonlyArray<string>;
 		readonly projectionIds?: ReadonlyArray<string>;

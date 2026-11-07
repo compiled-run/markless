@@ -34,7 +34,7 @@ export const ic = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcRoot({ children }) @{
@@ -79,7 +79,7 @@ export function IcItem({ children }) @{
 	// place is worth nothing unless another expression can USE it. It has to
 	// answer after a write to `code`, not only at first paint.
 	// Guarded because a widget instance rooting a flippable arm registers no
-	// widget scope, so its own shared cells read undefined after resume.
+	// subtree scope, so its own shared cells read undefined after resume.
 	const char = computed(() => w.code?.slice(pos, pos + 1) ?? '');
 	// tour's "2 of 5": the count asked by a part standing IN the roster it is
 	// counting, so no forward pass can answer it - and printed into surrounding

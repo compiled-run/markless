@@ -51,7 +51,7 @@ export function materializeDomLocators(
 	return byHostId;
 }
 
-// The instance path a composed widget-scoped handle id carries, restated here
+// The instance path a composed subtree-scoped handle id carries, restated here
 // for the reason fns/instance-scope.ts restates the serializer's grammar: the
 // lean resume chunk strips one prefix rather than taking an import edge for it.
 // No `m` here on purpose: the bare key is the module-space alias, and stripping
@@ -62,7 +62,7 @@ const HOST_SCOPE = /r:[^:]*:|[cm]\d+:/g;
 /**
  * One element per key, and a loud refusal when a key names more than one.
  *
- * A widget-scoped handle is one element PER RENDERED WIDGET, so composition
+ * A subtree-scoped handle is one element PER RENDERED WIDGET, so composition
  * qualifies its id with the rendered widget's own root path and the reading
  * handler asks with the same path. Every registration is filed under three keys
  * all the same: that qualified id, the id exactly as the module compiled it, and

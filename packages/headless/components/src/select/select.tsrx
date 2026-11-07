@@ -62,7 +62,7 @@ export const selectState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const selectItemState = shared(
@@ -71,7 +71,7 @@ export const selectItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function SelectRoot({

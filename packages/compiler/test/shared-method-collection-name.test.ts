@@ -10,7 +10,7 @@ import { shared, state } from '@markless/core';
 export const bag = shared(() => {
 	const s = state({ count: 0 });
 	return { ...s, ${method} };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Counter() @{
 	const c = bag();

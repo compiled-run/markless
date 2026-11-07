@@ -648,9 +648,10 @@ function Header() @{
 
 `session()` does not mean "run a hook." It means: resolve this named dataflow
 instance for the current graph context. A definition declares which context that
-is: `request`, `container`, `page`, or `widget`. For app data the context is
-usually request/container/page — one instance per request, per container, or per
-page. `widget` scope is the component-library case: one instance per rendered
+is: `app`, `container`, or `subtree`. For app data the context is usually `app`
+— one instance per request on the server and per document in the browser, kept
+across in-place navigation — or `container`, one instance per rendered
+container. `subtree` scope is the component-library case: one instance per rendered
 widget, resolved by the outermost component instance that calls the definition,
 so a second `<SelectRoot>` on the page resolves a second instance. The instance is created during initial render,
 serialized into the graph payload, resumed lazily in the browser, and
@@ -846,38 +847,40 @@ inside one `.tsrx` module:
   refuse a handle reached through an instance, because nothing mints or emits the
   id yet; the refusal is deliberate, since a recorded relationship that renders
   no attribute would be invisible.
-- **Page scope is the default.** Omitting `scope` resolves the definition to one
+- **App scope is the default.** Omitting `scope` resolves the definition to one
   instance for the page, which in the browser lives for the document (see
-  "Where an instance lives"). `'request'`, `'container'`, `'page'`, and
-  `'widget'` are accepted and recorded on the definition; any other value fails
-  the compile closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+  "Where an instance lives"). `'app'`, `'container'`, and `'subtree'` are
+  accepted and recorded on the definition; any other value fails the compile
+  closed with `MARKLESS_SHARED_SCOPE_INVALID`. The old names `'page'` and
+  `'request'` (now `'app'`) and `'widget'` (now `'subtree'`) fail with a message
+  that names the new scope.
 - **A family shape with no declared scope warns.** When two or more components of
   the module that declares a definition resolve it, that is the shape of a widget
-  family. Left without a scope it is page-scoped, so two of those widgets on one
+  family. Left without a scope it is app-scoped, so two of those widgets on one
   page share one graph and move together. The compiler emits the warning
   `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`, naming the components and both fixes:
-  add `{ scope: 'widget' }` for a graph per rendered widget, or write
-  `{ scope: 'page' }` to keep the sharing on purpose. It is a warning, not an
-  error, so existing page-scoped families keep compiling; either explicit
+  add `{ scope: 'subtree' }` for a graph per rendered widget, or write
+  `{ scope: 'app' }` to keep the sharing on purpose. It is a warning, not an
+  error, so existing app-scoped families keep compiling; either explicit
   spelling silences it.
-- **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
+- **Subtree scope is per rendered widget.** A `subtree`-scoped definition's graph
   nodes belong to the first component of the module that resolves it, not to the
   module root. Composition reads that ownership back: the widget root is the
   outermost composed instance that carries the definition's cells, and every
   other piece of the widget — trigger, content, item — finds that root as the
   longest registered widget-root prefix of its own instance path. The instance id
   is the definition id qualified by the widget-root path
-  (`c0:shared:select.tsrx#select/state:s`), so a widget-scoped `shared:` id is
+  (`c0:shared:select.tsrx#select/state:s`), so a subtree-scoped `shared:` id is
   the one page-space family composition does qualify. A widget nested inside
   another widget's content owns its own root path; two widgets of one family
   nested inside one another resolve to the outermost of the two, which is what
   "the outermost component that resolves the definition" means above.
-- **No compile diagnostic is owed for widget scope.** Spec 03's normative refusal
+- **No compile diagnostic is owed for subtree scope.** Spec 03's normative refusal
   is compose-time — "a child node id that composition cannot classify is a
-  compose-time refusal" — and a widget-scoped id is always classifiable: it is
+  compose-time refusal" — and a subtree-scoped id is always classifiable: it is
   either qualified by a registered widget root or, when the resolving component
   is the page itself and has no instance path, page-wide, which is the same
-  answer page scope gives.
+  answer app scope gives.
 
 How the browser keeps one instance per document:
 
@@ -1073,7 +1076,7 @@ export function SelectItem({ value, children }) @{
 
 All three components read and write the same select graph instance for that
 rendered widget. A second `<SelectRoot>` gets a different graph instance: with
-`widget` scope, the instance id is the definition id qualified by the instance
+`subtree` scope, the instance id is the definition id qualified by the instance
 path of the outermost resolving component, and the trigger and item pieces
 resolve through the same path. No provider component, context ID, wrapper hook,
 or tree-shaped public API is introduced; the compiler/runtime records graph

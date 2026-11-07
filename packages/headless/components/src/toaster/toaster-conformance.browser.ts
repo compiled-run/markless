@@ -7,7 +7,7 @@ import MultiEmbed from './scenarios/multi-embed.tsrx';
 // the SSR island lever is a string-level transform that resolves each component
 // identifier against THIS file's own import statements.
 //
-// Toaster is the page-scope family. Every other family wired to this battery
+// Toaster is the app-scope family. Every other family wired to this battery
 // keeps its embeds apart; this one is supposed to join them, because a message
 // raised by a component that never renders a region still has to arrive. So the
 // load-bearing check here is (e), not (b).
@@ -15,7 +15,7 @@ runMultiEmbedConformance({
 	family: 'toaster',
 	render: () => renderSSRIslands([MultiEmbed, MultiEmbed]),
 	embedFrame: 'frame',
-	// The rows, not the region: `toasterState` is page-scoped and so spells one
+	// The rows, not the region: `toasterState` is app-scoped and so spells one
 	// id for the whole page by design, while `toasterItemState` is a widget per
 	// row and is the one thing here the island discriminator must keep apart.
 	widgetDefinitionSuffixes: ['#toasterItemState'],

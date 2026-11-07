@@ -959,17 +959,16 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 function assertOptionalSharedScope(record: Record<string, unknown>, context: string): void {
 	if (record.scope === undefined) return;
 	if (
-		record.scope === 'widget' ||
-		record.scope === 'request' ||
+		record.scope === 'app' ||
 		record.scope === 'container' ||
-		record.scope === 'page'
+		record.scope === 'subtree'
 	) {
 		return;
 	}
 
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),
-		`Invalid ${context}: expected scope widget, request, container, or page.`,
+		`Invalid ${context}: expected scope app, container, or subtree.`,
 	);
 }
 

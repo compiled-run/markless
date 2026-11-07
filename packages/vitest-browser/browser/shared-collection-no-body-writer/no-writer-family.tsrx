@@ -17,7 +17,7 @@ export const noWriterBox = shared(
 
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** Reads the collection, never writes it. */

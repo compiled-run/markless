@@ -3,7 +3,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import Gate from './fixtures/part-row-gate.tsrx';
 
-// Both blocks are the same widget-scoped shared instance, the same computed()
+// Both blocks are the same subtree-scoped shared instance, the same computed()
 // over the same plain state cell, the same keyed repeat and the same seven
 // strings. They differ only in whether one row is a component part.
 

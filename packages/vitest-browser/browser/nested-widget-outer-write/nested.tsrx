@@ -10,7 +10,7 @@ export const outerState = shared(
 
 		return { ...outer };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const innerState = shared(
@@ -19,7 +19,7 @@ export const innerState = shared(
 
 		return { ...inner };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const stepState = shared(
@@ -28,7 +28,7 @@ export const stepState = shared(
 
 		return { ...step };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const ownState = shared(
@@ -37,7 +37,7 @@ export const ownState = shared(
 
 		return { ...own };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Outer({ label, children }) @{

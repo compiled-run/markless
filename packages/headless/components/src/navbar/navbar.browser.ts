@@ -523,7 +523,7 @@ test('CSR: a press away from the trigger leaves the next click on it working', a
 	expect(el(ProductsContent).hasAttribute('hidden')).toBe(false);
 });
 
-// The defect the previous adoption attempt died on: one widget-scoped handle
+// The defect the previous adoption attempt died on: one subtree-scoped handle
 // shared by every instance meant the dismissal answered for the LAST entry on the
 // page. Opening the SECOND entry is what makes that visible.
 test('CSR: with two entries on the page a dismissal reaches the one that is showing', async () => {

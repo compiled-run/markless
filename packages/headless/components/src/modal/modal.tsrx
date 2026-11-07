@@ -42,7 +42,7 @@ export const modalState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ModalRoot({

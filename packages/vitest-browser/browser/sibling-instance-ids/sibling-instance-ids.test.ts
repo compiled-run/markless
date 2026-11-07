@@ -2,7 +2,7 @@ import { cleanup, render, renderSSR } from '@markless/vitest-browser';
 import { afterEach, expect, test } from 'vitest';
 import Page from './page.tsrx';
 
-// Childless sibling parts that each root a widget-scoped shared() instance
+// Childless sibling parts that each root a subtree-scoped shared() instance
 // inside one enclosing widget are separate instances: each mints its own id and
 // names it by IDREF, and a client render allocates both exactly as the server
 // does — whether the family holds a cell or nothing but an element() handle.

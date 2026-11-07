@@ -278,7 +278,7 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: {
 		summary: 'Several components share a shared() definition that has no scope.',
 		what: 'Several components in one file use the same `shared()` value, and it has no scope. So every copy of the widget on the page shares one value.',
-		how: "Pass `{ scope: 'widget' }` to give each widget its own value. Pass `{ scope: 'page' }` if one value for the page is what you want.",
+		how: "Pass `{ scope: 'subtree' }` to give each widget its own value. Pass `{ scope: 'app' }` if one value for the page is what you want.",
 	},
 	MARKLESS_SERIALIZE_UNSUPPORTED_VALUE: {
 		summary: 'State holds a value that Markless cannot send from the server to the browser.',

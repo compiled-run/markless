@@ -9,7 +9,7 @@ export const panelState = shared(
 
 		return { ...panel };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PanelRoot({ children }) @{

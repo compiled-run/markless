@@ -55,7 +55,7 @@ export async function carryKeptParts(input: {
 	];
 	const outsideInstances = new Set(
 		(arriving.state.sharedDefinitions ?? []).flatMap((definition) =>
-			definition.scope === 'widget' ? [] : definition.graphNodeIds,
+			definition.scope === 'subtree' ? [] : definition.graphNodeIds,
 		),
 	);
 	const values = new Map<string, unknown>();

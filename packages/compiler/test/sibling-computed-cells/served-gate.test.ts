@@ -16,7 +16,7 @@ export const treeItemState = shared(
 		const item = state({ open: false, leaf: false });
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TreeItem({ open = false, leaf = false, children }) @{

@@ -21,7 +21,7 @@ export const box = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function App() @{
@@ -173,7 +173,7 @@ import { computed, shared, state } from '@markless/core';
 export const cell = shared(() => {
 	const inner = state({ checked: false });
 	return { ...inner };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Label() @{
 	const seat = cell();

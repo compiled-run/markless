@@ -93,7 +93,7 @@ the HTML:
    versions, status (`pending`, `resolved`, `rejected`), and settled value/error
    data when available. This prevents resume from refetching data the initial
    render already resolved.
-3. **Shared instances** — shared definition IDs, request/container/page scope,
+3. **Shared instances** — shared definition IDs, app/container/subtree scope,
    version counters, and the plain state snapshot for each touched shared
    instance. Methods/actions are never serialized.
 4. **Subscription graph** — which symbol (DOM update, computed, async

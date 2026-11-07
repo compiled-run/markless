@@ -9,7 +9,7 @@ import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
-// A page-scoped shared() in lib/choice.tsrx read by three routes; its browser instance lives for the document.
+// An app-scoped shared() in lib/choice.tsrx read by three routes; its browser instance lives for the document.
 
 vi.setConfig({ testTimeout: 30_000 });
 

@@ -5,7 +5,7 @@ import NamedRowPage from './named-row-page.tsrx';
 import SeededPage from './seeded-page.tsrx';
 
 /**
- * `@markless/ui`'s taglist with taglist taken out: a widget-scope `shared()`
+ * `@markless/ui`'s taglist with taglist taken out: a subtree-scope `shared()`
  * factory, a root writing the collection from its own prop, one part repeating
  * over it, one sibling part writing it.
  *
