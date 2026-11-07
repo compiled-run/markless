@@ -120,7 +120,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'function createCaptureContext(context, bound) {',
 		'	const slots = {};',
 		'	for (const slot of bound.captureSlots) slots[slot.slotId] = slot;',
-		'	return {',
+		'	const capture = {',
 		'		read(slotId) {',
 		'			const slot = requiredCaptureSlot(slots, slotId);',
 		'			const route = slot.route;',
@@ -135,6 +135,8 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
 		`			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], ${rowed && keyedRowLocals ? 'route.rows ? marklessRowLocal(bound, context.graph, route) : ' : ''}context.locals?.[route.itemName]);`,
+		// A prop the child's module could only read as a value may be filled with a callback here.
+		'			if (route.kind === callbackRoute || route.kind === "callback-slot-route") return (...args) => capture.invoke(slotId, args);',
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -170,6 +172,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		`			return context.invokeSymbol(${rowed ? 'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)' : '(context.graph?.marklessInstancePath || "") + route.callbackSymbolId'}, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });`,
 		'		},',
 		'	};',
+		'	return capture;',
 		'}',
 		'',
 		// The resolver stays self-contained (it is loaded from a data: URL in some
