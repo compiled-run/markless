@@ -3371,6 +3371,15 @@ function stateInitializerPropReadStatements(
  * drops the wrapper and the printer re-derives whatever parentheses the
  * position actually needs.
  */
+// `__MARKLESS_DEV_ENABLED__` folds to false in a production build, so the branch it guards ships no code.
+function devEnabledNode(): EmissionNode {
+	return logicalNode(
+		'||',
+		binaryNode('===', unaryNode('typeof', identifierNode('__MARKLESS_DEV_ENABLED__')), literalNode('undefined')),
+		identifierNode('__MARKLESS_DEV_ENABLED__'),
+	);
+}
+
 function expressionFromSource(source: string, filename: string): EmissionNode {
 	const { program, errors } = parseEmissionSource(`(${source});`, filename, 'ts');
 	const statements = asNodes((program as unknown as AnyNode).body);
@@ -4887,11 +4896,11 @@ export function buildAsyncBoundaryUpdateEmission(
 				exportName,
 				['context'],
 				[
-					// A waiting block asks for its arms' records alone, to fetch their code beside its data.
+					// Dev only: a waiting block asks for its arms' records alone, to fetch their code beside its data.
 					...(records
 						? [
 								ifStatementNode(
-									memberChainNode('context.armRecordsOnly'),
+									logicalNode('&&', devEnabledNode(), memberChainNode('context.armRecordsOnly')),
 									returnStatementNode(identifierNode('marklessBoundaryRecords')),
 								),
 							]

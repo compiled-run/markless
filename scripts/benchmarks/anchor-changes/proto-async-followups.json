@@ -5,44 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/resume-async-wiring"
-			],
-			"delta": 495,
-			"reason": "a waiting @try fetches its arm's update and dom-update symbols beside its data",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"web/ssr-data/renderer"
 			],
 			"delta": 1211,
 			"reason": "children projected into a @try: unserved arms spend the projection span, live projections there fail with a rewrite",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -1,
-			"reason": "a waiting @try fetches its arm's update and dom-update symbols beside its data",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 495,
-			"reason": "a waiting @try fetches its arm's update and dom-update symbols beside its data",
 			"date": "2026-11-07"
 		},
 		{
@@ -54,30 +20,6 @@
 			],
 			"delta": 1211,
 			"reason": "children projected into a @try: unserved arms spend the projection span, live projections there fail with a rewrite",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": -2,
-			"reason": "a waiting @try fetches its arm's update and dom-update symbols beside its data",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -1,
-			"reason": "a waiting @try fetches its arm's update and dom-update symbols beside its data",
 			"date": "2026-11-07"
 		}
 	]

@@ -309,7 +309,7 @@ symbol:2
 const marklessBoundaryArms = [[{ "text": "<p>" }, { "read": { "graphNodeId": "computed:details", "path": ["title"] } }, { "text": "</p>" }], [{ "text": "<p>Broken</p>" }]];
 const marklessBoundaryRecords = [{ "locators": [{ "hostNodeId": "h1", "index": 0, "tagName": "p" }], "events": [], "domUpdates": [{ "hostNodeId": "h1", "source": "details.title", "graphNodeId": "computed:details", "path": ["title"], "target": { "kind": "text" }, "symbolId": "symbol:0" }], "behaviors": [], "elementHandles": [] }, { "locators": [{ "hostNodeId": "h2", "index": 0, "tagName": "p" }], "events": [], "domUpdates": [], "behaviors": [], "elementHandles": [] }];
 export function symbol_2(context) {
-  if (context.armRecordsOnly) return marklessBoundaryRecords;
+  if ((typeof __MARKLESS_DEV_ENABLED__ === "undefined" || __MARKLESS_DEV_ENABLED__) && context.armRecordsOnly) return marklessBoundaryRecords;
   const arm = context.status === "rejected" ? 1 : 0;
   const parts = marklessBoundaryArms[arm] ?? [];
   const html = parts.map((part) => part.text !== undefined ? part.text : marklessBoundaryText(context.graph.read(part.read.graphNodeId, part.read.path))).join("");

@@ -12,6 +12,8 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 
+declare const __MARKLESS_DEV_ENABLED__: boolean;
+
 // Spec D8 (12-arm-rendering): first appearances render @pending structurally,
 // navigations hold the outgoing page, and RE-settles hold the prior settled
 // content busy until it commits or stalls (resume-resettle-hold.ts). This
@@ -201,7 +203,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							snapshot,
 						});
 					}
-					if (!isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status))
+					if (
+						(typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) &&
+						!isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)
+					)
 						preloadTryArm(input.loadSymbol, boundary.updateSymbolId);
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
@@ -250,7 +255,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	};
 }
 
-// A waiting block fetches its @try arm's code beside its data, not after it.
+// Dev only, where symbols load on demand: a waiting block fetches its @try arm's code beside its data.
 function preloadTryArm(loadSymbol: WiringInput['loadSymbol'], updateSymbolId: string): void {
 	void Promise.resolve(loadSymbol(updateSymbolId))
 		.then(async (symbol) => {
