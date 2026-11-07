@@ -6,33 +6,9 @@
 				"loadWeight",
 				"linux-x64",
 				"bench /",
-				"executedChars"
-			],
-			"delta": 225,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
 				"jsGzipBytes"
 			],
 			"delta": 77,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 2,
 			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
 			"date": "2026-11-07"
 		},
@@ -54,18 +30,6 @@
 				"loadWeight",
 				"linux-x64",
 				"bench /settings",
-				"executedChars"
-			],
-			"delta": -221,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
 				"jsGzipBytes"
 			],
 			"delta": 77,
@@ -78,18 +42,6 @@
 				"loadWeight",
 				"linux-x64",
 				"docs /",
-				"executedChars"
-			],
-			"delta": 34,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
 				"jsGzipBytes"
 			],
 			"delta": 70,
@@ -102,33 +54,9 @@
 				"loadWeight",
 				"linux-x64",
 				"docs /concepts/state",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
 				"jsGzipBytes"
 			],
 			"delta": 70,
-			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
-			"date": "2026-11-07"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"executedChars"
-			],
-			"delta": 1,
 			"reason": "In-place navigation re-creates arriving video and audio in the live document so they load (router fragment entry +463 B rendered)",
 			"date": "2026-11-07"
 		},
