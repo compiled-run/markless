@@ -8,9 +8,9 @@
 				"docs /",
 				"executedChars"
 			],
-			"delta": 138,
-			"reason": "docs sidebar close toggle and its view transition (owner request)",
-			"date": "2026-11-06"
+			"delta": 105,
+			"reason": "docs sidebar close toggle and its slide (owner request)",
+			"date": "2026-11-07"
 		},
 		{
 			"surface": "perf-guards",
@@ -20,9 +20,33 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 444,
-			"reason": "docs sidebar close toggle and its view transition (owner request)",
-			"date": "2026-11-06"
+			"delta": 647,
+			"reason": "docs sidebar close toggle and its slide (owner request)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 138,
+			"reason": "docs sidebar close toggle and its slide (owner request)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 237,
+			"reason": "docs sidebar close toggle and its slide (owner request)",
+			"date": "2026-11-07"
 		}
 	]
 }
