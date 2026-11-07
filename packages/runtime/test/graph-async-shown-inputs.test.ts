@@ -161,6 +161,68 @@ test('the read reaches through a chain: an input of the value a key read is held
 	expect(graph.read('computed:heading')).toBe('3 in B');
 });
 
+test('a chained async value blocked by a rejected sibling still runs on its last-good pin', async () => {
+	const orders = scripted();
+	const past = scripted();
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:storeId', value: 'A' },
+			{ graphNodeId: 'state:query', value: 'mugs' },
+		],
+		computed: [
+			{
+				graphNodeId: 'computed:heading',
+				dependencies: [
+					{ graphNodeId: 'computed:past', path: ['length'] },
+					{ graphNodeId: 'state:storeId', path: [] },
+				],
+				compute: (read) => `${read('computed:past', ['length'])} in ${read('state:storeId')}`,
+			},
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:orders',
+				dependencies: [{ graphNodeId: 'state:storeId', path: [] }],
+				key: (read) => read('state:storeId'),
+				run: orders.run,
+			},
+			{
+				graphNodeId: 'computed:past',
+				dependencies: [
+					{ graphNodeId: 'state:query', path: [] },
+					{ graphNodeId: 'computed:orders', path: ['value'] },
+				],
+				key: (read) => [read('state:query'), read('computed:orders', ['value'])],
+				run: past.run,
+			},
+		],
+	} as never);
+	graph.read('computed:heading');
+	orders.runs[0]!.resolve(['a1']);
+	await tick();
+	past.runs[0]!.resolve(Array.from({ length: 12 }, () => 'p'));
+	await tick();
+	expect(graph.read('computed:heading')).toBe('12 in A');
+
+	graph.write({ graphNodeId: 'state:storeId', value: 'B' });
+	await graph.flush();
+	orders.runs[1]!.resolve(Promise.reject(new Error('offline')));
+	await tick();
+	await graph.flush();
+	expect(graph.read('computed:orders', ['status'])).toBe('rejected');
+	expect(graph.read('computed:past', ['status'])).not.toBe('rejected');
+	expect(graph.read('computed:heading')).toBe('12 in A');
+
+	graph.write({ graphNodeId: 'state:query', value: 'cups' });
+	await graph.flush();
+	expect(past.runs).toHaveLength(2);
+	expect(past.runs[1]!.key).toEqual(['cups', ['a1']]);
+	expect(graph.read('computed:past', ['status'])).not.toBe('rejected');
+	past.runs[1]!.resolve(Array.from({ length: 7 }, () => 'p'));
+	await tick();
+	expect(graph.read('computed:heading')).toBe('7 in A');
+});
+
 test('a chained async value whose own input moved fetches at once on the inputs the screen shows', async () => {
 	const revenue = scripted();
 	const converted = scripted();
