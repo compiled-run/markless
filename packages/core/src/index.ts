@@ -7,6 +7,7 @@ export {
 	FrameworkApiRuntimeError,
 } from './framework-api.ts';
 export type {
+	AsyncComputedRecipe,
 	AsyncComputedValue,
 	ElementHandle,
 	FrameworkApiName,

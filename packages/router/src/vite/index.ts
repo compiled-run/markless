@@ -185,7 +185,7 @@ export interface MarklessRouterOptions {
 	prefetch?: boolean;
 	/**
 	 * A reload, or a client-rendered return to a page, shows the async content this tab last saw while it
-	 * revalidates, instead of `@pending`. On by default, kept per tab and per visitor session.
+	 * revalidates, instead of `@pending`. Off for now: the server mints no session scope, so no build emits cache code.
 	 * `exclude` names async values never kept (a trailing `*` matches every name it starts);
 	 * an entry that names nothing in the build fails the build. `false` emits no cache code at all.
 	 */

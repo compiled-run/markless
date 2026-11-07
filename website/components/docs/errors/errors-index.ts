@@ -868,6 +868,22 @@ export const errorIndex: ErrorIndex = {
 					words: 'an async value looks something up after an await markless_async_post_await_read an async computed() looks a value up with a key that comes from an await.',
 				},
 				{
+					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+					title: 'Text shows an input of an async value without the value',
+					chip: 'warning',
+					kind: 'compile warning',
+					guided: true,
+					words: 'text shows an input of an async value without the value markless_async_input_beside_value text inside a @try shows an input of an async value without the value itself.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+					title: 'An `@catch` is written without an `@try` before it',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'an `@catch` is written without an `@try` before it markless_async_catch_without_try an `@catch` is written without an `@try` before it: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_ASYNC_ARM_ORDER',
 					title: 'An `@pending` arm is written after `@catch`',
 					chip: 'error',
@@ -899,6 +915,14 @@ export const errorIndex: ErrorIndex = {
 			icon: 'puzzle',
 			blurb: 'Components, props, children, @if and markup.',
 			codes: [
+				{
+					code: 'MARKLESS_BLOCK_SIBLING_NODES',
+					title: 'A block renders one node',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a block renders one node markless_block_sibling_nodes a block holds two or more nodes side by side.',
+				},
 				{
 					code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 					title: 'A component returns markup from two places',
@@ -1188,6 +1212,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a page has no build data markless_router_render_data_missing a markless runtime error from @markless/router.',
 				},
 				{
+					code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
+					title: 'A resumeCache exclude names no async value',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'a resumecache exclude names no async value markless_resume_cache_exclude_unmatched a markless build tooling error from @markless/bundler.',
+				},
+				{
 					code: 'MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',
 					title: 'A route’s code was registered too late',
 					chip: 'error',
@@ -1244,14 +1276,6 @@ export const errorIndex: ErrorIndex = {
 					words: 'a .tsrx file has errors, so the build stopped markless_compile_blocked a .tsrx file has errors, so the build stopped.',
 				},
 				{
-					code: 'MARKLESS_BLOCK_SIBLING_NODES',
-					title: 'A block renders one node',
-					chip: 'error',
-					kind: 'compile error',
-					guided: true,
-					words: 'a block renders one node markless_block_sibling_nodes a block holds two or more nodes side by side.',
-				},
-				{
 					code: 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE',
 					title: 'markless-allow cannot silence an error',
 					chip: 'warning',
@@ -1282,14 +1306,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'build error',
 					guided: true,
 					words: 'node-only code reaches the browser markless_node_in_browser code that only runs in node is reachable from code the browser loads.',
-				},
-				{
-					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
-					title: 'Text shows an input of an async value without the value',
-					chip: 'warning',
-					kind: 'compile warning',
-					guided: true,
-					words: 'text shows an input of an async value without the value markless_async_input_beside_value text inside a @try shows an input of an async value without the value itself.',
 				},
 				{
 					code: 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT',
@@ -1428,28 +1444,12 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
-					code: 'MARKLESS_ASYNC_PLANE_MISSING',
-					title: '',
-					chip: 'error',
-					kind: 'runtime error',
-					guided: false,
-					words: ' markless_async_plane_missing a markless runtime error from @markless/web.',
-				},
-				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
-					title: '',
+					title: 'A @catch reset has no graph to re-run values in',
 					chip: 'error',
 					kind: 'runtime error',
 					guided: false,
-					words: ' markless_catch_reset_graph_missing a markless runtime error from @markless/web.',
-				},
-				{
-					code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
-					title: '',
-					chip: 'error',
-					kind: 'build error',
-					guided: false,
-					words: ' markless_resume_cache_exclude_unmatched a markless build tooling error from @markless/bundler.',
+					words: 'a @catch reset has no graph to re-run values in markless_catch_reset_graph_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_CSR_BEHAVIOR_HOST_MISSING',
@@ -1722,6 +1722,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a new list row is empty markless_repeat_row_mint_empty a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_PLANE_MISSING',
+					title: 'A page reads an async value no compiled code set up',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a page reads an async value no compiled code set up markless_async_plane_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_SYMBOL_UNKNOWN',
@@ -2002,14 +2010,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'an @try lost its place on the page markless_arm_commit_anchors_missing a markless runtime error from @markless/web.',
-				},
-				{
-					code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
-					title: 'An `@catch` is written without an `@try` before it',
-					chip: 'error',
-					kind: 'compile error',
-					guided: false,
-					words: 'an `@catch` is written without an `@try` before it markless_async_catch_without_try an `@catch` is written without an `@try` before it: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_RESUME_LOCATOR_MISSING',

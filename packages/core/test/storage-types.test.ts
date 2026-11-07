@@ -74,6 +74,30 @@ test('computed(async ...) types as the resolved value, with no wrapper', () => {
 	).toEqual([]);
 });
 
+test('computed(async ({ signal }) => ...) takes the abort signal the runtime passes', () => {
+	expect(
+		diagnosticsForCallSite(
+			'const user = computed(async ({ signal }) => { const s: AbortSignal = signal; void s; return { name: "Ada" }; });\nconst name: string = user.name;\nvoid name;',
+			"import { computed } from './framework-api';",
+		),
+	).toEqual([]);
+});
+
+test('computed(() => ...) keeps its sync type and takes no recipe argument', () => {
+	expect(
+		diagnosticsForCallSite(
+			'const total = computed(() => 2 + 3);\nconst sum: number = total;\nvoid sum;',
+			"import { computed } from './framework-api';",
+		),
+	).toEqual([]);
+	expect(
+		diagnosticsForCallSite(
+			'void computed(({ signal }) => signal.aborted);',
+			"import { computed } from './framework-api';",
+		).length,
+	).toBeGreaterThan(0);
+});
+
 // Requires `vp pack` output. Skipped when dist is absent (plain `vp test` runs
 // without packing), mirroring scripts/release/publish-shape.test.ts. This is the
 // assertion that ties the SHIPPED declaration to the SHIPPED doc: both files

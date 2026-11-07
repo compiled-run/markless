@@ -386,6 +386,17 @@ function birthday(p: { age: number }) {
 <button onClick={() => birthday(person)}>Birthday</button>
 ```
 
+## Give state a type
+
+TypeScript takes the type from the starting value. When the starting value is narrower than what the state will hold, pass the type: `state<T>(initial: T): T`.
+
+```tsrx
+type Sort = 'newest' | 'oldest';
+
+let sort = state<Sort>('newest');
+let todos = state<Todo[]>([]);
+```
+
 ## Make state in the component body
 
 Write `state()` next to your other variables in the component body. Not above the component, not inside a handler, and not inside an `@if` or `@for`. It only works in `.tsrx` files. For a value that several components share, use [shared](/build/shared).
