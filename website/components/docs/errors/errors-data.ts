@@ -8225,8 +8225,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
-		title: '',
-		area: 'internal',
+		title: 'Live children sit in an @if or @switch arm that redraws',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',
@@ -8244,8 +8244,8 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
-		title: '',
-		area: 'internal',
+		title: 'Live children sit inside a component’s @try',
+		area: 'components',
 		packageName: '@markless/compiler',
 		stage: 'build',
 		severity: 'error',

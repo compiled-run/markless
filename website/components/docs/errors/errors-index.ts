@@ -1108,6 +1108,22 @@ export const errorIndex: ErrorIndex = {
 					words: 'duplicate attribute on one element markless_attribute_duplicate duplicate attribute on one element: a markless build error.',
 				},
 				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+					title: 'Live children sit in an @if or @switch arm that redraws',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'live children sit in an @if or @switch arm that redraws markless_projection_live_in_branch a markless build tooling error from @markless/compiler.',
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+					title: 'Live children sit inside a component’s @try',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'live children sit inside a component’s @try markless_projection_live_in_try a markless build tooling error from @markless/compiler.',
+				},
+				{
 					code: 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
 					title: 'Only the props rest binding can be spread onto a component',
 					chip: 'error',
@@ -1443,22 +1459,6 @@ export const errorIndex: ErrorIndex = {
 			icon: 'gear',
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
-				{
-					code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
-					title: '',
-					chip: 'error',
-					kind: 'build error',
-					guided: false,
-					words: ' markless_projection_live_in_branch a markless build tooling error from @markless/compiler.',
-				},
-				{
-					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
-					title: '',
-					chip: 'error',
-					kind: 'build error',
-					guided: false,
-					words: ' markless_projection_live_in_try a markless build tooling error from @markless/compiler.',
-				},
 				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',

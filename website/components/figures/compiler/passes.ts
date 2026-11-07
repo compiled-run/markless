@@ -14,6 +14,7 @@ const DOES: Readonly<Record<string, string>> = {
 	'public-render-module': 'Writes the browser and server render modules.',
 	'server-only-props': 'Stops the compile if browser code reads a prop the server keeps to itself.',
 	'payload-scripts': 'Writes the markless/state and markless/view script tags.',
+	'projection-arms': 'Finds the {children} a redrawn @if, @switch or @try arm would freeze.',
 	'symbol-modules': 'Writes one module per symbol.',
 	'runtime-demand-map': 'Lists the runtime code each symbol and record needs.',
 	'trigger-groups': 'Groups each event with the state, records and symbols it touches.',
