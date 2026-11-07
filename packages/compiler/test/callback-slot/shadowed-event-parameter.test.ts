@@ -59,10 +59,6 @@ for (const name of ['next', 'event', 'value']) {
 			_slot: string,
 			args: unknown[],
 		) => invoked.push(...args);
-		// The import is stripped above; the user-action mark itself (submit-quiet-design.md Q2)
-		// is not what this test exercises, so both calls become no-ops.
-		(globalThis as Record<string, unknown>).marklessUserActionStart = () => {};
-		(globalThis as Record<string, unknown>).marklessUserActionEnd = () => {};
 		await (await load(handler.source))({
 			event: { type: 'click' },
 			graph: { read: () => '', write: (write: { value: unknown }) => writes.push(write.value) },

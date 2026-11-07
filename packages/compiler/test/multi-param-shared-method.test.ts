@@ -151,42 +151,27 @@ test('a parameter carrying parentheses of its own keeps its whole parameter list
 });
 
 // Byte-stability: the shapes that already worked emit exactly what they emitted
-// before the parameter-list scan changed, nested one level deeper inside the
-// user-action mark's `try` (submit-quiet-design.md Q2). These two strings are the canary.
+// before the parameter-list scan changed. These two strings are the canary.
 test('one-parameter and zero-argument emission is byte-unchanged', async () => {
 	const zero = await compileHandler('bump() { s.searchAt = 1; },', 'b.bump();');
 	expect(zero.inlined).toContain('(() => { s.searchAt = 1; })()');
 	expect(zero.module).toBe(
-		`import { marklessUserActionStart } from "@markless/web/fns/user-action";
-import { marklessUserActionEnd } from "@markless/web/fns/user-action";
-export function symbol_0(context) {
-  marklessUserActionStart(context);
-  try {
-    (() => {
-      context.graph.write({ graphNodeId: "shared:src/box.tsrx#buf/state:s", path: ["searchAt"], value: 1 });
-    })();
-    ${ECHO_WRITE};
-  } finally {
-    marklessUserActionEnd(context);
-  }
+		`export function symbol_0(context) {
+  (() => {
+    context.graph.write({ graphNodeId: "shared:src/box.tsrx#buf/state:s", path: ["searchAt"], value: 1 });
+  })();
+  ${ECHO_WRITE};
 }`,
 	);
 
 	const one = await compileHandler('typed(text: string) { s.search = text; },', "b.typed('a');");
 	expect(one.inlined).toContain("((text: string) => { s.search = text; })('a')");
 	expect(one.module).toBe(
-		`import { marklessUserActionStart } from "@markless/web/fns/user-action";
-import { marklessUserActionEnd } from "@markless/web/fns/user-action";
-export function symbol_0(context) {
-  marklessUserActionStart(context);
-  try {
-    ((text) => {
-      ${SEARCH_WRITE};
-    })('a');
-    ${ECHO_WRITE};
-  } finally {
-    marklessUserActionEnd(context);
-  }
+		`export function symbol_0(context) {
+  ((text) => {
+    ${SEARCH_WRITE};
+  })('a');
+  ${ECHO_WRITE};
 }`,
 	);
 });

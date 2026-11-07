@@ -3,7 +3,7 @@ import type { ResumeDomElement, ResumeDomNode, ResumeViewRecord } from '../resum
 import {
 	PROTOCOL_ROW_END_COMMENT,
 	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-page-markers.ts';
+} from '../../../serializer/src/protocol-row-markers.ts';
 
 // The items of the keyed rows an element sits in, for a callback a row passed the component it renders.
 export function marklessRowLocals(

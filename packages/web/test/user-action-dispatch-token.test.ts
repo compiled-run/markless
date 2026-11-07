@@ -112,3 +112,48 @@ test('a callback the handler fires and forgets keeps the user action through its
 		{ at: 'callback 2 after await', open: false },
 	]);
 });
+
+test('the dispatcher marks a DOM event body loud and a call made after the dispatch ended quiet, so no handler module carries a wrap', async () => {
+	const save = element('BUTTON');
+	const root = element('SECTION', [save]);
+	root.__marklessDelegatedDispatch = true;
+	const order: string[] = [];
+	let handlerContext: (Context & { readonly graph?: Record<string, unknown> }) | undefined;
+	const loadSymbol = (symbolId: string) =>
+		symbolId === 'symbol:click'
+			? (context: typeof handlerContext) => {
+					if (!handlerContext) {
+						const graph = context!.graph!;
+						for (const [name, label] of [
+							['markUserActionStart', 'loud-start'],
+							['markUserActionEnd', 'loud-end'],
+							['markQuietStart', 'quiet-start'],
+							['markQuietEnd', 'quiet-end'],
+						] as const) {
+							const original = graph[name] as () => void;
+							graph[name] = () => {
+								order.push(label);
+								original();
+							};
+						}
+					}
+					handlerContext = context;
+					order.push('handler');
+				}
+			: async () => {
+					await wait(1);
+					order.push('callback');
+				};
+	const { runtime } = await resumeFromPayloadDocument({
+		document: payloadDocument(),
+		root: root as never,
+		loadSymbol: loadSymbol as never,
+	});
+
+	await runtime.dispatch({ type: 'click', target: save } as never, { ignoreUnmatched: true });
+	order.length = 0;
+	await runtime.dispatch({ type: 'click', target: save } as never, { ignoreUnmatched: true });
+	await handlerContext!.invokeSymbol!('symbol:callback', { ...handlerContext });
+
+	expect(order).toEqual(['loud-start', 'handler', 'loud-end', 'quiet-start', 'callback', 'quiet-end']);
+});

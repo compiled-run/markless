@@ -1,6 +1,5 @@
 import { expect, test } from 'vitest';
 import { marklessEntryMarkEnd, marklessEntryMarkStart } from '../src/fns/entry-mark.ts';
-import { marklessUserActionEnd, marklessUserActionStart } from '../src/fns/user-action.ts';
 
 // The entry mark is always shown as a user action (submit-quiet-design.md Q1), so only a body
 // running inside a DOM dispatch may open it.
@@ -12,11 +11,9 @@ function graph(order: string[]) {
 }
 
 function runBody(context: object, beforeEnd?: () => void) {
-	marklessUserActionStart(context);
 	marklessEntryMarkStart(context, ['computed:orders']);
 	beforeEnd?.();
 	marklessEntryMarkEnd(context, ['computed:orders']);
-	marklessUserActionEnd(context);
 }
 
 test('a body inside a DOM dispatch opens and closes the entry mark', () => {

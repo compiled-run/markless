@@ -33,25 +33,13 @@ export function Preference() @{
 	);
 });
 
-// A `data:` URL import resolves no bare specifier, so the module-wide
-// `@markless/web/fns/user-action` import every event-handler now carries
-// (submit-quiet-design.md Q2) is stubbed rather than left to fail; this test
-// only cares about the receiver/write/call behavior, not the user-action mark.
-function stubUserActionImport(source: string): string {
-	return `const marklessUserActionStart = () => {}, marklessUserActionEnd = () => {};\n${source.replace(
-		/^import \{[^}]*\} from ['"]@markless\/web\/fns\/user-action['"];\n?/gm,
-		'',
-	)}`;
-}
-
 async function emittedHandler(source: string) {
 	const result = await compile(source);
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	const module = result.symbolModules.modules.find((module) => module.kind === 'event-handler');
 	if (!module) throw Error('Missing emitted handler');
 	const loaded = await import(
-		'data:text/javascript;base64,' +
-			Buffer.from(stubUserActionImport(module.source)).toString('base64')
+		'data:text/javascript;base64,' + Buffer.from(module.source).toString('base64')
 	);
 	return {
 		result,

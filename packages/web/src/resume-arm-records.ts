@@ -4,11 +4,7 @@ import {
 	missingElementLocatorError,
 	runtimeResumeError,
 } from './inline/resume-errors.ts';
-import {
-	isArmBranchAnchorComment,
-	marklessElementAt,
-	pageCommentCensus,
-} from './resume-anchor-census.ts';
+import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -18,6 +14,13 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 } from './resume-types.ts';
+
+// Arm-branch anchors index in their owning boundary's census, never the page's.
+function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
+	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
+	return text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:');
+}
+
 export {
 	composedArmRecordQualifier,
 	installComposedArmRecordQualifier,

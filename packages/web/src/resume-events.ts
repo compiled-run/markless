@@ -308,7 +308,6 @@ export function createEventWiring(input: {
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
-	const catchScope = input.asyncBoundaries && { graph: input.graph, boundaries: input.asyncBoundaries };
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
 	// The detached subtree's own top is the row the repeat took out, and it carries
 	// where it hung. That is what lets a dispatch several microtasks behind its
@@ -732,8 +731,14 @@ export function createEventWiring(input: {
 			) => {
 				// The caller's writes wait for this symbol's own, so loading its code splits no task.
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
+				const { graph } = context;
+				let loud: boolean | undefined;
 				try {
 					const symbol = await input.loadSymbol(symbolId);
+					// A write this body makes is loud only inside a DOM dispatch; the same body a timer reaches later is quiet.
+					loud = context.userActionToken?.open === true;
+					if (loud) graph.markUserActionStart?.();
+					else graph.markQuietStart?.();
 					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && marklessIsBoundSymbolId(symbolId)
@@ -749,6 +754,8 @@ export function createEventWiring(input: {
 							throw error;
 					});
 				} finally {
+					if (loud) graph.markUserActionEnd?.();
+					else if (loud === false) graph.markQuietEnd?.();
 					releaseFlush?.();
 				}
 			};
@@ -782,7 +789,9 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: readHandle,
-				...(catchScope && { catchScope }),
+				...(input.asyncBoundaries && {
+					catchScope: { graph: input.graph, boundaries: input.asyncBoundaries },
+				}),
 				...(locals ? { locals } : {}),
 				releaseQueue: options.releaseQueue,
 				userActionToken,

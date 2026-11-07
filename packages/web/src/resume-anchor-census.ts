@@ -2,23 +2,14 @@ import {
 	PROTOCOL_BLOCK_START_COMMENT,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
-	PROTOCOL_ROW_END_COMMENT,
-	PROTOCOL_ROW_START_COMMENT,
+	PROTOCOL_UNCOUNTED_COMMENT,
 } from '../../serializer/src/protocol-page-markers.ts';
 import type { ResumeDomComment, ResumeDomElement, ResumeDomNode } from './resume-types.ts';
 
-// Arm-branch anchors index in their owning boundary's census (T104): every
-// page-level comment walk must skip them. Own module: lean closures stay lean.
-export function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
-	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
-	return text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:');
-}
-
-// Page anchor indexes skip arm-branch anchors and the row comments a list adds per row.
 export const isUncountedComment = (comment: ResumeDomComment): boolean =>
-	isArmBranchAnchorComment(comment) ||
-	comment.data === PROTOCOL_ROW_START_COMMENT ||
-	comment.data === PROTOCOL_ROW_END_COMMENT;
+	PROTOCOL_UNCOUNTED_COMMENT.test(
+		comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '',
+	);
 
 // The page's children: between the markers an author's element as the container carries.
 export function pageNodes<N extends { nodeType?: number }>(root: {

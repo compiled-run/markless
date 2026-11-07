@@ -12,15 +12,10 @@ type ScalarWriteGraph = {
 		readonly returnValue?: 'previous' | 'next';
 		readonly update: (value: unknown) => unknown;
 	}) => unknown;
-	readonly markUserActionStart?: () => void;
-	readonly markUserActionEnd?: () => void;
-	readonly markQuietStart?: () => void;
-	readonly markQuietEnd?: () => void;
 };
 
 type ScalarWriteContext = {
 	readonly graph?: ScalarWriteGraph;
-	readonly userActionToken?: { readonly open: boolean };
 };
 
 type ScalarWriteInput =
@@ -45,25 +40,16 @@ export function marklessWriteScalar(context: ScalarWriteContext, input: ScalarWr
 		throw marklessScalarLeafError('MARKLESS_SCALAR_WRITE_CELL_MISSING', 'write-cell');
 	}
 	context.graph.read?.(input.graphNodeId, []);
-	// The scalar leaf has no user-action wrap of its own, so it decides loud or quiet here.
-	const loud = context.userActionToken?.open === true;
-	if (loud) context.graph.markUserActionStart?.();
-	else context.graph.markQuietStart?.();
-	try {
-		if ('update' in input) {
-			return context.graph.update({
-				graphNodeId: input.graphNodeId,
-				path: [],
-				returnValue: input.returnValue,
-				update: input.update,
-			});
-		}
-		context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
-		return input.value;
-	} finally {
-		if (loud) context.graph.markUserActionEnd?.();
-		else context.graph.markQuietEnd?.();
+	if ('update' in input) {
+		return context.graph.update({
+			graphNodeId: input.graphNodeId,
+			path: [],
+			returnValue: input.returnValue,
+			update: input.update,
+		});
 	}
+	context.graph.write({ graphNodeId: input.graphNodeId, path: [], value: input.value });
+	return input.value;
 }
 
 function marklessScalarLeafError(code: string, site: string): Error {

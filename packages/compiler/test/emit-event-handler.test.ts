@@ -415,8 +415,6 @@ async function runHandler(
 				? graph.update({ ...input, path: [] })
 				: graph.write({ ...input, path: [] });
 		},
-		marklessUserActionStart: () => {},
-		marklessUserActionEnd: () => {},
 		save: (event: unknown) => {
 			recorder.calls.push(`save ${JSON.stringify(event)}`);
 			return 'saved';
@@ -462,23 +460,17 @@ test('both paths choose the same module shape for every fixture', async () => {
 
 	// Stated rather than derived, so a shape that moves shows up as a failure
 	// here instead of quietly passing the equality above.
-	// Every `general` event-handler and callback-prop shape carries two more imports than before:
-	// `marklessUserActionStart`/`marklessUserActionEnd` from `@markless/web/fns/user-action`
-	// (submit-quiet-design.md Q2), which mark the handler's own turn so a write it makes — sync
-	// or after an `await` in the same handler, or forwarded through a callback prop — starts a
-	// loud refresh. The scalar-leaf shape marks its one write in `write-scalar.ts` instead, so its
-	// import count is unchanged.
 	expect(shapes).toEqual({
 		'scalar-leaf-step': 'scalar-leaf/sync/imports:1',
 		'scalar-leaf-local': 'scalar-leaf/sync/imports:1',
 		'guarded-scalar-leaf': 'scalar-leaf/sync/imports:1',
-		'imported-reference': 'general/sync/imports:3',
-		'authored-body-writes': 'general/sync/imports:2',
-		'method-call-write': 'general/sync/imports:2',
-		'commented-body': 'general/sync/imports:2',
-		'capture-child-handler': 'general/async/imports:2',
-		'capture-callback-prop': 'general/sync/imports:2',
-		'empty-body': 'general/sync/imports:2',
+		'imported-reference': 'general/sync/imports:1',
+		'authored-body-writes': 'general/sync/imports:0',
+		'method-call-write': 'general/sync/imports:0',
+		'commented-body': 'general/sync/imports:0',
+		'capture-child-handler': 'general/async/imports:0',
+		'capture-callback-prop': 'general/sync/imports:0',
+		'empty-body': 'general/sync/imports:0',
 	});
 });
 
@@ -837,11 +829,7 @@ test('every guarded callback shape prints the guard the author wrote', () => {
 		expect(paths.printed, `${shape.name}: leaked the captured binding`).not.toMatch(
 			/(^|[^."'\w])onChange\b/,
 		);
-		// The guard statement is the one line that still names the capture slot;
-		// the user-action wrap (submit-quiet-design.md Q2) added lines around it,
-		// so an index into the body no longer finds it reliably.
-		bodies[shape.name] =
-			meaningfulLines(paths.printed).find((line) => line.includes(GUARD_SLOT_ID)) ?? '';
+		bodies[shape.name] = meaningfulLines(paths.printed)[1] ?? '';
 	}
 
 	// The guard operator survives in every shape, stated line by line so a rewrite

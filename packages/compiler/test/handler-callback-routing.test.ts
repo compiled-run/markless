@@ -139,9 +139,7 @@ export function ModalTrigger({ onChange }) @{
 	// still runs after it; the callback's call is the last thing that callback
 	// does, so it is inlined unawaited rather than making the callback async.
 	expect(source).toContain('await (async (next) =>');
-	// Nested one level deeper than before: the user-action mark (submit-quiet-design.md
-	// Q2) wraps the whole handler body in its own `try`.
-	expect(source).toContain('onDismiss: () => {\n      (async (next) =>');
+	expect(source).toContain('onDismiss: () => {\n    (async (next) =>');
 });
 
 test('a shared-instance method called only inside the callback lowers', async () => {
@@ -249,10 +247,8 @@ export function ModalTrigger() @{
 
 	const [source] = eventSymbolSources(result);
 	expect(source).not.toMatch(/\bmodal\./);
-	// Nested one level deeper than before: the user-action mark (submit-quiet-design.md
-	// Q2) wraps the whole handler body in its own `try`, which this closure sits inside.
 	expect(source).toContain(
-		`return () => {\n        context.graph.write({ graphNodeId: "${GRAPH_NODE}", path: ["open"], value: false });`,
+		`return () => {\n      context.graph.write({ graphNodeId: "${GRAPH_NODE}", path: ["open"], value: false });`,
 	);
 });
 

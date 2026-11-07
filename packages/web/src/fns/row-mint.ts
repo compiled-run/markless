@@ -12,7 +12,7 @@ import type {
 import {
 	PROTOCOL_ROW_END_COMMENT,
 	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-page-markers.ts';
+} from '../../../serializer/src/protocol-row-markers.ts';
 
 /**
  * The nodes a resumed client BUILDS for a keyed repeat, and nothing else.

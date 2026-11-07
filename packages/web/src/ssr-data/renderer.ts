@@ -4,7 +4,7 @@ import type { KeepParts } from '../fns/keep-parts-hook.ts';
 import {
 	PROTOCOL_ROW_END_COMMENT,
 	PROTOCOL_ROW_START_COMMENT,
-} from '../../../serializer/src/protocol-page-markers.ts';
+} from '../../../serializer/src/protocol-row-markers.ts';
 import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,

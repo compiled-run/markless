@@ -74,18 +74,11 @@ function evaluateSymbol(source: string): Symbol {
 		.replace(/^export const /gm, 'const ')
 		.replace(/^export function /gm, 'function ');
 	const name = /function (symbol_\d+)\(/.exec(body)![1];
-	// The user-action mark import (submit-quiet-design.md Q2) is stripped with every other
-	// import above; these differential checks compare write/derive behavior, not the mark.
-	return new Function(
-		'marklessUpdateText',
-		'marklessWriteScalar',
-		'marklessUserActionStart',
-		'marklessUserActionEnd',
-		`${body}\nreturn ${name};`,
-	)(marklessUpdateText, marklessWriteScalar, noop, noop);
+	return new Function('marklessUpdateText', 'marklessWriteScalar', `${body}\nreturn ${name};`)(
+		marklessUpdateText,
+		marklessWriteScalar,
+	);
 }
-
-function noop(): void {}
 
 async function compileBoard() {
 	const compiled = await compileTsrxModule({

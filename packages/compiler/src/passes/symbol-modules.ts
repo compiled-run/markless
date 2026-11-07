@@ -6207,7 +6207,6 @@ export function buildEventHandlerEmission(
 
 	const shownReads = symbol.kind === 'event-handler' ? symbol.shownReads : undefined;
 	const entryMarks = symbol.entryMarks;
-	const markUserAction = symbol.kind !== 'event-handler' || symbol.eventName !== 'attach';
 	const catchRunner = symbol.catchRunnerGraphNodeId;
 	const scalarLeaf =
 		input.captureSlots.length === 0 && !shownReads && !entryMarks && !catchRunner
@@ -6347,20 +6346,6 @@ export function buildEventHandlerEmission(
 						}),
 					]
 				: []),
-			...(markUserAction
-				? [
-						moduleImportNode({
-							kind: 'named' as const,
-							localName: USER_ACTION_START_FN,
-							source: '@markless/web/fns/user-action',
-						}),
-						moduleImportNode({
-							kind: 'named' as const,
-							localName: USER_ACTION_END_FN,
-							source: '@markless/web/fns/user-action',
-						}),
-					]
-				: []),
 			...imports.map((moduleImport) =>
 				moduleImportNode({
 					kind: moduleImport.kind,
@@ -6374,14 +6359,10 @@ export function buildEventHandlerEmission(
 				eventHandlerFunctionNode(exportName, isAsync, [
 					...(shownReads ? [shownReadsStatement(shownReads)] : []),
 					...(importedReference ? [] : eventHandlerParameterStatements(input)),
-					...(markUserAction
+					...(entryMarks
 						? [
-								userActionCallStatement(USER_ACTION_START_FN),
-								...(entryMarks ? [entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks)] : []),
-								tryFinallyNode(bodyStatements, [
-									...(entryMarks ? [entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks)] : []),
-									userActionCallStatement(USER_ACTION_END_FN),
-								]),
+								entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks),
+								tryFinallyNode(bodyStatements, [entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks)]),
 							]
 						: bodyStatements),
 				]),
@@ -7787,8 +7768,6 @@ function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanti
 const SHOWN_READS_FN = 'marklessShownReads';
 const ENTRY_MARK_START_FN = 'marklessEntryMarkStart';
 const ENTRY_MARK_END_FN = 'marklessEntryMarkEnd';
-const USER_ACTION_START_FN = 'marklessUserActionStart';
-const USER_ACTION_END_FN = 'marklessUserActionEnd';
 
 function shownReadsStatement(
 	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
@@ -7814,13 +7793,6 @@ function entryMarkCallStatement(fnName: string, graphNodeIds: ReadonlyArray<stri
 			identifierNode('context'),
 			stringArrayNode(graphNodeIds),
 		]),
-	};
-}
-
-function userActionCallStatement(fnName: string): EmissionNode {
-	return {
-		type: 'ExpressionStatement',
-		expression: callNode(identifierNode(fnName), [identifierNode('context')]),
 	};
 }
 

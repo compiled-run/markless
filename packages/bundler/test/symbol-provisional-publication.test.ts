@@ -69,14 +69,7 @@ test.each([
 	const finalSource = (await callLoad(plugin, `\0${module.id}`)) as string;
 	expect(finalSource).toContain('context.args');
 	expect(await earlyLoad).toBe(finalSource);
-	// A `data:` URL has no base to resolve the bare `@markless/web/fns/user-action` specifier
-	// against; this import is the real module's own mark around its write (submit-quiet-
-	// design.md Q2), harmless as a no-op here since the fake `context.graph` below carries
-	// neither `markUserActionStart` nor `markUserActionEnd` for it to call.
-	const runnableSource = finalSource
-		.replace(/^import .*from "@markless\/web\/fns\/user-action";$/gm, '')
-		.replace(/\bmarklessUserAction(?:Start|End)\(/g, 'Boolean(');
-	const emitted = await import(`data:text/javascript,${encodeURIComponent(runnableSource)}`);
+	const emitted = await import(`data:text/javascript,${encodeURIComponent(finalSource)}`);
 	const write = vi.fn();
 	emitted[module.exportName!]({ args: [value], event: new Event('click'), graph: { write } });
 	expect(write).toHaveBeenCalledExactlyOnceWith({

@@ -792,9 +792,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			userActionDepth = Math.max(0, userActionDepth - 1);
 			if (userActionDepth === 0 && (flushScheduled || flushing || dirtyPaths.length > 0)) {
 				flushUserAction = true;
-				void flush().then(() => {
-					flushUserAction = false;
-				});
+				// The dispatch awaits and reports this same flush; here it only ends the latch.
+				const end = () => void (flushUserAction = false);
+				void flush().then(end, end);
 			}
 		},
 		markQuietStart: () => void quietDepth++,
