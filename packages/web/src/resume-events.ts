@@ -307,6 +307,7 @@ export function createEventWiring(input: {
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
+	const catchScope = input.asyncBoundaries && { graph: input.graph, boundaries: input.asyncBoundaries };
 	const rowEventRecords: ResumeRowEventRecords = new WeakMap();
 	// The detached subtree's own top is the row the repeat took out, and it carries
 	// where it hung. That is what lets a dispatch several microtasks behind its
@@ -773,6 +774,7 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: readHandle,
+				...(catchScope && { catchScope }),
 				...(locals ? { locals } : {}),
 				releaseQueue: options.releaseQueue,
 			} as DispatchSymbolContext;

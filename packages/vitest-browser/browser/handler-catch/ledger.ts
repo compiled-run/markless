@@ -7,3 +7,9 @@ export async function saveReport(days: number): Promise<void> {
 	await new Promise((resolve) => setTimeout(resolve, 5));
 	throw new Error(`could not save ${days}`);
 }
+
+export const actions = {
+	save(days: number): Promise<void> {
+		return saveReport(days);
+	},
+};

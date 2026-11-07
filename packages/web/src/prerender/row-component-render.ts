@@ -24,6 +24,7 @@ import {
 	marklessWithEnclosingWidgetRoots,
 } from '../fns/instance-scope.ts';
 import { marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
+export { marklessNoteMintedRow } from './evaluator.ts';
 import { marklessRosterSeedPass, sharedSeedPass } from './shared-seed-slot.ts';
 import {
 	evaluatePrerenderDataComponent,

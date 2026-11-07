@@ -22,6 +22,10 @@ const WRAPPERS = new Set<unknown>([
 	'TSNonNullExpression',
 ]);
 
+export function isFunctionNode(node: AnyNode | undefined): boolean {
+	return !!node && FUNCTION_TYPES.has(node.type);
+}
+
 /** Whether a handler can hand a promise back: an async function, or one that returns a value that may be one. A promise it starts and does not return is not its result. */
 export function handlerMayReturnPromise(node: AnyNode | undefined): boolean {
 	if (!node || !FUNCTION_TYPES.has(node.type)) return false;

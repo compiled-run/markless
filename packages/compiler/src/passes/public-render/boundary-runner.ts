@@ -119,7 +119,7 @@ export function handlerCatchBoundaryIds(
 ): ReadonlySet<string> {
 	const ids = new Set<string>();
 	for (const event of semanticGraph.events)
-		if (event.handlerCatchBoundaryId) ids.add(event.handlerCatchBoundaryId);
+		for (const id of [event.handlerCatchBoundaryId, event.dispatchCatchBoundaryId]) if (id) ids.add(id);
 	for (const edge of semanticGraph.componentEdges) {
 		if (edge.catchBoundaryId) ids.add(edge.catchBoundaryId);
 		for (const prop of edge.props)

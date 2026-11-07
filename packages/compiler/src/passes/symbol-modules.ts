@@ -7867,7 +7867,7 @@ function handlerCatchNode(body: ReadonlyArray<EmissionNode>, runnerGraphNodeId: 
 					{
 						type: 'ExpressionStatement',
 						expression: callNode(identifierNode(HANDLER_CATCH_FN), [
-							memberChainNode('context.graph'),
+							identifierNode('context'),
 							literalNode(runnerGraphNodeId),
 							identifierNode(HANDLER_CATCH_ERROR_NAME),
 						]),
@@ -7886,7 +7886,7 @@ function catchReturnedPromises(node: EmissionNode, runnerGraphNodeId: string): E
 		return {
 			...node,
 			argument: callNode(identifierNode(HANDLER_CATCH_RETURNED_FN), [
-				memberChainNode('context.graph'),
+				identifierNode('context'),
 				literalNode(runnerGraphNodeId),
 				node.argument as EmissionNode,
 			]),

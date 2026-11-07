@@ -163,7 +163,7 @@ test('a plain handler that returns a promise hands it to the catch; one that onl
 		),
 	);
 	const handler = returning.handlers.find((source) => source.includes(HANDLER_CATCH_IMPORT));
-	expect(handler).toMatch(/return marklessHandlerCatchReturned\(context\.graph, "computed:asyncGate:0", /);
+	expect(handler).toMatch(/return marklessHandlerCatchReturned\(context, "computed:asyncGate:0", /);
 	expect(handler).not.toMatch(/async function/);
 
 	const concise = await compile(
@@ -280,4 +280,70 @@ export function Page() @{
 	};
 	expect(await runners('Quiet')).toEqual([['computed:report', false]]);
 	expect(await runners('Wrapper')).toEqual([['computed:asyncGate:0', true]]);
+});
+
+test("a handler whose result the compiler cannot see marks the @try around it, and makes its component's use mark the one around it", async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { computed } from '@markless/core';
+
+function Guarded({ onSave }) @{
+	@try {
+		<button type="button" onClick={onSave}>Save</button>
+	} @catch (error) {
+		<p>{error.message}</p>
+	}
+}
+
+function Plain({ onSave }) @{
+	<button type="button" onClick={onSave}>Save</button>
+}
+
+export function Page() @{
+	const report = computed(async () => { await null; return { days: 7 }; });
+	<div>
+		@try {
+			<>
+				<output>{report.days}</output>
+				<Plain onSave={() => {}} />
+			</>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+		@try {
+			<>
+				<output>{report.days}</output>
+				<Guarded onSave={() => {}} />
+			</>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</div>
+}`,
+		symbols: [],
+	});
+	expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([]);
+	expect(
+		result.semanticGraph.events
+			.filter((event) => event.handlerMayReject)
+			.map((event) => [event.componentName, event.dispatchCatchBoundaryId ?? null]),
+	).toEqual([
+		['Guarded', 'boundary:0'],
+		['Plain', null],
+	]);
+	expect(result.protocolView.asyncBoundaries.map((boundary) => boundary.catchesHandlers === true)).toEqual([
+		true,
+		true,
+		false,
+	]);
+	expect(
+		result.moduleGraphInterface.render.components.map((component) => [
+			component.componentName,
+			component.rejectingHandlers === true,
+		]),
+	).toEqual([
+		['Guarded', false],
+		['Plain', true],
+		['Page', false],
+	]);
 });

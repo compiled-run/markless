@@ -192,6 +192,8 @@ export type SsrDataReadContext = {
 	// Inside an arm this render is bringing into the DOM for the first time, so
 	// the components it holds are new instances rather than live ones.
 	readonly freshInstances?: true;
+	// The @try blocks this context renders inside, outermost first.
+	readonly enclosingBoundaryIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataStructure = {
@@ -508,6 +510,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 			repeatOuter: repeat.repeatOuter,
 			...(repeat.key !== undefined ? { repeatKey: repeat.key } : {}),
 			...(repeat.freshInstances ? { freshInstances: repeat.freshInstances } : {}),
+			enclosingBoundaryIds: repeat.enclosingBoundaryIds,
 			hostSegment: repeat.hostSegment,
 			sharedSeeds: repeat.sharedSeeds,
 			...(repeat.asyncError !== undefined ? { asyncError: repeat.asyncError } : {}),
@@ -643,6 +646,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									repeatId: context.repeatId,
 									repeatOuter: context.repeatOuter,
 									sharedSeeds: childSeeds,
+									enclosingBoundaryIds: context.enclosingBoundaryIds,
 									...input.projectionSegment?.(context),
 								})
 							: undefined,
@@ -837,7 +841,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								: [];
 						if (items.length === 0)
 							return slot.emptyTemplateId
-								? renderChunk(slot.emptyTemplateId, {})
+								? renderChunk(slot.emptyTemplateId, {
+										enclosingBoundaryIds: context.enclosingBoundaryIds,
+									})
 								: { html: '', tokens: [] };
 						const keyPath = record?.keyPath;
 						// `key row` reads the item itself, so an empty path is still a key.
@@ -853,6 +859,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								// Rows mint fresh item/index but must not drop the seed map the
 								// way branch and async keep it: a part's pre-row write rides here.
 								sharedSeeds: context.sharedSeeds,
+								enclosingBoundaryIds: context.enclosingBoundaryIds,
 								...(keyed ? { key: readValuePath(item, keyPath ?? []) } : {}),
 							}),
 						);
@@ -892,6 +899,10 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										item: context.repeatItem,
 										index: context.repeatIndex,
 										key: context.repeatKey,
+										enclosingBoundaryIds: [
+											...(context.enclosingBoundaryIds ?? []),
+											slot.boundaryId,
+										],
 										...(typeof selected === 'number'
 											? {}
 											: { asyncError: selected.error }),

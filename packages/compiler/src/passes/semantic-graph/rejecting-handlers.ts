@@ -10,7 +10,11 @@ export function componentsWithRejectingHandlers(
 ): ReadonlySet<string> {
 	const rejecting = new Set<string>();
 	for (const event of graph.events)
-		if (event.handlerReturnsPromise && !event.handlerCatchBoundaryId && event.componentName)
+		if (
+			event.componentName &&
+			((event.handlerReturnsPromise && !event.handlerCatchBoundaryId) ||
+				(event.handlerMayReject && !event.dispatchCatchBoundaryId))
+		)
 			rejecting.add(event.componentName);
 	for (const edge of graph.componentEdges)
 		if (edge.props.some((prop) => 'returnsPromise' in prop && prop.returnsPromise && !prop.catchBoundaryId))

@@ -38,7 +38,7 @@ test("a handler's rejection fails only its boundary's gate, and reset clears it 
 	expect(graph.read('computed:gate', ['status'])).toBe('fulfilled');
 	expect(runs).toBe(1);
 
-	marklessHandlerCatch(graph, 'computed:gate', new Error('could not save 7'));
+	marklessHandlerCatch({ graph }, 'computed:gate', new Error('could not save 7'));
 	expect(graph.read('computed:gate', ['status'])).toBe('rejected');
 	expect((graph.read('computed:gate', []) as { error: Error }).error.message).toBe('could not save 7');
 	expect(graph.read('computed:report', ['status'])).toBe('fulfilled');
@@ -60,10 +60,10 @@ test("a plain handler's returned promise fails the gate when it rejects; any oth
 	const graph = { failHandler: (graphNodeId: string, error: unknown) => void failed.push([graphNodeId, error]) };
 	const error = new Error('could not save');
 
-	expect(marklessHandlerCatchReturned(graph, 'computed:gate', 3)).toBe(3);
-	await marklessHandlerCatchReturned(graph, 'computed:gate', Promise.resolve('saved'));
+	expect(marklessHandlerCatchReturned({ graph }, 'computed:gate', 3)).toBe(3);
+	await marklessHandlerCatchReturned({ graph }, 'computed:gate', Promise.resolve('saved'));
 	expect(failed).toEqual([]);
 
-	await expect(marklessHandlerCatchReturned(graph, 'computed:gate', Promise.reject(error))).resolves.toBeUndefined();
+	await expect(marklessHandlerCatchReturned({ graph }, 'computed:gate', Promise.reject(error))).resolves.toBeUndefined();
 	expect(failed).toEqual([['computed:gate', error]]);
 });

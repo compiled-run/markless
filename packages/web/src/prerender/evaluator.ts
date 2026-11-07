@@ -656,7 +656,10 @@ async function evaluatePrerenderDataSurface(
 	});
 	if (fresh && graph) {
 		const shown = mountedInstances.get(graph);
-		if (!fresh.keepsShown) mountedInstances.set(graph, mountedNow);
+		if (!fresh.keepsShown) {
+			mountedInstances.set(graph, mountedNow);
+			mintedRows.delete(pageGraphOf(graph));
+		}
 		else if (shown) for (const instance of mountedNow) shown.add(instance);
 	}
 	// A count is asked before the members it counts have rendered, so the page
@@ -854,6 +857,26 @@ function marklessPlacedInstanceRead(
 
 // Per live graph, the component instances its last re-render placed on the page.
 const mountedInstances = new WeakMap<RuntimeGraph, Set<string>>();
+// Rows the browser built after the last re-render, by page-space row path: what they hold is on the page too.
+const mintedRows = new WeakMap<RuntimeGraph, Set<string>>();
+const pageGraphOf = (graph: RuntimeGraph) =>
+	(graph as MarklessScopedGraph).marklessPageGraph ?? graph;
+
+export function marklessNoteMintedRow(graph: RuntimeGraph, rowSegment: string): void {
+	const page = pageGraphOf(graph);
+	let rows = mintedRows.get(page);
+	if (!rows) mintedRows.set(page, (rows = new Set()));
+	rows.add(rowSegment);
+}
+
+function inMintedRow(graph: RuntimeGraph, instancePrefix: string): boolean {
+	const rows = mintedRows.get(pageGraphOf(graph));
+	if (!rows) return false;
+	const qualify = (graph as MarklessScopedGraph).marklessQualifyGraphNodeId;
+	const pagePrefix = qualify ? qualify(instancePrefix) : instancePrefix;
+	for (const row of rows) if (pagePrefix.startsWith(row)) return true;
+	return false;
+}
 
 // An instance the last re-render did not place (or, before any, whose cells the graph holds nothing for) starts fresh.
 function marklessChildNotYetLive(
@@ -864,7 +887,8 @@ function marklessChildNotYetLive(
 ): boolean {
 	if (!graph || !definition) return false;
 	const mounted = mountedInstances.get(graph);
-	if (mounted) return !mounted.has(instancePrefix);
+	if (mounted && (mounted.has(instancePrefix) || !inMintedRow(graph, instancePrefix)))
+		return !mounted.has(instancePrefix);
 	const ids = instanceCellIds(surface, definition, instancePrefix, new Set());
 	return ids.length > 0 && ids.every((id) => graph.read(id) === undefined);
 }
@@ -902,10 +926,12 @@ function settlesInside(
 	settling: PrerenderSettling | undefined,
 	edge: { readonly asyncBoundaryId?: string },
 	parentPath: string,
+	enclosingBoundaryIds: ReadonlyArray<string> | undefined,
 ): boolean {
 	return (
 		!settling ||
-		(edge.asyncBoundaryId === settling.boundaryId &&
+		((edge.asyncBoundaryId === settling.boundaryId ||
+			!!enclosingBoundaryIds?.includes(settling.boundaryId)) &&
 			(!parentPath || settling.ownerPath.endsWith(parentPath)))
 	);
 }
@@ -1581,7 +1607,12 @@ export function evaluatePrerenderDataComponent(input: {
 										childSurface.components[edge.childComponentName],
 										input.symbolPrefix + symbolPrefix,
 									) &&
-										settlesInside(input.settling, edge, input.symbolPrefix))
+										settlesInside(
+											input.settling,
+											edge,
+											input.symbolPrefix,
+											context.enclosingBoundaryIds,
+										))
 										? { freshInstance: true as const }
 										: {}),
 									...(input.settling && { settling: input.settling }),

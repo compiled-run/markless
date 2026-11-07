@@ -859,6 +859,10 @@ export type SemanticEvent = {
 	readonly handlerCatchBoundaryId?: string;
 	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
 	readonly handlerReturnsPromise?: true;
+	/** The handler's result is out of sight here (a received prop, an imported or computed function), so it may reject. */
+	readonly handlerMayReject?: true;
+	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
+	readonly dispatchCatchBoundaryId?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
