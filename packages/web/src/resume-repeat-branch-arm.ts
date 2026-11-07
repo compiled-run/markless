@@ -5,6 +5,7 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
+	ResumeRowRoot,
 } from './resume-types.ts';
 
 // Rows written straight into an arm share their parent with the other arm, so they follow the arm the branch painted.
@@ -19,7 +20,7 @@ export function followBranchArm(
 	arm: { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> },
 	adopt: (rows: ReadonlyArray<ResumeDomNode>, items: ReadonlyArray<unknown>) => void,
 ): {
-	readonly showing: (rows?: ReadonlyMap<unknown, ResumeDomElement>) => boolean;
+	readonly showing: (rows?: ReadonlyMap<unknown, ResumeRowRoot>) => boolean;
 	readonly end: () => ResumeDomNode | undefined;
 } | undefined {
 	const shown = branchArmEntry(parent, repeat, input.root);
@@ -28,8 +29,10 @@ export function followBranchArm(
 	const replaced = (rows: ReadonlyArray<ResumeDomElement & { __marklessRowParent?: unknown }>) =>
 		!rows.some((row) => row.parentElement === parent) &&
 		rows.some((row) => row.__marklessRowParent !== parent);
-	const showing = (rows?: ReadonlyMap<unknown, ResumeDomElement>) =>
-		shown.arm === repeat.branchArm!.arm && !(rows?.size && replaced([...rows.values()]));
+	// A list straight in an arm never has ranged rows: the compiler keeps those to one element.
+	const showing = (rows?: ReadonlyMap<unknown, ResumeRowRoot>) =>
+		shown.arm === repeat.branchArm!.arm &&
+		!(rows?.size && replaced([...rows.values()] as ResumeDomElement[]));
 	// The arm's first own element after the rows: new rows go in front of it.
 	let tail: ResumeDomNode | undefined;
 	// A refresh marks the rows busy, as it marks a list host inside the arm.

@@ -4,3 +4,6 @@ export const PROTOCOL_CONTAINER_END_COMMENT = 'markless:page-end';
 export const PROTOCOL_CONTAINER_HOST_NODE_ID = 'container';
 // An @if, @switch or @try start comment: it, its content and the comment `/` + its text are one step of an element address.
 export const PROTOCOL_BLOCK_START_COMMENT = /^markless:(?:branch|arm-branch|async):/;
+// A keyed row that is not one element renders between these two comments.
+export const PROTOCOL_ROW_START_COMMENT = 'markless:row';
+export const PROTOCOL_ROW_END_COMMENT = '/markless:row';

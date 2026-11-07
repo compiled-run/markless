@@ -452,12 +452,13 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					nestedRepeatIds.has(repeat.id) ||
 					liveRowComponentMint(input, repeat, render) !== null)) ||
 			(render.rowStartOffset === 'unknown' && render.rowEndOffset === undefined) ||
-			!rowRootsOneElement(input, render) ||
+			!(render.rowRange || rowRootsOneElement(input, render)) ||
 			enclosingRow === null
 		)
 			return [];
 		emitted.add(repeat.id);
-		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, true);
+		// A ranged row's addresses start at the first node inside its comments, not at a row element.
+		const rowHostPaths = hostPathsForChunk(input, render.rowChunkId, !render.rowRange);
 		// Row-owned handles ride the repeat, in row-relative coordinates, for the
 		// same reason row events do: the resumed set is whatever the parent's live
 		// children are right now, so a read walks rows rather than trusting a
@@ -544,6 +545,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 					? { rowStartOffset: render.rowStartOffset }
 					: {}),
 				...(render.rowEndOffset !== undefined ? { rowEndOffset: render.rowEndOffset } : {}),
+				...(render.rowRange ? { rowRange: true as const } : {}),
 				...built,
 				...(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName))
 					? { indexName }

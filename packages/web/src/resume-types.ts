@@ -78,7 +78,12 @@ export type ResumeDomCreatedElement = {
 	innerHTML: string;
 	readonly content?: { readonly childNodes?: ArrayLike<unknown> };
 };
-export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
+export type ResumeDomComment = ResumeDomNode & {
+	readonly nodeType: 8;
+	readonly data?: string;
+	readonly parentElement?: ResumeDomElement | null;
+	__marklessRowLocals?: () => Record<string, unknown>;
+};
 export type ResumeBranchArmEntry = {
 	arm?: number;
 	start?: ResumeDomComment;
@@ -149,6 +154,8 @@ export type ResumeAsyncBoundaryRecord = {
 };
 // The range an arm commit addresses: boundaries and escalating branches alike.
 export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
+// A keyed row: its one element, or the start comment of a row that renders between row comments.
+export type ResumeRowRoot = ResumeDomElement | ResumeDomComment;
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 /** Wires the nested repeats inside one row a keyed repeat registered. */

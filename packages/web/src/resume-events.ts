@@ -25,6 +25,7 @@ import type {
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
 	ResumeKeyedRepeatRowEvent,
+	ResumeRowRoot,
 	ResumeRuntimeErrorContext,
 	ResumeRuntimeInput,
 	ResumeSymbolContext,
@@ -40,7 +41,7 @@ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
 	readonly parent: ResumeDomElement;
-	readonly rowRoot: ResumeDomElement;
+	readonly rowRoot: ResumeRowRoot;
 	readonly rowKey: unknown;
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
 };

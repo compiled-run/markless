@@ -22,9 +22,9 @@ import {
 	resolveRowComponentMint,
 	rowBranchMints,
 	stepsAfterNestedRows,
-	templateHasBareTryRoot,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
+import { rowRangeRefusal } from '../row-range.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
 import {
 	joinDeciders,
@@ -122,25 +122,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 			return;
 		}
-		const rowShape = shapeDecidedBy?.length === 0 ? null : rowShapeBesidesOneElement(rowNodes);
-		if (rowShape) {
+		const rangeRefusal =
+			shapeDecidedBy?.length === 0 || !repeat.rowRange
+				? null
+				: rowRangeRefusal(input.semanticGraph, repeat.id);
+		if (rangeRefusal) {
 			diagnostics.push({
 				...keyedRepeatRowNotOneElementDiagnostic({
 					itemName: rowItemLabel(repeat),
-					rowShape,
-					node,
-					filename: input.filename,
-				}),
-				...shapeChecked,
-			});
-			return;
-		}
-		const bareTryChild = shapeDecidedBy?.length === 0 ? null : rowComponentWithBareTry(repeat.id, input);
-		if (bareTryChild) {
-			diagnostics.push({
-				...keyedRepeatRowNotOneElementDiagnostic({
-					itemName: repeat.itemName,
-					rowShape: `<${bareTryChild}>, whose template is an @try with no element around it`,
+					rowShape: rowShapeBesidesOneElement(rowNodes) ?? 'no single element at its top level',
+					reason: rangeRefusal,
 					node,
 					filename: input.filename,
 				}),
@@ -344,35 +335,6 @@ function testDecidedBy(
 		for (const prop of deciding) props.add(prop);
 	}
 	return [...props];
-}
-
-// The row IS a child component whose own top level is a bare @try: the row element changes with every arm.
-function rowComponentWithBareTry(
-	repeatId: string,
-	input: {
-		readonly semanticGraph: SemanticGraphArtifact;
-		readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
-	},
-): string | null {
-	const chunks = input.semanticGraph.markup.chunks;
-	const row = chunks.find((chunk) => chunk.id === `repeat:${repeatId}:row`);
-	if (!row || row.hosts.some((host) => host.coordinate.path.length === 1)) return null;
-	const top = row.slots.filter((slot) => slot.coordinate.path.length === 1);
-	const only = top.length === 1 ? top[0] : undefined;
-	if (only?.kind !== 'child-component') return null;
-	const edge = input.semanticGraph.componentEdges.find(
-		(candidate) => candidate.id === only.componentEdgeId,
-	);
-	if (!edge) return null;
-	const bare =
-		edge.importSource === undefined
-			? templateHasBareTryRoot(
-					chunks.find((chunk) => chunk.id === `template:${edge.childComponentName}`),
-				)
-			: input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
-					(candidate) => candidate.componentName === edge.childComponentName,
-				)?.bareTryRoot === true;
-	return bare ? edge.childComponentName : null;
 }
 
 // Mirrors how the markup collector counts a row's top-level nodes; null when the row is one element, or one @if or @switch whose every arm is.

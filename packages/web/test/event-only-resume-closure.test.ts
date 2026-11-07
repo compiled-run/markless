@@ -143,7 +143,11 @@ const resumeOnDemandEntries = [
 // 2026-11-05: a row wired under a component built in the browser tags its own root with its locals at wire time, so a
 // handler reads its prop/item/index without depending on the page's static keyed-repeat view: 33,433 -> 33,512 raw,
 // one line in resume-keyed-repeats.ts.
-const sourceByteLimit = 33512;
+// 2026-11-06: a keyed row that is not one element renders between row comments, and resume-keyed-repeats.ts finds,
+// moves and removes it as that whole range: 33,512 -> 35,910 raw. The range code itself is the lazy
+// fns/served-row-ranges.ts, loaded only by a page with such a list; minified 10,887 -> 11,524, gzip 4,381 -> 4,550 bytes
+// (rolldown, workspace packages and lazy imports external, same method both sides).
+const sourceByteLimit = 35910;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

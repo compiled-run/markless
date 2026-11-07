@@ -1,0 +1,194 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1349,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 147,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-locals"
+			],
+			"delta": 371,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-anchor-census"
+			],
+			"delta": 156,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": -6,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1284,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 137,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 68,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1349,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 147,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-locals"
+			],
+			"delta": 371,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-anchor-census"
+			],
+			"delta": 156,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": -6,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1270,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 137,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 46,
+			"reason": "Keyed rows that are not one element render between row comments: page comment censuses skip the row comments and the renderer wraps each such row; locating ranged rows ships only in the lazy fns/served-row-ranges chunk.",
+			"date": "2026-11-06"
+		}
+	]
+}

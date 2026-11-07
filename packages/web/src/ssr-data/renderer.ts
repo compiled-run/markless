@@ -2,6 +2,10 @@ import { PROJECTION_MARK_PATTERN, PROJECTION_MARK_PREFIX } from '../fns/projecti
 import { marklessAttributeValue } from '../dom-attribute.ts';
 import type { KeepParts } from '../fns/keep-parts-hook.ts';
 import {
+	PROTOCOL_ROW_END_COMMENT,
+	PROTOCOL_ROW_START_COMMENT,
+} from '../../../serializer/src/protocol-page-markers.ts';
+import {
 	MARKLESS_DEFERRED_COUNT_CLOSE,
 	MARKLESS_DEFERRED_COUNT_NAME,
 	MARKLESS_DEFERRED_COUNT_OPEN,
@@ -150,6 +154,7 @@ export type SsrRenderData = {
 		readonly itemKey?: true;
 		readonly rowChunkId: string;
 		readonly emptyChunkId?: string;
+		readonly rowRange?: true;
 	}>;
 	readonly boundaries: ReadonlyArray<{
 		readonly boundaryId: string;
@@ -861,7 +866,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								? Promise.all(started)
 								: (started as ReadonlyArray<RenderedPart>),
 							(rows): RenderedPart => ({
-								html: rows.map((row) => row.html).join(''),
+								html: rows
+									.map((row) =>
+										record?.rowRange
+											? `<!--${PROTOCOL_ROW_START_COMMENT}-->${row.html}<!--${PROTOCOL_ROW_END_COMMENT}-->`
+											: row.html,
+									)
+									.join(''),
 								tokens: rows.flatMap((row) => row.tokens),
 							}),
 						);

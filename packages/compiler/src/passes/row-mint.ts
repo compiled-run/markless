@@ -17,12 +17,8 @@ import {
 } from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import { childRootIsOneElement } from './row-range.ts';
 import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
-
-// A row's root is its one element, which a bare @try replaces whenever its arm changes.
-export function templateHasBareTryRoot(chunk: SemanticMarkupChunk | undefined): boolean {
-	return !!chunk?.slots.some((slot) => slot.kind === 'async' && slot.coordinate.path.length === 1);
-}
 
 export type RowComponentMint = {
 	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
@@ -568,11 +564,11 @@ function childIsMintable(
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
 	if (reach === 'unknown') return false;
-	// A row moves as its one element, so a @try beside that element would be left behind.
-	return !(
-		isWholeRow &&
-		reach === 'boundaries' &&
-		childRootBoundary(input, edge, childTemplateId, new Set())
+	if (!isWholeRow || reach !== 'boundaries') return true;
+	// A row whose child renders more than one element moves as its whole row range, @try anchors included.
+	return (
+		!childRootIsOneElement(input, edge, childTemplateId) ||
+		!childRootBoundary(input, edge, childTemplateId, new Set())
 	);
 }
 

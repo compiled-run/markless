@@ -1,5 +1,5 @@
 import { runtimeResumeError } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { isUncountedComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
 import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import {
@@ -550,7 +550,7 @@ function commentsBetween(start: ResumeDomComment, end: ResumeDomComment): Resume
 	const comments: ResumeDomComment[] = [];
 	type Linked = ResumeDomNode & { readonly nextSibling?: Linked | null };
 	const visit = (node: Linked): void => {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+		if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))
 			comments.push(node as ResumeDomComment);
 		for (const child of Array.from(node.childNodes ?? [])) visit(child as Linked);
 	};

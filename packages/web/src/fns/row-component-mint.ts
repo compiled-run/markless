@@ -10,7 +10,7 @@ import {
 	type Awaitable,
 } from '../ssr-data/awaitable.ts';
 import type { ArmRegistrationDeps } from '../resume-commit-arm.ts';
-import { isArmBranchAnchorComment } from '../resume-anchor-census.ts';
+import { isUncountedComment } from '../resume-anchor-census.ts';
 import { spliceCensus } from '../resume-census.ts';
 import { marklessOwningSurface } from '../prerender/owning-surface.ts';
 import { marklessSsrRowQualifiedView } from './row-qualified-view.ts';
@@ -24,9 +24,11 @@ import {
 	patchRow,
 	refocus,
 	renderEmptyArm,
+	rowRangeNodes,
 	servedEmptyArm,
 	shownRowGraph,
 	slotValue,
+	wrapRowRange,
 	type RowMintGraph,
 } from './row-mint.ts';
 import { marklessRowSlotReader, type RowSlotReader } from './row-slot-mint.ts';
@@ -41,6 +43,7 @@ import type {
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
 	ResumeRenderDataThunk,
+	ResumeRowRoot,
 } from '../resume-types.ts';
 
 /**
@@ -75,11 +78,11 @@ export type RowComponentMintHost = {
 };
 
 export type MintedRow = {
-	readonly rowRoot: ResumeDomElement;
+	readonly rowRoot: ResumeRowRoot;
 	readonly nodes: ReadonlyArray<ResumeDomNode>;
 	readonly commit: () => Promise<void>;
-	/** The row this one replaced under the same key. */
-	replaced?: ResumeDomElement;
+	/** The nodes of the row this one replaced under the same key. */
+	replaced?: ReadonlyArray<ResumeDomNode>;
 };
 
 export type RowComponentMintApi = {
@@ -95,7 +98,7 @@ export type RowComponentMintApi = {
 		item: unknown,
 		graph?: RowMintGraph,
 		values?: ReadonlyArray<unknown>,
-	): ResumeDomElement | undefined;
+	): ResumeRowRoot | undefined;
 	/** Answers a row's expression slots through the owning component's render-data reader. */
 	slotReader(
 		repeat: ResumeKeyedRepeatRecord,
@@ -110,9 +113,9 @@ export type RowComponentMintApi = {
 	rows(
 		repeat: ResumeKeyedRepeatRecord,
 		parent: ResumeDomElement,
-		live: Map<unknown, ResumeDomElement>,
+		live: Map<unknown, ResumeRowRoot>,
 		servedItems?: ReadonlyMap<unknown, readonly [unknown, number]>,
-		registerRow?: (rowRoot: ResumeDomElement, rowKey: unknown) => void,
+		registerRow?: (rowRoot: ResumeRowRoot, rowKey: unknown) => void,
 	): Awaitable<() => Promise<void>>;
 };
 
@@ -275,7 +278,7 @@ export function marklessRowComponentMint(
 															return followRowItem(rowGraph, after);
 														// A wrapped child is built again inside the row it stands in, so the row's own elements and focus stay.
 														const swap =
-															before && repeat.rowComponent?.slotPath
+															before && repeat.rowComponent?.slotPath && liveRow.nodeType === 1
 																? placeMintedChild(rowInput, before, after, liveRow)
 																: undefined;
 														if (swap) {
@@ -582,25 +585,28 @@ function renderedIfRenderable(input: ComponentRowInput): Awaitable<RenderedCompo
 // The new row takes the old one's place, census slot, events and focus at once.
 function replaceRow(
 	parent: ResumeDomElement,
-	liveRow: ResumeDomElement,
+	liveRow: ResumeRowRoot,
 	row: MintedRow,
 	rowKey: unknown,
-	live: Map<unknown, ResumeDomElement>,
-	registerRow: ((rowRoot: ResumeDomElement, rowKey: unknown) => void) | undefined,
+	live: Map<unknown, ResumeRowRoot>,
+	registerRow: ((rowRoot: ResumeRowRoot, rowKey: unknown) => void) | undefined,
 ): void {
-	const path = focusPath(liveRow);
-	(liveRow as ReplaceableNode).replaceWith?.(row.rowRoot);
+	const path = liveRow.nodeType === 1 && focusPath(liveRow);
+	const outgoing = liveRow.nodeType === 1 ? [liveRow] : rowRangeNodes(liveRow);
+	const incoming = row.rowRoot.nodeType === 1 ? [row.rowRoot] : row.nodes;
+	(outgoing[0] as ReplaceableNode).replaceWith?.(...incoming);
+	for (const node of outgoing.slice(1)) (node as ReplaceableNode).replaceWith?.();
 	for (let node: ResumeDomElement | null | undefined = parent; node; node = node.parentElement)
 		if (node.__marklessCensus) {
-			spliceCensus(node.__marklessCensus, [liveRow], [row.rowRoot]);
+			spliceCensus(node.__marklessCensus, outgoing, incoming);
 			break;
 		}
 	// A departed row keeps its parent for a dispatch still in flight from it.
 	(liveRow as { __marklessRowParent?: ResumeDomElement }).__marklessRowParent = parent;
-	row.replaced = liveRow;
+	row.replaced = outgoing;
 	live.set(rowKey, row.rowRoot);
 	registerRow?.(row.rowRoot, rowKey);
-	if (path?.length) refocus(parent, [[row.rowRoot, path]]);
+	if (path && path.length && row.rowRoot.nodeType === 1) refocus(parent, [[row.rowRoot, path]]);
 }
 
 function itemCopy(item: unknown): unknown {
@@ -640,9 +646,11 @@ function rowIsStale(
 	repeat: ResumeKeyedRepeatRecord,
 	before: RenderedComponentRow,
 	after: RenderedComponentRow,
-	live: ResumeDomElement,
+	live: ResumeRowRoot,
 ): boolean {
 	if (before.rendered.html === after.rendered.html) return false;
+	// A ranged row has no one element to compare in place, so a changed render rebuilds it.
+	if (live.nodeType !== 1) return true;
 	const parsed = (render: RenderedComponentRow) => {
 		const nodes = parseRowNodes(parent, repeat, render.rendered.html);
 		return {
@@ -941,10 +949,13 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 	const elementsByHostId = resolveRowHosts(input.repeat, childNodes, rendered.view);
 	const comments = rowComments(childNodes);
 	const branches = resolveRowBranches(input.repeat, comments, rendered.view);
+	const ranged = input.repeat.rowRange && wrapRowRange(input.parent, childNodes);
 	const placed = rowComponent.slotPath
 		? placeInWrapper(input, childNodes, rowComponent.slotPath)
-		: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
-	const rowRoot = placed.rowRoot as ResumeDomElement | undefined;
+		: ranged
+			? { nodes: ranged, rowRoot: ranged[0] as ResumeRowRoot }
+			: { nodes: childNodes, rowRoot: childNodes.find((node) => node.nodeType === 1) };
+	const rowRoot = placed.rowRoot as ResumeRowRoot | undefined;
 	if (!rowRoot)
 		throw rowComponentError(
 			input.repeat,
@@ -1067,7 +1078,7 @@ async function commitMintedRow(
 		readonly comments: ReadonlyArray<ResumeDomComment>;
 		readonly rowKey: unknown;
 		readonly rowSegment: string;
-		readonly replaced?: ResumeDomElement;
+		readonly replaced?: ReadonlyArray<ResumeDomNode>;
 		/** A wrapped child built again: the nodes of the one it replaced. */
 		readonly outgoing?: ReadonlyArray<ResumeDomNode>;
 	},
@@ -1091,8 +1102,7 @@ async function commitMintedRow(
 	};
 	const deps = await registration.armRegistrationDeps(armRecords);
 	// A row built again under its key releases every host its old row registered.
-	const replaced = row.replaced;
-	const gone = row.outgoing ?? (replaced ? [replaced] : []);
+	const gone = row.outgoing ?? row.replaced ?? [];
 	for (const [hostNodeId, element] of deps.elementsByHostId)
 		if (gone.some((node) => node === element || (node as ResumeDomElement).contains?.(element)))
 			deps.disposeHost(hostNodeId);
@@ -1430,7 +1440,7 @@ function rowComments(nodes: ReadonlyArray<ResumeDomNode>): ReadonlyArray<ResumeD
 	const comments: ResumeDomComment[] = [];
 	(function visit(list: ReadonlyArray<ResumeDomNode>): void {
 		for (const node of list) {
-			if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+			if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))
 				comments.push(node as ResumeDomComment);
 			visit(node.childNodes ?? []);
 		}

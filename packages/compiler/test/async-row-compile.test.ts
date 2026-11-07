@@ -106,14 +106,13 @@ ${input.child}
 
 for (const sameFile of [false, true]) {
 	const where = sameFile ? 'a same-file' : 'an imported';
-	test(`a @for row that is ${where} component whose template is a bare @try says the row is not one element`, async () => {
+	test(`a @for row that is ${where} component whose template is a bare @try builds, tracking the row between row comments`, async () => {
 		const errors = await rowErrors({
 			child: child('Detail', tryRoot),
 			row: '<Detail topic={chosen} />',
 			sameFile,
 		});
-		expect([...new Set(errors.map((error) => error.code))]).toEqual(['MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT']);
-		expect(errors[0]!.message).toContain('<Detail>');
+		expect(errors).toEqual([]);
 	});
 
 	test(`a @for row that is ${where} component with an element around its @try builds`, async () => {

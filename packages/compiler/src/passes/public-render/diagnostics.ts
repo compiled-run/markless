@@ -235,6 +235,7 @@ export function keyedRepeatRowsUnplacedDiagnostic(input: {
 export function keyedRepeatRowNotOneElementDiagnostic(input: {
 	readonly itemName: string;
 	readonly rowShape: string;
+	readonly reason: string;
 	readonly node: AnyNode;
 	readonly filename: string;
 }): CompilerDiagnostic {
@@ -243,8 +244,8 @@ export function keyedRepeatRowNotOneElementDiagnostic(input: {
 		severity: 'error',
 		phase: PUBLIC_RENDER_PHASE,
 		title: 'Each row of this list must be one element',
-		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.`,
-		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}, and this list ${input.reason}. After the page loads, the browser follows a row that is not one element as everything between two comment markers, but not in a list like this one, so it would lose track of part of each row.`,
+		why: 'A row that is not one element is tracked between two comment markers. A list inside another row, a row holding a nested @for, an @if or @switch, an element() handle, a behavior or an event that cancels before code loads, a list passed as children, and a list standing straight in an @if or @try arm still find their part of a row by counting elements, which a row of several nodes breaks.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderPlan'],
