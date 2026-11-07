@@ -4887,6 +4887,15 @@ export function buildAsyncBoundaryUpdateEmission(
 				exportName,
 				['context'],
 				[
+					// A waiting block asks for its arms' records alone, to fetch their code beside its data.
+					...(records
+						? [
+								ifStatementNode(
+									memberChainNode('context.armRecordsOnly'),
+									returnStatementNode(identifierNode('marklessBoundaryRecords')),
+								),
+							]
+						: []),
 					// The runtime passes the settled status; arm 1 is @catch, arm 0 is @try.
 					constDeclarationNode(
 						'arm',

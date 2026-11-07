@@ -335,6 +335,8 @@ export type ResumeSymbolContext = {
 	readonly rosterCount?: (rosterGraphNodeId: string) => number;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly arm?: number;
+	// Asks an async-boundary update symbol for its arms' records alone.
+	readonly armRecordsOnly?: true;
 	readonly branchId?: string;
 	readonly composedBranchId?: string;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;

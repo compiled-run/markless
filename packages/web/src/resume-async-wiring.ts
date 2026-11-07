@@ -5,7 +5,9 @@ import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type {
+	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
+	ResumeSymbolContext,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
 } from './resume-types.ts';
@@ -199,6 +201,8 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							snapshot,
 						});
 					}
+					if (!isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status))
+						preloadTryArm(input.loadSymbol, boundary.updateSymbolId);
 					// The re-settle hold sees every snapshot before the shared settle path.
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
@@ -244,6 +248,18 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			wire(boundary, !settled, !settled, settled && shown ? new Map(shown) : undefined);
 		},
 	};
+}
+
+// A waiting block fetches its @try arm's code beside its data, not after it.
+function preloadTryArm(loadSymbol: WiringInput['loadSymbol'], updateSymbolId: string): void {
+	void Promise.resolve(loadSymbol(updateSymbolId))
+		.then(async (symbol) => {
+			const arms = (await symbol({ armRecordsOnly: true } as ResumeSymbolContext)) as unknown;
+			const records = Array.isArray(arms) ? (arms[0] as ResumeArmRecordSet | undefined) : undefined;
+			for (const update of records?.domUpdates ?? [])
+				if (update.symbolId) void Promise.resolve(loadSymbol(update.symbolId)).catch(() => {});
+		})
+		.catch(() => {});
 }
 
 // A settle heard twice (it landed in the task that started it) commits once, or the second commit replaces rows under a press.

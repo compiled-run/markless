@@ -3995,13 +3995,13 @@ test('resume runtime starts unsettled async boundary runners at creation and set
 	// is a local demand: the runner starts during runtime startup.
 	expect(runs).toHaveLength(1);
 	expect(runs[0]).toMatchObject({ key: 'ada' });
-	expect(loadedSymbols).toEqual([]);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
 
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
 	await graph.flush();
 
-	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:boundary-update']);
 	expect(renderedHtml).toEqual(['<p>User ada</p>']);
 	expect(applied).toEqual([
 		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
@@ -4116,14 +4116,14 @@ test('resume runtime installs settled arm event listeners before exposing range 
 	});
 
 	await resume.start();
-	expect(loadedSymbols).toEqual([]);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
 	await graph.flush();
 
 	expect(listenerTypesAtRemoval[0]).toEqual(expect.arrayContaining(['pointerdown', 'keydown']));
 	// Installing delegation enumerates record metadata only; handlers stay lazy.
-	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:boundary-update']);
 });
 
 // One async boundary whose settled arms rebuild through an update symbol.
@@ -4628,7 +4628,7 @@ test('resume runtime disposes pending-range hosts when an async boundary settles
 	await resume.activateBehaviors('h1');
 	graph.write({ graphNodeId: 'state:tick', value: 1 });
 	await graph.flush();
-	expect(loadedSymbols).toEqual(['symbol:spinner', 'symbol:pending-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:spinner', 'symbol:pending-update']);
 
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
