@@ -471,10 +471,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
-	const asyncPlanes = {
-		...payloadAsyncPlanes(compiled.payloadScripts.state, compiled.moduleGraphInterface.asyncPlanes),
-		...(input.resumeCache && { resumeCache: input.resumeCache }),
-	};
+	const asyncPlanes = payloadAsyncPlanes(
+		compiled.payloadScripts.state,
+		compiled.moduleGraphInterface.asyncPlanes,
+	);
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -934,9 +934,6 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		manifest,
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
-		asyncComputedNames: compiled.payloadScripts.state.computed.flatMap((computed) =>
-			computed.async ? [computed.name] : [],
-		),
 		moduleImports: compiled.semanticGraph.moduleImports,
 		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),

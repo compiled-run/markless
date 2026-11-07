@@ -80,9 +80,7 @@ export function wireResettleHold(input: {
 }): ResettleHold {
 	const pendingArmHtmlById = new Map<string, string>();
 	for (const boundary of input.hasHtmlRenderer ? input.boundaries : []) {
-		// Seeded content stays up through a slow revalidation, as server-settled content does.
-		if (!boundary.updateSymbolId || boundary.seeded || input.tracker.hasSettledContent(boundary.id))
-			continue;
+		if (!boundary.updateSymbolId || input.tracker.hasSettledContent(boundary.id)) continue;
 		const pendingHtml = capturePendingArmHtml(boundary);
 		if (pendingHtml !== undefined) pendingArmHtmlById.set(boundary.id, pendingHtml);
 	}

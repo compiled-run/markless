@@ -39,14 +39,10 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot };
 	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
 	quiet?: boolean;
-	/** The run in flight started inside a user action, or the node's first run did; the resume cache never keeps such a value. */
-	action?: boolean;
-	/** The node's first run started inside a user action. */
-	createdByAction?: true;
 };
 
-/** What started a run: a graph write, or the resume cache re-checking a value it seeded; neither for a plain read. */
-export type RunCause = 'write' | 'revalidate';
+/** What started a run: a graph write; nothing for a plain read. */
+export type RunCause = 'write';
 
 /** What the async plane shares with the held-inputs plane. */
 export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
@@ -187,12 +183,12 @@ export function createAsyncPlane(
 			add(node);
 			state?.held?.seed(node);
 		},
-		rerun(graphNodeId, revalidate) {
+		rerun(graphNodeId) {
 			const node = nodes.get(graphNodeId);
-			if (node?.snapshot.status !== (revalidate ? 'fulfilled' : 'rejected')) return false;
-			// A reset re-runs a rejected value, and a seeded value revalidates, though the key has not changed.
+			if (node?.snapshot.status !== 'rejected') return false;
+			// A reset re-runs a rejected value even though its key has not changed.
 			node.gate = 1;
-			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
+			withRefresh((loaded) => loaded.advance(node));
 			return true;
 		},
 		holdInputs(factory) {

@@ -255,8 +255,6 @@ export type ProtocolStatePayload = {
 	}>;
 	// Served form only: value records two or more envelopes hold, which decoding copies back into each.
 	readonly sharedRecords?: ReadonlyArray<SerializedRecord>;
-	// Pages with async values only: names the build that compiled the module, so resume cache entries from another build miss.
-	readonly buildHash?: string;
 };
 
 // D3 arm-relative coordinates: records inside an async boundary arm index

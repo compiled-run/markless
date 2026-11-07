@@ -137,8 +137,6 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	readonly settleTracker?: AsyncBoundarySettleTracker;
 	// The re-settle hold (resume-resettle-hold.ts) observes every snapshot of an update-symbol boundary.
 	readonly onAsyncSnapshot?: (boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) => void;
-	// The page's state payload: the resume cache reads its build and dependency records.
-	readonly state?: ResumeRuntimeInput['state'];
 }): AsyncBoundaryWiring {
 	const releasesById = new Map<string, Array<() => void>>();
 	const release = (boundaryId: string) => {
@@ -199,7 +197,6 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							if (!claim()) return;
 							input.settleTracker?.markSettled(boundary.id);
 							(asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, false);
-							settledCache(input, boundary, snapshot);
 						}
 						return boundaryRangeJournal(boundary.id, {
 							type: 'async-boundary-snapshot',
@@ -219,16 +216,12 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
 						// After the pass: what updates in place lands with the rest of this flush.
 						void input.graph.flush().then(() => asyncPlanes.busy?.apply(boundary));
-						settledCache(input, boundary, snapshot);
 						return result;
 					});
 				},
 			});
 			releases.push(subscribed);
 		}
-		// Settled content shown at wake: a resume cache keeps it, or revalidates the content it seeded.
-		if (asyncPlanes.cache && input.settleTracker?.hasSettledContent(boundary.id))
-			asyncPlanes.cache(input, boundary, 'fulfilled');
 		if (!demand) return;
 		for (const asyncRead of boundary.asyncReads)
 			input.graph.read(asyncRead.graphNodeId, ['status']);
@@ -243,7 +236,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					boundary,
 					snapshot,
 					claimSettle(painted, read.graphNodeId, input.graph.read(read.graphNodeId, [])),
-				).finally(() => settledCache(input, boundary, snapshot));
+				);
 			}
 		}
 	};
@@ -271,11 +264,6 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			);
 		},
 	};
-}
-
-function settledCache(input: WiringInput, boundary: ResumeAsyncBoundaryRecord, snapshot: unknown) {
-	const status = (snapshot as { readonly status?: unknown } | null)?.status;
-	if (isSettledStatus(status)) asyncPlanes.cache?.(input, boundary, status);
 }
 
 // Dev only, where symbols load on demand: a waiting block fetches its @try arm's code beside its data.

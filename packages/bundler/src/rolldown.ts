@@ -48,7 +48,6 @@ import { fallbackImportedSource } from './link-driver.ts';
 import { createPluginState } from './plugin-state.ts';
 import { encodedSymbolSource } from './source-module.ts';
 import { moduleIdFor } from './module-id.ts';
-import { unmatchedResumeCacheExcludes } from './resume-cache-excludes.ts';
 import { importedRouteModules } from './composed-route-modules.ts';
 import type {
 	ClientBuildHandoff,
@@ -56,7 +55,6 @@ import type {
 	MarklessRolldownOptions,
 	MarklessRolldownPluginApi,
 	MarklessTransformManifest,
-	ResumeCacheOptions,
 } from './types.ts';
 import { clientSymbolEntries } from './virtual-ids.ts';
 import type { BuiltPrerenderRecords } from './build/prerender.ts';
@@ -79,7 +77,6 @@ export type {
 	MarklessRolldownPluginApi,
 	MarklessTransformManifest,
 	MarklessVirtualModule,
-	ResumeCacheOptions,
 	TransformTsrxModuleInput,
 	TransformTsrxModuleResult,
 } from './types.ts';
@@ -238,9 +235,6 @@ export function createMarklessRolldownPlugin(input: {
 			declareRouteModules: (isRoute: (moduleId: string) => boolean) => {
 				internalOptions.routeModules = isRoute;
 			},
-			declareResumeCache: (options: ResumeCacheOptions | false) => {
-				internalOptions.resumeCache = options;
-			},
 			declarePackOwnership: (packs: PackOwnership) => {
 				declaredPacks = packs;
 			},
@@ -345,13 +339,6 @@ export function createMarklessRolldownPlugin(input: {
 		async buildEnd(error) {
 			const hook = packing?.buildEnd;
 			await (typeof hook === 'function' ? hook : hook?.handler)?.call(this, error);
-			if (!error && internalOptions.dev !== true && getEnvironment(this) === 'client') {
-				const unmatched = unmatchedResumeCacheExcludes(
-					internalOptions.resumeCache,
-					state.asyncComputedNames,
-				);
-				if (unmatched) this.error(unmatched);
-			}
 			// Kept only to reuse a compile within the module graph; render and later environments never read it.
 			if (internalOptions.dev !== true) {
 				state.linkedTransformCache.clear();

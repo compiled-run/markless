@@ -2,7 +2,6 @@ import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client
 import type { ProtocolStatePayload, ProtocolStreamedArmPatch } from '@markless/serializer';
 import { decodeProtocolPayloadLists } from '@markless/serializer/record-templates';
 import type { ResumeDomOwnerDocument } from './resume-types.ts';
-import { PROTOCOL_SEEDED_SCRIPT_ATTRIBUTE } from '../../serializer/src/protocol-seeded-script.ts';
 
 // Show-then-adopt, adopt half (T107 streaming): the __mArm executor already
 // swapped settled arm content into the boundary's anchor range pre-runtime;
@@ -47,25 +46,14 @@ export function adoptStreamedArmPatches(
 	);
 	const armPatchesByBoundary = new Map<string, ProtocolStreamedArmPatch>();
 	const deltas = new Map<string, StreamedStateDelta>();
-	// Patches the resume cache seeded, until a streamed patch for the same block supersedes them.
-	const seeded = new Set<string>();
 	for (const script of scripts) {
-		const cached = script.getAttribute(PROTOCOL_SEEDED_SCRIPT_ATTRIBUTE) !== null;
-		// Cache entries are written by the browser, not the compiler: one that does not parse is a miss.
-		let parsed: unknown;
-		try {
-			parsed = JSON.parse(script.textContent as string);
-		} catch (error) {
-			if (!cached) throw error;
-			continue;
-		}
 		const boundaryId = script.getAttribute('data-boundary');
 		if (boundaryId) {
-			if (!uncommittedBoundaryIds.has(boundaryId)) {
-				armPatchesByBoundary.set(boundaryId, parsed as ProtocolStreamedArmPatch);
-				if (cached) seeded.add(boundaryId);
-				else seeded.delete(boundaryId);
-			}
+			if (!uncommittedBoundaryIds.has(boundaryId))
+				armPatchesByBoundary.set(
+					boundaryId,
+					JSON.parse(script.textContent as string) as ProtocolStreamedArmPatch,
+				);
 			continue;
 		}
 		const graphNodeId = script.getAttribute('data-graph-node') ?? '';
@@ -73,7 +61,10 @@ export function adoptStreamedArmPatches(
 			(candidate) => candidate.runnerGraphNodeId === graphNodeId,
 		);
 		if (!boundary || uncommittedBoundaryIds.has(boundary.id)) continue;
-		const delta = decodeProtocolPayloadLists('markless/state', parsed as StreamedStateDelta | null);
+		const delta = decodeProtocolPayloadLists(
+			'markless/state',
+			JSON.parse(script.textContent as string) as StreamedStateDelta | null,
+		);
 		if (delta) deltas.set(graphNodeId, delta);
 	}
 	const cells = mergeStateRecords(decoded.state.cells, deltas.values(), 'cells');
@@ -97,7 +88,6 @@ export function adoptStreamedArmPatches(
 						'markless/view',
 						armPatch[1],
 					) as (typeof boundary)['armRecords'],
-					...(seeded.has(boundary.id) && { seeded: true as const }),
 				};
 			}),
 		},

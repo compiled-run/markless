@@ -85,25 +85,11 @@ test('can disable Nitro for route-only fixtures and apps', () => {
 		'markless-router:typegen',
 		'markless-router:anchors',
 		'markless-router:html',
-		'markless-router:resume-cache',
 		'markless-router:routes',
 	]);
 	expect(names).not.toContain('markless-router:vite');
 	expect(names).not.toContain('nitro:init');
 });
-
-test.each([[{}], [{ resumeCache: { exclude: ['quote'] } }], [{ resumeCache: false }]] as const)(
-	'ships no resume cache code while the server mints no session scope token (%o)',
-	(options) => {
-		const plugin = flattenPlugins([router({ nitro: false, ...options })]).find(
-			(candidate) => candidate.name === 'markless-router:resume-cache',
-		);
-		const declared: unknown[] = [];
-		const configResolved = plugin?.configResolved as (config: unknown) => void;
-		configResolved({ plugins: [{ api: { declareResumeCache: (cache: unknown) => declared.push(cache) } }] });
-		expect(declared).toEqual([false]);
-	},
-);
 
 test.each([[{}], [{ nitro: false }]] as const)(
 	'declares http server-only on page modules and nothing else (%o)',

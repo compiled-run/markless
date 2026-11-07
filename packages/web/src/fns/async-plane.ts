@@ -252,12 +252,6 @@ export type AsyncPlaneSlot = {
 		readonly settleRange: typeof settleRange;
 		readonly shown: typeof shown;
 	};
-	// Installed by `fns/resume-cache`: told when a boundary shows settled content.
-	cache?: (
-		wiring: Parameters<typeof import('../resume-async-wiring.ts').wireAsyncBoundariesWithoutLoadingCapability>[0],
-		boundary: import('../resume-types.ts').ResumeAsyncBoundaryRecord,
-		status: 'fulfilled' | 'rejected',
-	) => void;
 };
 
 // Busy marks: the per-element marks load with the first refresh over shown content.

@@ -106,7 +106,6 @@ export function registerFinalTransformArtifacts(
 	const { internalOptions, dev, state } = ctx;
 	const { moduleMetadata } = state;
 	const { cacheKey, manifestSource } = plan;
-	for (const name of transformed.asyncComputedNames ?? []) state.asyncComputedNames.add(name);
 	if (!renderDataRequest)
 		registerTransformArtifacts(state, {
 			owner: cacheKey,

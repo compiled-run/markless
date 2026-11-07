@@ -671,13 +671,9 @@ A form handler adds `{ id: crypto.randomUUID(), title }` to `drafts`, and the li
 
 Changing a row that is already saved is a refresh, not a first load: the row keeps its old content, marked busy, until the save answers.
 
-## A reload starts over, for now
+## A reload starts over
 
-A reload starts every block over, so the page shows `@pending` again for answers the visitor saw a second ago. Markless has a built-in fix for this, but it is off.
-
-When it is on, each block's last answer is kept in the tab's session storage and painted straight away on the next load of that page, in that tab. The load still runs every time, and the new answer replaces the kept one as a quiet refresh. A failed load keeps the kept answer and shows `@catch` after it. An answer a click asked for, such as a save, is never kept or run again.
-
-It stays off because a kept answer is only safe to show to the same visitor session, and Markless hasn't settled how the server tells one session from the next. Until then no page keeps anything. `router({ resumeCache: false })` already makes sure no code for it ships.
+A reload starts every block over, so the page shows `@pending` again. Keeping the last answer across a reload is parked for now.
 
 ## Build errors inside `@try`
 

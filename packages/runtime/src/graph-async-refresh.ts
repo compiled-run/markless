@@ -48,7 +48,6 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			value: (node.snapshot as { readonly value?: unknown }).value,
 			...(kept && { valueKey: kept.valueKey }),
 			...(node.quiet && { quiet: true }),
-			...(node.action && { action: true }),
 		};
 	};
 
@@ -94,11 +93,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const version = ++node.version;
 		node.controller = controller;
 		// Read in the writing turn: a demanded run is never quiet, nor one a handler's entry hold proves.
-		const byAction = !!state.isUserAction?.();
-		if (byAction && node.snapshot.status === 'idle') node.createdByAction = true;
-		node.action = byAction || !!node.createdByAction;
-		// A revalidation (the resume cache re-checking content it seeded) is never something the user asked for.
-		node.quiet = cause === 'revalidate' || (!node.entryHold && cause === 'write' && !byAction && !!state.isUserAction);
+		node.quiet =
+			!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false);
 		// A re-run keeps the last good value addressable while pending and after a
 		// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
 		const kept = lastGood(node.snapshot);
@@ -119,13 +115,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 				node.servedKey = undefined;
 				if (waiting) node.gate = 2;
 			}
-			publish(
-				node,
-				node.quiet || node.action
-					? { ...snapshot, ...(node.quiet && { quiet: true }), ...(node.action && { action: true }) }
-					: snapshot,
-				landed,
-			);
+			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
 		};
 		const commitRejected = (error: unknown): void =>
 			land({ status: 'rejected', version, key, error, ...kept });

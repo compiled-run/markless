@@ -38,14 +38,7 @@ export interface MarklessRolldownOptions {
 	bundleGraphAdders?: Set<BundleGraphAdder>;
 	rootDir?: string;
 	buildId?: string;
-	/**
-	 * Pages keep the settled content of their async blocks in the tab's session storage and show it, revalidating,
-	 * on a reload or a client-rendered return. The router turns this on; `exclude` names async values never kept.
-	 */
-	resumeCache?: boolean | ResumeCacheOptions;
 }
-
-export type ResumeCacheOptions = { readonly exclude?: ReadonlyArray<string> };
 
 export type MarklessVirtualModuleType =
 	| 'payload'
@@ -106,8 +99,6 @@ export interface TransformTsrxModuleInput {
 	symbols?: import('@markless/compiler').SymbolResolverModuleInput['symbols'];
 	devResumeReexport?: boolean;
 	buildId?: string;
-	/** Set where the app keeps a resume cache: client modules serving async values install it. */
-	resumeCache?: ResumeCacheOptions;
 	environment?: MarklessEnvironment;
 	clientOutput?: MarklessClientOutput;
 	includeScalarActionPlans?: boolean;
@@ -144,8 +135,6 @@ export interface TransformTsrxModuleResult {
 	manifest: MarklessTransformManifest;
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
-	/** The names of the module's async computeds, which `resumeCache.exclude` entries must match. */
-	asyncComputedNames?: ReadonlyArray<string>;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
 	/** The resolved ids of the stylesheets the module imports for their effect, in source order. */
 	stylesheetImports: ReadonlyArray<string>;
@@ -290,8 +279,6 @@ export type MarklessRolldownPluginApi = {
 	declareElementOnlyAttributes: (attributes: SemanticGraphInput['elementOnlyAttributes']) => void;
 	/** A host plugin names, per root-relative module id, the modules it renders as pages. */
 	declareRouteModules: (isRoute: (moduleId: string) => boolean) => void;
-	/** A host plugin that mints a session scope for its documents turns the resume cache on, or `false` keeps it off. */
-	declareResumeCache: (options: ResumeCacheOptions | false) => void;
 	/** The packing pass names the pack each module went into, so the import map can list only chunks several pages load. */
 	declarePackOwnership: (packs: PackOwnership) => void;
 	invalidateGeneratedModules: (

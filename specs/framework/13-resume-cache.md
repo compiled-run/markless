@@ -1,6 +1,18 @@
 # 13. Resume Cache: Refresh-Stable Boundaries via Persisted Settled Snapshots
 
-Status: IMPLEMENTED BEHIND A FAIL-CLOSED SCOPE (2026-11-06, branch
+Status: Parked (owner, 2026-11-07). The implementation lives only on branch
+`proto/resume-cache` (f9b058637); no main-line code ships it.
+
+Why parked: measured, the cache only wins on reloads of pages with slow data,
+on client-rendered reloads, and on Back to a landing page or to a page reached
+after a POST. The browser's back/forward cache and ordinary HTTP caching
+already cover the other returns, and the cache adds lasting complexity across
+the runtime, web, router, bundler and compiler (session scoping, build keys,
+seeding and revalidation). Research:
+[`goals/async-error-states/resume-cache-research.md`](../../goals/async-error-states/resume-cache-research.md).
+The text below is the design as built on that branch, kept for a later revival.
+
+Prior status: IMPLEMENTED BEHIND A FAIL-CLOSED SCOPE (2026-11-06, branch
 `proto/resume-cache`): capture, keying, CSR and streamed-SSR seeding,
 revalidation, failure table, exclude diagnostics and observability are built
 and tested; the router mints NO scope token yet, so no served page keeps a

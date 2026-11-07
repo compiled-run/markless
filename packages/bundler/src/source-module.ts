@@ -574,11 +574,7 @@ function payloadHasComputed(payloadState: unknown): boolean {
 	return Array.isArray(computed) && computed.length > 0;
 }
 
-export type AsyncPlanesDemand = {
-	readonly async: boolean;
-	readonly held: boolean;
-	readonly resumeCache?: import('./types.ts').ResumeCacheOptions;
-};
+export type AsyncPlanesDemand = { readonly async: boolean; readonly held: boolean };
 
 // The only place the async and matched-value planes are named, so an app that serves neither emits neither.
 // A module installs them for the components it composes too, whose own modules may never load.
@@ -604,12 +600,6 @@ function emitAsyncPlanesInstall(planes: AsyncPlanesDemand | undefined): string |
 			? [
 					"import { installMarklessHeldInputs } from '@markless/web/fns/held-inputs-plane';",
 					'installMarklessHeldInputs();',
-				]
-			: []),
-		...(planes.resumeCache
-			? [
-					"import { installMarklessResumeCache } from '@markless/web/fns/resume-cache';",
-					`installMarklessResumeCache(${planes.resumeCache.exclude?.length ? JSON.stringify(planes.resumeCache.exclude) : ''});`,
 				]
 			: []),
 	].join('\n');

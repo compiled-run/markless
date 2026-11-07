@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 312,
+	total: 311,
 	guided: 48,
 	groups: [
 		{
@@ -1226,14 +1226,6 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a page has no build data markless_router_render_data_missing a markless runtime error from @markless/router.',
-				},
-				{
-					code: 'MARKLESS_RESUME_CACHE_EXCLUDE_UNMATCHED',
-					title: 'A resumeCache exclude names no async value',
-					chip: 'error',
-					kind: 'build error',
-					guided: false,
-					words: 'a resumecache exclude names no async value markless_resume_cache_exclude_unmatched a markless build tooling error from @markless/bundler.',
 				},
 				{
 					code: 'MARKLESS_ROUTE_ARTIFACT_REGISTERED_LATE',

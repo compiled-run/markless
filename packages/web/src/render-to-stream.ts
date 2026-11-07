@@ -23,7 +23,6 @@ import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
 	renderSsrOutput,
-	resumeCacheScope,
 	storageRenderContext,
 	type RenderToStringOptions,
 	type SsrRenderable,
@@ -31,17 +30,6 @@ import {
 	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
-import { runResumeCacheSeed } from './inline/resume-seed.ts';
-import { INLINE_MODULE_LOADER_SOURCE } from './inline/resumer.ts';
-import { resumeCacheDependencyKey } from './resume-cache-key.ts';
-import {
-	RESUME_CACHE_KEY_PREFIX,
-	RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE,
-	RESUME_CACHE_SEEDED_ATTRIBUTE,
-} from './resume-cache-storage-key.ts';
-import { deserializeGraphValue, type SerializedGraphPayload } from '../../serializer/src/value.ts';
-
-declare const __MARKLESS_DEV_ENABLED__: boolean;
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -151,12 +139,9 @@ export async function renderToStream(
 		]);
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
+	const shell = await assembleSsrContainer(component, output, options);
 	const pendingArms = pendingStreamArms(output, renderContext);
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
-	const seed = resumeCacheSeedScripts(output, pendingArms, options, resumeModuleUrl);
-	// The seed must land INSIDE the container: splitSsrContainer requires the shell to end with
-	// the container's own closing tag, so nothing may be appended after assembleSsrContainer's result.
-	const shell = await assembleSsrContainer(component, output, options, [seed]);
 	return {
 		shell,
 		pendingArmCount: pendingArms.length,
@@ -368,59 +353,6 @@ function armDependencyClosure(output: SsrRenderOutput, graphNodeId: string): Rea
 		for (const dependency of definition.dependencies ?? []) closure.add(dependency.graphNodeId);
 	}
 	return closure;
-}
-
-// A shell whose pending blocks the resume cache can key asks this tab's cache for each before it paints.
-function resumeCacheSeedScripts(
-	output: SsrRenderOutput,
-	pendingArms: ReadonlyArray<PendingArm>,
-	options: RenderToStreamOptions,
-	resumeModuleUrl: string | undefined,
-): string {
-	const scope = resumeCacheScope(options, output.state, output.view);
-	const state = output.state;
-	if (!scope || !state?.buildHash || pendingArms.length === 0) return '';
-	const read = (graphNodeId: string, path: ReadonlyArray<string>) => {
-		const record = [...state.cells, ...state.computed].find(
-			(candidate) => candidate.graphNodeId === graphNodeId,
-		);
-		let value: unknown = record?.directValue;
-		if (value === undefined && record?.value !== undefined)
-			value = isSerializedGraphPayload(record.value) ? deserializeGraphValue(record.value) : record.value;
-		for (const segment of path) value = (value as Record<string, unknown> | null | undefined)?.[segment];
-		return value;
-	};
-	const items = pendingArms.flatMap((arm) => {
-		const boundary = output.view?.asyncBoundaries.find((candidate) => candidate.id === arm.boundaryId);
-		const key = boundary && resumeCacheDependencyKey(state, boundary.asyncReads, read);
-		return key ? [[arm.boundaryId, arm.graphNodeId, key] as const] : [];
-	});
-	if (items.length === 0) return '';
-	const nonceAttribute = options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : '';
-	const call = `(${runResumeCacheSeed.toString()})(${[
-		RESUME_CACHE_KEY_PREFIX,
-		scope,
-		state.buildHash,
-		ASYNC_BOUNDARY_ARM.try,
-		RESUME_CACHE_SEEDED_ATTRIBUTE,
-		RESUME_CACHE_SEED_SCRIPT_ATTRIBUTE,
-		items,
-		resumeModuleUrl ?? null,
-		typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__,
-	]
-		.map((value) => escapeScriptJson(JSON.stringify(value)))
-		.join(',')},${INLINE_MODULE_LOADER_SOURCE});`;
-	// Lands inside the container (assembleSsrContainer's extraContainerParts), never appended after
-	// the shell string: splitSsrContainer requires the shell to end with the container's own </div>.
-	return (
-		armExecutorScript(resumeModuleUrl, options.nonce) +
-		`<script data-markless-resume-seed${nonceAttribute}>${escapeInlineScript(call)}</script>`
-	);
-}
-
-function isSerializedGraphPayload(value: unknown): value is SerializedGraphPayload {
-	const candidate = value as Partial<SerializedGraphPayload> | null;
-	return typeof candidate === 'object' && !!candidate && 'root' in candidate && Array.isArray(candidate.records);
 }
 
 function renderArmAppend(
