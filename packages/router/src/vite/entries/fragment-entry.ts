@@ -632,6 +632,20 @@ function nodesBetween(parent: Node, after: Node | undefined, before: Node | null
 const scriptsIn = (element: Element): Element[] =>
 	element.localName === 'script' ? [element] : [...element.querySelectorAll('script')];
 
+const isMedia = (element: Element): boolean =>
+	element.localName === 'video' || element.localName === 'audio';
+
+// A media element starts loading where it is parsed, and the parsed page has no window to load into: the live document makes each one anew.
+function adoptArriving<T extends ChildNode>(d: Document, node: T): T {
+	const adopted = d.adoptNode(node);
+	if (adopted.nodeType !== 1) return adopted;
+	const element = adopted as unknown as Element;
+	if (isMedia(element)) return d.importNode(element, true) as unknown as T;
+	for (const media of element.querySelectorAll('video, audio'))
+		media.replaceWith(d.importNode(media, true));
+	return adopted;
+}
+
 const serverHostAttributes = new WeakMap<Document, Set<string>>();
 
 // A container kept in place takes the server's attributes; one a script set on it, and the server never served, stays.
@@ -694,7 +708,7 @@ function morphRange(
 			cursor = after;
 			continue;
 		}
-		const node = d.adoptNode(next);
+		const node = adoptArriving(d, next);
 		parent.insertBefore(node, cursor && cursor !== stop ? cursor : stop);
 		if (node.nodeType === 1) fresh.push(node as Element);
 	}
@@ -781,18 +795,18 @@ function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): bo
 		}
 	});
 	leaving.forEach((slot, index) => {
-		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
+		const nodes = [...arriving[index]!.childNodes].map((node) => adoptArriving(d, node));
 		slot.replaceChildren(...nodes);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
 	return true;
 }
 
-// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
+// A template's content is not its children, so a morph cannot see it; a custom element owns its own state; a media element picks its source once.
 const replacedWhole = (element: Element, incoming: Element, page: boolean): boolean =>
 	element.localName === 'template' ||
 	(element.localName === 'script' && (page || !element.isEqualNode(incoming))) ||
-	(element.localName.includes('-') && !element.isEqualNode(incoming));
+	((element.localName.includes('-') || isMedia(element)) && !element.isEqualNode(incoming));
 
 type MorphRange = readonly [
 	parent: Node,
@@ -872,7 +886,7 @@ function morphNode(
 	const name = element.localName;
 	page ||= isContainer(element);
 	if (replacedWhole(element, incoming, page)) {
-		const node = d.adoptNode(incoming);
+		const node = adoptArriving(d, incoming);
 		element.replaceWith(node);
 		fresh.push(node);
 		return;
