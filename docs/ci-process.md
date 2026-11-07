@@ -41,7 +41,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 
 | Mode      | Jobs                                                                                                                                               | Time                                                                                                                                                                          |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
+| `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, then the site's component and page tests, the `website` project in `website/`: about 6 s, both added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
 | `--full`  | fast, plus `browser` (browser + `ui` projects, `api:check`), `completion-matrix` (measured alone: 6 s), the four box jobs, `test` (the analyzer receipt set), `website-boxes`, `perf-guards`, `demo-boxes`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
 | `--clean` | any mode, in a fresh worktree of `HEAD`                                                                                                            | adds about 5 s (worktree + offline `pnpm install`)                                                                                                                            |
 
@@ -119,7 +119,7 @@ Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to
 | --- | --- | --- | --- | --- |
 | `agent-files` | agent files match `.ruler/` | always | always | always |
 | `typecheck` | `ci.yml` structure, `pnpm typecheck`, lint | always | always | always |
-| `typecheck-ts7` | the same type gate on TypeScript 7.1 | always | always | always |
+| `typecheck-ts7` | the same type gate on TypeScript 7.1, then the website's component and page tests (its tooling tests run in `website-boxes`) | always | always | always |
 | `unit` (3 shards) | the node test project, including Chromium and WebKit fixture tests | when its inputs changed | same | skipped if the queue tested the commit |
 | `browser` (3 shards) | the real-Chromium `browser` and `ui` projects, the `@markless/ui` API manifest | when its inputs changed | same | same |
 | `completion-matrix` | the packaged editor plugin's completions | when its inputs changed | same | same |
