@@ -715,6 +715,8 @@ export function createEventWiring(input: {
 		// Opened before the try: beginning the window cannot throw, and the finally
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
+		// Only a real DOM event opens a user action (submit-quiet-design.md Q2); every call this dispatch makes inherits it.
+		const userActionToken = { open: true };
 		try {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
@@ -744,6 +746,8 @@ export function createEventWiring(input: {
 			// body no caller awaits, so its failure is reported here rather than
 			// escaping the dispatch as an unhandled rejection.
 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+				// Decided when called, not when the callee's code arrives: a timer calling back after the caller finished is quiet.
+				const calleeToken = context.userActionToken?.open ? { open: true } : undefined;
 				try {
 					// The callback channel belongs to this dispatch, so a context that
 					// arrived without one runs on the dispatch's own graph.
@@ -752,12 +756,15 @@ export function createEventWiring(input: {
 						{
 							...context,
 							graph: context.graph ?? input.graph,
+							userActionToken: calleeToken,
 						},
 						true,
 					);
 				} catch (error) {
 					await report(error, symbolId);
 					return undefined;
+				} finally {
+					if (calleeToken) calleeToken.open = false;
 				}
 			};
 			const baseContext = {
@@ -767,6 +774,7 @@ export function createEventWiring(input: {
 				getElementHandle: readHandle,
 				...(locals ? { locals } : {}),
 				releaseQueue: options.releaseQueue,
+				userActionToken,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
@@ -782,6 +790,7 @@ export function createEventWiring(input: {
 			await report(error, activeSymbolId);
 			throw error;
 		} finally {
+			userActionToken.open = false;
 			await input.flushRuntimeGraph();
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({

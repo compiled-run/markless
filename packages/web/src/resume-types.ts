@@ -348,6 +348,8 @@ export type ResumeSymbolContext = {
 	readonly invokeSymbol?: (symbolId: string, context: ResumeSymbolContext) => Promise<unknown>;
 	// Called at an authored `await` in a handler: the page's next event may start.
 	readonly releaseQueue?: () => void;
+	// Open while this call runs inside a real DOM event's dispatch (submit-quiet-design.md Q2).
+	readonly userActionToken?: { readonly open: boolean };
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (
