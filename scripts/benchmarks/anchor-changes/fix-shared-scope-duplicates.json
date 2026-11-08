@@ -3,22 +3,29 @@
 		{
 			"surface": "perf-guards",
 			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
-			"delta": 206,
-			"reason": "shared() scope rename (PR #533): the docs code blocks' in-browser compile worker carries the new error for the old names 'page', 'request' and 'widget' (+162 B gzip measured on the worker), and every compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (1673385)",
+			"delta": 229,
+			"reason": "shared() scope rename (PR #533): the docs code blocks' in-browser compile worker carries the new error for the old names 'page', 'request' and 'widget' (+162 B gzip measured on the worker), and every compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (1673385); plus the resume page-lifetime check (a resume whose page a navigation swapped while its module loaded answers as a no-op): +23 B gzip measured on CI run 42432200137, which measured 1673614",
 			"date": "2026-11-07"
 		},
 		{
 			"surface": "perf-guards",
 			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
-			"delta": 64,
-			"reason": "shared() scope rename (PR #533): the in-browser compile worker carries the new error for the old scope names, and each compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (2166082)",
+			"delta": 87,
+			"reason": "shared() scope rename (PR #533): the in-browser compile worker carries the new error for the old scope names, and each compiled 'subtree' check and record is one byte longer than 'widget'; measured on CI run 42420722905 against the anchor main carries (2166082); plus the resume page-lifetime check (a resume whose page a navigation swapped while its module loaded answers as a no-op): +23 B gzip measured on CI run 42432200137, which measured 2166169",
 			"date": "2026-11-07"
 		},
 		{
 			"surface": "perf-guards",
 			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
-			"delta": 30,
-			"reason": "shared() scope rename (PR #533): 'subtree' is one character longer than 'widget' in each family's compiled shared-definition record and in the web runtime's scope checks; no other content changed on this page; measured on CI run 42420722905 against the anchor main carries (495974)",
+			"delta": 53,
+			"reason": "shared() scope rename (PR #533): 'subtree' is one character longer than 'widget' in each family's compiled shared-definition record and in the web runtime's scope checks; no other content changed on this page; measured on CI run 42420722905 against the anchor main carries (495974); plus the resume page-lifetime check (a resume whose page a navigation swapped while its module loaded answers as a no-op): +23 B gzip measured on CI run 42432200137, which measured 496027",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["runtimeModules", "web/payload-resume"],
+			"delta": 137,
+			"reason": "a resume carries the page lifetime its payload scripts were read in and answers as a no-op when an in-place navigation swapped the page while the resume module loaded, instead of matching the leaving page's locators against the new page; measured on CI run 42432200137 (5490 -> 5627 B rendered)",
 			"date": "2026-11-07"
 		}
 	]
