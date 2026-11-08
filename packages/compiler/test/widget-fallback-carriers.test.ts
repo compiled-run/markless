@@ -39,7 +39,7 @@ import { shared, state } from '@markless/core';
 export const box = shared(() => {
 	const held = state({ items: [] as readonly string[] });
 	return { ...held };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ children }) @{
 	const held = box();
@@ -66,7 +66,7 @@ import { shared, state } from '@markless/core';
 export const box = shared(() => {
 	const held = state({ tag: '' });
 	return { ...held };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ tag, children }) @{
 	const held = box();

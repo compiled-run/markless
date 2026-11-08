@@ -9,7 +9,7 @@ import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
-// A page-scoped shared() whose factory calls an imported function on an imported const, used by its own module and by a page.
+// An app-scoped shared() whose factory calls an imported function on an imported const, used by its own module and by a page.
 
 vi.setConfig({ testTimeout: 30_000 });
 

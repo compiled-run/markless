@@ -25,18 +25,18 @@ export default function DrinkPick() @{
 
 const SOURCES = {
 	namePicker: [{ name: 'name-picker.tsrx', code: shown(here('./name-picker.tsrx')) }],
-	talliesPage: [
-		{ name: 'tally.tsrx', code: shown(here('./tally-page.tsrx')) },
+	talliesApp: [
+		{ name: 'tally.tsrx', code: shown(here('./tally-app.tsrx')) },
 		{
 			name: 'tallies.tsrx',
-			code: shown(here('./tallies-page.tsrx')).replace('./tally-page.tsrx', './tally.tsrx'),
+			code: shown(here('./tallies-app.tsrx')).replace('./tally-app.tsrx', './tally.tsrx'),
 		},
 	],
-	talliesWidget: [
-		{ name: 'tally.tsrx', code: shown(here('./tally-widget.tsrx')) },
+	talliesSubtree: [
+		{ name: 'tally.tsrx', code: shown(here('./tally-subtree.tsrx')) },
 		{
 			name: 'tallies.tsrx',
-			code: shown(here('./tallies-widget.tsrx')).replace('./tally-widget.tsrx', './tally.tsrx'),
+			code: shown(here('./tallies-subtree.tsrx')).replace('./tally-subtree.tsrx', './tally.tsrx'),
 		},
 	],
 	drinkPick: [{ name: 'drink-pick.tsrx', code: DRINK_PICK }],

@@ -1,3 +1,4 @@
+import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
@@ -25,6 +26,7 @@ import {
 	callbackSlotSourceDiagnostic,
 	implicitFamilyScopeDiagnostic,
 	invalidSharedScopeDiagnostic,
+	renamedSharedScopeDiagnostic,
 	sharedDefinitionCycleDiagnostic,
 	sharedSeedUnresolvedValueDiagnostic,
 	unboundCallbackSlotDiagnostic,
@@ -554,7 +556,7 @@ function unresolvedSharedCallDiagnostic(input: {
 		suggestions: [
 			{
 				message:
-					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+					"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
@@ -1686,6 +1688,15 @@ function canonicalCycleKey(cycleNames: ReadonlyArray<string>): string {
 	return canonical ?? cycleNames.join('->');
 }
 
+const RENAMED_SHARED_SCOPES = {
+	page: 'app',
+	request: 'app',
+	widget: 'subtree',
+} as const satisfies Record<string, SemanticSharedScope>;
+
+const isSharedScope = (value: unknown): value is SemanticSharedScope =>
+	(PROTOCOL_SHARED_SCOPES as ReadonlyArray<unknown>).includes(value);
+
 function sharedScopeFromOptions(
 	node: AnyNode | undefined,
 	state: WalkState,
@@ -1710,13 +1721,20 @@ function sharedScopeFromOptions(
 			);
 			return undefined;
 		}
-		if (
-			value.value === 'request' ||
-			value.value === 'container' ||
-			value.value === 'page' ||
-			value.value === 'widget'
-		) {
-			return value.value;
+		if (isSharedScope(value.value)) return value.value;
+		const renamedTo =
+			typeof value.value === 'string' && Object.hasOwn(RENAMED_SHARED_SCOPES, value.value)
+				? RENAMED_SHARED_SCOPES[value.value as keyof typeof RENAMED_SHARED_SCOPES]
+				: undefined;
+		if (renamedTo) {
+			state.graph.diagnostics.push(
+				renamedSharedScopeDiagnostic({
+					from: value.value as string,
+					to: renamedTo,
+					valueSpan: sourceSpan(value, state.filename),
+				}),
+			);
+			return undefined;
 		}
 		state.graph.diagnostics.push(
 			invalidSharedScopeDiagnostic({

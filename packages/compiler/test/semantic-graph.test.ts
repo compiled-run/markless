@@ -64,7 +64,7 @@ export const session = shared(() => {
 			data.status = 'anonymous';
 		},
 	};
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Header() @{
 	const currentSession = session();
@@ -109,7 +109,7 @@ export const listBox = shared(() => {
 	const box = state({ items: [{ id: 'a', label: 'A' }] });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function List() @{
 	const box = listBox();
@@ -131,7 +131,7 @@ export const listBox = shared(() => {
 	const box = state({ items: [{ id: 'a', label: 'A' }] });
 
 	return box;
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function List() @{
 	const box = listBox();
@@ -956,7 +956,7 @@ test('buildSemanticGraph records shared definitions and instance calls', async (
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			factorySource: expect.stringContaining('const data = state'),
 			sourceSpan: {
 				filename: 'src/session.tsrx',

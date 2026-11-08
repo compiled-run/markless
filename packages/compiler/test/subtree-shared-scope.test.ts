@@ -13,7 +13,7 @@ export const sel = shared(() => {
 			s.open = !s.open;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const s = sel();
@@ -31,7 +31,7 @@ export const pop = shared(() => {
 	const p = state({ open: false });
 
 	return { ...p };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function PopRoot({ children }) @{
 	const p = pop();
@@ -77,12 +77,12 @@ test('widget is an accepted shared() scope and is recorded on the definition', a
 			definition.scope,
 		]),
 	).toEqual([
-		['shared:src/sel.tsrx#sel', 'widget'],
-		['shared:src/sel.tsrx#pop', 'widget'],
+		['shared:src/sel.tsrx#sel', 'subtree'],
+		['shared:src/sel.tsrx#pop', 'subtree'],
 	]);
 });
 
-test('a widget-scoped definition records the component that resolves it', async () => {
+test('a subtree-scoped definition records the component that resolves it', async () => {
 	const compiled = await compile('src/sel.tsrx', familySource);
 
 	expect(
@@ -100,7 +100,7 @@ test('a widget-scoped definition records the component that resolves it', async 
 // The widget root is the composed instance that OWNS the definition's cells.
 // Giving those cells to the module root instead would make one widget of every
 // family declared in the module.
-test('widget-scoped cells belong to the first component that resolves the definition', async () => {
+test('subtree-scoped cells belong to the first component that resolves the definition', async () => {
 	const compiled = await compile('src/sel.tsrx', familySource);
 	const definitions = compiled.publicRenderModule.componentDefinitions;
 	const cellIdsFor = (name: string) => {

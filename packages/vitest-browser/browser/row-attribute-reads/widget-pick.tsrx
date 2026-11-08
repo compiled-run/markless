@@ -5,7 +5,7 @@ export const pick = shared(
 		const chosen = state({ name: 'maia' });
 		return chosen;
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 const ITEMS = [

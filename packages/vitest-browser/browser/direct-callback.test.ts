@@ -151,17 +151,17 @@ test('SSR resume: a callback writes the state of the parent that passed it, one 
 	);
 });
 
-test('CSR: a callback writes widget-scoped shared() state of its own widget', async () => {
+test('CSR: a callback writes subtree-scoped shared() state of its own widget', async () => {
 	await eachCallbackWritesItsOwnWidget((await render(WidgetShared)).container as HTMLElement);
 });
-test('SSR resume: a callback writes widget-scoped shared() state of its own widget', async () => {
+test('SSR resume: a callback writes subtree-scoped shared() state of its own widget', async () => {
 	await eachCallbackWritesItsOwnWidget((await renderSSR(WidgetShared)).container as HTMLElement);
 });
 
-test('CSR: a callback writes widget-scoped shared() state, one module below the page', async () => {
+test('CSR: a callback writes subtree-scoped shared() state, one module below the page', async () => {
 	await eachCallbackWritesItsOwnWidget((await render(WidgetSharedPage)).container as HTMLElement);
 });
-test('SSR resume: a callback writes widget-scoped shared() state, one module below the page', async () => {
+test('SSR resume: a callback writes subtree-scoped shared() state, one module below the page', async () => {
 	await eachCallbackWritesItsOwnWidget(
 		(await renderSSR(WidgetSharedPage)).container as HTMLElement,
 	);

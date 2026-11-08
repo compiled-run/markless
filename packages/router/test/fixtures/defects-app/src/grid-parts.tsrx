@@ -8,7 +8,7 @@ export const gridState = shared(
 		const cells = state({ sort: '', picked: 0 });
 		return { ...cells };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export function HeaderCell({

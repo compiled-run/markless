@@ -132,7 +132,7 @@ export const taglistState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per tag, rooted by `taglist.item`. */
@@ -142,7 +142,7 @@ export const taglistItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TagListRoot({

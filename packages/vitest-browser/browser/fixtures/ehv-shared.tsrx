@@ -9,7 +9,7 @@ export const ehv = shared(
 
 		return { ...s, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function EhvSharedRoot({ children }) @{

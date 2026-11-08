@@ -68,7 +68,7 @@ Components are just ways to create local graph scopes, attach reads/writes, and
 project graph values into DOM.
 
 `shared()` lifts that same graph model into a named dataflow. Some named graphs
-are request/container/page state; others are UI graph instances used by
+are app or container state; others are UI graph instances used by
 headless UI libraries and design systems whose pieces are authored as separate
 components. This is different from hooks and context, which scope state through
 render order, provider ancestry, component subscriptions, and rerender
@@ -648,10 +648,11 @@ function Header() @{
 
 `session()` does not mean "run a hook." It means: resolve this named dataflow
 instance for the current graph context. A definition declares which context that
-is: `request`, `container`, `page`, or `widget`. For app data the context is
-usually request/container/page — one instance per request, per container, or per
-page. `widget` scope is the component-library case: one instance per rendered
-widget, resolved by the outermost component instance that calls the definition,
+is: `app` (the default), `container`, or `subtree`. For app data the context is
+`app` or `container`: one instance per request on the server and per document
+in the browser, or one per container. `subtree` scope is the component-library
+case: one instance per rendered subtree,
+resolved by the outermost component instance that calls the definition,
 so a second `<SelectRoot>` on the page resolves a second instance. The instance is created during initial render,
 serialized into the graph payload, resumed lazily in the browser, and
 shared with other containers on the document through one plain-data record.
@@ -671,14 +672,14 @@ Semantics:
   separately-built bundles.
 - **Resolution:** a bare call resolves the active instance of that shared
   definition for the current graph context. There is no `provide()` or
-  `create()` in v1. For request/page data, the active instance is the
-  request/container/page instance. For headless UI and design-system components,
+  `create()` in v1. For app and container data, the active instance is the
+  app or container instance. For headless UI and design-system components,
   the active instance is the compiler-owned UI graph instance serialized for
   that widget. Multiple widgets get distinct graph instances through normal
   component, key, and projection identity: the widget instance is the instance
   path (see "Graph node identity") of the outermost component that resolves the
   definition, and event/resume symbols carry that same path in their symbol ids.
-  A `widget`-scoped definition's instance id is its definition id qualified by
+  A `subtree`-scoped definition's instance id is its definition id qualified by
   that path, so two rendered widgets of one family never share a node while the
   root/trigger/item pieces of one widget always do.
 - **Boundaries are dataflow, not components.** The framework tracks who reads,
@@ -736,12 +737,17 @@ Markless versions, share state.
   compared). A container whose shape does not match does not bind: it keeps an
   instance of its own and reports `MARKLESS_SHARED_SHAPE_MISMATCH` once, naming
   the definition, so no container ever reads a value of another shape.
-- **Scopes.** `page` (the default) and `request` behave the same in the
-  browser: one instance per document. `container` is one instance per
+- **Scopes.** `app` (the default) is one instance per request on the server
+  and one per document in the browser. `container` is one instance per
   container element: it is not shared with other containers, and because an
   in-place navigation keeps the container element, it lives across navigation
-  too. `widget` is one instance per rendered widget; widgets are not kept
-  across a navigation, so each page's widgets start from their served values.
+  too. `subtree` is one instance per rendered subtree root; subtrees are not
+  kept across a navigation, so each page's subtrees start from their served
+  values.
+- **Renamed scopes are refused.** `'page'` and `'request'` (now `'app'`) and
+  `'widget'` (now `'subtree'`) fail the compile with
+  `MARKLESS_SHARED_SCOPE_RENAMED`, which names the new spelling. They are not
+  accepted as aliases.
 
 
 Rationale receipts (GitHub code search, June 2026): ~75% of React `useContext`
@@ -846,38 +852,39 @@ inside one `.tsrx` module:
   refuse a handle reached through an instance, because nothing mints or emits the
   id yet; the refusal is deliberate, since a recorded relationship that renders
   no attribute would be invisible.
-- **Page scope is the default.** Omitting `scope` resolves the definition to one
-  instance for the page, which in the browser lives for the document (see
-  "Where an instance lives"). `'request'`, `'container'`, `'page'`, and
-  `'widget'` are accepted and recorded on the definition; any other value fails
-  the compile closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+- **App scope is the default.** Omitting `scope` resolves the definition to one
+  instance for the app, which in the browser lives for the document (see
+  "Where an instance lives"). `'app'`, `'container'`, and `'subtree'` are
+  accepted and recorded on the definition. `'page'`, `'request'`, and `'widget'`
+  fail the compile closed with `MARKLESS_SHARED_SCOPE_RENAMED`; any other value
+  fails it with `MARKLESS_SHARED_SCOPE_INVALID`.
 - **A family shape with no declared scope warns.** When two or more components of
   the module that declares a definition resolve it, that is the shape of a widget
-  family. Left without a scope it is page-scoped, so two of those widgets on one
+  family. Left without a scope it is app-scoped, so two of those widgets on one
   page share one graph and move together. The compiler emits the warning
   `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`, naming the components and both fixes:
-  add `{ scope: 'widget' }` for a graph per rendered widget, or write
-  `{ scope: 'page' }` to keep the sharing on purpose. It is a warning, not an
-  error, so existing page-scoped families keep compiling; either explicit
+  add `{ scope: 'subtree' }` for a graph per rendered widget, or write
+  `{ scope: 'app' }` to keep the sharing on purpose. It is a warning, not an
+  error, so existing app-scoped families keep compiling; either explicit
   spelling silences it.
-- **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
+- **Subtree scope is per rendered widget.** A `subtree`-scoped definition's graph
   nodes belong to the first component of the module that resolves it, not to the
   module root. Composition reads that ownership back: the widget root is the
   outermost composed instance that carries the definition's cells, and every
   other piece of the widget — trigger, content, item — finds that root as the
   longest registered widget-root prefix of its own instance path. The instance id
   is the definition id qualified by the widget-root path
-  (`c0:shared:select.tsrx#select/state:s`), so a widget-scoped `shared:` id is
+  (`c0:shared:select.tsrx#select/state:s`), so a subtree-scoped `shared:` id is
   the one page-space family composition does qualify. A widget nested inside
   another widget's content owns its own root path; two widgets of one family
   nested inside one another resolve to the outermost of the two, which is what
   "the outermost component that resolves the definition" means above.
-- **No compile diagnostic is owed for widget scope.** Spec 03's normative refusal
+- **No compile diagnostic is owed for subtree scope.** Spec 03's normative refusal
   is compose-time — "a child node id that composition cannot classify is a
-  compose-time refusal" — and a widget-scoped id is always classifiable: it is
+  compose-time refusal" — and a subtree-scoped id is always classifiable: it is
   either qualified by a registered widget root or, when the resolving component
   is the page itself and has no instance path, page-wide, which is the same
-  answer page scope gives.
+  answer app scope gives.
 
 How the browser keeps one instance per document:
 
@@ -893,7 +900,7 @@ How the browser keeps one instance per document:
   on its first read, which the runtime makes at start; that write brings every
   binding, derived value and arm to the live value, exactly as a write would. A
   container that has not woken yet is woken by the first write it has to show:
-  a server-rendered page that declares a `page` or `request` definition adds
+  a server-rendered page that declares an `app` definition adds
   its container to the record's dormant list from its startup script (one
   push; no listener runs), and a write wakes each listed container whose state
   resolves that definition. A client-rendered mount listens on the instance
@@ -1073,7 +1080,7 @@ export function SelectItem({ value, children }) @{
 
 All three components read and write the same select graph instance for that
 rendered widget. A second `<SelectRoot>` gets a different graph instance: with
-`widget` scope, the instance id is the definition id qualified by the instance
+`subtree` scope, the instance id is the definition id qualified by the instance
 path of the outermost resolving component, and the trigger and item pieces
 resolve through the same path. No provider component, context ID, wrapper hook,
 or tree-shaped public API is introduced; the compiler/runtime records graph

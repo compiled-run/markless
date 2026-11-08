@@ -14,7 +14,7 @@ const FAMILY = `import { shared, state } from '@markless/core';
 export const meterState = shared(() => {
 	const meter = state({ value: 0, ownLabel: '' });
 	return { ...meter };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 function MeterRoot({ children }) @{
 	const meter = meterState();

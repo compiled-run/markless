@@ -46,7 +46,7 @@ test('a toast raised after load paints, stacks, and dismisses itself', async () 
 });
 
 // A minted row must match a served row at every observable instant, so the row
-// joins the DOM finished. Its `ui-front` and `style` read a page-scoped shared()
+// joins the DOM finished. Its `ui-front` and `style` read an app-scoped shared()
 // instance - the queue the page has been writing since load - and rendering them
 // from the compile-time factory instead put the row on screen wrong and left a
 // follow-up refresh to correct it. Under load that correction was skipped and
@@ -84,7 +84,7 @@ test('a minted toast is finished before it joins the DOM', async () => {
 	await cleanup();
 });
 
-// The close button reads `item.id` off the widget-scoped `shared()` instance the
+// The close button reads `item.id` off the subtree-scoped `shared()` instance the
 // row's own component wrote. The read has to answer at DISPATCH as well as at
 // render: the handler runs later, on a graph the bound symbol reaches through
 // wrapper after wrapper, and the row's rendered widget is only findable there if

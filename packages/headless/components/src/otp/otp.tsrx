@@ -49,7 +49,7 @@ export const otpState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function OtpRoot({

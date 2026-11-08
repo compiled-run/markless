@@ -79,7 +79,7 @@ export type PaginationInstanceState = Seeded<
 
 /**
  * The per-item instance: one page number, seeded by the `item` part and read by
- * whichever control that item wraps. It is its own widget-scoped definition, so
+ * whichever control that item wraps. It is its own subtree-scoped definition, so
  * every rendered `item` starts a fresh one and the control inside resolves to the
  * nearest one.
  */

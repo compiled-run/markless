@@ -72,7 +72,7 @@ export const navbarState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // The panel's id is minted here, not on the root: one handle is one element per rendered widget (MARKLESS_ELEMENT_HANDLE_DUPLICATE).
@@ -91,7 +91,7 @@ export const navbarItemState = shared(
 
 		return { ...item, contentEl, boxEl, triggerEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NavbarRoot({

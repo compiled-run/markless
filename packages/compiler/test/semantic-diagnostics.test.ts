@@ -447,7 +447,7 @@ test('B919 reports unknown shared scope strings', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'Unknown shared() scope "session". Valid scopes are "request", "container", "page", and "widget".',
+				'Unknown shared() scope "session". Valid scopes are "app", "container", and "subtree".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,
@@ -457,8 +457,37 @@ test('B919 reports unknown shared scope strings', async () => {
 	]);
 });
 
+test.each([
+	['widget', 'subtree'],
+	['page', 'app'],
+	['request', 'app'],
+])('the old shared() scope %s is refused with its new name %s', async (from, to) => {
+	const source = `import { shared } from '@markless/core'; export const session = shared(() => ({}), { scope: '${from}' });`;
+	const graph = await buildSemanticGraph({ filename: 'src/session.tsrx', source });
+	const scopeStart = source.lastIndexOf(`'${from}'`);
+
+	expect(graph.sharedDefinitions[0]).not.toHaveProperty('scope');
+	expect(graph.diagnostics).toEqual([
+		expect.objectContaining({
+			code: 'MARKLESS_SHARED_SCOPE_RENAMED',
+			severity: 'error',
+			message: `shared() scope "${from}" is now "${to}".`,
+			suggestions: [
+				{
+					message: `Write \`{ scope: "${to}" }\`. "app" is the default, so an app-wide shared() can also drop the option.`,
+				},
+			],
+			primarySpan: {
+				filename: 'src/session.tsrx',
+				start: scopeStart,
+				end: scopeStart + from.length + 2,
+			},
+		}),
+	]);
+});
+
 test('B919 reports non-literal shared scope values', async () => {
-	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'request'; export const session = shared(() => ({}), { scope });`;
+	const dynamicScopeSource = `import { shared } from '@markless/core'; const scope = 'app'; export const session = shared(() => ({}), { scope });`;
 	const graph = await buildSemanticGraph({
 		filename: 'src/session.tsrx',
 		source: dynamicScopeSource,
@@ -469,7 +498,7 @@ test('B919 reports non-literal shared scope values', async () => {
 		expect.objectContaining({
 			code: 'MARKLESS_SHARED_SCOPE_INVALID',
 			message:
-				'shared() scope must be a string literal. Valid scopes are "request", "container", "page", and "widget".',
+				'shared() scope must be a string literal. Valid scopes are "app", "container", and "subtree".',
 			primarySpan: {
 				filename: 'src/session.tsrx',
 				start: scopeStart,

@@ -34,7 +34,7 @@ export const collapsibleState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CollapsibleRoot({

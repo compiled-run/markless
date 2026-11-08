@@ -57,7 +57,7 @@ export const flipState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function FlipRoot({ onFlip, children, ...rest }) @{
 	const flip = flipState();

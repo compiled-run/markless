@@ -38,7 +38,7 @@ export const toaster = shared(() => {
 			s.label = announce(text);
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const s = toaster();
@@ -227,7 +227,7 @@ import { shared, state } from '@markless/core';
 export const toaster = shared(() => {
 	const s = state({ label: '' });
 	return { ...s, show(text) { s.label = text; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function showFromAnywhere(text) {
 	const s = toaster();
@@ -264,7 +264,7 @@ import { shared, state } from '@markless/core';
 export const toaster = shared(() => {
 	const s = state({ label: '' });
 	return { ...s, show(text) { s.label = text; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Named() @{
 	const s = toaster();

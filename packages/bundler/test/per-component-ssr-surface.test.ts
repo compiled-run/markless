@@ -11,7 +11,7 @@ import { shared, state } from '@markless/core';
 export const sel = shared(() => {
 	const s = state({ open: false });
 	return { ...s, toggle() { s.open = !s.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const s = sel();

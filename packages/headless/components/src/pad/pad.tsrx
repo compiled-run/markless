@@ -218,7 +218,7 @@ export const padState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PadRoot({

@@ -9,7 +9,7 @@ export const hi = shared(
 
 		return { ...s, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function HiRoot({ children }) @{

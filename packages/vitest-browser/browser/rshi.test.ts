@@ -3,7 +3,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import OnePage from './fixtures/rshi-one-page.tsrx';
 import TwoPage from './fixtures/rshi-two-page.tsrx';
 
-// Defect 78. A widget-scoped element() handle read from a METHOD of the shared
+// Defect 78. A subtree-scoped element() handle read from a METHOD of the shared
 // record, called by a part that binds no handle of its own: the carousel
 // trigger's shape. The reading part's own edge path names no rendered widget,
 // so before this witness the read fell back to the module-level id, two rendered

@@ -127,7 +127,7 @@ export function planMdxResumeGroups(input: {
 		}
 		const definitions = new Set((state.sharedDefinitions ?? []).map((record) => record.id));
 		const foreignDefinitions = (state.sharedDefinitions ?? []).flatMap((record) => [
-			...(!owns(record.id) || record.scope !== 'widget' ? [record.id] : []),
+			...(!owns(record.id) || record.scope !== 'subtree' ? [record.id] : []),
 			...(record.dependencies ?? [])
 				.filter((dependency) => !definitions.has(dependency.definitionId))
 				.map((dependency) => dependency.definitionId),

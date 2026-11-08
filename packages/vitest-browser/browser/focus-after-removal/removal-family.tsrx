@@ -28,7 +28,7 @@ export const removalBox = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per row, as `taglist.item` roots one per tag. */
@@ -38,7 +38,7 @@ export const removalRow = shared(
 
 		return { ...row };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RemovalRoot({ value = [], onChange, children }) @{

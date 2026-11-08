@@ -22,7 +22,7 @@ export const gaugeState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GaugeRoot({ children }: { children?: Children }) @{

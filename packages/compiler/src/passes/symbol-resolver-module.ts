@@ -250,7 +250,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 				]),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
-		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
+		// A `shared:`/`storage:` id belongs to the page, and a subtree-scoped one to
 		// its widget root, not to the edge this row was bound through. The runtime
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
@@ -279,7 +279,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
 		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
-		// A widget-scoped element() handle is spelled module-level in this symbol
+		// A subtree-scoped element() handle is spelled module-level in this symbol
 		// exactly as its graph nodes are, so it takes the SAME instance path - the
 		// bound edge's, which names the rendered widget even when the dispatching
 		// part binds no handle of its own.

@@ -11,7 +11,7 @@ import type {
 	PaginationRootProps,
 } from './pagination-types.ts';
 
-// This family holds no computed(): a widget-scoped shared computed read in a part's attribute renders once and never refreshes, so every part compares against `pagination.page` with a plain unclamped cell read.
+// This family holds no computed(): a subtree-scoped shared computed read in a part's attribute renders once and never refreshes, so every part compares against `pagination.page` with a plain unclamped cell read.
 
 export const paginationState = shared(
 	() => {
@@ -56,7 +56,7 @@ export const paginationState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by the component that seeds it, so a control nested in a `PaginationItem` resolves to that item and needs no page number of its own.
@@ -66,7 +66,7 @@ export const paginationItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // No default landmark name: a declared aria-label would drop the consumer's own from the spread, and two paginations on a page must stay told apart.

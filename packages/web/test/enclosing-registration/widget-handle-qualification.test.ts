@@ -5,7 +5,7 @@ import {
 	type MarklessWidgetRegistry,
 } from '../../src/fns/instance-scope.ts';
 
-// A widget-scoped element() handle is one element per RENDERED widget, so its
+// A subtree-scoped element() handle is one element per RENDERED widget, so its
 // registration has to be qualified with the root path of the instance the
 // binding part's state read resolved to. These pin the three answers the
 // enclosing-family witness reads back through the DOM.

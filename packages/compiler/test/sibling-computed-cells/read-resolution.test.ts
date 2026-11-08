@@ -23,7 +23,7 @@ export const stepperState = shared(
 		const stepper = state({ step: 0, count: 3 });
 		return { ...stepper };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function StepperBackTrigger({ children }) @{

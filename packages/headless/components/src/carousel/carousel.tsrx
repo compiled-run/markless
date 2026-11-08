@@ -206,7 +206,7 @@ export const carouselState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CarouselRoot({

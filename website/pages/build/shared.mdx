@@ -37,7 +37,7 @@ Press play on either player, then turn one volume knob.
 
 <PlayerAnatomy />
 
-<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'page' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
+<Code steps={[{ label: 'Press Play. The click runs in NowPlaying, and MiniPlayer changes too.', shows: 'Playing: Harbour Lights' }, { label: "Change the track to `'Tide Pool'`. Both components show the new name.", source: "track: 'Tide Pool'" }, { label: "Try breaking it: change `{ scope: 'app' }` to `{ scope: 'everyone' }`, and read the error under the result.", source: "scope: 'everyone'" }]}>
 ```tsrx title="player.tsrx"
 import { shared, state } from '@markless/core';
 
@@ -54,7 +54,7 @@ export const player = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 function MiniPlayer() @{
@@ -83,14 +83,15 @@ export default function NowPlaying() @{
 
 The second argument is the *scope*: who shares one copy.
 
-<InkCards label="The four scopes" cards={[
-	{ icon: 'book', name: "'page'", line: 'Every component on the page shares one copy. This is the default.' },
-	{ icon: 'envelope', name: "'request'", line: "One copy per request on the server; the same as 'page' in the browser." },
+<InkCards label="The three scopes" cards={[
+	{ icon: 'book', name: "'app'", line: 'The whole app shares one copy: a fresh one for each request on the server, and one per browser tab. This is the default.' },
 	{ icon: 'parcel', name: "'container'", line: 'One copy per Markless app on the page, not shared with the others.' },
-	{ icon: 'puzzle', name: "'widget'", line: 'One copy per rendered widget, like each player or each menu.' },
+	{ icon: 'puzzle', name: "'subtree'", line: 'One copy per rendered subtree, like each player or each menu.' },
 ]} />
 
-The scope is one of these four words, and the player above shows what happens with any other. A widget is the first component that calls the definition, plus everything inside it. The volume knobs above are `'widget'`, and so are the [UI components](/ui), so two menus open and close on their own.
+The scope is one of these three words, and the player above shows what happens with any other. Leave the option out and you get `'app'`.
+
+A *subtree* is the first component that calls the definition, plus everything it renders inside itself. The volume knobs above are `'subtree'`, and so are the [UI components](/ui), so two menus open and close on their own.
 
 ## A copy lasts until a reload
 

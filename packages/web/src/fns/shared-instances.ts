@@ -286,7 +286,7 @@ function publish(
 }
 
 function liveDefinitions(state: ProtocolStatePayload): Definition[] {
-	return (state.sharedDefinitions ?? []).filter((definition) => definition.scope !== 'widget');
+	return (state.sharedDefinitions ?? []).filter((definition) => definition.scope !== 'subtree');
 }
 
 function instancesAt(

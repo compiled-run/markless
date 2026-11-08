@@ -22,7 +22,7 @@ export type ProtocolSharedInstances = {
 	dormant?: object[];
 };
 
-// Widget instances are per rendered widget; every other scope outlives the page.
+// Subtree instances are per rendered subtree root; every other scope outlives the page.
 export const hasLiveSharedDefinitions = (
 	state: { readonly sharedDefinitions?: ReadonlyArray<{ readonly scope?: string }> } | undefined,
-): boolean => !!state?.sharedDefinitions?.some((definition) => definition.scope !== 'widget');
+): boolean => !!state?.sharedDefinitions?.some((definition) => definition.scope !== 'subtree');

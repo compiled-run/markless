@@ -18,7 +18,7 @@ function rooting(name: string, definitionId: string): PrerenderDataDefinition {
 		state: {
 			cells: [{ graphNodeId: `${definitionId}/state:own` }],
 			computed: [],
-			sharedDefinitions: [{ id: definitionId, scope: 'widget' }],
+			sharedDefinitions: [{ id: definitionId, scope: 'subtree' }],
 		},
 		view: { domUpdates: [], events: [], behaviors: [], elementHandles: [] },
 		rootChunkId: `template:${name}`,

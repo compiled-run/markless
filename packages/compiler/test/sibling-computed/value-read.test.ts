@@ -22,7 +22,7 @@ export const box = shared(() => {
 	const banged = computed(() => loud + '!');
 	const asked = computed(() => banged + '?');
 	return { ...s, loud, banged, asked };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -79,7 +79,7 @@ export const dial = shared(() => {
 	const doubled = computed(() => cell.count * 2);
 	const capped = computed(() => Math.min(doubled, 6));
 	return { ...cell, doubled, capped };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Dial() @{
 	const d = dial();

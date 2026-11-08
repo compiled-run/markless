@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	PROTOCOL_EVENT_ACTION_KIND,
+	PROTOCOL_SHARED_SCOPES,
 	STORAGE_PROTOCOL_VERSION,
 	type ProtocolEventActionKind,
 	type ProtocolStatePayload,
@@ -958,18 +959,11 @@ function assertOptionalSharedDefinitions(record: Record<string, unknown>): void 
 
 function assertOptionalSharedScope(record: Record<string, unknown>, context: string): void {
 	if (record.scope === undefined) return;
-	if (
-		record.scope === 'widget' ||
-		record.scope === 'request' ||
-		record.scope === 'container' ||
-		record.scope === 'page'
-	) {
-		return;
-	}
+	if ((PROTOCOL_SHARED_SCOPES as ReadonlyArray<unknown>).includes(record.scope)) return;
 
 	throw invalidPayloadShapeError(
 		contextPayloadType(context),
-		`Invalid ${context}: expected scope widget, request, container, or page.`,
+		`Invalid ${context}: expected scope ${PROTOCOL_SHARED_SCOPES.join(', ')}.`,
 	);
 }
 

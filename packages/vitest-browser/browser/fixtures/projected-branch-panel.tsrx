@@ -14,7 +14,7 @@ export const panel = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Panel({ children }) @{

@@ -82,7 +82,7 @@ export const modal = shared(() => {
 	const s = state({ open: false, labelled: false, described: false });
 	const titleEl = element<HTMLHeadingElement>();
 	return { ...s, titleEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ open = false, children }) @{
 	const m = modal();

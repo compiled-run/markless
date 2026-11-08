@@ -38,7 +38,7 @@ export const ticker = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function TickerRoot({ onTick }) @{

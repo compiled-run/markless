@@ -734,6 +734,46 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 		"key": 28
 	},
 	{
+		"id": "scope",
+		"term": "scope",
+		"icon": "puzzle",
+		"sketch": "",
+		"parts": [
+			{
+				"prose": "Who shares one copy of a ",
+				"code": "shared()",
+				"key": 0
+			},
+			{
+				"prose": " value: ",
+				"code": "'app'",
+				"key": 1
+			},
+			{
+				"prose": " (the default, one for the whole app), ",
+				"code": "'container'",
+				"key": 2
+			},
+			{
+				"prose": " (one per Markless app on the page), or ",
+				"code": "'subtree'",
+				"key": 3
+			},
+			{
+				"prose": " (one per rendered component and what it holds).",
+				"code": "",
+				"key": 4
+			}
+		],
+		"usedIn": [
+			{
+				"href": "/build/shared",
+				"title": "Shared"
+			}
+		],
+		"key": 29
+	},
+	{
 		"id": "server-render",
 		"term": "server render",
 		"icon": "database",
@@ -760,7 +800,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Resuming"
 			}
 		],
-		"key": 29
+		"key": 30
 	},
 	{
 		"id": "shared",
@@ -785,7 +825,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Shared"
 			}
 		],
-		"key": 30
+		"key": 31
 	},
 	{
 		"id": "slug",
@@ -809,7 +849,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Links"
 			}
 		],
-		"key": 31
+		"key": 32
 	},
 	{
 		"id": "state",
@@ -843,7 +883,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "The state graph"
 			}
 		],
-		"key": 32
+		"key": 33
 	},
 	{
 		"id": "state-graph",
@@ -863,7 +903,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "The state graph"
 			}
 		],
-		"key": 33
+		"key": 34
 	},
 	{
 		"id": "storage",
@@ -893,7 +933,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Storage"
 			}
 		],
-		"key": 34
+		"key": 35
 	},
 	{
 		"id": "stream",
@@ -913,7 +953,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Pages"
 			}
 		],
-		"key": 35
+		"key": 36
 	},
 	{
 		"id": "streamed-render",
@@ -947,7 +987,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "The payload"
 			}
 		],
-		"key": 36
+		"key": 37
 	},
 	{
 		"id": "symbol",
@@ -971,7 +1011,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Lazy chunks"
 			}
 		],
-		"key": 37
+		"key": 38
 	},
 	{
 		"id": "test-render",
@@ -996,7 +1036,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Testing"
 			}
 		],
-		"key": 38
+		"key": 39
 	},
 	{
 		"id": "ts91001",
@@ -1021,7 +1061,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Dev setup"
 			}
 		],
-		"key": 39
+		"key": 40
 	},
 	{
 		"id": "tsrx",
@@ -1060,7 +1100,7 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Editor setup"
 			}
 		],
-		"key": 40
+		"key": 41
 	},
 	{
 		"id": "values",
@@ -1080,9 +1120,9 @@ export const ENTRIES: readonly GlossaryEntry[] = [
 				"title": "Reading a .tsrx file"
 			}
 		],
-		"key": 41
+		"key": 42
 	}
 ];
 
 /** The A to Z rail: each letter and the card it jumps to, or empty when no word starts with it. */
-export const LETTERS: readonly { readonly letter: string; readonly to: string }[] = [{"letter": "A", "to": "analyzer"}, {"letter": "B", "to": "browser-only"}, {"letter": "C", "to": "chunk"}, {"letter": "D", "to": "diagnostic"}, {"letter": "E", "to": "element-handle"}, {"letter": "F", "to": "fallback-runtime"}, {"letter": "G", "to": ""}, {"letter": "H", "to": ""}, {"letter": "I", "to": "instructions"}, {"letter": "J", "to": ""}, {"letter": "K", "to": "key"}, {"letter": "L", "to": ""}, {"letter": "M", "to": "markless-allow"}, {"letter": "N", "to": "native-host"}, {"letter": "O", "to": ""}, {"letter": "P", "to": "packing"}, {"letter": "Q", "to": ""}, {"letter": "R", "to": "resume"}, {"letter": "S", "to": "server-render"}, {"letter": "T", "to": "test-render"}, {"letter": "U", "to": ""}, {"letter": "V", "to": "values"}, {"letter": "W", "to": ""}, {"letter": "X", "to": ""}, {"letter": "Y", "to": ""}, {"letter": "Z", "to": ""}];
+export const LETTERS: readonly { readonly letter: string; readonly to: string }[] = [{"letter": "A", "to": "analyzer"}, {"letter": "B", "to": "browser-only"}, {"letter": "C", "to": "chunk"}, {"letter": "D", "to": "diagnostic"}, {"letter": "E", "to": "element-handle"}, {"letter": "F", "to": "fallback-runtime"}, {"letter": "G", "to": ""}, {"letter": "H", "to": ""}, {"letter": "I", "to": "instructions"}, {"letter": "J", "to": ""}, {"letter": "K", "to": "key"}, {"letter": "L", "to": ""}, {"letter": "M", "to": "markless-allow"}, {"letter": "N", "to": "native-host"}, {"letter": "O", "to": ""}, {"letter": "P", "to": "packing"}, {"letter": "Q", "to": ""}, {"letter": "R", "to": "resume"}, {"letter": "S", "to": "scope"}, {"letter": "T", "to": "test-render"}, {"letter": "U", "to": ""}, {"letter": "V", "to": "values"}, {"letter": "W", "to": ""}, {"letter": "X", "to": ""}, {"letter": "Y", "to": ""}, {"letter": "Z", "to": ""}];

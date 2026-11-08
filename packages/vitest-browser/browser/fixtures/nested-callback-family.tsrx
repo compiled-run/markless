@@ -19,7 +19,7 @@ export const nkf = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NkfRoot({ label = '', children }) @{

@@ -1,8 +1,8 @@
 import { shared, state } from '@markless/core';
 
-// Page scope is the opposite of the accordion's widget scope: ONE cell for the
+// App scope is the opposite of the accordion's subtree scope: ONE cell for the
 // whole page no matter how many islands read it. Two islands of this module are
-// what proves island discrimination left page-scoped sharing alone.
+// what proves island discrimination left app-scoped sharing alone.
 export const pageCounter = shared(
 	() => {
 		const data = state({ count: 0 });
@@ -13,7 +13,7 @@ export const pageCounter = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export default function PageScopedCounter() @{

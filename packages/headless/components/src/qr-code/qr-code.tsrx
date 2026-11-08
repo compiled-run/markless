@@ -22,7 +22,7 @@ export const qrCodeState = shared(
 			path: computed(() => qrPath(qr.value, qr.recovery)),
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function QrCodeRoot({ value, recovery = 'medium', children, ...rest }: QrCodeRootProps) @{

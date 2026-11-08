@@ -1,6 +1,6 @@
-import * as tally from './tally-page.tsrx';
+import * as tally from './tally-app.tsrx';
 
-export default function TalliesPage() @{
+export default function TalliesApp() @{
 	<section>
 		<tally.Tally label="Left"><tally.Badge /></tally.Tally>
 		<tally.Tally label="Right"><tally.Badge /></tally.Tally>

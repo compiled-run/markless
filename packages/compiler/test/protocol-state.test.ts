@@ -22,7 +22,7 @@ export const session = shared(() => {
 			data.status = 'anonymous';
 		},
 	};
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Header() @{
 	const currentSession = session();
@@ -49,7 +49,7 @@ test('createProtocolStatePayloadFromArena serializes shared definition metadata'
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			version: 0,
 			graphNodeIds: [
 				'shared:src/session.tsrx#session/state:data',

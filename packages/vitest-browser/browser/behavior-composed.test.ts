@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import App from './fixtures/behavior-composed.tsrx';
 
-// The composition-shaped sibling of `behavior-page-scope.test.ts`. CSR
+// The composition-shaped sibling of `behavior-app-scope.test.ts`. CSR
 // activates authored behaviors BEFORE it demand-loads the runtime graph, so a
 // behavior on a child component's element reaches its symbol through a
 // graph-less activation context. Nothing about that pass may cost the child its

@@ -148,7 +148,7 @@ export const ratingState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RatingRoot({
