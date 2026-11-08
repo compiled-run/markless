@@ -134,7 +134,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 
 			.nav-shade:has([ui-open])::before {
 				opacity: 1;
-				transition: none;
+				transition: opacity 140ms ease-out;
 			}
 
 			.nav-pill {
@@ -287,7 +287,9 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				translate: -50% 0;
 			}
 
-			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. Opening and switching are instant; only closing fades. */
+			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. Every panel is
+			   the same size, so a switch has no size to morph. Opening shows the box and panel on the first frame, already
+			   at 0.4, and settles them in 140ms; a switch crossfades the cards in 120ms; closing fades out. */
 			.nav-box {
 				z-index: 59;
 				display: none;
@@ -302,7 +304,14 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 			.nav-pill[ui-open] .nav-box {
 				display: block;
 				opacity: 1;
-				transition: none;
+				transition:
+					opacity 140ms ease-out,
+					translate 140ms ease-out;
+
+				@starting-style {
+					opacity: 0.4;
+					translate: -50% -5px;
+				}
 			}
 
 			.nav-panel {
@@ -314,6 +323,14 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				padding: 1rem;
 				overflow: clip;
 				opacity: 1;
+				transition:
+					opacity 140ms ease-out,
+					translate 140ms ease-out;
+
+				@starting-style {
+					opacity: 0.4;
+					translate: -50% -5px;
+				}
 			}
 
 			.nav-panel[hidden] {
@@ -324,13 +341,33 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 					display 150ms allow-discrete;
 			}
 
+			/* Switching: the outgoing cards fade out over the incoming ones, which drift in a few pixels from their side. */
+			.nav-panel[ui-from='end'] {
+				@starting-style {
+					opacity: 0.4;
+					translate: calc(-50% + 10px) 0;
+				}
+			}
+
+			.nav-panel[ui-from='start'] {
+				@starting-style {
+					opacity: 0.4;
+					translate: calc(-50% - 10px) 0;
+				}
+			}
+
 			.nav-panel[hidden][ui-to] {
-				transition: none;
+				transition:
+					opacity 120ms ease-out,
+					display 120ms allow-discrete;
 			}
 
 			@media (prefers-reduced-motion: reduce) {
 				.nav-box,
-				.nav-panel[hidden] {
+				.nav-pill[ui-open] .nav-box,
+				.nav-panel,
+				.nav-panel[hidden],
+				.nav-panel[hidden][ui-to] {
 					transition: none;
 				}
 			}
