@@ -4,8 +4,7 @@ import Depth1 from './depth-1.tsrx';
 import Depth2 from './depth-2.tsrx';
 import Depth3 from './depth-3.tsrx';
 
-// A row a keyed @for builds inside a component that was itself built in the browser keeps its prop, its row item and
-// its own state in its click handlers.
+// A keyed row inside a browser-built component keeps its prop, item and state in its click handlers.
 afterEach(() => cleanup());
 
 const text = (selector: string) => document.querySelector(selector)?.textContent ?? null;

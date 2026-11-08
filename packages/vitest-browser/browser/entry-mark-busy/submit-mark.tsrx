@@ -4,7 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// submit-quiet-design.md Q1 option 1: `await save(); reload++` marks the balance busy from the click.
+// `await save(); reload++` marks the balance busy from the click.
 export function SubmitMark() @{
 	let reload = state(0);
 	const balance = computed(async () => {

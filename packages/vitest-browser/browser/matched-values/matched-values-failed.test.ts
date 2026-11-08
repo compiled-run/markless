@@ -6,10 +6,7 @@ import { FailCatch } from './failcatch.tsrx';
 import { Revenue } from './revenue.tsrx';
 import { Share } from './share.tsrx';
 
-// A failed refresh keeps the pin a reader needs to read it (a value that would mix never
-// falls back to the live, torn figure), and a source that outran a failed sibling still
-// serves the kept answer it was fetched with. Maieul's errors UC16/UC18/UC20, plus the
-// two-source disagreement UC16/UC20 and its Share handler, each under CSR and SSR.
+// A failed refresh keeps the pin its reader needs, and a source that outran a failed sibling serves its kept answer, under CSR and SSR.
 afterEach(() => {
 	reset();
 	cleanup();
@@ -38,8 +35,7 @@ const click = (container: HTMLElement, selector: string) =>
 	container.querySelector<HTMLElement>(selector)!.click();
 const settle = () => new Promise((resolve) => setTimeout(resolve, 60));
 
-// Every distinct (perDay, profit) pair the browser could paint, sampled on every mutation and
-// before every frame, the way async-catch-recovery-paint samples a label and its rows.
+// Every distinct (perDay, profit) pair the browser could paint, sampled on every mutation and before every frame.
 function paintedPairs(container: HTMLElement): () => string[] {
 	const read = () => `${text(container, '[data-per-day]')}|${text(container, '[data-profit]')}`;
 	const seen = [read()];
@@ -62,7 +58,7 @@ function paintedPairs(container: HTMLElement): () => string[] {
 }
 
 each(
-	'Errors UC16: a failed refresh keeps the pin, not the live mixed figure',
+	'a failed refresh keeps the pin, not the live mixed figure',
 	{ csr: () => render(Revenue), ssr: () => renderSSR(Revenue) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
@@ -75,7 +71,7 @@ each(
 		await settle();
 		fail('revenue:20d', 'offline');
 		await settle();
-		// What UC16 rejects: 10,000 / 20 = 500 and 10,000 - 10,000 = 0, figures no range produced.
+		// The torn figures this rules out: 10,000 / 20 = 500 and 10,000 - 10,000 = 0, figures no range produced.
 		expect(text(container, '[data-per-day]')).toBe('1000');
 		expect(text(container, '[data-profit]')).toBe('5000');
 		expect(text(container, '[data-inline]')).toBe('1000');
@@ -89,7 +85,7 @@ each(
 );
 
 each(
-	'Errors UC18: a re-ask after a failure lands from the pinned pair, never a wipe or a torn figure',
+	'a re-ask after a failure lands from the pinned pair, never a wipe or a torn figure',
 	{ csr: () => render(Revenue), ssr: () => renderSSR(Revenue) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
@@ -117,7 +113,7 @@ each(
 );
 
 each(
-	'UC16/UC20 disagreement: a source that outran a failed sibling still serves its kept answer, and an unrelated switch applies at once',
+	'two sources disagree: a source that outran a failed sibling still serves its kept answer, and an unrelated switch applies at once',
 	{ csr: () => render(Disagreement), ssr: () => renderSSR(Disagreement) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
@@ -151,7 +147,7 @@ each(
 );
 
 each(
-	'UC16/UC20 disagreement, both land: the common range releases once every source has answered it',
+	'two sources disagree, both land: the common range releases once every source has answered it',
 	{ csr: () => render(Disagreement), ssr: () => renderSSR(Disagreement) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
@@ -166,7 +162,7 @@ each(
 );
 
 each(
-	'Errors UC22: a catch-all cannot swallow a failed input',
+	'a catch-all cannot swallow a failed input',
 	{ csr: () => render(FailCatch), ssr: () => renderSSR(FailCatch) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-heading]'), { timeout: 5_000 }).toBe('12 past orders in A');
@@ -185,7 +181,7 @@ each(
 );
 
 each(
-	'UC29/Share, failed: a handler acts on the pair the screen shows, including under a failed refresh',
+	'a handler acts on the pair the screen shows, including under a failed refresh',
 	{ csr: () => render(Share), ssr: () => renderSSR(Share) },
 	async (container) => {
 		await expect.poll(() => text(container, '[data-figure]'), { timeout: 5_000 }).toBe('1000');

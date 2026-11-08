@@ -173,10 +173,7 @@ export function collectTsrxAuthorWarnings(
 
 export type TsrxRefreshHover = { readonly start: number; readonly end: number; readonly text: string };
 
-/**
- * Editor hovers saying what a refresh does: one on each `@try` keyword and one on each
- * read of an async value, from the same compiler facts the runtime's busy marks follow.
- */
+/** Editor hovers on each `@try` and async read saying what a refresh does, from the facts the runtime's busy marks follow. */
 export function collectTsrxRefreshHovers(
 	source: string,
 	filename = 'module.tsrx',

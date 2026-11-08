@@ -6,11 +6,7 @@ import { WrapperImported } from './wrapper-imported.tsrx';
 import { WrapperSameFile } from './wrapper-same-file.tsrx';
 import { WrapperSpread } from './wrapper-spread.tsrx';
 
-// W37 wraps only a native element's own event-handler module as a user action; W38 made entry
-// marks (the early busy mark) reach a handler forwarded through a component prop, but did not
-// make those same handlers count as a user action. A save made through a wrapper Button must be
-// loud the same way a save made directly on a native button is: marked busy AND announced
-// ("Updating…"/"Updated"), not just marked.
+// A save through a wrapper Button is loud like one on a native button: marked busy and announced, not just marked.
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -63,9 +59,7 @@ async function loudWrapperSaveScenario(screen: Screen): Promise<void> {
 	await expect.poll(() => text(container, '[data-balance]'), poll).toBe('101');
 	await expect.poll(() => busy(container, '[data-balance]'), poll).toBe(false);
 	await expect.poll(() => document.querySelector(REGION)?.textContent, poll).toBe('Updated');
-	// The recipe's own delay (10ms) lands well inside the pending-settle deadline, so "Updating…"
-	// never gets a chance to show (same shape as quiet-refresh.test.ts's fast cases); a quiet
-	// refresh would announce nothing at all, so landing on "Updated" is still the loud signal.
+	// The 10ms recipe lands before "Updating…" can show; a quiet refresh announces nothing, so "Updated" is the loud signal.
 	expect(said(), 'a save forwarded through a wrapper component still announces its settle').toEqual([
 		'Updated',
 	]);

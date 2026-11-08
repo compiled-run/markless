@@ -5,11 +5,7 @@ type ResetGraph = {
 	readonly marklessQualifyGraphNodeId?: (graphNodeId: string) => string;
 };
 
-/**
- * `reset` from `@catch (error, reset)`: re-runs the failed async values its block reads. Each entry
- * is a value followed by the async values it reads, upstream first, so a re-run input takes the
- * place of the values waiting on it.
- */
+/** `reset` from `@catch (error, reset)`: re-runs the block's failed async values, each followed by the values it reads. */
 export function marklessCatchReset(
 	graph: ResetGraph | undefined,
 	resets: ReadonlyArray<ReadonlyArray<string>>,

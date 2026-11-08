@@ -5,10 +5,7 @@ import { FailingPoll } from './failing-poll.tsrx';
 import { PollAndButton } from './poll-and-button.tsrx';
 import { Socket } from './socket.tsrx';
 
-// A refresh a write outside an event handler causes — a timer, a socket message, a promise
-// continuation no handler started — is quiet: no busy mark, no announcement, but it still
-// updates in place, and a failure still keeps the kept content with @catch right after it
-// (goals/async-error-states/submit-quiet-design.md Q2).
+// A refresh caused outside an event handler is quiet (no busy mark, no announcement) but still updates, and fails with @catch after kept content.
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -35,8 +32,7 @@ function click(container: ParentNode, selector: string): void {
 	button.click();
 }
 
-// Samples a selector's busy state every frame over a window, so a one-frame flicker a plain
-// before/after check would miss is caught too.
+// Samples busy state every frame, so a one-frame flicker is caught too.
 function sampleBusy(container: ParentNode, selector: string) {
 	const seen: boolean[] = [];
 	let running = true;
@@ -126,9 +122,7 @@ async function socketScenario(screen: Screen) {
 	const sawBusy = sampleBusy(container, '[data-feed]');
 	const said = listen();
 	click(container, '[data-connect]');
-	// The handler loads its compiled module asynchronously; wait for that one-off load before
-	// dispatching once. Dispatching on every poll retry would restart the fetch each time and
-	// it would never land.
+	// Wait for the handler's one-off module load, then dispatch once: re-dispatching would restart the fetch forever.
 	await wait(150);
 	dispatch();
 	await expect.poll(() => text(container, '[data-feed]'), poll).toBe('live-1');
@@ -153,9 +147,7 @@ async function awaitedHandlerScenario(screen: Screen) {
 
 	const said = listen();
 	click(container, '[data-save]');
-	// The write happens only after the handler's own 20ms `await`, so the busy mark (and the
-	// refresh it guards) only starts then — still loud, because the write is still inside the
-	// click handler's own turn.
+	// The write comes after the handler's 20ms `await`, so the mark starts then, still loud inside the click's turn.
 	await expect.poll(() => busy(container, '[data-total]'), poll).toBe(true);
 	expect(text(container, '[data-total]')).toBe('100');
 	await expect.poll(() => text(container, '[data-total]'), poll).toBe('101');
@@ -186,8 +178,7 @@ async function failingPollScenario(screen: Screen) {
 	await expect.poll(() => numberOf(container, '[data-orders]'), poll).toBeGreaterThanOrEqual(102);
 	await wait(60);
 	expect(sawBusy(), 'a quiet poll never sets aria-busy, even when it fails').not.toContain(true);
-	// Recommendation: announce a quiet refresh's failure always, even though nothing was said
-	// while it was pending.
+	// A quiet refresh's failure is always announced, though nothing was said while pending.
 	await expect.poll(() => document.querySelector(REGION)?.textContent, poll).toBe('Update failed');
 	expect(said(), 'the failure is announced on its own').toEqual(['Update failed']);
 }

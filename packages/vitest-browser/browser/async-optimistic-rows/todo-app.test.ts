@@ -16,10 +16,7 @@ function submit(container: HTMLElement, title: string) {
 }
 
 test('CSR: a draft shows immediately, then swaps in place to the confirmed row', async () => {
-	// Generous delay: the row's id is only known after submit, so the save
-	// behavior is pre-registered by title; a wide delay also absorbs this
-	// file's first-interaction module warm-up cost, so the optimistic frame
-	// is reliably observable instead of racing it.
+	// A wide delay keeps the optimistic frame observable past this file's first-interaction module load.
 	configureSave('Buy milk', { delayMs: 300 });
 	const screen = await render(TodoApp);
 	const container = screen.container as HTMLElement;
@@ -134,11 +131,7 @@ test('CSR: a parent reload never shows a saved item twice (dedup by client id)',
 });
 
 test('CSR: editing an existing item (toggle done) uses the busy-hold rule, not the optimistic-draft rule', async () => {
-	// Finding: toggling an EXISTING confirmed row is a re-settle of settled
-	// content (spec D8), not a first run, so the framework holds the old
-	// content busy instead of showing the row's own @pending arm — the
-	// @pending text never appears below the 5s stall threshold. The optimistic
-	// pattern in the prompt only applies as written to brand-new rows.
+	// Toggling a confirmed row re-settles settled content (spec D8), so it holds busy and never shows the row's @pending.
 	configureSave('seed-1', { delayMs: 150 });
 	const screen = await render(TodoApp);
 	const container = screen.container as HTMLElement;
@@ -160,7 +153,7 @@ test('CSR: editing an existing item (toggle done) uses the busy-hold rule, not t
 	expect(toggleCalls('seed-1')).toHaveLength(1);
 });
 
-test('UC7: no aria-busy anywhere during a draft\'s optimistic window (a first run is not a refresh)', async () => {
+test('no aria-busy anywhere during a draft\'s optimistic window (a first run is not a refresh)', async () => {
 	configureSave('Watched add', { delayMs: 150 });
 	const screen = await render(TodoApp);
 	const container = screen.container as HTMLElement;

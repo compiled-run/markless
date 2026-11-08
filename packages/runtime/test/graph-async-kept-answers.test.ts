@@ -103,8 +103,7 @@ test('a long-pinned reader keeps only the one answer it reads, across 200 unrela
 	await tick();
 	expect(graph.read('computed:profit')).toBe(5000);
 
-	// revenue moves to 20d and never lands again; costs moves to 20d too (same shared input) and
-	// keeps churning on an unrelated input (filter) after that. Reading profit pins both at 10d.
+	// revenue and costs both move to 20d (costs keeps churning on filter); reading profit pins both at 10d.
 	graph.write({ graphNodeId: 'state:range', value: '20d' });
 	await graph.flush();
 	graph.read('computed:profit');

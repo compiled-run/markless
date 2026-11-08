@@ -1,5 +1,4 @@
-// Mock save/list API for the optimistic-row proof. Call counts and the
-// SSR-call count are read directly by tests; there is no network involved.
+// Mock save/list API; tests read its call counts directly, with no network involved.
 export type Draft = { id: string; title: string };
 export type Todo = { id: string; title: string; done: boolean };
 
@@ -41,11 +40,9 @@ function wait(ms: number) {
 
 export async function saveTodo(draft: Draft): Promise<Todo> {
 	saveLog.push({ id: draft.id, title: draft.title, at: seq++ });
-	// A real mutation would hit the network from the browser only; this
-	// counter is the proof that it never runs during server rendering.
+	// Proves the mutation never runs during server rendering.
 	if (typeof window === 'undefined') ssrSaveCalls += 1;
-	// The id is only known after submit; configureSave by title lets a test set
-	// behavior before a draft's id exists. id wins if both are set.
+	// A draft's id is only known after submit, so behaviour can be set by title; id wins if both are set.
 	const behavior = behaviors.get(draft.id) ?? behaviors.get(draft.title) ?? { delayMs: 10, fail: false };
 	await wait(behavior.delayMs);
 	if (behavior.fail) throw new Error(`save failed: ${draft.title}`);

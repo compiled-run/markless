@@ -95,11 +95,7 @@ function peek(node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>): unkn
 		: readPath((node.snapshot as { readonly value?: unknown }).value, path);
 }
 
-/**
- * Async computeds as an installable plane, holding only what a page with settled values reads.
- * `refresh` answers the refresh half, or a promise of it: calls made while it loads wait and run in order,
- * each with the user-action state it was made in.
- */
+/** Async computeds as a plane; `refresh` answers the refresh half or its promise, and calls made while it loads run in order. */
 export function createAsyncPlane(
 	internals: AsyncComputedPlaneInternals,
 	asyncComputed: ReadonlyArray<RuntimeGraphAsyncComputed> | undefined,

@@ -1,8 +1,6 @@
 import { computed, state } from '@markless/core';
 
-// A page @if whose arm holds a same-file component with an async value of its own,
-// wrapped in a fragment with a sibling and handed a callback, like a converted edit form;
-// the @if sits in a child of the page, so the arm's instance ids carry that child's prefix.
+// An @if arm holding a same-file async child in a fragment with a callback, inside a child of the page, like a converted edit form.
 async function loadTodo(id: number) {
 	await new Promise((resolve) => setTimeout(resolve, 5));
 	return { name: `todo-${id}` };

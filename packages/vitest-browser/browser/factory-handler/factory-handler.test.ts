@@ -4,8 +4,7 @@ import { Tally } from './tally.tsrx';
 
 afterEach(() => cleanup());
 
-// A factory that only returns a function keeps nothing between calls, so the browser rebuilding
-// it on every event is sound; a factory that keeps state fails the build instead.
+// A function-only factory is safely rebuilt on every event; a stateful one fails the build.
 test.each([
 	['CSR', () => render(Tally)],
 	['SSR', () => renderSSR(Tally)],

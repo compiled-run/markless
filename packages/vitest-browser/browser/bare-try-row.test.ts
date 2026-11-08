@@ -2,8 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import BareTryRowPage from './bare-try-row/page.tsrx';
 
-// A keyed row whose component is a bare @try renders between row comments, so reordering, inserting, removing
-// and re-keying it works, and an arm swap inside the row (settling, failing, recovering) never loses it.
+// A keyed row whose component is a bare @try lives between row comments and survives reorders and arm swaps.
 afterEach(() => cleanup());
 
 const WAIT = { timeout: 2000, interval: 10 };

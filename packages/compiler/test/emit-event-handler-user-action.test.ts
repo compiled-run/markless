@@ -1,9 +1,4 @@
-/**
- * The dispatcher (`resume-events.ts`) decides whether a handler body runs as a user action, in one
- * place for every DOM event and every call that event makes, so no event-handler or callback-prop
- * module carries a user-action wrap of its own: a handler that never writes an async input pays
- * nothing for it.
- */
+// The dispatcher alone decides whether a handler runs as a user action, so no handler module carries a wrap of its own.
 import { expect, test } from 'vitest';
 import type { GeneratedSymbolModule, PlannedSymbol } from '../src/artifacts.ts';
 import { compileTsrxModule } from '../src/compile-module.ts';

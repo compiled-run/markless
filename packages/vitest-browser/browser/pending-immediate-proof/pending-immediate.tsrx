@@ -1,9 +1,7 @@
 import { computed, state } from '@markless/core';
 import { wait } from './latency-api.ts';
 
-// The top-level Slow is a first client-rendered mount; each row added by the
-// button is a newly created row — both are "nothing on screen for that spot"
-// cases, never a refresh of settled content.
+// A first client mount and newly added rows: both have nothing on screen yet, never a refresh of settled content.
 function Slow() @{
 	const value = computed(async () => {
 		await wait();

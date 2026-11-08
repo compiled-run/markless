@@ -47,11 +47,7 @@ export type SymbolSourceSemantics = {
 	 * passes, spreads, writes or indexes it dynamically.
 	 */
 	staticMemberKeys(name: string): ReadonlySet<string> | null;
-	/**
-	 * The source with every function nested inside the outermost one blanked out: what runs on the
-	 * source's own turn, not on whichever turn a callee later invokes a nested callback. Absent when
-	 * the source is not itself a function or could not be analyzed.
-	 */
+	/** The source with nested functions blanked out: what runs on its own turn. Absent when the source is not an analyzable function. */
 	readonly ownTurnSource?: string;
 };
 

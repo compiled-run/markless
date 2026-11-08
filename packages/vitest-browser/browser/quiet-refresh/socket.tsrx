@@ -4,9 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// submit-quiet-design.md Q2: a socket-style message callback is not an event handler, so the
-// write it makes stays quiet, same as a poll. Connecting happens inside a click, but that
-// click's own turn ends long before any later message arrives.
+// A socket message callback is not an event handler, so its write stays quiet like a poll's.
 export function Socket() @{
 	let tick = state(0);
 	const feed = computed(async () => {

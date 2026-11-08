@@ -7,14 +7,7 @@ import type {
 import type { ConstructReachInput } from './construct-reach.ts';
 import { VOID_TAG_NAMES } from './semantic-graph/collect-markup.ts';
 
-/**
- * Whether what a chunk renders at its top level is exactly one element.
- *
- * A keyed row that is not - a fragment, text, a bare @try, a child component
- * whose own template is not - is tracked by the browser between a pair of row
- * comments instead of as one element. A top-level @if or @switch counts as one
- * element when each of its arms does: the row element is then the arm's.
- */
+/** Whether a chunk's top level is exactly one element; an @if or @switch counts when each arm is. Other rows live between row comments. */
 export function chunkRootIsOneElement(
 	input: Pick<ConstructReachInput, 'chunks' | 'componentEdges' | 'importedModuleInterfaces'>,
 	chunkId: string,
@@ -84,12 +77,7 @@ function topLevelUnits(chunk: SemanticMarkupChunk): Array<'element' | 'text' | S
 	return units;
 }
 
-/**
- * Why the browser cannot yet track this repeat's rows between row comments, or
- * null when it can, phrased to follow "this list". Each reason names a part of
- * the row that is still found by counting elements, so a row holding one keeps
- * the one-element rule.
- */
+/** Why the browser cannot yet track this repeat's rows between row comments (phrased to follow "this list"), or null when it can. */
 export function rowRangeRefusal(
 	graph: Pick<
 		SemanticGraphArtifact,

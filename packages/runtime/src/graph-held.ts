@@ -218,8 +218,7 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		if (node.snapshot.key == null) node.servedKey = { key: node.key(peek) };
 	};
 
-	// `true` when two input lists share an input and agree on all they share, `false` when they
-	// differ on one, `undefined` when they share none.
+	// `true` when two input lists share an input and agree on it, `false` when they differ, `undefined` when they share none.
 	const agreement = (
 		left: ReadonlyArray<RuntimeAsyncInput>,
 		right: ReadonlyArray<RuntimeAsyncInput>,

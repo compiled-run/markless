@@ -1,8 +1,7 @@
 import { expect, test, vi } from 'vitest';
 import * as busyMarks from '../src/fns/async-plane.ts';
 
-// The per-element marks load with the first refresh; calls made while they load run in order once they arrive.
-// The last read to settle clears with its settle commit, which the wiring signals with set(boundary, false).
+// Marks load with the first refresh, and calls made meanwhile run in order once they arrive.
 function block() {
 	const marked = new Set<string>();
 	const host = (name: string) => ({

@@ -478,8 +478,7 @@ export function planPrerenderTriggerGroups(input: {
 	);
 }
 
-// Graph cells a settled arm reads: the arm's own records, the page records bound to its
-// hosts, and the props it forwards to child components rendered inside it.
+// Graph cells a settled arm reads: its own records, page records bound to its hosts, and props it forwards to children inside it.
 function settledArmReadGraphNodeIds(
 	input: { readonly componentEdges?: ReadonlyArray<SemanticComponentEdge> },
 	completeView: ProtocolViewPayload,

@@ -11,9 +11,7 @@ import ArmTextTwo from './async-playground/arm-text-two.tsrx';
 import ArmTextThree from './async-playground/arm-text-three.tsrx';
 import { userEvent } from 'vitest/browser';
 
-// The converted TanStack Query playground's shapes: an @if arm holding a component with a sync computed over
-// its own state, rows whose @try settles by re-rendering the page, and a @try arm of bare text beside a sibling,
-// at one to three components deep.
+// The converted TanStack Query playground's shapes, at one to three components deep.
 
 function click(container: HTMLElement, selector: string) {
 	const element = container.querySelector<HTMLElement>(selector);

@@ -65,11 +65,7 @@ export function resolveBoundaryRunners(
 	);
 }
 
-/**
- * A @try whose settled content reads several async values, directly or through
- * sync computeds, settles on one minted sync computed over all of them, so
- * every reader of the boundary gates on the complete async closure.
- */
+/** A @try reading several async values settles on one minted sync computed over all of them, so every reader gates on the whole set. */
 export function mintAsyncBoundaryGates(
 	semanticGraph: Omit<SemanticGraphArtifact, 'graphBindings' | 'asyncBoundaries'> & {
 		graphBindings: SemanticGraphBinding[];

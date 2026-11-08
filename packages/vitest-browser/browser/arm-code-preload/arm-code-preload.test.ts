@@ -10,8 +10,7 @@ afterEach(() => {
 
 const poll = { timeout: 5_000, interval: 5 };
 
-// A CSR mount shows @pending while the data loads; the settled arm's code must be fetched in that
-// window, not after the data arrives, so the two load side by side instead of one after the other.
+// The settled arm's code loads while the CSR mount shows @pending, side by side with the data, not after it.
 test('CSR: a waiting @try starts loading its settled arm code before its data resolves', async () => {
 	const base = Report as unknown as { readonly loadSymbol: (symbolId: string) => unknown };
 	const requested: string[] = [];

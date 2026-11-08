@@ -1,10 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// Text written straight into a @try arm has no element of its own inside the arm: the
-// element around the @try also holds the boundary's markers and siblings, so the read
-// must not become a whole-element text write there. It writes its own text node, or,
-// where only the render knows that node's place, the arm re-renders.
+// Text straight in a @try arm writes its own text node (or re-renders the arm), never the shared enclosing element.
 
 const ARM_TEXT = `
 import { computed } from '@markless/core';

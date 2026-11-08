@@ -3,8 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import ImportedPageStateRows from './imported-page-state-rows.tsrx';
 import PageStateRows from './page-state-rows.tsrx';
 
-// Keyed rows in a @try whose child reads page state are built and kept by the browser on a refresh; a child
-// whose text has no binding is built again inside the row it stands in.
+// Keyed rows in a @try whose child reads page state are kept by the browser on refresh; an unbound child is rebuilt in its row.
 
 afterEach(cleanup);
 

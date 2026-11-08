@@ -6,8 +6,7 @@ import ImportedTimerPage from './imported-child-callback/imported-timer.tsrx';
 import ImportedTwoWrappersPage from './imported-child-callback/imported-two-wrappers.tsrx';
 import SameFilePage from './imported-child-callback/same-file.tsrx';
 
-// A callback prop handed to a component imported from another module runs when that component calls it,
-// even when the child's own module also forwards that prop under another name.
+// A callback prop handed to an imported child runs when it calls it, even when the child forwards it under another name.
 afterEach(() => cleanup());
 
 const count = (root: ParentNode) => root.querySelector('[data-count]')?.textContent;

@@ -4,10 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// submit-quiet-design.md Q2: the write a handler makes after its own `await` is still the
-// user's action, so the refresh it starts is loud, same as a write made before any `await`.
-// The fetch is slow enough (over the 250ms pending-settle deadline) to render "Updating…"
-// before it renders "Updated".
+// A write after the handler's own `await` is still the user's action, so its refresh is loud; the fetch outlasts the settle deadline.
 export function AwaitedHandler() @{
 	let reload = state(0);
 	const total = computed(async () => {

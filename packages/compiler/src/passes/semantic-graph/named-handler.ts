@@ -11,11 +11,7 @@ import type { WalkState } from './types.ts';
 /** Why a handler named by a body local has no browser route, and the rewrite that has one. */
 export type UnroutableHandler = { readonly why: string; readonly rewrite: string };
 
-/**
- * What a component-body local named as a handler holds: a function reached through
- * any `const` aliases, the visible function a factory call returns, or why neither is
- * knowable. Null for a name that is not a body local or holds some other value.
- */
+/** What a body-local handler name holds through `const` aliases or a factory's returned function; null for a non-local or non-function. */
 export type NamedHandler =
 	| { readonly kind: 'function'; readonly node: AnyNode }
 	| { readonly kind: 'factory'; readonly returned: AnyNode }

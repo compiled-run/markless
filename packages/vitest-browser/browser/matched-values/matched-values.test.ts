@@ -14,8 +14,7 @@ import { Stock } from './stock.tsrx';
 import { Stores } from './stores.tsrx';
 import { Tabs } from './tabs.tsrx';
 
-// While an async value refreshes, whatever reads it beside an input of its key reads that input as the
-// shown value was fetched with it, until the new value lands; inputs outside the key stay live.
+// While an async value refreshes, a reader sees its key inputs as the shown value was fetched; other inputs stay live.
 afterEach(() => {
 	reset();
 	cleanup();
@@ -60,7 +59,7 @@ function watch(container: HTMLElement, read: Record<string, () => string | null>
 	};
 }
 
-each('UC10: a figure never pairs the old total with the new range', { csr: () => render(Revenue), ssr: () => renderSSR(Revenue) }, async (container) => {
+each('a figure never pairs the old total with the new range', { csr: () => render(Revenue), ssr: () => renderSSR(Revenue) }, async (container) => {
 	await expect.poll(() => text(container, '[data-per-day]'), { timeout: 5_000 }).toBe('1000');
 	await expect.poll(() => text(container, '[data-profit]')).toBe('5000');
 	await expect.poll(() => text(container, '[data-inline]')).toBe('1000');
@@ -89,7 +88,7 @@ each('UC10: a figure never pairs the old total with the new range', { csr: () =>
 	expect(busy(container, '[data-inline]')).toBe(false);
 });
 
-each('UC11: a label beside a dependent fetch names the subject of its data', { csr: () => render(Stores), ssr: () => renderSSR(Stores) }, async (container) => {
+each('a label beside a dependent fetch names the subject of its data', { csr: () => render(Stores), ssr: () => renderSSR(Stores) }, async (container) => {
 	await expect.poll(() => text(container, '[data-heading]'), { timeout: 5_000 }).toBe('12 past orders in A');
 	hold('orders:B', 'past:b1:mug');
 	const stop = watch(container, { heading: () => text(container, '[data-heading]') });
@@ -103,7 +102,7 @@ each('UC11: a label beside a dependent fetch names the subject of its data', { c
 	expect(stop()).toEqual({ heading: ['12 past orders in A', '3 past orders in B'] });
 });
 
-each('UC12: a list row and a formatted child prop never pair old prices with the new currency', { csr: () => render(Prices), ssr: () => renderSSR(Prices) }, async (container) => {
+each('a list row and a formatted child prop never pair old prices with the new currency', { csr: () => render(Prices), ssr: () => renderSSR(Prices) }, async (container) => {
 	const rows = () => texts(container, '[data-text]');
 	const tags = () => texts(container, '[data-tag]');
 	await expect.poll(rows, { timeout: 5_000 }).toBe('10 EUR|4 EUR');
@@ -120,7 +119,7 @@ each('UC12: a list row and a formatted child prop never pair old prices with the
 	expect(stop()).toEqual({ rows: ['10 EUR|4 EUR', '11 USD|5 USD'], tags: ['10 EUR|4 EUR', '11 USD|5 USD'] });
 });
 
-each('UC14: the page catches up when the new answer equals the old', { csr: () => render(Stock), ssr: () => renderSSR(Stock) }, async (container) => {
+each('the page catches up when the new answer equals the old', { csr: () => render(Stock), ssr: () => renderSSR(Stock) }, async (container) => {
 	await expect.poll(() => text(container, '[data-line]'), { timeout: 5_000 }).toBe('Size M ships today');
 	hold('stock:L');
 	expect(busy(container, '[data-line]')).toBe(false);
@@ -133,7 +132,7 @@ each('UC14: the page catches up when the new answer equals the old', { csr: () =
 	expect(busy(container, '[data-line]'), 'the caught-up line is no longer dimmed').toBe(false);
 });
 
-each('UC16: a switch the refresh is not about applies at once, to a matched figure', { csr: () => render(Rates), ssr: () => renderSSR(Rates) }, async (container) => {
+each('a switch the refresh is not about applies at once, to a matched figure', { csr: () => render(Rates), ssr: () => renderSSR(Rates) }, async (container) => {
 	await expect.poll(() => text(container, '[data-daily]'), { timeout: 5_000 }).toBe('1000');
 	hold('sales:long');
 	const stop = watch(container, { daily: () => text(container, '[data-daily]') });
@@ -147,7 +146,7 @@ each('UC16: a switch the refresh is not about applies at once, to a matched figu
 	expect(stop()).toEqual({ daily: ['1000', '1100', '1650'] });
 });
 
-each('UC16′: the same switch reaches a value computed by a fetch, asked with the shown inputs', { csr: () => render(Convert), ssr: () => renderSSR(Convert) }, async (container) => {
+each('the same switch reaches a value computed by a fetch, asked with the shown inputs', { csr: () => render(Convert), ssr: () => renderSSR(Convert) }, async (container) => {
 	await expect.poll(() => text(container, '[data-converted]'), { timeout: 5_000 }).toBe('€1000');
 	hold('income:1m');
 	asked.length = 0;
@@ -163,7 +162,7 @@ each('UC16′: the same switch reaches a value computed by a fetch, asked with t
 	expect(stop()).toEqual({ converted: ['€1000', '$1100', '$1650'] });
 });
 
-each('UC17: a slow refresh does not block a computation over an input its fetch did not read', { csr: () => render(Groups), ssr: () => renderSSR(Groups) }, async (container) => {
+each('a slow refresh does not block a computation over an input its fetch did not read', { csr: () => render(Groups), ssr: () => renderSSR(Groups) }, async (container) => {
 	await expect.poll(() => text(container, '[data-shown]'), { timeout: 5_000 }).toBe('s1 l1 s2');
 	hold('rows:2');
 	click(container, '[data-next]');
@@ -174,7 +173,7 @@ each('UC17: a slow refresh does not block a computation over an input its fetch 
 	await expect.poll(() => text(container, '[data-shown]'), { timeout: 5_000 }).toBe('');
 });
 
-each('UC20, UC21, UC25: the clicked control moves at once, two clicks count as two, a sync value never waits', { csr: () => render(Tabs), ssr: () => renderSSR(Tabs) }, async (container) => {
+each('the clicked control moves at once, two clicks count as two, a sync value never waits', { csr: () => render(Tabs), ssr: () => renderSSR(Tabs) }, async (container) => {
 	await expect.poll(() => text(container, '[data-page]'), { timeout: 5_000 }).toBe('Page uno');
 	await expect.poll(() => text(container, '[data-quote]')).toBe('5');
 	hold('page:dos', 'quote:2', 'quote:3');
@@ -201,7 +200,7 @@ each('UC20, UC21, UC25: the clicked control moves at once, two clicks count as t
 	expect(busy(container, '[data-quote]')).toBe(false);
 });
 
-each('UC29, UC30: a handler acts on the pair the screen shows, and a re-ask does not block it', { csr: () => render(Share), ssr: () => renderSSR(Share) }, async (container) => {
+each('a handler acts on the pair the screen shows, and a re-ask does not block it', { csr: () => render(Share), ssr: () => renderSSR(Share) }, async (container) => {
 	await expect.poll(() => text(container, '[data-figure]'), { timeout: 5_000 }).toBe('1000');
 	hold('revenue:20d:0');
 	click(container, '[data-span]');
@@ -218,7 +217,7 @@ each('UC29, UC30: a handler acts on the pair the screen shows, and a re-ask does
 	release('revenue:20d:1');
 });
 
-each('UC22: a task that waits for new data never freezes its component', { csr: () => render(Freeze), ssr: () => renderSSR(Freeze) }, async (container) => {
+each('a task that waits for new data never freezes its component', { csr: () => render(Freeze), ssr: () => renderSSR(Freeze) }, async (container) => {
 	await expect.poll(() => text(container, '[data-logged]'), { timeout: 5_000 }).toBe('qty:1 total:100');
 	hold('quote:2');
 	const stop = watch(container, { logged: () => text(container, '[data-logged]') });
@@ -231,7 +230,7 @@ each('UC22: a task that waits for new data never freezes its component', { csr: 
 	expect(stop().logged, 'never the quantity 2 beside the quote for 1').toEqual(['qty:1 total:100', 'qty:2 total:200']);
 });
 
-each('UC27: a catch-all cannot swallow a refresh', { csr: () => render(RefreshCatch), ssr: () => renderSSR(RefreshCatch) }, async (container) => {
+each('a catch-all cannot swallow a refresh', { csr: () => render(RefreshCatch), ssr: () => renderSSR(RefreshCatch) }, async (container) => {
 	await expect.poll(() => text(container, '[data-heading]'), { timeout: 5_000 }).toBe('12 past orders in A');
 	hold('rc-orders:B');
 	click(container, '[data-store-b]');

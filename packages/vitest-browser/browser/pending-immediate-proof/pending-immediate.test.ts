@@ -7,8 +7,7 @@ afterEach(() => cleanup());
 
 type Sample = { readonly t: number; readonly pending: boolean; readonly content: boolean; readonly height: number };
 
-// Frame-sampled like goals/async-refresh-proof: one rAF tick per sample,
-// until the spot settles or a generous timeout elapses.
+// One rAF tick per sample, until the spot settles or a generous timeout elapses.
 async function sample(slot: HTMLElement, startedAt: number, timeoutMs: number): Promise<Sample[]> {
 	const samples: Sample[] = [];
 	await new Promise<void>((resolve) => {
@@ -59,9 +58,7 @@ for (const latencyMs of LATENCIES) {
 		const result = metrics(samples);
 		console.log('MOUNT', latencyMs, JSON.stringify(result));
 
-		// Today's rule already has no deadline gate on a first run (graph-async.ts
-		// publishes a pending snapshot synchronously): blank time before the
-		// pending placeholder paints is one frame, not MARKLESS_PENDING_SETTLE_DEADLINE_MS.
+		// A first run publishes pending synchronously, so blank time before @pending paints is one frame, not the settle deadline.
 		expect(result.blankMs).toBeLessThan(100);
 		expect(result.pendingFlashes).toBeLessThanOrEqual(1);
 		expect(result.timeToCorrectMs).toBeGreaterThan(latencyMs - 20);

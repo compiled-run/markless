@@ -1,7 +1,6 @@
 import { computed, state } from '@markless/core';
 
-// Two @ifs in a child of the page hold one component, one given a changing prop,
-// so that component's derive is bound per edge and its ids are spelled from the page.
+// Two @ifs hold one component, one with a changing prop, so its derive binds per edge with ids spelled from the page.
 function Badge({ caption }) @{
 	let taps = state(0);
 	const text = computed(() => `${caption}:${taps}`);

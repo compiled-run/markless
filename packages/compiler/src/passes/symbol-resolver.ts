@@ -529,8 +529,7 @@ export function planBoundSymbolResolver(
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
 					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant') &&
-					// A derive's or runner's constant slot is emitted as its value, which only
-					// works when every edge agrees; edges that disagree need a row each.
+					// A derive's or runner's constant slot is emitted as its value, so edges that disagree need a row each.
 					((symbol.kind !== 'sync-computed-derive' &&
 						symbol.kind !== 'async-computed-runner') ||
 						edgeDependentSlots.every(captureSlotFoldsToConstant))
@@ -1098,8 +1097,7 @@ function behaviorGraphAccess(
 	};
 }
 
-// The async values a reset may re-run, each after the async values it reads (directly or through sync
-// computeds), which follow it in its entry: a rejected input re-runs in place of the values reading it.
+// The async values a reset may re-run, each followed by the async values it reads, so a rejected input re-runs in their place.
 function resetOrder(
 	reads: ReadonlyArray<string>,
 	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],

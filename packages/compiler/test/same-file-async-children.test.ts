@@ -2,8 +2,7 @@ import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
 import { collectTsrxModuleDiagnostics } from '../src/index.ts';
 
-// A same-file child placed by a keyed row re-runs its async recipe in the browser, and that
-// recipe reads the row's item from the props of the instance the row placed.
+// A same-file child a keyed row places re-runs its async recipe from the props of the instance the row placed.
 
 const errorCodes = async (source: string) =>
 	collectTsrxModuleDiagnostics(

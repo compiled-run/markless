@@ -185,8 +185,7 @@ export function App() @{
 	for (const banned of ['arm', 'tier', 'anchor', 'boundary'])
 		expect(diagnostic?.message.toLowerCase()).not.toMatch(new RegExp(`\\b${banned}\\b`));
 
-	// The toggle replaces only the @if's own range: the record ships the flip
-	// symbol and its anchor pair inside the @try content.
+	// The toggle replaces only the @if's own range inside the @try content.
 	const record = result.protocolView.asyncBoundaries[0]?.armRecords?.[0]?.branches?.[0];
 	expect(record).toEqual(
 		expect.objectContaining({

@@ -3,8 +3,7 @@ import { render, renderSSR } from '../../src/index.ts';
 import SameNamePage from './same-name-page.tsrx';
 import SameNamePolicy from './same-name-policy.tsrx';
 
-// A page's @for and handler policy read the page's own values when a same-file
-// child, declared first, takes a prop of the same name.
+// The page's @for and handlers read its own values when a same-file child declared first takes a prop of the same name.
 
 const prevented: boolean[] = [];
 const record = (event: Event) => {

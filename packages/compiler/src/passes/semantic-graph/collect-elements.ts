@@ -620,10 +620,7 @@ function placeAsyncBoundary(host: AnyNode, boundary: AnyNode): void {
 	});
 }
 
-/**
- * Text written straight into a @try arm's fragment owns its one text node in the host, counted
- * past the boundary's anchor comment, so a refresh rewrites that node in place. Call inside the arm.
- */
+/** Text written straight into a @try arm owns its own text node past the anchor comment, so a refresh rewrites it in place. Call inside the arm. */
 export function placeAsyncArmText(boundary: AnyNode, arm: AnyNode, state: WalkState): void {
 	const placement = asyncBoundaryPlacements.get(boundary);
 	const body = asNodes(arm.body).filter((child) => !isIgnorableJsxTextNode(child));

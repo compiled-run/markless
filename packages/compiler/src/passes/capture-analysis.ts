@@ -317,8 +317,7 @@ function importedCaptureSymbols(
 								),
 			}))
 			.filter((slot) => republished || !wasProjectedThroughComponentEdge(slot.propName, edge))
-			// A derive whose prop has no route on this edge stays unbound here and reads its own instance's props.
-			// A row's value is rendered with the row, and a changed item rebuilds it, so only a callback needs it later.
+			// An unrouted derive reads its own instance's props; a row's value rebuilds with the row, so only a callback needs it later.
 			.flatMap((slot) => {
 				if (
 					captureSymbol.kind === 'event-handler' ||

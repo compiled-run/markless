@@ -13,8 +13,7 @@ function loader(modules: Readonly<Record<string, Loaded>>) {
 	) as (url: string) => Promise<Loaded>;
 }
 
-// A boot listener drops the promise it gets back: the runtime has already reported a handler's
-// failure, so the same failure must not surface a second time as an unhandled rejection.
+// The runtime already reported the handler's failure, so it must not surface again as an unhandled rejection.
 test('the boot loader settles a dispatch whose failure the runtime already reported', async () => {
 	const reported = new Error('save failed') as Error & Record<string, unknown>;
 	markRuntimeErrorReported(reported);

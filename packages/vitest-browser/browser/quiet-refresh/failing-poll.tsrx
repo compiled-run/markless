@@ -4,9 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// submit-quiet-design.md Q2: a quiet refresh that fails still keeps the last good content and
-// opens @catch right after it (the ordinary failed-refresh rule), and still announces the
-// failure, because a poll that silently stopped working is worse than one that occasionally speaks up.
+// A failed quiet refresh keeps content with @catch after it and still announces, since a silently broken poll is worse.
 export function FailingPoll() @{
 	let poll = state(0);
 	const orders = computed(async () => {

@@ -2,9 +2,7 @@ import { expect, test } from 'vitest';
 import { buildSemanticGraph, lowerStateAccess, planPayloadArena } from '../src/index.ts';
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
 
-// submit-quiet-design.md Q1 option 1: the compiler, not the runtime, decides which async values a
-// handler marks busy from its own entry, from handler write analysis plus each async value's key
-// inputs (handler write analysis + asyncKeyInputs; see paired-async-values.ts).
+// The compiler decides which async values a handler marks busy from its entry, from its writes and each value's key inputs.
 async function entryMarksOf(source: string) {
 	const semanticGraph = await buildSemanticGraph({ filename: 'src/App.tsrx', source });
 	const stateLowering = lowerStateAccess({ semanticGraph });
@@ -77,8 +75,7 @@ export function App() @{
 	expect(symbols).toEqual([{ eventName: 'click', entryMarks: undefined }]);
 });
 
-// A handler authored on a component's prop (`<Button onClick={...}>`) is a `callback-prop`
-// symbol, not an `event-handler` one; it carries the same writes and needs the same mark.
+// A handler on a component prop is a `callback-prop` symbol, and needs the same mark as an `event-handler`.
 async function callbackPropEntryMarksOf(source: string) {
 	const semanticGraph = await buildSemanticGraph({ filename: 'src/App.tsrx', source });
 	const stateLowering = lowerStateAccess({ semanticGraph });
@@ -144,8 +141,7 @@ export function App() @{
 	expect(symbols).toEqual([{ propName: 'onClick', entryMarks: undefined }]);
 });
 
-// A write inside a function the handler only hands to someone else runs on that callee's turn,
-// whichever API takes it; only a write in the handler's own body earns the mark.
+// A write in a function the handler only hands off runs on the callee's turn, so it earns no mark.
 const deferredShapes = {
 	setInterval: 'setInterval(() => { reload++; }, 1000)',
 	requestAnimationFrame: 'requestAnimationFrame(() => { reload++; })',

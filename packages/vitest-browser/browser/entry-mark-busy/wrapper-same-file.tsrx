@@ -9,8 +9,7 @@ function Button({ onClick, children }: { readonly onClick?: () => void; readonly
 	<button type="button" data-save onClick={onClick}>{children}</button>
 }
 
-// The handler that writes `reload` is authored on `Button`'s `onClick` prop, one component away
-// from the native element `Button` forwards it onto by name.
+// The `reload` writer is authored on `Button`'s `onClick` prop, which `Button` forwards onto the native element.
 export function WrapperSameFile() @{
 	let reload = state(0);
 	const balance = computed(async () => {

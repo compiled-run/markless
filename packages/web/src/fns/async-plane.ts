@@ -55,8 +55,7 @@ const parts = {
 	awaitsAncestor(...args: Parameters<typeof awaitsAsyncAncestor>) {
 		return awaitsAsyncAncestor(...args);
 	},
-	// A CSR mount serves no snapshot for a sync computed only an async value's key reads: nothing
-	// write-triggered has run yet, so its first demand would read it unresolved. Derive it once now.
+	// A CSR mount serves no snapshot for a sync computed only an async key reads, so derive it once now.
 	async deriveAsyncKeys(
 		input: Omit<SyncRefresh, 'computed' | 'records'>,
 		records: ReadonlyArray<SyncRefresh['computed']>,

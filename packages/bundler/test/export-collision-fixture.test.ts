@@ -9,8 +9,7 @@ import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
 import { listenOnFreePort } from './helpers/listen.ts';
 
-// Two modules declaring a same-named component must each render their own markup: the linker keys a
-// composed child by the module it is imported from, not by its declared name.
+// The linker keys a composed child by the module it is imported from, not by its declared name.
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');

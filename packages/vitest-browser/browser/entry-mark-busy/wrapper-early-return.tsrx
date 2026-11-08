@@ -9,8 +9,7 @@ function Button({ onClick, children }: { readonly onClick?: () => void; readonly
 	<button type="button" data-save onClick={onClick}>{children}</button>
 }
 
-// A handler that returns before writing, authored on a forwarded prop: the mark still clears,
-// and nothing refetches.
+// A forwarded handler that returns before writing: the mark clears and nothing refetches.
 export function WrapperEarlyReturn() @{
 	let ok = state(true);
 	let reload = state(0);

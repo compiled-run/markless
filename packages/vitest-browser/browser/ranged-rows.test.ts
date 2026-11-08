@@ -2,8 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import RangedRowsPage from './ranged-rows/page.tsrx';
 
-// Keyed rows that are not one element - a fragment, a component whose template is a fragment, text alone -
-// render between row comments, and the browser reorders, adds, removes and rebuilds each as its whole range.
+// Keyed rows that are not one element live between row comments and are reordered, added, removed and rebuilt as whole ranges.
 afterEach(() => cleanup());
 
 const WAIT = { timeout: 2000, interval: 10 };

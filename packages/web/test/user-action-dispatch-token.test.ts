@@ -3,9 +3,7 @@ import type { ProtocolViewPayload } from '@markless/serializer';
 import { createProtocolStatePayload, renderPayloadScripts } from '../../serializer/src/index.ts';
 import { resumeFromPayloadDocument } from '../src/index.ts';
 
-// Only a real DOM event's dispatch opens a user action (submit-quiet-design.md Q2). A call that
-// dispatch makes carries it for its whole body, awaits included, decided when the call is made
-// rather than when the callee's code arrives; a call made after the dispatch ended carries none.
+// Only a DOM event's dispatch opens a user action; its calls carry it through awaits, and calls after it ended carry none.
 
 type Token = { readonly open: boolean } | undefined;
 type Context = {

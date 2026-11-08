@@ -1128,8 +1128,7 @@ export type SemanticTemplateRead = {
 	// The branch site whose arm body holds this read directly, with no host of
 	// its own. Such a read drives the arm's range, never the enclosing element.
 	readonly armScopeBranchSiteId?: string;
-	// The async boundary whose arm body holds this read directly, with no host of
-	// its own; the arm re-renders on refresh instead of writing the enclosing element.
+	// The @try whose arm body holds this read with no host of its own; the arm re-renders on refresh.
 	readonly armScopeBoundaryId?: string;
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
@@ -1980,8 +1979,7 @@ export type PlannedSymbol =
 			}>;
 			// Async values whose key reads a symbol this handler writes, marked busy from its entry.
 			readonly entryMarks?: ReadonlyArray<string>;
-			// `@catch (error, reset)` names the handler calls, each with the async values its block
-			// reads, upstream first, every one followed by the async values it reads itself.
+			// `@catch (error, reset)` handler calls, each with the async values its block reads, upstream first.
 			readonly catchResets?: ReadonlyArray<{
 				readonly name: string;
 				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
@@ -2004,8 +2002,7 @@ export type PlannedSymbol =
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
 			// Async values whose key reads a symbol this callback writes, marked busy from its entry.
 			readonly entryMarks?: ReadonlyArray<string>;
-			// `@catch (error, reset)` names this callback prop's own source calls, each with the
-			// async values its block reads, upstream first, every one followed by its own reads.
+			// This callback prop's `@catch (error, reset)` source calls, each with the async values its block reads, upstream first.
 			readonly catchResets?: ReadonlyArray<{
 				readonly name: string;
 				readonly resets: ReadonlyArray<ReadonlyArray<string>>;

@@ -4,8 +4,7 @@ import IfAsyncChildEdit from './if-async-child-edit.tsrx';
 import IfAsyncChildPlain from './if-async-child-plain.tsrx';
 import IfChildBoundDerive from './if-child-bound-derive.tsrx';
 
-// An @if holding a same-file component that keeps an async value of its own builds,
-// and each flip renders the child, which then settles its own value.
+// An @if holding a same-file child with its own async value builds, and each flip renders and settles the child.
 
 function click(container: HTMLElement, selector: string) {
 	const element = container.querySelector<HTMLElement>(selector);

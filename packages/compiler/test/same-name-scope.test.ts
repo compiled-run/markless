@@ -2,8 +2,7 @@ import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { resolveBoundaryRunners } from '../src/passes/public-render/boundary-runner.ts';
 
-// A page and a same-file child that use one name each read their own binding:
-// the child is declared first, so an unscoped lookup by name finds the child's.
+// The child is declared first, so an unscoped lookup by name would find the child's binding instead of the page's.
 
 async function compile(source: string) {
 	const result = await compileTsrxModule({ filename: 'src/page.tsrx', symbols: [], source });

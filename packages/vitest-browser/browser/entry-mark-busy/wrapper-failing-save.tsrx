@@ -9,8 +9,7 @@ function Button({ onClick, children }: { readonly onClick?: () => void; readonly
 	<button type="button" data-save onClick={onClick}>{children}</button>
 }
 
-// A forwarded handler whose save rejects before its write: the mark clears, and nothing
-// refetches either.
+// A forwarded handler whose save rejects before its write: the mark clears and nothing refetches.
 export function WrapperFailingSave() @{
 	let reload = state(0);
 	let shouldFail = state(true);

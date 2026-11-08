@@ -13,8 +13,7 @@ const click = (container: ParentNode, selector: string) => {
 	target.click();
 };
 
-// `{children}` sits inside the child's @try: a CSR mount serves @pending first, so the
-// projection lands when the settled arm renders, and comes back after a failure and reset.
+// `{children}` inside the child's @try lands when the settled arm renders, and returns after a failure and reset.
 test.each([
 	['CSR', () => render(StaticPage)],
 	['SSR', () => renderSSR(StaticPage)],
@@ -30,8 +29,7 @@ test.each([
 	expect(text(container, '[data-body] [data-projected] em')).toBe('entry');
 });
 
-// A redrawn arm carries projected markup as static HTML, so the dev server refuses a page that
-// projects handlers or state reads into a child's @try; bundler/test/dev-projection-live-arm.test.ts pins the message.
+// A redrawn arm carries projected markup as static HTML, so dev refuses projected handlers or state reads (pinned in bundler/test/dev-projection-live-arm.test.ts).
 test('live projected children inside a child @try are refused by the dev server', async () => {
 	const response = await fetch(`${new URL('./live-page.tsrx', import.meta.url).href}?import`);
 	expect(response.status).toBe(500);

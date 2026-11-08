@@ -3,10 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { PollThroughNestedProps } from './poll-nested-props.tsrx';
 import { PollThroughProp } from './poll-prop.tsrx';
 
-// The gap goals/handoffs/async-final3.md named: a callback prop a timer or socket message calls
-// through a component, via the same capture-slot dispatch (`invokeSymbol`/`marklessInvokeCallbackSlot`)
-// a click uses, must stay quiet; only a real DOM dispatch's own live extent — synchronous or
-// through an awaited continuation — makes that same callback loud.
+// A callback prop called by a timer or socket through capture-slot dispatch stays quiet; only a live DOM dispatch makes it loud.
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -122,8 +119,7 @@ async function quietSocketScenario(screen: Screen) {
 	const sawBusy = sampleBusy(container, '[data-orders]');
 	const said = listen();
 	click(container, '[data-connect]');
-	// The handler loads its compiled module asynchronously; wait for that one-off load before
-	// dispatching once, same as quiet-refresh.test.ts's socket scenario.
+	// Wait for the handler's one-off module load before dispatching once.
 	await wait(150);
 	dispatch();
 	await expect.poll(() => numberOf(container, '[data-orders]'), poll).toBeGreaterThanOrEqual(101);

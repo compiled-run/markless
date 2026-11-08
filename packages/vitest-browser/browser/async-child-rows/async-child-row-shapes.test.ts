@@ -4,8 +4,7 @@ import Ledger from './ledger.tsrx';
 import Notes from './notes.tsrx';
 import Topics from './topics.tsrx';
 
-// The same three defects in other shapes: a child that IS the row, string keys,
-// a row prepended rather than appended, a failing load, and a re-keyed child wrapped in its own element.
+// Other shapes: a child that is the row, string keys, a prepended row, a failing load, a re-keyed wrapped child.
 afterEach(cleanup);
 
 // Each load waits on a timer-backed fetch, so a loaded machine gets room to answer.

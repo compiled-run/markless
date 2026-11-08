@@ -92,13 +92,11 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const controller = new AbortController();
 		const version = ++node.version;
 		node.controller = controller;
-		// Read in the writing turn: a demanded run is never quiet, nor one a handler's entry hold proves.
-		// A revalidation (a page shown again re-asking its values) is never something the user asked for.
+		// Read in the writing turn: a demanded or entry-held run is loud, and a revalidation is always quiet.
 		node.quiet =
 			cause === 'revalidate' ||
 			(!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false));
-		// A re-run keeps the last good value addressable while pending and after a
-		// failure (spec D8 / Solid 2 `latest`); a first run has none, so reads answer undefined.
+		// A re-run keeps the last good value readable while pending and after a failure (spec D8); a first run has none.
 		const kept = lastGood(node.snapshot);
 		publish(node, pendingSnapshot(node, version, key));
 
@@ -137,8 +135,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	const advance = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
-		// Sync computeds have no settlement state, so walk through them until the
-		// gate reaches the async nodes whose snapshots can block this runner.
+		// Walk through sync computeds to the async nodes whose snapshots can block this runner.
 		const visited = new Set<string>([node.graphNodeId]);
 		let blocked: RuntimeAsyncComputedNode | undefined;
 		let shown = true;

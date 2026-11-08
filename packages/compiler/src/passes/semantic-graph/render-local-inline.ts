@@ -746,11 +746,7 @@ function readsServerOnlyProp(
 	);
 }
 
-/**
- * A const holding what a factory call returned is rebuilt from that call on every event, so
- * a factory that keeps state between calls would start fresh each time. Null when the
- * rebuild is sound: the factory only returns a function, or the value is not a function.
- */
+/** A factory-returned const is rebuilt on every event, so a stateful factory would restart; null when the rebuild is sound. */
 function statefulFactoryCall(
 	name: string,
 	init: AnyNode,

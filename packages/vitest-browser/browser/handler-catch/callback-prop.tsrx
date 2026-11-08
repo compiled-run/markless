@@ -5,8 +5,7 @@ function SaveButton({ onSave }) @{
 	<button type="button" data-save onClick={onSave}>Save</button>
 }
 
-// A callback prop that rejects reaches the @catch around the child that calls it; an inner
-// @try with only @pending is skipped on the way out.
+// A rejecting callback prop reaches the @catch around the calling child, skipping an inner @pending-only @try.
 export function CallbackProp() @{
 	let note = state('idle');
 	const range = computed(async () => {

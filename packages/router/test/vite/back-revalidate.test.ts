@@ -64,8 +64,7 @@ type Seen = {
 	persisted: boolean[];
 };
 
-// Installed before any page script: what the list showed first, whether @pending or a busy mark was ever in
-// the page, and how many painted frames showed @pending (read just after each paint).
+// Installed before any page script: the list's first content, whether @pending or a busy mark appeared, and @pending frame count.
 function record() {
 	const w = window as unknown as { __seen: Seen; __resetSeen: () => void };
 	const reset = () => {

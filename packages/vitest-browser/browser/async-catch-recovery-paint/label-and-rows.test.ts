@@ -5,8 +5,7 @@ import { failNext } from './pages.ts';
 import TemplateLabel from './template-label.tsrx';
 import TwoHoleLabel from './two-hole-label.tsrx';
 
-// A label and the rows beside it, read from one async answer, paint together: on a refresh
-// and on the answer that replaces a @catch.
+// A label and its rows, read from one async answer, paint together on a refresh and on recovery from @catch.
 
 afterEach(() => {
 	failNext(0);

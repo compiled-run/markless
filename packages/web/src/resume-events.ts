@@ -719,7 +719,7 @@ export function createEventWiring(input: {
 		// Opened before the try: beginning the window cannot throw, and the finally
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
-		// Only a real DOM event opens a user action (submit-quiet-design.md Q2); every call this dispatch makes inherits it.
+		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
 		const userActionToken = { open: true };
 		try {
 			await input.prepareRuntimeShared();

@@ -2,9 +2,7 @@ import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
 import { emitSymbolResolverModule } from '../src/index.ts';
 
-// The compiler half of a keyed row whose child holds its own async value: the
-// child's async recipe keeps the props it reads in the payload, a collection that
-// reads state follows it, and a bound row reads its own prop cell.
+// A keyed row whose child holds its own async value keeps the props that value reads in the payload.
 
 test('SSR seeds the props an async recipe reads, since it runs again in the browser', async () => {
 	const result = await compileTsrxModule({

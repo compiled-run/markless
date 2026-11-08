@@ -1,8 +1,7 @@
 import { computed, state } from '@markless/core';
 import { answer } from './gates.ts';
 
-// Two sources fetched for different inputs: profit pins to the newest range both have
-// answered, and the source that outran the other serves its kept answer for it.
+// Two sources fetched for different inputs: profit pins to the newest range both answered, and the faster source serves its kept answer.
 const revenueTotals = { '10d': 10000, '20d': 30000 } as Record<string, number>;
 const costTotals = { '10d': 5000, '20d': 10000 } as Record<string, number>;
 const days = (range: string) => (range === '10d' ? 10 : 20);

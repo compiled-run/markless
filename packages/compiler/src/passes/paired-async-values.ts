@@ -47,13 +47,7 @@ export function asyncKeyInputs(
 	return keyInputsOf;
 }
 
-/**
- * The async computeds some reader pairs with an input of their key: a reader that reads the
- * value beside one of those inputs, or beside another async value fetched with one of them.
- * Readers are computeds (async ones too), handlers and component edges, each a list of the
- * nodes it reads. Each paired value keeps its upstream async values, whose inputs it was
- * fetched with; only a page that serves one loads matched values.
- */
+/** Async computeds a reader (computed, handler or component edge) reads beside an input of their key, each with its upstream async values. */
 export function pairedAsyncValues(
 	computed: ReadonlyMap<string, ComputedNode>,
 	readers: Iterable<ReadonlyArray<string>>,

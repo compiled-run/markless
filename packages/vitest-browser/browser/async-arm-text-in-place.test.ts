@@ -3,8 +3,7 @@ import { render, renderSSR } from '../src/index.ts';
 import PageHead from './async-arm-text-in-place/page-head.tsrx';
 import ChildUnderIf from './async-arm-text-in-place/child-under-if.tsrx';
 
-// Text written straight into a @try arm's fragment refreshes its own text node: the arm's elements
-// stay the same objects and keep focus, and the anchors and siblings around the arm stay put.
+// Text in a @try arm refreshes its own text node: arm elements keep identity and focus, and surrounding anchors stay put.
 
 function click(container: HTMLElement, selector: string) {
 	const element = container.querySelector<HTMLElement>(selector);

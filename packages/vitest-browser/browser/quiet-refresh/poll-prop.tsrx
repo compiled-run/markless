@@ -4,8 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// `onTick` is an unfilled callback slot Child reaches through the runtime's capture-slot dispatch
-// (the same mechanism a forwarded click handler uses) whichever of these things calls it.
+// `onTick` is an unfilled callback slot reached through capture-slot dispatch, whoever calls it.
 function Child({ onTick }: { readonly onTick?: () => void }) @{
 	<div>
 		<button
@@ -50,10 +49,7 @@ function Outer({ onTick }: { readonly onTick?: () => void }) @{
 	<Child onTick={onTick} />
 }
 
-// submit-quiet-design.md Q2: the same callback-prop symbol — reached through the identical
-// capture-slot dispatch every time — is loud when a click invokes it directly, and quiet when a
-// timer tick or a socket message does, even though all three calls run through the same
-// `onTick?.()` reference.
+// The same `onTick?.()` is loud when a click calls it and quiet when a timer or socket does.
 export function PollThroughProp() @{
 	let poll = state(0);
 	const orders = computed(async () => {

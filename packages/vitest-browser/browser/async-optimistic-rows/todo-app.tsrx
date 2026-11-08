@@ -1,9 +1,7 @@
 import { computed, state } from '@markless/core';
 import { listTodos, saveTodo, toggleTodo, type Draft, type Todo } from './save-api.ts';
 
-// Each submission is its own row. Its async value performs the save:
-// @pending shows the draft (optimistic), @try shows the confirmed result,
-// @catch (error, reset) shows the failure with retry, scoped to that item.
+// Each submission is its own row: @pending shows the draft, the @try arm the confirmed result, @catch the failure with retry.
 function SavingTodo({ draft }: { draft: Draft }) @{
 	const saved = computed(async () => await saveTodo(draft));
 
@@ -20,9 +18,7 @@ function SavingTodo({ draft }: { draft: Draft }) @{
 	</li>
 }
 
-// Editing an existing item with the same pattern: the recipe reads a local
-// "pending edit" state; while it is undefined the recipe returns the
-// confirmed row unchanged (a real save never runs for an untouched row).
+// While no edit is pending the recipe returns the confirmed row unchanged, so an untouched row never saves.
 function EditingTodo({ todo }: { todo: Todo }) @{
 	let pendingDone = state<boolean | undefined>(undefined);
 	const saved = computed(async () => {

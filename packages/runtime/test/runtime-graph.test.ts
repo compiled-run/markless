@@ -1446,8 +1446,7 @@ test('runtime graph versions async computed requests and ignores stale completio
 
 	expect(runs[0].signal.aborted).toBe(true);
 	expect(runs).toHaveLength(2);
-	// A plain `graph.write`, outside any marked user action, starts a quiet
-	// refresh (submit-quiet-design.md Q2): no busy mark, no announcement.
+	// A plain `graph.write` outside a user action starts a quiet refresh: no busy mark, no announcement.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
@@ -1463,8 +1462,7 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Same quiet refresh as above (submit-quiet-design.md Q2): the stale
-	// resolution it ignores does not change that.
+	// Still quiet: the stale resolution it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
@@ -1478,7 +1476,7 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Still the same quiet refresh (submit-quiet-design.md Q2): it lands quiet too.
+	// Still the same quiet refresh: it lands quiet too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,
@@ -1547,8 +1545,7 @@ test('runtime graph ignores stale rejected async computed completions', async ()
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Same quiet refresh as above (submit-quiet-design.md Q2): the stale
-	// rejection it ignores does not change that.
+	// Still quiet: the stale rejection it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
@@ -1561,7 +1558,7 @@ test('runtime graph ignores stale rejected async computed completions', async ()
 	second.resolve('Bob');
 	await drainMicrotasks();
 
-	// Still the same quiet refresh (submit-quiet-design.md Q2): it lands quiet too.
+	// Still the same quiet refresh: it lands quiet too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,

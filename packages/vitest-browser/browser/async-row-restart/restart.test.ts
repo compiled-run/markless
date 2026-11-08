@@ -5,8 +5,7 @@ import DetailPage from './detail-page.tsrx';
 import PricePage from './price-page.tsrx';
 import RestartPage from './restart-page.tsrx';
 
-// A component a keyed @for creates in the browser (here, to start it over) keeps taking its own answers, its parent's
-// reload, and calls on its async fields, however many times it is created again.
+// A component a keyed @for recreates in the browser keeps its answers, its parent's reload, and its async fields' calls.
 afterEach(() => {
 	cleanup();
 	forgetRequests();

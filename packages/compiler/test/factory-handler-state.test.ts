@@ -39,8 +39,7 @@ export default function Ledger() @{
 `;
 }
 
-// The browser rebuilds a handler's body consts from their definitions on every event, so a
-// const holding what a stateful factory returned would start from a fresh factory each click.
+// Handler body consts are rebuilt on every event, so a stateful factory's result would restart each click.
 const stateful = {
 	closureCounter: {
 		body: `const makeCounter = () => { let count = 0; return () => { count += 1; total = count; }; };\n\tconst handler = makeCounter();`,

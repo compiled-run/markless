@@ -9,8 +9,7 @@ function Inner({ onClick, children }: { readonly onClick?: () => void; readonly 
 	<button type="button" data-save onClick={onClick}>{children}</button>
 }
 
-// Two forwarding hops: Outer hands the same prop to Inner, which is the one that finally
-// forwards it onto the native element.
+// Two hops: Outer hands the prop to Inner, which forwards it onto the native element.
 function Outer({ onClick, children }: { readonly onClick?: () => void; readonly children?: Children }) @{
 	<Inner onClick={onClick}>{children}</Inner>
 }

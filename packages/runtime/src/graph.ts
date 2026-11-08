@@ -158,10 +158,7 @@ export type RuntimeGraphAsyncSnapshot =
 export type RuntimeGraphAsyncComputed = {
 	readonly graphNodeId: string;
 	readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;
-	/**
-	 * Sync computeds in the key this graph holds as cells their derives write: their async
-	 * sources gate a run, and a write to a source holds it until the derive answers.
-	 */
+	/** Sync computeds in the key, held as cells their derives write: a write to a source holds a run until the derive answers. */
 	readonly syncHops?: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly dependencies: ReadonlyArray<RuntimeGraphComputedDependency>;

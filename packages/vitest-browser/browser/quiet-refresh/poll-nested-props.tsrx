@@ -4,8 +4,7 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// `onTick` is an unfilled callback slot Child reaches through the runtime's capture-slot dispatch
-// (the same mechanism a forwarded click handler uses) whichever of these things calls it.
+// `onTick` is an unfilled callback slot reached through capture-slot dispatch, whoever calls it.
 function Child({ onTick }: { readonly onTick?: () => void }) @{
 	<div>
 		<button

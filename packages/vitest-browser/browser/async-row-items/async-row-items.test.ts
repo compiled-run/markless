@@ -7,8 +7,7 @@ import Ledger from './ledger.tsrx';
 import Totals from './totals.tsrx';
 import Weather from './weather.tsrx';
 
-// A row's item handed whole, or a nested field of it, to a child with its own @try, and a
-// same-file helper holding one: each loads, re-runs with its own props, and fails alone.
+// A row item, or a nested field of it, handed to a child with its own @try loads, re-runs with its props, and fails alone.
 afterEach(cleanup);
 
 // Each load waits on a timer-backed fetch, and a first click with no hover fetches its handler code cold.

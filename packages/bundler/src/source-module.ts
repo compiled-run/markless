@@ -576,8 +576,7 @@ function payloadHasComputed(payloadState: unknown): boolean {
 
 export type AsyncPlanesDemand = { readonly async: boolean; readonly held: boolean };
 
-// The only place the async and matched-value planes are named, so an app that serves neither emits neither.
-// A module installs them for the components it composes too, whose own modules may never load.
+// The only place the async and matched-value planes are named, so an app that serves neither emits neither; it installs them for composed components too.
 export function payloadAsyncPlanes(
 	payloadState: unknown,
 	composed?: { readonly async?: boolean; readonly held?: boolean },

@@ -226,8 +226,7 @@ const ASYNC_PLANES = [
 	'web/fns/held-inputs-plane',
 ];
 
-// Runtime modules the build emits, or with `entryHtml` only those in the chunks the page preloads or
-// loads as scripts and what those import statically.
+// Runtime modules the build emits; with `entryHtml`, only those the page preloads or loads, plus their static imports.
 async function runtimeModulesIn(dist: string, entryHtml?: string): Promise<string[]> {
 	const attribution = JSON.parse(
 		await readFile(marklessBuildManifestPath(dist, MARKLESS_BYTE_ATTRIBUTION), 'utf8'),

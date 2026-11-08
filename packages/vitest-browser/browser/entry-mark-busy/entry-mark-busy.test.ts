@@ -15,10 +15,7 @@ import { WrapperImported } from './wrapper-imported.tsrx';
 import { WrapperSameFile } from './wrapper-same-file.tsrx';
 import { WrapperSpread } from './wrapper-spread.tsrx';
 
-// The compiler marks a visible async value busy from the moment a handler that writes one of its
-// key's inputs starts, not from the write itself (goals/async-error-states/submit-quiet-design.md
-// Q1 option 1). The mark stays unbroken until the refresh that write causes lands or fails, and
-// clears with no refresh when the handler never reaches the write.
+// A handler that writes an async value's key input marks it busy from its start until the refresh lands or fails, or at once if it never writes.
 afterEach(() => cleanup());
 afterEach(() => commands.throttleCpu(1));
 
@@ -45,10 +42,7 @@ function click(container: ParentNode, selector: string): void {
 	button.click();
 }
 
-// Reconstructs every `aria-busy` value a selector held, from the mutation that set it rather
-// than a frame sample: a frame-rate poll can miss the whole window on a loaded main thread
-// (goals/handoffs/async-w39.md), while every attribute mutation is still recorded even when the
-// callback that reports it is delayed.
+// Rebuilt from attribute mutations rather than frame samples, which miss short windows on a loaded main thread.
 function sampleBusy(container: ParentNode, selector: string) {
 	const target = container.querySelector(selector);
 	if (!target) throw new Error(`Expected ${selector} in the rendered DOM.`);
@@ -191,8 +185,7 @@ async function syncKeyInputScenario(screen: Screen) {
 	assertNoGap(stop());
 }
 
-// Throttled on purpose: the busy window here is short enough (one 25ms handler delay plus a
-// 10ms recipe) that a loaded main thread is what exposed the dropped-sample flake this guards.
+// Throttled on purpose: a loaded main thread is what exposed the dropped-sample flake this guards.
 test('CSR: a key reached through a sync computed is still marked from the click', async () => {
 	await commands.throttleCpu(6);
 	await syncKeyInputScenario(await render(SyncKeyInput));
@@ -224,8 +217,7 @@ test('SSR: two clicks during the same wait both land, and the mark never drops b
 	await twoClicksScenario(await renderSSR(TwoClicks));
 });
 
-// The handler is authored on a component's prop rather than directly on the native element; the
-// mark has to start at the click regardless of how many components forward it on the way down.
+// The mark starts at the click however many components forward the handler prop down.
 test('CSR: a handler forwarded through a same-file wrapper component is marked from the click', async () => {
 	await submitMarkScenario(await render(WrapperSameFile));
 });
