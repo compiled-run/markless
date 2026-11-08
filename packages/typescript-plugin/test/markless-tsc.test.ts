@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -96,6 +97,27 @@ test('standard event casing and numeric attribute strings typecheck', () => {
 	expect(result.status).toBe(0);
 });
 
+test('standard HTML, SVG, ARIA and XML namespace attributes typecheck on the elements that define them', () => {
+	const result = runMarklessTsc('standard-attributes');
+	expect(result.output).toBe('');
+	expect(result.status).toBe(0);
+});
+
+test('a misspelled attribute, or a camelCase spelling the platform does not define, still fails', () => {
+	const result = runMarklessTsc('standard-attribute-misspellings');
+	expect(result.status).not.toBe(0);
+	for (const name of ['datetiem', 'tabIndex', 'xmlnss', 'strokeWidth', 'startOfset', 'nme'])
+		expect(result.output).toContain(`Property '${name}' does not exist`);
+});
+
+test('the generated attribute names match the attribute lists they are generated from', async () => {
+	const { generateElementAttributeNamesSource, ELEMENT_ATTRIBUTE_NAMES_FILE } =
+		await import('../scripts/generate-element-attributes.ts');
+	expect(readFileSync(ELEMENT_ATTRIBUTE_NAMES_FILE, 'utf8')).toBe(
+		generateElementAttributeNamesSource(),
+	);
+});
+
 // TypeScript 7.1 cannot load this plugin; it reads .tsrx through @tsrx/content-mapper and the
 // strict compiler entry the fixtures' tsconfig names. Both checkers must report the same errors.
 const typescript7Tsc = join(repoRoot, 'scripts/typescript-7/node_modules/typescript/bin/tsc');
@@ -130,6 +152,8 @@ test.each([
 	'attribute-spelling-errors',
 	'anchor-prefetch',
 	'anchor-prefetch-errors',
+	'standard-attributes',
+	'standard-attribute-misspellings',
 ])('TypeScript 7.1 with the content mapper reports what markless-tsc reports: %s', (fixture) => {
 	const typescript5 = runMarklessTsc(fixture);
 	const typescript7 = runTypescript7(fixture);
