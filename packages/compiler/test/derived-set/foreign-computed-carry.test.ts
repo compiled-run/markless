@@ -28,7 +28,7 @@ export const box = shared(() => {
 	const trimmed = computed(() => trim(s.label));
 	const plain = computed(() => s.label + '?');
 	return { ...s, loud, quiet, wrapped, trimmed, plain };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();

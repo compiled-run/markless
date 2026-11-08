@@ -572,10 +572,10 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
-// Only page- and request-scoped instances are shared with other containers; container and widget instances are a container's own.
+// Only app-scoped instances are shared with other containers; container and subtree instances are a container's own.
 function sharedWakeSource(state: ProtocolStatePayload): string {
 	return (state.sharedDefinitions ?? []).some(
-		(definition) => definition.scope !== 'widget' && definition.scope !== 'container',
+		(definition) => definition.scope !== 'subtree' && definition.scope !== 'container',
 	)
 		? createInlineResumerSharedWakeSource(
 				PROTOCOL_SHARED_INSTANCES_PROPERTY,

@@ -30,7 +30,7 @@ export const ic = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcRoot({ children }) @{
@@ -76,7 +76,7 @@ test('the root and a part both ask the count, with no refusal and one record eac
 			rosterGraphNodeId: ROSTER_ID,
 			rosterSource: 'w.itemEls',
 			source: 'w.itemEls.length',
-			sourceSpan: { filename: 'src/Ic.tsrx', start: 328, end: 344 },
+			sourceSpan: { filename: 'src/Ic.tsrx', start: 329, end: 345 },
 		},
 		{
 			computedGraphNodeId: 'computed:of',
@@ -85,7 +85,7 @@ test('the root and a part both ask the count, with no refusal and one record eac
 			rosterGraphNodeId: ROSTER_ID,
 			rosterSource: 'w.itemEls',
 			source: 'w.itemEls.length',
-			sourceSpan: { filename: 'src/Ic.tsrx', start: 527, end: 543 },
+			sourceSpan: { filename: 'src/Ic.tsrx', start: 528, end: 544 },
 		},
 	]);
 });
@@ -239,7 +239,7 @@ export const ic = shared(
 		const total = computed(() => itemEls.length);
 		return { ...s, itemEls, total };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcRoot({ children }) @{
@@ -298,7 +298,7 @@ export const ic = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcRoot({ children }) @{

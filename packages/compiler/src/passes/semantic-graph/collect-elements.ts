@@ -1063,7 +1063,7 @@ function resolveElementHandleIdrefs(
 			continue;
 		}
 		// A page-wide factory is one graph per PAGE, so its handle names one element
-		// however many widgets render; only a widget-scoped one mints per instance.
+		// however many widgets render; only a subtree-scoped one mints per instance.
 		if (
 			handleBinding.sharedDefinitionId !== undefined &&
 			widgetRootComponentName(graph, handleBinding.sharedDefinitionId) === undefined
@@ -1081,7 +1081,7 @@ function resolveElementHandleIdrefs(
 }
 
 /**
- * The component that resolves a widget-scoped factory first owns its nodes, so
+ * The component that resolves a subtree-scoped factory first owns its nodes, so
  * its rendered instance is the widget root every other part is seeded from.
  */
 function widgetRootComponentName(
@@ -1091,7 +1091,7 @@ function widgetRootComponentName(
 	const definition = graph.sharedDefinitions.find(
 		(candidate) => candidate.id === sharedDefinitionId,
 	);
-	if (definition?.scope !== 'widget') return undefined;
+	if (definition?.scope !== 'subtree') return undefined;
 	return graph.sharedInstances.find(
 		(instance) => instance.definitionId === sharedDefinitionId && instance.componentName,
 	)?.componentName;

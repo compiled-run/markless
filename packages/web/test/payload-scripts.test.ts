@@ -242,7 +242,7 @@ test('runtime decodes shared definition metadata from async state payload script
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [
@@ -284,7 +284,7 @@ test('runtime decodes shared definition metadata from async state payload script
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			version: 0,
 			graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 			returnProperties: [
@@ -331,7 +331,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([
 		{
 			id: 'shared:src/session.tsrx#session',
-			scope: 'page',
+			scope: 'app',
 			version: 1,
 			patch: [['set', ['status'], 'ready']],
 		},
@@ -355,7 +355,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([
 		{
 			id: 'shared:src/session.tsrx#session',
-			scope: 'page',
+			scope: 'app',
 			version: 2,
 			patch: [['set', ['user', 'name'], 'Grace']],
 		},
@@ -394,7 +394,7 @@ test('runtime folds received shared patch records into decoded graph state', asy
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [

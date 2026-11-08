@@ -1,11 +1,13 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 import type {
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticSharedDependency,
+	SemanticSharedScope,
 	SemanticStateRead,
 	SemanticTemplateRead,
 	SourceSpan,
@@ -988,7 +990,8 @@ export function invalidSharedScopeDiagnostic(input: {
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
-	const valid = '"request", "container", "page", and "widget"';
+	const quoted = PROTOCOL_SHARED_SCOPES.map((scope) => `"${scope}"`);
+	const valid = `${quoted.slice(0, -1).join(', ')}, and ${quoted.at(-1)}`;
 	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
 	const valueText = literal ? `"${input.valueSource?.slice(1, -1)}"` : input.valueSource;
 	return semanticGraphDiagnostic({
@@ -997,11 +1000,27 @@ export function invalidSharedScopeDiagnostic(input: {
 		message: literal
 			? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
 			: `shared() scope must be a string literal. Valid scopes are ${valid}.`,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
+		why: 'shared() scope controls how long the data lives and who shares it. Silently dropping an unknown scope would change whether one app, one container, or one rendered subtree owns the data.',
 		span: input.valueSpan,
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'Use `shared(factory)` for one copy per app, `shared(factory, { scope: "container" })` for one copy per container, or `shared(factory, { scope: "subtree" })` for one copy per rendered subtree.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
+	});
+}
+
+export function renamedSharedScopeDiagnostic(input: {
+	readonly from: string;
+	readonly to: SemanticSharedScope;
+	readonly valueSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_SHARED_SCOPE_RENAMED',
+		title: 'shared() scope was renamed',
+		message: `shared() scope "${input.from}" is now "${input.to}".`,
+		why: 'The shared() scopes are app, container, and subtree. "page" and "request" became "app", and "widget" became "subtree", with the same behaviour. The old names no longer compile, so no build keeps a scope by accident.',
+		span: input.valueSpan,
+		suggestion: `Write \`{ scope: "${input.to}" }\`. "app" is the default, so an app-wide shared() can also drop the option.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_RENAMED',
 	});
 }
 
@@ -1110,7 +1129,7 @@ export function sharedSeedUnresolvedValueDiagnostic(input: {
 }
 
 // A shared() definition that several components of its own module resolve is a
-// widget family shape. Left without a scope it is page-scoped, so two of those
+// widget family shape. Left without a scope it is app-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
 // choice instead of an omission; either spelling silences it.
 export function implicitFamilyScopeDiagnostic(input: {
@@ -1124,18 +1143,18 @@ export function implicitFamilyScopeDiagnostic(input: {
 		severity: 'warning',
 		phase: 'semantic-graph',
 		title: 'shared() family has no declared scope',
-		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it is page-scoped.`,
-		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it has one copy for the whole app.`,
+		why: 'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
 		primarySpan: input.span,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		source: input.definitionName,
 		suggestions: [
 			{
-				message: `Add { scope: 'widget' } to give each rendered widget its own graph.`,
+				message: `Add { scope: 'subtree' } to give each rendered widget its own graph.`,
 			},
 			{
-				message: `Write { scope: 'page' } explicitly to keep one graph shared across the page.`,
+				message: `Write { scope: 'app' } explicitly to keep one graph shared across the app.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
@@ -1414,7 +1433,7 @@ export function rowOwnedIdrefElementHandleDiagnostic(
  * The widget root is the component that resolves the factory, and it renders
  * BEFORE the token naming its own instance exists: that token is written into
  * the seed map the root hands its parts. A part reads it; the root cannot. The
- * same holds for a factory whose scope is not `widget`, where one handle would
+ * same holds for a factory whose scope is not `subtree`, where one handle would
  * name one element per page rather than one per rendered widget.
  */
 export function widgetRootIdrefElementHandleDiagnostic(
@@ -1423,11 +1442,11 @@ export function widgetRootIdrefElementHandleDiagnostic(
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		title: 'This shared() element() handle cannot be named by an IDREF here',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'widget' }.`,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'subtree' }.`,
+		why: 'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-wide factory.',
 		span: reference.sourceSpan,
 		suggestion:
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 	});
 }

@@ -11,7 +11,7 @@ export const disclosureState = shared(
 
 		return { ...disclosure, rootEl, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Disclosure({ label = '', children }) @{

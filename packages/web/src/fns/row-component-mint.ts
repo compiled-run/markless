@@ -1201,7 +1201,7 @@ function hostInstancePathsAround(
 	return paths;
 }
 
-// A widget-scoped definition whose composed id still names no instance belongs
+// A subtree-scoped definition whose composed id still names no instance belongs
 // to neither a root the row is nor a live ancestor, so its nodes would be a
 // second instance nothing else reads.
 function assertRowWidgetsResolved(
@@ -1209,7 +1209,7 @@ function assertRowWidgetsResolved(
 	state: ProtocolStatePayload,
 ): void {
 	for (const definition of state.sharedDefinitions ?? []) {
-		if (definition.scope !== 'widget') continue;
+		if (definition.scope !== 'subtree') continue;
 		if (definition.id.startsWith('shared:'))
 			throw rowComponentError(
 				repeat,
@@ -1259,7 +1259,7 @@ async function seedMintedGraphNodes(
 					: await deserializeGraphValue(computed.value as SerializedGraphPayload),
 		});
 	}
-	// A widget-scoped definition owns nodes the row's cells never list - the ones
+	// A subtree-scoped definition owns nodes the row's cells never list - the ones
 	// its parts reach only through the definition - and the census counts those too.
 	for (const definition of state.sharedDefinitions ?? [])
 		for (const graphNodeId of definition.graphNodeIds) deps.graphNodeIds?.add?.(graphNodeId);
@@ -1270,7 +1270,7 @@ async function seedMintedGraphNodes(
  *
  * A graph's widget registry is minted once, from the definitions the payload
  * served, and a row born after that carries roots no served definition names.
- * Its parts would otherwise resolve their widget-scoped ids against another
+ * Its parts would otherwise resolve their subtree-scoped ids against another
  * row's root, or against none at all, so the row's registry is merged in before
  * any record that reads it is registered.
  */
@@ -1281,7 +1281,7 @@ async function mergeMintedWidgetRoots(
 	rowSegment: string,
 ): Promise<void> {
 	const definitions = (state.sharedDefinitions ?? []).filter(
-		(definition) => definition.scope === 'widget',
+		(definition) => definition.scope === 'subtree',
 	);
 	const [{ marklessComposedWidgetRegistry }, instanceScope] = await Promise.all([
 		import('./composition.ts'),

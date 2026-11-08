@@ -43,7 +43,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 ${body}
 `;
@@ -82,7 +82,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();
@@ -108,7 +108,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();
@@ -138,7 +138,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();

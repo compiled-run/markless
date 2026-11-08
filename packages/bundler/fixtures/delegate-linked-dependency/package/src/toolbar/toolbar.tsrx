@@ -7,5 +7,5 @@ export const toolbarState = shared(
 
 		return { ...toolbar, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );

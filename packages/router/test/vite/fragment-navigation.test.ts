@@ -611,7 +611,7 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('page-scoped shared state keeps its live value on the new page', async () => {
+		test('app-scoped shared state keeps its live value on the new page', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-hit]').click();
 			await page.locator('[data-hit]').click();

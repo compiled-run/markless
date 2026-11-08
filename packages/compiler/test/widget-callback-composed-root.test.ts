@@ -20,7 +20,7 @@ export const wcb = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WcbRoot({ label = '', onChange, children }) @{
@@ -44,7 +44,7 @@ export const grp = shared(
 		const g = state({ name: '', count: 0 });
 		return { ...g, record(next: boolean) { g.count = g.count + 1; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function GrpRoot({ name, children }) @{
 	const g = grp();
@@ -77,7 +77,7 @@ export const grp = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function GrpRoot({ name, onChange, children }) @{
 	const g = grp();

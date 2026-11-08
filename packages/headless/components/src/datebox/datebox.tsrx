@@ -146,7 +146,7 @@ export const dateboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function DateBoxRoot({

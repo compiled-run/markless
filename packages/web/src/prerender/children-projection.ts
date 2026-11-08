@@ -17,7 +17,7 @@ export type ChildrenProjectionLink = {
 };
 
 /**
- * The widget-scoped families a placed child ROOTS: the definitions whose cells
+ * The subtree-scoped families a placed child ROOTS: the definitions whose cells
  * its own payload owns, so every rendered instance of it starts a widget
  * instance of its own. A part reads the innermost root that encloses it, which
  * is why a root nested in another root's projection ends the outer seed phase.
@@ -40,7 +40,7 @@ export function widgetRootsOf(
 	// alone would read every part of such a family as a widget root of its own.
 	const carried = new Set(widgetFallbacksOf(surface, componentName, importSource) ?? []);
 	const rooted = (state.sharedDefinitions ?? []).flatMap((definition) => {
-		if (definition.scope !== 'widget') return [];
+		if (definition.scope !== 'subtree') return [];
 		if (![...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))) return [];
 		if (!carried.has(definition.id)) return [definition.id];
 		// A carrier still roots when the page it stands on gives it the standing

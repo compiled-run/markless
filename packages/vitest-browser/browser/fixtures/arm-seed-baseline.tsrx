@@ -7,7 +7,7 @@ const flag = shared(
 		const f = state({ invalid: false });
 		return { ...f };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Root({ invalid = false, children }) @{

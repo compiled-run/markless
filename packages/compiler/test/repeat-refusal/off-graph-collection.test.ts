@@ -117,7 +117,7 @@ export const calendarState = shared(() => {
 	const s = state({ picked: ['a', 'b'] as readonly string[] });
 	const days = computed(() => s.picked.map((one) => one + '!'));
 	return { ...s, days };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 const definitionId = 'shared:src/cal.tsrx#calendarState';

@@ -4,7 +4,7 @@ import { compileTsrxModule, linkBarrelComponents, moduleLinkResolutionKey } from
 import { widgetRootComponents } from '../src/passes/public-render/shared-seed-pass.ts';
 
 // The ratified consumer surface is `family.state()`: a namespace-member call on
-// a family object that reaches a widget-scoped shared definition through a
+// a family object that reaches a subtree-scoped shared definition through a
 // plain barrel. These tests state what that call must mean. They are RED: the
 // resolution they describe is not implemented yet (see the receipt for
 // U144-namespace-state-call), and the two shapes below are the smallest
@@ -16,7 +16,7 @@ import { shared, state } from '@markless/core';
 export const pnl = shared(() => {
 	const s = state({ open: false });
 	return { ...s, toggle() { s.open = !s.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const s = pnl();
@@ -53,7 +53,7 @@ test('the family module still owns the definition its own parts resolve', async 
 			definition.id,
 			definition.scope,
 		]),
-	).toEqual([[definitionId, 'widget']]);
+	).toEqual([[definitionId, 'subtree']]);
 	expect(
 		compiled.semanticGraph.sharedInstances.map((instance) => [
 			instance.definitionId,
@@ -126,7 +126,7 @@ test('the family module publishes its exported definition on its interface', asy
 			definition: expect.objectContaining({
 				id: definitionId,
 				name: 'pnl',
-				scope: 'widget',
+				scope: 'subtree',
 				returnProperties: expect.arrayContaining([
 					expect.objectContaining({
 						kind: 'graph',
@@ -266,10 +266,10 @@ export default function Report() @{
 	);
 	expect(
 		(consumer.protocolState.sharedDefinitions ?? []).map((item) => [item.id, item.scope]),
-	).toEqual([[definitionId, 'widget']]);
+	).toEqual([[definitionId, 'subtree']]);
 });
 
-// A widget-scoped definition is rooted by the module that DECLARES it. A
+// A subtree-scoped definition is rooted by the module that DECLARES it. A
 // consumer that resolves an adopted one is a part of somebody else's widget, so
 // the consumer module roots nothing: rooting the read there gave the definition
 // a second owner, and the consumer's own component served a second instance of

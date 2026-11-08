@@ -72,7 +72,7 @@ export const menubarState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by every `menubar.item`, so each menu on the bar gets a level of its
@@ -93,7 +93,7 @@ export const menubarItemState = shared(
 
 		return { ...level, itemEl, itemContentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MenubarRoot({ onChange, children, ...rest }: MenubarRootProps) @{

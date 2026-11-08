@@ -1014,7 +1014,7 @@ function resolvePayloadNodeOwners(
 				!edgeOwner.has(prop.graphNodeId)
 			)
 				edgeOwner.set(prop.graphNodeId, edge.parentComponentName);
-	// A widget-scoped shared() graph is one instance per rendered widget, so its
+	// A subtree-scoped shared() graph is one instance per rendered widget, so its
 	// nodes belong to the widget root, not the module root: that component's
 	// composed instance path is the widget root.
 	const widgetOwner = widgetRootComponents(input);

@@ -58,7 +58,7 @@ export function deriveAllowedModules(
 			: exactActionModules(runtimeDemandMap, action),
 	);
 	// The full tier loads the sync-policy core when ANY record on the page carries a
-	// policy (page-scoped). Exact (replaced) sets stay policy-free for policy-less
+	// policy (app-scoped). Exact (replaced) sets stay policy-free for policy-less
 	// actions, so this widening applies only while the action's kind is unreplaced.
 	const kindReplaced = new Map(
 		(runtimeDemandMap.recordKinds ?? []).map((kind) => [kind.kind, kind.replaced]),

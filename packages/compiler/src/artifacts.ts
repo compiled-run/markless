@@ -3,7 +3,7 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '@markless/serializer';
-import type { RenderedPayloadScripts } from '@markless/serializer';
+import type { ProtocolSharedScope, RenderedPayloadScripts } from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -647,7 +647,7 @@ export type ModuleGraphInterfaceProjection = {
 	readonly parentHostNodeId?: string;
 };
 
-export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
+export type SemanticSharedScope = ProtocolSharedScope;
 
 export type SemanticSharedDependency = {
 	readonly definitionId: string;
@@ -734,7 +734,7 @@ export type SemanticSharedInstance = {
 	readonly definitionId: string;
 	readonly definitionName: string;
 	readonly localName: string;
-	// The component whose body resolved the definition; widget scope needs it to
+	// The component whose body resolved the definition; subtree scope needs it to
 	// decide which composed instances belong to one rendered widget.
 	readonly componentName?: string;
 	readonly source: string;
@@ -941,6 +941,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_RETURN_UNNAMED'
 		| 'MARKLESS_SHARED_SEED_UNRESOLVED_VALUE'
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
+		| 'MARKLESS_SHARED_SCOPE_RENAMED'
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED'

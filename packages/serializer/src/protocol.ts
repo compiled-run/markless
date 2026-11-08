@@ -58,6 +58,9 @@ export {
 	type ProtocolEventHostEntry,
 } from './protocol-event-host.ts';
 
+export const PROTOCOL_SHARED_SCOPES = ['app', 'container', 'subtree'] as const;
+export type ProtocolSharedScope = (typeof PROTOCOL_SHARED_SCOPES)[number];
+
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
 /**
@@ -228,7 +231,7 @@ export type ProtocolStatePayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly exportedName: string;
-		readonly scope?: 'request' | 'container' | 'page' | 'widget';
+		readonly scope?: ProtocolSharedScope;
 		readonly version: number;
 		readonly graphNodeIds: ReadonlyArray<string>;
 		readonly projectionIds?: ReadonlyArray<string>;

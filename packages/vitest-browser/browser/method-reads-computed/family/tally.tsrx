@@ -49,7 +49,7 @@ export const tallyState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TallyRoot({

@@ -1,7 +1,7 @@
 import { computed, state } from '@markless/core';
 import { ImportedComposedChild } from './behavior-composed-child.tsrx';
 
-// The composition-shaped sibling of `behavior-page-scope.tsrx`: a child
+// The composition-shaped sibling of `behavior-app-scope.tsrx`: a child
 // component that takes a LIVE graph-bound prop and carries an authored
 // `attach=` behavior on its own element. CSR activates authored behaviors
 // BEFORE it demand-loads the runtime graph, so this behavior reaches its symbol

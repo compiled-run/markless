@@ -5,7 +5,7 @@ export const badge = shared(
 		const b = state({ label: '' });
 		return b;
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Badge({ label }: { readonly label: string }) @{

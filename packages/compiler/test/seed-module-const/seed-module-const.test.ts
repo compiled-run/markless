@@ -16,7 +16,7 @@ ${extra}
 export const gate = shared(() => {
 	const g = state(${seed});
 	return { ...g, grow() { g.x = g.x + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root() @{
 	const g = gate();

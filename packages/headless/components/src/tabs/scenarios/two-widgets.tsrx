@@ -2,7 +2,7 @@ import { tabs } from '../../index.ts';
 
 // Two tab sets on one page, sharing the same values on purpose. Each root is its
 // own instance boundary, so clicking in one must leave the other exactly where
-// it was — the row that catches a regression in `scope: 'widget'`.
+// it was — the row that catches a regression in `scope: 'subtree'`.
 export default function TwoWidgets() @{
 	<section>
 		<tabs.root value="one" data-testid="left-root">

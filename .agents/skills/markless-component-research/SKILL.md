@@ -52,7 +52,7 @@ Flexible structure; typical sections: metadata (research date, library versions)
 ## Markless API conventions (the API Design section MUST follow these)
 
 - **Parts:** lowercase compound namespaces (`checkbox.root`, `checkbox.trigger`); PascalCase components aliased lowercase via `export * as {family}`. Canonical roles: root, trigger, content, item, label, area, error, description, field (+ indicator, track, thumb, input, textarea where QDS uses them). `field` replaces QDS `hidden-input`. Never invent a part name — match the QDS folder or say why in the document.
-- **State:** one `shared()` widget-instance factory per family (`{ scope: 'widget' }`), internal only — never surfaced in the API. A widget root is always an instance boundary; parts resolve to the innermost enclosing root of their family.
+- **State:** one `shared()` widget-instance factory per family (`{ scope: 'subtree' }`), internal only — never surfaced in the API. A widget root is always an instance boundary; parts resolve to the innermost enclosing root of their family.
 - **Props:** `PropsOf<Tag>` for the host element surface; destructuring defaults on the root signature state what an omitted prop means; `{...rest}` first on every host element. No `bind:*`, no useBindings, no controlled/uncontrolled prop splits.
 - **Callbacks:** `onChange` (no `$` suffix) for the primary state change — a plain optional function-typed property on the factory return, seeded by the root. Handler composition is authored closures (`onClick={(e) => { x.toggle(); onClick?.(e); }}`), never handler arrays.
 - **State attributes:** `ui-*` presence attributes (`ui-checked`, `ui-disabled`, `ui-mixed`); no `data-*`, no `ui-qds-*` identity attributes, no key-value state strings unless genuinely multi-valued.

@@ -14,7 +14,7 @@ export const box = shared(
 		const framed = computed(() => SUFFIX + shout(s.label) + SUFFIX);
 		return { ...s, loud, framed };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Box() @{

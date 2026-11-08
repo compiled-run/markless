@@ -27,14 +27,14 @@ export const sheetState = shared(() => {
 	const panelEl = element();
 	const headingEl = element();
 	return { ...s, panelEl, headingEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const noticeState = shared(() => {
 	const n = state({ open: false });
 	const panelEl = element();
 	const headingEl = element();
 	return { ...n, panelEl, headingEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function SheetRoot({ children }) @{
 	const s = sheetState();

@@ -10,7 +10,7 @@ export const rowsState = shared(
 
 		return { ...box, boxEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RowsWidget({ name = '' }) @{

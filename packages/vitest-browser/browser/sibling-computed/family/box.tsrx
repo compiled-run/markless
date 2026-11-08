@@ -12,5 +12,5 @@ export const box = shared(
 		const shouted = computed(() => banged + banged);
 		return { ...s, loud, banged, asked, shouted };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );

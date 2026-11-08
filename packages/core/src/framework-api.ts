@@ -4,7 +4,7 @@ export type AsyncComputedValue<T> = T extends Promise<infer Value> ? Awaited<Val
 // never absent - so the array case carries no undefined.
 export type ElementHandle<T extends Element | readonly Element[] = Element> = T extends readonly (infer E extends Element)[] ? E[] : T | undefined;
 
-export type SharedScope = 'request' | 'container' | 'page' | 'widget';
+export type SharedScope = 'app' | 'container' | 'subtree';
 
 export type SharedOptions = {
 	readonly scope: SharedScope;

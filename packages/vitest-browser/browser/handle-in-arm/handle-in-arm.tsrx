@@ -10,7 +10,7 @@ export const widgetState = shared(
 
 		return { ...widget, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Widget({ startOpen = false, children }) @{

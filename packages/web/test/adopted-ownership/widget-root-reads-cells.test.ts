@@ -26,7 +26,7 @@ function surfaceWith(
 				state: {
 					cells: [{ graphNodeId: `${GAUGE}/state:g` }],
 					computed: [{ graphNodeId: `${GAUGE}/computed:loud` }],
-					sharedDefinitions: [{ id: GAUGE, scope: 'widget' }],
+					sharedDefinitions: [{ id: GAUGE, scope: 'subtree' }],
 				},
 			},
 		},

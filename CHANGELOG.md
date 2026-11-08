@@ -10,6 +10,15 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.14.0
+
+### Breaking changes
+
+- **@markless/core:** Rename shared() scopes to app, container and subtree.
+  To upgrade, rename the `scope` option of each `shared()` call: `'page'` and `'request'` become `'app'` (the default, so you can also drop the option), and `'widget'` becomes `'subtree'`. `'container'` keeps its name. Behaviour does not change. An old name now fails the compile with `MARKLESS_SHARED_SCOPE_RENAMED`, which names the new spelling.
+
+[All 3 commits since v0.13.0](https://github.com/compiled-run/markless/compare/7dd60eb3df318577f58415eadecb40bd8fb02f31...v0.14.0)
+
 ## 0.13.0
 
 No user-facing changes in the released packages.

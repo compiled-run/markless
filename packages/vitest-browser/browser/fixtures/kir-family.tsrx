@@ -15,7 +15,7 @@ export const kirGroup = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per item, rooted by `KirItem`. */
@@ -25,7 +25,7 @@ export const kirItem = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function KirRoot({ children, ...rest }) @{

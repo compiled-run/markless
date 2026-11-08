@@ -3,7 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import Page from './krgr-page.tsrx';
 
 /**
- * Removal from a keyed `@for` over WIDGET-scoped shared state.
+ * Removal from a keyed `@for` over SUBTREE-scoped shared state.
  *
  * One source feeds two lists - plain rows, and rows that each root a widget of
  * their own - so a failure on only one of them names the row root. Three keys

@@ -1,7 +1,7 @@
 import { shared, state } from '@markless/core';
 import { radiogroup } from '../../index.ts';
 
-// Page scope is one cell for the whole page, so the island discriminator that
+// App scope is one cell for the whole page, so the island discriminator that
 // keeps each embed's widget cells apart must not reach it: both embeds read this
 // counter and both see the other's write.
 const pageReads = shared(
@@ -15,7 +15,7 @@ const pageReads = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export default function MultiEmbedPageScope() @{

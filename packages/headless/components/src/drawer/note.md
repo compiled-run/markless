@@ -131,7 +131,7 @@ renders drawer markup but never enlists`, which asserts what actually happens.
 | `data-*` opt-out for drag                                              | consumer-authored attributes are not a surface the family reads                                         |
 | `snapToSequentialPoints`                                               | the sequential rule is the only rule shipped                                                            |
 | `fadeFromIndex`, `TRANSITIONS`, `BORDER_RADIUS`, `NESTED_DISPLACEMENT` | animation and nested displacement are consumer CSS                                                      |
-| Vaul's `NestedRoot` and `nested`                                       | its root is a context provider; ours is a `shared()` with `scope: 'widget'`, so nesting is just nesting |
+| Vaul's `NestedRoot` and `nested`                                       | its root is a context provider; ours is a `shared()` with `scope: 'subtree'`, so nesting is just nesting |
 
 ## Open questions
 

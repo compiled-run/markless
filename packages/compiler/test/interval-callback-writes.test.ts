@@ -47,7 +47,7 @@ export const ticker = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Panel() @{
@@ -217,7 +217,7 @@ export const ticker = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Root({ onTick }) @{

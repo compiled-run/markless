@@ -1226,7 +1226,7 @@ async function prerenderDataModuleSource(
 	// Two facts turn it on, because the pass does two jobs. It RUNS a widget
 	// root's shared seeds, which a module with a `shared-seed` symbol needs; and
 	// it FILES the widget-instance token every `shared()` element() handle mints
-	// its id from, which a module that roots a widget-scoped family needs whether
+	// its id from, which a module that roots a subtree-scoped family needs whether
 	// or not that family plans a seed. A family of element() handles over constant
 	// state plans no seed symbol at all, so gating on seeds alone left its parts
 	// minting against a token nobody had filed (MARKLESS_ELEMENT_HANDLE_WIDGET_

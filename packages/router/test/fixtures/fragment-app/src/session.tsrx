@@ -5,5 +5,5 @@ export const session = shared(
 		const visit = state({ hits: 0 });
 		return { ...visit };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );

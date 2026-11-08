@@ -285,7 +285,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: {
 		summary: 'Several components share a shared() definition that has no scope.',
 		what: 'Several components in one file use the same `shared()` value, and it has no scope. So every copy of the widget on the page shares one value.',
-		how: "Pass `{ scope: 'widget' }` to give each widget its own value. Pass `{ scope: 'page' }` if one value for the page is what you want.",
+		how: "Pass `{ scope: 'subtree' }` to give each widget its own value. Pass `{ scope: 'app' }` if one value for the whole app is what you want.",
+	},
+	MARKLESS_SHARED_SCOPE_RENAMED: {
+		summary: 'A shared() uses a scope name that Markless renamed.',
+		what: "The scopes are now `'app'`, `'container'`, and `'subtree'`. `'page'` and `'request'` became `'app'`, and `'widget'` became `'subtree'`. Each new name works exactly like the old one.",
+		how: "Write the new name. `'app'` is the default, so you can also leave the option out.",
+		before: [
+			"import { shared, state } from '@markless/core';",
+			'',
+			"export const menu = shared(() => state({ open: false }), { scope: 'widget' });",
+		],
+		example: ["export const menu = shared(() => state({ open: false }), { scope: 'subtree' });"],
 	},
 	MARKLESS_SERIALIZE_UNSUPPORTED_VALUE: {
 		summary: 'State holds a value that Markless cannot send from the server to the browser.',

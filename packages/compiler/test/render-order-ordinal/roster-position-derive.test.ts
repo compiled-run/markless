@@ -28,7 +28,7 @@ export const ic = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcRoot({ children }) @{
@@ -71,7 +71,7 @@ test('the roster position compiles with no refusal and one recognised record', a
 			handleName: 'mine',
 			hostNodeId: 'h1',
 			source: 'w.itemEls.indexOf(mine as HTMLDivElement)',
-			sourceSpan: { filename: 'src/Ic.tsrx', start: 464, end: 505 },
+			sourceSpan: { filename: 'src/Ic.tsrx', start: 465, end: 506 },
 		},
 	]);
 });
@@ -238,7 +238,7 @@ export const ic = shared(
 		const pos = computed(() => itemEls.indexOf(mine as HTMLDivElement));
 		return { ...s, itemEls, mine, pos };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcItem({ children }) @{

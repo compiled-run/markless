@@ -597,7 +597,7 @@ test('resume runtime dispatches versioned shared patches after lazy event writes
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [
@@ -654,7 +654,7 @@ test('resume runtime dispatches versioned shared patches after lazy event writes
 			type: 'async:shared-patch',
 			detail: {
 				id: 'shared:src/session.tsrx#session',
-				scope: 'page',
+				scope: 'app',
 				version: 1,
 				patch: [['set', ['status'], 'ready']],
 			},
@@ -681,7 +681,7 @@ test('resume runtime folds received shared patch events into graph state', async
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [
@@ -719,7 +719,7 @@ test('resume runtime folds received shared patch events into graph state', async
 		type: 'async:shared-patch',
 		detail: {
 			id: 'shared:src/session.tsrx#session',
-			scope: 'page',
+			scope: 'app',
 			version: 1,
 			patch: [['set', ['status'], 'ready']],
 		},

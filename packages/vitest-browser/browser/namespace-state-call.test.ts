@@ -4,7 +4,7 @@ import { cleanup, render, renderSSR } from '../src/index.ts';
 import Page from './fixtures/namespace-state-consumer.tsrx';
 
 // The ratified consumer surface: a component in another module reaches a
-// family's widget-scoped shared definition through a plain .ts barrel with a
+// family's subtree-scoped shared definition through a plain .ts barrel with a
 // namespace-member call (`family.state()`), and reads a live cell off it.
 //
 // Two things have to hold at once. The compile has to resolve the member call

@@ -179,11 +179,11 @@ export function collectPublicRenderComponentDefinitions(
 			...chunkGraphNodeIds(childChunks),
 			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
 		]);
-		// A widget-scoped shared() graph is one instance per rendered widget, so its
+		// A subtree-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
 			input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-				definition.scope === 'widget' ? [definition.id] : [],
+				definition.scope === 'subtree' ? [definition.id] : [],
 			),
 		);
 		const resolvedDefinitionIds = new Set(

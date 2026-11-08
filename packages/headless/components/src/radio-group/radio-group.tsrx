@@ -51,7 +51,7 @@ export const radiogroupState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by `radiogroup.item`: the parts inside one option read this instance, while the item's own body still reads the group's.
@@ -62,7 +62,7 @@ export const radiogroupItemState = shared(
 
 		return { ...item, fieldEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RadioGroupRoot({

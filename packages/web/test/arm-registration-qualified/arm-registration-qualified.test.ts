@@ -28,7 +28,7 @@ function pageOf(instancePaths: ReadonlyArray<string>) {
 	const root = { nodeType: 1, tagName: 'MAIN', childNodes: panels } as unknown as ResumeDomElement;
 	const graph = {
 		listSharedDefinitions: () =>
-			instancePaths.map((path) => ({ id: path + WIDGET, scope: 'widget' })),
+			instancePaths.map((path) => ({ id: path + WIDGET, scope: 'subtree' })),
 	} as unknown as RuntimeGraph;
 	const handles = materializeElementHandles(root, new Map(), [], []);
 	instancePaths.forEach((path, index) =>
@@ -81,7 +81,7 @@ test('unfiling the arm host takes the qualified key with it', () => {
 });
 
 // A handle no rendered widget owns - a bare name, a component-local id, a
-// page-scoped shared() graph - is page space by design and keeps the direct read.
+// app-scoped shared() graph - is page space by design and keeps the direct read.
 test('an id no rendered widget owns is still read exactly as compiled', () => {
 	const { panels, graph, handles } = pageOf(['c0:']);
 	expect(marklessInstanceScopedElementHandle(handles.get, 'c0:', graph)('panelEl')).toBe(

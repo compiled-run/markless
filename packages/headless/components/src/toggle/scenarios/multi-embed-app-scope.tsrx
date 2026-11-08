@@ -1,7 +1,7 @@
 import { shared, state } from '@markless/core';
-import { buttongroup } from '../../index.ts';
+import { toggle } from '../../index.ts';
 
-// Page scope is one cell for the whole page, so the island discriminator that
+// App scope is one cell for the whole page, so the island discriminator that
 // keeps each embed's widget cells apart must not reach it: both embeds read this
 // counter and both see the other's write.
 const pageReads = shared(
@@ -15,18 +15,17 @@ const pageReads = shared(
 			},
 		};
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export default function MultiEmbedPageScope() @{
 	const shelf = pageReads();
 
 	<section data-testid="page-frame">
-		<buttongroup.root value="left" name="page-align" data-testid="page-root">
-			<buttongroup.label data-testid="page-label">Text alignment</buttongroup.label>
-			<buttongroup.item value="left" data-testid="page-left-item">Left</buttongroup.item>
-			<buttongroup.item value="right" data-testid="page-right-item">Right</buttongroup.item>
-		</buttongroup.root>
+		<toggle.root name="page-notifications" data-testid="page-root">
+			<toggle.label data-testid="page-label">Enable notifications</toggle.label>
+			<toggle.trigger data-testid="page-trigger"><toggle.thumb data-testid="page-thumb" /></toggle.trigger>
+		</toggle.root>
 		<button type="button" data-testid="page-bump" onClick={() => shelf.bump()}>
 			This helped me
 		</button>

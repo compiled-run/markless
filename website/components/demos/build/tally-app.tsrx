@@ -6,7 +6,7 @@ export const tally = shared(
 		const box = state({ count: 0 });
 		return { ...box, increment() { box.count++; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'app' },
 );
 
 export function Tally({ label, children }: { label: string; children?: Children }) @{
@@ -59,24 +59,6 @@ export function Tally({ label, children }: { label: string; children?: Children 
 				button {
 					transition: none;
 				}
-			}
-
-			p {
-				outline: 1.5px dashed var(--muted-ink);
-				outline-offset: 0.55em;
-				margin-block-start: 1.4em;
-			}
-
-			p::before {
-				content: 'own copy' / '';
-				position: absolute;
-				inset-block-start: -2.05em;
-				inset-inline-start: -0.2em;
-				padding: 0 0.3em;
-				background: var(--paper);
-				color: var(--muted-ink);
-				font-family: var(--font-mono);
-				font-size: var(--step--2);
 			}
 		</style>
 	</p>

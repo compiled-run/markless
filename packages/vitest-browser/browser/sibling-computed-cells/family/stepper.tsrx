@@ -19,7 +19,7 @@ export const stepperState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function StepperRoot({ children }: { children?: Children }) @{

@@ -1,6 +1,6 @@
-import * as tally from './tally-widget.tsrx';
+import * as tally from './tally-subtree.tsrx';
 
-export default function TalliesWidget() @{
+export default function TalliesSubtree() @{
 	<section>
 		<tally.Tally label="Left"><tally.Badge /></tally.Tally>
 		<tally.Tally label="Right"><tally.Badge /></tally.Tally>

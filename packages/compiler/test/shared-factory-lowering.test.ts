@@ -28,7 +28,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false as boolean | 'mixed', name: '' as string });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -75,7 +75,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ open: (false satisfies boolean), tone: 'calm' as 'calm' | 'loud' });
 	return { ...cell, flip() { cell.open = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -108,7 +108,7 @@ export const spike = shared(() => {
 			s.changes = s.changes + 1;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -164,7 +164,7 @@ export const gate = shared(() => {
 			cell.open = wanted;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -192,7 +192,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false, disabled: false });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box({ disabled }) @{
 	const s = spike();
@@ -241,7 +241,7 @@ export const spike = shared(() => {
 	const s = state({ checked: false });
 	const triggerEl = element();
 	return { ...s, triggerEl, toggle() { s.checked = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Trigger() @{
 	const s = spike();
@@ -274,7 +274,7 @@ export const gate = shared(() => {
 	const cell = state({ open: false });
 	const panelEl = element();
 	return { ...cell, panelEl, flip() { cell.open = true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
@@ -303,7 +303,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked, children }) @{
 	const s = spike();
@@ -424,7 +424,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked = false, children }) @{
 	const s = spike();
@@ -448,7 +448,7 @@ export function Root({ checked = false, children }) @{
 	]);
 });
 
-// B6 (owner ruling) — a family shape that is page-scoped only by omission.
+// B6 (owner ruling) — a family shape that is app-scoped only by omission.
 test('a multi-component family with no declared scope warns and names both fixes', async () => {
 	const compiled = await compile(
 		'src/spike.tsrx',
@@ -481,12 +481,12 @@ export function Trigger() @{
 	expect(warning?.message).toContain('spike');
 	expect(warning?.message).toContain('Root');
 	expect(warning?.message).toContain('Trigger');
-	expect(JSON.stringify(warning)).toContain("{ scope: 'widget' }");
-	expect(JSON.stringify(warning)).toContain("{ scope: 'page' }");
+	expect(JSON.stringify(warning)).toContain("{ scope: 'subtree' }");
+	expect(JSON.stringify(warning)).toContain("{ scope: 'app' }");
 	expect(errors(compiled)).toEqual([]);
 });
 
-test('an explicit page scope on the same family shape silences the warning', async () => {
+test('an explicit app scope on the same family shape silences the warning', async () => {
 	const compiled = await compile(
 		'src/spike.tsrx',
 		`
@@ -495,7 +495,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: false });
 	return { ...s, toggle() { s.checked = true; } };
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Root({ children }) @{
 	const s = spike();
@@ -554,7 +554,7 @@ import { shared, state } from '@markless/core';
 export const gate = shared(() => {
 	const cell = state({ locked: false });
 	return { ...cell, release() { cell.locked = false; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Latch() @{
 	const cell = gate();
@@ -570,7 +570,7 @@ export function Panel({ locked = false, children }) @{
 }
 `;
 
-test('a widget-scoped cell is owned by the component that seeds it, not the first one', async () => {
+test('a subtree-scoped cell is owned by the component that seeds it, not the first one', async () => {
 	const compiled = await compile('src/gate.tsrx', partFirstSeedSource);
 	const source = compiled.publicRenderModule.ssrModuleSource ?? '';
 	const seeding = source.slice(source.indexOf('async function marklessRenderSsrPanel'));

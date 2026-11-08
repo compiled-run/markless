@@ -223,7 +223,7 @@ export const pickState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function PickRoot({ onFlip, tone, children }) @{
 	const pick = pickState();

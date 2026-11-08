@@ -100,23 +100,23 @@ test('SSR: child rows whose attribute reads a computed of shared() state', async
 	await everyRowRepaints();
 });
 
-test('CSR: widget rows whose attribute reads widget-scoped shared() state', async () => {
+test('CSR: widget rows whose attribute reads subtree-scoped shared() state', async () => {
 	await render(WidgetRows);
 	await everyRowRepaints();
 });
 
-test('SSR: widget rows whose attribute reads widget-scoped shared() state', async () => {
+test('SSR: widget rows whose attribute reads subtree-scoped shared() state', async () => {
 	await renderSSR(WidgetRows);
 	await everyRowRepaints();
 });
 
-test('CSR: rows in a part projected into a widget root read the root\'s widget-scoped shared() state', async () => {
+test('CSR: rows in a part projected into a widget root read the root\'s subtree-scoped shared() state', async () => {
 	await render(WidgetPart);
 	await everyRowRepaints();
 	expect(document.querySelector('[data-deck]')!.getAttribute('data-face')).toBe('lyra');
 });
 
-test('SSR: rows in a part projected into a widget root read the root\'s widget-scoped shared() state', async () => {
+test('SSR: rows in a part projected into a widget root read the root\'s subtree-scoped shared() state', async () => {
 	await renderSSR(WidgetPart);
 	await everyRowRepaints();
 	expect(document.querySelector('[data-deck]')!.getAttribute('data-face')).toBe('lyra');
@@ -139,12 +139,12 @@ async function widgetsRepaintApart() {
 	expect(checkedIn('data-first')).toEqual(rows('nova'));
 }
 
-test('CSR: two widgets\' rows each follow their own widget-scoped shared() state', async () => {
+test('CSR: two widgets\' rows each follow their own subtree-scoped shared() state', async () => {
 	await render(WidgetPair);
 	await widgetsRepaintApart();
 });
 
-test('SSR: two widgets\' rows each follow their own widget-scoped shared() state', async () => {
+test('SSR: two widgets\' rows each follow their own subtree-scoped shared() state', async () => {
 	await renderSSR(WidgetPair);
 	await widgetsRepaintApart();
 });

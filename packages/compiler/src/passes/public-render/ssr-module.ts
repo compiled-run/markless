@@ -1003,7 +1003,7 @@ function emitSsrDataLines(
 	);
 	// The mint that needs the token is inside the CHILD's module when the child is
 	// a root placed with no children, so this module's own chunks cannot answer
-	// for it. Its interface can: a module declaring a widget-scoped family with an
+	// for it. Its interface can: a module declaring a subtree-scoped family with an
 	// element() handle is one whose parts mint per-instance ids. A page importing
 	// no such module emits what it emitted before, byte for byte.
 	const importedWidgetHandleFamily = (edge: ComponentEdge): boolean =>
@@ -1013,7 +1013,7 @@ function emitSsrDataLines(
 				: undefined) ?? []
 		).some(
 			(entry) =>
-				entry.definition.scope === 'widget' &&
+				entry.definition.scope === 'subtree' &&
 				entry.graphBindings.some((binding) => binding.kind === 'element'),
 		);
 	// Where every child this render places STANDS: its instance path and the two

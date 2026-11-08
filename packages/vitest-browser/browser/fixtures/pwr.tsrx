@@ -16,7 +16,7 @@ export const pwr = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PwrRoot({ label = '', children }) @{

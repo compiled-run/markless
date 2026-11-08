@@ -17,7 +17,7 @@ export const icCard = shared(
 
 		return { ...card, noteEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function IcComposedPart({ children }) @{

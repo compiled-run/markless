@@ -107,7 +107,7 @@ pnpm run typecheck
 
 Start with [CONTRIBUTING.md](./CONTRIBUTING.md) for the workspace layout and [markless.dev/contributing](https://markless.dev/contributing) for the guided version. Agent rules live in [`.ruler/`](./.ruler/) and are generated into `AGENTS.md` and `CLAUDE.md` with `pnpm rules`.
 
-For editor support, install the TSRX extension (`ripple-ts.ripple-ts-vscode-plugin`). Apps made with `npm create markless` come with the editor settings already in place.
+For editor support, install [TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin) (`TSRX.tsrx-vscode-plugin`), or get it [from Open VSX](https://open-vsx.org/extension/TSRX/tsrx-vscode-plugin) in Cursor, Windsurf and other VS Code forks. Apps made with `npm create markless` come with the editor settings already in place.
 
 ## License
 

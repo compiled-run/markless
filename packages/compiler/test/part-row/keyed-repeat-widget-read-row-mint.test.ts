@@ -22,7 +22,7 @@ export const nest = shared(
 		const n = state({ label: '', items: [] as ReadonlyArray<{ id: string }> });
 		return { ...n };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NestItems({ testid }) @{
@@ -159,7 +159,7 @@ export const nest = shared(
 		const n = state({ label: '', items: [] as ReadonlyArray<{ id: string }> });
 		return { ...n };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NestItems({ testid }) @{
