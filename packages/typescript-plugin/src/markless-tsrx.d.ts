@@ -395,8 +395,6 @@ declare namespace __MarklessTypeService {
 		'stroke-linejoin'?: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round' | 'inherit';
 	};
 
-	type SvgAttributeValue = string | number | undefined;
-
 	type TableCellAttributes = {
 		colspan?: NumericAttributeValue;
 		/**
@@ -406,7 +404,9 @@ declare namespace __MarklessTypeService {
 		 */
 		headers?: string;
 		rowspan?: NumericAttributeValue;
-		// Current on <th>, legacy on <td>; typed on both so a cell's props spread onto either.
+	};
+
+	type TableHeaderAttributes = TableCellAttributes & {
 		abbr?: string;
 		scope?: 'row' | 'col' | 'rowgroup' | 'colgroup';
 	};
@@ -513,64 +513,71 @@ declare namespace __MarklessTypeService {
 																					| string
 																					| readonly string[];
 																			}
-																		: Tag extends 'td' | 'th'
+																		: Tag extends 'td'
 																			? TableCellAttributes
-																			: Tag extends 'textarea'
-																				? FormAttributes & {
-																						cols?: NumericAttributeValue;
-																						disabled?: boolean;
-																						placeholder?: string;
-																						readonly?: boolean;
-																						required?: boolean;
-																						rows?: NumericAttributeValue;
-																						value?: string;
-																					}
-																				: Tag extends 'video'
-																					? MediaAttributes & {
-																							height?: NumericAttributeValue;
-																							playsinline?: boolean;
-																							poster?: string;
-																							width?: NumericAttributeValue;
+																			: Tag extends 'th'
+																				? TableHeaderAttributes
+																				: Tag extends 'textarea'
+																					? FormAttributes & {
+																							cols?: NumericAttributeValue;
+																							disabled?: boolean;
+																							placeholder?: string;
+																							readonly?: boolean;
+																							required?: boolean;
+																							rows?: NumericAttributeValue;
+																							value?: string;
 																						}
-																					: Tag extends keyof SVGElementTagNameMap
-																						? SvgAttributes
-																						: {};
+																					: Tag extends 'video'
+																						? MediaAttributes & {
+																								height?: NumericAttributeValue;
+																								playsinline?: boolean;
+																								poster?: string;
+																								width?: NumericAttributeValue;
+																							}
+																						: Tag extends keyof SVGElementTagNameMap
+																							? SvgAttributes
+																							: {};
+
+	/** HTML 4 attributes the list still carries that HTML moved to another element. */
+	type MovedAttributeName<Tag extends PropertyKey> = Tag extends 'td' ? 'abbr' | 'scope' : never;
 
 	type StandardAttributeName<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		?
 				| HtmlGlobalAttributeName
-				| (Tag extends keyof HtmlAttributeNameByTag ? HtmlAttributeNameByTag[Tag] : never)
+				| (Tag extends keyof HtmlAttributeNameByTag
+						? Exclude<HtmlAttributeNameByTag[Tag], MovedAttributeName<Tag>>
+						: never)
 		: Tag extends keyof SVGElementTagNameMap
 			?
 					| SvgGlobalAttributeName
 					| (Tag extends keyof SvgAttributeNameByTag ? SvgAttributeNameByTag[Tag] : never)
 			: never;
 
-	/** The typed attributes above, plus every other standard attribute of the tag with a plain value. */
-	type WithStandardAttributes<Tag extends PropertyKey, Typed, Value> = Typed & {
-		[Name in Exclude<StandardAttributeName<Tag>, keyof Typed>]?: Value;
+	type TypedAttributes<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
+		: Tag extends keyof SVGElementTagNameMap
+			? Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
+			: never;
+
+	/** Every standard attribute of the tag that the typed attributes above leave out, with a plain value. */
+	type StandardAttributes<Tag extends PropertyKey> = {
+		[
+			Name in Exclude<StandardAttributeName<Tag>, keyof TypedAttributes<Tag>>
+		]?: Tag extends keyof HTMLElementTagNameMap ? AttributeValue : string | number | undefined;
 	};
 
-	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
-		? WithStandardAttributes<
-				Tag,
-				Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>,
-				AttributeValue
-			>
-		: Tag extends keyof SVGElementTagNameMap
-			? WithStandardAttributes<
-					Tag,
-					Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>,
-					SvgAttributeValue
-				>
-			: never;
+	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends
+		| keyof HTMLElementTagNameMap
+		| keyof SVGElementTagNameMap
+		? TypedAttributes<Tag> & StandardAttributes<Tag>
+		: never;
 
 	type IntrinsicTagName = keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap;
 
 	/** What @markless/router's Html and Link read from this contract. */
 	interface RouterContract {
 		readonly child: Child;
-		readonly htmlAttributes: WithStandardAttributes<'html', GlobalAttributes, AttributeValue>;
+		readonly htmlAttributes: GlobalAttributes & StandardAttributes<'html'>;
 	}
 	type IntrinsicElements = {
 		[Tag in IntrinsicTagName]: IntrinsicElementFor<Tag>;
