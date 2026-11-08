@@ -6,31 +6,33 @@ import { modeFor, sidebarFor, type SidebarEntry } from '../../nav.ts';
 import { asset } from '../../site-base.ts';
 import { INK_MARKS } from './ink-marks.ts';
 
-const SLIDE = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
+const SLIDE = { duration: 220, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
 
-// The layout switches once; the article's blocks are translated back from their old spot, the parts that hold fixed bars left alone.
+// The layout switches once; in the frame that first paints it, the nav and the article's on-screen blocks are animated
+// from where they were. Animations made there start on that frame, so none of the slide is spent before it shows.
 function slide(write: () => void, focusId: string) {
 	const root = document.documentElement;
+	const nav = document.getElementById('docs-sidebar');
 	const article = document.querySelector<HTMLElement>('.site-shell .prose');
 	const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const from = article?.getBoundingClientRect().left;
+	const navFrom = nav ? getComputedStyle(nav).translate : 'none';
 	if (!still) root.dataset.sidebarSliding = '';
 	write();
 	requestAnimationFrame(() => {
 		document.getElementById(focusId)?.focus();
 		if (still) return;
-		const done = () => delete root.dataset.sidebarSliding;
-		document.getElementById('docs-sidebar')?.addEventListener('transitionend', done, { once: true });
-		setTimeout(done, SLIDE.duration * 5);
-		if (article === null || from === undefined) return;
-		const shift = from - article.getBoundingClientRect().left;
-		for (const block of article.children) {
-			if (shift === 0 || block.id === 'docs-sidebar' || block.matches('header, markless-outline, script')) continue;
+		const moves: Animation[] = [];
+		if (nav) moves.push(nav.animate([{ translate: navFrom }, { translate: getComputedStyle(nav).translate }], SLIDE));
+		const shift = article && from !== undefined ? from - article.getBoundingClientRect().left : 0;
+		for (const block of article?.children ?? []) {
+			if (shift === 0 || block === nav || block.matches('header, markless-outline, script')) continue;
 			// Only blocks on screen get a layer of their own; the rest are already where they belong.
 			const { top, bottom } = block.getBoundingClientRect();
 			if (bottom < 0 || top > innerHeight) continue;
-			block.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], SLIDE);
+			moves.push(block.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], SLIDE));
 		}
+		void Promise.allSettled(moves.map((move) => move.finished)).then(() => delete root.dataset.sidebarSliding);
 	});
 }
 
@@ -168,7 +170,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			if (token) opened = withSection(opened, token, branch?.getAttribute('aria-expanded') === 'true');
 		}}
 		onSidebarleave={() => {
-			const token = document.querySelector('#docs-sidebar .branch:has([aria-current="page"])')?.getAttribute('data-section');
+			const token = document.querySelector('#docs-sidebar .branch[aria-expanded="true"]:has([aria-current="page"])')?.getAttribute('data-section');
 			if (token) opened = withSection(opened, token, true);
 		}}
 		onSidebararrive={() => {
@@ -580,12 +582,8 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				}
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The nav slides on a translate transition, held on its own layer while it moves. */
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The nav slides by translate, held on its own layer while it moves. */
 			@media (min-width: 70.01rem) {
-				.sidebar {
-					transition: translate 200ms cubic-bezier(0.2, 0, 0, 1);
-				}
-
 				.sidebar-close {
 					display: inline-flex;
 				}
@@ -620,11 +618,6 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.sidebar,
-				html[data-sidebar='closed'] .sidebar {
-					transition: none;
-				}
-
 				.node-chevron {
 					transition: none;
 				}

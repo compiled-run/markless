@@ -19,8 +19,18 @@
 	document.addEventListener('focusin', (event) => {
 		if (event.target instanceof Element && event.target.closest('.nav-pill')) root.removeAttribute('data-nav-away');
 	});
-	// Before any link or history step leaves the page, the sidebar records the section the reader was in, so it stays open on the next page.
-	const leaving = () => document.getElementById('docs-sidebar')?.dispatchEvent(new CustomEvent('sidebarleave'));
+	// The sidebar keeps the sections a reader has open across pages. It is told only when the page would otherwise lose
+	// one, so a reader with nothing to keep never wakes its code.
+	const sidebar = () => document.getElementById('docs-sidebar');
+	const kept = () => (root.getAttribute('data-sidebar-sections') ?? '').split(' ').filter(Boolean);
+	const leaving = () => {
+		const token = sidebar()?.querySelector('.branch[aria-expanded="true"]:has([aria-current="page"])')?.getAttribute('data-section');
+		if (token && !kept().includes(token)) sidebar().dispatchEvent(new CustomEvent('sidebarleave'));
+	};
+	const arriving = () => {
+		const closed = kept().some((token) => sidebar()?.querySelector(`.branch[data-section="${token}"][aria-expanded="false"]`));
+		if (closed) sidebar().dispatchEvent(new CustomEvent('sidebararrive'));
+	};
 	document.addEventListener(
 		'click',
 		(event) => {
@@ -30,11 +40,10 @@
 		true,
 	);
 	addEventListener('popstate', leaving, true);
-	// After a page swaps in, or once this page has loaded, the sidebar reopens the sections the reader keeps open.
-	const arriving = () => document.getElementById('docs-sidebar')?.dispatchEvent(new CustomEvent('sidebararrive'));
 	document.addEventListener('marklessrouterrendered', arriving);
-	if (document.readyState === 'complete') arriving();
-	else addEventListener('load', arriving, { once: true });
+	const idle = () => (window.requestIdleCallback ?? setTimeout)(arriving);
+	if (document.readyState === 'complete') idle();
+	else addEventListener('load', idle, { once: true });
 	// The full-screen menu belongs to the narrow layout: widening past it closes the menu, or the page would stay inert behind a menu nobody can see.
 	matchMedia('(min-width: 80rem) and (min-height: 37.5rem)').addEventListener('change', (event) => {
 		if (!event.matches) return;
