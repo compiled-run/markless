@@ -8,17 +8,35 @@ import { INK_MARKS } from './ink-marks.ts';
 
 const SLIDE = { duration: 200, easing: 'cubic-bezier(0.2, 0, 0, 1)' };
 
-// The storage write lands before the next frame; there the article, drawn live, is offset back from where it was.
-// An offset, not a transform: the article holds the fixed sidebar and outline, and a transform would carry them along.
-function glide(article: HTMLElement | null, from: number | undefined) {
-	if (article === null || from === undefined || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+// The layout switches once; the article's blocks are translated back from their old spot, the parts that hold fixed bars left alone.
+function slide(write: () => void, focusId: string) {
+	const root = document.documentElement;
+	const article = document.querySelector<HTMLElement>('.site-shell .prose');
+	const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const from = article?.getBoundingClientRect().left;
+	if (!still) root.dataset.sidebarSliding = '';
+	write();
 	requestAnimationFrame(() => {
+		document.getElementById(focusId)?.focus();
+		if (still) return;
+		const done = () => delete root.dataset.sidebarSliding;
+		document.getElementById('docs-sidebar')?.addEventListener('transitionend', done, { once: true });
+		setTimeout(done, SLIDE.duration * 5);
+		if (article === null || from === undefined) return;
 		const shift = from - article.getBoundingClientRect().left;
-		if (shift === 0) return;
-		article.style.position = 'relative';
-		const move = article.animate([{ left: `${shift}px` }, { left: '0px' }], SLIDE);
-		void move.finished.finally(() => article.style.removeProperty('position'));
+		for (const block of article.children) {
+			if (shift === 0 || block.id === 'docs-sidebar' || block.matches('header, markless-outline, script')) continue;
+			// Only blocks on screen get a layer of their own; the rest are already where they belong.
+			const { top, bottom } = block.getBoundingClientRect();
+			if (bottom < 0 || top > innerHeight) continue;
+			block.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], SLIDE);
+		}
 	});
+}
+
+function withSection(list: string, token: string, open: boolean) {
+	const rest = list.split(' ').filter((part) => part !== '' && part !== token);
+	return (open ? [...rest, token] : rest).join(' ');
 }
 
 // The current page's mark is the link's own state, so two pages render the sidebar alike and a navigation keeps it.
@@ -127,10 +145,14 @@ function PageLink({ entry }: { readonly entry: SidebarEntry }) @{
 
 export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 	const here = modeFor(pathname);
-	const sections = sidebarFor(pathname).map((section) => ({
+	const prefix = here.key === 'ui' ? 'u' : 'f';
+	const sections = sidebarFor(pathname).map((section, index) => ({
 		...section,
+		token: prefix + (index + 1),
 		expanded: section.entries.some((entry) => entry.active),
 	}));
+	// Sections the reader keeps open, as mode-and-position tokens ("f2 u1"); the stylesheet shows them on the first paint.
+	let opened = storage('sidebar-sections', '');
 	// oxlint-disable-next-line no-unused-vars -- the write persists the choice
 	let shown = storage('sidebar', 'open');
 	const marks = asset(INK_MARKS) + '#';
@@ -139,9 +161,26 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 		id="docs-sidebar"
 		class="sidebar"
 		aria-label="Documentation"
+		onClick={(event) => {
+			// The tree has toggled the section by the time the press reaches the nav.
+			const branch = (event.target as Element).closest('.branch-trigger')?.closest('.branch');
+			const token = branch?.getAttribute('data-section');
+			if (token) opened = withSection(opened, token, branch?.getAttribute('aria-expanded') === 'true');
+		}}
+		onSidebarleave={() => {
+			const token = document.querySelector('#docs-sidebar .branch:has([aria-current="page"])')?.getAttribute('data-section');
+			if (token) opened = withSection(opened, token, true);
+		}}
+		onSidebararrive={() => {
+			const kept = opened.split(' ');
+			for (const branch of document.querySelectorAll<HTMLElement>('#docs-sidebar .branch[aria-expanded="false"]'))
+				if (kept.includes(branch.dataset.section ?? '')) branch.querySelector<HTMLElement>('.branch-trigger')?.click();
+		}}
 		onKeydown={(event) => {
-			if (event.key !== 'Enter') return;
 			const row = event.target as HTMLElement;
+			const token = row.getAttribute('data-section');
+			if (token) opened = withSection(opened, token, row.getAttribute('aria-expanded') === 'true');
+			if (event.key !== 'Enter') return;
 			if (row.hasAttribute('data-page-href')) row.querySelector<HTMLAnchorElement>('a')?.click();
 		}}
 	>
@@ -154,11 +193,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			aria-expanded="false"
 			aria-controls="docs-sidebar"
 			onClick={() => {
-				const article = document.querySelector<HTMLElement>('.site-shell .prose');
-				const from = article?.getBoundingClientRect().left;
-				shown = 'open';
-				glide(article, from);
-				setTimeout(() => document.getElementById('sidebar-close')?.focus(), 0);
+				slide(() => {
+					shown = 'open';
+				}, 'sidebar-close');
 			}}
 		>
 			<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -177,11 +214,9 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					aria-expanded="true"
 					aria-controls="docs-sidebar"
 					onClick={() => {
-						const article = document.querySelector<HTMLElement>('.site-shell .prose');
-						const from = article?.getBoundingClientRect().left;
-						shown = 'closed';
-						glide(article, from);
-						setTimeout(() => document.getElementById('sidebar-open')?.focus(), 0);
+						slide(() => {
+							shown = 'closed';
+						}, 'sidebar-open');
 					}}
 				>
 					<svg class="sidebar-toggle-icon" viewBox="0 0 108 108" aria-hidden="true">
@@ -199,6 +234,7 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 								open={section.expanded}
 								level={1}
 								aria-label={section.title}
+								data-section={section.token}
 							>
 								<tree.itemtrigger class="branch-trigger">
 									<tree.itemindicator class="branch-indicator" aria-hidden="true">
@@ -504,12 +540,50 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 				overflow: visible;
 			}
 
-			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The layout switches once; the nav slides on a transition and the article glides back from its old spot, both by translate only. */
+			/* A section the reader left open shows on the first paint, before the page wakes and opens it for real. */
+			:is(
+			html[data-sidebar-sections~='f1'] .branch[data-section='f1'],
+			html[data-sidebar-sections~='f2'] .branch[data-section='f2'],
+			html[data-sidebar-sections~='f3'] .branch[data-section='f3'],
+			html[data-sidebar-sections~='f4'] .branch[data-section='f4'],
+			html[data-sidebar-sections~='f5'] .branch[data-section='f5'],
+			html[data-sidebar-sections~='f6'] .branch[data-section='f6'],
+			html[data-sidebar-sections~='f7'] .branch[data-section='f7'],
+			html[data-sidebar-sections~='f8'] .branch[data-section='f8'],
+			html[data-sidebar-sections~='f9'] .branch[data-section='f9'],
+			html[data-sidebar-sections~='f10'] .branch[data-section='f10'],
+			html[data-sidebar-sections~='f11'] .branch[data-section='f11'],
+			html[data-sidebar-sections~='f12'] .branch[data-section='f12'],
+			html[data-sidebar-sections~='u1'] .branch[data-section='u1'],
+			html[data-sidebar-sections~='u2'] .branch[data-section='u2'],
+			html[data-sidebar-sections~='u3'] .branch[data-section='u3'],
+			html[data-sidebar-sections~='u4'] .branch[data-section='u4'],
+			html[data-sidebar-sections~='u5'] .branch[data-section='u5'],
+			html[data-sidebar-sections~='u6'] .branch[data-section='u6'],
+			html[data-sidebar-sections~='u7'] .branch[data-section='u7'],
+			html[data-sidebar-sections~='u8'] .branch[data-section='u8'],
+			html[data-sidebar-sections~='u9'] .branch[data-section='u9'],
+			html[data-sidebar-sections~='u10'] .branch[data-section='u10'],
+			html[data-sidebar-sections~='u11'] .branch[data-section='u11'],
+			html[data-sidebar-sections~='u12'] .branch[data-section='u12']
+			) {
+				& > .branch-content {
+					display: block;
+				}
+
+				& > .branch-trigger .node-chevron {
+					rotate: 90deg;
+				}
+
+				& > .branch-trigger .branch-connector {
+					display: none;
+				}
+			}
+
+			/* Closing is a desktop choice: below 70rem the sidebar is the phone's page list. The nav slides on a translate transition, held on its own layer while it moves. */
 			@media (min-width: 70.01rem) {
 				.sidebar {
-					transition:
-						translate 200ms cubic-bezier(0.2, 0, 0, 1),
-						visibility 0s;
+					transition: translate 200ms cubic-bezier(0.2, 0, 0, 1);
 				}
 
 				.sidebar-close {
@@ -524,15 +598,24 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 
 				html[data-sidebar='closed'] .sidebar {
 					translate: calc(-100% - var(--space-s-l)) 0;
+				}
+
+				html[data-sidebar='closed']:not([data-sidebar-sliding]) .sidebar {
 					visibility: hidden;
-					transition:
-						translate 200ms cubic-bezier(0.2, 0, 0, 1),
-						visibility 0s 200ms;
 				}
 
 				html[data-sidebar='closed'] .sidebar-open {
 					display: inline-flex;
 					visibility: visible;
+				}
+
+				html[data-sidebar-sliding] .sidebar {
+					will-change: translate;
+				}
+
+				/* The page moves under a resting pointer for one slide; hover waits for it to land. */
+				html[data-sidebar-sliding] body {
+					pointer-events: none;
 				}
 			}
 
