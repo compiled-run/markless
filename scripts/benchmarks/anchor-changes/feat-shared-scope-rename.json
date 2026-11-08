@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 32,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 372,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 415,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 166,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "shared() scope rename: each subtree family spells 'subtree', one byte longer than 'widget', and the docs gain the renamed-scope error guide and a scope glossary card, so pages download a few hundred bytes more; executed JS moves within run noise; measured on CI run 42509802488 against queue run 42409914642",
+			"date": "2026-11-08"
+		}
+	]
+}

@@ -1403,7 +1403,7 @@ export function rowOwnedIdrefElementHandleDiagnostic(
  * The widget root is the component that resolves the factory, and it renders
  * BEFORE the token naming its own instance exists: that token is written into
  * the seed map the root hands its parts. A part reads it; the root cannot. The
- * same holds for a factory whose scope is not `widget`, where one handle would
+ * same holds for a factory whose scope is not `subtree`, where one handle would
  * name one element per page rather than one per rendered widget.
  */
 export function widgetRootIdrefElementHandleDiagnostic(
