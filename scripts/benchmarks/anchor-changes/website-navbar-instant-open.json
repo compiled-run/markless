@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 10,
+			"reason": "navbar.root delay={0} so menus open on the first frame (owner request)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "navbar.root delay={0} so menus open on the first frame (owner request)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -167,
+			"reason": "navbar.root delay={0} so menus open on the first frame (owner request)",
+			"date": "2026-11-06"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 10,
+			"reason": "navbar.root delay={0} so menus open on the first frame (owner request)",
+			"date": "2026-11-06"
+		}
+	]
+}

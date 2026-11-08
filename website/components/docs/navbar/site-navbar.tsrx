@@ -81,7 +81,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
-		<navbar.root class="nav-pill navbar-edge" aria-label="Main">
+		<navbar.root class="nav-pill navbar-edge" aria-label="Main" delay={0}>
 			<div class="nav-tools">
 				<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
 					<Brand />
@@ -125,7 +125,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				pointer-events: none;
 				background: color-mix(in oklch, var(--ink) 52%, transparent);
 				opacity: 0;
-				transition: opacity 325ms ease-in-out;
+				transition: opacity 150ms ease-out;
 
 				html.dark & {
 					background: color-mix(in oklch, black 58%, transparent);
@@ -134,6 +134,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 
 			.nav-shade:has([ui-open])::before {
 				opacity: 1;
+				transition: opacity 140ms ease-out;
 			}
 
 			.nav-pill {
@@ -286,7 +287,9 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				translate: -50% 0;
 			}
 
-			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. */
+			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. Every panel is
+			   the same size, so a switch has no size to morph. Opening shows the box and panel on the first frame, already
+			   at 0.4, and settles them in 140ms; a switch crossfades the cards in 120ms; closing fades out. */
 			.nav-box {
 				z-index: 59;
 				display: none;
@@ -295,18 +298,19 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				opacity: 0;
 				transition:
 					opacity 150ms ease,
-					translate var(--spring-slide-ms) var(--spring-slide),
 					display 150ms allow-discrete;
 			}
 
-			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
 			.nav-pill[ui-open] .nav-box {
 				display: block;
 				opacity: 1;
+				transition:
+					opacity 140ms ease-out,
+					translate 140ms ease-out;
 
 				@starting-style {
-					opacity: 0;
-					translate: -50% -0.5rem;
+					opacity: 0.4;
+					translate: -50% -5px;
 				}
 			}
 
@@ -320,62 +324,50 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				overflow: clip;
 				opacity: 1;
 				transition:
-					opacity 150ms ease,
-					translate var(--spring-slide-ms) var(--spring-slide),
-					display 150ms allow-discrete;
+					opacity 140ms ease-out,
+					translate 140ms ease-out;
 
 				@starting-style {
-					opacity: 0;
-					translate: -50% -0.5rem;
+					opacity: 0.4;
+					translate: -50% -5px;
 				}
 			}
 
 			.nav-panel[hidden] {
 				display: none;
 				opacity: 0;
+				transition:
+					opacity 150ms ease,
+					display 150ms allow-discrete;
 			}
 
-			/* Switching: the cards slide solid, a whole panel's width, on the slide spring. Transitions, not keyframes: a switch mid-slide carries on from where the cards are. */
-			.nav-panel[ui-from] {
+			/* Switching: the outgoing cards fade out over the incoming ones, which drift in a few pixels from their side. */
+			.nav-panel[ui-from='end'] {
 				@starting-style {
-					opacity: 1;
-					translate: -50% 0;
+					opacity: 0.4;
+					translate: calc(-50% + 10px) 0;
+				}
+			}
+
+			.nav-panel[ui-from='start'] {
+				@starting-style {
+					opacity: 0.4;
+					translate: calc(-50% - 10px) 0;
 				}
 			}
 
 			.nav-panel[hidden][ui-to] {
-				opacity: 1;
-				transition: display var(--spring-slide-ms) allow-discrete;
-			}
-
-			@media (prefers-reduced-motion: no-preference) {
-				.nav-panel > .card {
-					transition: translate var(--spring-slide-ms) var(--spring-slide);
-				}
-
-				.nav-panel[ui-from='end'] > .card {
-					@starting-style {
-						translate: 37.5rem 0;
-					}
-				}
-
-				.nav-panel[ui-from='start'] > .card {
-					@starting-style {
-						translate: -37.5rem 0;
-					}
-				}
-
-				.nav-panel[hidden][ui-to='start'] > .card {
-					translate: -37.5rem 0;
-				}
-
-				.nav-panel[hidden][ui-to='end'] > .card {
-					translate: 37.5rem 0;
-				}
+				transition:
+					opacity 120ms ease-out,
+					display 120ms allow-discrete;
 			}
 
 			@media (prefers-reduced-motion: reduce) {
-				.nav-panel {
+				.nav-box,
+				.nav-pill[ui-open] .nav-box,
+				.nav-panel,
+				.nav-panel[hidden],
+				.nav-panel[hidden][ui-to] {
 					transition: none;
 				}
 			}
