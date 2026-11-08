@@ -18,7 +18,7 @@ test('framework APIs fail loudly when executed without the TSRX compiler', () =>
 	expect(() => element()).toThrow(
 		'markless element() must be compiled from a .tsrx file before it can run.',
 	);
-	expect(() => shared(() => ({ user: 'Ada' }), { scope: 'page' })).toThrow(
+	expect(() => shared(() => ({ user: 'Ada' }), { scope: 'app' })).toThrow(
 		'markless shared() must be compiled from a .tsrx file before it can run.',
 	);
 	expect(() => storage('theme', 'light')).toThrow(

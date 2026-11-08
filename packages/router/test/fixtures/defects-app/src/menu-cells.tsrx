@@ -5,5 +5,5 @@ export const menus = shared(
 		const cells = state({ open: '', at: '' });
 		return { ...cells };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );

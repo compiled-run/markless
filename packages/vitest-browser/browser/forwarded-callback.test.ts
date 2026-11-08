@@ -183,19 +183,19 @@ async function eachStallCountsItsOwnPresses(container: HTMLElement, total?: () =
 
 const pageTotal = (container: HTMLElement) => () => container.querySelector('[data-total]')?.textContent;
 
-test('CSR: a callback prop writing widget-scoped shared() state reaches its own widget', async () => {
+test('CSR: a callback prop writing subtree-scoped shared() state reaches its own widget', async () => {
 	const { container } = await render(WidgetShared);
 	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
 });
-test('SSR resume: a callback prop writing widget-scoped shared() state reaches its own widget', async () => {
+test('SSR resume: a callback prop writing subtree-scoped shared() state reaches its own widget', async () => {
 	const { container } = await renderSSR(WidgetShared);
 	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
 });
-test('CSR: a callback prop writing widget-scoped shared() state, one module below the page', async () => {
+test('CSR: a callback prop writing subtree-scoped shared() state, one module below the page', async () => {
 	const { container } = await render(WidgetSharedPage);
 	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
 });
-test('SSR resume: a callback prop writing widget-scoped shared() state, one module below the page', async () => {
+test('SSR resume: a callback prop writing subtree-scoped shared() state, one module below the page', async () => {
 	const { container } = await renderSSR(WidgetSharedPage);
 	await eachStallCountsItsOwnPresses(container as HTMLElement, pageTotal(container as HTMLElement));
 });

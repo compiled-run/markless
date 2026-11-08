@@ -12,11 +12,11 @@ export const groupState = shared(() => {
 	const fieldEls = element<HTMLElement[]>();
 	const labelEl = element<HTMLLabelElement>();
 	return { ...group, fieldEls, labelEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export const itemState = shared(() => {
 	const fieldEl = element<HTMLInputElement>();
 	return { fieldEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Field({ children, ...rest }) @{
 	const group = groupState();
 	const item = itemState();
@@ -32,11 +32,11 @@ export const groupState = shared(() => {
 	const group = state({ value: '' });
 	const fieldEls = element<HTMLElement[]>();
 	return { ...group, fieldEls };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export const itemState = shared(() => {
 	const fieldEl = element<HTMLInputElement>();
 	return { fieldEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Field() @{
 	const group = groupState();
 	const item = itemState();
@@ -194,7 +194,7 @@ test('a spread-carried handler becomes its own record on the part element, never
 export const boxState = shared(() => {
 	const box = state({ on: false });
 	return { ...box, toggle() { box.on = !box.on; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Trigger({ children, ...rest }) @{
 	const box = boxState();
 	<button {...rest} type="button" onClick={() => { box.toggle(); }}>{children}</button>

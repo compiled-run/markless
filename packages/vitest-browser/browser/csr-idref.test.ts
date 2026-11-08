@@ -46,7 +46,7 @@ test('CSR: two widgets on one page name their own titles, not each other', async
 	const second = modalPair(screen.container as HTMLElement, 'b');
 
 	expect(second.labelledby).toBe(second.id);
-	// Widget scope: one rendered widget, one id. Gating the token must not
+	// Subtree scope: one rendered widget, one id. Gating the token must not
 	// collapse the two instances onto the enclosing page's single token.
 	expect(first.id).not.toBe(second.id);
 	expect(first.dialog.ownerDocument.getElementById(second.id!)).toBe(second.title);

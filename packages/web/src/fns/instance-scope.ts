@@ -178,12 +178,12 @@ export function marklessRowScopedGraphNodeId(
 }
 
 /**
- * Refuse a widget-scoped read that reached no rendered widget.
+ * Refuse a subtree-scoped read that reached no rendered widget.
  *
  * Left alone the id stays in page space, the graph answers `undefined`, and the
  * handler runs to completion writing nothing - a dismiss that matches no message.
  * Only an id whose prefix names the edge a part was compiled at, for a definition
- * this page files as a widget, is that: page-scoped `shared()` and storage ids
+ * this page files as a widget, is that: app-scoped `shared()` and storage ids
  * are page space on purpose, and a bare widget id claims no instance.
  */
 function assertWidgetReadResolved(
@@ -193,8 +193,8 @@ function assertWidgetReadResolved(
 ): void {
 	const slash = sharedId.lastIndexOf('/');
 	const definitionId = slash > 0 ? sharedId.slice(0, slash) : sharedId;
-	// The registry files every widget-scoped definition the graph lists, rendered
-	// or not, so membership here is what says "widget-scoped" rather than a guess.
+	// The registry files every subtree-scoped definition the graph lists, rendered
+	// or not, so membership here is what says "subtree-scoped" rather than a guess.
 	if (!registry.rootPaths.has(definitionId) && !registry.rowRooted.has(definitionId)) return;
 	throw marklessCodedError(
 		'WidgetInstanceRuntimeError',
@@ -205,7 +205,7 @@ function assertWidgetReadResolved(
 }
 
 /**
- * A widget-scoped `shared:` id as a bound symbol spells it: `c1:p2:shared:…`.
+ * A subtree-scoped `shared:` id as a bound symbol spells it: `c1:p2:shared:…`.
  *
  * The prefix is the component EDGE the widget's part was compiled at, so it
  * names no row - while the widget-root registry holds one root per RENDERED
@@ -216,7 +216,7 @@ function assertWidgetReadResolved(
  * the edge path first is what makes the lookup reach this row's own root.
  *
  * `undefined` means "no rendered widget owns this id", and every such id - a
- * storage slot, a page-scoped `shared()` graph - falls through to the caller and
+ * storage slot, an app-scoped `shared()` graph - falls through to the caller and
  * resolves exactly as it does today. A widget rooted OUTSIDE every row is not
  * one of them: no row can answer it, so the projection site answers it below.
  */
@@ -480,15 +480,15 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 }
 
 /**
- * A widget-scoped `element()` handle names one element PER RENDERED WIDGET, and
+ * A subtree-scoped `element()` handle names one element PER RENDERED WIDGET, and
  * its compiled id is one module-level string every instance of that widget
  * spells. Qualifying it exactly as the widget's graph nodes are qualified is
  * what turns it back into a key: the registration and the reading handler both
  * land on the rendered widget's own root path, so a page carrying two instances
  * answers each handler with its own element instead of the last registration.
  *
- * A handle that is not widget-scoped is returned untouched. A component-local
- * handle is already one element per key, and a page-scoped `shared()` graph is
+ * A handle that is not subtree-scoped is returned untouched. A component-local
+ * handle is already one element per key, and an app-scoped `shared()` graph is
  * page space by design.
  */
 export function marklessWidgetHandleId(
@@ -679,11 +679,11 @@ export function marklessPageSpaceId(graphNodeId: string): boolean {
 /**
  * One render's answer to "which rendered widget owns this id".
  *
- * Widget-scoped shared() definitions are the one page-space family that is NOT
+ * Subtree-scoped shared() definitions are the one page-space family that is NOT
  * page-wide: one graph per rendered widget. `rootPaths` answers, for an id a
  * part spells, WHICH rendered widget's instance path holds its nodes.
  * Composition fills it as it merges children; resume fills it from the payload.
- * A page with no widget-scoped definition never fills it and never pays for the
+ * A page with no subtree-scoped definition never fills it and never pays for the
  * lookup.
  *
  * `rowRooted` names the definitions at least one of whose rendered roots stands
@@ -758,7 +758,7 @@ function marklessRegistryHolder(graph: RuntimeGraph): object {
 
 /**
  * This graph's rendered widgets, minted on first ask and filled from the graph
- * itself: the payload's widget-scoped definitions carry their qualified root ids
+ * itself: the payload's subtree-scoped definitions carry their qualified root ids
  * and the projection sites composition registered them under, which is every
  * answer a lookup needs and the only place resume has ever read them from.
  */
@@ -787,7 +787,7 @@ function marklessShareWidgetRegistry(graph: object, registry: MarklessWidgetRegi
 
 function marklessNoteGraphWidgetRoots(registry: MarklessWidgetRegistry, graph: RuntimeGraph): void {
 	for (const definition of graph.listSharedDefinitions?.() ?? [])
-		if (definition.scope === 'widget') {
+		if (definition.scope === 'subtree') {
 			const rootPath = marklessInstancePath(definition.id);
 			marklessNoteWidgetRoot(registry, definition.id, rootPath);
 			for (const projectionId of definition.projectionIds ?? [])
@@ -966,7 +966,7 @@ function marklessWidgetRootPathThroughRows(
  * Two guards keep that from minting a phantom instance instead. The path must
  * carry no row of its own, because a path that already names its rows and STILL
  * found no root is not waiting on one. And the definition must be one some row
- * really did root: an id belonging to no widget at all - a page-scoped
+ * really did root: an id belonging to no widget at all - an app-scoped
  * `shared()` graph, a storage slot - is page space and stays exactly as spelled.
  */
 function marklessUnresolvedWidgetGraphNodeId(
@@ -1009,7 +1009,7 @@ function byDefinition<T>(id: string, lookup: (key: string) => T | undefined): T 
 	return lookup(id) ?? (slash > 0 ? lookup(id.slice(0, slash)) : undefined);
 }
 
-// Every id family a component owns is instance-local; a page-scoped shared()
+// Every id family a component owns is instance-local; an app-scoped shared()
 // graph and a persisted storage slot are page-space on purpose. The compiler
 // refuses at build time to emit an id belonging to neither, so this stays a
 // concatenation.

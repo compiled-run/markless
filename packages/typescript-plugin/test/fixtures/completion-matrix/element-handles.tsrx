@@ -12,7 +12,7 @@ const eh = shared(
 
 		return { contentEl, optionEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function EhContent() @{

@@ -144,13 +144,13 @@ type SsrChildComponent = {
 		/** Set by the compiler on a component whose body seeds a shared instance. */
 		readonly marklessSeedsShared?: boolean;
 		/**
-		 * The widget-scoped shared definitions this component ROOTS, set by the
+		 * The subtree-scoped shared definitions this component ROOTS, set by the
 		 * compiler on a component whose payload owns their cells. Every rendered
 		 * instance of it starts a widget instance of its own.
 		 */
 		readonly marklessWidgetRoots?: ReadonlyArray<string>;
 		/**
-		 * The widget-scoped shared definitions this component holds the cells of
+		 * The subtree-scoped shared definitions this component holds the cells of
 		 * WITHOUT designating them. Whether such a carrier is nevertheless a root
 		 * is a fact about where the page puts it, so the marker names the
 		 * candidates and the placement decides.
@@ -1670,7 +1670,7 @@ export function marklessSsrAppendChildView(context: {
 			...marklessSsrBindBehavior(behavior, context.child, childInstancePath),
 			hostNodeId: context.child.hostPrefix + behavior.hostNodeId,
 		});
-	// A widget-scoped handle id is one module-level string every instance of that
+	// A subtree-scoped handle id is one module-level string every instance of that
 	// widget spells, so it takes the same qualification every other record's graph
 	// ids take here. Without it the served payload files both instances' elements
 	// under one key and the last one registered answers every handler on the page.

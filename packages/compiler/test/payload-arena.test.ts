@@ -55,7 +55,7 @@ export const session = shared(() => {
 			data.status = 'anonymous';
 		},
 	};
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Header() @{
 	const currentSession = session();
@@ -648,7 +648,7 @@ test('planPayloadArena records shared definition state planning metadata', async
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			graphNodeIds: [
 				'shared:src/session.tsrx#session/state:data',
 				'shared:src/session.tsrx#session/computed:signedIn',

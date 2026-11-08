@@ -17,7 +17,7 @@ export default function Hardened() @{
 	</qrcode.root>
 }
 
-// Inside the root: the widget scope hands a component under the root the same code.
+// Inside the root: the subtree scope hands a component under the root the same code.
 function Harden() @{
 	const qr = qrcode.state();
 

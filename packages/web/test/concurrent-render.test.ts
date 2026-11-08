@@ -48,7 +48,7 @@ function composedRoot(rootSegment: string): ComposeStateDraft {
 						id: `${rootSegment}${DEFINITION}`,
 						name: 'widget',
 						exportedName: 'widget',
-						scope: 'widget',
+						scope: 'subtree',
 						version: 0,
 						graphNodeIds: [`${rootSegment}${CELL}`],
 					},

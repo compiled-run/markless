@@ -6,7 +6,7 @@ export const outer = shared(() => {
 	const o = state({ locked: false });
 
 	return { ...o };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const node = shared(() => {
 	const n = state({ open: false });
@@ -17,7 +17,7 @@ export const node = shared(() => {
 			n.open = n.open !== true;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function OuterRoot({ locked = false, children }) @{
 	const o = outer();

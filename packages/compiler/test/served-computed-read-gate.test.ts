@@ -14,7 +14,7 @@ export const slider = shared(() => {
 	const s = state({ value: 20, min: 0, max: 100 });
 	const percent = computed(() => ((s.value - s.min) / (s.max - s.min)) * 100);
 	return { ...s, percent };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 const HANDLER_READS_COMPUTED = `${FACTORY}

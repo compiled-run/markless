@@ -23,7 +23,7 @@ export const gateState = shared(
 		});
 		return { ...gate, cells, step() { gate.offset = gate.offset + 1; } };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GateRoot({ children, ...rest }: { readonly children?: unknown }) @{

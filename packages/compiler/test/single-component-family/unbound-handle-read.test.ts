@@ -33,7 +33,7 @@ export const dial = shared(
 		const markEls = element<HTMLButtonElement[]>();
 		return { ...d, markEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 `;
 

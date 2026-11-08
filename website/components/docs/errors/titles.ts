@@ -141,6 +141,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_BRANCH_ELSE_SPELLING: 'else is missing its @',
 	MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: 'An @if re-renders its whole @try',
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: 'A shared() has no scope',
+	MARKLESS_SHARED_SCOPE_RENAMED: 'A shared() scope was renamed',
 	MARKLESS_SERIALIZE_UNSUPPORTED_VALUE: 'State holds a value the server cannot send',
 	MARKLESS_COMPUTED_DEPENDENCY_CYCLE: 'A computed() reads itself',
 	MARKLESS_COMPONENT_IMPORT_CYCLE: 'Two files render each other',

@@ -274,7 +274,7 @@ export const resizableState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ResizableRoot({

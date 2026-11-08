@@ -26,7 +26,7 @@ for (const [shape, packing] of [
 		delete host.__overlayEvaluations;
 		try {
 			const source = `import { shared, state } from '@markless/core';
-const model = shared(() => { const data = state({ open: false }); return { ...data }; }, { scope: 'widget' });
+const model = shared(() => { const data = state({ open: false }); return { ...data }; }, { scope: 'subtree' });
 export default function ${shape.name}() @{
  const data = model();
  <${shape.tag} overlay hidden={!data.open} onClick={() => { throw new Error('lazy-handler'); }}>content</${shape.tag}>

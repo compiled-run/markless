@@ -8,7 +8,7 @@ export const boxState = shared(() => {
 	const box = state({ on: false });
 	const triggerEl = element();
 	return { ...box, triggerEl, toggle() { box.on = !box.on; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Root({ children, ...rest }) @{
 	const box = boxState();
 	<div {...rest} ui-on={box.on}>{children}</div>
@@ -26,7 +26,7 @@ export const panelState = shared(() => {
 	const panel = state({ open: false });
 	const knobEl = element();
 	return { ...panel, knobEl, flip() { panel.open = !panel.open; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Shell({ children, ...others }) @{
 	const panel = panelState();
 	<section {...others} ui-open={panel.open}>{children}</section>

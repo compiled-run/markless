@@ -6,7 +6,7 @@ const counter = shared(
 		const box = state({ version: 0 });
 		return { ...box };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export default function SharedAsyncPage() @{

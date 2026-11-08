@@ -4024,15 +4024,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'This shared() element() handle cannot be named by an IDREF here: a Markless build error.',
 		printed: [
-			'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT: Cannot resolve <attributeName>={<source>} because "<handleName>" is declared in a shared() factory that is not { scope: \'widget\' }.',
-			'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT: Cannot resolve <attributeName>={<source>} because "<handleName>" is declared in a shared() factory that is not { scope: \'subtree\' }.',
+			'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-wide factory.',
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 			'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		],
 		structured: true,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
+		why: 'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-wide factory.',
 		suggestion:
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 		sources: [
 			{
 				id: 'f0',
@@ -10462,13 +10462,13 @@ export const errorEntries: readonly ErrorEntry[] = [
 		printed: [
 			'MARKLESS_SHARED_CALL_UNRESOLVED: `<callSource>` reaches no shared() definition. <resolves>',
 			'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
-			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 			'https://markless.dev/errors/MARKLESS_SHARED_CALL_UNRESOLVED',
 		],
 		structured: true,
 		why: 'A call the compiler cannot resolve to a shared() definition creates no graph instance, so every read of it would render a dead value and every write would go nowhere — silently, at runtime.',
 		suggestion:
-			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'widget' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
+			"Export the definition from the module this call names, and compile that module in this build. Before: `export const famState = shared(() => ..., { scope: 'subtree' })` in `fam.tsrx` with nothing re-exporting it; after: `export { famState as state } from './fam.tsrx';` in the family index, so `fam.state()` names it.",
 		sources: [
 			{
 				id: 'f0',
@@ -10594,14 +10594,14 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'warning',
 		description: 'Several components share a shared() definition that has no scope.',
 		printed: [
-			'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: <length> components in this module resolve shared() "<definitionName>" (<components>), which is the shape of a widget family, but no scope is declared so it is page-scoped.',
-			'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
-			"Add { scope: 'widget' } to give each rendered widget its own graph.",
+			'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: <length> components in this module resolve shared() "<definitionName>" (<components>), which is the shape of a widget family, but no scope is declared so it has one copy for the whole app.',
+			'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+			"Add { scope: 'subtree' } to give each rendered widget its own graph.",
 			'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
 		],
 		structured: true,
-		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
-		suggestion: "Add { scope: 'widget' } to give each rendered widget its own graph.",
+		why: 'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		suggestion: "Add { scope: 'subtree' } to give each rendered widget its own graph.",
 		guide: {
 			summary: 'Several components share a shared() definition that has no scope.',
 			what: [
@@ -10626,7 +10626,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's1',
-					text: "{ scope: 'widget' }",
+					text: "{ scope: 'subtree' }",
 					code: true,
 				},
 				{
@@ -10635,12 +10635,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's3',
-					text: "{ scope: 'page' }",
+					text: "{ scope: 'app' }",
 					code: true,
 				},
 				{
 					id: 's4',
-					text: ' if one value for the page is what you want.',
+					text: ' if one value for the whole app is what you want.',
 				},
 			],
 			example: [],
@@ -10786,14 +10786,370 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'shared() scope must be valid: a Markless build error.',
 		printed: [
 			'MARKLESS_SHARED_SCOPE_INVALID: Unknown shared() scope <valueText>. Valid scopes are <valid>.',
-			'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'shared() scope controls how long the data lives and who shares it. Silently dropping an unknown scope would change whether one app, one container, or one rendered subtree owns the data.',
+			'Use `shared(factory)` for one copy per app, `shared(factory, { scope: "container" })` for one copy per container, or `shared(factory, { scope: "subtree" })` for one copy per rendered subtree.',
 			'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
 		],
 		structured: true,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
+		why: 'shared() scope controls how long the data lives and who shares it. Silently dropping an unknown scope would change whether one app, one container, or one rendered subtree owns the data.',
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'Use `shared(factory)` for one copy per app, `shared(factory, { scope: "container" })` for one copy per container, or `shared(factory, { scope: "subtree" })` for one copy per rendered subtree.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_SHARED_SCOPE_RENAMED',
+		title: 'A shared() scope was renamed',
+		area: 'state',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A shared() uses a scope name that Markless renamed.',
+		printed: [
+			'MARKLESS_SHARED_SCOPE_RENAMED: shared() scope "<from>" is now "<to>".',
+			'The shared() scopes are app, container, and subtree. "page" and "request" became "app", and "widget" became "subtree", with the same behaviour. The old names no longer compile, so no build keeps a scope by accident.',
+			'Write `{ scope: "<to>" }`. "app" is the default, so an app-wide shared() can also drop the option.',
+			'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_RENAMED',
+		],
+		structured: true,
+		why: 'The shared() scopes are app, container, and subtree. "page" and "request" became "app", and "widget" became "subtree", with the same behaviour. The old names no longer compile, so no build keeps a scope by accident.',
+		suggestion:
+			'Write `{ scope: "<to>" }`. "app" is the default, so an app-wide shared() can also drop the option.',
+		guide: {
+			summary: 'A shared() uses a scope name that Markless renamed.',
+			what: [
+				{
+					id: 's0',
+					text: 'The scopes are now ',
+				},
+				{
+					id: 's1',
+					text: "'app'",
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', ',
+				},
+				{
+					id: 's3',
+					text: "'container'",
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', and ',
+				},
+				{
+					id: 's5',
+					text: "'subtree'",
+					code: true,
+				},
+				{
+					id: 's6',
+					text: '. ',
+				},
+				{
+					id: 's7',
+					text: "'page'",
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' and ',
+				},
+				{
+					id: 's9',
+					text: "'request'",
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ' became ',
+				},
+				{
+					id: 's11',
+					text: "'app'",
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ', and ',
+				},
+				{
+					id: 's13',
+					text: "'widget'",
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ' became ',
+				},
+				{
+					id: 's15',
+					text: "'subtree'",
+					code: true,
+				},
+				{
+					id: 's16',
+					text: '. Each new name works exactly like the old one.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Write the new name. ',
+				},
+				{
+					id: 's1',
+					text: "'app'",
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' is the default, so you can also leave the option out.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'menu',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'shared',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r9',
+							text: '(() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r13',
+							text: '({ open: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r15',
+							text: ' }), { scope: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: "'subtree'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r17',
+							text: ' });',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'import',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' { shared, state } ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'from',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: "'@markless/core'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r5',
+							text: ';',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: 'export',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: 'menu',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r7',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'shared',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r9',
+							text: '(() ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r12',
+							text: 'state',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r13',
+							text: '({ open: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r14',
+							text: 'false',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r15',
+							text: ' }), { scope: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r16',
+							text: "'widget'",
+							style: 'color:#032f62;--shiki-dark:#9ecbff',
+						},
+						{
+							id: 'r17',
+							text: ' });',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+		},
 		sources: [
 			{
 				id: 'f0',

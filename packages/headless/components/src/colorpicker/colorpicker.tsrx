@@ -363,7 +363,7 @@ export const colorpickerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // One instance per rendered rail: the channel it carries, and its own element,
@@ -376,7 +376,7 @@ export const colorpickerRailState = shared(
 
 		return { ...rail, el };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ColorpickerRoot({

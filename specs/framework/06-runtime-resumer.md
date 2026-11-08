@@ -345,7 +345,7 @@ Verification contract:
 ```ts
 {
   id: "pkg/session#session",
-  scope: "page",
+  scope: "app",
   version: 42,
   patch: [
     ["set", ["user"], user],

@@ -195,7 +195,7 @@ export const box = shared(() => {
 		onChange: undefined as ((checked: boolean) => void) | undefined,
 		toggle() { s.checked = !s.checked; s.onChange?.(s.checked); },
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box({ onChange }) @{
 	const s = box();

@@ -5,7 +5,7 @@ export const directState = shared(
 		const tones = state({ tone: 'plain', note: 'direct' });
 		return tones;
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function DirectRoot({ children }) @{

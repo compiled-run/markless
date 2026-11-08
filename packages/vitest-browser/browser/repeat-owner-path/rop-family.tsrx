@@ -14,7 +14,7 @@ export const ropPanel = shared(
 
 		return { ...panel };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function RopPanel({ label = '', children, ...rest }: { readonly label?: string; readonly children?: unknown }) @{

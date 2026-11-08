@@ -78,7 +78,7 @@ export const gridlistState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per row, rooted by `gridlist.item`. */
@@ -88,7 +88,7 @@ export const gridlistItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GridListRoot({

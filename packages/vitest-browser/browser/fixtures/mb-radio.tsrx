@@ -16,7 +16,7 @@ export const mbGroup = shared(
 
 		return { ...s, fieldEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const mbItem = shared(
@@ -27,7 +27,7 @@ export const mbItem = shared(
 
 		return { ...s, fieldEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MbGroup({ children }) @{

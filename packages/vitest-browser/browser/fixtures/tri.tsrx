@@ -15,7 +15,7 @@ export const tri = shared(() => {
 			t.changes = t.changes + 1;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ checked, blocked, children }) @{
 	const t = tri();

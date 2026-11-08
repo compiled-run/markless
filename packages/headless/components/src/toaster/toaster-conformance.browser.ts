@@ -15,7 +15,7 @@ runMultiEmbedConformance({
 	family: 'toaster',
 	render: () => renderSSRIslands([MultiEmbed, MultiEmbed]),
 	embedFrame: 'frame',
-	// The rows, not the region: `toasterState` is page-scoped and so spells one
+	// The rows, not the region: `toasterState` is app-scoped and so spells one
 	// id for the whole page by design, while `toasterItemState` is a widget per
 	// row and is the one thing here the island discriminator must keep apart.
 	widgetDefinitionSuffixes: ['#toasterItemState'],

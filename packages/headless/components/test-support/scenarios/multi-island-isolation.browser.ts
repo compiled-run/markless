@@ -3,7 +3,7 @@ import { page, userEvent } from 'vite-plus/test/browser';
 import { expect, test } from 'vitest';
 import { decodeProtocolPayloadLists } from '../../../../serializer/src/protocol-record-templates.ts';
 import MultiIslandAccordion from './multi-island-accordion.tsrx';
-import PageScopedCounter from './page-scoped-counter.tsrx';
+import PageScopedCounter from './app-scoped-counter.tsrx';
 
 const ShippingTriggers = page.getByTestId('shipping-trigger');
 const ReturnsTriggers = page.getByTestId('returns-trigger');
@@ -32,12 +32,12 @@ function el(locator: { element(): Element | null }) {
 }
 
 // One island's widget is not the other island's widget. Two same-shape islands
-// merge into one payload, so every widget-scoped id each island spells has to
+// merge into one payload, so every subtree-scoped id each island spells has to
 // come out of the merge naming that island alone: one accordionState per island,
 // one item cell per (island, item). Collapsing them gives the five demos on the
 // docs accordion page a single shared cell, which is what makes one trigger
 // drive another demo's items.
-test('islands spell distinct widget ids for the same widget-scoped family', async () => {
+test('islands spell distinct widget ids for the same subtree-scoped family', async () => {
 	await renderSSRIslands([MultiIslandAccordion, MultiIslandAccordion]);
 	const state = statePayload();
 
@@ -85,10 +85,10 @@ test('ArrowDown wraps inside its own island instead of crossing into the next', 
 	await expect.poll(() => document.activeElement).toBe(el(ShippingTriggers.nth(0)));
 });
 
-// The other half of the same rule: page scope means one cell for the whole page,
+// The other half of the same rule: app scope means one cell for the whole page,
 // so island discrimination must not reach it. Two islands reading one
-// page-scoped `shared()` still read one cell and see each other's writes.
-test('a page-scoped shared cell stays one cell across islands', async () => {
+// app-scoped `shared()` still read one cell and see each other's writes.
+test('an app-scoped shared cell stays one cell across islands', async () => {
 	await renderSSRIslands([PageScopedCounter, PageScopedCounter]);
 	const state = statePayload();
 

@@ -15,7 +15,7 @@ const c0 = protocolInstanceSegment(0);
 const c1 = protocolInstanceSegment(1);
 
 function pageGraphOf(definitionIds: ReadonlyArray<string>) {
-	const definitions = definitionIds.map((id) => ({ id, scope: 'widget' }));
+	const definitions = definitionIds.map((id) => ({ id, scope: 'subtree' }));
 	return {
 		read: () => undefined,
 		listSharedDefinitions: () => definitions,

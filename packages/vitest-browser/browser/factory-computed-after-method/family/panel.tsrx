@@ -69,7 +69,7 @@ export const panelState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 type PanelRect = {

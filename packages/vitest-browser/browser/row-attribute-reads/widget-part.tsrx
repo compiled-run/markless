@@ -6,7 +6,7 @@ export const deck = shared(
 		const face = state({ name: 'maia' });
 		return face;
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 const ITEMS = [

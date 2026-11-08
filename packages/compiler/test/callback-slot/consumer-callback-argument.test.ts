@@ -15,7 +15,7 @@ export const innerState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function InnerRoot({ checked = false, onChange, children }) @{
@@ -40,7 +40,7 @@ export const boxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxRoot({ checked = false, onChange, children }) @{

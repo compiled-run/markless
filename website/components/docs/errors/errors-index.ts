@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 305,
-	guided: 47,
+	total: 306,
+	guided: 48,
 	groups: [
 		{
 			area: 'state',
@@ -50,6 +50,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile warning',
 					guided: true,
 					words: 'a shared() has no scope markless_shared_family_scope_implicit several components share a shared() definition that has no scope.',
+				},
+				{
+					code: 'MARKLESS_SHARED_SCOPE_RENAMED',
+					title: 'A shared() scope was renamed',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a shared() scope was renamed markless_shared_scope_renamed a shared() uses a scope name that markless renamed.',
 				},
 				{
 					code: 'MARKLESS_STATE_CONST_REASSIGNMENT',

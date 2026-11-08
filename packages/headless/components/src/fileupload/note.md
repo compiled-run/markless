@@ -79,10 +79,10 @@ route through `toaster`, and neither is decided, so v1 ships without it.
 **A removed row stays on the page.** The remove button reaches the right upload
 and empties the store — the field's own list goes from three files to two, and
 from one to none, which the suite measures — but the row it removed is still
-rendered. A repeat over widget-scoped shared state adds rows as they arrive and
-never takes one away. The same shape over page-scoped state is fine, which is why
-toaster's dismiss row is green; this family cannot be page-scoped, because
-`for={upload.fieldEl}` on the label is refused outside widget scope
+rendered. A repeat over subtree-scoped shared state adds rows as they arrive and
+never takes one away. The same shape over app-scoped state is fine, which is why
+toaster's dismiss row is green; this family cannot be app-scoped, because
+`for={upload.fieldEl}` on the label is refused outside subtree scope
 (`MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT`). The two pinned `test.fails` rows in
 `fileupload.browser.ts` turn red the day this closes.
 

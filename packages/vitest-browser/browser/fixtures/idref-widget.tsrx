@@ -8,7 +8,7 @@ export const widgetState = shared(
 		const triggerEl = element<HTMLButtonElement>();
 		return { ...widget, triggerEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ label, children }) @{

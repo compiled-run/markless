@@ -14,7 +14,7 @@ describe('two players, one shared track', () => {
 		expect(describePlay('mini', true)).toContain('Both players are playing Harbour Lights');
 		expect(describePlay('big', false)).toBe(`Paused on ${BIG}. ${MINI} paused too.`);
 		expect(describeScrub('big', 0.5)).toBe(`Scrubbed ${BIG} to 50%. ${MINI} jumped to the same spot.`);
-		expect(describeVolume('mini', 0.6, 0.7)).toContain('each player is its own widget');
+		expect(describeVolume('mini', 0.6, 0.7)).toContain('each player has its own copy');
 		expect(VOLUME.mini).not.toBe(VOLUME.big);
 		expect(angleOf(0)).toBe(-135);
 		expect(angleOf(1)).toBe(135);

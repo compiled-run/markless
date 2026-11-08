@@ -31,7 +31,7 @@ export const spike = shared(() => {
 	const total = computed(() => s.base + s.step);
 
 	return { ...s, total, bump() { s.base = s.base + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 `;
 
 // All three read positions at once, plus a body seed above them.
@@ -141,7 +141,7 @@ export const gate = shared(() => {
 	const badge = computed(() => (cell.open ? 'open' : 'shut'));
 
 	return { ...cell, badge, bump() { cell.count = cell.count + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const cell = gate();
