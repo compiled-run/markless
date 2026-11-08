@@ -68,10 +68,9 @@ async function adoptStreamedPatchesIfPresent(
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
-	// The page lifetime the payload scripts were read in, when a module load sat between.
 	life: unknown = pageLifetime(input.root),
 ): Promise<ResumePayloadScriptsResult> {
-	if (pageLifetime(input.root) !== life) return startPayloadResume(input, decode, life);
+	if (pageLifetime(input.root) !== life) return wakeNoopResume;
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 	const retired = getRetiredResumedPayload(input.root);
@@ -130,7 +129,7 @@ async function startPayloadResume(
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
 	const result = await startDecodedResume(input, decoded, life);
-	if (pageLifetime(input.root) === life) registerLiveDispatch(input, result.runtime);
+	registerLiveDispatch(input, result.runtime);
 	return result;
 }
 
@@ -249,17 +248,16 @@ async function startDecodedResume(
 		renderData: input.renderData,
 	});
 	const retiring = runtime;
-	if (!swapped) {
-		(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
-			deleteResumedPayload(input.root);
-			retiring.dispose();
-		};
+	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
+		deleteResumedPayload(input.root);
+		retiring.dispose();
+	};
+	if (!swapped)
 		try {
 			await runtime.start();
 		} catch (error) {
 			if (!stale()) throw error;
 		}
-	}
 	if (stale()) {
 		runtime.dispose();
 		return { decoded, graph, runtime };
