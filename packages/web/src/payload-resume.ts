@@ -68,7 +68,10 @@ async function adoptStreamedPatchesIfPresent(
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
+	// The page lifetime the payload scripts were read in, when a module load sat between.
+	life: unknown = pageLifetime(input.root),
 ): Promise<ResumePayloadScriptsResult> {
+	if (pageLifetime(input.root) !== life) return startPayloadResume(input, decode, life);
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 	const retired = getRetiredResumedPayload(input.root);
@@ -76,10 +79,9 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
-		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
+		(root.__mStart ??= startPayloadResume(input, decode, life).finally(() => {
 			if (pageLifetime(root) === life) delete root.__mStart;
 		})),
 	);
@@ -122,12 +124,13 @@ const pageLifetime = (root: object): unknown => (root as { readonly __mL?: objec
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
-	const result = await startDecodedResume(input, decoded);
-	registerLiveDispatch(input, result.runtime);
+	const result = await startDecodedResume(input, decoded, life);
+	if (pageLifetime(input.root) === life) registerLiveDispatch(input, result.runtime);
 	return result;
 }
 
@@ -191,8 +194,8 @@ function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeR
 async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
+	life: unknown = pageLifetime(input.root),
 ): Promise<ResumePayloadScriptsResult> {
-	const life = pageLifetime(input.root);
 	// Composed children's symbols answer on their own instance's graph nodes.
 	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
 	const graph = await createRuntimeGraphFromResumePayload({
@@ -246,16 +249,17 @@ async function startDecodedResume(
 		renderData: input.renderData,
 	});
 	const retiring = runtime;
-	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
-		deleteResumedPayload(input.root);
-		retiring.dispose();
-	};
-	if (!swapped)
+	if (!swapped) {
+		(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
+			deleteResumedPayload(input.root);
+			retiring.dispose();
+		};
 		try {
 			await runtime.start();
 		} catch (error) {
 			if (!stale()) throw error;
 		}
+	}
 	if (stale()) {
 		runtime.dispose();
 		return { decoded, graph, runtime };
