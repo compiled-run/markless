@@ -68,7 +68,7 @@ async function adoptStreamedPatchesIfPresent(
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
-	life: unknown = pageLifetime(input.root),
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
 	if (pageLifetime(input.root) !== life) return wakeNoopResume;
 	const resumed = getAlreadyResumedPayload(input.root);
@@ -99,7 +99,7 @@ export async function resumeFromPrerenderRecordsImpl(
 	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
-		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
+		(root.__mStart ??= startDecodedResume(input, input, life).finally(() => {
 			if (pageLifetime(root) === life) delete root.__mStart;
 		})),
 	);
@@ -193,7 +193,7 @@ function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeR
 async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
-	life: unknown = pageLifetime(input.root),
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
 	// Composed children's symbols answer on their own instance's graph nodes.
 	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
