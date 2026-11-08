@@ -19,9 +19,9 @@ function slide(write: () => void, focusId: string) {
 	const navFrom = nav ? getComputedStyle(nav).translate : 'none';
 	if (!still) root.dataset.sidebarSliding = '';
 	write();
+	const focus = () => document.getElementById(focusId)?.focus();
 	requestAnimationFrame(() => {
-		document.getElementById(focusId)?.focus();
-		if (still) return;
+		if (still) return void focus();
 		const moves: Animation[] = [];
 		if (nav) moves.push(nav.animate([{ translate: navFrom }, { translate: getComputedStyle(nav).translate }], SLIDE));
 		const shift = article && from !== undefined ? from - article.getBoundingClientRect().left : 0;
@@ -32,7 +32,10 @@ function slide(write: () => void, focusId: string) {
 			if (bottom < 0 || top > innerHeight) continue;
 			moves.push(block.animate([{ translate: `${shift}px 0` }, { translate: '0 0' }], SLIDE));
 		}
-		void Promise.allSettled(moves.map((move) => move.finished)).then(() => delete root.dataset.sidebarSliding);
+		void Promise.allSettled(moves.map((move) => move.finished)).then(() => {
+			delete root.dataset.sidebarSliding;
+			focus();
+		});
 	});
 }
 
@@ -602,9 +605,16 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 					visibility: hidden;
 				}
 
+				/* One toggle shows at a time: the reopen button rides out hidden and fades in once the nav has landed. */
 				html[data-sidebar='closed'] .sidebar-open {
 					display: inline-flex;
 					visibility: visible;
+					transition: opacity 120ms ease-out;
+				}
+
+				html[data-sidebar-sliding] .sidebar-open {
+					opacity: 0;
+					transition: none;
 				}
 
 				html[data-sidebar-sliding] .sidebar {

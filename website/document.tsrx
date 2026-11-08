@@ -70,16 +70,22 @@ export default function Document({
 					}
 				}
 
-				/* The tracks beside the article, for what grows into its width. A closed sidebar leaves a button's width; the attribute is painted before content, so the first frame is already right. */
+				/* The tracks beside the article, for what grows into its width; the closed attribute is painted before content, so the first frame is already right. */
 				@media (min-width: 70.01rem) {
 					.site-shell {
 						--sidebar-track: calc(16rem + var(--space-s-l));
 						--rail-track: calc(11rem + var(--space-s-l));
 					}
 
+					/* Closed, the article sits centred on the page wherever it fits at full measure, as it does open on a wide screen,
+					   so a wide screen sees nothing move; narrower, the left margin gives way down to the reopen button. */
 					html[data-sidebar='closed'] .site-shell {
-						--sidebar-track: 3rem;
-						padding-left: calc(var(--space-s-l) + 3rem);
+						--sidebar-track: calc(16rem + var(--space-s-l));
+						--rail-track: calc(16rem + var(--space-s-l));
+						padding-left: max(
+							calc(var(--space-s-l) + 3rem),
+							min(calc(11rem + 2 * var(--space-s-l)), calc(100% - 11rem - 2 * var(--space-s-l) - 68ch))
+						);
 						padding-right: calc(11rem + 2 * var(--space-s-l));
 					}
 				}
