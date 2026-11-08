@@ -224,8 +224,9 @@ export function startFragmentNavigation(
 		event.preventDefault();
 		// A click on the page shown keeps it; once a navigation was woken, the run half also cancels that one.
 		if (here(url) && !starting) return;
+		const at = w.performance.now();
 		wake().then(
-			(api) => api.go(anchor) || w.location.assign(url.href),
+			(api) => api.go(anchor, at) || w.location.assign(url.href),
 			() => {
 				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
 				let left = false;
@@ -270,7 +271,7 @@ export type FragmentEarly = {
 export type FragmentNavigationApi = {
 	readonly traverse: (event: PopStateEvent) => void;
 	readonly replay: (event: Event | undefined) => void;
-	readonly go: (anchor: Element) => boolean;
+	readonly go: (anchor: Element, askedAt?: number) => boolean;
 };
 
 // The run half with its config bound: the bridge file that holds it carries the config, the page bridge does not.
@@ -798,7 +799,7 @@ export function runFragmentNavigation(
 		d.addEventListener(type, press, { passive: true });
 
 	// Links are taken in the capture phase, ahead of page handlers; a plain anchor after them, as the browser would follow it.
-	const go = (anchor: Element): boolean => {
+	const go = (anchor: Element, askedAt = w.performance.now()): boolean => {
 		const url = eligible(anchor, true);
 		if (!url) return false;
 		stopRest();
@@ -811,7 +812,14 @@ export function runFragmentNavigation(
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
+			entry.navigate(
+				d,
+				url,
+				replace ? 'replace' : 'push',
+				manual ? 'manual' : 'reset',
+				stops,
+				askedAt,
+			);
 		if (loaded) void swap(loaded);
 		else
 			load().then(swap, () => {

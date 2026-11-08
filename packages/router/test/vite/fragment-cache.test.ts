@@ -180,6 +180,37 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		test('a no-store page the press fetched is shown from that fetch when the navigation code arrives after it', async () => {
+			const { page } = await open(browser);
+			const now = await bumpElsewhere();
+			await page.route(
+				(url) => url.pathname.endsWith('.js'),
+				async (route) => {
+					await new Promise((done) => setTimeout(done, 400));
+					await route.continue();
+				},
+			);
+			// The idle tier may fetch the page before the press; from the press on, the click's own fetch is the only one.
+			await page.evaluate(() =>
+				addEventListener(
+					'pointerdown',
+					() => ((window as { pressedAt?: number }).pressedAt ??= performance.now()),
+					true,
+				),
+			);
+			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			const asked = await page.evaluate(() =>
+				performance
+					.getEntriesByType('resource')
+					.filter((entry) => entry.startTime >= (window as { pressedAt?: number }).pressedAt!)
+					.map((entry) => entry.name),
+			);
+			expect(
+				asked.filter((name) => fragmentPageUrl(new URL(name))?.pathname === '/live'),
+			).toHaveLength(1);
+			await page.close();
+		});
+
 		test('a mouse still over the link that woke the navigation code, through moves that go nowhere, fetches that page ahead', async () => {
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 			const { fetched } = trackFetches(page);
