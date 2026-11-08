@@ -26,11 +26,14 @@ import type {
 	SemanticLocalDeclaration,
 	SemanticMarkupArtifact,
 	SemanticOverlay,
+	SemanticBranchArm,
 	SemanticBranchSite,
 	SemanticStateRead,
 	SemanticStateWrite,
+	ModuleFunctionWrites,
 	SemanticTemplateBindingTarget,
 	SemanticTemplateRead,
+	SemanticRowLocalReads,
 } from '../../artifacts.ts';
 import type { FrameworkApiName } from './imports.ts';
 import type { StyleConstResolver } from './style-object.ts';
@@ -75,7 +78,9 @@ export type MutableSemanticGraphArtifact = {
 	aliases: SemanticGraphAlias[];
 	stateReads: SemanticStateRead[];
 	templateReads: SemanticTemplateRead[];
+	rowLocalReads?: SemanticRowLocalReads[];
 	stateWrites: SemanticStateWrite[];
+	importedFunctionWriteRequests?: string[];
 	asyncBoundaries: Array<{
 		readonly id: string;
 		readonly anchorOrder: number;
@@ -121,8 +126,12 @@ export type WalkState = {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** Props the host provides only while rendering on the server, by component export. */
-	readonly serverOnlyProps: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly serverOnlyProps: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	readonly hostIds: WeakMap<object, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
@@ -133,6 +142,7 @@ export type WalkState = {
 	currentBranchScopeIds: string[];
 	/** The `branch-site:` ids of the @if/@switch blocks enclosing the walk, outermost first. */
 	currentBranchSiteIds: string[];
+	currentBranchArms: SemanticBranchArm[];
 	currentKeyedRepeatScopeIds: string[];
 	/** Source span of each keyed repeat's item declaration, by repeat id. */
 	readonly keyedRepeatItemSpans: Map<string, { readonly start: number; readonly end: number }>;
@@ -143,6 +153,8 @@ export type WalkState = {
 	currentArmScope: { readonly branchSiteId: string; readonly hostNodeId: string | null } | null;
 	// The conditions every enclosing @if/@switch arm needs to hold, outermost first.
 	currentArmGuards: ArmGuard[];
+	/** Statements written directly in an @if/@switch arm body, where a state() is arm-local. */
+	readonly armBodyStatements: WeakSet<object>;
 	// Set while walking a component edge's children; `hostNodeId` is the enclosing
 	// host at entry. A read still seeing it is projected into the child.
 	currentProjectionScope: {
@@ -154,7 +166,8 @@ export type WalkState = {
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	currentAsyncBoundaryArm: number | null;
 	currentSharedDefinitionId: string | null;
-	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'loop' | null;
+	// 'branch' is a plain `if` statement in the body; 'arm' is an @if/@switch arm, where a state() can be arm-local.
+	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'arm' | 'loop' | 'row' | null;
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
@@ -260,7 +273,11 @@ export function createWalkState(input: {
 	readonly frameworkApiImports: ReadonlyMap<string, FrameworkApiName>;
 	readonly importedModuleInterfaces?: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants?: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-	readonly serverOnlyProps?: ReadonlyArray<{ readonly exportName: string; readonly propName: string }>;
+	readonly importedFunctionWrites?: Readonly<Record<string, ModuleFunctionWrites>>;
+	readonly serverOnlyProps?: ReadonlyArray<{
+		readonly exportName: string;
+		readonly propName: string;
+	}>;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -275,6 +292,7 @@ export function createWalkState(input: {
 		frameworkApiImports: input.frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
 		importedModuleConstants: input.importedModuleConstants ?? {},
+		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		hostIds: new WeakMap<object, string>(),
 		handledTemplateValues: new WeakSet<object>(),
@@ -283,11 +301,13 @@ export function createWalkState(input: {
 		currentStyleScopeClass: null,
 		currentBranchScopeIds: [],
 		currentBranchSiteIds: [],
+		currentBranchArms: [],
 		currentKeyedRepeatScopeIds: [],
 		keyedRepeatItemSpans: new Map(),
 		currentHostNodeId: null,
 		currentArmScope: null,
 		currentArmGuards: [],
+		armBodyStatements: new WeakSet<object>(),
 		currentProjectionScope: null,
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,

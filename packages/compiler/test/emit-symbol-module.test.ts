@@ -375,7 +375,7 @@ import { shared, state } from '@markless/core';
 export const box = shared(() => {
 	const s = state({ open: false });
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel({ open }: { open?: boolean }) @{
 	const s = box();
@@ -881,7 +881,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();
@@ -919,7 +919,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ tag }) @{
 	const box = boxState();

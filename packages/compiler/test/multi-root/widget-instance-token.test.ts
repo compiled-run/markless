@@ -13,13 +13,13 @@ export const nestState = shared(() => {
 	const nest = state({ marks: 0 });
 	const rootEl = element<HTMLDivElement>();
 	return { ...nest, rootEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export const levelState = shared(() => {
 	const level = state({ hits: 0, name: '' });
 	const contentEl = element<HTMLDivElement>();
 	return { ...level, contentEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function NestRoot({ children }) @{
 	const nest = nestState();

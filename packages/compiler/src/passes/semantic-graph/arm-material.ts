@@ -31,8 +31,11 @@ export function armMaterialField(
 ): { readonly armMaterial?: ModuleGraphInterfaceArmMaterial } {
 	if (chunks.length === 0) return {};
 	if (graph.graphBindings.some((binding) => owns(binding, componentName))) return {};
-	if (graph.sharedInstances.some((instance) => instance.componentName === componentName)) return {};
-	const hostNodeIds = new Set(chunks.flatMap((chunk) => chunk.hosts.map((host) => host.hostNodeId)));
+	if (graph.sharedInstances.some((instance) => instance.componentName === componentName))
+		return {};
+	const hostNodeIds = new Set(
+		chunks.flatMap((chunk) => chunk.hosts.map((host) => host.hostNodeId)),
+	);
 	const wired = [
 		...graph.events,
 		...graph.behaviors,

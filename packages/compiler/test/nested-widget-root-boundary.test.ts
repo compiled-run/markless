@@ -33,7 +33,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ label: '', invalid: false });
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ label = '', children }) @{
 	const s = spike();

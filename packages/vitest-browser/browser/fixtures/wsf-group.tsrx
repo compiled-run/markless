@@ -16,7 +16,7 @@ export const wsf = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function WsfRoot({ children }) @{

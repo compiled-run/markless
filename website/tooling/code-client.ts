@@ -3,12 +3,13 @@
 // runs in /_code-frame.html and compiles in the one Web Worker the session starts, where the
 // bundler's Node-only imports are swapped for in-memory stand-ins.
 import { execFile } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { isAbsolute, join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import type { Plugin } from 'vite';
-import { CODE_PREFETCH_FILE, type CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
+import type { CodePrefetchManifest } from '../components/docs/code/prefetch.ts';
 import { codePrefetchManifest, type PrefetchBundle } from './code-prefetch.ts';
 
 const RUNTIME_SOURCES_SCRIPT = fileURLToPath(new URL('./code-runtime-sources.ts', import.meta.url));
@@ -23,6 +24,18 @@ async function siteRuntimeSources(): Promise<Record<string, string[]>> {
 	return JSON.parse(stdout) as Record<string, string[]>;
 }
 
+async function warmPackReader(): Promise<(code: string) => string[]> {
+	const core = createRequire(createRequire(import.meta.url).resolve('@markless/core'));
+	const preload = await import(pathToFileURL(core.resolve('@markless/bundler/preload')).href);
+	return preload.warmEvaluatedImports;
+}
+
+/** The import map the bundler wrote into a built page. */
+function importMapOf(html: string): Record<string, string> {
+	const map = /<script type="?importmap"?>([\s\S]*?)<\/script>/.exec(html)?.[1];
+	return map ? (JSON.parse(map) as { imports: Record<string, string> }).imports : {};
+}
+
 const CODE_DIR = fileURLToPath(new URL('../components/docs/code/', import.meta.url));
 const FRAME_ENTRY = `${CODE_DIR}frame.ts`;
 const FRAME_RUNTIME = `${CODE_DIR}frame-runtime.ts`;
@@ -34,6 +47,14 @@ const BROWSER_ENTRIES: Readonly<Record<string, { readonly file: string; readonly
 		name: 'code-live',
 	},
 };
+/** The server render reads the prefetch lists from this module; the browser gets empty lists. */
+export const CODE_PREFETCH_MODULE = 'virtual:code-prefetch';
+/** Where the browser build writes the lists, in its output dir; the server build, which follows it, reads them from there. */
+export const CODE_PREFETCH_FILE = '_code-prefetch.json';
+const EMPTY_MANIFEST: CodePrefetchManifest = { session: [], live: [], cache: [], blocks: {} };
+const FONT_DIR = fileURLToPath(new URL('../styles/fonts/', import.meta.url));
+const FRAME_FONTS = ['ShantellSans-latin-variable.woff2', 'JoyElia-Regular.woff2', 'JoyElia-Bold.woff2'] as const;
+type FrameFonts = Readonly<Record<(typeof FRAME_FONTS)[number], string>>;
 const BUNDLER_SWAPS: Readonly<Record<string, string>> = {
 	'node:fs': `${CODE_DIR}source-fs.ts`,
 	'node:fs/promises': `${CODE_DIR}source-fs.ts`,
@@ -54,7 +75,11 @@ const BUNDLER_SWAP_SOURCE = new RegExp(
 export const CODE_FRAME_FILE = '_code-frame.html';
 
 /** The frame page: an empty stage and the script that fills it. */
-export function codeFrameHtml(script: string, preloads: readonly string[] = []): string {
+export function codeFrameHtml(
+	script: string,
+	fonts: FrameFonts,
+	preloads: readonly string[] = [],
+): string {
 	return `<!doctype html>
 <html lang="en">
 <head>
@@ -62,13 +87,17 @@ export function codeFrameHtml(script: string, preloads: readonly string[] = []):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>Code result</title>
-<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('/fonts/ShantellSans-latin-variable.woff2') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:400;font-display:swap;src:url('/fonts/JoyElia-Regular.woff2') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:700;font-display:swap;src:url('/fonts/JoyElia-Bold.woff2') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
+<style>@font-face{font-family:'Shantell Sans';font-style:normal;font-weight:400 700;font-display:swap;src:url('${fonts['ShantellSans-latin-variable.woff2']}') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:400;font-display:swap;src:url('${fonts['JoyElia-Regular.woff2']}') format('woff2')}@font-face{font-family:'Joy Elia';font-weight:700;font-display:swap;src:url('${fonts['JoyElia-Bold.woff2']}') format('woff2')}html{background:transparent;color-scheme:light}html.dark{color-scheme:dark}body{margin:0;color:CanvasText;font-family:system-ui,sans-serif}</style>
 ${preloads.map((href) => `<link rel="modulepreload" href="${href}">`).join('\n')}
 <script type="module" src="${script}"></script>
 </head>
 <body class="code-stage" data-code-frame></body>
 </html>
 `;
+}
+
+function frameFonts(url: (font: (typeof FRAME_FONTS)[number]) => string): FrameFonts {
+	return Object.fromEntries(FRAME_FONTS.map((font) => [font, url(font)])) as FrameFonts;
 }
 
 /** Answers the bundler's Node-only imports with in-memory stand-ins, for the worker only. */
@@ -104,9 +133,12 @@ function devPrefetchManifest(base: string): CodePrefetchManifest {
 
 export function codeClient(): Plugin[] {
 	let base = '/';
+	let command = 'serve';
 	let frameRef = '';
+	const fontRefs = new Map<(typeof FRAME_FONTS)[number], string>();
 	let runtimeSources: Promise<Record<string, string[]>> | undefined;
 	const entryRefs = new Map<string, string>();
+	let clientOutDir = '';
 	return [
 		codeCompilerSwaps(),
 		{
@@ -118,18 +150,22 @@ export function codeClient(): Plugin[] {
 			},
 			configResolved(config) {
 				base = config.base;
+				command = config.command;
+				// Each environment resolves its own config; the browser's output dir is the same in every one.
+				const client = config.environments?.client?.build?.outDir ?? config.build.outDir;
+				clientOutDir = isAbsolute(client) ? client : join(config.root, client);
 			},
 			configureServer(server) {
 				server.middlewares.use((req, res, next) => {
 					const path = (req.url ?? '').split('?', 1)[0];
-					if (path === `${base}${CODE_PREFETCH_FILE}`) {
-						res.setHeader('content-type', 'application/json; charset=utf-8');
-						res.end(JSON.stringify(devPrefetchManifest(base)));
-						return;
-					}
 					if (path !== `${base}${CODE_FRAME_FILE}`) return next();
 					res.setHeader('content-type', 'text/html; charset=utf-8');
-					res.end(codeFrameHtml(`${base}@fs${FRAME_ENTRY}`));
+					res.end(
+						codeFrameHtml(
+							`${base}@fs${FRAME_ENTRY}`,
+							frameFonts((font) => `${base}@fs${FONT_DIR}${font}`),
+						),
+					);
 				});
 			},
 			buildStart() {
@@ -141,19 +177,32 @@ export function codeClient(): Plugin[] {
 				runtimeSources = siteRuntimeSources();
 				runtimeSources.catch(() => {});
 				frameRef = this.emitFile({ type: 'chunk', id: FRAME_ENTRY, name: 'code-frame' });
+				for (const font of FRAME_FONTS)
+					fontRefs.set(
+						font,
+						this.emitFile({ type: 'asset', name: font, source: readFileSync(`${FONT_DIR}${font}`) }),
+					);
 				for (const [url, entry] of Object.entries(BROWSER_ENTRIES))
 					entryRefs.set(url, this.emitFile({ type: 'chunk', id: entry.file, name: entry.name }));
 			},
 			resolveId: {
 				filter: { id: /^virtual:code-/ },
 				handler(source) {
-					return Object.hasOwn(BROWSER_ENTRIES, source) ? `\0${source}` : null;
+					return Object.hasOwn(BROWSER_ENTRIES, source) || source === CODE_PREFETCH_MODULE ? `\0${source}` : null;
 				},
 			},
 			load: {
 				filter: { id: /^\0virtual:code-/ },
 				handler(id) {
 					const url = id.startsWith('\0') ? id.slice(1) : '';
+					if (url === CODE_PREFETCH_MODULE) {
+						if (this.environment?.config.consumer !== 'server') return `export default ${JSON.stringify(EMPTY_MANIFEST)};`;
+						if (command !== 'build') return `export default ${JSON.stringify(devPrefetchManifest(base))};`;
+						const listed = join(clientOutDir, CODE_PREFETCH_FILE);
+						if (!existsSync(listed))
+							throw new Error(`${CODE_PREFETCH_MODULE} is read before the browser build has listed what the blocks load (${listed} is missing)`);
+						return `export default ${readFileSync(listed, 'utf8')};`;
+					}
 					const entry = Object.hasOwn(BROWSER_ENTRIES, url) ? BROWSER_ENTRIES[url] : undefined;
 					if (!entry) return null;
 					if (this.environment?.config.consumer === 'server') return 'export default "";';
@@ -177,6 +226,7 @@ export function codeClient(): Plugin[] {
 					fileName: CODE_FRAME_FILE,
 					source: codeFrameHtml(
 						`${base}${script}`,
+						frameFonts((font) => `${base}${this.getFileName(fontRefs.get(font)!)}`),
 						imports.map((file) => `${base}${file}`),
 					),
 				});
@@ -189,7 +239,8 @@ export function codeClient(): Plugin[] {
 					if (!frameRef || this.environment?.name !== 'client' || !options.dir) return;
 					const dir = options.dir;
 					const file = join(dir, CODE_FRAME_FILE);
-					writeFileSync(file, dropSitePreloads(readFileSync(file, 'utf8')));
+					const frameHtml = readFileSync(file, 'utf8');
+					writeFileSync(file, dropSitePreloads(frameHtml));
 					const manifest = codePrefetchManifest(bundle as unknown as PrefetchBundle, {
 						base,
 						sessionEntry: BROWSER_ENTRIES['virtual:code-session-url']!.file,
@@ -198,6 +249,8 @@ export function codeClient(): Plugin[] {
 						runtimeTable: FRAME_RUNTIME,
 						frameFile: `${base}${CODE_FRAME_FILE}`,
 						blocks: await runtimeSources!,
+						warmImports: await warmPackReader(),
+						importMap: importMapOf(frameHtml),
 					});
 					const listed = [manifest.session, manifest.live, manifest.cache, ...Object.values(manifest.blocks)].flat();
 					const missing = listed.filter((url) => !existsSync(join(dir, url.slice(base.length))));

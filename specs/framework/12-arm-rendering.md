@@ -38,6 +38,24 @@ render happening in the browser, which the unified render/resume model allows.
 The resume model forbids re-executing components over existing server HTML; it
 does not forbid rendering new content client-side.
 
+### Arms picked by index
+
+A two-arm `@if` is picked by the truthiness of its test, and a `@switch` whose
+case tests are all literals is picked by comparing the discriminant's value with
+`armTests` (the literal per arm, `null` for `@default`). Two shapes are picked by
+INDEX instead: an `@if … @else if … @else` chain, and a `@switch` whose case
+tests are not all literals (`@switch (true) { @case charge > 50: … }`). For
+these the compiler mints one synthetic computed that asks the tests in order
+and answers the arm index (`(a) ? 0 : (b) ? 1 : 2`, or `(v) === (t0) ? 0 : …`
+ending in the `@default` arm's index, or one past the last arm when there is
+none); the site's `armTests` lists every arm's index, so the same picker the
+literal `@switch` uses selects by it. A chain with no final `@else` ends in an
+empty arm the computed answers when every test fails. The site records the
+index expression as `armIndexSource`, which the SSR module, the browser
+prerender evaluator, and row templates evaluate wherever they would otherwise
+evaluate the authored test text. Both shapes stay in tier 3: the flip rebuilds
+the chosen arm from compiled markup and never escalates for the chain itself.
+
 ## D2. Escalation is never silent
 
 If tier 3 cannot handle a flip (e.g. the @if contains a component), the
@@ -52,6 +70,11 @@ branch sites) index relative to the boundary's start anchor. Arms become
 closed, movable, replaceable, streamable units; the anchor pair is the only
 coupling to the page. Enables per-boundary lazy record loading; retires
 events-in-arm misalignment and in-arm compose offset arithmetic.
+
+A keyed `@for` row the browser builds after load (a row added by a write)
+registers each `@try` block its component renders the same way a settled arm
+registers the blocks nested in it: the block's anchors index the row's own
+comments, and the block settles and re-settles on its own like a served one.
 
 ## D4. Author vocabulary in diagnostics
 

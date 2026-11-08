@@ -177,7 +177,9 @@ function singleReturnArgument(block: AnyNode): AnyNode | undefined {
 	const statements = asNodes(block.body);
 	if (statements.length !== 1) return undefined;
 	const only = statements[0]!;
-	return only.type === 'ReturnStatement' ? ((only.argument as AnyNode | undefined) ?? undefined) : undefined;
+	return only.type === 'ReturnStatement'
+		? ((only.argument as AnyNode | undefined) ?? undefined)
+		: undefined;
 }
 
 const ASSERTION_TYPES: ReadonlySet<string> = new Set([

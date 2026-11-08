@@ -30,8 +30,11 @@ import {
 	undemandedRuntimeModules,
 } from './attribution.mjs';
 import { measureConstructGlue } from './construct-glue.mjs';
+import { LOAD_PLATFORM } from './evaluate.mjs';
 import { measureHiddenContent } from './hidden-content.mjs';
+import { measureStaticPropArms } from './static-prop-arms.mjs';
 import { measureRouteTable } from './route-table.mjs';
+import { measureServerStylesheets } from './server-stylesheets.mjs';
 import { measureResumeRows } from './resume-rows.mjs';
 import { resumeDataBreakdown } from '../resume-data/breakdown.mjs';
 import { LEAN_DISPATCH_MARKER_MODULES } from '../../../packages/compiler/src/lean-dispatch-modules.ts';
@@ -523,7 +526,7 @@ async function navigationRounds(browser, origin, nav, read) {
 
 export async function measure({ build = true, sites = ['bench', 'docs'], log = () => {} } = {}) {
 	const { chromium } = require('@playwright/test');
-	const result = { sites: {} };
+	const result = { platform: LOAD_PLATFORM, sites: {} };
 	for (const site of sites) {
 		if (build) await buildSite(site, log);
 		const publicDir = join(APP_DIRS[site], '.output/public');
@@ -630,5 +633,9 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 	result.hiddenContent = await measureHiddenContent(log);
 	log('load execution on a page linking a few and many routes');
 	result.routeTable = await measureRouteTable(log);
+	log('load cost of pages whose literal props rule out an arm, with its child short and long');
+	result.staticPropArms = await measureStaticPropArms(log);
+	log('Worker size with a small and a large prerendered stylesheet');
+	result.serverStylesheets = await measureServerStylesheets(log);
 	return result;
 }

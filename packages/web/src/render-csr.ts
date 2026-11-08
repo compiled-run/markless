@@ -1,3 +1,4 @@
+import { hasLiveSharedDefinitions } from '../../serializer/src/protocol-shared-instances.ts';
 import { markupNodes } from './markup-nodes.ts';
 import {
 	PROTOCOL_EVENT_ACTION_KIND,
@@ -38,6 +39,11 @@ type ExecutionLogGlobal = typeof globalThis & {
 	__mxLoadLog?: () => Promise<{
 		readonly logMarklessRenderSummary?: (input?: unknown) => unknown;
 	}>;
+};
+
+// Installed by a compiled module whose state declares a non-widget shared(); no module every app loads names it.
+type SharedInstancesHost = {
+	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 
 export async function renderCsrRuntime(input: {
@@ -173,13 +179,13 @@ export async function renderCsrRuntime(input: {
 			for (const release of cleanup.splice(0).reverse()) release();
 			runtime?.dispose();
 		},
-		// A page with no async boundary has nothing to settle; answering without the full runtime keeps a route swap demand-loaded.
+		// Without a served @try or a started runtime nothing can be settling, so a route swap stays demand-loaded.
 		whenAsyncBoundariesSettled: async () => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).whenAsyncBoundariesSettled?.();
 		},
 		holdPendingSettleCommits: async (ms) => {
-			if (view.asyncBoundaries.length === 0) return;
+			if (view.asyncBoundaries.length === 0 && !runtime) return;
 			await (await demandRuntime()).holdPendingSettleCommits?.(ms);
 		},
 	};
@@ -224,6 +230,14 @@ export async function renderCsrRuntime(input: {
 		await (await demandRuntime()).activateBehaviors(hostNodeId);
 	// Set only by an app module with an `onIdle` record; the runtime it starts at idle queues the hosts.
 	(globalThis as MarklessIdleHost).__mIdle?.wake(output.root, demandRuntime);
+	if (hasLiveSharedDefinitions(state))
+		(
+			await (globalThis as SharedInstancesHost).__marklessSharedInstances?.()
+		)?.registerDormantContainer(
+			output.root,
+			state,
+			() => void (disposed || deferredRuntime.start()),
+		);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await registerDelegatedTriggerDebug(output, view);
 	if ((globalThis as ExecutionLogGlobal).__mxLog) await marklessLogCsrSummary();
@@ -428,7 +442,11 @@ function installDelegatedTriggers(
 					? actionKind === PROTOCOL_EVENT_ACTION_KIND.event && record.syncPolicy
 					: !syncPolicyApplied && rowPolicy(element as RowNode, event.type, path);
 				if (policy) {
-					runSyncPolicyActions(policy, syncPolicyGraph, event as unknown as SyncPolicyDomEvent);
+					runSyncPolicyActions(
+						policy,
+						syncPolicyGraph,
+						event as unknown as SyncPolicyDomEvent,
+					);
 					syncPolicyApplied = true;
 				}
 			}
@@ -452,10 +470,12 @@ function installDelegatedTriggers(
 					throw unroutedDelegatedTriggerError(actionKind);
 				return;
 			}
-			await action(
-				event,
-				{ ignoreUnmatched: !named, syncPolicyAlreadyApplied: syncPolicyApplied },
-			);
+			// The walk runs after the browser has reset cancelBubble, so the stop is read now.
+			await action(event, {
+				ignoreUnmatched: !named,
+				syncPolicyAlreadyApplied: syncPolicyApplied,
+				propagationStopped: event.cancelBubble === true,
+			});
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
@@ -512,7 +532,8 @@ function installDelegatedTriggers(
 	};
 	const installEventNames = (eventName: string) => {
 		installEventListener(eventName);
-		if (isFocusPreloadEventName(eventName)) installPreloadTrigger('focusin', focusPreloadEventNames);
+		if (isFocusPreloadEventName(eventName))
+			installPreloadTrigger('focusin', focusPreloadEventNames);
 		// pointerenter does not bubble, so a delegated listener would only ever see
 		// the container's own crossing.
 		if (PRESS_EVENT_NAMES.includes(eventName))

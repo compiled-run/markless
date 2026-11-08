@@ -76,7 +76,7 @@ export const fileuploadState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const fileuploadItemState = shared(
@@ -85,7 +85,7 @@ export const fileuploadItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FileUploadRoot({

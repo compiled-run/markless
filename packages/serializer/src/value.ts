@@ -465,7 +465,7 @@ function isObject(value: unknown): value is object {
 	return typeof value === 'object' && value !== null;
 }
 
-function isPlainObject(value: object): boolean {
+export function isPlainObject(value: object): boolean {
 	const prototype = Object.getPrototypeOf(value);
 	return prototype === Object.prototype || prototype === null;
 }

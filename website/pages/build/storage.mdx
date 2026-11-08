@@ -1,105 +1,79 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import DrinkPick from '../../components/demos/build/drink-pick.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import MugSpot from '../../components/mascot/mug-spot.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import ReloadAnatomy from '../../components/figures/reload/reload-anatomy.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Keep a value across reloads with `storage()`
+# Storage
 
-<PageMeta time="3 min" assumes="state" />
+<PageMeta time="2 min" assumes="state" />
 
-<ThemeToggle />
+<Subtitle text="storage() is a value the browser keeps for the reader, so a reload doesn't reset it." terms="storage" />
 
-Some values belong to the reader, like a theme or a favourite drink. Reload the page, and `state()`
-starts over from its first value. The reader's choice is gone.
-
-`storage()` is string state that saves itself in the browser's `localStorage`. You read it and
-change it like any other variable. Each change also sets a `data-` attribute on `<html>`, so your
-CSS can follow the value.
-
-Pick a drink.
-
-<DrinkPick />
-
-One click changed three things: the highlighted button, the saved value in `localStorage`, and the
-`data-docs-drink` attribute on `<html>`. The Watch line shows the attribute. Now click **Reload
-page**. Your pick keeps its highlight.
-
-The first argument is the `localStorage` key. The second is the starting value, for a reader who
-has not picked yet. With the key `docs-drink`, `<html>` gets `data-docs-drink`.
-
-The highlight is plain CSS that reads that attribute. The demo uses a rule like this one for each
-drink:
-
-<MugSpot mood="wink" />
-
-```css
-html[data-docs-drink='coffee'] .coffee {
-	background: gold;
-}
-```
-
-## Style from the attribute
-
-The attribute is the part to style from. A dark theme works the same way:
-
-```tsrx
+```tsrx title="theme.tsrx"
 import { storage } from '@markless/core';
 
 let theme = storage('theme', 'light');
 
-export default function ThemeToggle() @{
-	<button onClick={() => (theme = theme === 'light' ? 'dark' : 'light')}>Switch theme</button>
+export default function Theme() @{
+	<p>Theme: {theme}</p>
 }
 ```
 
-```css
-[data-theme='dark'] body {
-	background: #222;
-	color: #eee;
+**`storage()`** takes a **key**, `'theme'`, and a **starting value**, `'light'`. You read and write `theme` like any other variable.
+
+## A reload keeps storage(), not state()
+
+A *reload* starts the page over from its code. `state()` starts over with it, and `storage()` doesn't.
+
+- The dark-mode switch is `storage()`: it stays dark.
+- The sidebar is `state()`: it closes again.
+- Clear the site data, and `storage()` starts over too.
+
+Flip the switch, open the sidebar, then press the reload arrow.
+
+<ReloadAnatomy />
+
+The key must be written as a plain string, so the build can find every saved value.
+
+<Code steps={[{ label: 'Press the button until it says dark, then reload this page.', shows: 'Mode: dark' }, { label: "Change the key to `'look'`, and the saved choice is gone.", source: "storage('look'" }, { label: "Try breaking it: build the key, `storage('mo' + 'de', 'light')`, and read the error under the result.", source: "storage('mo'+'de'" }]}>
+```tsrx title="mode-switch.tsrx"
+import { storage } from '@markless/core';
+
+export default function ModeSwitch() @{
+	let mode = storage('mode', 'light');
+
+	<button
+		onClick={() => {
+			mode = mode === 'light' ? 'dark' : 'light';
+		}}
+	>
+		Mode: {mode}
+	</button>
 }
 ```
+</Code>
 
-You can call `storage()` at the top of a file, as here. You can also call it inside a component,
-as the drink demo does.
+## Each write saves in three places
 
-When a server renders the page, Markless adds one small script before the page content. It
-reads the saved value and sets the `<html>` attribute first. So CSS that uses `data-theme` is right
-from the first paint.
+- a cookie named `markless-theme`, so the server renders the value in the first byte
+- `localStorage`, under `theme`
+- `data-theme` on `<html>`, for your CSS
 
-The early script covers `storage()` in the page file. On an `.mdx` page, it also covers the
-components the page imports directly.
+A page that shows a `storage()` value answers `Cache-Control: private`, so a shared cache never hands one reader's page to another.
 
-## One argument or two
+## One argument names the key for you
 
-| Call | `localStorage` key | Attribute on `<html>` |
+| Call | Saved under | Attribute on `<html>` |
 | --- | --- | --- |
-| `let theme = storage('theme', 'light')` | `theme` | `data-theme` |
-| `let theme = storage('light')` | `markless:theme` | `data-markless-theme` |
+| `storage('theme', 'light')` | `theme` | `data-theme` |
+| `storage('light')` | `markless:theme` | `data-markless-theme` |
 
-With one argument, that argument is the starting value. Markless builds the key from the variable
-name.
+With one argument, the key comes from the variable name, so renaming the variable loses saved values. Pass the key yourself for anything you ship.
 
-<Callout
-	sprite="cross"
-	title="Renaming the variable loses saved values"
-	text="With one argument, the key follows the variable name. Rename theme to mode, and every reader's saved choice is left behind under the old key. For anything you ship, pass the key yourself."
-/>
+The value is always a string. On a prerendered page, a small script sets the `<html>` attribute before the content, for the page file and, on an `.mdx` page, the components it imports directly.
 
-<Callout
-	sprite="cross"
-	title="Why does storage() reject my key?"
-	text="The key and the starting value must be written as plain strings, like 'theme'. A key built from other values stops the build with MARKLESS_STORAGE_KEY_STATIC. The value itself is always a string."
-/>
-
-Declare it with `let` so you can change it. You can't assign to a `const` storage value.
-
-## Try it yourself
-
-Copy the `DrinkPick` code into your own app. Add a **Water** button with the class `water` and a
-highlight rule of its own. Pick water, then reload the page.
-
-Next: [share state between components](/build/shared).
+When several components need one value, [share it with `shared()`](/build/shared).

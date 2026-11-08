@@ -69,7 +69,7 @@ try {
 	await page.waitForFunction(hash => document.querySelector(`.on-this-page-link[href="${hash}"]`)?.getAttribute('aria-current') === 'location', target);
 	await page.waitForFunction(hash => {
 		const top = document.querySelector(hash).getBoundingClientRect().top;
-		return top >= document.querySelector('.site-header').getBoundingClientRect().bottom && top < 150;
+		return top >= Math.max(0, ...[...document.querySelectorAll('.navbar-edge')].map((edge) => edge.getBoundingClientRect().bottom)) && top < 150;
 	}, target);
 	await page.screenshot({ path: `${output}/outline-section.png` });
 	await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));

@@ -10,7 +10,7 @@ export const fieldState = shared(
 		const descriptionEl = element<HTMLParagraphElement>();
 		return { ...field, errorEl, descriptionEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Root({ invalid = false, children }) @{

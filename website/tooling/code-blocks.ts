@@ -10,7 +10,7 @@ import { ColourTable, DocRegistry, highlightHtml, paneLines } from './ui-code-ru
 
 export const CODE_GENERATED_DIR = 'components/docs/code/generated';
 const CODE_COMPONENT = 'components/docs/code.tsrx';
-const PAGE_STYLE_SOURCE = fileURLToPath(new URL('../components/docs/code/style.css', import.meta.url));
+export const PAGE_STYLE_SOURCE = fileURLToPath(new URL('../components/docs/code/style.css', import.meta.url));
 /** The tab every block without a `.css` fence of its own shows the result's stylesheet in. */
 export const PAGE_STYLE = 'style.css';
 const SCOPED_PAGE_STYLE = 'page-style.css';

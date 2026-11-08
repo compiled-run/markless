@@ -2,7 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 // Only resume.ts loads this module, and it imports the locators statically already.
 import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
-import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
+import type { AsyncBoundarySettleTracker, AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
 import type {
@@ -93,9 +93,7 @@ export async function startResumeRuntime(input: {
 		readonly resettleBoundary: (boundaryId: string) => Promise<DomJournalResult | void>;
 		readonly holdPendingFlip: (graphNodeId: string) => boolean;
 	}) => void;
-	readonly connectAsyncBoundaryWiring: (
-		wiring: import('./resume-async-wiring.ts').AsyncBoundaryWiring,
-	) => void;
+	readonly connectAsyncBoundaryWiring: (wiring: () => Promise<AsyncBoundaryWiring>) => void;
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 	// Handed straight to the repeat runtime, which hands it to a component row's
@@ -104,7 +102,7 @@ export async function startResumeRuntime(input: {
 		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
 	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
-}): Promise<AsyncBoundarySettleTracker | undefined> {
+}): Promise<() => AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
 		prepared,
@@ -201,37 +199,29 @@ export async function startResumeRuntime(input: {
 		});
 	}
 	let settleTracker: AsyncBoundarySettleTracker | undefined;
-	if (runtimeInput.view.asyncBoundaries.length > 0) {
-		const asyncWiring = await import('./resume-async-wiring.ts');
-		// D8: settled-content tracking (deadline-gated pending, the navigation-
-		// transition settle promise, pending minimum duration).
-		settleTracker = asyncWiring.createAsyncBoundarySettleTracker({
-			boundaries: prepared.asyncBoundariesById.values(),
-		});
-		// Captures the mounted @pending arms before the runners are demanded below.
-		const { wireResettleHold } = await import('./resume-resettle-hold.ts');
-		const onAsyncSnapshot = wireResettleHold({
-			tracker: settleTracker,
-			boundaries: prepared.asyncBoundariesById.values(),
-			readStatus: (graphNodeId) => runtimeInput.graph.read(graphNodeId, ['status']),
-			commitArm: input.commitArm,
-			hasHtmlRenderer: !!runtimeInput.renderBranchHtml,
-		});
-		input.connectAsyncBoundaryWiring(asyncWiring.wireAsyncBoundariesWithoutLoadingCapability({
-			asyncBoundariesById: prepared.asyncBoundariesById,
-			graph: runtimeInput.graph,
-			root: runtimeInput.root,
-			loadSymbol: runtimeInput.loadSymbol,
-			renderBranchHtml: runtimeInput.renderBranchHtml,
-			renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
-			elementHandles: prepared.elementHandles,
-			storeContainerSubscription,
-			commitArm: input.commitArm,
-			demandOnStart: runtimeInput.demandAsyncBoundaries === true,
-			settleTracker,
-			onAsyncSnapshot,
-		}));
-	}
+	// A page that served no @try still wires one an escalated @if renders later.
+	let wiring: Promise<AsyncBoundaryWiring> | undefined;
+	const wire = () =>
+		(wiring ??= (async () => {
+			const started = await (
+				await import('./resume-async-wiring.ts')
+			).startAsyncBoundaries({
+				asyncBoundariesById: prepared.asyncBoundariesById,
+				graph: runtimeInput.graph,
+				root: runtimeInput.root,
+				loadSymbol: runtimeInput.loadSymbol,
+				renderBranchHtml: runtimeInput.renderBranchHtml,
+				renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
+				elementHandles: prepared.elementHandles,
+				storeContainerSubscription,
+				commitArm: input.commitArm,
+				demandOnStart: runtimeInput.demandAsyncBoundaries === true,
+			});
+			settleTracker = started.settleTracker;
+			return started;
+		})());
+	if (runtimeInput.view.asyncBoundaries.length > 0) await wire();
+	input.connectAsyncBoundaryWiring(wire);
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
@@ -362,7 +352,8 @@ export async function startResumeRuntime(input: {
 			capture: true,
 		});
 	}
-	return settleTracker;
+	// A getter: the tracker is created when the first @try is wired, which can be after start.
+	return () => settleTracker;
 }
 
 async function disposeRemovedAsyncRangeHosts(

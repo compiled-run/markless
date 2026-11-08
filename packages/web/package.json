@@ -1,6 +1,6 @@
 {
 	"name": "@markless/web",
-	"version": "0.9.0",
+	"version": "0.14.0",
 	"description": "Markless unified render/resume runtime for the web.",
 	"license": "MIT",
 	"repository": {
@@ -15,6 +15,7 @@
 	"sideEffects": false,
 	"exports": {
 		".": "./src/index.ts",
+		"./dom-attribute": "./src/dom-attribute.ts",
 		"./dom-journal": "./src/dom-journal.ts",
 		"./dom-update": "./src/dom-update.ts",
 		"./event-only-resume": "./src/event-only-resume.ts",
@@ -29,7 +30,9 @@
 		"./render-to-stream": "./src/render-to-stream.ts",
 		"./render-to-string": "./src/render-to-string.ts",
 		"./resume": "./src/payload-full.ts",
-		"./resume-storage-free": "./src/payload-full-storage-free.ts"
+		"./resume-storage-free": "./src/payload-full-storage-free.ts",
+		"./kept-swap": "./src/kept-swap.ts",
+		"./shared-swap": "./src/shared-swap.ts"
 	},
 	"publishConfig": {
 		"access": "public",
@@ -37,6 +40,10 @@
 			".": {
 				"types": "./dist/index.d.ts",
 				"default": "./dist/index.js"
+			},
+			"./dom-attribute": {
+				"types": "./dist/dom-attribute.d.ts",
+				"default": "./dist/dom-attribute.js"
 			},
 			"./dom-journal": {
 				"types": "./dist/dom-journal.d.ts",
@@ -97,6 +104,14 @@
 			"./resume-storage-free": {
 				"types": "./dist/resume-storage-free.d.ts",
 				"default": "./dist/resume-storage-free.js"
+			},
+			"./kept-swap": {
+				"types": "./dist/kept-swap.d.ts",
+				"default": "./dist/kept-swap.js"
+			},
+			"./shared-swap": {
+				"types": "./dist/shared-swap.d.ts",
+				"default": "./dist/shared-swap.js"
 			}
 		},
 		"provenance": true

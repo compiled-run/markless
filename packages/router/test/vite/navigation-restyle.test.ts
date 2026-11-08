@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
@@ -24,6 +24,9 @@ const SHEET = '*, ::before, ::after { box-sizing: border-box; } section p { marg
 beforeAll(async () => {
 	root = await mkdtemp(join(tmpdir(), 'markless-navigation-restyle-'));
 	await cp(resolve(import.meta.dirname, '../fixtures/shared-layout-app'), root, { recursive: true });
+	// Alpha links to Beta after its frame: the swap fills the frame with Beta's parts before it removes that link.
+	const alpha = join(root, 'pages/alpha.tsrx');
+	await writeFile(alpha, (await readFile(alpha, 'utf8')).replace(`</Frame>`, `</Frame><p><a href="/beta" data-in-page>{'Read beta'}</a></p>`));
 	await mkdir(join(root, 'public'), { recursive: true });
 	for (const name of ['alpha', 'beta']) await writeFile(join(root, `public/${name}.css`), `${SHEET}\n/* ${name} */\n`);
 	await writeFile(
@@ -70,6 +73,7 @@ async function wholeDocumentRestyles(page: Page, selector: string, title: string
 	const session = await page.context().newCDPSession(page);
 	const events: TraceEvent[] = [];
 	session.on('Tracing.dataCollected', ({ value }) => events.push(...(value as TraceEvent[])));
+	await page.locator(selector).scrollIntoViewIfNeeded();
 	const box = (await page.locator(selector).boundingBox())!;
 	await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 4 });
 	await page.waitForTimeout(450);
@@ -111,6 +115,19 @@ test('an in-place navigation that swaps the page and its stylesheet restyles the
 	expect(swapMs).toBeLessThan(1500);
 	expect(await page.evaluate(() => [...document.querySelectorAll('link[rel="stylesheet"]')].map((link) => link.getAttribute('href')))).toEqual(['/beta.css']);
 	expect(await page.evaluate(() => [...document.querySelectorAll('link[rel="stylesheet"]')].map((link) => link.getAttribute('media')))).toEqual([null]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a navigation from a link the swap removes restyles the whole document once', async () => {
+	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}/alpha`);
+	await page.waitForLoadState('networkidle');
+	// Removing the focused link mid-swap would force a style recalculation of the half-built document.
+	expect(await wholeDocumentRestyles(page, '[data-in-page]', 'Beta')).toBe(1);
+	expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
 	expect(errors).toEqual([]);
 	await page.close();
 });

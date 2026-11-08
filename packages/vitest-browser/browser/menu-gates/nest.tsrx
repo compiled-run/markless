@@ -15,7 +15,7 @@ export const nest = shared(
 
 		return { ...n };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NestRoot({ label, children, ...rest }) @{

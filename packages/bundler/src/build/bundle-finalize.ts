@@ -64,6 +64,7 @@ export type FinalizeBundleOptions = {
 	packing?: boolean;
 	dev?: boolean;
 	chunkImportMap?: boolean;
+	documentStylesheets?: boolean;
 	routeModules?: (moduleId: string) => boolean;
 };
 
@@ -95,6 +96,7 @@ export async function finalizeBundle(
 
 const renderedModules = collectRenderedModules(bundle, input.root);
 rootRelativeRegionComments(bundle, input.root);
+if (options.documentStylesheets) await dropStylesheetPreloadDependencies(bundle);
 await stripEmptyPreloadWrappersFromChunks(bundle);
 const removedSymbolFacades = new Set(rewriteGeneratedSymbolFacadeImports(bundle));
 await prefetchDynamicImportParses(bundle);
@@ -284,6 +286,29 @@ function bundleWithoutRemovedChunks(
 		next[key] = output;
 	}
 	return next;
+}
+
+async function dropStylesheetPreloadDependencies(bundle: Record<string, unknown>) {
+	const stylesheets = Object.values(bundle).flatMap((output) =>
+		isStylesheetAsset(output) ? [output.fileName] : [],
+	);
+	if (stylesheets.length === 0) return;
+	const chunks = Object.values(bundle).filter(
+		(output): output is { readonly type: 'chunk'; readonly fileName: string; code: string } =>
+			isChunkWithCode(output) && isChunkFile(output),
+	);
+	const dropped = await Promise.all(
+		chunks.map((chunk) =>
+			runChunkTask('stylesheetlessPreloads', chunk.fileName, chunk.code, stylesheets),
+		),
+	);
+	for (const [index, chunk] of chunks.entries()) chunk.code = dropped[index]!;
+}
+
+function isStylesheetAsset(output: unknown): output is { readonly fileName: string } {
+	if (!output || typeof output !== 'object') return false;
+	const asset = output as { readonly type?: unknown; readonly fileName?: unknown };
+	return asset.type === 'asset' && typeof asset.fileName === 'string' && asset.fileName.endsWith('.css');
 }
 
 async function stripEmptyPreloadWrappersFromChunks(bundle: Record<string, unknown>) {

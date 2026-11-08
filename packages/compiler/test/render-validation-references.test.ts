@@ -22,7 +22,6 @@ const filename = 'src/Probe.tsrx';
 
 function undeclaredRead(
 	source: string,
-	repeatLocals: ReadonlyArray<string> = [],
 ): { readonly name: string; readonly start: number; readonly end: number } | null {
 	const ast = parseModule(source, filename) as unknown as AnyNode;
 	const selected = selectPublicRenderRoot(ast);
@@ -32,7 +31,6 @@ function undeclaredRead(
 		component: selected.component,
 		filename,
 		moduleImports: [],
-		repeatLocals,
 		root: selected.root,
 		source,
 	});
@@ -137,13 +135,21 @@ test('POLICY: a global outside the known render globals list is still reported',
 	);
 });
 
-test('POLICY: a repeat local is not reported', () => {
-	const source = `export function App() @{ const rows = [1]; <main>@for (row of rows) { <p>{row}</p> }</main> }`;
+test('POLICY: a bare @for item read inside its loop is not reported', () => {
+	// The analyzer leaves a bare `row` head unresolved, so the policy is doing real work.
+	expect(
+		undeclaredRead(`export function App() @{ const rows = [1]; <main>@for (row of rows) { <p>{row}</p> }</main> }`),
+	).toBeNull();
+});
 
-	expect(undeclaredRead(source, ['row'])).toBeNull();
-	// Without the repeat-local policy the item binder is an unresolved name, so
-	// the policy is doing real work rather than shadowing an analyzer answer.
-	expect(undeclaredRead(source, [])?.name).toBe('row');
+test('POLICY: a bare @for item name read outside its loop is still reported', () => {
+	const source = `export function App() @{ const rows = [1]; <main>@for (row of rows) { <p>{row}</p> }<b>{row}</b></main> }`;
+
+	expect(undeclaredRead(source)).toEqual({
+		name: 'row',
+		start: source.lastIndexOf('row'),
+		end: source.lastIndexOf('row') + 'row'.length,
+	});
 });
 
 test('DIVERGES: a parameter bound inside the read resolves and is not reported', () => {

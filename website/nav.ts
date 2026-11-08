@@ -81,20 +81,20 @@ export const nav: readonly NavSection[] = [
 					'state() tells the page to watch a variable. You read it and assign to it like any other let.',
 			},
 			{
-				title: 'Computed',
-				href: '/concepts/computed',
-				icon: 'funnel',
-				number: '2',
-				description:
-					'A value you work out is never out of date. computed() derives one value from others and works it out again when one of them changes.',
-			},
-			{
 				title: 'Events',
 				href: '/concepts/events',
 				icon: 'click',
-				number: '3',
+				number: '2',
 				description:
 					'An event prop is on plus the DOM event name, and the browser hands your handler its own typed event object.',
+			},
+			{
+				title: 'Computed',
+				href: '/concepts/computed',
+				icon: 'funnel',
+				number: '3',
+				description:
+					'A value you work out is never out of date. computed() derives one value from others and works it out again when one of them changes.',
 			},
 			{
 				title: 'Conditionals',
@@ -232,7 +232,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'typecheck',
 				number: '2',
 				description:
-					'TypeScript checks a TSX copy of each .tsrx file, and every error points back to the line you wrote.',
+					'Your editor checks each .tsrx file with TypeScript as you type, and marks each mistake on the line you wrote.',
 			},
 			{
 				title: 'Testing',
@@ -262,7 +262,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'balance',
 				number: '1',
 				description:
-					'The design choices behind Markless on one page, for contributors and agents who want to weigh how it works.',
+					'Markless decides how each page works when you compile it, so the browser runs less: the shadcn/ui home page executes 131 kB at load instead of 1,403 kB.',
 			},
 			{
 				title: 'The big idea',
@@ -270,7 +270,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'bulb',
 				number: '2',
 				description:
-					'Markless reads a component at build time instead of running it, so the plan is written before anything renders, anywhere.',
+					'One component, written once and worked out at compile time, drawn by a browser, a server and an early native proof.',
 			},
 			{
 				title: 'The compiler',
@@ -278,7 +278,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'gear',
 				number: '3',
 				description:
-					'The real output the compiler makes from a counter: its state, its updates and the code each event runs.',
+					'What the compiler writes for a .tsrx file: its state nodes and symbols, each tied to a source line, compiled live in the browser.',
 			},
 			{
 				title: 'The payload',
@@ -286,7 +286,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'envelope',
 				number: '4',
 				description:
-					'What a server adds to its HTML so the browser can carry on: the state values, which element does what, and a small script that waits for the first interaction.',
+					'What a server adds to a rendered page: finished HTML plus two small blocks of data, markless/state and markless/view.',
 			},
 			{
 				title: 'Resuming',
@@ -294,7 +294,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'play',
 				number: '5',
 				description:
-					'Who hears the first click on each of the three paths a page can take: the browser with a direct module, the browser on the general path, or a server-rendered page.',
+					'How the browser picks up a page that was worked out ahead of time: the first press runs one handler, and nothing starts over.',
 			},
 			{
 				title: 'The state graph',
@@ -302,7 +302,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'graph',
 				number: '6',
 				description:
-					'The compiler writes down who reads what before the page exists, so one write touches one text node.',
+					'The graph the compiler writes of which values each spot reads, so a write reaches only its readers.',
 			},
 			{
 				title: 'Lazy chunks',
@@ -310,7 +310,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'puzzle',
 				number: '7',
 				description:
-					'Where the small functions behind each handler and update live, and when the browser gets and runs them.',
+					'Click code downloads with the page and runs only on its own click: symbols, packing, and what a symbol can reach.',
 			},
 			{
 				title: 'Native targets',
@@ -318,7 +318,7 @@ export const nav: readonly NavSection[] = [
 				icon: 'phone',
 				number: '8',
 				description:
-					'The same counter on a phone: the state graph and its functions are data, so a browser is not the only place they run.',
+					'The early iOS and macOS proofs: real native views, no web view, and a plan the compiler does not write yet.',
 			},
 		],
 	},
@@ -380,7 +380,7 @@ export const nav: readonly NavSection[] = [
 				href: '/reference',
 				icon: 'parcel',
 				number: '1',
-				description: 'Every Markless package, what it does, and its npm version.',
+				description: 'Every Markless package, what it does, and whether it is on npm.',
 			},
 			{
 				title: 'Glossary',
@@ -424,23 +424,6 @@ export const nav: readonly NavSection[] = [
 
 /** Every entry in reading order, which is what the prev/next pager walks. */
 export const flatNav: readonly NavEntry[] = nav.flatMap((section) => section.entries);
-
-export type Crumb = { readonly section: string; readonly page: string };
-
-/**
- * The header's trail for one pathname: the section it belongs to and its own
- * title. An unknown path (a 404, say) gets two empty strings rather than a
- * throw, and the header renders the mug on its own.
- */
-export function breadcrumbFor(pathname: string): Crumb {
-	for (const section of allNav)
-		for (const entry of section.entries)
-			if (entry.href === pathname) return { section: section.title, page: entry.title };
-	for (const section of allNav)
-		for (const entry of section.entries)
-			if (entry.href !== '/' && pathname.startsWith(entry.href + '/')) return { section: section.title, page: entry.title };
-	return { section: '', page: '' };
-}
 
 export const siteDescription =
 	'The Markless documentation: build for any device, the web way. Elements and events in TypeScript, with an API designed to compile to any device.';
@@ -577,7 +560,7 @@ export function assumesFor(assumes: string): readonly AssumesItem[] {
    The UI section. `@markless/ui` is a second set of pages under /ui,
    and the switch at the top of the sidebar moves a reader between the two. What
    follows is the same shape as the framework nav above, so one file still
-   decides the sidebar, the breadcrumb, the pager and the document head.
+   decides the sidebar, the pager and the document head.
    --------------------------------------------------------------------------- */
 
 export type ModeKey = 'framework' | 'ui';
@@ -859,7 +842,6 @@ export const uiNav: readonly NavSection[] = [
 export const flatUiNav: readonly NavEntry[] = uiNav.flatMap((section) => section.entries);
 
 /** Both sections, for the lookups that only need to find a page by its href. */
-const allNav: readonly NavSection[] = [...nav, ...uiNav];
 const allFlat: readonly NavEntry[] = [...flatNav, ...flatUiNav];
 
 /** The ink mark of the page at a pathname, if it is a docs page. */

@@ -11,7 +11,7 @@ import MultiEmbed from './scenarios/multi-embed.tsrx';
 // `widgetDefinitionSuffixes` is empty because these primitives hold no `shared()`
 // cell at all — a button's pressed state is a plain `state()` local to the part —
 // so there is no family-specific widget id to name. The family-agnostic half of
-// that check, which refuses any widget-scoped id repeated across the embeds, still
+// that check, which refuses any subtree-scoped id repeated across the embeds, still
 // runs over the merged payload.
 //
 // `rovingKey` is omitted rather than exempted: the primitives are single elements

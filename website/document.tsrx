@@ -4,9 +4,11 @@ import { findError } from './components/docs/errors/lookup.ts';
 import { findApp } from './components/docs/showcase/view.ts';
 import { asset } from './site-base.ts';
 import Pager from './components/docs/pager.tsrx';
-import SiteHeader from './components/docs/site-header.tsrx';
 import stylesheet from './styles/global.css?url';
 import brandStylesheet from './styles/brand.css?url';
+import joyEliaRegular from './styles/fonts/JoyElia-Regular.woff2?url';
+import joyEliaBold from './styles/fonts/JoyElia-Bold.woff2?url';
+import shantellSans from './styles/fonts/ShantellSans-latin-variable.woff2?url';
 
 export default function Document({
 	url,
@@ -39,11 +41,15 @@ export default function Document({
 			<meta name="twitter:card" content="summary" />
 			<link rel="icon" href={asset('favicon-mug.svg')} type="image/svg+xml" />
 			<link rel="apple-touch-icon" href={asset('markless-mug-icon.png')} />
+			<link rel="preload" href={joyEliaRegular} as="font" type="font/woff2" crossorigin="anonymous" />
+			<link rel="preload" href={joyEliaBold} as="font" type="font/woff2" crossorigin="anonymous" />
+			<link rel="preload" href={shantellSans} as="font" type="font/woff2" crossorigin="anonymous" />
 			<link rel="stylesheet" href={stylesheet} />
 			<link rel="stylesheet" href={brandStylesheet} />
 			<script src={asset('theme.js')}></script>
 			<script src={asset('mascot.js')}></script>
 			<script type="module" src={asset('outline.js')}></script>
+			<script type="module" src={asset('navbar.js')}></script>
 			@if (examplePage) {
 				<script type="module" src={asset('accordion-preview.js')}></script>;
 			}
@@ -53,6 +59,7 @@ export default function Document({
 				/* Unconditional rules first, the narrow-viewport media queries last: a query adds no specificity. */
 				.site-shell {
 					padding-inline: var(--space-s-l);
+					padding-block-start: var(--navbar-clear);
 				}
 				.example-shell { width:100%; margin:0; padding:0; }
 
@@ -73,7 +80,6 @@ export default function Document({
 				<main class="example-shell">{children}</main>;
 			} @else {
 				<div class="docs-shell">
-					<SiteHeader pathname={pathname} />
 					<div class="site-shell">
 						<main class="prose">
 							{children}

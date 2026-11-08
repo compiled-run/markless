@@ -68,7 +68,7 @@ Components are just ways to create local graph scopes, attach reads/writes, and
 project graph values into DOM.
 
 `shared()` lifts that same graph model into a named dataflow. Some named graphs
-are request/container/page state; others are UI graph instances used by
+are app or container state; others are UI graph instances used by
 headless UI libraries and design systems whose pieces are authored as separate
 components. This is different from hooks and context, which scope state through
 render order, provider ancestry, component subscriptions, and rerender
@@ -216,23 +216,31 @@ Semantics:
 - `computed(async ({ signal }) => ...)` creates a lazy async graph node. It does
   not run at creation; it runs only when demanded by a DOM update or TSRX async
   boundary.
-- Reactive reads before the first `await` form the dependency key for the async
-  node. When that key changes, the runtime creates a new request version. A key
-  part that holds an object or array (a whole `filters` object handed to a
-  helper) changes whenever a write lands inside it: the object keeps its
-  identity when a field is written, so identity never decides that it stayed
-  the same.
-- Reactive reads after the first `await` are a compile-time diagnostic. Snapshot
-  the value before awaiting, or split the logic into an async computed plus a
-  sync computed:
+- Reactive reads in the body form the dependency key for the async node. When
+  that key changes, the runtime creates a new request version. A key part that
+  holds an object or array (a whole `filters` object handed to a helper)
+  changes whenever a write lands inside it: the object keeps its identity when
+  a field is written, so identity never decides that it stayed the same.
+- A read after an `await` whose path is known before the await starts (a state
+  path such as `filters.q`, a prop path such as `route.params.id`, or such a read
+  inside a component-body helper the body calls) joins the key exactly as if it
+  had been copied into a `const` before the first `await`. Its value is taken
+  when the run starts; if it changes while the run waits, the run is aborted and
+  a new run starts with the new value, so the committed result is the one a read
+  after the await would give.
+- A read whose path depends on the awaited value is a compile-time diagnostic
+  (`MARKLESS_ASYNC_POST_AWAIT_READ`): a computed member key that holds an
+  `await`, or a body local assigned from awaited work, such as `items[res.id]`.
+  The key is fixed before the await, so it could only hold the whole
+  collection. Such a lookup inside a called helper is not detected; it stays
+  correct because the whole collection is then a key part. Return the awaited
+  value and do the lookup in a sync computed:
 
 ```tsrx
 import { computed } from '@markless/core';
 
-const rawUser = computed(async ({ signal }) =>
-  fetchUser(route.params.userId, signal)
-);
-const formattedUser = computed(() => formatUser(rawUser, locale));
+const picked = computed(async ({ signal }) => fetchPick(signal));
+const item = computed(() => items[picked.id]);
 ```
 
 - Async computeds compose through their key phases. If an async computed's
@@ -295,9 +303,10 @@ record required for resumability.
 Rationale: runtime-only tracking systems lose dependencies after `await` unless
 users manually read them before suspension; Qwik solves that with `track()`, and
 Vue/Angular document the same synchronous-tracking constraint. Svelte's compiler
-can recover some async dependencies in compiler-visible expressions. This
-framework takes the TSRX-only route: no marker, but strict compiler diagnostics
-at the async boundary.
+restores tracking after `await` in compiler-visible expressions, but reads in
+called helpers lose it. This framework takes the TSRX-only route: no marker; the
+compiler captures every statically known read into the key before the run
+starts, and refuses only reads whose path comes from the awaited value.
 
 The state, async, element, event, and element-behavior APIs are
 **compiler-rewritten framework APIs**, not runtime reactive values. Authors must
@@ -639,21 +648,21 @@ function Header() @{
 
 `session()` does not mean "run a hook." It means: resolve this named dataflow
 instance for the current graph context. A definition declares which context that
-is: `request`, `container`, `page`, or `widget`. For app data the context is
-usually request/container/page — one instance per request, per container, or per
-page. `widget` scope is the component-library case: one instance per rendered
-widget, resolved by the outermost component instance that calls the definition,
+is: `app` (the default), `container`, or `subtree`. For app data the context is
+`app` or `container`: one instance per request on the server and per document
+in the browser, or one per container. `subtree` scope is the component-library
+case: one instance per rendered subtree,
+resolved by the outermost component instance that calls the definition,
 so a second `<SelectRoot>` on the page resolves a second instance. The instance is created during initial render,
 serialized into the graph payload, resumed lazily in the browser, and
-synchronized by serialized patch events only when it crosses container/runtime
-boundaries.
+shared with other containers on the document through one plain-data record.
 
 ```txt
 shared definition
   -> request-scoped initial-render instance
   -> serialized graph snapshot
   -> lazy browser graph instance
-  -> CustomEvent patches across container/runtime boundaries
+  -> one document-wide instance record, kept across in-place navigation
 ```
 
 Semantics:
@@ -663,14 +672,14 @@ Semantics:
   separately-built bundles.
 - **Resolution:** a bare call resolves the active instance of that shared
   definition for the current graph context. There is no `provide()` or
-  `create()` in v1. For request/page data, the active instance is the
-  request/container/page instance. For headless UI and design-system components,
+  `create()` in v1. For app and container data, the active instance is the
+  app or container instance. For headless UI and design-system components,
   the active instance is the compiler-owned UI graph instance serialized for
   that widget. Multiple widgets get distinct graph instances through normal
   component, key, and projection identity: the widget instance is the instance
   path (see "Graph node identity") of the outermost component that resolves the
   definition, and event/resume symbols carry that same path in their symbol ids.
-  A `widget`-scoped definition's instance id is its definition id qualified by
+  A `subtree`-scoped definition's instance id is its definition id qualified by
   that path, so two rendered widgets of one family never share a node while the
   root/trigger/item pieces of one widget always do.
 - **Boundaries are dataflow, not components.** The framework tracks who reads,
@@ -680,13 +689,66 @@ Semantics:
 - **Local writes are graph writes.** Inside one container, `s.user = user`
   mutates the local reactive graph directly. Custom events are not the state
   engine.
-- **Cross-runtime writes are event patches.** When a shared instance spans
+- **Cross-runtime writes are published as data.** When a shared instance spans
   nested containers, sibling micro-frontends, or a page shell boundary, the write
-  additionally emits a versioned `CustomEvent` carrying plain serialized data.
-  Other runtimes fold the patch into their own local graph.
+  is also published to the document's versioned instance record as plain cloned
+  data. Other runtimes fold it into their own local graph.
 - **State crosses bundles; code does not.** Separately-built containers may each
   bundle their own `session.login()` implementation. They synchronize through
   shared definition IDs and data patches, not shared JS object identity.
+
+#### Where an instance lives
+
+`shared()` behaves like a request-scoped store (nanostores, per request): it
+replaces context, and it is how containers built separately, even on different
+Markless versions, share state.
+
+- **Server: one instance per request.** Every render, including the render of
+  an in-place navigation's next page, starts from the factory's initial values
+  (plus component seeds). A value written in one request, or in a browser, is
+  never seen by another request.
+- **Browser: one instance per document.** Until a value moves, the served values
+  are the instance, so a running container loads no binding code. The first
+  container whose value changes, or that receives another container's write,
+  creates the instance; a container that starts after that binds as it starts. From then on the instance
+  holds the live value through every in-place (router) navigation, Back and
+  Forward included, until the document is reloaded. A full reload starts again
+  from the served values.
+- **An in-place navigation shows the live value from its first frame.** The
+  next page is server-rendered with the defaults, as any request is. Before the
+  router swaps it in, it binds that page's reads of the instance to the live
+  value: every text, attribute and class the page writes from the instance,
+  directly or through a sync `computed()`, is updated in the page that is about
+  to be shown, so no frame shows the default. Markup the value would change
+  (an `@if`, `@for` or `@try` arm), properties such as an input's `value`, and
+  async `computed()` values are brought up to date by starting the page's
+  runtime as soon as the swap lands, the way a write would: an async value
+  re-runs with the live key and shows its pending state meanwhile.
+- **A field a component body seeds keeps its seed.** A cell the next page seeds
+  (`s.disabled = props.disabled`) takes that page's seed, not the live value;
+  the next write publishes it to the instance as usual.
+- **Containers share one instance by definition id.** Two containers on one
+  page (two apps, or two mounts of one app) that resolve the same definition id
+  read and write one instance: a write in either updates both. The instance is
+  plain data on the document, so containers built with different Markless
+  versions share it when their definition id and the shape of their served
+  state match. The shape is each state cell's id and the structure of its
+  served value (field names and value types, recursively; array items are not
+  compared). A container whose shape does not match does not bind: it keeps an
+  instance of its own and reports `MARKLESS_SHARED_SHAPE_MISMATCH` once, naming
+  the definition, so no container ever reads a value of another shape.
+- **Scopes.** `app` (the default) is one instance per request on the server
+  and one per document in the browser. `container` is one instance per
+  container element: it is not shared with other containers, and because an
+  in-place navigation keeps the container element, it lives across navigation
+  too. `subtree` is one instance per rendered subtree root; subtrees are not
+  kept across a navigation, so each page's subtrees start from their served
+  values.
+- **Renamed scopes are refused.** `'page'` and `'request'` (now `'app'`) and
+  `'widget'` (now `'subtree'`) fail the compile with
+  `MARKLESS_SHARED_SCOPE_RENAMED`, which names the new spelling. They are not
+  accepted as aliases.
+
 
 Rationale receipts (GitHub code search, June 2026): ~75% of React `useContext`
 call sites are hidden behind hand-rolled bare-call wrappers (`useAuth()`-style,
@@ -770,11 +832,15 @@ inside one `.tsrx` module:
   body resolves a shared instance read the same way; the server render body
   rebuilds the instance from the factory's graph nodes before the derive runs,
   so nothing closes over the factory's own local.
-- **Methods lower to graph writes.** A returned method that takes no parameters
-  is inlined at its call site, so `onClick={() => s.login()}` becomes the graph
-  writes the method body performs. A method that takes parameters is not
-  inlined: binding call-site arguments the graph cannot see is outside this
-  lowering.
+- **Methods lower to graph writes.** A returned method is inlined at its call
+  site, so `onClick={() => s.login()}` becomes the graph writes the method body
+  performs. A method that takes parameters is inlined as an arrow carrying the
+  method's own parameter list, called with the call-site arguments in order, so
+  `s.typed(text, now)` binds both. Any parameter shape works: several
+  parameters, defaults, destructuring, and function-typed parameters. A method
+  whose name is also a collection method (`add`, `delete`, `set`, `push`,
+  `clear`) is still a call to that method, because the factory's returned
+  methods decide it, not the name.
 - **A method body may hold locals and several statements.** Every read in the
   body is rewritten to its graph node, not only the read on the right of an
   assignment, so `toggle() { const next = s.checked !== true; s.checked = next; }`
@@ -786,50 +852,85 @@ inside one `.tsrx` module:
   refuse a handle reached through an instance, because nothing mints or emits the
   id yet; the refusal is deliberate, since a recorded relationship that renders
   no attribute would be invisible.
-- **Page scope is the default.** Omitting `scope` resolves the definition to one
-  instance for the page. `'request'`, `'container'`, `'page'`, and `'widget'`
-  are accepted and recorded on the definition; any other value fails the compile
-  closed with `MARKLESS_SHARED_SCOPE_INVALID`.
+- **App scope is the default.** Omitting `scope` resolves the definition to one
+  instance for the app, which in the browser lives for the document (see
+  "Where an instance lives"). `'app'`, `'container'`, and `'subtree'` are
+  accepted and recorded on the definition. `'page'`, `'request'`, and `'widget'`
+  fail the compile closed with `MARKLESS_SHARED_SCOPE_RENAMED`; any other value
+  fails it with `MARKLESS_SHARED_SCOPE_INVALID`.
 - **A family shape with no declared scope warns.** When two or more components of
   the module that declares a definition resolve it, that is the shape of a widget
-  family. Left without a scope it is page-scoped, so two of those widgets on one
+  family. Left without a scope it is app-scoped, so two of those widgets on one
   page share one graph and move together. The compiler emits the warning
   `MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT`, naming the components and both fixes:
-  add `{ scope: 'widget' }` for a graph per rendered widget, or write
-  `{ scope: 'page' }` to keep the sharing on purpose. It is a warning, not an
-  error, so existing page-scoped families keep compiling; either explicit
+  add `{ scope: 'subtree' }` for a graph per rendered widget, or write
+  `{ scope: 'app' }` to keep the sharing on purpose. It is a warning, not an
+  error, so existing app-scoped families keep compiling; either explicit
   spelling silences it.
-- **Widget scope is per rendered widget.** A `widget`-scoped definition's graph
+- **Subtree scope is per rendered widget.** A `subtree`-scoped definition's graph
   nodes belong to the first component of the module that resolves it, not to the
   module root. Composition reads that ownership back: the widget root is the
   outermost composed instance that carries the definition's cells, and every
   other piece of the widget — trigger, content, item — finds that root as the
   longest registered widget-root prefix of its own instance path. The instance id
   is the definition id qualified by the widget-root path
-  (`c0:shared:select.tsrx#select/state:s`), so a widget-scoped `shared:` id is
+  (`c0:shared:select.tsrx#select/state:s`), so a subtree-scoped `shared:` id is
   the one page-space family composition does qualify. A widget nested inside
   another widget's content owns its own root path; two widgets of one family
   nested inside one another resolve to the outermost of the two, which is what
   "the outermost component that resolves the definition" means above.
-- **No compile diagnostic is owed for widget scope.** Spec 03's normative refusal
+- **No compile diagnostic is owed for subtree scope.** Spec 03's normative refusal
   is compose-time — "a child node id that composition cannot classify is a
-  compose-time refusal" — and a widget-scoped id is always classifiable: it is
+  compose-time refusal" — and a subtree-scoped id is always classifiable: it is
   either qualified by a registered widget root or, when the resolving component
   is the page itself and has no instance path, page-wide, which is the same
-  answer page scope gives.
+  answer app scope gives.
 
-Two follow-ups are named here rather than implied by the lowering:
+How the browser keeps one instance per document:
 
-- **Cross-container patches are not wired.** "Cross-runtime writes are event
-  patches" above describes the intended contract, not current behavior. A write
-  updates the writing container's graph only; the `writeShared` routing that
-  would emit the versioned `CustomEvent` for a `container`-scoped instance is a
-  separate change and needs a ruling on the patch contract before it lands.
-- **Cross-file definitions fail closed.** Importing a definition from another
-  `.tsrx` module reports `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED`, because the
-  module graph interface carries no shared definitions for the importing module
-  to read the factory's nodes from. That is deliberate: an instance resolved
-  without its nodes would render blank and never update.
+- **The instance is a versioned record on the document.** It lives under
+  `PROTOCOL_SHARED_INSTANCES_PROPERTY` (`packages/serializer/src/protocol-shared-instances.ts`)
+  on the document, or on the container element for `container` scope, keyed by
+  definition id. Each entry holds the shape, the live value of each state cell
+  (structured clones, so no container holds another's objects) and the woken
+  containers listening to it. Every write a container's runtime makes to a
+  bound cell is published there and delivered to every other listener.
+- **A container binds when its runtime starts.** A cell whose served value
+  differs from the live one starts at the served value and takes the live one
+  on its first read, which the runtime makes at start; that write brings every
+  binding, derived value and arm to the live value, exactly as a write would. A
+  container that has not woken yet is woken by the first write it has to show:
+  a server-rendered page that declares an `app` definition adds
+  its container to the record's dormant list from its startup script (one
+  push; no listener runs), and a write wakes each listed container whose state
+  resolves that definition. A client-rendered mount listens on the instance
+  until its runtime starts.
+- **The router binds before the swap.** When a runtime has bound an instance
+  on the document (or on the container), the router hands the next page to
+  `bindSharedSwap` from `@markless/web/shared-swap`, which loads that page's
+  route module through its resume module, updates its direct and sync-derived
+  positions while it is still off screen, and starts the page's runtime as soon
+  as the swap lands when anything else reads a changed cell. A document whose
+  instances hold no values yet swaps in the same task, as before.
+- **Only apps that declare one pay for it.** The binding module's `import()`
+  is written only by a compiled module whose state declares a non-widget
+  `shared()` definition (it installs `__marklessSharedInstances`, the way
+  elevation installs its loader), and the compiler demands it only for such a
+  module, so other apps neither emit, download nor run it. The swap binder is
+  never preloaded: the router starts loading it with the next page's fetch,
+  and only once a runtime has bound an instance.
+
+Named here rather than implied by the lowering:
+
+- **Event patches are not the transport.** "Cross-runtime writes are event
+  patches" above described a `CustomEvent` per write; containers share instead
+  through the document record, which needs no listener on a container that has
+  not woken. The `writeShared`/`applySharedPatch` graph API remains for nested
+  runtimes and is not wired to it.
+- **An imported definition resolves to the defining module's nodes.** A page
+  that imports `choice` from `lib/choice.tsrx` reads
+  `shared:lib/choice.tsrx#choice/...`, the same nodes every other importer
+  reads, so one id names the instance on every page of the app.
 
 #### Shared examples
 
@@ -927,8 +1028,8 @@ function CartSidebar() @{
 ```
 
 The two bundles share live state without sharing code. The header write updates
-its local graph and emits a serialized patch for the `shell` shared ID; the
-sidebar runtime folds that patch into its own graph.
+its local graph and publishes the new value to the document's `shell` instance;
+the sidebar runtime folds that value into its own graph.
 
 **Headless UI / design-system graph**
 
@@ -979,7 +1080,7 @@ export function SelectItem({ value, children }) @{
 
 All three components read and write the same select graph instance for that
 rendered widget. A second `<SelectRoot>` gets a different graph instance: with
-`widget` scope, the instance id is the definition id qualified by the instance
+`subtree` scope, the instance id is the definition id qualified by the instance
 path of the outermost resolving component, and the trigger and item pieces
 resolve through the same path. No provider component, context ID, wrapper hook,
 or tree-shaped public API is introduced; the compiler/runtime records graph

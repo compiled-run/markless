@@ -18,7 +18,7 @@ export const tipState = shared(() => {
 	const tip = state({ open: false });
 	const triggerEl = element();
 	return { ...tip, triggerEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Trigger({ children, ...rest }) @{
 	const tip = tipState();
 	<button {...rest} el={tip.triggerEl} type="button" ui-open={tip.open}>
@@ -38,7 +38,7 @@ export const lampState = shared(() => {
 	const lamp = state({ lit: true });
 	const bulbEl = element();
 	return { ...lamp, bulbEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Bulb({ kids, ...others }) @{
 	const lamp = lampState();
 	<span role="status" ui-lit={lamp.lit} el={lamp.bulbEl} {...others}>

@@ -4,6 +4,7 @@ import { rootRelativeId } from '../module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 import type { MarklessSymbolManifestEntry, MarklessTransformManifest } from '../types.ts';
 import { executionLogIdentityOffsets } from './execution-log-hooks.ts';
+import { PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
 type GeneratedChunk = {
 	readonly type: 'chunk';
@@ -141,7 +142,7 @@ export function verifyGeneratedSymbolTableRoutes(
 			const reason =
 				table.literalLoads && literalLoadReaches(chunks, routeChunk, claimedChunk, symbol)
 					? undefined
-					: routeTerminationError(chunks, claimedChunk, symbol);
+					: routeTerminationError(chunks, routeChunk, claimedChunk, symbol);
 			if (reason) {
 				errors.push({ symbolId: symbol.symbolId, claimedChunk, reason });
 			} else {
@@ -309,7 +310,8 @@ function verifyDirectRoute(
 		return { claimedChunk: target.fileName };
 	if (
 		!(target.exports ?? []).includes(symbol.exportName) &&
-		!namespacePickReaches(routeChunk, target, symbol)
+		!namespacePickReaches(routeChunk, target, symbol) &&
+		!packLoaderReaches(routeChunk, target, symbol)
 	) {
 		return {
 			claimedChunk: target.fileName,
@@ -344,6 +346,28 @@ function namespacePickReaches(
 	return new RegExp(
 		String.raw`import\(\s*(["'\x60])${specifier}\1\s*\)\.then\(\s*\(?\s*([$\w]+)\s*\)?\s*=>\s*\(?\s*(?:\2\.[$\w]+\(\s*\)\s*,\s*)*\2\.[$\w]+\s*\)?\s*\)`,
 	).test(routeChunk.code);
+}
+
+// A lazy load the facade pass collapsed reads the symbol through a loader the pack exports, not a chunk export.
+function packLoaderReaches(
+	routeChunk: GeneratedChunk,
+	target: GeneratedChunk,
+	symbol: MarklessSymbolManifestEntry,
+): boolean {
+	if (
+		!symbolRenderedExports(target, normalizeVirtualId(symbol.virtualModuleId)).includes(
+			symbol.exportName,
+		) ||
+		!new RegExp(String.raw`get\s*(["'\x60]?)${escapeRegExp(symbol.exportName)}\1\s*\(\)`).test(
+			target.code,
+		) ||
+		!routeChunk.code.includes(relativeChunkSpecifier(routeChunk.fileName, target.fileName))
+	)
+		return false;
+	const loader = new RegExp(String.raw`${escapeRegExp(PACK_LOADER_PREFIX)}[\w$]+`, 'g');
+	return [...new Set(routeChunk.code.match(loader))].some((name) =>
+		target.code.includes(`export function ${name}(`),
+	);
 }
 
 function escapeRegExp(value: string): string {
@@ -386,6 +410,7 @@ function dynamicRouteReachesChunk(
 
 function routeTerminationError(
 	chunks: ReadonlyMap<string, GeneratedChunk>,
+	routeChunk: GeneratedChunk,
 	claimedChunk: string,
 	symbol: MarklessSymbolManifestEntry,
 ): string | undefined {
@@ -398,7 +423,10 @@ function routeTerminationError(
 	if (!chunkOrReexportChainContainsSymbol(chunks, target, symbolVirtualId, symbol.exportName)) {
 		return `claimed chunk does not contain its generated symbol module ${symbol.virtualModuleId} or a live re-export chain to it. ${DEBUGGING_PLAYBOOK_HINT}`;
 	}
-	if (!(target.exports ?? []).includes(symbol.exportName)) {
+	if (
+		!(target.exports ?? []).includes(symbol.exportName) &&
+		!packLoaderReaches(routeChunk, target, symbol)
+	) {
 		return `claimed chunk does not export ${symbol.exportName}. ${DEBUGGING_PLAYBOOK_HINT}`;
 	}
 	return undefined;

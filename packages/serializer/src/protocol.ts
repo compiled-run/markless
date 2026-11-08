@@ -58,6 +58,9 @@ export {
 	type ProtocolEventHostEntry,
 } from './protocol-event-host.ts';
 
+export const PROTOCOL_SHARED_SCOPES = ['app', 'container', 'subtree'] as const;
+export type ProtocolSharedScope = (typeof PROTOCOL_SHARED_SCOPES)[number];
+
 export type ProtocolAsyncBoundaryArm = (typeof ASYNC_BOUNDARY_ARM)[keyof typeof ASYNC_BOUNDARY_ARM];
 
 /**
@@ -125,6 +128,8 @@ export type ProtocolEventRecord = {
 	readonly syncPolicy?: ProtocolSyncPolicy;
 	readonly symbolIds: ReadonlyArray<string>;
 	readonly action?: ProtocolEventAction;
+	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
+	readonly forwarded?: true;
 };
 
 export function protocolEventActionKind(
@@ -158,10 +163,7 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
-		// The value the render already derived, in the same envelope a cell value
-		// uses. A resume only re-derives a sync computed when a dependency is
-		// WRITTEN, so without this a handler reading one before the first write
-		// answers undefined. Served only for computeds a handler reads.
+		// The render's derived value, served only where resume reads it before a dependency write: a handler, a flipped arm or a keyed @for.
 		readonly value?: unknown;
 		// The same value on the live channel cells use: a CSR mount hands it over
 		// in memory, so it never needs an envelope. Never served — payload
@@ -196,6 +198,9 @@ export type ProtocolStatePayload = {
 		// A roster derive only: the host-id prefix of the component that declared it,
 		// which its symbol-space id cannot spell once a module holds several components.
 		readonly hostScope?: string;
+		// Only subscriptions and other such computeds read it, so resume re-derives it
+		// when it is read rather than on every dependency write.
+		readonly deriveOnRead?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which
@@ -220,7 +225,7 @@ export type ProtocolStatePayload = {
 		readonly id: string;
 		readonly name: string;
 		readonly exportedName: string;
-		readonly scope?: 'request' | 'container' | 'page' | 'widget';
+		readonly scope?: ProtocolSharedScope;
 		readonly version: number;
 		readonly graphNodeIds: ReadonlyArray<string>;
 		readonly projectionIds?: ReadonlyArray<string>;
@@ -302,6 +307,13 @@ export type ProtocolBranchIdrefSite = {
 	readonly armIndex: number;
 };
 
+/** A state cell an arm declares: written back to `value` each time arm `arm` opens. */
+export type ProtocolBranchArmSeed = {
+	readonly arm: number;
+	readonly graphNodeId: string;
+	readonly value: unknown;
+};
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -312,6 +324,7 @@ export type ProtocolArmBranchRecord = {
 	readonly contentReads?: ReadonlyArray<ProtocolBranchContentRead>;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch inside the arm keeps the `dom-order-comment`
 	// anchors its own module counted; they name its comment text, not an index
@@ -617,11 +630,21 @@ export type ProtocolViewPayload = {
 			/** The component whose render-data reader answers `source` slots; present exactly when one is. */
 			readonly componentName?: string;
 			readonly textSlots?: ReadonlyArray<
-				{ readonly path: ReadonlyArray<number> } & ProtocolRowTemplateSlotValue
+				{
+					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
+				} & ProtocolRowTemplateSlotValue
 			>;
+			/**
+			 * `fromEnd` lists the depths in `path` whose element follows a nested
+			 * list's rows in its parent: on a live row those rows sit in front of it,
+			 * so a patch counts that step from the parent's last element. Omitted when
+			 * no nested list stands before the slot.
+			 */
 			readonly attributeSlots?: ReadonlyArray<
 				{
 					readonly path: ReadonlyArray<number>;
+					readonly fromEnd?: ReadonlyArray<number>;
 					readonly name: string;
 				} & ProtocolRowTemplateSlotValue
 			>;
@@ -713,6 +736,7 @@ export type ProtocolViewPayload = {
 		readonly endAnchor: { readonly strategy: 'dom-order-comment'; readonly index: number };
 		readonly symbolId?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
+		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 		readonly armRecords?: ReadonlyArray<{
 			readonly events: ReadonlyArray<{
 				readonly hostPath: ProtocolElementAddress;

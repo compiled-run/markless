@@ -7,6 +7,7 @@ import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
 import { marklessSsrIslandRosterAnswered } from '../../../../web/src/prerender/island-roster.ts';
+import type { KeepParts } from '../../../../web/src/fns/keep-parts-hook.ts';
 import {
 	protocolInstancePath,
 	protocolInstanceQualifies,
@@ -321,7 +322,11 @@ export async function renderMdxChild(
 				)
 			: rendered;
 	if (output) children.push({ ...child, output });
-	return output?.html ?? '';
+	const keep = (globalThis as Record<symbol, KeepParts | undefined>)[Symbol.for('markless.keep-parts')];
+	// An island with markdown between its tags places that content itself, so only a childless one is offered for keeping.
+	return output?.html && keep && !child.childrenElementTags?.length
+		? keep(output.html, undefined, { ...output, instancePath: child.hostPrefix })
+		: (output?.html ?? '');
 }
 
 // Markdown children travel as a projection, so the island counts their elements where its `{children}` lands.
@@ -429,7 +434,7 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 }
 
 /**
- * The island segment every id this child owns takes, plus the widget-scoped
+ * The island segment every id this child owns takes, plus the subtree-scoped
  * definitions that segment is allowed to reach.
  *
  * The segment is read back out of the child's own prefix rather than minted
@@ -448,7 +453,7 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
 		segment: prefix && protocolInstancePath(prefix) === prefix ? prefix : '',
 		widgetDefinitionIds: new Set(
 			(state.sharedDefinitions ?? [])
-				.filter((definition) => definition.scope === 'widget')
+				.filter((definition) => definition.scope === 'subtree')
 				.map((definition) => definition.id),
 		),
 	};
@@ -461,11 +466,11 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
  * same `c`/`p` path and their cells, computeds and element-handle rosters land
  * on one node unless the island segment separates them. What must NOT take the
  * segment is the page-space families that mean one node per page on purpose: a
- * `scope: 'page' | 'container' | 'request'` shared() graph and a storage slot
+ * `scope: 'app' | 'container'` shared() graph and a storage slot
  * are shared BETWEEN islands, and prefixing them gives each island a private
  * copy of state the author asked to be common.
  *
- * A widget-scoped shared() id is the exception inside the exception — one graph
+ * A subtree-scoped shared() id is the exception inside the exception — one graph
  * per rendered widget, so it is the island's — and a bare one (no path, because
  * no registered widget root claimed it at compose) is recognised by asking the
  * child's own definitions which scope it was declared at.
@@ -484,7 +489,7 @@ function islandScopedGraphNodeId(graphNodeId: string, island: MdxIslandScope): s
 /**
  * The registering half of a handle key, mirrored on the reading half.
  *
- * Resume re-spells only a widget-scoped `shared:` handle id per rendered widget;
+ * Resume re-spells only a subtree-scoped `shared:` handle id per rendered widget;
  * a component-local handle is already one element per key and the reading symbol
  * asks for it exactly as its module compiled it. Segmenting that second kind
  * here would file it under a key nothing ever asks for.
@@ -806,7 +811,7 @@ function appendMdxChildView(context: {
 	for (const behavior of childView.behaviors ?? []) {
 		context.behaviors.push(prefixMdxSymbolRecord(behavior, context.child, island));
 	}
-	// A widget-scoped handle id IS the roster key, so an island-blind one merges
+	// A subtree-scoped handle id IS the roster key, so an island-blind one merges
 	// two islands' plural handles into one roster and the arrow walk leaves the
 	// island it was pressed in.
 	for (const handle of childView.elementHandles ?? []) {

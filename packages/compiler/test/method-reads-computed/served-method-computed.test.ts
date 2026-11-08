@@ -36,7 +36,7 @@ export const tallyState = shared(() => {
 			board.own = (own === null ? seed : own).concat(mark);
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function TallyRoot({ marks = [] as readonly string[], children }) @{
 	const board = tallyState();

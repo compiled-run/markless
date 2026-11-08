@@ -228,7 +228,7 @@ export async function emitTransformResult(
 				linkedModules: virtualModules.keys(),
 			});
 			throwIfRenderDataUnlinked(renderData);
-			const styleImports = renderData.styleModules.map(
+			const styleImports = [...transformed.stylesheetImports, ...renderData.styleModules].map(
 				(styleModule) => `import ${JSON.stringify(styleModule)};`,
 			);
 			if (sharesCanonicalRenderData(request, renderDataModule)) {
@@ -265,6 +265,7 @@ export async function emitTransformResult(
 	state.styleClosures.set(
 		source,
 		new Set([
+			...transformed.stylesheetImports,
 			...transformed.virtualModules.flatMap((module) =>
 				module.type === 'style' ? [module.id] : [],
 			),

@@ -4,6 +4,7 @@ import { runtimeModuleIdFromOrigin } from './bundle-graph.ts';
 import type { MarklessBuildMetadataBundle } from './build-metadata.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
+import { collapsedGlueLength } from './lazy-module-facades.ts';
 
 export { MARKLESS_BYTE_ATTRIBUTION };
 
@@ -108,10 +109,14 @@ type RenderedModule = { readonly renderedLength: number; readonly code?: string 
 type RenderedModules = Record<string, RenderedModule | undefined>;
 
 // Unminified code carries bundler-minted names that spell source paths; count it without them.
-function renderedLength(module: RenderedModule | undefined, root: string | undefined): number {
+function renderedLength(
+	id: string,
+	module: RenderedModule | undefined,
+	root: string | undefined,
+): number {
 	if (!module) return 0;
 	return typeof module.code === 'string'
-		? withoutMachinePaths(module.code, root).length
+		? withoutMachinePaths(module.code, root).length - collapsedGlueLength(id, module.code)
 		: module.renderedLength;
 }
 
@@ -129,7 +134,7 @@ export function collectRenderedModules(
 		rendered.set(
 			item,
 			Object.entries(modules)
-				.map(([id, module]) => [id, renderedLength(module, root)] as const)
+				.map(([id, module]) => [id, renderedLength(id, module, root)] as const)
 				.filter(([, length]) => length > 0),
 		);
 	}

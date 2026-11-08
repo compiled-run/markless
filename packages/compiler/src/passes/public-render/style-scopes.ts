@@ -69,6 +69,18 @@ export function collectModuleStyleScopes(
 	};
 }
 
+const STYLESHEET_REQUEST = /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
+
+// A stylesheet imported for its effect ships with the module, ahead of the module's own blocks.
+export function collectStylesheetImports(ast: AnyNode): ReadonlyArray<string> {
+	return asNodes(ast.body).flatMap((statement) => {
+		if (statement.type !== 'ImportDeclaration' || statement.importKind === 'type') return [];
+		if (asNodes(statement.specifiers).length > 0) return [];
+		const request = (statement.source as AnyNode | undefined)?.value;
+		return typeof request === 'string' && STYLESHEET_REQUEST.test(request) ? [request] : [];
+	});
+}
+
 // One compile asks for the same subtrees' style blocks from the semantic graph, the markup collector and the
 // render plan; walking each tree once per ask was the pass's whole cost on a docs site.
 const styleNodesByRoot = new WeakMap<AnyNode, ReadonlyArray<AnyNode>>();

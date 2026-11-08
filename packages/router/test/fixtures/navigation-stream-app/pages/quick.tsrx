@@ -10,5 +10,8 @@ export default function Quick() @{
 		} @pending {
 			<p data-pending>pending</p>
 		}
+		<div style="height: 3000px">spacer</div>
+		<a data-to-recipe href="/recipe?u=4">to the slow page</a>
+		<a data-to-spot href="/#spot">to a spot on the start page</a>
 	</main>
 }

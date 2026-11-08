@@ -179,9 +179,12 @@ function payloadSeedReads(
 	);
 	const carried = seeds.some((seed) =>
 		seed.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID
-			? [...(seed.keys ?? []), ...(seed.scalarKeys ?? []), ...(seed.rowKeys ?? [])].includes(
-					propName,
-				)
+			? [
+					...(seed.keys ?? []),
+					...(seed.scalarKeys ?? []),
+					...(seed.deriveKeys ?? []),
+					...(seed.rowKeys ?? []),
+				].includes(propName)
 			: seed.graphNodeId === `${PROTOCOL_PROP_GRAPH_NODE_PREFIX}${propName}`,
 	);
 	if (!carried) return [];

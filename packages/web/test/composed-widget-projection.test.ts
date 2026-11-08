@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { protocolIslandSegment } from '../../serializer/src/protocol-constants.ts';
 import {
 	protocolInstanceSegment,
 	protocolProjectionSegment,
@@ -36,7 +37,7 @@ function groupRootChild(symbolPrefix: string) {
 						id: `${protocolInstanceSegment(0)}${DEFINITION}`,
 						name: 'pwr',
 						exportedName: 'pwr',
-						scope: 'widget',
+						scope: 'subtree',
 						version: 0,
 						graphNodeIds: [`${protocolInstanceSegment(0)}${CELL}`],
 					},
@@ -144,7 +145,7 @@ test('resume registers the projection site from the payload, with no render in s
 				id: `${rootPath}${DEFINITION}`,
 				name: 'pwr',
 				exportedName: 'pwr',
-				scope: 'widget' as const,
+				scope: 'subtree' as const,
 				version: 0,
 				graphNodeIds: [`${rootPath}${CELL}`],
 				projectionIds: [`${site}${DEFINITION}`],
@@ -175,7 +176,7 @@ function familyOwningChild(symbolPrefix: string, rootPath: string) {
 						id: `${rootPath}${DEFINITION}`,
 						name: 'pwr',
 						exportedName: 'pwr',
-						scope: 'widget',
+						scope: 'subtree',
 						version: 0,
 						graphNodeIds: [`${rootPath}${CELL}`],
 					},
@@ -230,4 +231,25 @@ test('a family composed one wrapper deeper than the page writes the composed cel
 	boundPartGraph(resumed, trigger).write(CELL);
 
 	expect(writes).toEqual([`${site}${local}${CELL}`]);
+});
+
+// A part placed outside every root roots its widget at the island itself, an
+// ancestor of every reader there. A part read inside a repeat of another widget
+// must still reach that widget, which only the row-free walk can see.
+test('a widget rooted at the island does not capture a row reader of a deeper widget', () => {
+	const island = protocolIslandSegment(0);
+	const navbarRoot = `${island}${protocolInstanceSegment(1)}${protocolInstanceSegment(2)}`;
+	const widgets = {
+		rootPaths: new Map([
+			[`${island}${DEFINITION}`, island],
+			[`${navbarRoot}${DEFINITION}`, navbarRoot],
+		]),
+		rowRooted: new Set<string>(),
+	};
+	const reader = `${island}${protocolInstanceSegment(1)}${protocolRowSegment('docs')}${protocolInstanceSegment(2)}${protocolProjectionSegment(5)}`;
+
+	expect(marklessComposedGraphNodeId(CELL, reader, widgets)).toBe(`${navbarRoot}${CELL}`);
+	expect(marklessComposedGraphNodeId(CELL, `${island}${protocolInstanceSegment(0)}`, widgets)).toBe(
+		`${island}${CELL}`,
+	);
 });

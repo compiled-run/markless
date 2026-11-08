@@ -113,7 +113,7 @@ const select = shared(() => {
 	const s = state({ items: [{ id: 'a' }] });
 	const optionEls = element<HTMLLIElement[]>();
 	return { ...s, optionEls };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function App() @{
 	const s = select();
 	<ul>@for (const item of s.items; key item.id) {

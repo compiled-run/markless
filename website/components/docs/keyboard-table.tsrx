@@ -3,6 +3,8 @@ import { select, lucide } from '@markless/ui';
 import PlatformIcon from './keyboard/platform-icon.tsrx';
 import AccordionPractice from './keyboard/accordion-practice.tsrx';
 import { metaFor } from './ui-meta/index.ts';
+import { keyPath } from './keyboard/ink.ts';
+import { art as controlArt } from '../figures/ink/controls.art.ts';
 import { detectPlatform, keyboardLayouts, shortcutFor, matchesShortcut, commandForKey, pressedKeys } from './keyboard/model.ts';
 
 export type KeyboardRow = {
@@ -35,7 +37,7 @@ const practiceShortcut = `if (!document.documentElement.hasAttribute('data-pract
 export default function KeyboardTable({family,rows}: {readonly family?: string;readonly rows?: readonly KeyboardRow[]}) @{
  const source = rows ? rows.map(row=>({does:row.does,join:row.join??'or',caps:row.keys.map(key=>({mac:{symbol:key,label:key},other:{symbol:key,label:key}}))})) : metaFor(family??'').keyboard;
  const actions = source.map((row,index)=>({id:String(index),does:row.does,mac:shortcutFor(row.caps,row.join??'or','mac'),windows:shortcutFor(row.caps,row.join??'or','windows'),linux:shortcutFor(row.caps,row.join??'or','linux')}));
- const drawings = keyboardLayouts.map(layout=>({...layout,keys:layout.keys.map(cap=>({...cap,legends:(cap.width <= 40 ? cap.label.split(' ') : [cap.label]).map((text,index,lines)=>({text,index,x:cap.x+cap.width/2,y:cap.y+cap.height/2+(index-(lines.length-1)/2)*12})),actionable:actions.some(action=>action[layout.id].keys.includes(cap.code)) || (family==='accordion' && cap.code==='KeyK')}))}));
+ const drawings = keyboardLayouts.map(layout=>({...layout,keys:layout.keys.map(cap=>({...cap,face:keyPath(cap.id,cap.x,cap.y,cap.width,cap.height),shadow:keyPath(cap.id+'-shadow',cap.x,cap.y+7,cap.width,cap.height),legends:(cap.width <= 40 ? cap.label.split(' ') : [cap.label]).map((text,index,lines)=>({text,index,x:cap.x+cap.width/2,y:cap.y+cap.height/2+(index-(lines.length-1)/2)*12})),actionable:actions.some(action=>action[layout.id].keys.includes(cap.code)) || (family==='accordion' && cap.code==='KeyK')}))}));
  const first = actions[0];
  if(!first) throw new Error('Keyboard explorer needs at least one action.');
  let keyboard = state({active:false,platform:'auto',platformLabel:'Automatic',hovered:'',hoverLabel:'',hoverPlatform:'',fn:false,demoIndex:'0',lastLabel:'Ready when you are',feedback:'Start typing in the example, or tap a key below.',actions,macKeys:first.mac.keys.join(' '),windowsKeys:first.windows.keys.join(' '),linuxKeys:first.linux.keys.join(' '),});
@@ -92,13 +94,15 @@ export default function KeyboardTable({family,rows}: {readonly family?: string;r
   >
    @for (const layout of drawings; key layout.id) {
     <div class="keyboard-layout platform-view" data-os={layout.id}>
+     <svg class="keyboard-sheet" viewBox={'0 0 '+controlArt.slip.wide.width+' '+controlArt.slip.wide.height} preserveAspectRatio="none" aria-hidden="true"><path class="sheet-shade" d={controlArt.slip.wide.shadow.wash} /><path class="sheet-hatch" d={controlArt.slip.wide.shadow.hatch} /><path class="sheet-paper" d={controlArt.slip.wide.paper} /><path class="sheet-ink" d={controlArt.slip.wide.ink} /></svg>
      <div class="keyboard-meta">{layout.name} · QWERTY</div>
      <div class="keyboard-scroll">
+
       <svg class="physical-keyboard" viewBox={'0 0 '+layout.width+' '+layout.height} role="group" aria-label={layout.name+' keyboard'}>
        @for (const cap of layout.keys; key cap.id) {
         <g class="keyboard-key" data-code={cap.code} data-actionable={cap.actionable} role={cap.actionable?'button':undefined} tabindex={cap.actionable?0:undefined} aria-label={cap.actionable?cap.label:undefined}>
-         <rect class="key-shadow" x={cap.x} y={cap.y+7} width={cap.width} height={cap.height} rx="5" />
-         <g class="key-top"><rect class="key-face" x={cap.x} y={cap.y} width={cap.width} height={cap.height} rx="5" />
+         <path class="key-shadow" d={cap.shadow} />
+         <g class="key-top"><path class="key-face" d={cap.face} />
          @for (const legend of cap.legends; key legend.index) {
           <text x={legend.x} y={legend.y} text-anchor="middle" dominant-baseline="middle">{legend.text}</text>;
          }
@@ -130,29 +134,35 @@ export default function KeyboardTable({family,rows}: {readonly family?: string;r
    .keyboard-study[data-family='accordion'] .keyboard-actions { display: none; }
    .keyboard-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: calc(var(--step-3) * 1.3); box-sizing: border-box; padding: 0; }
    .keyboard-title { font-size: var(--step-0); font-weight: 600; }
-   .platform-picker { --picker-edge: color-mix(in oklch, var(--ink) 80%, transparent); --picker-wash: color-mix(in srgb, var(--purple) 26%, var(--paper)); position: relative; display: grid; grid-template-columns: auto max-content; align-items: center; gap: .8em; font: var(--step--1)/1.3 'Shantell Sans', system-ui, sans-serif; }
+   .platform-picker { --picker-edge: color-mix(in oklch, var(--ink) 80%, transparent); --picker-wash: color-mix(in srgb, var(--purple) 26%, var(--paper)); position: relative; display: grid; grid-template-columns: auto max-content; align-items: center; gap: .8em; font: var(--step-0)/1.3 'Shantell Sans', system-ui, sans-serif; }
    .platform-picker[ui-open] { z-index: 30; --keyboard-control-shadow: 4px 4px 0 var(--purple); }
    .platform-picker { margin-inline-start: auto; }
    html.dark .platform-picker { --picker-wash: color-mix(in srgb, var(--purple) 20%, var(--paper)); }
-   .platform-trigger { box-sizing: border-box; box-shadow: var(--keyboard-control-shadow); display: flex; align-items: center; justify-content: space-between; gap: .7em; cursor: pointer; min-width: 10rem; border: 1px solid var(--picker-edge); border-radius: 6px; background: var(--paper); color: var(--ink); padding: .45em .8em; font: inherit; text-align: start; }
+   .platform-trigger { box-sizing: border-box; box-shadow: 2px 3px 0 var(--ink); display: flex; align-items: center; justify-content: space-between; gap: .7em; cursor: pointer; min-width: 10rem; border: 1.5px solid var(--ink); border-radius: 10px 6px 12px 8px; background: var(--paper); color: var(--ink); padding: .45em .8em; font: inherit; text-align: start; }
    .platform-trigger > svg { width: 1em; height: 1em; opacity: .65; transition: transform 140ms ease; }
    .platform-trigger[ui-open] > svg { transform: rotate(180deg); }
    .platform-trigger > span:not(.platform-icon) { flex: 1; text-align: left; }
    .platform-trigger:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
    .keyboard-drawing { position: relative; padding: .85rem 0 0; }
-   .keyboard-meta { color: var(--muted-ink); font: 11px var(--font-mono); margin: 0 0 .6rem .25rem; }
-   .keyboard-scroll { overflow-x: auto; padding: 16px 12px 24px;  }
-   .physical-keyboard { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 5px color-mix(in srgb, var(--ink) 6%, transparent)); }
-   .keyboard-key { --key-fill: var(--paper); --key-stroke: var(--code-edge); --key-opacity: .65; opacity: var(--key-opacity); transition: opacity 120ms ease-out; }
-   .key-shadow { fill: var(--keyboard-key-depth); stroke: var(--code-edge); stroke-width: .6; }
+   .keyboard-meta { position: relative; color: var(--muted-ink); font: var(--step--1) 'Shantell Sans', system-ui, sans-serif; margin: 0 0 .6rem .25rem; }
+   .keyboard-layout { position: relative; padding: 12px 18px 24px; }
+   .keyboard-scroll { position: relative; overflow-x: auto; padding: 10px 4px 8px; }
+   .keyboard-sheet { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+   .sheet-paper { fill: var(--paper); }
+   .sheet-ink { fill: var(--ink); }
+   .sheet-shade { fill: color-mix(in oklch, var(--ink) 18%, transparent); }
+   .sheet-hatch { fill: none; stroke: var(--ink); stroke-width: .6; stroke-linecap: round; opacity: .6; }
+   .physical-keyboard { position: relative; display: block; width: 100%; height: auto; }
+   .keyboard-key { --key-fill: var(--paper); --key-stroke: var(--ink); --key-opacity: .7; opacity: var(--key-opacity); transition: opacity 120ms ease-out; }
+   .key-shadow { fill: color-mix(in oklch, var(--ink) 22%, var(--paper)); stroke: var(--ink); stroke-width: 1; stroke-linejoin: round; }
    .key-top { transform: translateY(-2px); transition: transform 150ms ease-out; }
    .keyboard-key[data-actionable] { --key-opacity: 1; cursor: pointer; }
    .keyboard-key[data-actionable]:hover .key-top, .keyboard-key:focus-visible .key-top { transform: translateY(-5px); }
    .keyboard-key[data-actionable]:active .key-top { transform: translateY(4px); }
    .keyboard-key:focus-visible { outline: none; }
    .keyboard-key:focus-visible .key-face { stroke: var(--ink); stroke-width: 3; }
-   .key-face { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: 1.5; transition: fill 120ms ease-out, stroke 120ms ease-out; }
-   .keyboard-key text { fill: var(--ink); font: 11px system-ui, sans-serif; pointer-events: none; }
+   .key-face { fill: var(--key-fill); stroke: var(--key-stroke); stroke-width: 1.4; stroke-linejoin: round; transition: fill 120ms ease-out, stroke 120ms ease-out; }
+   .keyboard-key text { fill: var(--ink); font: 12px 'Shantell Sans', system-ui, sans-serif; pointer-events: none; }
    .platform-view { display: none; }
    html:not([data-keyboard-platform]) .keyboard-study[data-platform='auto'] .platform-view[data-os='windows'] { display: revert; }
    .keyboard-actions { min-width: 0; margin: 0; padding: .6rem 0 0; border: 0; border-top: 1px solid var(--code-edge); }
@@ -165,7 +175,7 @@ export default function KeyboardTable({family,rows}: {readonly family?: string;r
     .keyboard-study[data-family='accordion'] .keyboard-actions { display: block; }
    }
    @media (prefers-reduced-motion: reduce) { .keyboard-key, .key-face, .key-top, .keyboard-action { transition: none; } }
-   .platform-menu { position: absolute; grid-column: 2 / 3; inset-block-start: 100%; inset-inline: 0; box-sizing: border-box; inline-size: 100%; z-index: 30; margin-block: .3em; padding: .3em; border: 1px solid var(--picker-edge); border-radius: 6px; background: var(--paper); color: var(--ink); box-shadow: var(--keyboard-control-shadow); font: inherit; }
+   .platform-menu { position: absolute; grid-column: 2 / 3; inset-block-start: 100%; inset-inline: 0; box-sizing: border-box; inline-size: 100%; z-index: 30; margin-block: .3em; padding: .3em; border: 1.5px solid var(--ink); border-radius: 10px 6px 12px 8px; background: var(--paper); color: var(--ink); box-shadow: var(--keyboard-control-shadow); font: inherit; }
    .platform-menu:is([ui-closed], [hidden]) { display: none; }
    @supports (position-area: block-end) {
     .platform-picker { anchor-scope: --keyboard-platform; }
@@ -176,19 +186,18 @@ export default function KeyboardTable({family,rows}: {readonly family?: string;r
    .platform-option:hover { background: color-mix(in oklch, var(--ink) var(--hover-wash), transparent); }
    .platform-option[ui-selected] { background: var(--picker-wash); }
    .platform-option:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
-   .keyboard-instruction { margin: 0 .25rem; color: var(--muted-ink); font-size: var(--step--2); }
+   .keyboard-instruction { margin: .6rem .25rem 0; color: var(--muted-ink); }
    .keyboard-study[data-inspected] .keyboard-action { opacity: .3; }
    .keyboard-study[data-inspected] .keyboard-key { --key-opacity: .25; }
    .practice-feedback { display: grid; gap: .3rem; min-height: 4.5rem; box-sizing: border-box; padding: .9rem .25rem; }
-   .practice-feedback strong { font: 600 14px var(--font-mono); }
-   .practice-feedback span { font-size: var(--step--1); }
+   .practice-feedback strong { font: 600 var(--step-0) 'Shantell Sans', system-ui, sans-serif; }
    .keyboard-action { margin: 0; }
-   .reference-key { flex: 0 0 auto; min-width: 4rem; padding: .45rem .6rem; border: 1px solid var(--ink); border-radius: 3px; background: var(--paper); box-shadow: 2px 2px 0 var(--purple); text-align: center; font: 600 12px var(--font-mono); }
-   .keyboard-study[data-fn] .keyboard-key[data-code='Fn'] { --key-fill: var(--purple); --key-stroke: var(--ink); --key-opacity: 1; }
+   .reference-key { flex: 0 0 auto; min-width: 4rem; padding: .35rem .6rem; border: 1.5px solid var(--ink); border-radius: 7px 5px 8px 6px; background: var(--paper); box-shadow: 1px 2px 0 var(--ink); text-align: center; font: 600 var(--step-0) 'Shantell Sans', system-ui, sans-serif; }
+   .keyboard-study[data-fn] .keyboard-key[data-code='Fn'] { --key-fill: color-mix(in srgb, var(--yellow) 75%, var(--paper)); --key-stroke: var(--ink); --key-opacity: 1; }
    .keyboard-study[data-family='accordion']:not([data-playing]) { --keyboard-preview-depth: color-mix(in srgb, var(--ink) 15%, var(--paper)); --keyboard-key-depth: color-mix(in srgb, var(--ink) 10%, var(--paper)); }
    .keyboard-study[data-family='accordion']:not([data-playing]) .platform-picker { --picker-wash: color-mix(in srgb, var(--ink) 8%, var(--paper)); }
    .keyboard-study[data-family='accordion']:not([data-playing]) .key-face { fill: var(--paper); stroke: var(--code-edge); }
-   .keyboard-study[data-family='accordion']:not([data-playing]) .keyboard-key[data-code='KeyK'] .key-face { fill: var(--purple); stroke: var(--ink); }
+   .keyboard-study[data-family='accordion']:not([data-playing]) .keyboard-key[data-code='KeyK'] .key-face { fill: color-mix(in srgb, var(--yellow) 75%, var(--paper)); stroke: var(--ink); }
    @keyboard-inspection;
    @keyboard-platforms;
    @keyboard-highlights;

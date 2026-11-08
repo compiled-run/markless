@@ -20,7 +20,7 @@ export const cbs = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CbsRoot({ on = false, onChange, children }) @{

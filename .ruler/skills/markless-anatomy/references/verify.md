@@ -18,9 +18,10 @@ From the repository root: `pnpm run typecheck` and `pnpm ci:local --fast`.
 The figure's test (copy `state/wired.test.ts`) should pin:
 
 - the model: start value, one step per press, the wrap, the spoken sentence, the tour;
-- one crossed-out group and one live digit per wired spot, and one pulse per wire;
-- the static group reads no state;
-- exactly one margin note and no readout line;
+- one changing value per changing spot, and nothing else reading state (State: one crossed-out
+  group and one live digit per wired spot, one pulse per wire, and a static group that reads no
+  state);
+- no readout line, and at most one margin note;
 - each live number sits in the same text run as its label;
 - `drawing()` gives the same result twice, and each part has enough strokes to not look thin;
 - the freeze, written with `toMatchFileSnapshot`;
@@ -33,12 +34,12 @@ and the chrome-devtools MCP tools or a Playwright script. Clip to `figure.anatom
 
 - Light at desktop width.
 - Dark: toggle the site theme (the page's theme switch), same width.
-- 390 px wide: no sideways scroll; every number and the margin note still read.
-- Mid-motion: press and shoot about 300 ms (pulse to the object), 1 s (bean falling), 1.6 s
-  (pulses to the page) and 2.6 s (strike and new number), then settled.
-- Reduced motion: emulate `prefers-reduced-motion: reduce`; a press snaps to the result and no
-  tour runs.
-- Close-ups at device scale 3 or 4 of each clip, the crossed-out numbers and the jar.
+- 390 px wide: no sideways scroll; every number and word still reads.
+- Mid-motion: press and shoot the cause, the effect and the settled result (State: about 300 ms
+  pulse to the jar, 1 s bean falling, 1.6 s pulses to the page, 2.6 s strike and new number).
+- Reduced motion: emulate `prefers-reduced-motion: reduce`; every interaction still works, a
+  press snaps to the result and no tour runs.
+- Close-ups at device scale 3 or 4 of each object and every changing value.
 - Reload and check the console: no resume errors such as `MARKLESS_MDX_RENDER_DATA_ROOT_MISSING`.
 
 ## Review checklist
@@ -46,10 +47,13 @@ and the chrome-devtools MCP tools or a Playwright script. Clip to `figure.anatom
 Brief
 
 - [ ] Without the caption or prose, the drawing says the one sentence of the brief.
-- [ ] The parts are a real everyday page, named in shop words. No code, no metaphor to decode.
-- [ ] Wired spots and unwired content are obvious at a glance.
+- [ ] The brief passed every point of the checklist in `SKILL.md` section 1.
+- [ ] Two or three objects, each mapping to one thing in the code; one action, one change, and
+      at most one thing that deliberately stays still.
+- [ ] Any metaphor maps one to one, and no other page uses it.
+- [ ] At most about five words in the drawing, all code names or values.
 
-Language
+State only
 
 - [ ] Paper sheet on a desk, browser bar, curled corner, shadow on the desk.
 - [ ] The value is a physical object with a tag named exactly like the state variable.
@@ -58,23 +62,26 @@ Language
 
 Ink
 
-- [ ] Perspective from about 60° above, sheet square to the viewer, text level.
+- [ ] State: perspective from about 60° above, sheet square to the viewer, text level.
 - [ ] Tapered lines with weight on the shade side, overshoot and pen lifts.
 - [ ] Clustered, form-following hatching; cross-hatched darks; no grey fills.
-- [ ] Yellow wash only on what changes, pink only on the button, faint pencil lines underneath.
+- [ ] Yellow wash only on what changes, pink only on what the reader presses, faint pencil lines
+      underneath.
 - [ ] No card, border, figure number or legend; the drawing spans the prose column.
 - [ ] Light and dark both look intentional.
 
 Motion and access
 
-- [ ] Press, pulse into the object, the object changes, pulses out on every wire, strike and
-      ink-in, in that order.
-- [ ] At most one smaller crossed-out value per spot.
+- [ ] One press, cause then effect, once; nothing moves without a reason.
+- [ ] Every object responds to hover; drag, keyboard and touch work; one teaching surprise; the
+      response is instant.
+- [ ] State: press, pulse into the jar, the bean drops, pulses out on every wire, strike and
+      ink-in, in that order, with at most one smaller crossed-out value per spot.
 - [ ] Click, Enter and Space press; Escape resets; the idle tour stops after a touch and pauses
-      offscreen; reduced motion snaps.
+      offscreen; reduced motion keeps every interaction without the animation.
 - [ ] The live region speaks one plain sentence per change.
 
 Page
 
-- [ ] Heading in the "Follow the wire" style; one or two short sentences of prose.
+- [ ] Heading is a short instruction to the reader; one or two short sentences of prose.
 - [ ] Numbers inline after their labels, bold, readable at 390 px.

@@ -7,6 +7,11 @@ Every write-task verify array must include `pnpm run typecheck`, the Markless-aw
 Every write-task verify array must also include `pnpm ci:local --fast`, which runs CI's fast jobs with the exact commands from `.github/workflows/ci.yml` (the pre-commit hook runs them too). Everything heavier (browser, boxes-*, build-scale, perf-guards, benchmark, demo and website boxes, migrate checks) runs on GitHub Actions: the pull request's green CI run is the receipt, and no task is reported done before that run is green. Run a heavy job locally (`pnpm ci:local --job <id>`) only to debug a specific failure. Passing only the tests for your own change is not verification.
 When your PR merges or your task ends, remove your git worktree (`git worktree remove`) and your /tmp scratch, and stop any servers you started.
 
+## One analysis, used everywhere
+
+The yuku analyzer analyzes the whole project once: modules, imports and exports, scopes, bindings, references and the semantic graph. That analysis is the single source of truth. Every later stage (compiler, bundler, router, migrator, editor tooling) consumes those facts and never re-derives them by scanning text, matching regexes or re-parsing its own output. Emit correct output from the facts rather than editing output afterwards. If a stage needs a fact the analysis lacks, add it to the analyzer once so every stage gets it.
+Agents: before writing any check, scan, probe or rewrite over code or build output, name the analyzer or build fact that answers it and use that. A regex, string search or ad hoc parse over code is an architecture violation, not a shortcut; if the fact is missing, add it to the analyzer or return blocked.
+
 ## CI discipline
 
 CI exists to catch real defects. Never make a check pass by weakening it: no skipping, deleting, loosening assertions, adding retries, or raising a budget without a measured, stated reason. When a check fails, classify it before touching it (environment or config drift, a regression you introduced, a failure that was already there, or nondeterminism) and fix the root cause; a flaky test gets its nondeterminism fixed (random ports, awaited readiness, no wall-clock races), or is quarantined in `docs/ci-process.md` with an owner and an expiry date.

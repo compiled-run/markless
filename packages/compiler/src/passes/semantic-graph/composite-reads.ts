@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import {
+	expressionReadNames,
 	hasOptionalLink,
 	rootBindsInsideRegion,
 	rootIdentifierOffset,
@@ -82,7 +83,7 @@ export function isCompositeTemplateExpression(
 }
 
 // `a?.b.c` is the plain graph read `a.b.c` (optionalMemberReadSource); only other chains need a computed.
-function isDottedPath(node: AnyNode | undefined): boolean {
+export function isDottedPath(node: AnyNode | undefined): boolean {
 	if (node?.type === 'Identifier') return true;
 	return (
 		node?.type === 'MemberExpression' &&
@@ -145,9 +146,7 @@ export function pureCompositeReadSources(
 	}
 	if (node.type === 'TemplateLiteral') {
 		return joinReadSources(
-			asNodes(node.expressions).map((part) =>
-				pureCompositeReadSources(part, state, options),
-			),
+			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state, options)),
 		);
 	}
 	return null;
@@ -240,7 +239,10 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	if (offset === null) return false;
 	const semantic = state.semantic();
 	const symbolId = resolvedSymbolAt(semantic, offset);
-	if (symbolId !== null && semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module')
+	if (
+		symbolId !== null &&
+		semantic.scopes[semantic.bindings[symbolId]!.scope.id]!.kind !== 'module'
+	)
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
 	return (
@@ -343,8 +345,10 @@ export function mintTemplateExpressionComputed(
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
 ): { readonly graphNodeId: string } | null {
-	const bindings = scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
-	const aliases = scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const bindings =
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases =
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
 	const dependencies: SemanticGraphDependency[] = [];
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
@@ -391,6 +395,7 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
 }
@@ -450,19 +455,17 @@ export function readsUnroutedGraphCell(
 	const visit = (node: AnyNode, parent: AnyNode | null): void => {
 		const isName =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === node && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === node &&
+				parent.computed !== true) ||
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));
-		if (
-			!isName &&
-			(node.type === 'MemberExpression' || (identifiers && node.type === 'Identifier'))
-		) {
-			if (!rootBindsInsideRegion(node, state, region))
-				sources.push(expressionSource(node, state.source));
-		}
+		if (!isName && node.type === 'MemberExpression' && !rootBindsInsideRegion(node, state, region))
+			sources.push(expressionSource(node, state.source));
 		for (const child of childNodes(node)) visit(child, node);
 	};
 	visit(expression, null);
+	if (identifiers) sources.push(...expressionReadNames(expression, state));
 	return readsWritableGraphCell(sources, state, scope);
 }

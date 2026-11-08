@@ -123,10 +123,11 @@ screenshots into the markless repo's goal notes.
   `ui/<family>/` with `basic.tsrx` as the hero and one file per further example. In a section folder
   `counter.tsrx` is the teaching component shown verbatim on the page and `counter-demo.tsrx` wraps
   it in the playground frame, because a page places each component as its own top-level block. `callout.tsrx` and
-  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`.
+  `collapsible.tsrx` are docs chrome, not demos, and live in `components/docs/`. Both sit on the
+  `.ink-card` paper card that every MDX `>` blockquote also gets; its inked edge and the callout's
+  `info`, `warning` and `tip` marks are drawn in `components/docs/ink-card/card-ink.ts`.
 - `components/docs/sidebar.tsrx`, `document.tsrx`, `nav.ts` — the chrome. `nav.ts` is the single
-  source for the page list: the sidebar loops it, and the breadcrumb, the pager and the witness read
-  it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
+  source for the page list: the sidebar loops it, and the pager and the witness read it. Adding a page means adding an entry there and nothing else. `document.tsrx` renders a plain
   `<html>` root.
 - `styles/global.css` — the look, copied from the markless repo's `docs/` app, plus the code-block
   palette, the hover-doc box and the dark theme. Below `70rem` the sidebar's list is collapsed
@@ -134,16 +135,25 @@ screenshots into the markless repo's goal notes.
   the first phone screenful is the article rather than the navigation.
 - `public/favicon.svg` — the head icon. The crawler files `robots.txt`, `sitemap.xml` and
   `llms.txt` are not in `public/`; `tooling/seo-files.ts` writes them into the build output.
-- `public/theme/sun.png`, `public/theme/moon.png` — the two drawings on the theme toggle, cut from
-  the top pair of `theme-icons-sheet.png` by `tooling/cut-sprites.ts theme`. Each button carries the
-  drawing of the theme it is standing in, so the sun is only ever painted on paper and the moon only
-  ever on the dark ground.
+- `public/theme/sun.png`, `public/theme/moon.png` — the old raster theme drawings, cut from the top
+  pair of `theme-icons-sheet.png` by `tooling/cut-sprites.ts theme`. Only the linked accordion
+  examples page still paints them; the docs toggle draws in ink.
+- `components/docs/navbar/` — the site header. `site-navbar.tsrx` is the `@markless/ui` navbar laid
+  out like the QDS docs header: a floating bar of three panels from `80rem` wide and `37.5rem` tall up, and a top bar with a
+  full-screen `modal` menu below it, whose links show the same drawings as the cards. `sections.ts` names the panels and their cards. `decor.ts`
+  draws each card's picture, the dotted edges of the cards and panels, and the theme toggle's sun
+  and moon with the figures' ink pen, object by object from back to front, each object filled with
+  paper so it hides what it rests on. An object may carry one hover motion, scaled by the card's
+  `--hover`. `decor.test.ts` freezes the cards and edges into `public/nav-decor.svg` and the sun and
+  moon into `theme-art.art.ts` (run it with `-u` after editing a drawing). `public/navbar.js` slides the floating
+  bar away while the reader scrolls down, and closes the full-screen menu when the window widens
+  into the desktop layout.
 - `components/sprite.tsrx`, `components/mascot.tsrx`, `components/sticker.tsrx` — the hand-drawn
   accents. `public/sprites/`, `public/mascots/` and `public/stickers/` hold the cut assets;
   `tooling/cut-sprites.ts` is what cut them and is not part of the build. Sprites are the flat
   crayon doodles and ship twice, once as drawn and once lifted to chalk for the dark ground.
   Stickers are die-cut, with their own white border and shadow, so they carry depth and one file
-  reads on both grounds; they are the larger accents — the landing hero, a callout corner, the
+  reads on both grounds; they are the larger accents — the landing hero and the
   footer strip — while sprites stay small and inline.
 - `components/mascot/mug-spot.tsrx`: the mug hiding on a few pages, peeking over the top edge of
   the code block, callout, figure or pager that follows it, with a face or pose that fits the text
@@ -186,16 +196,19 @@ The dark theme is the paper design with the ground and the ink swapped and the s
 accents. Every dark value sits nested inside the rule that holds its light value, under an
 `html.dark &` (or `&.dark` on `:root`) selector, so the two are never apart.
 
-`components/docs/theme-toggle.tsrx` is the control, and `storage('theme', 'system')` is the whole of
+The toggle's `ThemeToggle` in `components/docs/navbar/site-navbar.tsrx` is the control, and `storage('theme', 'system')` is the whole of
 it: assigning to that binding writes `localStorage.theme` and stamps `data-theme` on `<html>`, and
 the seed script the router puts in the head applies the stored value before the first paint.
 `public/theme.js` resolves that stored choice (`system` against the OS setting) into a `dark` or
 `light` class on `<html>`, which is the only thing the CSS reads, so the theme never flashes.
 
-The toggle is an island each `.mdx` page renders rather than part of `site-header.tsrx`, because the
-router serves only the document's HTML and drops its state payload, so nothing on the document path
-can resume. The header reserves `.theme-toggle-slot` at the end of its tools row and the island is
-pinned to it.
+The toggle and the navbar that holds it are an island each `.mdx` page renders (`<SiteNavbar />`,
+beside `<Sidebar />`). The toggle lives in the navbar's own module because a page collects storage
+seeds only from the modules it renders directly, and that seed paints the stored theme before first
+paint. It is an island because the router serves only the document's HTML and drops its state
+payload, so nothing on the document path can resume. Each button draws the theme it stands in, so
+the sun is only ever painted on paper and the moon only ever on the dark ground; a click swaps
+them with a small turn and lets the yellow wash spread in after the ink.
 
 ## Live code
 
@@ -204,34 +217,23 @@ Pages teach with `<Code>` blocks the reader can edit.
 the browser. `pages/contributing/improve-the-docs.mdx`, served at `/contributing/improve-the-docs`,
 explains how to write one.
 
-## Previews
+## Visuals
 
-A UI family preview comes from the generator: `<Playground scenario="family/demo" />`. Every other
-interactive figure composes `components/docs/preview-card.tsrx`, which draws the same card with the
-same CSS (`components/docs/preview-card.test.ts` keeps it equal to `tooling/ui-playground-css.ts`).
+Pages use only the visuals the Start here pages use: a `<Code>` block with `steps`, a textbook
+column (a live demo on an `InkScreen` sheet with numbered margin notes beside it), an ink figure
+drawn with the `markless-anatomy` skill, `<Commands>`, plain fenced blocks and tables.
+`pages/contributing/improve-the-docs.mdx` lists which one fits which idea. A figure is a `.tsrx`
+component in `components/figures/<page>/`, with its CSS in its own `<style>`. A textbook column
+composes `components/figures/ink/margin-notes.tsrx` and `ring.tsrx`. Never put `Ring` or any other
+imported component inside an `@if` arm or `@for` row: draw the ring inline from `art.ring.ink`, as
+`figures/reading/blocks-demo.tsrx` does, or the arm renders in the browser and its code joins the
+page's prefetch.
 
-An `.mdx` page cannot wrap a component in another, so write a small `.tsrx` wrapper and render it
-from the page:
+`components/docs/preview-card.tsrx` and the `<Playground>` generator are being retired. Don't use
+them on a new or rewritten page; the pages that still import them move off them batch by batch.
 
-```tsrx
-import PreviewCard, { Action, Choice, Controls, Mono, Stage, Switch, Watch } from '../../docs/preview-card.tsrx';
-import Code from '../../docs/preview-card/code.tsrx';
-```
-
-| Part | Props | Draws |
-| --- | --- | --- |
-| `PreviewCard` (default) | `name` (`data-preview`, for tests), `label` (accessible name) | the card |
-| `Controls` | `title` | top band: title on the left, then the controls inside it |
-| `Switch` | `label`, `hint`, `checked`, `disabled`, `onChange(checked)` | on/off switch |
-| `Choice` | `label` (unique on the page), `hint`, `options` (2-4), `value`, `onChange(value)` | segmented one-of-few |
-| `Action` | `end`, `disabled`, `onClick()` | text button: Reset, Reload, Back, Next |
-| `Stage` | children | centred demo band |
-| `Watch` | children | yellow strip saying what the mechanism did |
-| `Mono` | children | code or an identifier inside Watch, without the prose chip |
-| `Code` | `files` (1-3 `CodePane`s from `codePane()` in `tooling/code-blocks.ts`) | file tabs, clamp, Expand code |
-
-The build demos keep their highlighted files in `components/demos/build/code-panes.ts`, written by
-`code-panes.test.ts` from the demo files; run `vp test -u` after editing a demo. Each part carries
-its own `<style>`, because the compiler stamps a module's scope class only on components that
-declare one. Option lists are fixed slots, not `@for`: an item built by a repeat loses its value
-or its handler when the page resumes.
+An `.mdx` page cannot wrap a component in another, so a figure that composes parts is its own
+`.tsrx` file that the page renders as a top-level block. Each part carries its own `<style>`,
+because the compiler stamps a module's scope class only on components that declare one. Option
+lists are fixed slots, not `@for`: an item built by a repeat loses its value or its handler when
+the page resumes.

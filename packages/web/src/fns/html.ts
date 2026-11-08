@@ -1,3 +1,5 @@
+import { marklessAttributeValue } from '../dom-attribute.ts';
+
 // Authored expression values reach these helpers unconstrained; each one
 // narrows the value itself before use.
 export type MarklessPublicPath = ReadonlyArray<string | number>;
@@ -33,17 +35,14 @@ export function marklessCsrSpreadAttributes(values: MarklessAttributeValues, sco
 			key === 'children'
 		)
 			continue;
-		const value = values?.[key];
-		if (value === null || value === undefined || value === false) continue;
+		const text = marklessAttributeValue(key, values?.[key]);
+		if (text === null) continue;
 		if (key === 'class' && scopeClass) {
 			classSeen = true;
-			html += marklessCsrAttribute(
-				'class',
-				(value === true ? '' : String(value)) + ' ' + scopeClass,
-			);
+			html += marklessCsrAttribute('class', text + ' ' + scopeClass);
 			continue;
 		}
-		html += value === true ? ` ${key}=""` : marklessCsrAttribute(key, value);
+		html += marklessCsrAttribute(key, text);
 	}
 	if (scopeClass && !classSeen) html += ` class="${scopeClass}"`;
 	return html;
@@ -85,17 +84,14 @@ export function marklessSsrSpreadAttributes(values: MarklessAttributeValues, sco
 			key === 'children'
 		)
 			continue;
-		const value = values?.[key];
-		if (value === null || value === undefined || value === false) continue;
+		const text = marklessAttributeValue(key, values?.[key]);
+		if (text === null) continue;
 		if (key === 'class' && scopeClass) {
 			classSeen = true;
-			html += marklessSsrAttribute(
-				'class',
-				(value === true ? '' : String(value)) + ' ' + scopeClass,
-			);
+			html += marklessSsrAttribute('class', text + ' ' + scopeClass);
 			continue;
 		}
-		html += value === true ? ` ${key}=""` : marklessSsrAttribute(key, value);
+		html += marklessSsrAttribute(key, text);
 	}
 	if (scopeClass && !classSeen) html += ` class="${scopeClass}"`;
 	return html;

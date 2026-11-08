@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { corpus } from '../components/docs/code/incremental-corpus.ts';
+import { codeBlockKey } from '../components/docs/code/prefetch-key.ts';
 import {
 	codePane,
 	FIRST_TAB,
@@ -202,6 +206,20 @@ describe('the shared style.css tab', () => {
 		expect(filesOf(module).map((file) => file.name)).toEqual(['Panel.tsrx', 'look.css', 'text.ts']);
 		expect(module).toContain('import sheet0 from "./look.css?url";');
 	});
+
+	// Rewrites and highlights every page's blocks: over 5 s on a CI runner.
+	it('names every page block by the key the prefetch manifest lists it under', async () => {
+		const listed = new Set(corpus.map((block) => codeBlockKey(block.files)));
+		const pages = fileURLToPath(new URL('../pages/', import.meta.url));
+		const unlisted: string[] = [];
+		for (const file of readdirSync(pages, { recursive: true, encoding: 'utf8' }).filter((name) => name.endsWith('.mdx'))) {
+			const written = new Map<string, string>();
+			await rewriteCodeBlocks(readFileSync(join(pages, file), 'utf8'), join(pages, file), '/site', (path, text) => written.set(path, text));
+			for (const [path, module] of written)
+				if (path.endsWith('/block.tsrx') && !listed.has(codeBlockKey(filesOf(module)))) unlisted.push(path);
+		}
+		expect(unlisted).toEqual([]);
+	}, 30_000);
 
 	it('confines the in-page copy to the result box, reading body as that box', () => {
 		const scoped = scopedPageStyle('body {\n\tcolor: red;\n}\n\nh1,\nbody p {\n\tmargin: 0;\n}\n');

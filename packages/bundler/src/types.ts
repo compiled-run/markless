@@ -1,6 +1,7 @@
 import type { PackOwnership } from './build/native-packing.ts';
 import type {
 	ArtifactChildMaterialization,
+	CompilerDiagnostic,
 	ModuleGraphInterfaceArtifact,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
@@ -74,6 +75,8 @@ export interface MarklessVirtualModule {
 	bundledSymbolModuleIds?: ReadonlyArray<string>;
 	/** Symbols and resolvers may resolve during linking, but never serve first-pass code. */
 	provisional?: boolean;
+	/** Registered by a first pass: it fills an empty slot but never replaces a final publication. */
+	firstPass?: boolean;
 }
 
 export interface TransformTsrxModuleInput {
@@ -85,7 +88,9 @@ export interface TransformTsrxModuleInput {
 	dev?: boolean;
 	importedModuleInterfaces?: SemanticGraphInput['importedModuleInterfaces'];
 	importedModuleConstants?: SemanticGraphInput['importedModuleConstants'];
+	importedFunctionWrites?: SemanticGraphInput['importedFunctionWrites'];
 	serverOnlyProps?: SemanticGraphInput['serverOnlyProps'];
+	elementOnlyAttributes?: SemanticGraphInput['elementOnlyAttributes'];
 	routeRoot?: SemanticGraphInput['routeRoot'];
 	renderDataImportSources?: Readonly<Record<string, string>>;
 	/** Pages are rendered on the server, so a browser-side render loads full render data only when it runs. */
@@ -102,6 +107,8 @@ export interface TransformTsrxModuleInput {
 	settleModuleUrl?: string;
 	headInjections?: GlobalInjections[];
 	styleModuleUrl?: (virtualModuleId: string) => string;
+	/** Resolves a stylesheet the module imports for its effect to the id it builds from. */
+	resolveStylesheetImport?: (request: string) => Promise<string | undefined>;
 	/** Scoped-style modules of the linked children, so a dev page links its whole tree. */
 	linkedStyleModuleIds?: readonly string[];
 	executionLog?: MarklessExecutionLogMode;
@@ -117,6 +124,8 @@ export interface TransformTsrxModuleInput {
 	// A client module served as a payload document: a conservative demand class still runs
 	// plain-ssr scalar plans, resolved only through served locators.
 	servedScalarPlans?: boolean;
+	/** Compiled while imports may still be unlinked: a refusal a missing component interface could clear is held on the result, not thrown. */
+	linkPending?: boolean;
 }
 
 export interface TransformTsrxModuleResult {
@@ -127,6 +136,8 @@ export interface TransformTsrxModuleResult {
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
+	/** The resolved ids of the stylesheets the module imports for their effect, in source order. */
+	stylesheetImports: ReadonlyArray<string>;
 	artifactChildren: ReadonlyArray<ArtifactChildCandidate>;
 	propFlow?: import('./prop-flow.ts').ModulePropFlow;
 	/** Imported constants a prop reads that this compile was not given. */
@@ -134,6 +145,10 @@ export interface TransformTsrxModuleResult {
 		readonly source: string;
 		readonly exportName: string;
 	}>;
+	/** Imported modules whose function write facts a handler needs and this compile was not given. */
+	importedFunctionWriteRequests?: ReadonlyArray<string>;
+	/** Refusals a `linkPending` compile held; a compile with every component interface decides them. */
+	linkPendingDiagnostics?: ReadonlyArray<CompilerDiagnostic>;
 }
 
 export type ArtifactChildCandidate = {
@@ -254,10 +269,14 @@ export type MarklessRolldownPluginApi = {
 	chunkImportMap: () => boolean;
 	/** A plugin that writes every document the app serves turns chunk import maps on. */
 	enableChunkImportMap: () => void;
+	/** A plugin whose documents carry every stylesheet their pages' code can load: a dynamic import then waits for none. */
+	deliverStylesheetsInDocuments: () => void;
 	/** A host plugin names, per root-relative module id, the props browser code must never read. */
 	declareServerOnlyProps: (
 		resolve: (moduleId: string) => SemanticGraphInput['serverOnlyProps'],
 	) => void;
+	/** A host plugin names the attributes only one kind of element acts on; a component given one must spread it onto such an element. */
+	declareElementOnlyAttributes: (attributes: SemanticGraphInput['elementOnlyAttributes']) => void;
 	/** A host plugin names, per root-relative module id, the modules it renders as pages. */
 	declareRouteModules: (isRoute: (moduleId: string) => boolean) => void;
 	/** The packing pass names the pack each module went into, so the import map can list only chunks several pages load. */
@@ -275,6 +294,13 @@ export type MarklessRolldownPluginApi = {
 	}>;
 	/** Whether every compiled module of this build mounts through the direct-DOM renderer. */
 	directCsrOnly: () => boolean;
+	/** Per component file of a route: the child files it imports only for arms no caller on the route renders. */
+	unreachableChildren: import('./build/interaction-closures.ts').UnreachableChildren;
+	/** A host plugin names the components a non-TSRX page renders (an MDX page), each with props fixed at build time. */
+	recordLiteralComponentInstances: (
+		source: string,
+		instances: ReadonlyArray<import('./prop-flow.ts').LiteralComponentInstance>,
+	) => void;
 	/** What the client build leaves for the environments built after it, so they can build in another process. */
 	clientBuildHandoff: () => ClientBuildHandoff;
 	/** Starts the later environments from a client build that ran in another process. */

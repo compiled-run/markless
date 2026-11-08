@@ -2,7 +2,7 @@ import { shared, state } from '@markless/core';
 import { type KrgrRow, withRow, withoutRow } from './krgr-rows.ts';
 
 /**
- * A widget-scoped collection, grown and shrunk by the widget's own methods.
+ * A subtree-scoped collection, grown and shrunk by the widget's own methods.
  *
  * This is the shape the fileupload family ships: the rows start empty, a part's
  * handler grows the list, and another part's handler takes one key back out.
@@ -30,7 +30,7 @@ export const krgrStore = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export const krgrItem = shared(
@@ -39,7 +39,7 @@ export const krgrItem = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function KrgrRoot({ name = '', children, ...rest }) @{

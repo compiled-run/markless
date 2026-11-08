@@ -8,5 +8,10 @@ export default function Start() @{
 		<a data-to-quick href="/quick">to the quick page</a>
 		<a data-to-arm-link href="/arm-link">to the link page</a>
 		<a data-to-toggle href="/toggle">to the toggle page</a>
+		<a data-to-start href="/">to this page</a>
+		<a data-to-spot href="#spot">to a spot on this page</a>
+		<div style="height: 3000px">spacer</div>
+		<p id="spot" style="margin: 0">spot</p>
+		<div style="height: 3000px">spacer</div>
 	</main>
 }

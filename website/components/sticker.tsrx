@@ -5,7 +5,7 @@ import { asset } from '../site-base.ts';
 // shadow, so one file reads on both the paper and the dark ground and there is
 // no dark twin the way a crayon sprite has one. `spot` names a placement:
 // `hero` floats one past the corner of the landing title, `callout` sits one on
-// the corner of a callout, `pager` puts one in the footer doodle strip.
+// the corner of a callout.
 export default function Sticker({
 	name,
 	size,

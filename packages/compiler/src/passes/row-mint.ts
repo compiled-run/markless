@@ -10,9 +10,14 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { childConstructReach, type ConstructReachInput } from './construct-reach.ts';
+import {
+	childConstructReach,
+	childRootBoundary,
+	type ConstructReachInput,
+} from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
 export type RowComponentMint = {
 	/** Absent when `rowChunkId` names the row's own markup instead of one edge. */
@@ -101,7 +106,7 @@ export function resolveRowComponentMint(
 		!projectionIsMintable(input, slot.projectionChunkId, new Set(), [input.itemName])
 	)
 		return null;
-	if (!childIsMintable(input, edge, slot.childTemplateId, new Set())) return null;
+	if (!childIsMintable(input, edge, slot.childTemplateId, new Set(), !wraps)) return null;
 	const itemProps = edge.props.filter((prop) => prop.source === input.itemName);
 	return {
 		componentEdgeId: slot.componentEdgeId,
@@ -170,7 +175,15 @@ function rowContentIsMintable(
 				(candidate) => candidate.id === slot.branchSiteId,
 			);
 			if (!site || site.asyncBoundaryId || site.testComputedGraphNodeId) return false;
-			if (!readsOnlyTheRow(input, chunk.componentName, site.testSource, rowNames)) return false;
+			if (
+				!readsOnlyTheRow(
+					input,
+					chunk.componentName,
+					site.armIndexSource ?? site.testSource,
+					rowNames,
+				)
+			)
+				return false;
 			return slot.armTemplateIds.every((armChunkId) =>
 				rowContentIsMintable(input, armChunkId, seen, rowNames),
 			);
@@ -287,12 +300,13 @@ export function rowBranchMints(
 		) !== null;
 	const testReadable =
 		site.testComputedGraphNodeId !== undefined ||
-		resolveGraphPath(
-			site.testSource,
-			graphBindingMap(graph, null, componentName),
-			semanticAliasMap(graph, null, componentName),
-		) !== null ||
-		expression(site.testSource);
+		(site.armIndexSource === undefined &&
+			resolveGraphPath(
+				site.testSource,
+				graphBindingMap(graph, null, componentName),
+				semanticAliasMap(graph, null, componentName),
+			) !== null) ||
+		expression(site.armIndexSource ?? site.testSource);
 	if (!testReadable) return false;
 	return slot.armTemplateIds.every((chunkId) => {
 		const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
@@ -345,10 +359,7 @@ function projectionIsMintable(
 			const nested = input.semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === slot.repeatId,
 			);
-			const nestedNames = [
-				...rowNames,
-				...[nested?.itemName, nested?.indexName].filter((name): name is string => !!name),
-			];
+			const nestedNames = [...rowNames, ...rowBoundNames(nested)];
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])].every(
 				(chunkId) => projectionIsMintable(input, chunkId, seen, nestedNames, true),
 			);
@@ -445,16 +456,27 @@ export function expressionSlotValue(
 	for (const name of names.names) {
 		if (rowNames.has(name)) continue;
 		const resolved = resolveGraphPath(name, bindings, aliases);
-		// A shared instance or a prop reads ids this page does not spell as its own.
+		const local = resolved
+			? undefined
+			: graph.rowLocalReads?.find(
+					(entry) => entry.componentName === componentName && entry.name === name,
+				);
+		if (local) {
+			if (local.unfollowed) return null;
+			for (const read of local.reads)
+				reads.push({ graphNodeId: read.graphNodeId, path: read.path });
+			continue;
+		}
 		if (!resolved) {
-			if (
-				graph.sharedInstances.some(
-					(instance) =>
-						instance.localName === name &&
-						(instance.componentName ?? componentName) === componentName,
-				)
-			)
-				return null;
+			const instance = graph.sharedInstances.find(
+				(candidate) =>
+					candidate.localName === name &&
+					(candidate.componentName ?? componentName) === componentName,
+			);
+			if (!instance) continue;
+			const members = sharedInstanceMemberReads(graph, instance, slot.residue.source);
+			if (!members) return null;
+			reads.push(...members);
 			continue;
 		}
 		// A prop read is routed to the parent's node by composition, which drops the template when it cannot.
@@ -475,7 +497,34 @@ export function expressionSlotValue(
 		}
 		reads.push({ graphNodeId: resolved.binding.id, path: resolved.path });
 	}
-	return { source: slot.residue.source, ...(reads.length > 0 ? { reads } : {}) };
+	const distinct = reads.filter(
+		(read, index) =>
+			reads.findIndex(
+				(other) =>
+					other.graphNodeId === read.graphNodeId &&
+					JSON.stringify(other.path) === JSON.stringify(read.path),
+			) === index,
+	);
+	return { source: slot.residue.source, ...(distinct.length > 0 ? { reads: distinct } : {}) };
+}
+
+// A shared() instance's members are its definition's graph nodes; the row reader qualifies a widget's per root.
+function sharedInstanceMemberReads(
+	graph: SemanticGraphArtifact,
+	instance: SemanticGraphArtifact['sharedInstances'][number],
+	source: string,
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | null {
+	const definition = graph.sharedDefinitions.find((candidate) => candidate.id === instance.definitionId);
+	if (!definition) return null;
+	const members = memberReads(source, instance.localName);
+	if (!members) return null;
+	const reads: Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> = [];
+	for (const member of members) {
+		const property = definition.returnProperties?.findLast((candidate) => candidate.name === member);
+		if (property?.kind !== 'graph') return null;
+		reads.push({ graphNodeId: property.graphNodeId, path: property.path });
+	}
+	return reads;
 }
 
 // The members `name` is read through, or null when any mention is not a plain `.member` read.
@@ -509,6 +558,7 @@ function childIsMintable(
 	edge: SemanticComponentEdge,
 	childTemplateId: string,
 	seen: Set<string>,
+	isWholeRow = false,
 ): boolean {
 	if (edge.importSource !== undefined) {
 		const entry = input.importedModuleInterfaces?.[edge.importSource]?.render.components.find(
@@ -517,5 +567,61 @@ function childIsMintable(
 		if (!entry) return false;
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
-	return reach !== 'boundaries' && reach !== 'unknown';
+	if (reach === 'unknown') return false;
+	// A row moves as its one element, so a @try beside that element would be left behind.
+	return !(
+		isWholeRow &&
+		reach === 'boundaries' &&
+		childRootBoundary(input, edge, childTemplateId, new Set())
+	);
+}
+
+// A nested list's rows stand in front of what follows its anchor, so a patch counts those steps from the parent's end; lists on both sides leave no count.
+export function stepsAfterNestedRows(
+	chunk: SemanticMarkupChunk,
+	path: ReadonlyArray<number>,
+	text: boolean,
+): number[] | null {
+	const anchors = chunk.slots.flatMap((slot) =>
+		slot.kind === 'repeat' ? [slot.coordinate.path] : [],
+	);
+	const fromEnd: number[] = [];
+	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {
+		const siblings = anchors.filter(
+			(anchor) =>
+				anchor.length === depth + 1 &&
+				anchor.slice(0, depth).every((step, at) => step === path[at]),
+		);
+		const before = siblings.some((anchor) => anchor[depth]! < path[depth]!);
+		if (before && siblings.some((anchor) => anchor[depth]! > path[depth]!)) return null;
+		if (before) fromEnd.push(depth);
+	}
+	return fromEnd;
+}
+
+// A computed over computeds only, with no storage, async or shared() node, never changes in the browser.
+export function constantInBrowser(
+	graph: SemanticGraphArtifact,
+	component: string,
+	graphNodeId: string,
+	seen = new Set<string>(),
+): boolean {
+	if (seen.has(graphNodeId)) return true;
+	seen.add(graphNodeId);
+	const binding = graph.graphBindings.find(
+		(candidate) =>
+			candidate.id === graphNodeId && (candidate.componentName ?? component) === component,
+	);
+	if (
+		!binding ||
+		binding.kind !== 'computed' ||
+		binding.storage ||
+		binding.async ||
+		binding.asyncCapable ||
+		binding.sharedDefinitionId !== undefined
+	)
+		return false;
+	return (binding.dependencies ?? []).every((dependency) =>
+		constantInBrowser(graph, component, dependency.graphNodeId, seen),
+	);
 }

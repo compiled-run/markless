@@ -80,14 +80,27 @@ render of a `#/` route.
   scripts are always fresh nodes and run again, `<template>` elements are always
   replaced, a custom element is replaced unless it is unchanged, and a form
   control shows the value the server rendered for the next page.
-- The address changes when the navigation starts, as a history entry the
-  swap later fills; a newer navigation replaces that entry while its page has
-  not swapped in. The leaving page stays on screen and interactive until the
-  next page's response has ended or the navigation deadline
-  (`MARKLESS_NAV_SETTLE_DEADLINE_MS`) has passed since the click; past it the
-  page swaps in showing its `@pending` arms. A newer navigation, or Back,
-  before the swap cancels it: the cancelled page never shows, and the page and
-  focus stay as they were.
+- The address and its history entry change when the navigation commits: in
+  the task that swaps the next page in, never at the click, so the address bar
+  never names a page that is not on screen. `replace` replaces the current
+  entry at that moment instead of adding one. The leaving page stays on screen
+  and interactive until the next page's response has ended or the navigation
+  deadline (`MARKLESS_NAV_SETTLE_DEADLINE_MS`) has passed since the click; past
+  it the page swaps in showing its `@pending` arms.
+- Until the swap the navigation can be cancelled, and a cancelled page never
+  shows. A newer navigation cancels it, so only the last one swaps in and adds
+  one entry. Back or Forward cancels it and moves from the page still shown, as
+  a browser does while a document is still loading: Back goes to the entry
+  before that page, which may be another document. A click on a link to the
+  page shown, or to a `#anchor` on it, cancels it and keeps the page.
+- The next page's head changes in the swap as well: before it, only its
+  stylesheets (not applied) and preloads are added, so a cancelled navigation
+  leaves the head of the page shown.
+- Back to a page restores the scroll offset it had when it was swapped out, not
+  the one at the click. A navigation whose fetch or code fails to load loads the
+  page as a document, adding its entry as a link would (`replace` replaces it),
+  unless the document is being left: a browser aborts those requests when the
+  user goes elsewhere, and loading the page then would cancel that navigation.
 - A page swapped in while its response still streams resumes its `@pending`
   boundaries from the arms the server streams, as a landing does: the browser
   never runs their async work again.
@@ -188,34 +201,91 @@ URL itself answers the whole document.
   Nitro plugin rewrites the request URL before routing, so a guard on a page
   path also guards its fragment. `http.request.url` keeps the fragment path.
 - The address bar and history entries show the page URL, never the prefix.
+- A click on a link to the page already shown (the same path and query, and no
+  `#` in its `href`) keeps that page as it is: nothing is fetched or swapped, no
+  history entry is added, and scroll positions and page state stay; a
+  navigation still waiting for its page is cancelled. A link to
+  the same page with a `#anchor` is left to the browser, which scrolls to it.
 - A redirect off the fragment path answers with a whole document; the router
   then loads the destination as a document.
 - The prefix is root-relative; apps served under a non-root base path are not
   covered yet.
+- A `shared()` instance outlives the swap: the next page is served with its
+  defaults, and before it is shown the router binds its reads to the live
+  value, so the first frame already shows it. See "Where an instance lives" in
+  `specs/framework/03-state-graph.md`.
 
 ### Kept parts
 
-A part of the page that both pages render byte for byte stays on screen across an in-place
-navigation, as it is, including what scripts did to it; the page's own content inside it is
-replaced, never morphed. Nothing is authored: the server decides from what it rendered.
+A part of the page that both pages render alike stays on screen across an in-place navigation, as
+it is, including what scripts did to it and the state the reader gave it; the page's own content
+inside it is replaced, never morphed. Nothing is authored: the server decides from what it
+rendered. A part with state behaves like a layout in Next.js: it keeps its state and its handlers,
+and the props the next page passes flow into it.
 
-- When the router's page server renders a component that carries no resume records (no state,
-  events, behaviours, element handles, branches, async content, lists or DOM updates, except the
-  update that places its `{children}`), it marks the component's root element with
-  `data-markless-keep="<hash>"` (`PROTOCOL_KEEP_ATTRIBUTE` in
-  `packages/serializer/src/protocol-keep.ts`). The hash covers the component's markup without
-  the children the page passed, so equal hashes are equal bytes.
+- When the router's page server renders a component (a child component, or a component an MDX page
+  places) that carries no resume records (no state of its own, events, behaviours, element
+  handles, branches, async content, lists or DOM updates, except the update that places its
+  `{children}` and updates of attributes whose values come from its props alone), it marks the
+  component's root element with `data-markless-keep="<hash>"` (`PROTOCOL_KEEP_ATTRIBUTE` in
+  `packages/serializer/src/protocol-keep.ts`). The hash covers the component's markup without the
+  children the page passed and without the values of those prop-set attributes, so equal hashes are
+  equal bytes but for those values.
+- A component with state of its own is marked the same way when nothing its state drives can add,
+  remove or swap nodes: no branches, async content or behaviours, and lists only over its props (or
+  values computed from its props alone). Its events, element handles and DOM updates of text,
+  attributes, `class` and `style` are allowed; an update of a field's live value (`value`,
+  `checked`, `selected`) or one the compiler does not locate by document order keeps it out. Its
+  root also gets `data-markless-instance="<path>"` (`PROTOCOL_KEEP_INSTANCE_ATTRIBUTE`), the
+  instance path its graph nodes carry on this page. Its hash leaves out every value its DOM updates
+  write and adds the shape of its records without their values, so two different components with
+  the same markup never share a hash.
+- Each element carrying a value that differs between pages gets `data-markless-vary="<names>"`
+  (`PROTOCOL_VARY_ATTRIBUTE`), the space-separated attribute names: those a prop sets; for a part
+  with state, those any DOM update writes, `m:on` on an element hosting an event (the event's place
+  in the page's event list differs between pages), and `#text` (`PROTOCOL_VARY_TEXT`) where an
+  update writes the element's own text. A site header whose nav links set `data-active` from a
+  `path` prop is kept on every route that renders it; only `data-active` differs.
 - When those children are the whole content of one element of the component, that element gets
   `data-markless-own` (`PROTOCOL_OWN_ATTRIBUTE`). Children placed any other way leave the page's
   content in the hash, so the part is only kept on pages that render it identically.
 - A part under 512 characters of markup (without the page's children) is not marked, and a part
   inside a kept part loses its own mark: a small part saves less than its mark costs.
 - In the swap, an element whose keep hash matches the next page's element at the same place stays;
-  each of its outermost own elements takes the next page's children, as new nodes. If the two
-  sides hold a different number of own elements, the element is morphed as before.
+  each element in it with a vary mark takes the next page's value of exactly what it names (an
+  attribute set, or removed when the next page leaves it out; `#text` the element's own text, run by
+  run between its child elements), pairing the marked elements of both sides in document order, and
+  each of its outermost own elements takes the next page's children, as new nodes. No other
+  attribute, text or node of the kept element changes, so focus, an attribute a script set, a
+  native `<details>` the reader opened and a running transition survive. If the two sides hold a
+  different number of own elements or of marked elements, the element is morphed as before. Vary
+  marks inside an own element belong to the page's content and are not paired.
+- A part with state also stays only when its elements and comments, outside its own elements, are
+  the same tags in the same order as the next page's (a script or its state may have changed them
+  since it was served); otherwise it is morphed and starts from the next page's state.
+- The kept part's instance carries over: the swap keeps its nodes, and the next page's runtime
+  adopts its live state. Before the next page shows, the router reads the live value of each of
+  the part's own `state()` cells (not its props or the callbacks its parent passed) from the leaving
+  page's runtime, under the leaving instance path, and decides each one as if the next page's props
+  had reached the live part: a value both pages serve alike keeps its live value, and a value the
+  two pages serve differently (a widget field the part's props set, like a tree item's `open`)
+  takes the next page's; for a plain object this holds field by field. The values that differ
+  from what the next page serves are written, off screen, into a graph of the next page, which
+  paints the texts and attributes that read them, computed values included, before the vary marks
+  copy them onto the kept nodes. The container then starts the next page's runtime from those
+  values (the live values every runtime tier reads before the served ones), under the next page's
+  instance path. A part whose leaving page never resumed holds no live state, and takes the next
+  page's values through its vary marks alone.
+- Why this instead of keeping the old runtime: an instance is its graph cells, its nodes and its
+  compiled handlers, which hold nothing of their own and read the graph. Keeping the leaving
+  page's runtime alive would put two runtimes, two graphs and two event routes over one container;
+  handing the live values to the next page's runtime, with the nodes kept, needs one module the
+  navigation loads only when a kept part with state is on the page, and nothing at load. A cell
+  that keeps its live value hands over the same object, not a copy.
+- A full reload starts every part from what the server renders.
 - Marks are attributes, so they move no element or comment index the resume payload counts.
-- Not yet: parts with state (they need a container of their own), and leaving kept markup out of
-  the navigation fetch.
+- Not yet: parts whose state drives branches, async content, behaviours or lists, and leaving kept
+  markup out of the navigation fetch.
 
 `navigate(href, { replace, scroll })` from `@markless/router` navigates from
 code exactly as a click on `<Link href={href} replace scroll>` does: a page of

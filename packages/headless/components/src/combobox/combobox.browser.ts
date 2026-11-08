@@ -16,6 +16,7 @@ import { UnavailableOptions } from './scenarios/unavailable-options.tsrx';
 import { WithCallbacks } from './scenarios/with-callbacks.tsrx';
 import { WithError } from './scenarios/with-error.tsrx';
 import { WithHelpAndError } from './scenarios/with-help-and-error.tsrx';
+import { SplitLabels } from './scenarios/split-labels.tsrx';
 
 const Root = page.getByTestId('root');
 const Label = page.getByTestId('label');
@@ -955,3 +956,22 @@ test('CSR: Home and End move the caret while the list is closed', async () => {
 	await userEvent.keyboard('{End}');
 	await expect.poll(() => el<HTMLInputElement>(Input).selectionStart).toBe(3);
 });
+
+// Rows that hold a repeat of their own come back from the server as arms. A page that
+// starts with none mints every one of them in the browser, and the arrow walk still has
+// to read them as one list rather than as one widget per row.
+for (const mode of MODES)
+	test(`${mode}: options minted after the first keystroke, each with a repeat inside, are walked as one list`, async () => {
+		if (mode === 'CSR') await render(SplitLabels);
+		else await renderSSR(SplitLabels);
+		expect(el(Rows).querySelectorAll('[role="option"]').length).toBe(0);
+		const input = el<HTMLInputElement>(Input);
+		await typeInto(input, 'a');
+		await expect.poll(() => el(Rows).querySelectorAll('[role="option"]').length).toBe(2);
+		await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+		await expect
+			.poll(() => (el(Rows).querySelector('[ui-highlighted]')?.textContent ?? '').trim())
+			.toBe('Banana');
+		await userEvent.keyboard('{Enter}');
+		await expect.poll(() => input.value).toBe('Banana');
+	});

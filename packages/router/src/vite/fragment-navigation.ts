@@ -21,6 +21,8 @@ export function startFragmentNavigation(
 	loadRun: () => Promise<FragmentNavigationRun>,
 	// What a press may start before the run half arrives; null when the app fetches nothing ahead of a click. A thunk, like the config.
 	intentOf: () => FragmentIntent | null,
+	// How long a failed run-half load waits for pagehide before it loads the clicked page as a document.
+	leaveDeadlineMs: number,
 ): void {
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
@@ -218,11 +220,22 @@ export function startFragmentNavigation(
 		if (mouse.metaKey || mouse.altKey || mouse.ctrlKey || mouse.shiftKey) return;
 		const anchor = anchorOf(event)!;
 		const url = followed(anchor);
-		if (!url || url.hash.startsWith('#/') || (url.hash && here(url))) return;
+		if (!url || url.hash.startsWith('#/') || (url.href.includes('#') && here(url))) return;
 		event.preventDefault();
+		// A click on the page shown keeps it; once a navigation was woken, the run half also cancels that one.
+		if (here(url) && !starting) return;
 		wake().then(
 			(api) => api.go(anchor) || w.location.assign(url.href),
-			() => w.location.assign(url.href),
+			() => {
+				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left) w.location.assign(url.href);
+				}, leaveDeadlineMs);
+			},
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
@@ -436,10 +449,15 @@ export function runFragmentNavigation(
 			'link[rel="stylesheet"][href]',
 		)) {
 			const href = new URL(link.getAttribute('href')!, d.baseURI).href;
+			const key = link.getAttribute(config.stylesheetKeyAttribute);
 			if (
 				[...d.querySelectorAll<HTMLLinkElement>('link[href]')].some(
 					(own) => own.href === href,
-				)
+				) ||
+				(key !== null &&
+					[...d.head.children].some(
+						(own) => own.getAttribute(config.stylesheetKeyAttribute) === key,
+					))
 			)
 				continue;
 			const preload = d.createElement('link');
@@ -783,14 +801,29 @@ export function runFragmentNavigation(
 	const go = (anchor: Element): boolean => {
 		const url = eligible(anchor, true);
 		if (!url) return false;
-		const current = new URL(location.href);
 		stopRest();
-		const replace = anchor.hasAttribute(config.replaceAttribute) || url.href === current.href;
+		// A link to the page already shown keeps it, scroll and state included, as client routers do.
+		if (pageKey(url) === pageKey(new URL(location.href))) {
+			state.stops = (state.stops ?? 0) + 1;
+			return true;
+		}
+		const replace = anchor.hasAttribute(config.replaceAttribute);
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
+		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset');
+			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
 		if (loaded) void swap(loaded);
-		else load().then(swap, () => location.assign(url.href));
+		else
+			load().then(swap, () => {
+				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
+				let left = false;
+				const leave = () => (left = true);
+				w.addEventListener('pagehide', leave);
+				w.setTimeout(() => {
+					w.removeEventListener('pagehide', leave);
+					if (!left && stops === state.stops) location.assign(url.href);
+				}, config.pendingDeadlineMs);
+			});
 		return true;
 	};
 	const follow = (routedPhase: boolean) => (event: Event) => {
@@ -805,6 +838,7 @@ export function runFragmentNavigation(
 	d.addEventListener('click', follow(false));
 	rescan();
 	const traverse = (event: PopStateEvent) => {
+		state.stops = (state.stops ?? 0) + 1;
 		const url = new URL(location.href);
 		if (url.hash.startsWith('#/') || pageKey(url) === state.shown) return;
 		const saved = (
@@ -825,6 +859,8 @@ export function runFragmentNavigation(
 
 // A fragment fetch asks for the page path under this prefix, so a cache keyed on the URL, or a host rewrite that drops the query, keeps it apart from the page.
 export const FRAGMENT_PATH_PREFIX = '/_markless/fragment';
+// Names the stylesheet a page's inline <style> or reference <link> carries, so a navigation keeps one it already has.
+export const STYLESHEET_KEY_ATTRIBUTE = 'data-markless-css';
 /** Set on every fragment response, so a redirect it answers can be pointed back at a fragment. */
 export const FRAGMENT_RESPONSE_HEADER = 'x-markless-fragment';
 

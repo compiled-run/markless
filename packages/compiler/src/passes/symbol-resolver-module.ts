@@ -55,6 +55,14 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 	// A slot route reads its answering symbol id out of the graph, so only a page
 	// whose parts actually escape a widget callback carries the extra branch.
 	const rowed = scopesInstances && (input.boundSymbols ?? []).some((row) => row.rowPieces);
+	const keyedCallbackRows = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some(
+			(slot) => slot.route.kind === 'callback-route' && slot.route.callbackRowPieces !== undefined,
+		),
+	);
+	const keyedRowLocals = (input.boundSymbols ?? []).some((row) =>
+		row.captureSlots.some((slot) => slot.route.kind === 'row-local' && slot.route.rows),
+	);
 	const routesCallbackSlots = (input.boundSymbols ?? []).some((row) =>
 		row.captureSlots.some((slot) => slot.route.kind === 'callback-slot-route'),
 	);
@@ -70,7 +78,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		...(rowed
 			? [
-					`import { marklessRowBoundGraphNodeId, marklessRowBoundPath } from '@markless/web/fns/row-bound-path';`,
+					`import { marklessRowBoundCallbackId, marklessRowBoundGraphNodeId, marklessRowBoundPath${keyedRowLocals ? ', marklessRowLocal' : ''}${keyedCallbackRows ? ', marklessRowBoundCallbackGraph' : ''} } from '@markless/web/fns/row-bound-path';`,
 					'',
 				]
 			: []),
@@ -126,7 +134,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'			}',
 		// A prop the root forwarded from its own props: the root's props are the page-space `prop:props` cell.
 		'			if (route.kind === "passthrough-route") return context.graph.read("prop:props", [route.propName, ...(route.path ?? []), ...(slot.path ?? [])]);',
-		'			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], context.locals?.[route.itemName]);',
+		`			if (route.kind === "row-local") return route.path.reduce((value, key) => value == null ? value : value[key], ${rowed && keyedRowLocals ? 'route.rows ? marklessRowLocal(bound, context.graph, route) : ' : ''}context.locals?.[route.itemName]);`,
 		'			throw new Error(`Capture slot ${slotId} is a callback route`);',
 		'		},',
 		'		invoke(slotId, args) {',
@@ -153,8 +161,13 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 			: []),
 		'			if (route.kind !== callbackRoute) throw new Error(`Capture slot ${slotId} is not a callback route`);',
 		'			if (typeof context.invokeSymbol !== "function") throw new Error("Bound callback invocation is unavailable");',
-		// The row spells its composer's callback from its own module, which may sit under an instance path.
-		'			return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, event: context.event, args });',
+		// The composer's instance path rides the callback id, so the callback runs on the page graph; this scope would qualify it twice.
+		...(rowed && keyedCallbackRows
+			? [
+					'			if (route.callbackRowPieces !== undefined) return context.invokeSymbol((context.graph?.marklessInstancePath || "") + route.callbackSymbolId, { ...context, graph: marklessRowBoundCallbackGraph(bound, context.graph, route.callbackRowPieces), event: context.event, args });',
+				]
+			: []),
+		`			return context.invokeSymbol(${rowed ? 'marklessRowBoundCallbackId(bound, context.graph, route.callbackSymbolId)' : '(context.graph?.marklessInstancePath || "") + route.callbackSymbolId'}, { ...context, graph: context.graph?.marklessPageGraph ?? context.graph, event: context.event, args });`,
 		'		},',
 		'	};',
 		'}',
@@ -237,7 +250,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 				]),
 		'	if (!path) return base;',
 		'	const pageSpace = new Set(bound.captureSlots.flatMap((slot) => slot.legacyGraphRead ? [slot.legacyGraphRead.graphNodeId] : []));',
-		// A `shared:`/`storage:` id belongs to the page, and a widget-scoped one to
+		// A `shared:`/`storage:` id belongs to the page, and a subtree-scoped one to
 		// its widget root, not to the edge this row was bound through. The runtime
 		// owns that reading; restating it here would put the write on a graph the
 		// part's own records never read.
@@ -266,7 +279,7 @@ function instanceScopeLines(widgetAware: boolean, rowed: boolean): string[] {
 		'		...context,',
 		'		graph: scopeGraph(context.graph),',
 		`		...(context.read ? { read: (graphNodeId, readPath) => context.graph.read(${scoped('graphNodeId', 'marklessGraphWidgetRegistry(context.graph)')}, readPath) } : {}),`,
-		// A widget-scoped element() handle is spelled module-level in this symbol
+		// A subtree-scoped element() handle is spelled module-level in this symbol
 		// exactly as its graph nodes are, so it takes the SAME instance path - the
 		// bound edge's, which names the rendered widget even when the dispatching
 		// part binds no handle of its own.
@@ -325,10 +338,17 @@ function serializeBoundRows(rows: SymbolResolverModuleInput['boundSymbols']): st
 			),
 		},
 	]);
-	return JSON.stringify(Object.fromEntries(serializedRows), (key, value) =>
-		Array.isArray(value) && value.length === 0 && OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key)
-			? undefined
-			: value,
+	// A row-local route reads its item along `path`, so an empty one stays.
+	return JSON.stringify(
+		Object.fromEntries(serializedRows),
+		function (this: { readonly kind?: unknown }, key: string, value: unknown) {
+			return Array.isArray(value) &&
+				value.length === 0 &&
+				OMITTED_EMPTY_BOUND_ROW_FIELDS.has(key) &&
+				this.kind !== 'row-local'
+				? undefined
+				: value;
+		},
 	);
 }
 

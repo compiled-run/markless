@@ -5,6 +5,7 @@ import type { PublicRenderModuleInput, SemanticMarkupResidue } from '../../artif
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { sharedInstanceVisibleFrom } from '../semantic-graph/collect-shared.ts';
+import { moduleSemantics } from '../semantic-graph/shared-ast.ts';
 import {
 	componentEdgesFor,
 	componentPropNames,
@@ -47,10 +48,11 @@ export function authoredResidueReadCases(
 	sources: ReadonlyArray<string>,
 	strip?: (source: string) => string,
 	deferred?: DeferredCountCases,
+	scoped: (source: string, body: string) => string = (_source, body) => body,
 ): string[] {
 	return sources.map((source) => {
 		const thunk = deferred?.bySource.get(source);
-		const body = strip ? strip(thunk ?? source) : (thunk ?? source);
+		const body = scoped(source, strip ? strip(thunk ?? source) : (thunk ?? source));
 		return thunk === undefined
 			? `case ${JSON.stringify(source)}:return (${body});`
 			: `case ${JSON.stringify(source)}:return ${deferred!.deferCall}((${COUNT_VALUE_PARAMETER})=>(${body}));`;
@@ -121,7 +123,7 @@ export function renderDecisionSources(
 			branch.testReads.length !== 1 &&
 			branch.testSource
 		)
-			sources.add(branch.testSource);
+			sources.add(branch.armIndexSource ?? branch.testSource);
 	const placedEdgeIds = inChunk
 		? new Set(
 				chunks.flatMap((chunk) =>
@@ -244,7 +246,7 @@ export function branchArmIndexSource(
 	branch: PublicRenderModuleInput['renderData']['branches'][number],
 	testSource: string | undefined,
 ): string {
-	return branch.kind === 'switch' && branch.armTests
+	return branch.armTests
 		? `(()=>{const marklessArmValue=(${testSource});const marklessArmTests=${JSON.stringify(branch.armTests)};const marklessArmMatch=marklessArmTests.findIndex((marklessTest)=>marklessTest!==null&&Object.is(marklessTest,marklessArmValue));return marklessArmMatch===-1?Math.max(0,marklessArmTests.indexOf(null)):marklessArmMatch;})()`
 		: `((${testSource})?0:1)`;
 }
@@ -509,20 +511,156 @@ export function sharedInstanceReadGraphNodeIds(
  * row can read keeps the plain innermost read.
  */
 export function repeatLocalSource(
-	repeats: PublicRenderModuleInput['semanticGraph']['keyedRepeats'],
-	name: string,
-	field: 'repeatItem' | 'repeatIndex',
+	repeats: KeyedRepeats,
+	binding: Pick<RowNameBinding, 'name' | 'field' | 'path' | 'paths'>,
 	context: string,
 ): string {
 	const declaring = repeats.filter((repeat) =>
-		field === 'repeatItem' ? repeat.itemName === name : repeat.indexName === name,
+		declaresRowName(repeat, binding.name, binding.field),
 	);
 	const encloses = declaring.some((repeat) =>
 		repeats.some((candidate) => candidate.enclosingRepeatId === repeat.id),
 	);
-	if (!encloses) return `${context}.${field}`;
+	if (!encloses) return rowValueRead(binding, context);
 	const ids = JSON.stringify(declaring.map((repeat) => repeat.id));
-	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined||${ids}.includes(r.repeatId))return r.${field};return ${context}.${field};})(${context})`;
+	return `((r)=>{for(;r;r=r.repeatOuter)if(r.repeatId===undefined||${ids}.includes(r.repeatId))return ${rowValueRead(binding, 'r')};return ${rowValueRead(binding, context)};})(${context})`;
+}
+
+// A name two loops destructure to different places reads the place its own row's loop gave it.
+function rowValueRead(
+	binding: Pick<RowNameBinding, 'field' | 'path' | 'paths'>,
+	row: string,
+): string {
+	const read = `${row}.${binding.field}${itemPathAccess(binding.path ?? [])}`;
+	if (!binding.paths) return read;
+	return `(${binding.paths.reduceRight(
+		(rest, { repeatId, path }) =>
+			`${row}.repeatId===${JSON.stringify(repeatId)}?${row}.${binding.field}${itemPathAccess(path)}:${rest}`,
+		read,
+	)})`;
+}
+
+function declaresRowName(
+	repeat: KeyedRepeats[number],
+	name: string,
+	field: RowNameBinding['field'],
+): boolean {
+	if (field === 'repeatIndex') return repeat.indexName === name;
+	return (
+		repeat.itemName === name || (repeat.itemAliases ?? []).some((alias) => alias.name === name)
+	);
+}
+
+// A destructured loop name reads its value off the row item at the path it binds.
+function itemPathAccess(path: ReadonlyArray<string>): string {
+	return path.map((key) => `?.[${JSON.stringify(key)}]`).join('');
+}
+
+type KeyedRepeats = PublicRenderModuleInput['semanticGraph']['keyedRepeats'];
+
+/** One name a component's own `@for` loops bind. */
+export type RowNameBinding = {
+	readonly name: string;
+	readonly field: 'repeatItem' | 'repeatIndex';
+	/** Set for a name a destructured loop binds: where on the row item its value sits. */
+	readonly path?: ReadonlyArray<string>;
+	/** Set when loops bind the name at different places on their items: each loop's place. */
+	readonly paths?: ReadonlyArray<{
+		readonly repeatId: string;
+		readonly path: ReadonlyArray<string>;
+	}>;
+	/** The component also binds this name outside its loops; a read outside every declaring row means that binding. */
+	readonly shadowsOuter: boolean;
+};
+
+/** The `@for` loops written in one component's own markup: the only loops whose bindings its expressions can see. */
+export function componentKeyedRepeats(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): KeyedRepeats {
+	const ids = new Set(
+		input.renderData.chunks.flatMap((chunk) =>
+			chunk.componentName === componentName
+				? chunk.slots.flatMap((slot) => (slot.kind === 'repeat' ? [slot.repeatId] : []))
+				: [],
+		),
+	);
+	return input.semanticGraph.keyedRepeats.filter((repeat) => ids.has(repeat.id));
+}
+
+export function componentRowNames(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	repeats: KeyedRepeats = componentKeyedRepeats(input, componentName),
+): ReadonlyArray<RowNameBinding> {
+	const fields = new Map<string, RowNameBinding['field']>();
+	const places = new Map<string, Array<{ repeatId: string; path: ReadonlyArray<string> }>>();
+	const place = (name: string, repeatId: string, path: ReadonlyArray<string>) => {
+		fields.set(name, 'repeatItem');
+		places.set(name, [...(places.get(name) ?? []), { repeatId, path }]);
+	};
+	for (const repeat of repeats) {
+		place(repeat.itemName, repeat.id, []);
+		for (const alias of repeat.itemAliases ?? []) place(alias.name, repeat.id, alias.path);
+	}
+	for (const repeat of repeats)
+		if (repeat.indexName && !fields.has(repeat.indexName))
+			fields.set(repeat.indexName, 'repeatIndex');
+	if (fields.size === 0) return [];
+	const outer = componentBodyLookup(input, componentName);
+	return [...fields].map(([name, field]) => {
+		const at = places.get(name) ?? [];
+		const [first] = at;
+		const shared = at.every(({ path }) => path.join('.') === first?.path.join('.'));
+		return {
+			name,
+			field,
+			shadowsOuter: outer(name),
+			...(first?.path.length ? { path: first.path } : {}),
+			...(shared ? {} : { paths: at }),
+		};
+	});
+}
+
+// Whether a name resolves to a binding from the component body's own scope, which every loop scope nests inside.
+function componentBodyLookup(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): (name: string) => boolean {
+	const component = componentAstsForResidueReaders(input.source.source, input.source.filename).get(
+		componentName,
+	);
+	const semantics = moduleSemantics(input.source.source, input.source.filename);
+	const functionScope = semantics.scopes.find(
+		(scope) => scope.kind === 'function' && scope.node.start === component?.start,
+	);
+	if (!functionScope) return () => false;
+	const bodyStart = (component?.body as AnyNode | undefined)?.start;
+	const from =
+		semantics.scopes.find(
+			(scope) => scope.parent?.id === functionScope.id && scope.node.start === bodyStart,
+		) ?? functionScope;
+	return (name) => semantics.lookup(name, { from }) !== null;
+}
+
+/**
+ * The value of a row name that also has an outer binding: the row's inside a row
+ * of a loop that declares it, which the context's row chain says, and
+ * `outerSource` everywhere else. The walk variable is a compiler name, so an
+ * authored name in `outerSource` cannot be shadowed by it.
+ */
+export function shadowedRowNameSource(
+	repeats: KeyedRepeats,
+	binding: RowNameBinding,
+	context: string,
+	outerSource: string,
+): string {
+	const ids = JSON.stringify(
+		repeats
+			.filter((repeat) => declaresRowName(repeat, binding.name, binding.field))
+			.map((repeat) => repeat.id),
+	);
+	return `((marklessRow)=>{for(;marklessRow;marklessRow=marklessRow.repeatOuter)if(marklessRow.repeatId===undefined?marklessRow.repeatItem!==undefined:${ids}.includes(marklessRow.repeatId))return ${rowValueRead(binding, 'marklessRow')};return ${outerSource};})(${context})`;
 }
 
 const CONTEXT = 'marklessResidueContext';
@@ -646,20 +784,23 @@ export function emitClientResidueReader(
 	} = componentResidueLocals(input, componentAst, evaluatedSources, readDependencies);
 	const bound = new Set<string>();
 	const lines: string[] = [];
-	for (const repeat of input.semanticGraph.keyedRepeats) {
-		if (reads(repeat.itemName) && !bound.has(repeat.itemName)) {
-			bound.add(repeat.itemName);
-			lines.push(
-				`const ${repeat.itemName}=${repeatLocalSource(input.semanticGraph.keyedRepeats, repeat.itemName, 'repeatItem', CONTEXT)};`,
-			);
-		}
-		if (repeat.indexName && reads(repeat.indexName) && !bound.has(repeat.indexName)) {
-			bound.add(repeat.indexName);
-			lines.push(
-				`const ${repeat.indexName}=${repeatLocalSource(input.semanticGraph.keyedRepeats, repeat.indexName, 'repeatIndex', CONTEXT)};`,
-			);
-		}
+	const repeats = componentKeyedRepeats(input, componentName);
+	const rowNames = componentRowNames(input, componentName, repeats);
+	for (const binding of rowNames) {
+		if (binding.shadowsOuter || !reads(binding.name)) continue;
+		bound.add(binding.name);
+		lines.push(`const ${binding.name}=${repeatLocalSource(repeats, binding, CONTEXT)};`);
 	}
+	const shadowing = rowNames.filter((binding) => binding.shadowsOuter);
+	// A name a loop shares with an outer binding is a parameter around each reading expression, so the argument still sees the outer one.
+	const rowScoped = (source: string, body: string) => {
+		const dependencies = readDependencies(source, 'expression');
+		const read = shadowing.filter((binding) => residueReferences(dependencies, binding.name));
+		if (read.length === 0) return body;
+		return `((${read.map((binding) => binding.name).join(',')})=>(${body}))(${read
+			.map((binding) => shadowedRowNameSource(repeats, binding, CONTEXT, binding.name))
+			.join(',')})`;
+	};
 	if (reads('error') && !bound.has('error')) {
 		bound.add('error');
 		lines.push(`const error=${CONTEXT}.asyncError;`);
@@ -743,6 +884,7 @@ export function emitClientResidueReader(
 				componentName,
 				`(${CONTEXT}.deferCount??((marklessThunk)=>marklessThunk((marklessHeld)=>{if(typeof marklessHeld!=='number')throw new Error('MARKLESS_ROSTER_COUNT_UNRESOLVED');return marklessHeld;})))`,
 			),
+			rowScoped,
 		)
 			.map((entry, index) => {
 				const needed = componentResidueLocals(

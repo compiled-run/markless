@@ -125,7 +125,7 @@ export const menuState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by every `menu.item`, so an item written inside another item's submenu
@@ -150,7 +150,7 @@ export const menuItemState = shared(
 
 		return { ...item, itemEl, itemContentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MenuRoot({
@@ -514,11 +514,11 @@ export function MenuItem({
 			? menu.checked.includes(item.value)
 				? 'true'
 				: 'false'
-			: false,
+			: undefined,
 	);
-	const hasPopup = computed(() => (item.submenu ? 'menu' : false));
+	const hasPopup = computed(() => (item.submenu ? 'menu' : undefined));
 	const isExpanded = computed(() =>
-		item.submenu ? (item.expanded ? 'true' : 'false') : false,
+		item.submenu ? (item.expanded ? 'true' : 'false') : undefined,
 	);
 
 	<div

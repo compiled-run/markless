@@ -52,11 +52,11 @@ const SHARED_INSTANCE_NODE = /^(?:shared|storage):/;
  * The page's own shared instances, read live for a row born after the page was.
  *
  * A minted row renders without the live graph because its own cells do not exist
- * in it yet, but a page-scoped `shared()` instance is not the row's - it is state
+ * in it yet, but an app-scoped `shared()` instance is not the row's - it is state
  * the page has been writing since load. Left to its compile-time factory the row
  * paints from an empty queue and joins the DOM wrong, with a follow-up refresh to
- * correct it. A widget-scoped id is instance-prefixed in page space, so only a
- * page-scoped instance answers here; what the graph lacks keeps its factory.
+ * correct it. A subtree-scoped id is instance-prefixed in page space, so only a
+ * app-scoped instance answers here; what the graph lacks keeps its factory.
  */
 function liveSharedInstanceSeeds(
 	surface: PrerenderDataSurface,
@@ -563,7 +563,10 @@ function renderRowChunk(
 				const branch = (definition.branches ?? []).find(
 					(candidate) => candidate.branchSiteId === slot.branchSiteId,
 				);
-				const value = scope.readDecision(branch?.testSource, context);
+				const value = scope.readDecision(
+					branch?.armIndexSource ?? branch?.testSource,
+					context,
+				);
 				if (!branch?.armTests) return value ? 0 : 1;
 				const match = branch.armTests.findIndex(
 					(candidate) => candidate !== null && Object.is(candidate, value),

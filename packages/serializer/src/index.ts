@@ -1,6 +1,7 @@
 export * from './payload-scripts.ts';
 export * from './protocol.ts';
 export * from './protocol-state.ts';
+export * from './protocol-shared-instances.ts';
 export {
 	encodeProtocolPayloadLists,
 	encodeRecordTemplates,
@@ -20,3 +21,4 @@ export * from './resume-record-delta.ts';
 export * from './storage-cookie.ts';
 export * from './storage-slot.ts';
 export * from './value.ts';
+export { valueAlongPaths } from './value-paths.ts';

@@ -145,11 +145,15 @@ export async function loadHook(ctx: MarklessHookContext, pluginContext: PluginCo
 			? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
 			: null;
 	const ownerSource = resolverSource ?? symbolSource ?? renderDataSource;
+	const payloadSource = normalizedId.startsWith(`${MARKLESS_VIRTUAL_PREFIX}payload:`)
+		? marklessVirtualModuleSourceFile(normalizedId, ctx.getRoot())
+		: null;
+	const publishingSource = ownerSource ?? payloadSource;
 	// The id resolves from its owner's first pass; only a final publication ships.
-	if (ownerSource) {
+	if (publishingSource) {
 		await moduleMetadata.awaitSourceClaimsPublished(
 			ctx.getEnvironment(pluginContext),
-			ownerSource,
+			publishingSource,
 		);
 	}
 	if (

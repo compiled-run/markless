@@ -1,126 +1,312 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import ListsSketch from '../../components/sketch/concepts/lists-sketch.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import TentAnatomy from '../../components/figures/lists/tent-anatomy.tsrx';
+import DrawerAnatomy from '../../components/figures/lists/drawer-anatomy.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# A key tells the page which row is which
+# Lists
 
-<PageMeta time="3 min" assumes="state, events, conditionals" />
+<PageMeta time="5 min" assumes="state, events, computed" />
 
-<ThemeToggle />
+<Subtitle text="@for draws one row per item, and a key tells the page which row is which." />
 
-You tick a row in a list. You sort the list. The tick is now on somebody else's row.
-
-Nothing crashed. The page saw three slots and filled them again from the top. It had no idea the rows
-were the same rows in a new order.
-
-**A key answers "which row is this?" Once a row has a key, everything on that row moves with it.**
-
-## Tick a row, then sort
-
-<ListsSketch />
-
-In the card above, tick Pears and press Reverse. Each number stays with its row, and so does the tick.
-
-In the code below, tick **Pears**. Press **Sort A to Z**. Then tick every row and press **Remove
-ticked**. The `@empty` line takes over.
-
-<Code note="Add { id: 'beans', name: 'Beans', done: false } to the starting list. Tick Beans and sort: the tick rides along.">
-```tsrx title="shopping-list.tsrx"
+```tsrx title="shelf.tsrx"
 import { state } from '@markless/core';
 
-export default function ShoppingList() @{
-	let items = state([
-		{ id: 'pears', name: 'Pears', done: false },
-		{ id: 'coffee', name: 'Coffee', done: false },
-		{ id: 'milk', name: 'Milk', done: false },
+export default function Shelf() @{
+	let books = state([
+		{ id: 'dune', title: 'Dune' },
+		{ id: 'emma', title: 'Emma' },
 	]);
+
+	<ul>
+		@for (const book of books; key book.id) {
+			<li>{book.title}</li>
+		}
+	</ul>
+}
+```
+
+**`@for`** draws one `<li>` per book. **`key book.id`** names each row by its data, so the page can tell the rows apart.
+
+## Every row needs a key
+
+A *key* is a value that names one item for good, like an id. Every `@for` needs one, even over a list that never changes.
+
+<Code steps={[{ label: "Add `{ id: 'kim', title: 'Kim' }` to the shelf.", shows: 'Kim' }, { label: 'Try breaking it: delete `; key book.id`. The build stops, because every row needs a key.', fails: 'MARKLESS_REPEAT_KEY_REQUIRED' }]}>
+```tsrx title="shelf.tsrx"
+import { state } from '@markless/core';
+
+export default function Shelf() @{
+	let books = state([
+		{ id: 'dune', title: 'Dune' },
+		{ id: 'emma', title: 'Emma' },
+	]);
+
+	<ul>
+		@for (const book of books; key book.id) {
+			<li>{book.title}</li>
+		}
+	</ul>
+}
+```
+</Code>
+
+## Add and remove rows
+
+Change the array the way you change any array: `push`, `splice` or `filter`. The page adds or removes just those rows. **`@empty`** shows instead when the list has no rows. Keys must be unique: two books with the id `ulysses` would be one row too many.
+
+<Code steps={[{ label: 'Remove Emma, then Dune. The `@empty` line takes over.', shows: 'The shelf is empty.' }, { label: "Add a button that runs `books.splice(0, 1)` to take the first book off.", source: 'books.splice(0, 1)' }]}>
+```tsrx title="shelf-edit.tsrx"
+import { state } from '@markless/core';
+
+export default function ShelfEdit() @{
+	let books = state([
+		{ id: 'dune', title: 'Dune' },
+		{ id: 'emma', title: 'Emma' },
+	]);
+	function remove(id: string) {
+		books = books.filter((b) => b.id !== id);
+	}
 
 	<section>
 		<ul>
-			@for (const item of items; key item.id) {
+			@for (const book of books; key book.id) {
 				<li>
-					<label>
-						<input
-							type="checkbox"
-							checked={item.done}
-							onChange={() =>
-								(item.done = !item.done)
-							}
-						/>
-						{item.name}
-					</label>
+					{book.title}
+					<button onClick={() => remove(book.id)}>
+						Remove
+					</button>
 				</li>
 			} @empty {
-				<li>Nothing left to buy.</li>
+				<li>The shelf is empty.</li>
 			}
 		</ul>
 		<button
 			onClick={() =>
-				(items = [...items].sort((a, b) =>
-					a.name.localeCompare(b.name),
-				))
+				books.push({
+					id: 'ulysses',
+					title: 'Ulysses',
+				})
 			}
 		>
-			Sort A to Z
-		</button>
-		<button
-			onClick={() =>
-				(items = items.filter(
-					(item) => !item.done,
-				))
-			}
-		>
-			Remove ticked
+			Add Ulysses
 		</button>
 	</section>
 }
 ```
 </Code>
 
-Pears moves to the bottom, and its tick goes with it. The sort did not build new rows. It moved the
-three rows that were already on the page into a new order. When the last row goes, the `@empty`
-block shows instead.
+## A row's own state moves with its key
 
-`key item.id` in the loop header is the whole identity story. Each row's checkbox handler changes
-`item.done` on its own item, wherever that row sits.
+When a row needs state of its own, like a tick, make the row a component in its own file, here `book-row.tsrx`. Each row gets its own `state()`, and the key keeps it with its book when the list moves.
 
-## Choosing a key
+- Reverse or sort the list, and each row moves with its item.
+- What the row holds rides along.
+- No row is built again.
 
-Use the value that names the item in your data: an id, a slug, an order number. It must be unique
-in the list, and the same item must carry the same key every time.
+Press **Reverse**, or drag a card onto another place.
 
-Avoid two things. The position names the slot, not the item, so it brings the original bug back. And
-a value the reader can edit turns a renamed row into a new row.
+<TentAnatomy />
 
-To get the position for display, add `index i` to the header. Keep the key on the data:
-
-```tsrx
+<Code steps={[{ label: 'Tick Dune, then press Reverse. The tick moves to the bottom with Dune.', shows: 'Dune, reading' }, { label: "Try breaking it: in reading-list.tsrx, write `let reading = state(false);` straight inside the `@for`, above `<BookRow>`. The build stops, because a row's state belongs in a row component.", fails: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE' }]}>
+```tsrx title="reading-list.tsrx"
 import { state } from '@markless/core';
+import { BookRow } from './book-row.tsrx';
 
-export default function Steps() @{
-	let steps = state([
-		{ id: 'grind', text: 'Grind the beans' },
-		{ id: 'pour', text: 'Pour the water' },
+export default function ReadingList() @{
+	let books = state([
+		{ id: 'dune', title: 'Dune' },
+		{ id: 'emma', title: 'Emma' },
+		{ id: 'ulysses', title: 'Ulysses' },
 	]);
 
-	<ol>
-		@for (const step of steps; index i; key step.id) {
-			<li>
-				{i + 1}: {step.text}
-			</li>
-		}
-	</ol>
+	<section>
+		<ul>
+			@for (const book of books; key book.id) {
+				<BookRow title={book.title} />
+			}
+		</ul>
+		<button onClick={() => books.reverse()}>
+			Reverse
+		</button>
+	</section>
+}
+```
+```tsrx title="book-row.tsrx"
+import { state } from '@markless/core';
+
+export function BookRow({
+	title,
+}: {
+	title: string;
+}) @{
+	let reading = state(false);
+
+	<li>
+		<label>
+			<input
+				type="checkbox"
+				checked={reading}
+				onChange={() => (reading = !reading)}
+			/>
+			{title}
+			{reading ? ', reading' : ''}
+		</label>
+	</li>
+}
+```
+</Code>
+
+## Change one row in place
+
+To change one row, write to its item: `book.read = !book.read`. Only that row updates, and so does anything worked out from the list.
+
+<Code steps={[{ label: 'Tick Dune.', shows: 'Read: 2' }, { label: 'Add a button under the list that marks every book read: `books.forEach((b) => (b.read = true))`.', source: 'b.read = true' }]}>
+```tsrx title="read-flags.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function ReadFlags() @{
+	let books = state([
+		{ id: 'dune', title: 'Dune', read: false },
+		{ id: 'emma', title: 'Emma', read: true },
+	]);
+	const done = computed(
+		() => books.filter((b) => b.read).length,
+	);
+
+	<section>
+		<ul>
+			@for (const book of books; key book.id) {
+				<li>
+					<label>
+						<input
+							type="checkbox"
+							checked={book.read}
+							onChange={() =>
+								(book.read = !book.read)
+							}
+						/>
+						{book.title}
+					</label>
+				</li>
+			}
+		</ul>
+		<p>Read: {done}</p>
+	</section>
+}
+```
+</Code>
+
+A row component can't write to the object it was given. Pass it a function to call instead, as [Components](/build/components) shows.
+
+## Filter and sort with a computed
+
+The rows you show are worked out from the full list, so put that in a `computed`. Type on the drawer's label: the cards that don't match sink, and the rest close up in their order.
+
+<DrawerAnatomy />
+
+<Code steps={[{ label: 'Type em.', shows: 'Emma' }, { label: 'Sort them: add `.toSorted((a, b) => a.title.localeCompare(b.title))` after the filter.', source: '.toSorted(' }, { label: 'Type zz. The `@empty` line shows.', shows: 'No match.' }]}>
+```tsrx title="search-shelf.tsrx"
+import { computed, state } from '@markless/core';
+
+export default function SearchShelf() @{
+	let query = state('');
+	let books = state([
+		{ id: 'dune', title: 'Dune' },
+		{ id: 'emma', title: 'Emma' },
+		{ id: 'ulysses', title: 'Ulysses' },
+	]);
+	const shown = computed(() =>
+		books.filter((book) =>
+			book.title
+				.toLowerCase()
+				.includes(query.toLowerCase()),
+		),
+	);
+
+	<section>
+		<input
+			value={query}
+			onInput={(event) =>
+				(query = event.currentTarget.value)
+			}
+		/>
+		<ul>
+			@for (const book of shown; key book.id) {
+				<li>{book.title}</li>
+			} @empty {
+				<li>No match.</li>
+			}
+		</ul>
+	</section>
+}
+```
+</Code>
+
+## Loop over a Set or a Map
+
+`@for` reads a `Set` or a `Map` directly. Pull a Map's key and value apart with `[t, n]`. For a plain object, loop over `computed(() => Object.entries(prices))`.
+
+<Code steps={[{ label: 'Press Add poetry, then Add Kim.', shows: 'Kim: 3' }]}>
+```tsrx title="genres.tsrx"
+import { state } from '@markless/core';
+
+export default function Genres() @{
+	let genres = state(
+		new Set(['novel', 'sci-fi']),
+	);
+	let copies = state(
+		new Map([
+			['Dune', 2],
+			['Emma', 1],
+		]),
+	);
+
+	<section>
+		<ul>
+			@for (const genre of genres; key genre) {
+				<li>{genre}</li>
+			}
+		</ul>
+		<ul>
+			@for (const [t, n] of copies; key t) {
+				<li>{t}: {n}</li>
+			}
+		</ul>
+		<button onClick={() => genres.add('poetry')}>
+			Add poetry
+		</button>
+		<button onClick={() => copies.set('Kim', 3)}>
+			Add Kim
+		</button>
+	</section>
+}
+```
+</Code>
+
+## Number the rows with index
+
+`index i` gives each row its place, for display. The key stays on the data:
+
+```tsrx
+@for (const book of books; index i; key book.id) {
+	<li>{i + 1}. {book.title}</li>
 }
 ```
 
-<Callout
-	sprite="cross"
-	title="What if I leave the key off?"
-	text="Every @for needs a key. Leave it off and the build stops with MARKLESS_REPEAT_KEY_REQUIRED and points at the loop header. Key by position, as in key i, and the build warns with MARKLESS_REPEAT_KEY_IS_INDEX. A row then follows its slot and not its data."
-/>
+## Repeat a fixed number of times
 
-Next: [how a page waits for data](/concepts/async).
+Loop over a short array of numbers, keyed by the number:
+
+```tsrx
+@for (const n of [1, 2, 3, 4, 5]; key n) {
+	<span>{n <= stars ? '★' : '☆'}</span>
+}
+```
+
+[Async values](/concepts/async) shows how a page waits for data.

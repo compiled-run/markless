@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1075,
+			"reason": "the State page demo is a live settings page drawn in ink (PR #317), built from @markless/ui select; and a code block without its own .css fence is now listed in the code-prefetch manifest under the key its page uses, so its result code downloads with the page instead of at the first click (the G2 fetches this fixed); measured on CI run 41909212731 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -4991,
+			"reason": "the State page demo is a live settings page drawn in ink (PR #317), built from @markless/ui select; and a code block without its own .css fence is now listed in the code-prefetch manifest under the key its page uses, so its result code downloads with the page instead of at the first click (the G2 fetches this fixed); measured on CI run 41909212731 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 37755,
+			"reason": "the State page demo is a live settings page drawn in ink (PR #317), built from @markless/ui select; and a code block without its own .css fence is now listed in the code-prefetch manifest under the key its page uses, so its result code downloads with the page instead of at the first click (the G2 fetches this fixed); measured on CI run 41909212731 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 9,
+			"reason": "the State page demo is a live settings page drawn in ink (PR #317), built from @markless/ui select; and a code block without its own .css fence is now listed in the code-prefetch manifest under the key its page uses, so its result code downloads with the page instead of at the first click (the G2 fetches this fixed); measured on CI run 41909212731 against main's merge-queue run 41903352996",
+			"date": "2026-11-04"
+		}
+	]
+}

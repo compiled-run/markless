@@ -24,3 +24,26 @@ test('dependency-only computed records do not scan dependencies during invalidat
 		expect(reads).toBe(0);
 	}
 });
+
+test('a pull registered for a node runs once, before the next read of it answers', () => {
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'derived', value: 1 }] });
+	let pulls = 0;
+	graph.pullBeforeRead!('derived', () => {
+		pulls++;
+		graph.write({ graphNodeId: 'derived', value: 2 });
+	});
+	expect(pulls).toBe(0);
+	expect(graph.read('derived')).toBe(2);
+	expect(graph.read('derived')).toBe(2);
+	expect(pulls).toBe(1);
+});
+
+test('the subscription count follows subscribe and release', () => {
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'count', value: 0 }] });
+	expect(graph.subscriptionCount!('count')).toBe(0);
+	const release = graph.subscribe({ id: 'a', graphNodeId: 'count', run() {} });
+	graph.subscribe({ id: 'b', graphNodeId: 'count', run() {} });
+	expect(graph.subscriptionCount!('count')).toBe(2);
+	release();
+	expect(graph.subscriptionCount!('count')).toBe(1);
+});

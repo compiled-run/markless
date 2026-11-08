@@ -14,6 +14,7 @@ export default function Home() @{
 		<Link data-nowhere>Nowhere</Link>
 		<a href="#section" data-hash-section>Section</a>
 		<a href="/#section" data-path-section>Section by path</a>
+		<a href="/" data-plain-home>Home again</a>
 		<div style="height: 1500px"></div>
 		<h2 id="section">Section</h2>
 	</main>

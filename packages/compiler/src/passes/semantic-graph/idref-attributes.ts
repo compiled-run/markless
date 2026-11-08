@@ -50,10 +50,7 @@ export function acceptsIdrefList(attributeName: string): boolean {
  * so they are refused rather than written: the set exists to name what the
  * compiler must reject, not a position it fills.
  */
-export const CSS_ANCHOR_ATTRIBUTES: ReadonlySet<string> = new Set([
-	'anchorName',
-	'positionAnchor',
-]);
+export const CSS_ANCHOR_ATTRIBUTES: ReadonlySet<string> = new Set(['anchorName', 'positionAnchor']);
 
 export function isCssAnchorAttribute(attributeName: string): boolean {
 	return CSS_ANCHOR_ATTRIBUTES.has(attributeName);

@@ -29,6 +29,7 @@ import {
 	type ChildrenSeedPathsInput,
 } from './passes/link/children-seed-paths.ts';
 import { withClosureActionOwners } from './passes/link/closure-action-owners.ts';
+import { withDerivedProps } from './passes/link/derived-props.ts';
 import { withRosterDerivations } from './passes/link/roster-derivations.ts';
 import { withStorageCells } from './passes/link/storage-cells.ts';
 import { withRowSlotReaders } from './passes/link/row-slot-readers.ts';
@@ -117,10 +118,25 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 			withClosureActionOwners(
 				withRosterDerivations(
 					withRowSlotReaders(
-						withSeedsFromProps(withStorageCells(artifacts.semanticGraph.moduleGraphInterface, storageCellsInput), {
-							symbolResolver: artifacts.symbolResolver,
-							protocolState: artifacts.protocolState,
-						}),
+						withSeedsFromProps(
+							withStorageCells(
+								withDerivedProps(artifacts.semanticGraph.moduleGraphInterface, {
+									source: input,
+									semanticGraph: artifacts.semanticGraph,
+									renderData: artifacts.renderData,
+									publicRenderPlan: artifacts.publicRenderPlan,
+									symbolResolver: artifacts.symbolResolver,
+									captureAnalysis: artifacts.captureAnalysis,
+									protocolState: artifacts.protocolState,
+									protocolView: artifacts.protocolView,
+								}),
+								storageCellsInput,
+							),
+							{
+								symbolResolver: artifacts.symbolResolver,
+								protocolState: artifacts.protocolState,
+							},
+						),
 						{
 							componentEdges: artifacts.semanticGraph.componentEdges,
 							protocolView: artifacts.protocolView,
@@ -153,6 +169,7 @@ async function runCompile(input: CompileTsrxModuleInput): Promise<CompileTsrxMod
 				importedModuleInterfaces: input.importedModuleInterfaces,
 				components: artifacts.semanticGraph.components,
 				sharedCallbackBindings: artifacts.semanticGraph.sharedCallbackBindings,
+				keyedRepeats: artifacts.semanticGraph.keyedRepeats,
 			},
 			artifacts.runtimeDemandMaps,
 		),
@@ -507,6 +524,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						components: (inputs.semanticGraph as SemanticGraphArtifact).components,
 						sharedCallbackBindings: (inputs.semanticGraph as SemanticGraphArtifact)
 							.sharedCallbackBindings,
+						keyedRepeats: (inputs.semanticGraph as SemanticGraphArtifact).keyedRepeats,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),
@@ -592,7 +610,9 @@ function parseErrorDiagnostic(
 		severity: 'error',
 		phase: 'parse',
 		title: rule?.title ?? 'TSRX parser rejected this source',
-		message: rule ? `${rule.message} (@tsrx/yuku reported: ${message})` : `@tsrx/yuku reported: ${message}`,
+		message: rule
+			? `${rule.message} (@tsrx/yuku reported: ${message})`
+			: `@tsrx/yuku reported: ${message}`,
 		why: 'The source could not enter the Markless compiler because the @tsrx/yuku parser failed at phase parse. Markless preserves the parser message and adapts its source location into the compiler diagnostic.',
 		primarySpan: parserErrorSpan(error, source),
 		passId: 'tsrx-semantic-graph',
@@ -615,10 +635,14 @@ function templateRuleBroken(
 	source: CompileTsrxModuleInput,
 ): { title: string; message: string; fix: string } | null {
 	const position = (error as SyntaxError & { readonly pos?: unknown }).pos;
-	const line = typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
+	const line =
+		typeof position === 'number' ? source.source.slice(0, position).split('\n').length : null;
 	const at = line === null ? '' : ` on line ${line}`;
 	if (message.startsWith('TSRX2011')) {
-		const tag = typeof position === 'number' ? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0] : undefined;
+		const tag =
+			typeof position === 'number'
+				? /^<[A-Za-z][\w.:-]*/.exec(source.source.slice(position))?.[0]
+				: undefined;
 		const subject = tag ? `\`${tag}>\`${at}` : `The node${at}`;
 		return {
 			title: 'A code block renders a single node',
@@ -663,6 +687,8 @@ const unserveableDiagnosticCodes: ReadonlySet<string> = new Set([
 	// body, so emitting would ship the word "else" and the arm's escaped source
 	// to the page — visible garbage rather than a branch.
 	'MARKLESS_BRANCH_ELSE_SPELLING',
+	// Same shape for an @pending after @catch: the word and the arm's source would ship as text.
+	'MARKLESS_ASYNC_ARM_ORDER',
 ]);
 
 function hasUnserveableDiagnostic(semanticGraph: SemanticGraphArtifact): boolean {
@@ -677,6 +703,7 @@ function emptyPublicRenderPlanArtifact(): PublicRenderPlanArtifact {
 	return {
 		passId: 'public-render-plan',
 		styleScopes: [],
+		stylesheetImports: [],
 		diagnostics: [],
 	};
 }

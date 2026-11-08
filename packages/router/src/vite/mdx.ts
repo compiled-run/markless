@@ -19,6 +19,7 @@ import { protocolIslandSegment } from '../../../serializer/src/protocol-constant
 import {
 	emitQueuedResumeContainerEvent,
 	emitRosterResumeLoaderInstall,
+	emitSharedInstancesLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
 import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
 import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
@@ -27,7 +28,13 @@ import { servedRenderDataSourceReference } from '../../../bundler/src/served-ren
 // re-optimizes mid-session.
 export const MDX_ROUTE_RUNTIME_SPECIFIER = '@markless/router/vite/runtime/mdx-route';
 
+type LiteralInstanceRecorder = (
+	source: string,
+	instances: ReadonlyArray<{ readonly childSource: string; readonly props: Record<string, unknown> }>,
+) => void;
+
 export function mdxTransformPlugin(): Plugin {
+	let recordInstances: LiteralInstanceRecorder | undefined;
 	return {
 		name: 'markless-router:mdx',
 		enforce: 'pre',
@@ -36,6 +43,14 @@ export function mdxTransformPlugin(): Plugin {
 			const include = optimizedDepsToInclude([MDX_ROUTE_RUNTIME_SPECIFIER], config);
 			return include.length > 0 ? { optimizeDeps: { include } } : undefined;
 		},
+		configResolved(config) {
+			const markless = config.plugins.find(
+				(plugin) =>
+					typeof (plugin as { api?: { recordLiteralComponentInstances?: unknown } }).api
+						?.recordLiteralComponentInstances === 'function',
+			) as { api: { recordLiteralComponentInstances: LiteralInstanceRecorder } } | undefined;
+			recordInstances = markless?.api.recordLiteralComponentInstances;
+		},
 		transform: {
 			order: 'pre',
 			filter: { id: /\.mdx(?:$|[?#])/ },
@@ -43,9 +58,23 @@ export function mdxTransformPlugin(): Plugin {
 				if (!isMdxFile(id)) {
 					return;
 				}
+				const route = parseMdxRoute(code, id);
+				// An MDX page passes only literals, so the bundler can tell which arms each component it renders shows.
+				if (recordInstances) {
+					const instances = [];
+					for (const component of route.components) {
+						const child = await this.resolve(component.specifier, id);
+						if (!child || child.external) continue;
+						instances.push({
+							childSource: child.id.split('?')[0]!,
+							props: Object.fromEntries(component.props.map((prop) => [prop.name, prop.value])),
+						});
+					}
+					recordInstances(decodePath(parseURL(id).pathname), instances);
+				}
 
 				return {
-					code: await transformMdxRoute(code, id),
+					code: await transformMdxRoute(code, id, route),
 					map: null,
 				};
 			},
@@ -53,8 +82,11 @@ export function mdxTransformPlugin(): Plugin {
 	};
 }
 
-export async function transformMdxRoute(source: string, id: string) {
-	const route = parseMdxRoute(source, id);
+export async function transformMdxRoute(
+	source: string,
+	id: string,
+	route: MdxRoute = parseMdxRoute(source, id),
+) {
 	const html = route.parts.map((part) => (part.kind === 'html' ? part.html : '')).join('');
 	if (route.components.length === 0) {
 		return [
@@ -125,6 +157,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
+		emitSharedInstancesLoaderInstall(),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
@@ -155,6 +188,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		'',
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
+		emitSharedInstancesLoaderInstall(),
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
@@ -200,7 +234,7 @@ function renderMdxResumeHandler(): string[] {
 				'  await runtime.dispatch(input.event, marklessMdxDispatchOptions(input));',
 				'}',
 				'function marklessMdxDispatchOptions(input) {',
-				'  return { syncPolicyAlreadyApplied: true, propagationStopped: input.propagationStopped, ignoreUnmatched: input.eventRecord == null };',
+				'  return { syncPolicyAlreadyApplied: input.syncPolicyAlreadyApplied === true, propagationStopped: input.propagationStopped === true, ignoreUnmatched: input.eventRecord == null };',
 				'}',
 			].join('\n'),
 		),

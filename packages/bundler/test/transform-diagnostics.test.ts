@@ -191,3 +191,33 @@ test('rejects an alternate-shaped prefix write to a read-only prop', async () =>
 
 	await expect(transform(filename, source)).rejects.toThrow('MARKLESS_STATE_READ_ONLY_WRITE');
 });
+
+test('an @pending after @catch names the arm order instead of failing the type strip', async () => {
+	const filename = 'src/Search.tsrx';
+	const source = `import { computed, state } from '@markless/core';
+
+export default function Search() @{
+	let query = state('');
+	const results = computed(async () => {
+		const q = query;
+		await null;
+		return { q };
+	});
+
+	<main>
+		@try {
+			<ul>{results.q}</ul>
+		} @catch (error) {
+			<p>{error.message}</p>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}`;
+
+	for (const environment of ['client', 'server'] as const) {
+		const build = transformTsrxModule({ filename, source, environment });
+		await expect(build).rejects.toThrow('MARKLESS_ASYNC_ARM_ORDER');
+		await expect(build).rejects.not.toThrow('MARKLESS_TYPE_STRIP_FAILED');
+	}
+});

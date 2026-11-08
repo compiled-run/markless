@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 13,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 13,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 13,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "rows reading widget-scoped shared() state repaint (PR #450): the row slot reader qualifies reads with the page graph's widget registry, downloaded at load and not executed then; measured on CI run 41756858029 against queue run 41749294950",
+			"date": "2026-11-04"
+		}
+	]
+}

@@ -53,7 +53,7 @@ test('typing dims the held results without swapping to @pending, then shows the 
 	expect(frames.some((frame) => frame.searching), '@pending replaced the results').toBe(false);
 	expect(frames.some((frame) => frame.list === null), 'a frame had no list').toBe(false);
 	expect(frames.some((frame) => frame.dimmed)).toBe(true);
-	expect(container.querySelector('ul')?.hasAttribute('aria-busy')).toBe(false);
+	await expect.poll(() => container.querySelector('ul')?.getAttribute('aria-busy') === 'true').toBe(false);
 	expect(container.querySelector('ul')?.style.opacity).toBe('1');
 });
 
@@ -71,6 +71,6 @@ test('Try again re-runs the search, holds the error busy, and shows the answer',
 	const frames = stop();
 
 	expect(frames.some((frame) => frame.searching), '@pending replaced the error').toBe(false);
-	expect(container.querySelector('ul')?.hasAttribute('aria-busy')).toBe(false);
+	await expect.poll(() => container.querySelector('ul')?.getAttribute('aria-busy') === 'true').toBe(false);
 	expect(container.querySelectorAll('[aria-busy="true"]')).toHaveLength(0);
 });

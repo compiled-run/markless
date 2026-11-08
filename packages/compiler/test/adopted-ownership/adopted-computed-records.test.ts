@@ -10,7 +10,7 @@ import { compileTsrxModulesWithInterfaces } from '../multi-module-compile-suppor
 // browser witness `adopted-family-derives`; these pin the build-time halves.
 
 const FAMILY = `import { computed, element, shared, state } from '@markless/core';
-export const gauge = shared(() => { const g = state({ label: 'quiet' }); const loud = computed(() => g.label.toUpperCase()); const marks = element(); return { ...g, loud, marks }; }, { scope: 'widget' });
+export const gauge = shared(() => { const g = state({ label: 'quiet' }); const loud = computed(() => g.label.toUpperCase()); const marks = element(); return { ...g, loud, marks }; }, { scope: 'subtree' });
 export function Panel({ children }) @{ const g = gauge(); <div data-panel data-loud={g.loud}>{children}</div> }`;
 
 const PARTS = `import { gauge } from './gauge.tsrx';
@@ -69,7 +69,7 @@ test('a family carrying no element() handle is adopted the same way', async () =
 		{
 			filename: 'src/box.tsrx',
 			source: `import { computed, shared, state } from '@markless/core';
-export const box = shared(() => { const b = state({ label: 'quiet' }); const loud = computed(() => b.label.toUpperCase()); return { ...b, loud }; }, { scope: 'widget' });`,
+export const box = shared(() => { const b = state({ label: 'quiet' }); const loud = computed(() => b.label.toUpperCase()); return { ...b, loud }; }, { scope: 'subtree' });`,
 			importSource: './box.tsrx',
 		},
 		{

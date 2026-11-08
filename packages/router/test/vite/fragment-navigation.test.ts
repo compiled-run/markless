@@ -2,7 +2,14 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { clientAssetsManifestPath } from '../../src/vite/client-assets-manifest.ts';
-import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
+import {
+	chromium,
+	webkit,
+	type Browser,
+	type BrowserType,
+	type Page,
+	type Route,
+} from '@playwright/test';
 import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { markless } from '@markless/bundler/vite';
@@ -12,6 +19,8 @@ import {
 	fragmentPageUrl,
 	fragmentRequestUrl,
 } from '../../src/vite/fragment-navigation.ts';
+import { isLinkBridgeModulePath } from '../../src/vite/runtime/link-bridge-module.ts';
+import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../src/navigation-timing.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { urlKeyedCache } from '../support/url-keyed-cache.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -150,11 +159,14 @@ async function stylesheetsBeforePage(
 	const own = await page.evaluate(async (destination) => {
 		const text = await (await fetch(`/_markless/fragment${destination}`)).text();
 		const doc = new DOMParser().parseFromString(text, 'text/html');
-		const have = new Set(
-			[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
+		const have = new Set([
+			...[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
 				(l) => l.href,
 			),
-		);
+			...[...document.querySelectorAll('[data-markless-css]')].map(
+				(node) => new URL(node.getAttribute('data-markless-css')!, location.href).href,
+			),
+		]);
 		return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
 			.map((l) => new URL(l.getAttribute('href')!, location.href))
 			.filter((url) => !have.has(url.href))
@@ -376,6 +388,75 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
+		// Lands after another document, holds the run half's file, and clicks a link before it arrives.
+		const clickBeforeRunHalf = async () => {
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			const errors: string[] = [];
+			const documents: string[] = [];
+			page.on('pageerror', (error) => errors.push(String(error)));
+			page.on('request', (request) => {
+				if (request.resourceType() === 'document') documents.push(request.url());
+			});
+			await page.addInitScript(() => {
+				(window as { requestIdleCallback?: unknown }).requestIdleCallback = () => 0;
+			});
+			const away = productionOrigin + '/away-document';
+			const awayAnswers: Array<() => Promise<void>> = [];
+			let holdAway = false;
+			await page.route(away, (route) => {
+				const answer = () =>
+					route.fulfill({ contentType: 'text/html', body: '<!doctype html><p>away' });
+				if (holdAway) awayAnswers.push(answer);
+				else return answer();
+			});
+			await page.goto(away);
+			await page.goto(productionOrigin + '/');
+			let run: Route | undefined;
+			await page.route(
+				(url) => isLinkBridgeModulePath(url.pathname),
+				(route) => void (run = route),
+			);
+			await page.evaluate(() =>
+				(document.querySelector('[data-nav="other"]') as HTMLElement).click(),
+			);
+			await expect.poll(() => run !== undefined).toBe(true);
+			const holdBack = () => (holdAway = true);
+			return { page, errors, documents, away, awayAnswers, holdBack, run: run! };
+		};
+
+		test('Back to another document while the run half is still loading goes back, and never loads the clicked page', async () => {
+			const { page, errors, documents, away, awayAnswers, holdBack, run } =
+				await clickBeforeRunHalf();
+			const landing = documents.length;
+			// The fallback's deadline never passes here, so only pagehide can decide it.
+			await page.evaluate((deadline) => {
+				const later = window.setTimeout;
+				window.setTimeout = ((callback: () => void, ms?: number) =>
+					ms === deadline ? 0 : later.call(window, callback, ms)) as typeof window.setTimeout;
+			}, MARKLESS_NAV_SETTLE_DEADLINE_MS);
+			const failed = page.waitForEvent('requestfailed', (request) => request === run.request());
+			holdBack();
+			await page.evaluate(() => history.back());
+			await expect.poll(() => awayAnswers.length, { timeout: 10_000 }).toBe(1);
+			// As WebKit does on leaving: the import in flight fails while the document is still shown.
+			void run.abort('aborted').catch(() => {});
+			await failed;
+			await awayAnswers[0]!();
+			await expect.poll(() => page.url()).toBe(away);
+			expect(documents.slice(landing)).toEqual([away]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a run half that fails to load while the page stays loads the clicked page as a document', async () => {
+			const { page, documents, run } = await clickBeforeRunHalf();
+			const landing = documents.length;
+			await run.abort('failed');
+			await landedOn(page, 'other');
+			expect(documents.slice(landing)).toEqual([productionOrigin + '/other']);
+			await page.close();
+		});
+
 		test('a plain anchor clicked ahead of the idle tier swaps by fragment, and one to an unknown path still loads', async () => {
 			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 			const errors: string[] = [];
@@ -428,39 +509,37 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('a prefetched page loads its own stylesheets before the click, so the swap never waits on them', async () => {
+		// A destination's own route CSS rides inside its fragment, so neither the prefetch nor the swap waits on a stylesheet file.
+		test('a prefetched page brings its route CSS inside its fragment, so the swap fetches no stylesheet', async () => {
 			const { page, errors } = await open(browser);
 			const styles: string[] = [];
 			page.on('request', (request) => {
 				if (request.resourceType() === 'stylesheet')
 					styles.push(new URL(request.url()).pathname);
 			});
-			const own = await page.evaluate(async () => {
+			const carried = await page.evaluate(async () => {
 				const text = await (await fetch('/_markless/fragment/other')).text();
 				const doc = new DOMParser().parseFromString(text, 'text/html');
-				const have = new Set(
-					[...document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(
-						(l) => l.href,
-					),
-				);
-				return [...doc.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')]
-					.map((l) => new URL(l.getAttribute('href')!, location.href))
-					.filter((url) => !have.has(url.href))
-					.map((url) => url.pathname);
+				return doc.querySelectorAll('style[data-markless-css]').length;
 			});
-			expect(own.length).toBeGreaterThan(0);
+			expect(carried).toBeGreaterThan(0);
 			await page.locator('[data-nav="other"]').hover();
-			await expect.poll(() => own.every((path) => styles.includes(path))).toBe(true);
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
+			expect(
+				await page
+					.locator('[data-mark]')
+					.evaluate((element) => getComputedStyle(element).color),
+			).toBe('rgb(200, 100, 50)');
+			expect(styles).toEqual([]);
 			expect(errors).toEqual([]);
 			await page.close();
 		});
 
-		test('a press with no hover before it requests the destination stylesheets with its page, not after it', async () => {
+		test('a press with no hover before it has no destination stylesheet left to request, its route CSS rides the page', async () => {
 			expect(
 				await stylesheetsBeforePage(browser, origin, '/', '[data-nav="other"]', '/other'),
-			).toEqual([true]);
+			).toEqual([]);
 		});
 
 		test('a press requests the stylesheets the document adds for the destination URL with its page', async () => {
@@ -532,16 +611,16 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		test('page-scoped shared state starts from the server on the new page', async () => {
+		test('app-scoped shared state keeps its live value on the new page', async () => {
 			const { page, errors } = await open(browser);
 			await page.locator('[data-hit]').click();
 			await page.locator('[data-hit]').click();
 			await expect.poll(() => text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-nav="other"]').click();
 			await landedOn(page, 'other');
-			expect(await text(page, '[data-hits]')).toBe('0');
+			expect(await text(page, '[data-hits]')).toBe('2');
 			await page.locator('[data-hit]').click();
-			await expect.poll(() => text(page, '[data-hits]')).toBe('1');
+			await expect.poll(() => text(page, '[data-hits]')).toBe('3');
 			expect(errors).toEqual([]);
 			await page.close();
 		});
@@ -1038,6 +1117,45 @@ for (const [name, browserType] of [
 					() => (window as unknown as Record<string, unknown>).__sameDocument,
 				),
 			).toBe(true);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
+		test('a navigation cancelled while its stylesheet loads leaves the head of the page shown', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			await page.evaluate(() => {
+				// The arriving page's stylesheet goes into the head, unapplied, ahead of the swap: cancel right then.
+				new MutationObserver((records, observer) => {
+					const added = records.flatMap((record) => [...record.addedNodes]);
+					if (!added.some((node) => (node as HTMLLinkElement).rel === 'stylesheet')) return;
+					observer.disconnect();
+					(document.querySelector('[data-crumb-home]') as HTMLElement).click();
+				}).observe(document.head, { childList: true });
+				(document.querySelector('[data-pager-next]') as HTMLElement).click();
+			});
+			await page.waitForTimeout(1000);
+			expect(new URL(page.url()).pathname).toBe('/');
+			expect(await page.title()).toBe('Guide home');
+			const head = () =>
+				page.evaluate(() =>
+					[...document.head.querySelectorAll('title, meta[name], link[rel="canonical"]')].map(
+						(element) =>
+							element.localName === 'title'
+								? element.textContent
+								: (element.getAttribute('content') ?? element.getAttribute('href')),
+					),
+				);
+			expect(await head()).toEqual(['Guide home', 'About Guide home', 'https://guide.test/']);
+			expect(
+				await page.evaluate(() =>
+					[...document.head.querySelectorAll('link[rel="stylesheet"]')].map((link) =>
+						link.getAttribute('media'),
+					),
+				),
+			).toEqual(['not all']);
+			await page.locator('[data-pager-next]').click();
+			await landedOn(page, 'alpha');
+			expect(await head()).toEqual(['Alpha guide', 'About Alpha guide', 'https://guide.test/alpha']);
 			expect(errors).toEqual([]);
 			await page.close();
 		});

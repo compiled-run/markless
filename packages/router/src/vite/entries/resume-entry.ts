@@ -40,6 +40,12 @@ interface RouteResumeModule {
 	readonly resumeContainerEvent?: (input: unknown) => unknown;
 }
 
+// The route resume module of the page `root` holds, for the swap that binds it to live shared() values.
+export function routeModule(root: ParentNode): Promise<unknown> | undefined {
+	const route = routeFromRoot(root);
+	return route && loadRouteResumeModule(route);
+}
+
 interface RouteScript {
 	readonly file?: string;
 	// The built chunk holding the route's resume module, then the export evaluating it inside a pack and the one holding it.

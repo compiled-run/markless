@@ -171,6 +171,8 @@ export type SsrRenderData = {
 		// The authored test, for an arm the compiler could not reduce to one graph
 		// read: the browser answers it through the component's compiled reader.
 		readonly testSource?: string;
+		// An `@else if` chain or condition-case `@switch` answers its arm index here, read in place of `testSource`.
+		readonly armIndexSource?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
 	}>;
 };
@@ -212,6 +214,8 @@ export type SsrDataStructure = {
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
 	readonly repeatIds?: ReadonlyArray<string>;
+	/** Component edges this render placed a child through, including their id prefix. */
+	readonly componentEdgeIds?: ReadonlyArray<string>;
 };
 
 export type SsrDataCoordinates = {
@@ -461,6 +465,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 					...materializeStructure(rendered.tokens),
 					repeatIds: anchors.flatMap((anchor) =>
 						anchor.kind === 'repeat' ? [anchor.id] : [],
+					),
+					componentEdgeIds: anchors.flatMap((anchor) =>
+						anchor.kind === 'child-component' ? [anchor.id] : [],
 					),
 				},
 				structureTokens: rendered.tokens,
@@ -823,8 +830,13 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 										context,
 									)
 								: [],
-					(items): Awaitable<RenderedPart> => {
-						if (!Array.isArray(items) || items.length === 0)
+					(collection): Awaitable<RenderedPart> => {
+						const items = Array.isArray(collection)
+							? collection
+							: typeof (collection as Iterable<unknown> | null)?.[Symbol.iterator] === 'function'
+								? [...(collection as Iterable<unknown>)]
+								: [];
+						if (items.length === 0)
 							return slot.emptyTemplateId
 								? renderChunk(slot.emptyTemplateId, {})
 								: { html: '', tokens: [] };

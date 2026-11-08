@@ -26,8 +26,10 @@ import { collectComponentProps } from './collect-components.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
+import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
+import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
-import { componentConstructReach } from '../construct-reach.ts';
+import { componentConstructReach, componentRootBoundary } from '../construct-reach.ts';
 import {
 	chunkElementCount,
 	componentAddressSteps,
@@ -48,6 +50,7 @@ import {
 	collectAssignment,
 	collectCollectionCall,
 	collectObjectAssign,
+	collectPassedStateWrites,
 	collectComputedWriteDiagnostics,
 	collectDelete,
 	collectExpressionReads,
@@ -69,7 +72,9 @@ import { attachKeyedRepeatRowHost, collectKeyedRepeat } from './collect-repeat.t
 import { retargetProjectedRepeatHosts } from './projected-repeat-host.ts';
 import { childContainerRepeatDiagnostics, containerRepeatComponents } from './container-repeat.ts';
 import { collectBranchSite } from './collect-branches.ts';
+import { ifChainOf } from './if-chain.ts';
 import { collectModuleGraphInterface, collectVariableDeclaration } from './collect-state.ts';
+import { moduleHandlerProps } from './handler-props.ts';
 import {
 	createMutableSemanticGraphArtifact,
 	createWalkState,
@@ -111,6 +116,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		frameworkApiImports,
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 	});
 	state.walk = walk;
@@ -179,6 +185,12 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	}
 
 	collectSharedCallbackBindings(state);
+	relayWidgetCallbackProps({
+		componentEdges: graph.componentEdges,
+		componentPropBindings: graph.componentPropBindings,
+		sharedCallbackBindings: graph.sharedCallbackBindings,
+		importedModuleInterfaces: state.importedModuleInterfaces,
+	});
 	collectImplicitFamilyScopeDiagnostics(state);
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
@@ -238,6 +250,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	// the count is a placeholder until the page composes, and only this module
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
+	const handlerProps = moduleHandlerProps(state);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -284,7 +297,11 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							}),
 						),
 						constructReach: componentConstructReach(constructReachInput, root.id),
+						...(componentRootBoundary(constructReachInput, root.id)
+							? { rootBoundary: true as const }
+							: {}),
 						...spreadHostsField(chunks),
+						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,
 							branchSites: graph.branchSites,
@@ -297,6 +314,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							: {}),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
+							: {}),
+						...(handlerProps.get(component.name)?.size
+							? { handlerProps: [...handlerProps.get(component.name)!].sort() }
 							: {}),
 					},
 				];
@@ -311,6 +331,15 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		return component ? [{ componentName: component.name, propName: declared.propName }] : [];
 	});
 
+	const misplacedAttributes = elementOnlyAttributeDiagnostics({
+		attributes: input.elementOnlyAttributes ?? [],
+		componentEdges: graph.componentEdges,
+		ownInterface: graph.moduleGraphInterface,
+		...(input.importedModuleInterfaces
+			? { importedModuleInterfaces: input.importedModuleInterfaces }
+			: {}),
+	});
+
 	return {
 		...graph,
 		...(serverOnlyProps.length > 0 ? { serverOnlyProps } : {}),
@@ -318,7 +347,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			{
 				source: input.source,
 				filename: input.filename,
-				diagnostics: graph.diagnostics,
+				diagnostics: [...graph.diagnostics, ...misplacedAttributes],
 				phase: 'semantic-graph',
 				passId: 'tsrx-semantic-graph',
 				artifactKeys: ['semanticGraph'],
@@ -510,16 +539,19 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'JSXIfExpression': {
 			collectBranchSite(node, state);
 			const site = lastBranchSiteId(state);
-			const test = node.test as AnyNode | undefined;
+			const chain = ifChainOf(node);
 			withArmScope(state, site, () => {
-				withArmGuard(state, test && { kind: 'if', test, holds: true }, () =>
-					walkBranch(node.consequent as AnyNode | undefined, state),
-				);
-				withArmGuard(state, test && { kind: 'if', test, holds: false }, () =>
-					walkBranch(node.alternate as AnyNode | undefined, state),
-				);
+				for (const [arm, body] of chain.arms.entries()) {
+					// Arm N holds when its own test does and every earlier test did not.
+					const guards: ArmGuard[] = chain.tests
+						.slice(0, Math.min(arm + 1, chain.tests.length))
+						.flatMap((test, index) => (test ? [{ kind: 'if', test, holds: index === arm }] : []));
+					withArm(state, site, arm, () =>
+						withArmGuards(state, guards, () => walkBranch(body, state)),
+					);
+				}
 			});
-			collectConditionalBranchText(node, state);
+			if (chain.links.length === 0) collectConditionalBranchText(node, state);
 			return;
 		}
 		case 'JSXSwitchExpression': {
@@ -531,7 +563,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 				switchCase.test ? [switchCase.test as AnyNode] : [],
 			);
 			withArmScope(state, site, () => {
-				for (const switchCase of asNodes(node.cases)) {
+				for (const [arm, switchCase] of asNodes(node.cases).entries()) {
 					walk(switchCase.test as AnyNode | undefined, state);
 					const caseBranchId = `branch:${state.nextBranchId++}`;
 					const caseTest = switchCase.test as AnyNode | undefined;
@@ -541,11 +573,16 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 							? { kind: 'case', discriminant, test: caseTest }
 							: { kind: 'default', discriminant, tests: caseTests });
 					state.currentBranchScopeIds.push(caseBranchId);
-					withArmGuard(state, guard, () => {
-						for (const caseChild of asNodes(switchCase.consequent)) {
-							walkMarkupStatement(caseChild, state);
-						}
-					});
+					withArm(state, site, arm, () =>
+						withArmGuard(state, guard, () =>
+							withCreationSite(state, 'arm', () => {
+								for (const caseChild of asNodes(switchCase.consequent)) {
+									state.armBodyStatements.add(caseChild);
+									walkMarkupStatement(caseChild, state);
+								}
+							}),
+						),
+					);
 					state.currentBranchScopeIds.pop();
 				}
 			});
@@ -565,7 +602,9 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 			state.currentArmGuards = [];
 			withArmScope(state, null, () => {
 				for (const child of childNodes(node)) {
-					walk(child, state);
+					if (child === node.body)
+						withCreationSite(state, 'row', () => walk(child, state));
+					else walk(child, state);
 				}
 			});
 			state.currentArmGuards = outerGuards;
@@ -612,6 +651,7 @@ function walk(node: AnyNode | null | undefined, state: WalkState): void {
 		case 'CallExpression':
 			collectCollectionCall(node, state);
 			collectObjectAssign(node, state);
+			collectPassedStateWrites(node, state);
 			if (getFrameworkApiForCall(node, state.frameworkApiImports) === 'computed') {
 				const [body, ...rest] = asNodes(node.arguments);
 				withFunctionSite(state, 'computed', () => {
@@ -699,9 +739,12 @@ function walkBranch(node: AnyNode | undefined, state: WalkState): void {
 	if (!node) return;
 	const branchId = `branch:${state.nextBranchId++}`;
 	state.currentBranchScopeIds.push(branchId);
-	withCreationSite(state, 'branch', () => {
+	withCreationSite(state, 'arm', () => {
 		if (node.type === 'BlockStatement') {
-			for (const statement of asNodes(node.body)) walkMarkupStatement(statement, state);
+			for (const statement of asNodes(node.body)) {
+				state.armBodyStatements.add(statement);
+				walkMarkupStatement(statement, state);
+			}
 			return;
 		}
 		walkMarkupStatement(node, state);
@@ -744,6 +787,18 @@ function withArmScope(state: WalkState, branchSiteId: string | null, run: () => 
 	run();
 	if (branchSiteId) state.currentBranchSiteIds.pop();
 	state.currentArmScope = previous;
+}
+
+function withArm(state: WalkState, branchSiteId: string | null, arm: number, run: () => void): void {
+	if (branchSiteId) state.currentBranchArms.push({ branchSiteId, arm });
+	run();
+	if (branchSiteId) state.currentBranchArms.pop();
+}
+
+function withArmGuards(state: WalkState, guards: ReadonlyArray<ArmGuard>, run: () => void): void {
+	state.currentArmGuards.push(...guards);
+	run();
+	state.currentArmGuards.length -= guards.length;
 }
 
 function withArmGuard(state: WalkState, guard: ArmGuard | undefined, run: () => void): void {

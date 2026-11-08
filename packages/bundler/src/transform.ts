@@ -33,6 +33,7 @@ import {
 	jsonSourceWithNonFiniteNumbers,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
+	hasLiveSharedDefinitions,
 } from '@markless/serializer';
 import type {
 	MarklessTransformManifest,
@@ -310,7 +311,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const settleId = settleVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
 		await compileWithBlockingDiagnostics(input, resolverId);
-	throwIfBlocked(input, blockingDiagnostics);
+	const linkPendingDiagnostics = linkPendingRefusals(
+		input,
+		compiledForAllClasses,
+		blockingDiagnostics,
+	);
+	throwIfBlocked(
+		input,
+		blockingDiagnostics.filter((diagnostic) => !linkPendingDiagnostics.includes(diagnostic)),
+	);
 	const runtimeDemandClass = input.runtimeDemandClass ?? 'prerender';
 	const servedScalarPlans =
 		input.servedScalarPlans === true && runtimeDemandClass === 'prerender' && !input.prerenderRecords
@@ -789,7 +798,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		),
 	];
 
-	const styleImport = styleId ? `import ${JSON.stringify(styleId)};\n` : '';
+	const stylesheetImports = await resolvedStylesheetImports(
+		compiled.publicRenderPlan.stylesheetImports,
+		input.resolveStylesheetImport,
+	);
+	const styleImport = [...stylesheetImports, ...(styleId ? [styleId] : [])]
+		.map((id) => `import ${JSON.stringify(id)};\n`)
+		.join('');
 	const inlineResumerSources =
 		(input.environment ?? 'lib') === 'client'
 			? undefined
@@ -799,7 +814,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				});
 	// Dev links the children's scoped styles too, so the SSR HTML is styled before any island's JS.
 	const styleModuleIds = [
-		...new Set([...(styleId ? [styleId] : []), ...(input.linkedStyleModuleIds ?? [])]),
+		...new Set([
+			...stylesheetImports,
+			...(styleId ? [styleId] : []),
+			...(input.linkedStyleModuleIds ?? []),
+		]),
 	];
 	const styleModuleUrl = input.styleModuleUrl;
 	const headInjections = [
@@ -867,6 +886,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
+					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
 					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
@@ -907,6 +927,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		moduleGraphInterface: compiled.moduleGraphInterface,
 		interfaceHash: moduleInterfaceHash(compiled.moduleGraphInterface),
 		moduleImports: compiled.semanticGraph.moduleImports,
+		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),
 		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled)),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
@@ -914,7 +935,35 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],
 			),
 		),
+		...(compiled.semanticGraph.importedFunctionWriteRequests?.length
+			? {
+					importedFunctionWriteRequests:
+						compiled.semanticGraph.importedFunctionWriteRequests,
+				}
+			: {}),
+		...(linkPendingDiagnostics.length > 0 ? { linkPendingDiagnostics } : {}),
 	};
+}
+
+// An imported component with no interface yet counts as an unknown number of elements, so an
+// element beside it is refused until a compile with every component's interface decides it.
+function linkPendingRefusals(
+	input: TransformTsrxModuleInput,
+	compiled: CompileTsrxModuleResult,
+	blockingDiagnostics: readonly CompilerDiagnostic[],
+): readonly CompilerDiagnostic[] {
+	if (input.linkPending !== true || prerenderInterfacesComplete(compiled, input)) return [];
+	return blockingDiagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_ELEMENT_UNADDRESSABLE',
+	);
+}
+
+/** Throws the refusals a `linkPending` compile held when no compile against linked imports replaced it. */
+export function throwIfLinkPending(
+	input: Pick<TransformTsrxModuleInput, 'filename' | 'source'>,
+	result: Pick<TransformTsrxModuleResult, 'linkPendingDiagnostics'>,
+): void {
+	throwIfBlocked(input, result.linkPendingDiagnostics ?? []);
 }
 
 // A relative specifier in the render-data virtual module would resolve against
@@ -1152,7 +1201,7 @@ async function prerenderDataModuleSource(
 	// Two facts turn it on, because the pass does two jobs. It RUNS a widget
 	// root's shared seeds, which a module with a `shared-seed` symbol needs; and
 	// it FILES the widget-instance token every `shared()` element() handle mints
-	// its id from, which a module that roots a widget-scoped family needs whether
+	// its id from, which a module that roots a subtree-scoped family needs whether
 	// or not that family plans a seed. A family of element() handles over constant
 	// state plans no seed symbol at all, so gating on seeds alone left its parts
 	// minting against a token nobody had filed (MARKLESS_ELEMENT_HANDLE_WIDGET_
@@ -1269,9 +1318,11 @@ type CompiledTransformInput = Pick<
 	| 'symbols'
 	| 'importedModuleInterfaces'
 	| 'importedModuleConstants'
+	| 'importedFunctionWrites'
 	| 'artifactChildMaterializations'
 	| 'executionLog'
 	| 'serverOnlyProps'
+	| 'elementOnlyAttributes'
 	| 'routeRoot'
 >;
 
@@ -1282,12 +1333,16 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 		moduleId: input.moduleId,
 		source: input.source,
 		...(input.serverOnlyProps?.length ? { serverOnlyProps: input.serverOnlyProps } : {}),
+		...(input.elementOnlyAttributes?.length
+			? { elementOnlyAttributes: input.elementOnlyAttributes }
+			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		importedModuleConstants: input.importedModuleConstants,
+		importedFunctionWrites: input.importedFunctionWrites,
 		artifactChildMaterializations: input.artifactChildMaterializations,
 		// 'never' is the consumer posture (MARKLESS_CONSUMER_BUILD); the lab
 		// default 'auto' keeps the authored-source strings for dev tooling.
@@ -1643,4 +1698,12 @@ function authorsPendingArm(markup: {
 				(slot.armTemplateIds as { readonly pending?: string }).pending !== undefined,
 		),
 	);
+}
+
+async function resolvedStylesheetImports(
+	requests: ReadonlyArray<string>,
+	resolve: TransformTsrxModuleInput['resolveStylesheetImport'],
+): Promise<ReadonlyArray<string>> {
+	const ids = await Promise.all(requests.map(async (request) => (await resolve?.(request)) ?? request));
+	return [...new Set(ids)];
 }

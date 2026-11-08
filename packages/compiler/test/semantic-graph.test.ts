@@ -64,7 +64,7 @@ export const session = shared(() => {
 			data.status = 'anonymous';
 		},
 	};
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export function Header() @{
 	const currentSession = session();
@@ -109,7 +109,7 @@ export const listBox = shared(() => {
 	const box = state({ items: [{ id: 'a', label: 'A' }] });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function List() @{
 	const box = listBox();
@@ -131,7 +131,7 @@ export const listBox = shared(() => {
 	const box = state({ items: [{ id: 'a', label: 'A' }] });
 
 	return box;
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function List() @{
 	const box = listBox();
@@ -421,6 +421,20 @@ const unstableCreationCases = [
 		message: 'inside a loop',
 		cell: 'state:item',
 		source: `import { state } from '@markless/core'; export function App() @{ for (let i = 0; i < 3; i++) { const item = state(i); } <p>done</p> }`,
+	},
+	{
+		name: '@for rows',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a @for row',
+		cell: 'state:liked',
+		source: `import { state } from '@markless/core'; export function App() @{ let books = state([{ id: 'a' }]); <ul>@for (const book of books; key book.id) { let liked = state(false); <li onClick={() => (liked = !liked)}>{liked ? 'liked' : book.id}</li> }</ul> }`,
+	},
+	{
+		name: '@for rows with an index',
+		code: 'MARKLESS_STATE_CREATION_SITE_UNSTABLE',
+		message: 'inside a @for row',
+		cell: 'computed:shout',
+		source: `import { computed, state } from '@markless/core'; export function List() @{ let words = state(['x']); <ol>@for (const word of words; index at; key word) { const shout = computed(() => word + at); <li>{shout}</li> }</ol> }`,
 	},
 ] as const;
 
@@ -942,7 +956,7 @@ test('buildSemanticGraph records shared definitions and instance calls', async (
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			factorySource: expect.stringContaining('const data = state'),
 			sourceSpan: {
 				filename: 'src/session.tsrx',

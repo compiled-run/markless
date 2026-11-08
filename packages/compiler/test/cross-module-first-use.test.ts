@@ -203,7 +203,8 @@ test('a prop forwarded through a middle module reaches the grandchild', async ()
 	expect(foreignIn(firstUse(PARENT, 'other++'), LEAF)).toEqual([]);
 });
 
-test('an imported child inside a parent @if arm is created whole when the arm opens', async () => {
+// The arm renders in the browser by running the child, so the toggle's first use is the whole route's.
+test('an imported child inside a parent @if arm leaves the opening first use unbounded', async () => {
 	const { result, firstUse } = await compile([
 		readout(`
 			<p onClick={() => console.info('child click')}>
@@ -216,10 +217,8 @@ test('an imported child inside a parent @if arm is created whole when the arm op
 			}
 		`),
 	]);
-	const child = result(CHILD);
-	expect(foreignIn(firstUse(PARENT, 'open = !open'), CHILD).sort()).toEqual(
-		child.symbolResolver.symbols.map((symbol) => symbol.id).sort(),
-	);
+	expect(result(CHILD).symbolResolver.symbols.length).toBeGreaterThan(0);
+	expect(firstUse(PARENT, 'open = !open')).toBe('unknown');
 });
 
 test('a same-module child re-renders through its props', async () => {
@@ -434,7 +433,7 @@ test('a widget part invoking a callback slot names the slot the root binds to it
 							},
 						};
 					},
-					{ scope: 'widget' },
+					{ scope: 'subtree' },
 				);
 				export function SwitchRoot({ onToggle, children }: { onToggle?: (on: boolean) => void; children?: unknown }) @{
 					const current = switchState();
@@ -572,4 +571,90 @@ test.each([
 	]);
 	for (const marker of ["tab = 'b'", "console.info('outer')"])
 		expect(foreignIn(anyFirstUse(result(PAGE), marker), SEARCH)).toEqual([]);
+});
+
+test('a callback in a child a plain @for renders reads its row as data, not as a call', async () => {
+	const PANEL = '/workspace/src/Nav.tsrx';
+	const { page } = await compile([
+		{
+			filename: CHILD,
+			importSource: './Readout.tsrx',
+			source: `
+				import { shared, state } from '@markless/core';
+				export const switchState = shared(
+					() => {
+						const box = state({ on: false });
+						return {
+							...box,
+							onToggle: undefined as ((on: boolean) => void) | undefined,
+							flip() {
+								box.on = !box.on;
+								box.onToggle?.(box.on);
+							},
+						};
+					},
+					{ scope: 'subtree' },
+				);
+				export function SwitchRoot({ onToggle, children }: { onToggle?: (on: boolean) => void; children?: unknown }) @{
+					const current = switchState();
+					current.onToggle = onToggle;
+					<div>{children}</div>
+				}
+			`,
+		},
+		{
+			filename: PANEL,
+			source: `
+				import { shared, state } from '@markless/core';
+				import { SwitchRoot } from './Readout.tsrx';
+				import Unseen from './Unseen.tsrx';
+				const SECTIONS = [{ title: 'a' }, { title: 'b' }];
+				const opened = shared(() => state({ titles: [] as string[] }));
+				function Row({ section, page }: { section: { title: string }; page: string }) @{
+					const store = opened();
+					<SwitchRoot onToggle={(on) => (store.titles = on ? [section.title] : [])}>{page}</SwitchRoot>
+				}
+				export default function Nav({ page }: { page: string }) @{
+					<nav>
+						<Unseen />
+						@for (const section of SECTIONS; key section.title) {
+							<Row section={section} page={page} />
+						}
+					</nav>
+				}
+			`,
+		},
+	]);
+	const toggle = page(PANEL).passedProps.find((entry) => entry.prop === 'onToggle')!;
+	expect(bounded(toggle.reach as RuntimeDemandMapFirstUseReach).calls ?? []).toEqual([]);
+});
+
+test('a write leaves a child a constant @for renders mounted once', async () => {
+	const PANEL = '/workspace/src/List.tsrx';
+	const { firstUse } = await compile([
+		{
+			filename: PANEL,
+			source: `
+				import { state } from '@markless/core';
+				import Unseen from './Unseen.tsrx';
+				const ITEMS = [{ title: 'a' }, { title: 'b' }];
+				function Row({ item }: { item: { title: string } }) @{
+					<li>{item.title}</li>
+				}
+				export default function List() @{
+					let count = state(0);
+					<section>
+						<Unseen />
+						<button onClick={() => count++}>{count}</button>
+						<ul>
+							@for (const item of ITEMS; key item.title) {
+								<Row item={item} />
+							}
+						</ul>
+					</section>
+				}
+			`,
+		},
+	]);
+	bounded(firstUse(PANEL, 'count++'));
 });

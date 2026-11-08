@@ -30,7 +30,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
-import { collectComponentEdge } from './collect-components.ts';
+import { collectComponentEdge, receivedHandlerRelay } from './collect-components.ts';
 import {
 	detachedContentMode,
 	isDeclarativeShadowRoot,
@@ -43,13 +43,19 @@ import {
 	collectCompositeTemplateExpression,
 	type CompositeReadOptions,
 	isCompositeTemplateExpression,
+	isDottedPath,
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
-import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.ts';
+import {
+	collectExpressionReads,
+	expressionReadNames,
+	resolvedSymbolAt,
+} from './collect-expressions.ts';
+import { collectRowLocalReads } from './row-local-reads.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -207,7 +213,10 @@ function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
 
 export function collectTemplateExpression(expression: AnyNode | undefined, state: WalkState): void {
 	if (!state.currentHostNodeId || !expression) return;
-	if (readsShadowingRowItem(expression, state)) return;
+	if (readsShadowingRowItem(expression, state)) {
+		collectRowLocalReads(expression, state);
+		return;
+	}
 	const joined = joinedTextExpressions.get(expression);
 	if (joined === null) return;
 	const composite =
@@ -218,6 +227,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
+	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
@@ -238,8 +248,23 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
 			: {}),
 		computedGraphNodeId: composite?.graphNodeId,
+		...unroutedReadNames(expression, composite, state),
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+// What a read with no route names, so state lowering can say which binding it leaves stale.
+function unroutedReadNames(
+	expression: AnyNode,
+	composite: { readonly graphNodeId: string } | null | undefined,
+	state: WalkState,
+): { readonly readNames?: ReadonlyArray<string> } {
+	if (composite) return {};
+	const unwrapped =
+		expression.type === 'ChainExpression' ? (expression.expression as AnyNode) : expression;
+	if (isDottedPath(unwrapped)) return {};
+	const names = expressionReadNames(expression, state);
+	return names.length > 0 ? { readNames: names } : {};
 }
 
 function templateReadSource(
@@ -621,6 +646,7 @@ export function collectConditionalBranchText(node: AnyNode, state: WalkState): v
 			sourceSpan: sourceSpanValue,
 			target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
+			...unroutedReadNames(test, null, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 	}
@@ -924,7 +950,7 @@ function resolveElementHandleIdrefs(
 			continue;
 		}
 		// A page-wide factory is one graph per PAGE, so its handle names one element
-		// however many widgets render; only a widget-scoped one mints per instance.
+		// however many widgets render; only a subtree-scoped one mints per instance.
 		if (
 			handleBinding.sharedDefinitionId !== undefined &&
 			widgetRootComponentName(graph, handleBinding.sharedDefinitionId) === undefined
@@ -942,7 +968,7 @@ function resolveElementHandleIdrefs(
 }
 
 /**
- * The component that resolves a widget-scoped factory first owns its nodes, so
+ * The component that resolves a subtree-scoped factory first owns its nodes, so
  * its rendered instance is the widget root every other part is seeded from.
  */
 function widgetRootComponentName(
@@ -952,7 +978,7 @@ function widgetRootComponentName(
 	const definition = graph.sharedDefinitions.find(
 		(candidate) => candidate.id === sharedDefinitionId,
 	);
-	if (definition?.scope !== 'widget') return undefined;
+	if (definition?.scope !== 'subtree') return undefined;
 	return graph.sharedInstances.find(
 		(instance) => instance.definitionId === sharedDefinitionId && instance.componentName,
 	)?.componentName;
@@ -1063,23 +1089,29 @@ function collectAttribute(
 					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
-			const inlined = handler
-				? inlineHandlerRenderLocals(handler.node, state, attributeName)
-				: null;
+			const relayed = handler ? receivedHandlerRelay(handler.node, state) : undefined;
+			const inlined =
+				handler && !relayed
+					? inlineHandlerRenderLocals(handler.node, state, attributeName)
+					: null;
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
 				eventName: normalizeEventName(attributeName),
 				...(handler
 					? {
-							handlerSource: inlined?.source ?? handler.source,
+							handlerSource: relayed?.source ?? inlined?.source ?? handler.source,
 							handlerSpan: handler.span,
 						}
 					: {}),
 				...(inlined?.definitionSpans.length
 					? { handlerDefinitionSpans: inlined.definitionSpans }
 					: {}),
-				handlerParameters: handler ? handlerParameterNames(handler.node) : [],
+				handlerParameters: relayed
+					? [relayed.parameter]
+					: handler
+						? handlerParameterNames(handler.node)
+						: [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
 			});
@@ -1168,6 +1200,7 @@ function collectAttribute(
 		? null
 		: conditionalClassTarget(attributeName, expressionValue, state.currentStyleScopeClass);
 	if (conditionalClass && readsShadowingRowItem(conditionalClass.test, state)) {
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		walk(expressionValue, state);
 		return;
 	}
@@ -1179,6 +1212,7 @@ function collectAttribute(
 			state,
 			TEMPLATE_READ_OPTIONS,
 		);
+		if (expressionValue) collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
@@ -1187,6 +1221,7 @@ function collectAttribute(
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(conditionalClass.test, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
@@ -1227,6 +1262,7 @@ function collectAttribute(
 
 	if (expressionValue && expressionValue.type !== 'Literal') {
 		if (readsShadowingRowItem(expressionValue, state)) {
+			collectRowLocalReads(expressionValue, state);
 			walk(expressionValue, state);
 			return;
 		}
@@ -1252,6 +1288,7 @@ function collectAttribute(
 			walk(expressionValue, state);
 			return;
 		}
+		collectRowLocalReads(expressionValue, state);
 		state.graph.templateReads.push({
 			...rowScope(state),
 			hostNodeId,
@@ -1260,6 +1297,7 @@ function collectAttribute(
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(expressionValue, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(expressionValue, state);
@@ -1304,8 +1342,11 @@ function collectStyleObjectAttribute(
 	if (lowering?.kind === 'static') return;
 
 	const composite =
-		lowering?.kind === 'dynamic' ? mintStyleObjectComputed(lowering, definitions, inlinedNames, state) : null;
-	if (composite) for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		lowering?.kind === 'dynamic'
+			? mintStyleObjectComputed(lowering, definitions, inlinedNames, state)
+			: null;
+	if (composite)
+		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
 	if (
 		lowering?.kind === 'dynamic' &&
 		(composite || lowering.valueExpressions.every((value) => rendersStyleValue(value, state)))
@@ -1318,6 +1359,7 @@ function collectStyleObjectAttribute(
 			target: bindingTargetForAttribute('style', state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 			computedGraphNodeId: composite?.graphNodeId,
+			...unroutedReadNames(usageNode, composite, state),
 			componentName: state.currentComponentName ?? undefined,
 		});
 		walk(usageNode, state);
@@ -1375,13 +1417,20 @@ function mintStyleObjectComputed(
 	if (!readSources) return null;
 	// An inlined const's definition reads stand in for the const itself.
 	const sources = new Set(
-		readSources.filter((source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? '')),
+		readSources.filter(
+			(source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? ''),
+		),
 	);
 	for (const definition of definitions)
-		for (const dependency of collectGraphDependencies(definition, state)) sources.add(dependency.source);
+		for (const dependency of collectGraphDependencies(definition, state))
+			sources.add(dependency.source);
 	if (sources.size === 0) return null;
 
-	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, [...sources], state);
+	return mintTemplateExpressionComputed(
+		`() => ${lowering.expressionSource}`,
+		[...sources],
+		state,
+	);
 }
 
 function collectDuplicateAttributeDiagnostics(

@@ -177,8 +177,7 @@ function shadowedSyncPolicyCall(node: AnyNode | undefined): StraySyncPolicyCall 
 	walkNode(body, (candidate) => {
 		if (found || own.has(candidate)) return;
 		const action = syncActionCall(candidate, eventParam);
-		if (action)
-			found = { action, node: candidate, eventParam, reason: 'shadowed-event-name' };
+		if (action) found = { action, node: candidate, eventParam, reason: 'shadowed-event-name' };
 	});
 	return found;
 }
@@ -552,7 +551,8 @@ function rebindsName(node: AnyNode, name: string): boolean {
 				declaresName(statement, name, false, true),
 			),
 		);
-	if (node.type === 'CatchClause') return patternBindsName(node.param as AnyNode | undefined, name);
+	if (node.type === 'CatchClause')
+		return patternBindsName(node.param as AnyNode | undefined, name);
 	if (node.type === 'ForStatement')
 		return declaresName(node.init as AnyNode | undefined, name, false, true);
 	if (node.type === 'ForInStatement' || node.type === 'ForOfStatement')
@@ -576,7 +576,8 @@ function declaresName(
 	if (
 		statements.some(
 			(statement) =>
-				((statement.type === 'FunctionDeclaration' || statement.type === 'ClassDeclaration') &&
+				((statement.type === 'FunctionDeclaration' ||
+					statement.type === 'ClassDeclaration') &&
 					getIdentifierName(statement.id as AnyNode | undefined) === name) ||
 				(statement.type === 'VariableDeclaration' &&
 					asNodes(statement.declarations).some((declarator) =>

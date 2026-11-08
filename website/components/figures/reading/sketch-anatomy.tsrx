@@ -60,7 +60,7 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
 			.sketch {
-				margin: var(--space-m) 0;
+				margin: var(--flow-block) 0;
 				container: sketch / inline-size;
 			}
 

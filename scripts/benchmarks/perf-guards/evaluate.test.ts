@@ -106,6 +106,36 @@ function measurement(): Json {
 			short: { shippedBytes: 330_000, executedChars: 55_000, answered: true, errors: [] },
 			long: { shippedBytes: 355_000, executedChars: 55_001, answered: true, errors: [] },
 		},
+		staticPropArms: {
+			short: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 19_439 },
+				},
+				answered: true,
+			},
+			long: {
+				routes: {
+					tsrx: { executedChars: 3_820, jsGzipBytes: 20_686 },
+					mdx: { executedChars: 1_891, jsGzipBytes: 2_106 },
+					shown: { executedChars: 3_820, jsGzipBytes: 22_929 },
+				},
+				answered: true,
+			},
+		},
+		serverStylesheets: {
+			small: {
+				workerBytes: 498_145,
+				clientCssBytes: 939,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
+			large: {
+				workerBytes: 498_146,
+				clientCssBytes: 358_845,
+				copies: { prerendered: 0, runtime: 1, document: 1 },
+			},
+		},
 	};
 }
 
@@ -358,6 +388,65 @@ describe('performance guards', () => {
 			expect.stringContaining(
 				'[G14] the hidden-panel fixture did not answer its date panel or help button: boom',
 			),
+		]);
+	});
+
+	test('G18 fails a page that loads code for an arm its literal props rule out', () => {
+		expect(failures(measurement())).toEqual([]);
+
+		const leaking = measurement();
+		leaking.staticPropArms.long.routes.tsrx.jsGzipBytes += 3_677;
+		expect(failures(leaking)).toEqual([
+			expect.stringContaining(
+				'[G18] a page passing Caption only text loads 20.2 KB of JS and runs 3820 chars at load with the short Gloss, 23.8 KB and 3820 with the long one: +3677 B and +0 chars for a Gloss its literal props never show (budget +512 B, +512 chars)',
+			),
+		]);
+
+		const running = measurement();
+		running.staticPropArms.long.routes.mdx.executedChars += 1_500;
+		expect(failures(running)).toEqual([
+			expect.stringContaining('[G18] an MDX page passing Caption only text'),
+		]);
+
+		const toothless = measurement();
+		toothless.staticPropArms.long.routes.shown.jsGzipBytes =
+			toothless.staticPropArms.short.routes.shown.jsGzipBytes;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('it must load at least 2.0 KB more'),
+		]);
+
+		const broken = measurement();
+		broken.staticPropArms.long.answered = false;
+		expect(failures(broken)).toEqual([
+			expect.stringContaining("[G18] the static-prop fixture's /glossary did not open its Gloss"),
+		]);
+	});
+
+	test('G17 fails a Worker that carries the stylesheet text of a prerendered page, or a sheet twice', () => {
+		const over = measurement();
+		over.serverStylesheets.large.workerBytes += 178_376;
+		expect(failures(over)).toEqual([
+			expect.stringContaining(
+				"[G17] the inline-CSS fixture's Worker is 486.5 KB with its prerendered page's stylesheet small and 660.7 KB with it 349.5 KB bigger: +174.2 KB of Worker for CSS only a prerendered page uses (budget +1.0 KB)",
+			),
+		]);
+
+		const carried = measurement();
+		carried.serverStylesheets.small.copies.prerendered = 1;
+		expect(failures(carried)).toEqual([
+			expect.stringContaining(
+				"the small Worker carries the prerendered page's stylesheet text 1 times, the runtime page's 1 times and the document's 1 times",
+			),
+		]);
+
+		const twice = measurement();
+		twice.serverStylesheets.large.copies.runtime = 2;
+		expect(failures(twice)).toEqual([expect.stringContaining("the runtime page's 2 times")]);
+
+		const toothless = measurement();
+		toothless.serverStylesheets.large.clientCssBytes = 939;
+		expect(failures(toothless)).toEqual([
+			expect.stringContaining('the large build must ship at least 64.0 KB more CSS'),
 		]);
 	});
 

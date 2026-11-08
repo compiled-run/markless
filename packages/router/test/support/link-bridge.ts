@@ -8,7 +8,7 @@ export function servedLinkBridge(
 	const inline = /<script data-markless-router-link-resumer>([\s\S]*?)<\/script>/.exec(html)?.[1];
 	if (inline !== undefined) return inline;
 	const stub =
-		/<script type="module" data-markless-router-link-resumer>import b from"([^"]+)";b\(([\s\S]*?)\)<\/script>/.exec(
+		/<script type="module" async data-markless-router-link-resumer>import b from"([^"]+)";b\(([\s\S]*?)\)<\/script>/.exec(
 			html,
 		);
 	if (!stub) return undefined;

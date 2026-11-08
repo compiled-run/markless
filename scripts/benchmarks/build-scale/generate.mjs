@@ -21,7 +21,13 @@ function componentSource(index) {
 		{ length: 6 },
 		(_, row) => `<li class="row-${row}"><span>Item ${row} of widget ${index}</span></li>`,
 	).join('\n\t\t\t');
+	// Every widget hands a helper its event, as a converted site's parts do; one in ten hands it state to change.
+	const helperCall =
+		index % 10 === 0
+			? `<button type="button" onClick={() => addTag(tags, draft)}>Keep</button>`
+			: `<button type="button" onClick={() => count++}>Again</button>`;
 	return `import { state } from '@markless/core';
+import { addTag, moveFocus } from './widget-helpers.ts';
 
 export default function Widget${index}({ label }: { label: string }) @{
 	let open = state(false);
@@ -33,8 +39,9 @@ export default function Widget${index}({ label }: { label: string }) @{
 		<h2>{label} widget ${index}</h2>
 		<button type="button" aria-expanded={open} onClick={() => (open = !open)}>Toggle</button>
 		<button type="button" onClick={() => count++}>Count {count}</button>
-		<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} />
+		<input value={draft} onInput={(event) => (draft = event.currentTarget.value)} onKeyDown={(event) => moveFocus(event, ${index})} />
 		<button type="button" onClick={() => (tags = [...tags, draft || 'new'])}>Add</button>
+		${helperCall}
 		@if (open) {
 			<>
 				<p class="panel">Panel of widget ${index}: {draft}</p>
@@ -52,6 +59,16 @@ export default function Widget${index}({ label }: { label: string }) @{
 }
 `;
 }
+
+const widgetHelpersSource = `export function moveFocus(event: KeyboardEvent, widget: number): void {
+	const target = event.currentTarget as HTMLElement | null;
+	if (event.key === 'ArrowDown') target?.closest('[data-widget="' + widget + '"]')?.querySelector('button')?.focus();
+}
+
+export function addTag(tags: string[], draft: string): void {
+	tags.push(draft || 'new');
+}
+`;
 
 function layerSource(index, layerBytes) {
 	const paragraph = `<p>Layer ${index} holds portaled content that a page opens on use, written out in full so its markup is large.</p>`;
@@ -160,6 +177,7 @@ export async function generateBuildScaleApp(options) {
 	);
 	await writeFile(join(dir, 'document.tsrx'), documentSource);
 	await writeFile(join(dir, 'components/body-extras.tsrx'), bodyExtrasSource(layers));
+	await writeFile(join(dir, 'components/widget-helpers.ts'), widgetHelpersSource);
 	for (let i = 0; i < components; i++)
 		await writeFile(join(dir, `components/widget-${i}.tsrx`), componentSource(i));
 	for (let i = 0; i < layers; i++)

@@ -15,7 +15,7 @@ export const gate = shared(() => {
 	const cell = state({ picked: [] });
 
 	return { ...cell };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Row({ option, children }) @{
 	const cell = gate();
@@ -92,7 +92,7 @@ export const board = shared(() => {
 	const slots = state({ taken: [], locked: false });
 
 	return { ...slots };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Seat({ seat, children }) @{
 	const slots = board();

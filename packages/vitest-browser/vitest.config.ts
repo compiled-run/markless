@@ -28,6 +28,14 @@ const parkPointer: BrowserCommand<[]> = async ({ page }) => {
 	await page.mouse.move(-1, -1);
 };
 
+// Slows the page's main thread the way a loaded CI runner does, so a timing race shows on every run.
+// The session stays attached: detaching it drops the throttle.
+const cpuSessions = new WeakMap<object, Promise<{ send(method: string, params: object): Promise<unknown> }>>();
+const throttleCpu: BrowserCommand<[rate: number]> = async ({ page }, rate) => {
+	if (!cpuSessions.has(page)) cpuSessions.set(page, page.context().newCDPSession(page));
+	await (await cpuSessions.get(page)!).send('Emulation.setCPUThrottlingRate', { rate });
+};
+
 // Browser test project for @markless/vitest-browser. Runs the CSR + SSR
 // resume harness tests in a real headless Chromium through the vite-plus
 // playwright provider. The markless plugin compiles .tsrx fixtures; testSSR
@@ -47,7 +55,7 @@ export default defineProject({
 			headless: true,
 			provider: playwright(),
 			instances: [{ browser: 'chromium' }],
-			commands: { parkPointer },
+			commands: { parkPointer, throttleCpu },
 		},
 	},
 });

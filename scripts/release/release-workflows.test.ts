@@ -17,6 +17,7 @@ type Job = {
 	readonly needs?: string | readonly string[];
 	readonly permissions?: Record<string, string>;
 	readonly env?: Record<string, string>;
+	readonly outputs?: Record<string, string>;
 	readonly steps: readonly Step[];
 };
 
@@ -63,13 +64,13 @@ describe('release.yml mode=cut', () => {
 		expect(run).toContain('node scripts/release/cut.mjs\n');
 	});
 
-	test('moves main only after the release commit inherited a green run or pull request CI passed every required check on it', () => {
+	test('lands through the merge queue only after the release commit inherited a green run or pull request CI passed every required check on it', () => {
 		const order = [
 			'Push the release commit to its release branch',
 			'Inherit the green CI run of the commit the release was cut from',
 			'Run CI on the release pull request',
 			"Require every check main's protection names on the release commit",
-			'Move main to the release commit',
+			"Land the release commit through main's merge queue",
 		];
 		const cutting = "inputs.mode == 'cut' && steps.cut.outputs.resumed != 'true'";
 		const notInherited = `${cutting} && steps.inherit.outputs.inherited != 'true'`;
@@ -106,18 +107,29 @@ describe('release.yml mode=cut', () => {
 		expect(step(cut, order[3]!).run).toBe(
 			'node scripts/release/required-checks.mjs --sha "$SHA"',
 		);
-		const move = step(cut, order[4]!).run!;
-		expect(move).toContain(
-			'if [ "$main" = "$base" ] && git push origin "${SHA}:refs/heads/main"; then',
+		const land = step(cut, order[4]!);
+		expect(land.run).toBe(
+			'node scripts/release/land.mjs --tag "$TAG" --release "$SHA" --cut-from "$BASE"',
 		);
-		expect(move).toContain('gh pr merge "$pr" --merge --match-head-commit "$SHA"');
-		expect(move.indexOf('git push origin "${SHA}:refs/heads/main"')).toBeLessThan(
-			move.indexOf('gh pr merge'),
-		);
-		expect(move).not.toMatch(/--force|\+\$\{SHA\}|--admin|--squash|--rebase/u);
+		expect(land.env).toEqual({
+			TAG: '${{ steps.cut.outputs.tag }}',
+			SHA: '${{ steps.cut.outputs.sha }}',
+			BASE: '${{ steps.cut.outputs.base }}',
+		});
+		// main takes changes only through its merge queue: no step pushes or merges into main itself.
+		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
+		expect(commands).not.toMatch(/refs\/heads\/main|gh pr merge|--force|--admin/u);
 		const pushTag = step(cut, 'Push the tag');
-		expect(pushTag.if).toBe("inputs.mode == 'cut' && steps.cut.outputs.push_tag == 'true'");
+		expect(pushTag.if).toBe(
+			"inputs.mode == 'cut' && (steps.cut.outputs.push_tag == 'true' || steps.land.outputs.tagged == 'true')",
+		);
 		expect(names(cut).indexOf('Push the tag')).toBeGreaterThan(names(cut).indexOf(order[4]!));
+		expect(cut.outputs!.sha).toBe('${{ steps.land.outputs.sha || steps.cut.outputs.sha }}');
+		const withdraw = step(cut, 'Withdraw release pull requests a stopped cut left open');
+		expect(names(cut).indexOf(withdraw.name)).toBeLessThan(
+			names(cut).indexOf('Cut the next minor version'),
+		);
+		expect(withdraw.run).toContain('dequeuePullRequest');
 		expect(cut.permissions!['pull-requests']).toBe('write');
 		expect(step(cut, 'Delete the release branch').if).toContain('always()');
 		expect(
@@ -149,21 +161,27 @@ describe('release.yml mode=cut', () => {
 	});
 
 	test('refuses before pushing anything unless the nightly screen readers passed on a commit the release contains', () => {
-		const gate = step(cut, 'Require the nightly screen readers green on a commit the release contains');
+		const gate = step(
+			cut,
+			'Require the nightly screen readers green on a commit the release contains',
+		);
 		expect(gate.if).toBe("steps.cut.outputs.resumed != 'true'");
 		expect(gate.env).toEqual({ BASE: '${{ steps.cut.outputs.base }}' });
 		expect(gate.run).toBe('node scripts/release/reader-gate.mjs --base "$BASE"');
-		expect(names(cut).indexOf(gate.name)).toBeGreaterThan(names(cut).indexOf('Cut the next minor version'));
+		expect(names(cut).indexOf(gate.name)).toBeGreaterThan(
+			names(cut).indexOf('Cut the next minor version'),
+		);
 		expect(names(cut).indexOf(gate.name)).toBeLessThan(
 			names(cut).indexOf('Push the release commit to its release branch'),
 		);
 	});
 
-	test('posts commit statuses only through inherit-ci.mjs, which proves the release changed versions alone', () => {
+	test('posts commit statuses only through inherit-ci.mjs and land.mjs, which prove the commit changed versions alone', () => {
 		const commands = cut.steps.map((candidate) => candidate.run ?? '').join('\n');
 		expect(commands).not.toMatch(/\/statuses\/|check-runs -X|--method POST/u);
 		expect(cut.permissions!.statuses).toBe('write');
 		expect(commands.match(/inherit-ci\.mjs/gu)).toHaveLength(1);
+		expect(commands.match(/land\.mjs/gu)).toHaveLength(1);
 	});
 
 	test('the cut and announce jobs cannot publish', () => {

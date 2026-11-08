@@ -1,19 +1,18 @@
 import PageMeta from '../../components/page-meta.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import PrintoutAnatomy from '../../components/figures/reading/printout-anatomy.tsrx';
 import SketchAnatomy from '../../components/figures/reading/sketch-anatomy.tsrx';
 import BlocksDemo from '../../components/figures/reading/blocks-demo.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
 # Reading a .tsrx file
 
 <PageMeta time="5 min" assumes="nothing" />
-
-<ThemeToggle />
 
 <Subtitle text="Every .tsrx file is made of two things: values and instructions." terms="values instructions" />
 
@@ -72,8 +71,8 @@ export default function Rsvp() @{
 
 <Callout
 	sprite="cross"
-	title="Why can't I call my own function in { }?"
-	text="Braces show plain reads, maths and method calls, like {guests.length} or {name.toUpperCase()}. A function you wrote, as in {format(guest)}, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Work it out with computed() and show that instead."
+	title="Which functions can I call in { }?"
+	text="Braces show plain reads, maths, method calls and your own functions, like {guests.length}, {name.toUpperCase()} or {format(guest)}. A function held in a let, which could be swapped for another, stops the build with MARKLESS_TEMPLATE_EXPRESSION_UNSUPPORTED. Declare it with const or function instead."
 />
 
 ## `@{ }` holds instructions, run top to bottom

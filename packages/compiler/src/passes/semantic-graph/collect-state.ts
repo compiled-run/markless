@@ -18,6 +18,7 @@ import type {
 	SemanticLocalBinding,
 	SemanticModuleImport,
 	SourceSpan,
+	SemanticBranchArm,
 } from '../../artifacts.ts';
 import {
 	getFrameworkApiForCall,
@@ -80,7 +81,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		if (id && !name && (id.type === 'ObjectPattern' || id.type === 'ArrayPattern'))
 			for (const local of patternIdentifiers(id)) {
 				const localName = getIdentifierName(local);
-				if (!localName || state.graph.aliases.some((alias) => alias.sourceSpan?.start === local.start))
+				if (
+					!localName ||
+					state.graph.aliases.some((alias) => alias.sourceSpan?.start === local.start)
+				)
 					continue;
 				state.graph.localDeclarations.push({
 					name: localName,
@@ -132,6 +136,7 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 			if (!state.currentSharedDefinitionId) {
 				collectSharedInstance({
 					localName: name,
+					declaration: id,
 					init,
 					state,
 				});
@@ -206,7 +211,8 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 		}
 
 		if (frameworkApi === 'state') {
-			if (state.currentCreationSite) {
+			const armScope = armLocalStateScope(node, init, state);
+			if (state.currentCreationSite && !armScope) {
 				reportUnstableCreationSite(name, 'state', init, state.currentCreationSite, state);
 				continue;
 			}
@@ -272,6 +278,10 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				declarationKind: state.currentHelperCall ? 'let' : declarationKind,
 				writable: true,
 				valueKind: initialValueKind(initial),
+				...(armScope ? { armScope } : {}),
+				...(armScope && state.currentBranchArms.length > 1
+					? { enclosingArms: state.currentBranchArms.slice(0, -1) }
+					: {}),
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
@@ -448,7 +458,10 @@ export function collectComputedBinding(input: {
 
 // A body function the recipe calls is spliced in, unless it writes; that one stays a capture to refuse.
 function inlineRecipeLocals(body: AnyNode, state: WalkState) {
-	const spliced = inlineRenderLocals(body, state, { leaveCaptureOwned: true, inlineFunctions: true });
+	const spliced = inlineRenderLocals(body, state, {
+		leaveCaptureOwned: true,
+		inlineFunctions: true,
+	});
 	return spliced.kind === 'inlined' &&
 		!spliced.definitions.some((definition) => writesOutside(definition, state))
 		? spliced
@@ -636,7 +649,9 @@ function freeNames(node: AnyNode, state: WalkState): ReadonlyArray<string> {
 	const visit = (current: AnyNode, parent: AnyNode | null) => {
 		const isKey =
 			parent &&
-			((parent.type === 'MemberExpression' && parent.property === current && parent.computed !== true) ||
+			((parent.type === 'MemberExpression' &&
+				parent.property === current &&
+				parent.computed !== true) ||
 				(parent.type === 'Property' && parent.key === current && parent.computed !== true));
 		if (
 			current.type === 'Identifier' &&
@@ -659,7 +674,9 @@ function initializerForCall(
 	state: WalkState,
 ): string {
 	if (parameters.length === 0) return initializerSource;
-	const args = asNodes(call.arguments).map((argument) => expressionSource(argument, state.source));
+	const args = asNodes(call.arguments).map((argument) =>
+		expressionSource(argument, state.source),
+	);
 	return `((${parameters.join(', ')}) => (${initializerSource}))(${args.join(', ')})`;
 }
 
@@ -669,6 +686,19 @@ function findDirectReturnArgument(body: AnyNode | undefined): AnyNode | undefine
 	}
 
 	return undefined;
+}
+
+// A state() written directly in an arm body with a starting value the compiler can read restarts each time the arm opens.
+function armLocalStateScope(
+	declaration: AnyNode,
+	init: AnyNode,
+	state: WalkState,
+): SemanticBranchArm | null {
+	if (state.currentCreationSite !== 'arm' || !state.armBodyStatements.has(declaration))
+		return null;
+	const arm = state.currentBranchArms[state.currentBranchArms.length - 1];
+	if (!arm || !evaluateInitialStateValue(firstArgument(init), state).ok) return null;
+	return arm;
 }
 
 function reportUnstableCreationSite(
@@ -813,8 +843,13 @@ function collectImportedHelperBindingForCall(
 
 	const returns = helperExport.returns;
 	const parameters = returns.parameters ?? [];
-	const unreachable = (returns.initializerNames ?? []).filter((name) => !parameters.includes(name));
-	if (returns.initializerSource !== undefined && (unreachable.length > 0 || !returns.parameters)) {
+	const unreachable = (returns.initializerNames ?? []).filter(
+		(name) => !parameters.includes(name),
+	);
+	if (
+		returns.initializerSource !== undefined &&
+		(unreachable.length > 0 || !returns.parameters)
+	) {
 		state.graph.diagnostics.push(
 			unsupportedHelperStateReturnDiagnostic({
 				helperName: moduleImport.localName,
@@ -838,7 +873,14 @@ function collectImportedHelperBindingForCall(
 		...graphBindingFromInterfaceReturn(returns, state),
 		...declaringComponent(state),
 		...(returns.initializerSource !== undefined
-			? { initializerSource: initializerForCall(returns.initializerSource, parameters, call, state) }
+			? {
+					initializerSource: initializerForCall(
+						returns.initializerSource,
+						parameters,
+						call,
+						state,
+					),
+				}
 			: {}),
 	});
 	state.currentHelperCall = previousCall;
@@ -889,7 +931,9 @@ function collectHelperBindingForCall(
 			...(returns.parameters ? [] : ['a parameter pattern']),
 			...declaredNamesIn(helper.body as AnyNode | undefined),
 		]);
-		const unreachable = (returns.initializerNames ?? []).filter((name) => helperLocals.has(name));
+		const unreachable = (returns.initializerNames ?? []).filter((name) =>
+			helperLocals.has(name),
+		);
 		if (!returns.parameters || unreachable.length > 0) {
 			state.graph.diagnostics.push(
 				unsupportedHelperStateReturnDiagnostic({
@@ -923,7 +967,12 @@ function collectHelperBindingForCall(
 	if (binding?.initializerSource !== undefined && returns?.kind === 'state' && returns.parameters)
 		state.graph.graphBindings[index] = {
 			...binding,
-			initializerSource: initializerForCall(binding.initializerSource, returns.parameters, call, state),
+			initializerSource: initializerForCall(
+				binding.initializerSource,
+				returns.parameters,
+				call,
+				state,
+			),
 		} as SemanticGraphBinding;
 	return target;
 }
@@ -1481,13 +1530,19 @@ function findFunctionStateValue(node: AnyNode | undefined): AnyNode | null {
 		node.type === 'ClassExpression'
 	)
 		return node;
-	if (node.type === 'TSAsExpression' || node.type === 'TSSatisfiesExpression' || node.type === 'ParenthesizedExpression')
+	if (
+		node.type === 'TSAsExpression' ||
+		node.type === 'TSSatisfiesExpression' ||
+		node.type === 'ParenthesizedExpression'
+	)
 		return findFunctionStateValue(node.expression as AnyNode | undefined);
 	if (node.type === 'ObjectExpression')
 		for (const property of asNodes(node.properties)) {
 			if (property.type === 'Property' && property.method === true) return property;
 			const found = findFunctionStateValue(
-				(property.type === 'SpreadElement' ? property.argument : property.value) as AnyNode | undefined,
+				(property.type === 'SpreadElement' ? property.argument : property.value) as
+					| AnyNode
+					| undefined,
 			);
 			if (found) return found;
 		}

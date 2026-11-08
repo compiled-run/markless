@@ -42,7 +42,7 @@ export const tooltipState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TooltipRoot({

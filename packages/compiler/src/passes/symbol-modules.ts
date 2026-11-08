@@ -34,9 +34,9 @@ import {
 	PROTOCOL_PROPS_GRAPH_NODE_ID,
 	protocolElementHandleReadId,
 } from '@markless/serializer';
+import { marklessAttributeValue as attributeText } from '@markless/web/dom-attribute';
 import { unaddressableElementDiagnostics } from './element-address-diagnostics.ts';
 import type { SourceSpan } from '../diagnostics.ts';
-import { staticAttributeText } from './semantic-graph/collect-markup.ts';
 import { boundarySettleRecords, type BoundarySettleRecords } from './boundary-settle-records.ts';
 import {
 	armChildDescent,
@@ -288,7 +288,9 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
-		...(branchArms.propDecided.length > 0 ? { propDecidedBranches: branchArms.propDecided } : {}),
+		...(branchArms.propDecided.length > 0
+			? { propDecidedBranches: branchArms.propDecided }
+			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
 			...branchArms.diagnostics,
@@ -1364,9 +1366,11 @@ function armPartReadPath(
 type ArmRefusal = {
 	readonly detail: string;
 	readonly span?: SourceSpan;
-	// A same-module component that has to run: the one refusal a re-render of the
-	// page through the prerender evaluator can answer.
+	// A component that has to run, or content a flip cannot rebuild: what a
+	// re-render of the page through the prerender evaluator can answer.
 	readonly escalatable?: boolean;
+	// What the browser runs instead, in the author's words: "the @try block it holds".
+	readonly runs?: string;
 };
 
 type ArmPartsContext = {
@@ -1394,7 +1398,12 @@ function renderBranchArms(
 } {
 	const renderData = input.renderData;
 	if (!renderData)
-		return { armsBySite: new Map(), diagnostics: [], escalationCandidates: [], propDecided: [] };
+		return {
+			armsBySite: new Map(),
+			diagnostics: [],
+			escalationCandidates: [],
+			propDecided: [],
+		};
 	const armsBySite = new Map<string, PublicRenderPlanBranchArms>();
 	const diagnostics: SymbolModulesDiagnostic[] = [];
 	const escalationCandidates: ArmEscalationCandidate[] = [];
@@ -1426,12 +1435,15 @@ function renderBranchArms(
 		};
 		const arms = branch.armChunkIds.map((chunkId) => renderChunkParts(context, chunkId));
 		if (arms.some((arm) => arm === null)) {
-			// A branch nobody asks to flip ships no symbol, so it needs no diagnostic.
-			const symbol = input.symbolResolver.symbols.find(
-				(candidate) =>
-					candidate.kind === 'branch-update' &&
-					candidate.branchSiteId === branch.branchSiteId,
-			);
+			// A branch nobody asks to flip ships no symbol, and one whose test reads nothing never flips.
+			const symbol =
+				branch.testReads.length > 0
+					? input.symbolResolver.symbols.find(
+							(candidate) =>
+								candidate.kind === 'branch-update' &&
+								candidate.branchSiteId === branch.branchSiteId,
+						)
+					: undefined;
 			if (symbol) {
 				const refused = branchArmUnsupportedDiagnostic(
 					branch,
@@ -1473,7 +1485,9 @@ function renderBranchArms(
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
 					});
-					diagnostics.push(branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id));
+					diagnostics.push(
+						branchArmRendersInBrowserDiagnostic(branch, refusals, symbol.id),
+					);
 				}
 			}
 			continue;
@@ -1514,7 +1528,9 @@ function rowListDeciders(
 	const row = semanticGraph.markup.chunks.find(
 		(chunk) =>
 			/^repeat:.*:row$/.test(chunk.id) &&
-			chunk.slots.some((slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId),
+			chunk.slots.some(
+				(slot) => slot.kind === 'branch' && slot.branchSiteId === branch.branchSiteId,
+			),
 	);
 	const repeat = row
 		? semanticGraph.keyedRepeats.find((candidate) => row.id === `repeat:${candidate.id}:row`)
@@ -1550,6 +1566,7 @@ function branchArmRendersInBrowserDiagnostic(
 	const names = [
 		...new Set(refusals.flatMap((refusal) => /^<([^>]+)>/.exec(refusal.detail)?.[1] ?? [])),
 	].map((name) => `<${name}>`);
+	names.push(...new Set(refusals.flatMap((refusal) => refusal.runs ?? [])));
 	const shown = names.length > 0 ? names.join(', ') : 'its components';
 	return {
 		code: BRANCH_ARM_RENDERS_IN_BROWSER_CODE,
@@ -1591,7 +1608,7 @@ function branchArmUnsupportedDiagnostic(
 		phase: 'public-render',
 		title: `Changing this ${label} cannot rebuild what it shows`,
 		message: `this ${label} (${branch.testSource}) cannot be rebuilt when ${branch.testSource} changes because ${detail}.`,
-		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own, shows a function it was handed, or — when it comes from another file — shows a value that keeps changing while it is shown has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
+		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		...(refusal?.span ? { primarySpan: refusal.span } : {}),
 		passId: 'symbol-modules',
 		artifactKeys: ['renderData', 'symbolResolver', 'symbolModules'],
@@ -1617,7 +1634,10 @@ function renderBoundaryArms(
 				(candidate): candidate is string => candidate !== undefined,
 			);
 			const arms = chunkIds.map((chunkId) =>
-				renderChunkParts({ renderData, asyncComputedNodeIds, rowAttributes: true }, chunkId),
+				renderChunkParts(
+					{ renderData, asyncComputedNodeIds, rowAttributes: true },
+					chunkId,
+				),
 			);
 			if (arms.some((arm) => arm === null)) return [];
 			return [
@@ -1645,8 +1665,15 @@ function renderChunkParts(
 		context.refusals?.push({
 			detail,
 			...(span ? { span } : {}),
-			...(escalatable ? { escalatable: true } : {}),
+			// An imported child renders in its own module when the browser runs it.
+			...(escalatable || child?.imported ? { escalatable: true } : {}),
 		});
+		return null;
+	};
+	// This module's own render answers it; an imported child's content keeps refuse()'s answer.
+	const renderedHere = (detail: string, runs: string) => {
+		if (!context.inline || child?.imported) return refuse(detail);
+		context.refusals?.push({ detail, escalatable: true, runs });
 		return null;
 	};
 	const chunk = (child?.chunks ?? renderData.chunks).find(
@@ -1670,9 +1697,7 @@ function renderChunkParts(
 				const scoped = scopedPropPart(scope, slot.residue.graphNodeId, slot.residue.path);
 				if (scoped === 'unsupported')
 					return refuse('a value it shows comes from a prop the flip cannot recompute');
-				// A value inside an imported child refreshes through records that
-				// module owns, and this module cannot address them, so only a value
-				// that is already decided may be shown there.
+				// An imported child's changing value refreshes through records its own module owns.
 				if (child?.imported && (!scoped || 'read' in scoped))
 					return refuse(
 						`<${child.componentName}> shows a value that changes after it is shown`,
@@ -1751,7 +1776,8 @@ function renderChunkParts(
 							rowAttributes &&
 							rowSlot.kind === 'attribute' &&
 							!rowSlot.directClassMatch &&
-							(rowSlot.residue.kind === 'repeat-item' || rowSlot.residue.kind === 'graph-read')
+							(rowSlot.residue.kind === 'repeat-item' ||
+								rowSlot.residue.kind === 'graph-read')
 						) {
 							rowParts.push({
 								attribute: {
@@ -1768,14 +1794,19 @@ function renderChunkParts(
 													),
 												},
 											}),
-									...(rowSlot.alwaysPresent ? { alwaysPresent: true as const } : {}),
+									...(rowSlot.alwaysPresent
+										? { alwaysPresent: true as const }
+										: {}),
 								},
 							});
 							continue;
 						}
 						if (rowSlot.kind !== 'text')
-							return refuse(
-								`a repeated row inside it holds a ${rowSlot.kind} binding`,
+							return renderedHere(
+								`a repeated row inside it holds ${rowSlot.kind === 'attribute' ? 'an' : 'a'} ${
+									rowSlot.kind
+								} binding`,
+								'the @for block it holds',
 							);
 						if (rowSlot.residue.kind === 'repeat-item')
 							rowParts.push({ itemPath: rowSlot.residue.path });
@@ -1791,8 +1822,9 @@ function renderChunkParts(
 								},
 							});
 						else
-							return refuse(
+							return renderedHere(
 								'a repeated row inside it reads a value that cannot be recomputed',
+								'the @for block it holds',
 							);
 					}
 				}
@@ -1892,6 +1924,23 @@ function renderChunkParts(
 				});
 				continue;
 			}
+			if (slot.kind === 'async') {
+				context.refusals?.push({
+					detail: armSlotRefusalDetail(slot),
+					escalatable: true,
+					runs: 'the @try block it holds',
+				});
+				return null;
+			}
+			if (slot.kind === 'branch') {
+				const nested = renderData.branches?.find(
+					(candidate) => candidate.branchSiteId === slot.branchSiteId,
+				);
+				return renderedHere(
+					armSlotRefusalDetail(slot),
+					`the ${nested?.kind === 'switch' ? '@switch' : '@if'} it holds`,
+				);
+			}
 			return refuse(armSlotRefusalDetail(slot));
 		}
 	}
@@ -1906,7 +1955,8 @@ function armSlotRefusalDetail(slot: SemanticMarkupSlot): string {
 		return 'an element() handle it binds is named by an IDREF, and that id is minted for the rendered widget, which a flip has no way to mint again';
 	if ('residue' in slot && slot.residue.kind === 'element-handle-id-list')
 		return 'an element() handle it binds is named by an IDREF list, and those ids are minted for the rendered widget, which a flip has no way to mint again';
-	return `it holds ${slot.kind === 'attribute' || slot.kind === 'async' ? 'an' : 'a'} ${slot.kind} binding`;
+	if (slot.kind === 'async') return 'it holds a @try block';
+	return `it holds ${slot.kind === 'attribute' ? 'an' : 'a'} ${slot.kind} binding`;
 }
 
 // One prop name to the value a flip rebuilds the child's markup with.
@@ -1975,7 +2025,7 @@ function scopedPropConstant(
 }
 
 function constantAttributeHtml(name: string, value: unknown, alwaysPresent: boolean): string {
-	const text = staticAttributeText(name, value);
+	const text = attributeText(name, value);
 	if (text === null) return '';
 	const escaped = armTextEscape(text).replaceAll('"', '&quot;');
 	return alwaysPresent ? escaped : ` ${name}="${escaped}"`;
@@ -2067,10 +2117,8 @@ function staticChildComponentMarkup(
 	return wired ? null : chunk.statics.join('');
 }
 
-// Names the one value that kept the flip out; falls back to the shape-level
-// refusal for a child this descent cannot express for any other reason. Only a
-// same-module child's own value is escalatable: an imported child's markup and
-// records belong to a module this one cannot address.
+// Names the one value that kept the flip out. A child given only constants, or
+// one from another file without projected children, renders in the browser by running it.
 function childRefusalReason(
 	context: ArmPartsContext,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'child-component' }>,
@@ -2083,14 +2131,16 @@ function childRefusalReason(
 		semanticGraph && edge && !edge.importSource
 			? armChildOwnValueRefusal(semanticGraph, edge.childComponentName)
 			: undefined;
-	// A child given only constants renders the same in the browser as on the server, whichever module it lives in.
-	const constantProps =
-		edge !== undefined &&
-		edge.children.childCount === 0 &&
-		edge.props.every((prop) => prop.kind === 'serializable');
 	return own
 		? { detail: own, escalatable: true }
-		: { detail: 'has to run to produce its content', escalatable: constantProps };
+		: {
+				detail: 'has to run to produce its content',
+				escalatable:
+					edge !== undefined &&
+					edge.children.childCount === 0 &&
+					(edge.importSource !== undefined ||
+						edge.props.every((prop) => prop.kind === 'serializable')),
+			};
 }
 
 function componentEdgeSpan(
@@ -2104,31 +2154,59 @@ function componentEdgeSpan(
 
 const emptyLocalNames = new Set<string>();
 
+// A name a destructured @for binds is a row local read at its path on the row item.
+type RowLocalNames = ReadonlySet<string> & {
+	readonly itemPaths?: ReadonlyMap<string, ReadonlyArray<string>>;
+};
+
+function rowLocalPath(localNames: ReadonlySet<string>, name: string): ReadonlyArray<string> {
+	return (localNames as RowLocalNames).itemPaths?.get(name) ?? [name];
+}
+
 function rowLocalNamesBySymbol(
 	renderData: RenderDataArtifact | undefined,
 	semanticGraph?: SemanticGraphArtifact,
 	symbolResolver?: SymbolResolverPlan,
 ): ReadonlyMap<string, ReadonlySet<string>> {
-	const localNamesBySymbol = new Map<string, Set<string>>();
-	const addLocal = (symbolId: string, itemName: string): void => {
+	const localNamesBySymbol = new Map<
+		string,
+		Set<string> & { itemPaths?: Map<string, ReadonlyArray<string>> }
+	>();
+	const addLocal = (
+		symbolId: string,
+		itemName: string,
+		aliases: SemanticGraphArtifact['keyedRepeats'][number]['itemAliases'] = [],
+	): void => {
 		let localNames = localNamesBySymbol.get(symbolId);
 		if (!localNames) {
 			localNames = new Set();
 			localNamesBySymbol.set(symbolId, localNames);
 		}
 		localNames.add(itemName);
+		localNames.itemPaths?.delete(itemName);
+		for (const alias of aliases) {
+			localNames.add(alias.name);
+			(localNames.itemPaths ??= new Map()).set(alias.name, [itemName, ...alias.path]);
+		}
+	};
+	// Outer rows first, so an inner row's names win over an outer row's of the same spelling.
+	const depth = (repeatId: string): number => {
+		const repeat = semanticGraph?.keyedRepeats.find((candidate) => candidate.id === repeatId);
+		return repeat?.enclosingRepeatId ? 1 + depth(repeat.enclosingRepeatId) : 0;
 	};
 	if (renderData) {
-		for (const repeat of renderData.repeats) {
+		for (const repeat of [...renderData.repeats].sort(
+			(left, right) => depth(left.repeatId) - depth(right.repeatId),
+		)) {
 			const rowHostIds = renderChunkHostIds(renderData, repeat.rowChunkId);
-			const indexName = semanticGraph?.keyedRepeats.find(
+			const semanticRepeat = semanticGraph?.keyedRepeats.find(
 				(candidate) => candidate.id === repeat.repeatId,
-			)?.indexName;
+			);
 			for (const interaction of renderData.interactions) {
 				if (!rowHostIds.has(interaction.hostNodeId)) continue;
 				for (const symbolId of interaction.symbolIds) {
-					addLocal(symbolId, repeat.itemName);
-					if (indexName) addLocal(symbolId, indexName);
+					addLocal(symbolId, repeat.itemName, semanticRepeat?.itemAliases);
+					if (semanticRepeat?.indexName) addLocal(symbolId, semanticRepeat.indexName);
 				}
 			}
 		}
@@ -2140,7 +2218,8 @@ function rowLocalNamesBySymbol(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		for (const repeat of semanticGraph?.keyedRepeats ?? [])
-			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) addLocal(symbol.id, repeat.itemName);
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id))
+				addLocal(symbol.id, repeat.itemName, repeat.itemAliases);
 	}
 	return localNamesBySymbol;
 }
@@ -4606,7 +4685,13 @@ export function buildBranchUpdateEmission(input: BranchUpdateEmissionInput): Emi
 		),
 		armTextEscaperFunctionNode('marklessBranchText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBranchText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBranchText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 	];
 
@@ -4746,7 +4831,13 @@ export function buildAsyncBoundaryUpdateEmission(
 		),
 		armTextEscaperFunctionNode('marklessBoundaryText'),
 		...(hasRepeatParts
-			? [branchRowsFunctionNode('marklessBoundaryText', hasEmptyRepeatParts, hasRowAttributeParts)]
+			? [
+					branchRowsFunctionNode(
+						'marklessBoundaryText',
+						hasEmptyRepeatParts,
+						hasRowAttributeParts,
+					),
+				]
 			: []),
 		...(records && rowsShiftLocators ? [boundaryArmRecordsFunctionNode()] : []),
 	];
@@ -4887,7 +4978,9 @@ function armsHaveRowAttributeParts(
 	arms: ReadonlyArray<ReadonlyArray<PublicRenderPlanBranchArms['arms'][number][number]>>,
 ): boolean {
 	return arms.some((arm) =>
-		arm.some((part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row)),
+		arm.some(
+			(part) => 'repeat' in part && part.repeat.rowParts.some((row) => 'attribute' in row),
+		),
 	);
 }
 
@@ -5099,7 +5192,11 @@ function branchRowsFunctionNode(
 				callNode(identifierNode('marklessAttributeHtml'), [
 					memberChainNode('row.attribute.name'),
 					conditionalNode(
-						binaryNode('!==', memberChainNode('row.attribute.itemPath'), identifierNode('undefined')),
+						binaryNode(
+							'!==',
+							memberChainNode('row.attribute.itemPath'),
+							identifierNode('undefined'),
+						),
 						walkItem('row.attribute.itemPath'),
 						callNode(memberChainNode('graph.read'), [
 							memberChainNode('row.attribute.read.graphNodeId'),
@@ -5486,7 +5583,10 @@ function localValueNode(text: string, localNames: ReadonlySet<string>): Emission
 	if (!path || path.length < 2) return null;
 	if (!localNames.has(path[0] ?? '')) return null;
 
-	return optionalPathNode(memberChainNode('context.locals'), path);
+	return optionalPathNode(memberChainNode('context.locals'), [
+		...rowLocalPath(localNames, path[0]!),
+		...path.slice(1),
+	]);
 }
 
 /** The band-local twin of `staticSourcePath`, which reaches the scanner band. */
@@ -5509,11 +5609,12 @@ function staticDottedPath(text: string): ReadonlyArray<string> | null {
 function optionalPathNode(base: EmissionNode, path: ReadonlyArray<string>): EmissionNode {
 	let expression = base;
 	for (const part of path) {
+		const named = VALUE_IDENTIFIER_PATTERN.test(part);
 		expression = {
 			type: 'MemberExpression',
 			object: expression,
-			property: identifierNode(part),
-			computed: false,
+			property: named ? identifierNode(part) : literalNode(part),
+			computed: !named,
 			optional: true,
 		};
 	}
@@ -5796,7 +5897,10 @@ function rewriteGraphReadsAndLocals(
 		typeof node.name === 'string' &&
 		input.localNames.has(node.name)
 	) {
-		return optionalPathNode(memberChainNode('context.locals'), [node.name]);
+		return optionalPathNode(
+			memberChainNode('context.locals'),
+			rowLocalPath(input.localNames, node.name),
+		);
 	}
 
 	if (node.type === 'MemberExpression' && node.computed !== true && isNode(node.object)) {
@@ -6072,6 +6176,15 @@ export function buildEventHandlerEmission(
 						source: '@markless/web/fns/write-through',
 					}),
 				),
+			...(referenced.has(CHANGED_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: CHANGED_FN,
+							source: '@markless/web/fns/changed',
+						}),
+					]
+				: []),
 			...(referenced.has(CALLBACK_SLOT_FN)
 				? [
 						moduleImportNode({
@@ -6647,10 +6760,12 @@ function localNamesVisibleIn(fn: AnyNode, localNames: ReadonlySet<string>): Read
 	if (isNode(fn.body)) collectOwnScopeBindingNames(fn.body, bound);
 	if (bound.size === 0) return localNames;
 
-	const visible = new Set<string>();
+	const visible: Set<string> & { itemPaths?: RowLocalNames['itemPaths'] } = new Set<string>();
 	for (const name of localNames) {
 		if (!bound.has(name)) visible.add(name);
 	}
+	const itemPaths = (localNames as RowLocalNames).itemPaths;
+	if (itemPaths) visible.itemPaths = itemPaths;
 
 	return visible.size === localNames.size ? localNames : visible;
 }
@@ -6723,6 +6838,9 @@ function rewriteEventHandlerNode(
 
 	const unfilled = unfilledCallbackSlotNode(node, rewrite);
 	if (unfilled) return carryEventHandlerComments(node, unfilled);
+
+	const passed = passedStateCallNode(node, rewrite);
+	if (passed) return carryEventHandlerComments(node, passed);
 
 	const write = eventWriteNode(node, rewrite);
 	if (write) return carryEventHandlerComments(node, write);
@@ -6837,6 +6955,47 @@ function containsOwnAwait(node: unknown): boolean {
 	}
 
 	return false;
+}
+
+// The call runs as authored, then each path it wrote is marked changed before the handler reads on.
+function passedStateCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	const chain = node.type === 'ChainExpression' && isNode(node.expression) ? node : null;
+	const call = chain ? (chain.expression as AnyNode) : node;
+	if (call.type !== 'CallExpression') return null;
+	const args = asNodes(call.arguments);
+	const claimed = new Set<string>();
+	const writes = (rewrite.symbol.writes ?? []).filter((write) => {
+		const passedTo = write.passedTo;
+		if (!passedTo || rewrite.claimedWrites.has(write)) return false;
+		const argument = args[passedTo.argumentIndex];
+		if (!argument || valueNodeText(argument, rewrite.source) !== passedTo.argument)
+			return false;
+		if (!isNode(call.callee) || valueNodeText(call.callee, rewrite.source) !== passedTo.callee)
+			return false;
+		const key = `${passedTo.argumentIndex}:${write.graphNodeId}:${JSON.stringify(write.path)}:${JSON.stringify(write.row?.itemPath ?? null)}`;
+		if (claimed.has(key)) return false;
+		claimed.add(key);
+		return true;
+	});
+	if (writes.length === 0) return null;
+	for (const write of writes) rewrite.claimedWrites.add(write);
+
+	const rewritten = rewriteEventHandlerChildren(call, (child) =>
+		rewriteEventHandlerNode(child, call, rewrite),
+	);
+	// The paths are found before the call runs: a row the call removes has no path after it.
+	return callNode(identifierNode(CHANGED_FN), [
+		memberChainNode('context.graph'),
+		arrayNode(
+			writes.map((write) =>
+				arrayNode([
+					literalNode(write.graphNodeId),
+					rowItemPathNode(write) ?? stringArrayNode(write.path),
+				]),
+			),
+		),
+		chain ? chainExpressionNode(chain, rewritten) : rewritten,
+	]);
 }
 
 /**
@@ -7412,6 +7571,7 @@ function collectIdentifierNames(node: unknown, names: Set<string>): void {
 const ROW_ITEM_PATH_FN = 'marklessRowItemPath';
 const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
+const CHANGED_FN = 'marklessChanged';
 
 // The graph a write through a handler local lands on: where the local's value lives, found at dispatch.
 function writeThroughCall(through: LoweredWriteThrough, graphNodeId: string): EmissionNode {

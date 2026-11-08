@@ -2,12 +2,7 @@ import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import type { SemanticGraphDiagnostic, SemanticModuleImport } from '../../artifacts.ts';
 import { uiImportShapeDiagnostic } from './diagnostics.ts';
 
-export type FrameworkApiName =
-	| 'state'
-	| 'computed'
-	| 'element'
-	| 'shared'
-	| 'storage';
+export type FrameworkApiName = 'state' | 'computed' | 'element' | 'shared' | 'storage';
 
 const frameworkApiNames = new Set<FrameworkApiName>([
 	'state',
@@ -126,7 +121,10 @@ export function collectUiImportShapeDiagnostics(input: {
 		const specifiers = asNodes(statement.specifiers);
 
 		if (source.startsWith('@markless/ui/')) {
-			if (specifiers.length > 0 && specifiers.every((specifier) => specifier.importKind === 'type'))
+			if (
+				specifiers.length > 0 &&
+				specifiers.every((specifier) => specifier.importKind === 'type')
+			)
 				continue;
 			const name = source.slice('@markless/ui/'.length).split('/')[0];
 			if (!name) continue;

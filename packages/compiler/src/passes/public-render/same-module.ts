@@ -32,6 +32,7 @@ import {
 	type ComponentReference,
 	ssrComposedPayloadView,
 } from './shared.ts';
+import { componentSeedCellIndexes } from './derive-set.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 
 export function ssrComponentFunctionName(componentName: string): string {
@@ -107,7 +108,7 @@ export function emitSameModuleSsrComponents(
 		const payloadStateExpression = `marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(owned)})`;
 		return [
 			`const ${valuesName} = new Map([`,
-			stateEntries(input, owned.seedCellIndexes).join(',\n'),
+			stateEntries(input, componentSeedCellIndexes(input, componentName, owned)).join(',\n'),
 			']);',
 			localName ? `const ${localName} = { renderSsr: ${functionName} };` : null,
 			`async function ${functionName}(marklessSsrProps = {}, marklessSsrRenderContext) {`,

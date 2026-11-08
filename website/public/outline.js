@@ -34,7 +34,6 @@ class MarklessOutline extends HTMLElement {
 			.filter((entry) => entry.heading);
 		if (!entries.length) return;
 		const controller = new AbortController();
-		const header = document.querySelector('.site-header');
 		let frame = 0;
 		const save = () => {
 			try {
@@ -42,7 +41,7 @@ class MarklessOutline extends HTMLElement {
 			} catch {}
 		};
 		let current = entries.find((entry) => entry.link.hasAttribute('aria-current'));
-		const readingLine = () => (header?.getBoundingClientRect().bottom ?? 0) + 32;
+		const readingLine = () => Math.max(0, ...[...document.querySelectorAll('.navbar-edge')].map((edge) => edge.getBoundingClientRect().bottom)) + 32;
 		// A #fragment load can scroll after load; until it does, keep the heading the fragment names.
 		let awaitingFragment = entries.some((entry) => entry.link.hash === location.hash && entry.heading.getBoundingClientRect().top > readingLine() + 1);
 		const update = () => {

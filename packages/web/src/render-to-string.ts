@@ -13,7 +13,7 @@ import {
 	type ProtocolViewPayload,
 	type StorageSeedMetadata,
 } from '@markless/serializer';
-import { encodeProtocolPayloadLists, renderPayloadScripts } from '@markless/serializer';
+import { encodeProtocolPayloadLists, renderPayloadScripts, serializeGraphValue } from '@markless/serializer';
 import {
 	type ProtocolArmRecordSet,
 	protocolEventDispatchesMarkless,
@@ -41,6 +41,7 @@ import {
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
 	createInlineResumerStorageWakeSource,
+	createInlineResumerSharedWakeSource,
 	renderPrerenderInlineResumerSource,
 	renderInlineResumerPageSource,
 	INLINE_PAGE_FORWARDS_UNKNOWN,
@@ -51,7 +52,12 @@ import {
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
 import { prepareSsrResumeRecords } from './prerender/records.ts';
-import { CONTAINER_ATTRIBUTE } from './fns/container-region.ts';
+import { CONTAINER_ATTRIBUTE, RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import {
+	hasLiveSharedDefinitions,
+	PROTOCOL_SHARED_INSTANCES_PROPERTY,
+	PROTOCOL_SHARED_INSTANCES_VERSION,
+} from '../../serializer/src/protocol-shared-instances.ts';
 import {
 	marklessSsrRosterCounted,
 	marklessSsrRosterPositionContext,
@@ -158,6 +164,21 @@ export function storageRenderContext(cookie: string | null | undefined): {
 	return cookie ? { [STORAGE_RENDER_CONTEXT_READER]: createStorageCookieReader(cookie) } : {};
 }
 
+// A rebuilt value the serializer refuses is compared as absent: the request left it out too, or serves its own.
+function withoutUnserializableComputedValues<T extends { readonly state: ProtocolStatePayload }>(
+	baseline: T,
+): T {
+	const unserializable = (record: ProtocolStatePayload['computed'][number]) =>
+		record.directValue !== undefined && !serializeGraphValue(record.directValue).ok;
+	if (!baseline.state.computed.some(unserializable)) return baseline;
+	const computed = baseline.state.computed.map((record) => {
+		if (!unserializable(record)) return record;
+		const { directValue: _, ...kept } = record;
+		return kept;
+	});
+	return { ...baseline, state: { ...baseline.state, computed } };
+}
+
 // Shared container assembly for the blocking (renderToString) and streaming
 // (renderToStream) paths: payload scripts, preload links, head injections,
 // and the inline resumer around the rendered page html.
@@ -176,7 +197,7 @@ export async function assembleSsrContainer(
 	const wakeChannelEnabled =
 		hasPayload && browserTriggers && prerenderWakeModuleUrl !== undefined;
 	const baseline = wakeChannelEnabled
-		? await derivePrerenderResumeRecords(component, options.props)
+		? withoutUnserializableComputedValues(await derivePrerenderResumeRecords(component, options.props))
 		: undefined;
 	const requestRecords = { state, view };
 	const classification = baseline
@@ -270,7 +291,8 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
+						sharedWakeSource(state),
 					artifactSources?.defer,
 				)
 			: '';
@@ -284,12 +306,12 @@ export async function assembleSsrContainer(
 	);
 
 	return [
-		storageSeedScript,
-		renderHeadInjections(artifactHeadInjections(component), options.nonce),
-		renderModulePreloadLinks(modulePreloads, options.nonce),
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
 			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
+		storageSeedScript,
+		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+		renderModulePreloadLinks(modulePreloads, options.nonce),
 		renderContainer(
 			options.containerId,
 			[
@@ -362,7 +384,8 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)),
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
+						sharedWakeSource(state),
 					artifactInlineResumerSources(component)?.defer,
 				)
 			: '';
@@ -544,6 +567,19 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
+// Only app-scoped instances are shared with other containers; container and subtree instances are a container's own.
+function sharedWakeSource(state: ProtocolStatePayload): string {
+	return (state.sharedDefinitions ?? []).some(
+		(definition) => definition.scope !== 'subtree' && definition.scope !== 'container',
+	)
+		? createInlineResumerSharedWakeSource(
+				PROTOCOL_SHARED_INSTANCES_PROPERTY,
+				PROTOCOL_SHARED_INSTANCES_VERSION,
+				CONTAINER_ATTRIBUTE,
+			)
+		: '';
+}
+
 // Each storage cell's slot key and the value this render gave it.
 function storageWakeSource(
 	state: ProtocolStatePayload,
@@ -577,16 +613,16 @@ function renderedCellValue(
 
 function renderHeadInjection(injection: RenderHeadInjection, nonce: string | undefined): string {
 	const attributes = { ...injection.attributes };
-	if (nonce && injection.tag === 'script' && !attributes.nonce) {
+	if (nonce && (injection.tag === 'script' || injection.tag === 'style') && !attributes.nonce) {
 		attributes.nonce = nonce;
 	}
 	const renderedAttributes = Object.entries(attributes)
 		.map(([name, value]) => `${name}="${escapeAttribute(value)}"`)
 		.join(' ');
 	const suffix = renderedAttributes ? ` ${renderedAttributes}` : '';
-	return injection.tag === 'link'
-		? `<${injection.tag}${suffix}>`
-		: `<${injection.tag}${suffix}>${escapeInlineScript(injection.children ?? '')}</${injection.tag}>`;
+	if (injection.tag === 'link') return `<${injection.tag}${suffix}>`;
+	const children = injection.children ?? '';
+	return `<${injection.tag}${suffix}>${injection.tag === 'style' ? escapeInlineStyle(children) : escapeInlineScript(children)}</${injection.tag}>`;
 }
 
 function renderModulePreloadLinks(
@@ -617,6 +653,8 @@ function renderModulePreloadLinks(
 function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePayload): boolean {
 	return (
 		(state.storage?.length ?? 0) > 0 ||
+		// A page that only reads a shared() instance still binds to its live value after a swap or another container's write.
+		hasLiveSharedDefinitions(state) ||
 		view.events.some(protocolEventDispatchesMarkless) ||
 		state.computed.some(
 			(computed) =>
@@ -1051,6 +1089,23 @@ function renderContainer(
 	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
 }
 
+/**
+ * Splits the early-event capture script off the front of the html that precedes the container.
+ * A document host serves it ahead of its stylesheets: a classic script waits for every stylesheet
+ * above it, and the parser waits for the script.
+ */
+export function splitEarlyEventCapture(head: string): {
+	readonly capture: string;
+	readonly rest: string;
+} {
+	// Built here, not at module scope, so a bundle that never splits drops this function whole.
+	const captureStart = `>${escapeInlineScript(createEarlyEventCaptureSource([]).slice(0, -'[]);'.length))}`;
+	const start = head.startsWith('<script') ? head.indexOf(captureStart) : -1;
+	if (start === -1 || head.lastIndexOf('<', start) !== 0) return { capture: '', rest: head };
+	const end = head.indexOf('</script>', start) + '</script>'.length;
+	return { capture: head.slice(0, end), rest: head.slice(end) };
+}
+
 const CONTAINER_OPEN = `<div ${CONTAINER_ATTRIBUTE}`;
 const CONTAINER_CLOSE = '</div>';
 
@@ -1114,7 +1169,7 @@ function renderInlineResumerScript(
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
-		? ` data-markless-resume-module="${escapeAttribute(resumeModuleUrl)}"`
+		? ` ${RESUME_MODULE_ATTRIBUTE}="${escapeAttribute(resumeModuleUrl)}"`
 		: '';
 	const settleModuleAttribute = settleModuleUrl
 		? ` data-markless-settle-module="${escapeAttribute(settleModuleUrl)}"`
@@ -1237,4 +1292,9 @@ function escapeAttribute(value: string): string {
 
 function escapeInlineScript(value: string): string {
 	return value.replace(/<\/script/gi, '<\\/script');
+}
+
+// `</style` can only sit in a CSS string or comment, where `\/` reads as `/`.
+function escapeInlineStyle(value: string): string {
+	return value.replace(/<\/style/gi, '<\\/style');
 }

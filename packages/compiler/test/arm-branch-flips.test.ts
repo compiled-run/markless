@@ -620,3 +620,82 @@ export function Panel({ open, mode }) @{
 		expect.objectContaining({ code: 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED', severity: 'warning' }),
 	);
 });
+
+// The build refuses any caller that can change a prop-decided @if, so its flip, which ships no code, never runs.
+test.each([
+	{
+		name: 'computed over two props',
+		component: 'Panel',
+		props: ['open', 'mode'],
+		source: `
+import { state, computed } from '@markless/core';
+
+function Counter() @{
+	let count = state(0);
+	<button type="button" onClick={() => count++}>{count}</button>
+}
+
+export function Panel({ open, mode }) @{
+	const shown = computed(() => open && mode !== 'off');
+	<section>
+		@if (shown) {
+			<Counter />
+		}
+	</section>
+}
+`,
+	},
+	{
+		name: 'one prop, both arms stateful',
+		component: 'Toggle',
+		props: ['inBar'],
+		source: `
+import { state } from '@markless/core';
+
+function Tally({ label }) @{
+	let taps = state(0);
+	<em onClick={() => taps++}>{label}{taps}</em>
+}
+
+export default function Toggle({ inBar }) @{
+	<div>
+		@if (inBar) {
+			<Tally label="bar" />
+		} @else {
+			<Tally label="page" />
+		}
+	</div>
+}
+`,
+	},
+])(
+	'a prop-decided @if names no flip symbol in its demand map: $name',
+	async ({ source, component, props }) => {
+		const result = await compileTsrxModule({
+			filename: 'src/Decided.tsrx',
+			source,
+			symbols: [],
+		});
+		const decided = result.symbolModules.propDecidedBranches ?? [];
+		expect(decided.map((branch) => branch.componentName)).toEqual([component]);
+		const flip = decided[0]!.symbolId;
+		expect(result.symbolModules.modules.some((module) => module.symbolId === flip)).toBe(false);
+		for (const map of Object.values(result.runtimeDemandMaps)) {
+			const branch = map.payloadRecords.find((record) => record.kind === 'branch');
+			expect(branch?.symbolIds).toEqual([]);
+		}
+		const reach = result.moduleGraphInterface.render.components.find(
+			(candidate) => candidate.componentName === component,
+		)?.firstUseReach;
+		for (const prop of props) {
+			const propReach = reach?.props.find((candidate) => candidate.name === prop)?.reach;
+			expect(propReach, prop).toBeTypeOf('object');
+			expect(
+				(propReach as { readonly symbolIds: ReadonlyArray<string> }).symbolIds,
+			).not.toContain(flip);
+		}
+		const mount = reach?.mount;
+		expect(mount).toBeTypeOf('object');
+		expect((mount as { readonly symbolIds: ReadonlyArray<string> }).symbolIds).not.toContain(flip);
+	},
+);

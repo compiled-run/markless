@@ -125,6 +125,8 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Same reason for the live roster: a CSR mount reaches the runtime start through client output, so the roster loader is named there or a row added after mount is never renumbered.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasOverlayMarks === true":
 		'Same reason for elevation: a CSR mount reaches the runtime start without a resume module, and the overlay behaviour must be named by client output or its chunk is never emitted.',
+	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasLiveSharedState === true":
+		'Same reason for shared() instances that outlive the page: a CSR mount builds its graph without a resume module, so the binding module is named by client output or the mount never binds to the document instance.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly":
 		'Same reason for onIdle: a CSR mount has no resume module and no inline trigger, so the app module with an idle record hands the mount its idle wake or the handlers never run.',
 	"packages/bundler/src/source-module.ts :: input.environment === 'client' ? clientRowMintLoader(input) : null,":

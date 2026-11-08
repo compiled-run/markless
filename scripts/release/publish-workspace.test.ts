@@ -4,8 +4,12 @@ import { chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { releasePackages, rootVersion } from './release-packages.mjs';
+
+// Each test runs the publisher as a child Node process that starts about thirty fake tools: 0.5 to 1.2 s
+// alone and up to 2.1 s with six copies running at load average 24, past 5 s under the pre-commit run at 35.
+vi.setConfig({ testTimeout: 30_000 });
 
 const publishCli = fileURLToPath(new URL('./publish-workspace.mjs', import.meta.url));
 const version = rootVersion() as string;
@@ -118,7 +122,8 @@ exit 1
 	return directory;
 }
 
-async function runPublish(fakeDirectory: string, deadlineMs = 10_000) {
+// The scripted view answers end every wait; the deadline only decides the run that passes its own.
+async function runPublish(fakeDirectory: string, deadlineMs = 600_000) {
 	const result = spawnSync(process.execPath, [publishCli, '--version', version], {
 		encoding: 'utf8',
 		env: {

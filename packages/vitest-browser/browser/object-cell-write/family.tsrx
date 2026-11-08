@@ -19,7 +19,7 @@ export const boxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function BoxRoot({ children }) @{

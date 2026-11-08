@@ -57,30 +57,41 @@ const OBJECT_READS = new Set([
 	'toString',
 	'valueOf',
 ]);
-const READS: Record<Exclude<ValueKind, 'primitive' | 'regexp' | 'unknown' | 'date'>, Set<string>> =
-	{
-		array: ARRAY_READS,
-		object: OBJECT_READS,
-		map: new Set(['get', 'has', 'keys', 'values', 'entries', 'forEach']),
-		set: new Set([
-			'has',
-			'keys',
-			'values',
-			'entries',
-			'forEach',
-			'union',
-			'intersection',
-			'difference',
-			'symmetricDifference',
-			'isSubsetOf',
-			'isSupersetOf',
-			'isDisjointFrom',
-		]),
-		'weak-map': new Set(['get', 'has']),
-		'weak-set': new Set(['has']),
-		url: new Set(['toString', 'toJSON']),
-		'search-params': new Set(['get', 'getAll', 'has', 'keys', 'values', 'entries', 'forEach', 'toString']),
-	};
+const READS: Record<
+	Exclude<ValueKind, 'primitive' | 'regexp' | 'unknown' | 'date'>,
+	Set<string>
+> = {
+	array: ARRAY_READS,
+	object: OBJECT_READS,
+	map: new Set(['get', 'has', 'keys', 'values', 'entries', 'forEach']),
+	set: new Set([
+		'has',
+		'keys',
+		'values',
+		'entries',
+		'forEach',
+		'union',
+		'intersection',
+		'difference',
+		'symmetricDifference',
+		'isSubsetOf',
+		'isSupersetOf',
+		'isDisjointFrom',
+	]),
+	'weak-map': new Set(['get', 'has']),
+	'weak-set': new Set(['has']),
+	url: new Set(['toString', 'toJSON']),
+	'search-params': new Set([
+		'get',
+		'getAll',
+		'has',
+		'keys',
+		'values',
+		'entries',
+		'forEach',
+		'toString',
+	]),
+};
 const CONSTRUCTED: Record<string, ValueKind> = {
 	Array: 'array',
 	Map: 'map',
@@ -192,12 +203,15 @@ function callsArrowMember(
 	if (receiver?.type !== 'ObjectExpression') return false;
 	const properties = asNodes(receiver.properties);
 	const called =
-		method === null ? properties.map((property) => property.value as AnyNode | undefined) : [propertyValue(receiver, method)];
+		method === null
+			? properties.map((property) => property.value as AnyNode | undefined)
+			: [propertyValue(receiver, method)];
 	return (
 		called.length > 0 &&
 		properties.every((property) => property.type === 'Property') &&
 		called.every(
-			(value) => value?.type === 'ArrowFunctionExpression' && !namesIdentifier(value, localName),
+			(value) =>
+				value?.type === 'ArrowFunctionExpression' && !namesIdentifier(value, localName),
 		)
 	);
 }
@@ -209,7 +223,8 @@ function propertyValue(object: AnyNode, key: string): AnyNode | undefined {
 			(property) =>
 				property.type === 'Property' &&
 				property.computed !== true &&
-				(getIdentifierName(property.key as AnyNode) ?? (property.key as AnyNode).value) === key,
+				(getIdentifierName(property.key as AnyNode) ?? (property.key as AnyNode).value) ===
+					key,
 		)?.value as AnyNode | undefined,
 	);
 }
@@ -237,7 +252,8 @@ function isTransparent(node: AnyNode): boolean {
 function isRead(kind: ValueKind, method: string): boolean {
 	if (kind === 'primitive' || kind === 'regexp') return true;
 	if (kind === 'unknown') return false;
-	if (kind === 'date') return method.startsWith('get') || method.startsWith('to') || method === 'valueOf';
+	if (kind === 'date')
+		return method.startsWith('get') || method.startsWith('to') || method === 'valueOf';
 	return READS[kind].has(method) || OBJECT_READS.has(method);
 }
 
@@ -254,7 +270,8 @@ function kindAtPath(kind: ValueKind, init: AnyNode, path: ReadonlyArray<string |
 					(property) =>
 						property.type === 'Property' &&
 						property.computed !== true &&
-						(getIdentifierName(property.key as AnyNode) ?? (property.key as AnyNode).value) === key,
+						(getIdentifierName(property.key as AnyNode) ??
+							(property.key as AnyNode).value) === key,
 				)?.value as AnyNode | undefined,
 			);
 		} else if (current.type === 'ArrayExpression' && /^\d+$/.test(key)) {

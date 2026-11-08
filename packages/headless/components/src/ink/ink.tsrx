@@ -263,7 +263,7 @@ export const inkState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function InkRoot({

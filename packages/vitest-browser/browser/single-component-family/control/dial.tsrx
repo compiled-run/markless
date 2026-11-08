@@ -13,7 +13,7 @@ export const controlDial = shared(
 
 		return { ...d, markEls, headEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ControlDial({ tag, children }) @{

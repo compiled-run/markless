@@ -16,6 +16,7 @@ export function Counter({ start, label }: CounterProps) @{
 export function DocumentHead() @{
 	<head>
 		<meta property="og:title" content="A page title" />
+		<link rel="preload" href="/font.woff2" as="font" type="font/woff2" crossorigin="anonymous" />
 		<script src="/theme.js" type="module" async defer crossorigin="anonymous"></script>
 	</head>
 }

@@ -1,27 +1,32 @@
 import { tooltip } from '@markless/ui';
 import { art } from './term-art.ts';
-import { captionOf } from './term-glossary.ts';
+import { captionOf, glossaryHref } from './term-glossary.ts';
 
-/** A word in running text that shows a small ink sketch of what it means. `word` must be a key of the glossary in term-glossary.ts. */
+/** A word in running text that shows what it means: its one-line caption, with a small ink sketch for the words that have one. `word` must be a key of the glossary in term-glossary.ts. */
 export default function Term({ word }: { readonly word: string }) @{
 	const caption = captionOf(word);
-	const sketch = word === 'events' ? art.events : word === 'values' ? art.values : word === 'instructions' ? art.instructions : art.elements;
+	const sketch = word === 'events' ? art.events : word === 'values' ? art.values : word === 'instructions' ? art.instructions : word === 'elements' ? art.elements : null;
 
 	<tooltip.root class="term">
 		<tooltip.trigger class="word">{word}</tooltip.trigger>
 		<tooltip.content class="tip" data-term={word}>
-			<svg class="sketch" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
-				<path class="paper" d={sketch.paper} />
-				<path class="pink" d={sketch.pink} />
-				<path class="hatch" d={sketch.hatch} />
-				<path class="paper" d={sketch.cover} />
-				<path class="fine" d={sketch.fine} />
-				<path class="ink" d={sketch.ink} />
-				@for (const label of sketch.labels; key label.key) {
-					<text class="hand" x={label.x} y={label.y} transform={'rotate(' + label.tilt + ' ' + label.x + ' ' + label.y + ')'}>{label.text}</text>
-				}
-			</svg>
+			@if (sketch) {
+				<svg class="sketch" viewBox={'0 0 ' + art.width + ' ' + art.height} aria-hidden="true">
+					<path class="paper" d={sketch.paper} />
+					<path class="pink" d={sketch.pink} />
+					<path class="hatch" d={sketch.hatch} />
+					<path class="paper" d={sketch.cover} />
+					<path class="fine" d={sketch.fine} />
+					<path class="ink" d={sketch.ink} />
+					@for (const label of sketch.labels; key label.key) {
+						<text class="hand" x={label.x} y={label.y} transform={'rotate(' + label.tilt + ' ' + label.x + ' ' + label.y + ')'}>{label.text}</text>
+					}
+				</svg>
+			}
 			<span class="caption">{caption}</span>
+			<a class="more" href={glossaryHref(word)}>
+				In the glossary
+			</a>
 		</tooltip.content>
 		<style>
 			.term {
@@ -134,6 +139,16 @@ export default function Term({ word }: { readonly word: string }) @{
 			.caption {
 				margin: 0.4rem 0 0;
 				color: var(--ink);
+			}
+
+			.more {
+				display: block;
+				margin-top: 0.35rem;
+				color: var(--ink);
+				font-size: 0.9em;
+				text-decoration-color: var(--pink);
+				text-decoration-thickness: 0.12em;
+				text-underline-offset: 0.16em;
 			}
 		</style>
 	</tooltip.root>

@@ -21,6 +21,7 @@ import type {
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
 	SemanticGraphBinding,
+	SemanticKeyedRepeat,
 	SemanticSharedCallbackBinding,
 	SymbolModulesArtifact,
 	SymbolResolverPlan,
@@ -29,6 +30,7 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_PAGE_SPACE_ID_PREFIXES,
 	PROTOCOL_VISIBLE_EVENT_NAME,
+	hasLiveSharedDefinitions,
 	protocolEventActionKind,
 	type ProtocolArmBranchRecord,
 	type ProtocolArmRecordSet,
@@ -89,10 +91,15 @@ const ASYNC_BOUNDARY = [
 	'web/resume-stream-patches',
 ];
 const BEHAVIOR = ['web/resume-behaviors'];
+// A shared() instance that outlives the page: its binding at wake.
+const SHARED_INSTANCES = ['web/fns/shared-instances'];
+// The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
+const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...SHARED_INSTANCES,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -181,6 +188,7 @@ export function createRuntimeDemandMap(
 		// This module's own components, so a same-module edge can name its child.
 		readonly components?: ReadonlyArray<SemanticComponent>;
 		readonly sharedCallbackBindings?: ReadonlyArray<SemanticSharedCallbackBinding>;
+		readonly keyedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
 	},
 	demandClass: RuntimeDemandClass,
 ): RuntimeDemandMapArtifact {
@@ -232,7 +240,12 @@ export function createRuntimeDemandMap(
 	const scalarRows =
 		classRouting.scalarRows &&
 		!storageRequiresFullResume &&
-		isScalarOnlyKeyedRepeatModule(input.symbolResolver, input.protocolView);
+		isScalarOnlyKeyedRepeatModule(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+			input.componentEdges,
+		);
 	const payloadRecords = payloadDemandRecords(
 		input.protocolView,
 		closedSymbolDemand,
@@ -245,6 +258,7 @@ export function createRuntimeDemandMap(
 		dispatchCore,
 		fullTier,
 		input.overlays ?? [],
+		fixedBranchSymbolIds(input.symbolModules),
 	);
 	const scope: FirstUseScope = {
 		resolver: input.symbolResolver,
@@ -268,7 +282,11 @@ export function createRuntimeDemandMap(
 			closurePlans,
 		),
 		armActions: armActionDemandRecords(scope, dispatchCore),
-		capabilityModuleIds: capabilityModuleIds(input.symbolResolver, input.protocolView),
+		capabilityModuleIds: capabilityModuleIds(
+			input.symbolResolver,
+			input.protocolView,
+			input.protocolState,
+		),
 		...nestedRecordDemand(
 			input.protocolView,
 			closedSymbolDemand,
@@ -288,6 +306,8 @@ export function createRuntimeDemandMap(
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...BEHAVIOR,
+			...SHARED_INSTANCES,
+			...SHARED_SWAP,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -308,6 +328,8 @@ function firstUseComposition(
 	| 'importedModuleInterfaces'
 	| 'components'
 	| 'sharedCallbackBindings'
+	| 'fixedBranchSymbolIds'
+	| 'staticRepeatIds'
 > {
 	return {
 		componentEdges: Array.isArray(input.componentEdges)
@@ -317,7 +339,24 @@ function firstUseComposition(
 		importedModuleInterfaces: input.importedModuleInterfaces,
 		components: input.components ?? [],
 		sharedCallbackBindings: input.sharedCallbackBindings ?? [],
+		fixedBranchSymbolIds: fixedBranchSymbolIds(input.symbolModules),
+		staticRepeatIds: staticRepeatIds(input.keyedRepeats ?? []),
 	};
+}
+
+// A @for over a value no graph node holds renders its rows once, as does one over such a row's own items.
+function staticRepeatIds(repeats: ReadonlyArray<SemanticKeyedRepeat>): ReadonlySet<string> {
+	const byId = new Map(repeats.map((repeat) => [repeat.id, repeat]));
+	const isStatic = (repeat: SemanticKeyedRepeat | undefined): boolean =>
+		!!repeat &&
+		repeat.collectionGraphNodeId === undefined &&
+		(repeat.enclosingRepeatId === undefined || isStatic(byId.get(repeat.enclosingRepeatId)));
+	return new Set(repeats.filter(isStatic).map((repeat) => repeat.id));
+}
+
+// The build refuses every caller that can change a prop-decided branch's props, so its flip, which ships no code, never runs.
+function fixedBranchSymbolIds(symbolModules: SymbolModulesArtifact): ReadonlySet<string> {
+	return new Set((symbolModules.propDecidedBranches ?? []).map((branch) => branch.symbolId));
 }
 
 /** The scope a module's own first-use answers are computed in, for publishing on its interface. */
@@ -378,6 +417,7 @@ function closureEventPlans(
 function capabilityModuleIds(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
 ): ReadonlyArray<string> {
 	const symbols = resolver.symbols;
 	const behavior =
@@ -393,7 +433,11 @@ function capabilityModuleIds(
 			(symbol) =>
 				symbol.kind === 'async-computed-runner' || symbol.kind === 'async-boundary-update',
 		);
-	return [...(behavior ? BEHAVIOR : []), ...(asyncBoundary ? ASYNC_BOUNDARY : [])];
+	return [
+		...(behavior ? BEHAVIOR : []),
+		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
+	];
 }
 
 // Records served inside arms and rows ride outside the flat payload streams. Every one the compiler
@@ -562,6 +606,8 @@ function referencesValue(value: unknown, id: string): boolean {
 function isScalarOnlyKeyedRepeatModule(
 	resolver: SymbolResolverPlan,
 	view: ProtocolViewPayload,
+	state: ProtocolStatePayload,
+	componentEdges: unknown,
 ): boolean {
 	if ((view.keyedRepeats?.length ?? 0) === 0 || (view.domUpdates?.length ?? 0) === 0)
 		return false;
@@ -595,6 +641,12 @@ function isScalarOnlyKeyedRepeatModule(
 		);
 		if (writes.length === 0) return false;
 		if (writesDemandNonTextRuntime(writes, view)) return false;
+		if (
+			writes.some((write) =>
+				cellReadOutsideTextUpdates(write.graphNodeId, view, state, componentEdges),
+			)
+		)
+			return false;
 		const domUpdateSymbolIds = textDomUpdatesForWrites(writes, view).map(
 			(update) => update.symbolId,
 		);
@@ -680,7 +732,6 @@ function eventHandlerBodyAllowsScalarLeaf(
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
 ): boolean {
-	const authoredWrite = authoredWriteSource(write);
 	const prefix = 'const __marklessHandler = ';
 	const wrapped = `${prefix}${symbol.source};`;
 	let program: AnyNode;
@@ -691,7 +742,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 	}
 	const declarator = asNodes(asNodes(program.body)[0]?.declarations)[0];
 	const fn = declarator?.init as AnyNode | undefined;
-	if (!authoredWrite || !fn || !isNode(fn.body)) return false;
+	if (!fn || !isNode(fn.body)) return false;
 	const body = fn.body as AnyNode;
 	const statements = body.type === 'BlockStatement' ? asNodes(body.body) : [body];
 	const parameters = new Set(
@@ -710,8 +761,7 @@ function eventHandlerBodyAllowsScalarLeaf(
 						? undefined
 						: statement;
 		if (!expression) return false;
-		if (!wrote && wrapped.slice(expression.start, expression.end) === authoredWrite)
-			return (wrote = true);
+		if (!wrote && isAuthoredWrite(expression, write)) return (wrote = true);
 		return parameterCancel(expression, parameters);
 	});
 }
@@ -730,24 +780,36 @@ function parameterCancel(node: AnyNode, parameters: ReadonlySet<string>): boolea
 	);
 }
 
-function authoredWriteSource(
+// The handler's one recorded write, as the assignment or update node itself: the semantic pass already proved its target is the state cell.
+function isAuthoredWrite(
+	node: AnyNode,
 	write: NonNullable<
 		Extract<PlannedSymbol, { readonly kind: 'event-handler' }>['writes']
 	>[number],
-): string | null {
+): boolean {
+	let current = node;
+	while (current.type === 'ParenthesizedExpression' && isNode(current.expression))
+		current = current.expression as AnyNode;
 	if (write.operation === 'assign') {
-		const operator = write.assignmentOperator ?? '=';
-		if (!write.valueSource) return null;
-		return `${write.source} ${operator} ${write.valueSource}`;
+		return (
+			current.type === 'AssignmentExpression' &&
+			current.operator === (write.assignmentOperator ?? '=') &&
+			isIdentifierNamed(current.left, write.source)
+		);
 	}
+	return (
+		write.operation === 'update' &&
+		current.type === 'UpdateExpression' &&
+		current.operator === write.updateOperator &&
+		current.prefix === (write.prefix === true) &&
+		isIdentifierNamed(current.argument, write.source)
+	);
+}
 
-	if (write.operation === 'update' && write.updateOperator) {
-		return write.prefix
-			? `${write.updateOperator}${write.source}`
-			: `${write.source}${write.updateOperator}`;
-	}
-
-	return null;
+function isIdentifierNamed(node: unknown, name: string): boolean {
+	return (
+		isNode(node) && (node as AnyNode).type === 'Identifier' && (node as AnyNode).name === name
+	);
 }
 
 function literalValueSource(source: string | undefined): string | null {
@@ -890,6 +952,7 @@ function payloadDemandRecords(
 	dispatchCore: ReadonlyArray<string>,
 	fullTier: ReadonlyArray<string>,
 	overlays: ReadonlyArray<{ readonly hostNodeId: string }>,
+	fixedBranchSymbolIds: ReadonlySet<string> = new Set(),
 ): RuntimeDemandMapArtifact['payloadRecords'] {
 	const rowDispatchCore = replacement.scalarRows ? ROW_LEAN_DISPATCH_CORE : fullTier;
 	return [
@@ -949,7 +1012,9 @@ function payloadDemandRecords(
 		...(view.branches ?? []).map((record): RuntimeDemandMapRecord => {
 			// A branch whose test reads nothing never flips, so nothing ever loads its flip symbol.
 			const flipSymbolIds =
-				record.symbolId && (record.testReads?.length || record.contentReads?.length)
+				record.symbolId &&
+				!fixedBranchSymbolIds.has(record.symbolId) &&
+				(record.testReads?.length || record.contentReads?.length)
 					? [record.symbolId]
 					: [];
 			return {
@@ -1388,6 +1453,9 @@ export type FirstUseScope = {
 		| undefined;
 	readonly components: ReadonlyArray<SemanticComponent>;
 	readonly sharedCallbackBindings: ReadonlyArray<SemanticSharedCallbackBinding>;
+	// Flip symbols of branches that never flip once built.
+	readonly fixedBranchSymbolIds: ReadonlySet<string>;
+	readonly staticRepeatIds: ReadonlySet<string>;
 };
 
 // Written paths per graph node; null when the whole node may have changed.
@@ -1430,7 +1498,7 @@ function firstUseDemand(
 			if (!read.graphNodeId.startsWith('prop:')) continue;
 			const prop = read.path[0];
 			if (prop === undefined) return 'unknown';
-			calls.push({ prop });
+			if (!rowDataRead(symbolId, read, scope.captureAnalysis)) calls.push({ prop });
 		}
 		const slots = composerSlotCalls(symbolId, scope.captureAnalysis);
 		if (slots === 'unknown') return 'unknown';
@@ -1442,6 +1510,30 @@ function firstUseDemand(
 		}
 	}
 	return consequenceReach(scope, symbolIds, new Set(ownRecordIds), affected, calls);
+}
+
+// A field of a row the page serves as data, never code a composing module passes.
+function rowDataRead(
+	symbolId: string,
+	read: { readonly componentName?: string; readonly path: ReadonlyArray<string> },
+	captureAnalysis: CaptureAnalysisArtifact | undefined,
+): boolean {
+	const slots = (
+		captureAnalysis?.extractedSymbols.find((symbol) => symbol.symbolId === symbolId)
+			?.captureSlots ?? []
+	).filter(
+		(slot) =>
+			slot.propName === read.path[0] &&
+			slot.owner.componentName === read.componentName &&
+			slot.path.join('\0') === read.path.slice(1).join('\0'),
+	);
+	return (
+		slots.length > 0 &&
+		slots.every(
+			(slot) =>
+				slot.routes.length > 0 && slot.routes.every((route) => route.kind === 'row-local'),
+		)
+	);
 }
 
 // Resume start derives every served repeat's unserved computed collection, whichever action woke
@@ -1577,8 +1669,10 @@ function consequenceReach(
 				(written) => startsWithPath(path, written) || startsWithPath(written, path),
 			);
 		});
+	const fixed = (branch: { readonly symbolId?: string }) =>
+		branch.symbolId !== undefined && scope.fixedBranchSymbolIds.has(branch.symbolId);
 	const branchFlips = (branch: NonNullable<ProtocolViewPayload['branches']>[number]) =>
-		reads(branch.testReads) || reads(branch.contentReads);
+		!fixed(branch) && (reads(branch.testReads) || reads(branch.contentReads));
 	const repeatMoves = (repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number]) => {
 		const branches = repeat.rowTemplate?.branchSlots ?? [];
 		const slotReads = [
@@ -1611,6 +1705,7 @@ function consequenceReach(
 			return !branch || branchFlips(branch);
 		}) ||
 		edge.keyedRepeatScopeIds.some((id) => {
+			if (scope.staticRepeatIds.has(id)) return false;
 			const repeat = view.keyedRepeats?.find((candidate) => candidate.id === id);
 			return !repeat || repeatMoves(repeat);
 		}) ||
@@ -1618,6 +1713,10 @@ function consequenceReach(
 			(view.asyncBoundaries ?? []).some(
 				(boundary) => boundary.id === edge.asyncBoundaryId && reads(boundary.asyncReads),
 			));
+	// Rows a static @for renders once take constant props: the compiler refuses a reactive read in them.
+	const staticRow = (edge: SemanticComponentEdge) =>
+		edge.keyedRepeatScopeIds.length > 0 &&
+		edge.keyedRepeatScopeIds.every((id) => scope.staticRepeatIds.has(id));
 	let mountsLocalChild = false;
 	if (affected.size > 0) {
 		for (let grew = true; grew;) {
@@ -1634,6 +1733,7 @@ function consequenceReach(
 					mountsLocalChild = true;
 					continue;
 				}
+				if (staticRow(edge)) continue;
 				const names = changedPropNames(edge, affected, reads);
 				if (names.size === 0) continue;
 				for (const binding of scope.graphBindings) {
@@ -1660,7 +1760,8 @@ function consequenceReach(
 	for (const edge of scope.componentEdges) {
 		if (edge.importSource === undefined) continue;
 		const mounts = edgeMounts(edge);
-		const names = mounts ? new Set<string>() : changedPropNames(edge, affected, reads);
+		const names =
+			mounts || staticRow(edge) ? new Set<string>() : changedPropNames(edge, affected, reads);
 		if (!mounts && names.size === 0) continue;
 		const child = importedChildReach(scope, edge);
 		if (!child) return 'unknown';
@@ -1698,15 +1799,16 @@ function consequenceReach(
 				for (const id of event.symbolIds ?? []) symbolIds.add(id);
 		for (const branch of set.branches ?? []) {
 			if (!branch.symbolId) return false;
-			symbolIds.add(branch.symbolId);
+			if (!fixed(branch)) symbolIds.add(branch.symbolId);
 			for (const arm of branch.armRecords ?? []) if (!armSymbols(arm)) return false;
 		}
 		return true;
 	};
 	const readsNothing = (branch: {
+		readonly symbolId?: string;
 		readonly testReads?: ReadonlyArray<unknown>;
 		readonly contentReads?: ReadonlyArray<unknown>;
-	}) => !branch.testReads?.length && !branch.contentReads?.length;
+	}) => fixed(branch) || (!branch.testReads?.length && !branch.contentReads?.length);
 	// A branch that reads nothing never flips, so its served arm stays wired and a write reaches that arm's records like the page's own.
 	const liveArmReach = (set: ArmRecordSetLike | undefined): boolean => {
 		if (!set) return true;
@@ -1724,7 +1826,7 @@ function consequenceReach(
 				for (const id of event.symbolIds ?? []) symbolIds.add(id);
 		}
 		for (const branch of set.branches ?? []) {
-			if (!(reads(branch.testReads) || reads(branch.contentReads))) {
+			if (fixed(branch) || !(reads(branch.testReads) || reads(branch.contentReads))) {
 				if (readsNothing(branch))
 					for (const arm of branch.armRecords ?? []) if (!liveArmReach(arm)) return false;
 				continue;
@@ -1815,7 +1917,8 @@ function moduleMountReach(
 	scope: FirstUseScope,
 	parts: ReachParts = emptyParts(),
 ): RuntimeDemandMapFirstUseReach {
-	for (const symbol of scope.resolver.symbols) parts.symbolIds.add(symbol.id);
+	for (const symbol of scope.resolver.symbols)
+		if (!scope.fixedBranchSymbolIds.has(symbol.id)) parts.symbolIds.add(symbol.id);
 	for (const record of scope.records) parts.recordIds.add(record.recordId);
 	// A new instance seeds its shared state, which every reader of those cells sees.
 	for (const seed of scope.state.sharedSeeds ?? [])

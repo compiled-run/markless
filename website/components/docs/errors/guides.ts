@@ -4,6 +4,8 @@ export type GuideSource = {
 	readonly summary: string;
 	readonly what: string;
 	readonly how: string;
+	/** A whole .tsrx file that raises this code, so the page can show the broken version above the fix. */
+	readonly before?: readonly string[];
 	readonly example?: readonly string[];
 };
 
@@ -24,6 +26,13 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'In a `.tsrx` file, Markless treats `state`, `computed`, `element`, `shared`, and `storage` as its own names. This call uses one of those names, but the name does not come from an import of `@markless/core`.',
 		how: 'If you meant the Markless function, import it. If you wrote your own helper with that name, rename the helper.',
 		example: ["import { state } from '@markless/core';"],
+		before: [
+			'export function Profile() @{',
+			"\tlet name = state('Ada');",
+			'',
+			'\t<h2>{name}</h2>',
+			'}',
+		],
 	},
 	MARKLESS_FRAMEWORK_API_RUNTIME_CALL: {
 		summary: 'A Markless function like state() ran without Markless rewriting it first.',
@@ -49,25 +58,45 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'A value at the top of a file belongs to every page that uses the file, not to one copy of the component. So Markless refuses `state()` and `computed()` there.',
 		how: 'Move the call into the component body. If many components need the same value, use `shared()` instead.',
 		example: [
-			'export function Counter() @{',
-			'\tlet count = state(0);',
+			'export function Settings() @{',
+			"\tlet theme = state('light');",
 			'',
-			'\t<button onClick={() => count++}>{count}</button>',
+			'\t<p>Theme: {theme}</p>',
+			'}',
+		],
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			"let theme = state('light');",
+			'',
+			'export function Settings() @{',
+			'\t<p>Theme: {theme}</p>',
 			'}',
 		],
 	},
 	MARKLESS_STATE_CREATION_SITE_UNSTABLE: {
 		summary:
-			'state() or computed() is created inside an @if, a loop, a handler, or another computed.',
-		what: 'Each `state()` and `computed()` needs one fixed place in the component. This one sits inside a branch, a loop, an event handler, or another `computed()`.',
-		how: 'Declare the value once, at the top level of the component body. Branch around the markup that uses it, not around the declaration. Write to it from the handler instead of creating it there.',
+			'state() or computed() is created in a loop, a handler, another computed, or an @if arm it cannot start from.',
+		what: 'Each `state()` and `computed()` needs one fixed place in the component. This one sits inside a loop, an event handler, another `computed()`, or an `@if`/`@switch` arm with a starting value the compiler cannot read. A `state()` in an arm is allowed when its starting value is a literal: it starts fresh each time the arm opens.',
+		how: 'Give the arm state a literal starting value, such as `state(0)` or `state("")`, or declare the value once at the top level of the component body and branch around the markup that uses it. Write to it from the handler instead of creating it there.',
 	},
 	MARKLESS_STATE_STALE_LOCAL_WRITE: {
 		summary:
 			'An event handler writes a plain variable that the markup reads, so the page never changes.',
 		what: 'A handler changes a plain `let`, and the markup shows that variable. The markup reads it only once, when the page first renders, so the click changes nothing on screen.',
 		how: 'Wrap the value in `state()`. Then the page updates every time the handler writes it.',
-		example: ['let count = state(0);', '', '<button onClick={() => count++}>{count}</button>'],
+		example: [
+			"let theme = state('light');",
+			'',
+			"<button onClick={() => (theme = 'dark')}>Theme: {theme}</button>",
+		],
+		before: [
+			'export function Settings() @{',
+			"\tlet theme = 'light';",
+			'',
+			"\t<button onClick={() => (theme = 'dark')}>Theme: {theme}</button>",
+			'}',
+		],
 	},
 	MARKLESS_STATE_WRITE_IN_COMPUTED: {
 		summary: 'A computed() body writes to state.',
@@ -83,7 +112,19 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		summary: 'Code assigns a new value to state that was declared with const.',
 		what: 'Markless keeps the normal JavaScript rules. A `const` binding can never get a new value, and `state()` does not change that.',
 		how: 'Use `let` for state that you replace. A `const` object state still lets you change its properties, like `menu.open = true`.',
-		example: ['let count = state(0);', 'const menu = state({ open: false });'],
+		example: [
+			"let theme = state('light');",
+			'const menu = state({ open: false });',
+		],
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			'export function Settings() @{',
+			"\tconst theme = state('light');",
+			'',
+			"\t<button onClick={() => (theme = 'dark')}>Theme: {theme}</button>",
+			'}',
+		],
 	},
 	MARKLESS_STATE_READ_ONLY_WRITE: {
 		summary: 'Code writes to a computed() value or to a prop, and both are read-only.',
@@ -105,7 +146,20 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		summary: 'An @for loop has no key.',
 		what: 'Every `@for` inside an element needs a key, even one over a fixed list. Without a key, Markless cannot tell which row is which when the list changes.',
 		how: 'Add a key that stays the same for each item, like an id. If state belongs to the position in the list, key by the index instead.',
-		example: ['@for (const item of items; key item.id) {', '\t<li>{item.name}</li>', '}'],
+		example: ['@for (const guest of guests; key guest.id) {', '\t<li>{guest.name}</li>', '}'],
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			'export function Guests() @{',
+			"\tlet guests = state([{ id: 1, name: 'Ada' }]);",
+			'',
+			'\t<ul>',
+			'\t\t@for (const guest of guests) {',
+			'\t\t\t<li>{guest.name}</li>',
+			'\t\t}',
+			'\t</ul>',
+			'}',
+		],
 	},
 	MARKLESS_REPEAT_KEY_IS_INDEX: {
 		summary:
@@ -141,14 +195,12 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		],
 	},
 	MARKLESS_ASYNC_POST_AWAIT_READ: {
-		summary: 'An async computed() reads state after an await.',
-		what: 'Markless records which state an async `computed()` reads before its first `await`. A read after the `await` is invisible to it.',
-		how: 'Copy the value into a local before the first `await`. Use the local after it.',
+		summary: 'An async computed() looks a value up with a key that comes from an await.',
+		what: 'Markless reads every state an async `computed()` names when it starts running, including reads after an `await`, and runs it again when one of them changes. A lookup whose key is the awaited answer, such as `items[res.id]`, cannot be read before the answer arrives.',
+		how: 'Return the answer from the async `computed()`. Do the lookup in a plain `computed()` that reads it.',
 		example: [
-			'const details = computed(async ({ signal }) => {',
-			'\tconst q = name;',
-			'\treturn { title: await loadGreeting(q, signal) };',
-			'});',
+			'const picked = computed(async ({ signal }) => loadPick(signal));',
+			'const item = computed(() => items[picked.id]);',
 		],
 	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
@@ -160,7 +212,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		summary: 'An event prop like onClick gets a value instead of a function.',
 		what: 'An event prop needs a function. This one gets the result of an expression, which runs once during render.',
 		how: 'Wrap the expression in an arrow function.',
-		example: ['<button onClick={() => count++}>Add</button>'],
+		example: [
+			'<button onClick={() => (saved = true)}>Save</button>',
+		],
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			'export function Save() @{',
+			'\tlet saved = state(false);',
+			'',
+			'\t<button onClick={(saved = true)}>Save</button>',
+			'}',
+		],
 	},
 	MARKLESS_HANDLER_READS_RENDER_LOCAL: {
 		summary:
@@ -193,6 +256,19 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'Without the `@`, Markless does not see a branch. A braced `} else {` stops the build. An unbraced one shows the word "else" and the code after it as text.',
 		how: 'Write `@else`, with the `@` sign.',
 		example: ['@if (open) {', '\t<p>Open</p>', '} @else {', '\t<p>Closed</p>', '}'],
+		before: [
+			"import { state } from '@markless/core';",
+			'',
+			'export function Menu() @{',
+			'\tlet open = state(false);',
+			'',
+			'\t@if (open) {',
+			'\t\t<p>Open</p>',
+			'\t} else {',
+			'\t\t<p>Closed</p>',
+			'\t}',
+			'}',
+		],
 	},
 	MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: {
 		summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
@@ -202,7 +278,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: {
 		summary: 'Several components share a shared() definition that has no scope.',
 		what: 'Several components in one file use the same `shared()` value, and it has no scope. So every copy of the widget on the page shares one value.',
-		how: "Pass `{ scope: 'widget' }` to give each widget its own value. Pass `{ scope: 'page' }` if one value for the page is what you want.",
+		how: "Pass `{ scope: 'subtree' }` to give each widget its own value. Pass `{ scope: 'app' }` if one value for the whole app is what you want.",
+	},
+	MARKLESS_SHARED_SCOPE_RENAMED: {
+		summary: 'A shared() uses a scope name that Markless renamed.',
+		what: "The scopes are now `'app'`, `'container'`, and `'subtree'`. `'page'` and `'request'` became `'app'`, and `'widget'` became `'subtree'`. Each new name works exactly like the old one.",
+		how: "Write the new name. `'app'` is the default, so you can also leave the option out.",
+		before: [
+			"import { shared, state } from '@markless/core';",
+			'',
+			"export const menu = shared(() => state({ open: false }), { scope: 'widget' });",
+		],
+		example: ["export const menu = shared(() => state({ open: false }), { scope: 'subtree' });"],
 	},
 	MARKLESS_SERIALIZE_UNSUPPORTED_VALUE: {
 		summary: 'State holds a value that Markless cannot send from the server to the browser.',
@@ -266,12 +353,22 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 	MARKLESS_DIRECT_EVAL_UNSUPPORTED: {
 		summary: "eval() inside a component runs code that reads the component's names.",
 		what: 'Markless moves handlers and derived values into their own modules, and rewrites each state read and write it sees in your code. It cannot see inside an `eval` string, and the names that string reads are not defined where the code runs.',
-		how: "Write the code directly: `count++`, not `eval('count++')`. For code that only needs globals, use `new Function(code)()` or `(0, eval)(code)`.",
+		how: "Write the code directly: `total++`, not `eval('total++')`. For code that only needs globals, use `new Function(code)()` or `(0, eval)(code)`.",
 	},
 	MARKLESS_STORAGE_KEY_STATIC: {
 		summary: 'storage() gets a key or fallback that is not a string literal.',
 		what: 'Markless reads the `storage()` key and fallback when it builds your code. So both must be string literals.',
 		how: "Pass string literals, like `storage('theme', 'light')`. Or leave out the key: `storage('light')`.",
+	},
+	MARKLESS_CAPTURE_OPAQUE_PROP: {
+		summary: 'An event handler uses a prop whose value the browser cannot get back.',
+		what: 'An event handler runs in the browser after the page loads, so every prop it uses needs a value the build can hand it there: state, a constant, or a callback the parent passed. A received callback works anywhere, even straight on an element: `<button onClick={onPress}>` runs the callback this instance was given, with the event, and runs nothing if it was given none. The build stops when the prop is something else, like the result of a function call or a `let`, or when a handler calls a prop the parent never passes without `?.`.',
+		how: 'Pass a callback, a literal, or plain constant data, or hold the value in `state()` in the parent. For a callback the parent may leave out, call it as `onPress?.()`.',
+		example: [
+			'function Key({ onPress }: { readonly onPress?: (event: MouseEvent) => void }) @{',
+			'\t<button onClick={onPress}>Go</button>',
+			'}',
+		],
 	},
 	MARKLESS_CHILDREN_OPAQUE: {
 		summary: 'Code maps, counts, indexes, or changes children.',
@@ -309,6 +406,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'',
 			'\t<button onClick={() => console.log(query)}>{query}</button>',
 			'}',
+		],
+	},
+	MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: {
+		summary: 'prefetch={false} sits on something that never renders the link.',
+		what: 'Only an `<a>` acts on `prefetch={false}`. Here it is on another element, or on a component that does not pass its props on to an `<a>`, so the router would still request the page early and nothing would tell you.',
+		how: 'Put `prefetch={false}` on the `<a>` or `<Link>` itself. A component of your own can take it when it spreads its props onto its `<a>` and does not set the same attribute there itself.',
+		example: [
+			"export function NavLink({ children, ...rest }: PropsOf<'a'>) @{",
+			'\t<a {...rest}>{children}</a>',
+			'}',
+			'',
+			'<NavLink href="/logout" prefetch={false}>Log out</NavLink>',
 		],
 	},
 	MARKLESS_ROUTER_RESPONSE_COMMITTED: {

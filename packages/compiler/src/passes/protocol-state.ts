@@ -20,6 +20,7 @@ export function createProtocolStatePayloadFromArena(
 			payloadArena: input.payloadArena,
 		});
 	const deriveSymbolIds = syncDeriveSymbolIds(symbolResolver);
+	const readOnlyBySubscriptions = deriveOnReadGraphNodeIds(input, symbolResolver);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
@@ -34,6 +35,9 @@ export function createProtocolStatePayloadFromArena(
 						path: dependency.path,
 					})),
 				}
+			: {}),
+		...(readOnlyBySubscriptions.has(computed.graphNodeId)
+			? { deriveOnRead: true as const }
 			: {}),
 	}));
 	const callbackSlots = callbackSlotNodes(input);
@@ -126,6 +130,56 @@ function assertClassifiable(graphNodeId: string): void {
 			`MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED: the compiler cannot tell whether graph node "${graphNodeId}" belongs to a composed component instance or to the page, so it refuses to emit it into the state payload.`,
 		),
 		{ code: 'MARKLESS_COMPOSED_GRAPH_NODE_UNCLASSIFIED', graphNodeId },
+	);
+}
+
+/**
+ * The sync computeds resume may re-derive when read instead of on every
+ * dependency write (spec 03). A handler, a behavior or another module reads its
+ * value synchronously, so a computed any of them can reach stays current, and so
+ * does everything such a computed derives from.
+ */
+function deriveOnReadGraphNodeIds(
+	input: ProtocolStatePayloadInput,
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): ReadonlySet<string> {
+	const { computed, sharedDefinitions } = input.payloadArena.state;
+	const current = new Set<string>([
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+				? (symbol.reads ?? []).map((read) => read.graphNodeId)
+				: symbol.kind === 'behavior'
+					? (symbol.graphAccess?.reads ?? []).map((read) => read.graphNodeId)
+					: [],
+		),
+		...input.payloadArena.view.behaviors.flatMap((behavior) =>
+			(behavior.inputGraphReads ?? []).map((read) => read.graphNodeId),
+		),
+		...input.payloadArena.view.keyedRepeats.map((repeat) => repeat.collectionGraphNodeId),
+		...input.semanticGraph.componentEdges.flatMap((edge) =>
+			edge.props.flatMap((prop) =>
+				prop.kind === 'graph-reference' ? [prop.graphNodeId] : [],
+			),
+		),
+		...sharedDefinitions.flatMap((definition) => definition.graphNodeIds),
+		...input.semanticGraph.graphBindings.flatMap((binding) =>
+			binding.componentName ? [] : [binding.id],
+		),
+		...computed.flatMap((node) =>
+			node.async ? (node.dependencies ?? []).map((dependency) => dependency.graphNodeId) : [],
+		),
+	]);
+	for (let size = -1; size !== current.size;) {
+		size = current.size;
+		for (const node of computed)
+			if (current.has(node.graphNodeId))
+				for (const dependency of node.dependencies ?? [])
+					current.add(dependency.graphNodeId);
+	}
+	return new Set(
+		computed.flatMap((node) =>
+			node.async || current.has(node.graphNodeId) ? [] : [node.graphNodeId],
+		),
 	);
 }
 

@@ -1,5 +1,5 @@
 import {
-	addressedHostNodeIds,
+	renderAddressedHostNodeIds,
 	foldInertHosts,
 } from '../../artifact-helpers/addressed-hosts.ts';
 import { parseModule } from '../../js-ast.ts';
@@ -12,7 +12,7 @@ import {
 	emitClientResidueReader,
 	emitClientResidueReaderPrelude,
 } from './residue-reader.ts';
-import { handlerReadGraphNodeIds } from './derive-set.ts';
+import { resumeReadGraphNodeIds } from './derive-set.ts';
 import {
 	adoptedWidgetDefinitionIds,
 	componentBoundElementHandles,
@@ -59,18 +59,17 @@ export function collectPublicRenderComponentDefinitions(
 	});
 
 	const residueReaderPrelude = emitClientResidueReaderPrelude(input, [...componentNames]);
-	// A CSR mount derives these for the render and then drops the value, leaving a
-	// handler's first read undefined the way a resumed page's is.
-	const handlerReads = handlerReadGraphNodeIds(input);
-	const handlerReadComputedIds = new Set(
+	// A CSR mount derives these for the render and then drops the value, so they are served as on a resumed page.
+	const resumeReads = resumeReadGraphNodeIds(input);
+	const resumeReadComputedIds = new Set(
 		input.protocolState.computed.flatMap((computed) =>
-			computed.async === false && handlerReads.has(computed.graphNodeId)
+			computed.async === false && resumeReads.has(computed.graphNodeId)
 				? [computed.graphNodeId]
 				: [],
 		),
 	);
 
-	const addressedHosts = addressedHostNodeIds(input.protocolView);
+	const addressedHosts = renderAddressedHostNodeIds(input);
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;
@@ -179,11 +178,11 @@ export function collectPublicRenderComponentDefinitions(
 			...chunkGraphNodeIds(childChunks),
 			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
 		]);
-		// A widget-scoped shared() graph is one instance per rendered widget, so its
+		// A subtree-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
 			input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-				definition.scope === 'widget' ? [definition.id] : [],
+				definition.scope === 'subtree' ? [definition.id] : [],
 			),
 		);
 		const resolvedDefinitionIds = new Set(
@@ -279,7 +278,7 @@ export function collectPublicRenderComponentDefinitions(
 			);
 		const servedComputedIndexes = ownedComputedIndexes.filter((index) => {
 			const computed = input.protocolState.computed[index];
-			return !!computed && handlerReadComputedIds.has(computed.graphNodeId);
+			return !!computed && resumeReadComputedIds.has(computed.graphNodeId);
 		});
 		return [
 			{

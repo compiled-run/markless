@@ -312,6 +312,7 @@ async function startTriggerGroup(
 			type Handoff = {
 				readonly event: ResumeDomEvent;
 				readonly syncPolicyAlreadyApplied?: boolean;
+				readonly propagationStopped?: boolean;
 			};
 			(
 				adopted.root as typeof adopted.root & {
@@ -328,6 +329,7 @@ async function startTriggerGroup(
 					try {
 						await candidate.runtime.dispatch(handoff.event, {
 							syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true,
+							propagationStopped: handoff.propagationStopped === true,
 						});
 						matched = true;
 					} catch (error) {
@@ -467,6 +469,9 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 			for (const segment of matching(deletion.graphNodeId))
 				deleted = segment.graph.delete(deletion) || deleted;
 			return deleted;
+		},
+		changed: (change) => {
+			for (const segment of owners(change.graphNodeId)) segment.graph.changed(change);
 		},
 		subscribe: (subscription) => local.graph.subscribe(subscription),
 		subscribeJournal: (listener) => local.graph.subscribeJournal(listener),

@@ -1,0 +1,11 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 97,
+			"reason": "a row host binding el= lifts a constant @for collection onto the graph (PR #465): the docs playground compile worker carries the new check, downloaded at load and not executed then (110176 chars run, unchanged); measured on CI run 41904681698 against queue run 41898980164",
+			"date": "2026-11-04"
+		}
+	]
+}

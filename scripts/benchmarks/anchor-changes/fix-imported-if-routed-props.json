@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 4,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "an @if in a child imported from another file reads its routed props live (PR #448): resume-branches carries the composed graph's prop routes and prerender/evaluator reads each one, downloaded at load and not executed then; measured on CI run 41754358974 against queue run 41749294950",
+			"date": "2026-11-04"
+		}
+	]
+}

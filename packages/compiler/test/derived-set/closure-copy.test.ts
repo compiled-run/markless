@@ -17,7 +17,7 @@ export const box = shared(() => {
 	const leaf = computed(() => doubled + 1);
 	const unrelated = computed(() => s.other * 3);
 	return { ...s, doubled, leaf, unrelated };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();
@@ -36,7 +36,7 @@ export const panel = shared(() => {
 	const stem = computed(() => held.tip.length);
 	const crown = computed(() => stem + 1);
 	return { ...held, sideline, stem, crown };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Panel() @{
 	const p = panel();

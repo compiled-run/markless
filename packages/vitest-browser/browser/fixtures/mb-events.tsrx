@@ -9,7 +9,7 @@ export const mbEvents = shared(
 
 		return { ...s };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MbEventsRoot({ children }) @{

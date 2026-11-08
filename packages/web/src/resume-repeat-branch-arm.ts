@@ -18,10 +18,18 @@ export function followBranchArm(
 	},
 	arm: { mounted: boolean; nodes: ReadonlyArray<ResumeDomNode> },
 	adopt: (rows: ReadonlyArray<ResumeDomNode>, items: ReadonlyArray<unknown>) => void,
-): { readonly showing: () => boolean; readonly end: () => ResumeDomNode | undefined } | undefined {
+): {
+	readonly showing: (rows?: ReadonlyMap<unknown, ResumeDomElement>) => boolean;
+	readonly end: () => ResumeDomNode | undefined;
+} | undefined {
 	const shown = branchArmEntry(parent, repeat, input.root);
 	if (!shown) return undefined;
-	const showing = () => shown.arm === repeat.branchArm!.arm;
+	// Rows a re-commit of the arm replaced belong to the repeat it wired in their place; rows this repeat took out itself carry their parent.
+	const replaced = (rows: ReadonlyArray<ResumeDomElement & { __marklessRowParent?: unknown }>) =>
+		!rows.some((row) => row.parentElement === parent) &&
+		rows.some((row) => row.__marklessRowParent !== parent);
+	const showing = (rows?: ReadonlyMap<unknown, ResumeDomElement>) =>
+		shown.arm === repeat.branchArm!.arm && !(rows?.size && replaced([...rows.values()]));
 	const paint = () => {
 		const nodes = showing() ? nodesBetween(parent, shown) : [],
 			items = nodes.length ? readKeyedRepeatCollection(input.graph, repeat) : [];

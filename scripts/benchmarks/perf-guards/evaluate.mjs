@@ -36,7 +36,8 @@ export function evaluate(measurement, anchors) {
 				checkLoadWeight(
 					subject,
 					result.load,
-					anchors.loadWeight?.[LOAD_PLATFORM]?.[subject],
+					measurement.platform ?? LOAD_PLATFORM,
+					anchors.loadWeight?.[measurement.platform ?? LOAD_PLATFORM]?.[subject],
 					fail,
 					note,
 				);
@@ -59,6 +60,9 @@ export function evaluate(measurement, anchors) {
 		checkResumeRows(measurement.resumeRows, anchors.resumeRows ?? {}, fail, note);
 	if (measurement.hiddenContent) checkHiddenContent(measurement.hiddenContent, fail, note);
 	if (measurement.routeTable) checkRouteTable(measurement.routeTable, fail, note);
+	if (measurement.staticPropArms) checkStaticPropArms(measurement.staticPropArms, fail, note);
+	if (measurement.serverStylesheets)
+		checkServerStylesheets(measurement.serverStylesheets, fail, note);
 	for (const [site, siteResult] of Object.entries(measurement.sites))
 		for (const [route, result] of Object.entries(siteResult.routes))
 			if (result.resumeData)
@@ -84,8 +88,8 @@ const breakdown = (attribution) =>
 // Linux CI's Chromium runs a few hundred chars more of one build at load than a Mac does, so each platform has its anchors.
 export const LOAD_PLATFORM = `${process.platform}-${process.arch}`;
 
-function checkLoadWeight(subject, load, anchor, fail, note) {
-	const line = `${subject} (${LOAD_PLATFORM}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
+function checkLoadWeight(subject, load, platform, anchor, fail, note) {
+	const line = `${subject} (${platform}): runs ${load.executedChars} chars of JS source and downloads ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load`;
 	if (!anchor) {
 		fail('G16', `${line}, with no anchor for this platform. ${acceptHint('load', subject)}`);
 		return;
@@ -498,6 +502,55 @@ function checkRouteTable({ few, many }, fail, note) {
 			`${line}: +${grown} chars run at load for links nobody touched (budget +${BUDGETS.routeTableLoadChars}). A page's route table must stay inert until idle or a link intent: the shadcn port's docs pages evaluated a 109 kB table of their 136 linked routes at load, 63% of all JavaScript they ran by the load event. ${INVARIANT}`,
 		);
 	note('G15', `${line}: ${grown >= 0 ? '+' : ''}${grown} chars`);
+}
+
+function checkStaticPropArms({ short, long }, fail, note) {
+	if (!short.answered || !long.answered)
+		return fail('G18', `the static-prop fixture's /glossary did not open its Gloss on click. ${INVARIANT}`);
+	const shown = long.routes.shown.jsGzipBytes - short.routes.shown.jsGzipBytes;
+	if (shown < BUDGETS.staticPropArmMinShownGrowth)
+		return fail(
+			'G18',
+			`/glossary loads ${kb(shown)} more with the long Gloss: it must load at least ${kb(BUDGETS.staticPropArmMinShownGrowth)} more, or this guard compares two equal builds. Grow the fixture's long Gloss.`,
+		);
+	for (const name of ['tsrx', 'mdx']) {
+		const before = short.routes[name];
+		const after = long.routes[name];
+		const bytes = after.jsGzipBytes - before.jsGzipBytes;
+		const chars = after.executedChars - before.executedChars;
+		const line = `${name === 'mdx' ? 'an MDX' : 'a'} page passing Caption only text loads ${kb(before.jsGzipBytes)} of JS and runs ${before.executedChars} chars at load with the short Gloss, ${kb(after.jsGzipBytes)} and ${after.executedChars} with the long one`;
+		if (bytes > BUDGETS.staticPropArmLoadBytes || chars > BUDGETS.staticPropArmLoadChars)
+			return fail(
+				'G18',
+				`${line}: +${bytes} B and +${chars} chars for a Gloss its literal props never show (budget +${BUDGETS.staticPropArmLoadBytes} B, +${BUDGETS.staticPropArmLoadChars} chars). A component whose literal props rule out an arm must not load the code that arm renders: a docs page passing Subtitle only text ran its glossary Term's tooltip code at load. ${INVARIANT}`,
+			);
+		note('G18', `${line}: ${bytes >= 0 ? '+' : ''}${bytes} B, ${chars >= 0 ? '+' : ''}${chars} chars`);
+	}
+}
+
+function checkServerStylesheets({ small, large }, fail, note) {
+	const css = large.clientCssBytes - small.clientCssBytes;
+	const grown = large.workerBytes - small.workerBytes;
+	const line = `the inline-CSS fixture's Worker is ${kb(small.workerBytes)} with its prerendered page's stylesheet small and ${kb(large.workerBytes)} with it ${kb(css)} bigger`;
+	if (css < BUDGETS.serverStylesheetMinCssGrowth)
+		return fail(
+			'G17',
+			`${line}: the large build must ship at least ${kb(BUDGETS.serverStylesheetMinCssGrowth)} more CSS, or this guard compares two equal builds. Grow the fixture's large stylesheet.`,
+		);
+	for (const [variant, result] of Object.entries({ small, large })) {
+		const { prerendered, runtime, document } = result.copies;
+		if (prerendered !== 0 || runtime !== 1 || document !== 1)
+			return fail(
+				'G17',
+				`${line}: the ${variant} Worker carries the prerendered page's stylesheet text ${prerendered} times, the runtime page's ${runtime} times and the document's ${document} times; it must carry them 0, 1 and 1 times. A prerendered page is served as a file, so the Worker never writes its CSS, and a sheet's text ships once. ${INVARIANT}`,
+			);
+	}
+	if (grown > BUDGETS.serverStylesheetGrowthBytes)
+		return fail(
+			'G17',
+			`${line}: +${kb(grown)} of Worker for CSS only a prerendered page uses (budget +${kb(BUDGETS.serverStylesheetGrowthBytes)}). The server bundle carries stylesheet text only for pages it renders at runtime: the shadcn port's Worker carried 54 MB of prerendered pages' CSS, past Cloudflare's 64 MiB limit. ${INVARIANT}`,
+		);
+	note('G17', `${line}: ${grown >= 0 ? '+' : ''}${grown} B`);
 }
 
 function noteResumeData(subject, data, anchors, note) {

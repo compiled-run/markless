@@ -24,6 +24,10 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Streamed-arm adoption reads dependency edges from the inert state-patch scripts the server emitted.',
 	'packages/web/src/fns/streamed-arms.ts :: html: arm.innerHTML,':
 		'Streamed-arm adoption commits the inert arm template the server streamed instead of rendering the arm.',
+	'packages/web/src/kept-swap.ts :: while (node && node.nodeType !== 1 && node.nodeType !== 8) node = node.nextSibling;':
+		"A navigation compares a kept part's live nodes with the next page's served ones before keeping it; it locates nothing.",
+	'packages/web/src/kept-swap.ts :: (left.nodeType === 8 && (left as Comment).data !== (right as Comment).data) ||':
+		"A navigation compares a kept part's live comments with the next page's served ones before keeping it; it locates nothing.",
 	'packages/web/src/fns/settle-plan.ts :: const walker = root.ownerDocument!.createTreeWalker(root, 128);':
 		'The settle filler finds the build-emitted hole comments inside one arm template.',
 	'packages/web/src/inline/payload-document.ts :: const text = element.textContent ?? element.text ?? element.innerHTML;':

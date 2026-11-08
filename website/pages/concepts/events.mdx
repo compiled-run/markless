@@ -1,161 +1,266 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import EventsSketch from '../../components/sketch/concepts/events-sketch.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import KeycardAnatomy from '../../components/figures/events/keycard-anatomy.tsrx';
+import FormAnatomy from '../../components/figures/events/form-anatomy.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Events hand you the browser's own event
+# Events
 
-<PageMeta time="3 min" assumes="state" />
+<PageMeta time="5 min" assumes="state" />
 
-<ThemeToggle />
+<Subtitle text="An event prop runs your handler when the browser fires one of its events, and hands it the real event object." terms="events" />
 
-You have written this in a plain script, with no framework anywhere near it:
-
-```ts
-input.addEventListener('input', (event) => {
-	name = event.currentTarget.value;
-});
-```
-
-Everything in that line still holds here. Same event names, same event object, same properties.
-
-**An event prop is `on` plus the event name. Your handler gets the browser's own event.**
-
-```tsrx
-<input onInput={(event) => (name = event.currentTarget.value)} />
-```
-
-`event.key`, `event.target` and `event.preventDefault()` are the real ones. The docs you read
-when you learned the DOM still apply.
-
-## Print a mug
-
-Type a name into the field. Press Enter. Then press Escape. Each row shows what one handler got from
-the browser and what it changed.
-
-<EventsSketch />
-
-<Code note="Add a paragraph under the preview that shows {name.length}, and type a name. Then change onInput to onChange and type again: the preview waits until you leave the field.">
-```tsrx title="mug-label.tsrx"
+```tsrx title="composer.tsrx"
 import { state } from '@markless/core';
 
-export default function MugLabel() @{
-	let name = state('');
-	let printed = state('nothing yet');
+export default function Composer() @{
+	let draft = state('');
+
+	<label>
+		Message
+		<input
+			value={draft}
+			onInput={(event) =>
+				(draft = event.currentTarget.value)
+			}
+		/>
+		<p>{draft.length} characters</p>
+	</label>
+}
+```
+
+**`onInput`** is `on` plus the browser's `input` event. The **`event`** your handler gets is the real one, so `event.currentTarget.value` is what was typed.
+
+## A handler gets the browser's own event
+
+An *event* is something a person does: a key press, a click, a tap. Your handler runs once for each one, and never before.
+
+- Name the prop `on` plus the event name, with a capital letter: `onClick`, `onKeyDown`.
+- The browser makes the event, with every field it always has.
+- Your handler gets that same object: `event.key`, `event.target`, `event.preventDefault()`.
+
+Press a key on the drawing, or type on your own keyboard.
+
+<KeycardAnatomy />
+
+<Code steps={[{ label: 'Type hello.', shows: '5 characters' }, { label: 'Under the count, add `<p>{draft.toUpperCase()}</p>`, and type again.', source: '{draft.toUpperCase()}' }]}>
+```tsrx title="composer.tsrx"
+import { state } from '@markless/core';
+
+export default function Composer() @{
+	let draft = state('');
+
+	<label>
+		Message
+		<input
+			value={draft}
+			onInput={(event) =>
+				(draft = event.currentTarget.value)
+			}
+		/>
+		<p>{draft.length} characters</p>
+	</label>
+}
+```
+</Code>
+
+## Pass your own values to a handler
+
+Wrap the call in an arrow function, `onClick={() => pick('red')}`, to pass a value. A function from the component body works as a handler too.
+
+<Code steps={[{ label: 'Press Blue.', shows: 'Picked: blue' }, { label: "Add a Green button that calls `pick('green')`.", source: "pick('green')" }]}>
+```tsrx title="colours.tsrx"
+import { state } from '@markless/core';
+
+export default function Colours() @{
+	let picked = state('none');
+	function pick(colour: string) {
+		picked = colour;
+	}
+
+	<section>
+		<button onClick={() => pick('red')}>
+			Red
+		</button>
+		<button onClick={() => pick('blue')}>
+			Blue
+		</button>
+		<p>Picked: {picked}</p>
+	</section>
+}
+```
+</Code>
+
+## Read the key with event.key
+
+`event.key` is the key's name: `'Enter'`, `'Escape'`, `'a'`. `event.shiftKey` is true while Shift is held. Here Enter sends the message, and Escape empties the box.
+
+<Code steps={[{ label: 'Type hello and press Enter.', shows: 'Sent: hello' }, { label: "Add a Clear button that runs `sent = ''`.", source: "sent = ''" }, { label: "Make Shift+Enter not send: `event.key === 'Enter' && !event.shiftKey`.", source: '!event.shiftKey' }]}>
+```tsrx title="shortcuts.tsrx"
+import { state } from '@markless/core';
+
+export default function Shortcuts() @{
+	let draft = state('');
+	let sent = state('nothing yet');
+
+	<section>
+		<input
+			value={draft}
+			onInput={(event) =>
+				(draft = event.currentTarget.value)
+			}
+			onKeyDown={(event) => {
+				if (event.key === 'Enter') sent = draft;
+				if (event.key === 'Escape') draft = '';
+			}}
+		/>
+		<p>Sent: {sent}</p>
+	</section>
+}
+```
+</Code>
+
+## Stop a form reloading the page
+
+A form's submit reloads the page, which throws away what was typed. Call `event.preventDefault()` in `onSubmit` to keep the page. `new FormData(event.currentTarget)` reads the fields by their `name`.
+
+<FormAnatomy />
+
+<Code steps={[{ label: 'Type ada@example.com and press Join.', shows: 'ada@example.com' }, { label: 'Add `required` to the input, and press Join with the box empty. The browser stops the submit before your handler runs.', source: 'required' }]}>
+```tsrx title="signup.tsrx"
+import { state } from '@markless/core';
+
+export default function Signup() @{
+	let joined = state('');
 
 	<form
 		onSubmit={(event) => {
 			event.preventDefault();
-			printed = name;
+			const form = event.currentTarget;
+			const data = new FormData(form);
+			joined = String(data.get('email'));
 		}}
 	>
-		<label>
-			Name for the mug
-			<input
-				value={name}
-				onInput={(event) =>
-					(name = event.currentTarget.value)
-				}
-				onKeyDown={(event) => {
-					if (event.key === 'Escape') name = '';
-				}}
-			/>
-		</label>
-		<p>Preview: {name}</p>
-		<p>Printed: {printed}</p>
-		<button type="submit">Print it</button>
+		<input name="email" type="email" />
+		<button type="submit">Join</button>
+		<p>{joined}</p>
 	</form>
 }
 ```
 </Code>
 
-The preview follows every key, because `onInput` changes `name`. Enter copies the name to the
-printed line, and the page stays put. Escape clears the field.
+`preventDefault()` works on the very first submit, because the build puts that call in the page itself.
 
-The submit handler calls `event.preventDefault()`, the same as in a script tag. That is why Enter
-does not reload the page.
+## Read the right property for each control
 
-## The code for a click runs when someone clicks
+There is no shortcut that ties a field to state. Set the value, and write it back in the handler:
 
-Your component runs once, to set up the page. A handler is different. Its code runs only when its
-event fires. This holds whether the page renders in the browser alone or on a server.
+- **Text box, text area:** `onInput`, read `.value`.
+- **Number, range:** `onInput`, read `.valueAsNumber`.
+- **Select:** `onChange`, read `.value`.
+- **Checkbox:** `onChange`, read `.checked`.
+- **Radio:** `onChange`, and set the value that radio stands for.
 
-## Code that waits until the page is idle
-
-Some code belongs on the page but should never slow it down: an analytics tag, a chat widget, any
-third-party script. No click asks for it.
-
-**`onIdle` runs its handler once, after the page has loaded and the browser has nothing better to
-do.** Put it on the element the code belongs to.
-
-```tsrx
-export default function Footer() @{
-	<footer
-		onIdle={async () => {
-			const analytics =
-				await import('./analytics.ts');
-			analytics.start();
-		}}
-	>
-		Made by Example Co.
-	</footer>
-}
-```
-
-Like any handler, its code downloads only when it runs. The `import()` inside it does the same for
-the analytics script, so neither one is part of the page load.
-
-It runs once per element. An element inside an `@if` or `@for` runs it after the element appears
-and the page is idle again. An element that is gone by then never runs it.
-
-## Naming the prop
-
-Write `on` and then the event name. `click` becomes `onClick`, `input` becomes `onInput`, and
-`keydown` becomes `onKeyDown`. The case after `on` does not matter, so `onKeydown` works too.
-
-To run two handlers for one event, pass an array. They run in the order you wrote them.
-
-```tsrx
+<Code steps={[{ label: 'Untick the box.', shows: 'off, Medium, 50' }, { label: 'Add `<option>Large</option>` to the select, and pick it.', source: '<option>Large</option>' }]}>
+```tsrx title="controls.tsrx"
 import { state } from '@markless/core';
 
-export default function SaveButton() @{
-	let note = state('nothing saved');
-	let saves = state(0);
+export default function Settings() @{
+	let sound = state(true);
+	let size = state('Medium');
+	let volume = state(50);
 
-	const save = () => (note = 'saved');
-	const countSave = () => saves++;
-
-	<button onClick={[save, countSave]}>{note}, {saves} times</button>
+	<section>
+		<input
+			type="checkbox"
+			checked={sound}
+			onChange={(event) =>
+				(sound = event.currentTarget.checked)
+			}
+		/>
+		<select
+			value={size}
+			onChange={(event) =>
+				(size = event.currentTarget.value)
+			}
+		>
+			<option>Small</option>
+			<option>Medium</option>
+		</select>
+		<input
+			type="range"
+			value={volume}
+			onInput={(event) =>
+				(volume =
+					event.currentTarget.valueAsNumber)
+			}
+		/>
+		<p>
+			{sound ? 'on' : 'off'}, {size}, {volume}
+		</p>
+	</section>
 }
 ```
+</Code>
 
-## What a handler can read
+## Every other DOM event works the same way
 
-A handler can read state, props, imports, and `const` values built from those. It can also call a
-function you declared in the component body, with `function` or `const`, and pass it arguments:
-`onClick={() => add(2)}` runs `add` with the state and props it reads, including other body
-functions it calls. A `const` built with `new Map(...)`, `new Set(...)`, `new Date(...)` or another
-built-in, or any other body `const`, is built again for each click, so it is read-only there: a
-handler that changes it, as in `list.push(3)` or `box.count = 1`, stops the build with
-`MARKLESS_HANDLER_WRITES_RENDER_LOCAL`. Keep changing data in `state()`. It cannot read other variables from the component body. Those exist only while the
-component sets up the page, and the click comes later. The build stops with
-`MARKLESS_HANDLER_READS_RENDER_LOCAL`, or with `MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED` for an
-instance of your own class, and names the variable.
+`onPointerMove`, `onFocus`, `onBlur`, `onWheel`, `onDblClick` and the rest follow the same pattern: `on` plus the event name.
 
-<Callout
-	sprite="cross"
-	title="Why does preventDefault() inside an if stop the build?"
-	text="The browser decides about its default action the moment the event fires. So Markless runs your preventDefault() decision right then, before the rest of the handler. That only works if the if test reads state, props or constants. It can also compare one field of the event with a fixed value, such as event.key === 'Enter'. A test that reads anything else stops the build with MARKLESS_SYNC_POLICY_UNEXTRACTABLE."
-/>
+<Code steps={[{ label: 'Move the pointer over the text.', rewrites: 1 }, { label: "Add `onPointerLeave` that writes `x = 0`.", source: 'onPointerLeave' }]}>
+```tsrx title="pad.tsrx"
+import { state } from '@markless/core';
 
-## Try this
+export default function Pad() @{
+	let x = state(0);
+	let y = state(0);
 
-Add a line that shows `{name.length}` under the preview. The handler does not change.
+	<div
+		onPointerMove={(event) => {
+			x = event.offsetX;
+			y = event.offsetY;
+		}}
+	>
+		Pen at {x}, {y}
+	</div>
+}
+```
+</Code>
 
-Then swap `onInput` for `onChange` and type again. The preview now waits until you leave the field.
-That is the browser's own `change` event, unchanged.
+## Stop a click reaching the parent
 
-Next: [parts of the page that come and go](/concepts/conditionals).
+A click on a button inside a clickable row reaches the row too. Call `event.stopPropagation()` to keep it on the button:
+
+```tsrx
+<li onClick={() => (open = id)}>
+	{title}
+	<button
+		onClick={(event) => {
+			event.stopPropagation();
+			remove(id);
+		}}
+	>
+		Delete
+	</button>
+</li>
+```
+
+There are no shortcuts like `onClick|once`. You write the call, as in plain JavaScript.
+
+## Run several handlers on one event
+
+Pass an array, and they run in order. If one throws an error, the ones after it don't run.
+
+```tsrx
+<button onClick={[send, clearDraft]}>Send</button>
+```
+
+## A handler's code waits for its event
+
+Your component runs once, to set up the page. A handler's code isn't part of that: it runs only when its event fires. Two event props run without a person: `onIdle` once the page is idle, and `onVisible` once the element scrolls into view.
+
+[Computed values](/concepts/computed) work a value out from your state, so it can never go stale.

@@ -31,12 +31,12 @@ import {
 import {
 	marklessComposedGraphNodeId,
 	marklessInstancePath,
-	marklessRowSegment,
 	marklessWidgetHandleId,
+	marklessRowPath,
 } from './instance-scope.ts';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 import type { SsrDataStructure } from '../ssr-data/renderer.ts';
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
+import { ASYNC_BOUNDARY_ARM, serializeGraphValue, valueAlongPaths } from '@markless/serializer';
 import type { ProtocolBranchIdrefSite, ProtocolComposedGraphProp } from '@markless/serializer';
 
 // SSR composition works on DRAFT payload records: the shapes the protocol
@@ -144,13 +144,13 @@ type SsrChildComponent = {
 		/** Set by the compiler on a component whose body seeds a shared instance. */
 		readonly marklessSeedsShared?: boolean;
 		/**
-		 * The widget-scoped shared definitions this component ROOTS, set by the
+		 * The subtree-scoped shared definitions this component ROOTS, set by the
 		 * compiler on a component whose payload owns their cells. Every rendered
 		 * instance of it starts a widget instance of its own.
 		 */
 		readonly marklessWidgetRoots?: ReadonlyArray<string>;
 		/**
-		 * The widget-scoped shared definitions this component holds the cells of
+		 * The subtree-scoped shared definitions this component holds the cells of
 		 * WITHOUT designating them. Whether such a carrier is nevertheless a root
 		 * is a fact about where the page puts it, so the marker names the
 		 * candidates and the placement decides.
@@ -463,20 +463,21 @@ export async function marklessSsrRenderChild(
 	return output.html ?? '';
 }
 /**
- * The runtime instance segment one `@for` row contributes. A KEYED row has an
- * identity of its own, so everything composed inside it — payload entries,
- * seeds, minted ids, event routes — hangs off `r:<key>:`. An unkeyed row has no
- * identity to carry and contributes nothing.
+ * The runtime instance segments the `@for` rows around a placed child contribute.
+ * A KEYED row has an identity of its own, so everything composed inside it -
+ * payload entries, seeds, minted ids, event routes - hangs off `r:<key>:`, one
+ * segment per enclosing row. Undefined when one of those rows is UNKEYED: it has
+ * no identity to carry, so its interactive output refuses.
  */
-export function marklessSsrRowSegment(repeatKey: unknown): string {
-	return repeatKey === undefined ? '' : marklessRowSegment(repeatKey);
+export function marklessSsrRowSegment(context: Parameters<typeof marklessRowPath>[0]): string | undefined {
+	return marklessRowPath(context);
 }
 
-/** Places a composed child inside its row: the row segment leads the edge's own prefixes. */
+/** Places a composed child inside its rows: the row segments lead the edge's own prefixes. */
 export function marklessSsrRowPlacement<
 	T extends { readonly hostPrefix: string; readonly symbolPrefix: string },
->(child: T, repeatKey: unknown): T {
-	const segment = marklessSsrRowSegment(repeatKey);
+>(child: T, context: Parameters<typeof marklessRowPath>[0]): T {
+	const segment = marklessRowPath(context);
 	if (!segment) return child;
 	return {
 		...child,
@@ -856,9 +857,11 @@ export function marklessSsrCallbackSymbol(
 }
 // An arm rebuild and a resume-time derive read their props back out of the
 // graph, which a CSR mount seeds and a served page must carry; `keys` narrows
-// the bag, null means a lone prop. A `scalarKeys` property is one only a derive
-// reads, carried only when its value is a scalar: a structured prop is projected
-// markup or data the composer routes from its graph, so a copy ships it twice.
+// the bag, null means a lone prop. A `deriveKeys` property is one only a derive
+// reads, carried when the serializer encodes it, with only the `derivePaths` its
+// derives read; `scalarKeys` is projected children, whose markup the served HTML
+// already holds. Either is dropped when the composer routes it from its own
+// graph, so a copy never ships it twice.
 export function marklessSsrSeedPropCells(
 	state: ComposeStateDraft,
 	props: Readonly<Record<string, unknown>> | undefined,
@@ -866,19 +869,41 @@ export function marklessSsrSeedPropCells(
 		readonly graphNodeId: string;
 		readonly keys: ReadonlyArray<string> | null;
 		readonly scalarKeys?: ReadonlyArray<string>;
+		readonly deriveKeys?: ReadonlyArray<string>;
+		readonly derivePaths?: Readonly<Record<string, ReadonlyArray<ReadonlyArray<string>>>>;
 		readonly rowKeys?: ReadonlyArray<string>;
 	}>,
+	renderContext?: Pick<SsrRenderContext, 'prerenderSettle'>,
 ) {
 	const seeded = cells.flatMap((cell) => {
 		const name = cell.graphNodeId.slice('prop:'.length);
+		const derived = new Map<string, unknown>();
+		for (const key of cell.deriveKeys ?? []) {
+			const raw = props?.[key];
+			const paths =
+				cell.derivePaths && Object.hasOwn(cell.derivePaths, key)
+					? cell.derivePaths[key]
+					: undefined;
+			const value = paths ? valueAlongPaths(raw, paths) : raw;
+			// A forced-arm probe hands structured props over as placeholders, not data.
+			if (
+				marklessIsScalarProp(raw) ||
+				(raw !== undefined &&
+					!renderContext?.prerenderSettle &&
+					serializeGraphValue(value).ok)
+			)
+				derived.set(key, value);
+		}
+		const valueOf = (key: string) => (derived.has(key) ? derived.get(key) : props?.[key]);
 		const present = [
 			...(cell.keys ?? []).filter((key) => props?.[key] !== undefined),
 			...(cell.scalarKeys ?? []).filter((key) => marklessIsScalarProp(props?.[key])),
+			...derived.keys(),
 			...(cell.rowKeys ?? []).filter((key) => props?.[key] !== undefined),
 		];
 		if (cell.keys ? present.length === 0 : props?.[name] === undefined) return [];
 		const value = cell.keys
-			? Object.fromEntries(present.map((key) => [key, props?.[key]]))
+			? Object.fromEntries(present.map((key) => [key, valueOf(key)]))
 			: props?.[name];
 		const seededCell = {
 			graphNodeId: cell.graphNodeId,
@@ -886,13 +911,17 @@ export function marklessSsrSeedPropCells(
 			valueKind: marklessSsrValueKind(value),
 			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
-		if (cell.keys && (cell.scalarKeys || cell.rowKeys) && cell.graphNodeId === 'prop:props')
+		if (
+			cell.keys &&
+			(cell.scalarKeys || cell.deriveKeys || cell.rowKeys) &&
+			cell.graphNodeId === 'prop:props'
+		)
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
 						cell.keys?.includes(key) ||
 						!marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
-							? [[key, props?.[key]]]
+							? [[key, valueOf(key)]]
 							: [],
 					),
 				);
@@ -1011,13 +1040,38 @@ export function marklessSsrHandedDown(
 	return externalSymbolIds.filter((symbolId) => received.has(symbolId));
 }
 
-function marklessSsrComposedView(
+// Every component of a module carries the module's whole view, and a record stated for a child's spread host is this render's only when it placed that child through the same edge.
+function marklessSsrEdgeOwnedView(
 	structure: SsrDataStructure,
 	view: SsrViewDraft,
+	idPrefix: string,
+): SsrViewDraft {
+	const placed = new Set(structure.componentEdgeIds ?? []);
+	const own = <T extends SsrRecord>(records: ReadonlyArray<T>, mark?: SsrRecord): T[] =>
+		records.flatMap((record) => {
+			const edgeId = record.componentEdgeId;
+			if (typeof edgeId !== 'string') return [record];
+			if (!placed.has(idPrefix + edgeId)) return [];
+			const { componentEdgeId: _edgeId, ...rest } = record;
+			return [{ ...rest, ...mark } as T];
+		});
+	return {
+		...view,
+		locators: own(view.locators),
+		events: own(view.events, { forwarded: true }),
+		domUpdates: own(view.domUpdates),
+		elementHandles: own(view.elementHandles),
+	};
+}
+
+function marklessSsrComposedView(
+	structure: SsrDataStructure,
+	moduleView: SsrViewDraft,
 	children: ReadonlyArray<SsrComposedChild>,
 	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry>,
 	idPrefix = '',
 ) {
+	const view = marklessSsrEdgeOwnedView(structure, moduleView, idPrefix);
 	// View composition qualifies child dom updates before state composition runs,
 	// so the widget roots must be known by here or a widget's reads land on the
 	// first widget of its family.
@@ -1616,7 +1670,7 @@ export function marklessSsrAppendChildView(context: {
 			...marklessSsrBindBehavior(behavior, context.child, childInstancePath),
 			hostNodeId: context.child.hostPrefix + behavior.hostNodeId,
 		});
-	// A widget-scoped handle id is one module-level string every instance of that
+	// A subtree-scoped handle id is one module-level string every instance of that
 	// widget spells, so it takes the same qualification every other record's graph
 	// ids take here. Without it the served payload files both instances' elements
 	// under one key and the last one registered answers every handler on the page.

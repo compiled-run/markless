@@ -10,13 +10,20 @@ Run Vite commands through `vp` (Vite+), as the scripts in `package.json` do: `vp
 `vite build`. The app aliases `vite` to `@voidzero-dev/vite-plus-core`, so that plugins get
 Vite+, and that package has no `vite` command.
 
+## Type checking
+
+The `check` script formats and lints with `vp check`, then type-checks every `.tsrx` and `.ts`
+file with `markless-tsc`, the TypeScript command line with `.tsrx` support. Each error prints as
+`pages/index.tsrx(9,24): error TS2322: ...`, and the script exits non-zero, so CI can run it.
+
 ## Editor support
 
 `tsconfig.json` carries the editor wiring: the `plugins` entries load the Markless
 TypeScript plugin, and the top-level `tsrx` block tells it which compiler to use. Any editor
 built on TypeScript's own language server (`tsserver`) reads that file — VS Code with the
-upstream TSRX extension (`ripple-ts.ripple-ts-vscode-plugin`), WebStorm, and Zed all do — so
-completions, hover, and go-to-definition work in `.tsrx` files.
+[TSRX Syntax for VS Code](https://marketplace.visualstudio.com/items?itemName=TSRX.tsrx-vscode-plugin) extension (`TSRX.tsrx-vscode-plugin`), WebStorm, and Zed all
+do — so completions, hover, and go-to-definition work in `.tsrx` files. Cursor, Windsurf and
+other VS Code forks install the same extension [from Open VSX](https://open-vsx.org/extension/TSRX/tsrx-vscode-plugin).
 
 {{editorNote}}
 

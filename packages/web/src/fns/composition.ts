@@ -311,7 +311,7 @@ export function marklessRegisterComposedWidgets(children: ReadonlyArray<ComposeC
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
 		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
-			if (definition.scope !== 'widget') continue;
+			if (definition.scope !== 'subtree') continue;
 			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			if (
 				!marklessDesignatesWidget(child, definition.id) &&
@@ -350,7 +350,7 @@ function marklessComposedWidgetSites(
 		const instancePath = marklessComposedInstancePath(child);
 		if (!instancePath) continue;
 		for (const definition of child.output?.state?.sharedDefinitions ?? []) {
-			if (definition.scope !== 'widget') continue;
+			if (definition.scope !== 'subtree') continue;
 			if (!marklessCarriesWidgetCells(child, definition.id)) continue;
 			const site: MarklessWidgetSite = {
 				path: instancePath,
@@ -457,7 +457,7 @@ function marklessComposedSharedDefinition(
 	instancePath: string,
 	childrenWidgetRoot: string | undefined,
 ): ComposeSharedDefinition {
-	if (definition.scope !== 'widget' || !instancePath) return definition;
+	if (definition.scope !== 'subtree' || !instancePath) return definition;
 	const projectionIds = marklessProjectionIds(definition, childrenWidgetRoot).map(
 		(projectionId) => instancePath + projectionId,
 	);
@@ -628,7 +628,7 @@ function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): 
 		if (!marklessComposedInstancePath(child).includes('r:')) continue;
 		const carried = new Set(
 			(state.sharedDefinitions ?? []).flatMap((definition) =>
-				definition.scope === 'widget' && !marklessDesignatesWidget(child, definition.id)
+				definition.scope === 'subtree' && !marklessDesignatesWidget(child, definition.id)
 					? [definition.id]
 					: [],
 			),
@@ -651,7 +651,7 @@ function marklessMergedWidgetCells(
 ): ReadonlyArray<ComposeStateNode> {
 	const widgetIds = new Set(
 		sharedDefinitions.flatMap((definition) =>
-			definition.scope === 'widget' ? [definition.id] : [],
+			definition.scope === 'subtree' ? [definition.id] : [],
 		),
 	);
 	if (widgetIds.size === 0) return cells;
@@ -762,7 +762,7 @@ function marklessComposedSymbol(
 				...marklessInstanceScopedGraph(graph, instancePath),
 				read,
 			},
-			// A widget-scoped element() handle is one element per rendered widget,
+			// A subtree-scoped element() handle is one element per rendered widget,
 			// so it resolves against this instance the way this instance's graph
 			// nodes do.
 			getElementHandle: marklessInstanceScopedElementHandle(

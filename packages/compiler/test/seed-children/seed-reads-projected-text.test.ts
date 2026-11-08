@@ -3,7 +3,7 @@ import { compileTsrxModule } from '../../src/index.ts';
 import { SEED_CHILDREN_UNAVAILABLE_CODE } from '../../src/passes/public-render/seed-children-diagnostics.ts';
 
 /**
- * A widget family whose label part seeds a widget-scoped cell from its OWN
+ * A widget family whose label part seeds a subtree-scoped cell from its OWN
  * `children`, and a sibling part that renders that cell into an attribute. The
  * sibling paints during the projection, which is after the seed pass, so what
  * the seed saw is what the attribute carries — there is no second paint.
@@ -12,7 +12,7 @@ const FAMILY = `import { shared, state } from '@markless/core';
 export const meterState = shared(() => {
 	const meter = state({ value: 0, ownLabel: '' });
 	return { ...meter };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 function MeterRoot({ children }) @{
 	const meter = meterState();
@@ -41,7 +41,7 @@ const ALTERNATE_FAMILY = `import { shared, state } from '@markless/core';
 export const gaugeStore = shared(() => {
 	const gauge = state({ level: 0, caption: '' });
 	return { ...gauge };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 function GaugeShell({ children }) @{
 	const gauge = gaugeStore();

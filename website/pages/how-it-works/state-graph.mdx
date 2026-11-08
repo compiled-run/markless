@@ -1,143 +1,96 @@
 import PageMeta from '../../components/page-meta.tsrx';
-import Callout from '../../components/docs/callout.tsrx';
-import ThemeToggle from '../../components/docs/theme-toggle.tsrx';
+import Subtitle from '../../components/docs/subtitle.tsrx';
+import GraphAnatomy from '../../components/figures/state-graph/graph-anatomy.tsrx';
+import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
-import StateGraphSketch from '../../components/sketch/how2/state-graph-sketch.tsrx';
 
+<SiteNavbar />
 <Sidebar />
 
-# Why one write touches one text node
+# The state graph
 
-<PageMeta time="5 min" assumes="state, computed, events" />
+<PageMeta time="2 min" assumes="state, computed, events" />
 
-<ThemeToggle />
+<Subtitle text="The state graph is a map, written at compile time, of which values each spot on the page reads." terms="state values" />
 
-Last page, a click ran `count++`, and one number on the page changed. Who decided which number?
-
-The compiler did, before the page existed. It wrote down who reads what.
-
-## The problem
-
-A write has to change the page. One common way is to run the component again and compare the result
-with the page. That reruns the whole component, even when one character changes.
-
-Markless skips that work. It needs a list that says which text, attributes and rows read each piece
-of state. That list is the _state graph_.
-
-## Three parts
-
-- A **node** holds one value. Each `state()` becomes a node with an ID like `state:count`. Each
-  `computed()` becomes one too.
-- A **subscription** is a reader. It names one node and one path into that node's value. When that
-  path changes, it runs a small function.
-- The **journal** is the list of DOM changes those functions return, such as "set this text".
-
-Think of plumbing, as an analogy. A write opens one tap, and water reaches only the pipes on that tap.
-
-Here is a counter with one computed value. Press **Next** a few times:
-
-<Code note="Add a third line that reads {count + 100}. Then add a second state() with its own button and line. Each button moves only the lines that read its state.">
-```tsrx title="state-computed.tsrx"
+```tsrx title="player.tsrx"
 import { computed, state } from '@markless/core';
 
-export default function StateComputed() @{
-	let count = state(2);
-	const doubled = computed(() => count * 2);
+const SONGS = ['Harbour Lights', 'Slow Train', 'Northbound'];
+
+export default function Player() @{
+	let playing = state('Harbour Lights');
+	let liked = state(new Set<string>());
+	let volume = state(6);
+	const isLiked = computed(() => liked.has(playing));
+	const title = computed(() => playing.toUpperCase());
+	const cover = computed(() => '/covers/' + playing + '.jpg');
 
 	<section>
-		<button onClick={() => count++}>Next</button>
-		<p>count: {count}</p>
-		<p>doubled: {doubled}</p>
+		<h2>{title}</h2>
+		<button
+			class={isLiked ? 'heart on' : 'heart'}
+			onClick={() => (liked = new Set([...liked, playing]))}
+		>
+			♥
+		</button>
+		<ul>
+			@for (const song of SONGS; key song) {
+				<li
+					class={song === playing ? 'row on' : 'row'}
+					onClick={() => (playing = song)}
+				>
+					{song}
+				</li>
+			}
+		</ul>
+		<img src={cover} alt="" />
+		<label>
+			Volume {volume}
+			<input
+				type="range"
+				max="10"
+				onInput={(e) => (volume = Number(e.target.value))}
+			/>
+		</label>
 	</section>
+}
+```
+
+**`playing`**, **`liked`** and **`volume`** are values the page watches. **`isLiked`** reads two of them, and **`title`** and **`cover`** read one. Each spot in the markup that reads a value gets an edge from it, so one value can feed many spots, and one spot can depend on many values.
+
+## You build the graph by building the page
+
+The compiler turns each `state()` and `computed()` into a *node*, and each spot that reads one into a *subscription*, drawn as an edge. Drag pieces onto the page, then pick a song, like it, or turn the volume:
+
+<GraphAnatomy />
+
+- Each piece brings its computed value and its spot, with edges from every value they read. The heart brings `isLiked`, which reads both `liked` and `playing`.
+- The heading reads nothing, so it never gets a node.
+- A write travels only its own branch: liking a song never touches the header or the cover. Drag a reader off again and a song pick reaches fewer spots.
+
+## A write runs only its own path
+
+When `playing` changes, `@markless/runtime`:
+
+1. marks `state:playing` changed, and any computed that reads it stale,
+2. waits for the current code to finish, then runs one *flush*,
+3. runs only the subscriptions on that path and applies the page changes they return.
+
+<Code steps={[{ label: 'Change `Harbour Lights` to `Slow Train`.', shows: 'Now playing: Slow Train' }, { label: "Under the paragraph, add `<button onClick={() => (playing = 'Northbound')}>Next</button>`. Press it.", shows: 'Now playing: Northbound' }]}>
+```tsrx title="player.tsrx"
+import { state } from '@markless/core';
+
+export default function Player() @{
+	let playing = state('Harbour Lights');
+
+	<p>Now playing: {playing}</p>
 }
 ```
 </Code>
 
-Both lines move, because both read `count`, one of them through `doubled`. The button label never
-changes, because it reads nothing.
+- Two writes in the same turn share one flush.
+- A write to `song.title` doesn't reach a reader of `song.artist`; replacing `song` reaches both.
+- `@markless/core` has no effect function. The compiler plans every subscription.
 
-<StateGraphSketch />
-
-## One write, step by step
-
-The full graph lives in `@markless/runtime`. The general browser path builds it, and so does a
-server-rendered page that needs the full runtime. In that graph, a click that runs `count++` does
-this:
-
-1. If the new value equals the old one, nothing happens.
-2. Otherwise the graph stores it and records the written path as dirty.
-3. The graph marks `doubled` as stale, because `doubled` depends on `count`.
-4. The graph schedules one flush as a _microtask_: a job that runs right after the current code
-   finishes.
-5. The flush runs each subscription whose path meets a dirty path. The `doubled` subscription reads
-   `doubled`, so it recomputes now.
-6. Each subscription returns a journal entry, such as `setText`. Markless applies the entries to the
-   DOM.
-
-Two writes in the same turn share one flush. If a handler writes `1` and then `2`, the journal gets
-one entry, with `2`.
-
-**Misconception: something compares the old page with the new page.** Nothing does. A subscription
-returns the exact change. There is no tree to compare.
-
-## Paths, not whole objects
-
-A subscription listens to a path inside a value, not to the whole value. Two paths meet when one is
-a prefix of the other.
-
-```tsrx
-import { state } from '@markless/core';
-
-export function Menu() @{
-	let menu = state({ open: true, title: 'Menu' });
-
-	<section>
-		<h2>{menu.title}</h2>
-		<button onClick={() => { menu.open = false; }}>Close</button>
-	</section>
-}
-```
-
-In the full runtime, a write to `menu.open` does not wake the reader of `menu.title`. A write that replaces `menu` wakes
-both, because the empty path is a prefix of every path.
-
-## Computed values
-
-A computed node lists the paths it depends on. A write to one of those paths marks it stale. It
-recomputes on its next read, not before. Chains work the same way: a computed that reads another
-computed goes stale with it.
-
-On a server-rendered page, the `markless/state` script carries each computed as a recipe. The
-recipe is its dependencies plus the ID of a derive symbol. The current value travels too, but only for a sync
-computed that a handler reads.
-
-## What a subscription can return
-
-The full runtime sends its DOM changes through the journal. These are the entry types:
-
-| Entry | What it does |
-| --- | --- |
-| `setText` | Sets the text of one text node |
-| `setAttr`, `setProp` | Sets one attribute, or one DOM property |
-| `insertRange`, `removeRange`, `moveRange` | Inserts, removes or moves a run of nodes, such as an `@if` branch |
-| `runCleanup` | Runs a cleanup registered for one element |
-
-**Misconception: you need an effect to keep the page in sync.** `@markless/core` exports no effect
-function. Its authoring exports are `state`, `computed`, `shared`, `element` and `storage`. The
-compiler plans every subscription for you.
-
-## The direct module keeps it smaller
-
-Mount the counter from earlier pages with `render()`, and it takes the direct browser module instead. That
-module skips this machinery. Its graph is a `Map` of state values. After a handler runs, it reads
-each text slot again and writes only the ones whose value changed.
-
-Same result, fewer moving parts: only the text that reads the changed state changes.
-
-<Callout
-	sprite="cross"
-	title="Why did my @if run a component again?"
-	text="An @if or @switch inside @try can hold a component. Then a toggle re-renders the whole @try block and runs the component again. The compiler warns with MARKLESS_TRY_BLOCK_TOGGLE_RERENDER, and the fix it suggests is to move the component outside the @if."
-/>
-
-Next: [when click code downloads, and when it runs](/how-it-works/lazy-chunks).
+[Lazy chunks](/how-it-works/lazy-chunks) shows where the code behind each subscription lives.

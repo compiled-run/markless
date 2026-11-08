@@ -24,7 +24,7 @@ permissions:
 
 jobs:
     agent-files:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 5
         steps:
             - uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
     # `vp check --no-fmt` adds the lint stage (fmt is excluded: the tree has
     # pre-existing formatting drift that is scheduled separately).
     typecheck:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -105,7 +105,7 @@ jobs:
     # have agreed for a while; also checks website/. Known 7.x gaps:
     # https://github.com/tsrx-org/tsrx/issues/136
     typecheck-ts7:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -144,7 +144,7 @@ jobs:
     # so the globs below see a clean checkout with no node_modules or dist to
     # hash.
     lanes:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         permissions:
             contents: read
             # Reads the merge queue's CI run for this commit.
@@ -434,14 +434,15 @@ jobs:
                   echo "build-warnings=${{ steps.build_warnings.outputs.cache-hit != 'true' }}"
 
     # Fills the browser and system-package caches the unit, browser and box lanes restore. Keyed by the
-    # lockfile, so the pinned Playwright version is part of the key; WebKit rides along for the node tests
-    # that drive both engines; the browsers sit beside the checkout, so a lint of the tree never sees them.
+    # lockfile, so the pinned Playwright version is part of the key, and by the runner image, because WebKit
+    # is a per-distro build (the ubuntu24 one needs ICU 74, which ubuntu26 lacks); WebKit rides along for the
+    # node tests that drive both engines; the browsers sit beside the checkout, so a lint of the tree never sees them.
     # No lane needs this job: waiting on it cost a merge group a second runner queue (12 minutes on
     # 2026-10-27), and only a Playwright bump misses the cache, when each lane installs its own copy.
     prepare-playwright:
         needs: lanes
         if: needs.lanes.outputs.run_playwright == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 15
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -471,7 +472,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
                   lookup-only: true
 
@@ -500,9 +501,9 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-${{ runner.os }}-chromium-webkit-
+                      playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Install the pinned Chromium and WebKit
@@ -514,7 +515,7 @@ jobs:
               if: steps.playwright-cache.outputs.cache-hit != 'true'
               uses: actions/cache/save@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             # A new key starts from the newest older entry, so the mirror only serves what changed.
@@ -524,7 +525,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Download the Playwright system packages
@@ -555,7 +556,7 @@ jobs:
     unit:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_unit == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         strategy:
             fail-fast: false
@@ -591,7 +592,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -600,7 +601,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -624,7 +625,7 @@ jobs:
     browser:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_browser == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 25
         strategy:
             fail-fast: false
@@ -661,7 +662,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -670,7 +671,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -701,7 +702,7 @@ jobs:
     completion-matrix:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_completion_matrix == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -749,7 +750,7 @@ jobs:
     boxes-bundler:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_bundler == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 25
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -781,7 +782,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -790,7 +791,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -848,7 +849,7 @@ jobs:
     boxes-router:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_router == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -916,7 +917,7 @@ jobs:
     boxes-music-player:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_music_player == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -987,7 +988,7 @@ jobs:
     boxes-music-player-ssr:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_boxes_music_player_ssr == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 25
         env:
             NPM_CONFIG_AUDIT: 'false'
@@ -1060,7 +1061,7 @@ jobs:
     website-boxes:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_website_boxes == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -1092,7 +1093,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -1101,7 +1102,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1143,7 +1144,7 @@ jobs:
     perf-guards:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_perf_guards == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 30
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -1175,7 +1176,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -1184,7 +1185,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1202,6 +1203,16 @@ jobs:
             - name: Run the performance guards
               run: pnpm perf:guard
 
+            # A Linux anchor is accepted from this file: pnpm perf:guard:accept <guard> <subject> --from last-measurement.json
+            - name: Upload the perf-guards measurement
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: perf-guards-measurement
+                  path: /tmp/markless-perf-guards/last-measurement.json
+                  if-no-files-found: ignore
+                  retention-days: 7
+
             - name: Mark the perf-guards lane complete
               run: echo ok > perf-guards-completed.txt
 
@@ -1217,7 +1228,7 @@ jobs:
     demo-boxes:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_demo_boxes == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
@@ -1249,7 +1260,7 @@ jobs:
               id: playwright-cache
               uses: actions/cache/restore@v4
               with:
-                  key: playwright-${{ runner.os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
+                  key: playwright-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-chromium-webkit-${{ needs.lanes.outputs.playwright_version }}
                   path: ${{ github.workspace }}-ms-playwright
 
             - name: Restore the Playwright system packages
@@ -1258,7 +1269,7 @@ jobs:
               with:
                   key: playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-${{ needs.lanes.outputs.playwright_version }}
                   restore-keys: |
-                      playwright-apt-${{ runner.os }}-
+                      playwright-apt-${{ runner.os }}-${{ needs.lanes.outputs.image_os }}-
                   path: ${{ github.workspace }}-playwright-apt
 
             - name: Hand the cached system packages to apt
@@ -1310,7 +1321,7 @@ jobs:
     carry-queue-markers:
         needs: lanes
         if: needs.lanes.outputs.queue_run != ''
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         permissions:
             contents: read
@@ -1458,7 +1469,7 @@ jobs:
     save-lane-markers:
         needs: [lanes, unit, browser]
         if: always()
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 5
         steps:
             - name: Mark the unit lane complete
@@ -1507,7 +1518,7 @@ jobs:
                 build-warnings,
             ]
         if: always()
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
             RUN_RECEIPTS: ${{ needs.lanes.outputs.run_receipts }}
@@ -1686,7 +1697,7 @@ jobs:
     # suite. It is blocking, because the whole point of the workspace-detection
     # work is the behavior only a real install can show.
     package-manager-matrix:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         env:
             # Turns the matrix file on. Without it every lane is skipped.
@@ -1725,7 +1736,7 @@ jobs:
     build-scale:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_build_scale == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@v4
@@ -1762,7 +1773,7 @@ jobs:
     build-warnings:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_build_warnings == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 20
         steps:
             - uses: actions/checkout@v4
@@ -1794,7 +1805,7 @@ jobs:
                   path: build-warnings-completed.txt
 
     changes:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         permissions:
             contents: read
@@ -1811,13 +1822,15 @@ jobs:
 
             # On main the base is the last commit whose CI run passed, not the previous push: a red or
             # unfinished run before this one leaves commits that still need benchmarking.
+            # A pull request runs on GitHub's merge of the head into main, so its base is that merge's
+            # first parent: the event's base.sha can predate main commits the merge already carries.
             - name: Decide whether benchmarks can be affected
               id: filter
               env:
                   GH_TOKEN: ${{ github.token }}
               run: |
                   if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
-                    base="${{ github.event.pull_request.base.sha }}"
+                    base="$(git rev-parse HEAD^1)"
                   elif [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then
                     base="${{ github.event.merge_group.base_sha }}"
                   elif [ "$GITHUB_EVENT_NAME" = "push" ] && [ -n "$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&event=merge_group&status=success&per_page=1" --jq '.workflow_runs[0].id // empty' || true)" ]; then
@@ -1850,7 +1863,7 @@ jobs:
     benchmark:
         needs: changes
         if: needs.changes.outputs.bench == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 30
         strategy:
             fail-fast: false
@@ -2043,7 +2056,7 @@ jobs:
     benchmark-guard:
         needs: [changes, benchmark]
         if: needs.changes.outputs.bench == 'true'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         env:
             MARKLESS_JSFB_BASELINE_RESULTS: ${{ github.workspace }}/.jsfb-merged/markless-jsfb/results-markless-base

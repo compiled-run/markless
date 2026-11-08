@@ -19,7 +19,7 @@ export default box(
 		await page.click('.sidebar-summary', WAIT);
 		await page.click('.sidebar a[href="/ui/combobox"]', WAIT);
 		await expect.page.text(page, 'h1', 'combobox', WAIT);
-		await expect.page.exists(page, '.site-header', WAIT);
+		await expect.page.exists(page, '.site-navbar', WAIT);
 		if (
 			(await page.networkRequests()).filter((request) => request.resourceType === 'Document')
 				.length !== 1

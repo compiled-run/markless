@@ -161,11 +161,13 @@ export function wireKeyedRepeats(
 		readonly renderData?: ResumeRenderDataThunk;
 		readonly root?: ResumeDomElement;
 		readonly pageRepeats?: ReadonlyArray<ResumeKeyedRepeatRecord>;
+		readonly moved?: (read: SlotRead) => boolean;
 	},
 	rowComponentHost?: RowComponentHost,
 	onRow?: ResumeRepeatRowHook,
 ): void | Promise<void> {
 	const pageRepeats = input.pageRepeats ?? input.view.keyedRepeats ?? [];
+	const moved = input.moved ?? movedSinceWiring(input.graph, pageRepeats);
 	// Only a changeable component row rewrites a prop node composition left in place; with none, every such list is fixed.
 	const rowsChange = pageRepeats.some(
 		(each) =>
@@ -177,11 +179,11 @@ export function wireKeyedRepeats(
 	// An onIdle or onVisible handler started this runtime and no reader has acted yet: building rows is not its code to run.
 	const deferredStart = typeof input.root?.__marklessDelegatedDispatch === 'string';
 	const nested = !onRow && (globalThis as ResumeNestedRepeatsHost).__marklessNestedRepeats;
-	if (nested) return nested({ ...input, pageRepeats }, rowComponentHost);
+	if (nested) return nested({ ...input, pageRepeats, moved }, rowComponentHost);
 	if (!armRows && input.view.keyedRepeats?.some((repeat) => repeat.branchArm))
 		return import('./resume-repeat-branch-arm.ts').then((module) => {
 			armRows = module;
-			return wireKeyedRepeats(input, rowComponentHost, onRow);
+			return wireKeyedRepeats({ ...input, moved }, rowComponentHost, onRow);
 		});
 	for (const repeat of input.view.keyedRepeats ?? []) validateOneRepeat(input.graph, repeat);
 	const armsWired: Array<Promise<unknown>> = [];
@@ -210,7 +212,9 @@ export function wireKeyedRepeats(
 		const arm: MountedEmptyArm = { mounted: false, nodes: [] };
 		const builds = Boolean(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent),
 			cell = builds ? rowMintCell(input.graph) : undefined;
+		const stale = () => slotReadGroups(repeat).map((reads) => reads.some(moved));
 		const adopt = (rows: ReadonlyArray<ResumeDomNode>, from: ReadonlyArray<unknown>): void => {
+			const moved = slots.ready ? stale() : [];
 			rowRootsByKey.clear();
 			slots.values.clear();
 			served.clear();
@@ -220,7 +224,7 @@ export function wireKeyedRepeats(
 				rowRootsByKey.set(rowKey, rowRoot);
 				served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
 				if (slots.ready)
-					slots.values.set(rowKey, rowSlotValues(repeat, item, rowIndex, input.graph, slots));
+					slots.values.set(rowKey, servedSlotValues(repeat, item, rowIndex, input.graph, slots, moved));
 				registerRowEvents(rowRoot, rowKey);
 			}
 		};
@@ -233,7 +237,7 @@ export function wireKeyedRepeats(
 		}
 		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
 		const apply = (mint: RowMint | undefined): void => {
-			if (follow && !follow.showing()) return;
+			if (follow && !follow.showing(rowRootsByKey)) return;
 			applyKeyedRepeatRowOrder(
 				input.graph,
 				repeat,
@@ -255,8 +259,9 @@ export function wireKeyedRepeats(
 				}
 				slots.branches ??= repeat.rowTemplate?.branchSlots && mint.branchValues;
 				if ((slots.read || slots.branches) && !slots.ready) {
+					const moved = stale();
 					for (const [rowKey, [item, index]] of served)
-						slots.values.set(rowKey, rowSlotValues(repeat, item, index, input.graph, slots));
+						slots.values.set(rowKey, servedSlotValues(repeat, item, index, input.graph, slots, moved));
 					slots.ready = true;
 					if (slots.branches)
 						for (const [rowKey, rowRoot] of rowRootsByKey) registerRowEvents(rowRoot, rowKey, true);
@@ -268,7 +273,17 @@ export function wireKeyedRepeats(
 		const startLoading = (): void => {
 			if (!builds || loading) return;
 			loading = readyMint();
-			void loading?.then((mint) => apply(mint)).catch(() => undefined);
+			// Rows adopted from these very items: a reconcile would only undo the browser's own edit, as in a contenteditable.
+			void loading
+				?.then(
+					(mint) =>
+						(!slots.moved &&
+							items.length &&
+							served.size === items.length &&
+							readKeyedRepeatCollection(input.graph, repeat) === items) ||
+						apply(mint),
+				)
+				.catch(() => undefined);
 		};
 		// No gesture changes a fixed prop list, so none waits for its row code: it loads when idle.
 		const propCollection = !rowsChange && isProp(repeat.collectionGraphNodeId);
@@ -577,7 +592,40 @@ type RowSlots = {
 	settled?: boolean;
 	read?: RowSlotReader | undefined;
 	branches?: RowMint['branchValues'];
+	moved?: boolean;
 };
+type SlotRead = { readonly graphNodeId: string; readonly path?: ReadonlyArray<string> };
+const UNPAINTED = Symbol();
+// The row code can arrive after a gesture's write, so what the server painted is the state as wiring found it.
+function movedSinceWiring(graph: Pick<RuntimeGraph, 'read'>, repeats: ReadonlyArray<ResumeKeyedRepeatRecord>) {
+	// An unserializable value compares by identity.
+	const text = (read: SlotRead): unknown => {
+		let value: unknown;
+		try {
+			value = graph.read(read.graphNodeId, read.path);
+			return JSON.stringify(value, (_, v) =>
+				typeof v === 'bigint' ? `${v}n` : v instanceof Map || v instanceof Set ? [...v] : v,
+			);
+		} catch {
+			return value;
+		}
+	};
+	const served = new Map(repeats.flatMap(rowSlotReads).map((read) => [JSON.stringify(read), text(read)]));
+	return (read: SlotRead) => served.has(JSON.stringify(read)) && served.get(JSON.stringify(read)) !== text(read);
+}
+function servedSlotValues(
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+	index: number,
+	graph: Pick<RuntimeGraph, 'read'>,
+	slots: RowSlots,
+	moved: ReadonlyArray<boolean>,
+): unknown[] {
+	const values = rowSlotValues(repeat, item, index, graph, slots);
+	if (!moved.includes(true)) return values;
+	slots.moved = true;
+	return values.map((value, at) => (moved[Math.min(at, moved.length - 1)] ? UNPAINTED : value));
+}
 // So a write in place still reads as a moved item.
 function itemCopy(item: unknown): unknown {
 	try {
@@ -611,17 +659,21 @@ function rowSlotValues(
 	);
 	return slots?.branches ? [...values, ...slots.branches(repeat, item, index, graph, read)] : values;
 }
-function rowSlotReads(repeat: ResumeKeyedRepeatRecord) {
-	return [
-		...templateSlots(repeat),
-		...(repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]),
-	].flatMap((slot) =>
-		'source' in slot
-			? (slot.reads ?? [])
-			: 'graphNodeId' in slot
-				? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]
-				: [],
+// One group per text or attribute slot, then one for every @if value.
+function slotReadGroups(repeat: ResumeKeyedRepeatRecord): SlotRead[][] {
+	const branches = (repeat.rowTemplate?.branchSlots ?? []).flatMap((branch) => [branch, ...branch.arms.flatMap(slotsOf)]);
+	return [...templateSlots(repeat).map((slot) => [slot]), branches].map((group: ReadonlyArray<(typeof branches)[number]>) =>
+		group.flatMap((slot) =>
+			'source' in slot
+				? (slot.reads ?? [])
+				: 'graphNodeId' in slot
+					? [{ graphNodeId: slot.graphNodeId, path: slot.graphPath }]
+					: [],
+		),
 	);
+}
+function rowSlotReads(repeat: ResumeKeyedRepeatRecord) {
+	return slotReadGroups(repeat).flat();
 }
 function firstDuplicateRepeatKey(
 	repeat: ResumeKeyedRepeatRecord,

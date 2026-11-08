@@ -2,6 +2,7 @@ import type {
 	LoweredRowItem,
 	LoweredStateRead,
 	LoweredStateWrite,
+	PassedStateWrite,
 	SemanticGraphAlias,
 	SemanticGraphArtifact,
 	SemanticGraphBinding,
@@ -166,6 +167,13 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 			continue;
 		}
 
+		if (write.passedTo) {
+			const passed = lowerPassedStateWrite(write, write.passedTo, input, lookup);
+			if (passed?.kind === 'write') writes.push(passed.write);
+			else if (passed) diagnostics.push(passed.diagnostic);
+			continue;
+		}
+
 		if (write.through) {
 			const through = lowerWriteThrough(
 				write,
@@ -327,6 +335,38 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		),
 		writes,
 		diagnostics,
+	};
+}
+
+// A call changed state in place; an assumed change to a value nothing may write is the call's own business.
+function lowerPassedStateWrite(
+	write: SemanticStateWrite,
+	passedTo: PassedStateWrite,
+	input: StateLoweringInput,
+	lookup: GraphLookup,
+): RowItemWriteLowering | null {
+	if (write.rowRepeatId) {
+		const row = lowerRowItemWrite(write, input);
+		if (row?.kind === 'write')
+			return { kind: 'write', write: { ...row.write, source: passedTo.argument, passedTo } };
+		return row && !passedTo.assumed ? row : null;
+	}
+	const resolved = resolveStateGraphPath(input, write.target, lookup, null, write.componentName);
+	if (!resolved) return null;
+	if (resolved.binding.kind !== 'state' || !resolved.binding.writable)
+		return passedTo.assumed
+			? null
+			: { kind: 'diagnostic', diagnostic: readOnlyWriteDiagnostic(write, resolved.binding) };
+	return {
+		kind: 'write',
+		write: {
+			source: passedTo.argument,
+			sourceSpan: write.targetSpan,
+			graphNodeId: resolved.binding.id,
+			path: resolved.path,
+			operation: 'call',
+			passedTo,
+		},
 	};
 }
 
@@ -608,106 +648,6 @@ type ResolvedStateGraphPath = {
 	readonly componentName?: string;
 };
 
-function templateExpressionGraphReadSource(source: string, lookup: GraphLookup): string | null {
-	if (!isCompositeTemplateExpression(source)) return null;
-
-	const code = blankLiteralText(source);
-	const candidates = [...lookup.bindings.keys(), ...lookup.aliases.keys()].sort(
-		(left, right) => right.length - left.length,
-	);
-	for (const name of candidates) {
-		if (sourceContainsIdentifier(code, name)) return name;
-	}
-
-	return null;
-}
-
-// Blanks string, template-text and comment characters so only code is searched for names.
-function blankLiteralText(source: string): string {
-	let out = '';
-	const braceDepths: number[] = [];
-	let depth = 0;
-	let index = 0;
-	const blankUntil = (end: number) => {
-		out += source.slice(index, end).replace(/[^\n]/g, ' ');
-		index = end;
-	};
-	const scanTemplateText = () => {
-		while (index < source.length) {
-			const char = source[index];
-			if (char === '\\') {
-				blankUntil(Math.min(index + 2, source.length));
-			} else if (char === '`') {
-				out += char;
-				index += 1;
-				return;
-			} else if (char === '$' && source[index + 1] === '{') {
-				out += '${';
-				index += 2;
-				braceDepths.push(depth);
-				depth += 1;
-				return;
-			} else {
-				blankUntil(index + 1);
-			}
-		}
-	};
-	while (index < source.length) {
-		const char = source[index]!;
-		if (char === "'" || char === '"') {
-			out += char;
-			index += 1;
-			while (index < source.length && source[index] !== char) {
-				blankUntil(Math.min(index + (source[index] === '\\' ? 2 : 1), source.length));
-			}
-			if (index < source.length) {
-				out += char;
-				index += 1;
-			}
-		} else if (char === '`') {
-			out += char;
-			index += 1;
-			scanTemplateText();
-		} else if (char === '/' && source[index + 1] === '/') {
-			const end = source.indexOf('\n', index);
-			blankUntil(end === -1 ? source.length : end);
-		} else if (char === '/' && source[index + 1] === '*') {
-			const end = source.indexOf('*/', index + 2);
-			blankUntil(end === -1 ? source.length : end + 2);
-		} else if (char === '{') {
-			depth += 1;
-			out += char;
-			index += 1;
-		} else if (char === '}') {
-			depth -= 1;
-			out += char;
-			index += 1;
-			if (braceDepths.at(-1) === depth) {
-				braceDepths.pop();
-				scanTemplateText();
-			}
-		} else {
-			out += char;
-			index += 1;
-		}
-	}
-	return out;
-}
-
-function isCompositeTemplateExpression(source: string): boolean {
-	return /[?:+\-*/%<>=!&|()[\]{}]/.test(source);
-}
-
-function sourceContainsIdentifier(source: string, identifier: string): boolean {
-	return new RegExp(`(^|[^$0-9A-Z_a-z])${escapeRegExp(identifier)}(?=$|[^$0-9A-Z_a-z])`).test(
-		source,
-	);
-}
-
-function escapeRegExp(value: string): string {
-	return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function scopedGraphLookup(
 	input: StateLoweringInput,
 	sharedDefinitionId: string | null,
@@ -744,7 +684,9 @@ export function staticTemplateReadDiagnostic(
 	};
 	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
 		return null;
-	const readSource = templateExpressionGraphReadSource(read.source, lookup);
+	const readSource = read.readNames?.find(
+		(name) => lookup.bindings.has(name) || lookup.aliases.has(name),
+	);
 	if (!readSource) return null;
 	const diagnostic = templateExpressionStaticDiagnostic({
 		source: read.source,
@@ -752,24 +694,20 @@ export function staticTemplateReadDiagnostic(
 		sourceSpan: read.sourceSpan,
 		filename: semanticGraph.filename,
 	});
-	const props = read.componentName ? propsOnlyReads(read.source, lookup, semanticGraph.moduleImports) : null;
+	const props = read.componentName
+		? propsOnlyReads(read.readNames ?? [], lookup, semanticGraph.moduleImports)
+		: null;
 	return props ? { ...diagnostic, decidedByProps: { componentName: read.componentName!, props } } : diagnostic;
 }
 
 // Every name the expression reads is a prop or an import: anything else, a body local included, keeps the warning unsettled.
 function propsOnlyReads(
-	source: string,
+	names: ReadonlyArray<string>,
 	lookup: GraphLookup,
 	imports: StateLoweringInput['semanticGraph']['moduleImports'],
 ): ReadonlyArray<string> | null {
-	const code = blankLiteralText(source);
 	const props = new Set<string>();
-	for (const match of code.matchAll(/(?<![$\w.])([A-Za-z_$][\w$]*)(?![$\w])/g)) {
-		const name = match[1]!;
-		const after = code.slice(match.index + name.length);
-		const before = code.slice(0, match.index);
-		if (/^\s*:/.test(after) && /[{,]\s*$/.test(before)) continue;
-		if (/^(?:true|false|null|undefined|typeof|void|in|instanceof|new)$/.test(name)) continue;
+	for (const name of names) {
 		const resolved = resolveGraphPath(name, lookup.bindings, lookup.aliases);
 		if (!resolved && imports.some((imported) => imported.localName === name && !imported.typeOnly))
 			continue;

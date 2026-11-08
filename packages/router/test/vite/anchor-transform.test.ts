@@ -69,6 +69,54 @@ export default function Nav({ mode }) @{
 		);
 	});
 
+	async function lowered(source: string) {
+		const plugin = anchorTransformPlugin();
+		const handler = (plugin.transform as { handler: Function }).handler;
+		(plugin.configResolved as Function)({ root: '/project' });
+		return handler.call({ fs: routeTypegenFs(), parse: parseAst }, source, '/project/nav.tsrx');
+	}
+
+	it('lowers prefetch on a plain anchor the way it does on Link', async () => {
+		const result = await lowered(`export default function Nav({ mode }) @{
+	<nav>
+		<a href="/b" prefetch={false}>B</a>
+		<a href="/c" prefetch>C</a>
+		<a href="/d" prefetch={mode}>D</a>
+	</nav>
+}`);
+		expect(result?.code).toContain('<a href="/b" data-markless-router-prefetch="none">B</a>');
+		expect(result?.code).toContain('<a href="/c">C</a>');
+		expect(result?.code).toContain(
+			"<a href=\"/d\" data-markless-router-prefetch={(mode) === false ? 'none' : undefined}>D</a>",
+		);
+	});
+
+	it('lowers prefetch on a component for the compiler to check it reaches an anchor', async () => {
+		const result = await lowered(`import { navbar } from '@markless/ui';
+export default function Nav() @{
+	<navbar.root>
+		<navbar.itemlink href="/" prefetch={false}>Home</navbar.itemlink>
+		<HomeLink href="/" prefetch={false}>Home</HomeLink>
+	</navbar.root>
+}`);
+		expect(result?.code).toContain(
+			'<navbar.itemlink href="/" data-markless-router-prefetch="none">Home</navbar.itemlink>',
+		);
+		expect(result?.code).toContain(
+			'<HomeLink href="/" data-markless-router-prefetch="none">Home</HomeLink>',
+		);
+	});
+
+	it('refuses prefetch on an element that is not an anchor', async () => {
+		await expect(
+			lowered(`export default function Nav() @{
+	<button prefetch={false}>Theme</button>
+}`),
+		).rejects.toThrow(
+			/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: `prefetch=\{false\}` on <button> does nothing/,
+		);
+	});
+
 	it('lowers an href-less Link with data-driven children to the anchor the component renders', async () => {
 		const source = `import { Link } from '@markless/router';
 export default function Tag({ tag }) @{
