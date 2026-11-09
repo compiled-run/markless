@@ -161,6 +161,11 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 		const releases: Array<() => void> = [];
 		releasesById.set(boundary.id, releases);
 		const painted = new Map(shown);
+		// A settle that resolves after disposal claims nothing, so it commits nothing.
+		const claimFor = (graphNodeId: string, snapshot: unknown) => {
+			const claim = claimSettle(painted, graphNodeId, snapshot);
+			return () => !disposed && claim();
+		};
 		for (const asyncRead of boundary.asyncReads) {
 			const subscribed = input.graph.subscribe({
 				id: `async-boundary:${boundary.id}:${asyncRead.graphNodeId}:${asyncRead.path.join('.')}`,
@@ -180,7 +185,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 						snapshot,
 						input.settleTracker?.hasSettledContent(boundary.id) === true,
 					);
-					const claim = claimSettle(painted, asyncRead.graphNodeId, snapshot);
+					const claim = claimFor(asyncRead.graphNodeId, snapshot);
 					snapshot = boundaryGateSnapshot(
 						input.graph,
 						boundary,
@@ -218,7 +223,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					input.onAsyncSnapshot?.(boundary, snapshot);
 					return settleAsyncBoundaryRange(input, boundary, snapshot, claim).then((result) => {
 						// After the pass: what updates in place lands with the rest of this flush.
-						void input.graph.flush().then(() => asyncPlanes.busy?.apply(boundary));
+						if (!disposed) void input.graph.flush().then(() => asyncPlanes.busy?.apply(boundary));
 						return result;
 					});
 				},
@@ -238,7 +243,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 					input,
 					boundary,
 					snapshot,
-					claimSettle(painted, read.graphNodeId, input.graph.read(read.graphNodeId, [])),
+					claimFor(read.graphNodeId, input.graph.read(read.graphNodeId, [])),
 				);
 			}
 		}
@@ -310,6 +315,7 @@ export async function startAsyncBoundaries(
 		readStatus: (graphNodeId) => input.graph.read(graphNodeId, ['status']),
 		commitArm: (boundary, update) => commitShownArm(input.commitArm, boundary, update),
 		hasHtmlRenderer: !!input.renderBranchHtml,
+		storeContainerSubscription: input.storeContainerSubscription,
 	});
 	return {
 		settleTracker,
