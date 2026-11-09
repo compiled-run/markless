@@ -133,6 +133,125 @@ describe('module edges', () => {
 	});
 });
 
+describe('computed specifiers with static parts', () => {
+	const files = {
+		'pkg/src/loader.ts':
+			"import { name } from './name.ts'; export const load = () => import(`./plugins/${name}.ts`);",
+		'pkg/src/name.ts': "export const name = 'x';",
+		'pkg/src/plugins/alpha.ts': 'export {};',
+		'pkg/src/plugins/nested/beta.ts': 'export {};',
+		'pkg/src/plugins/readme.json': '{}',
+		'pkg/src/other.ts': 'export {};',
+		'pkg/test/loader.test.ts': "import { load } from '../src/loader.ts'; load;",
+	};
+
+	test('a template import() is an edge to every file its static prefix and suffix match', async () => {
+		const graph = await graphOf({ files });
+		expect(graph.opaque.has('pkg/src/loader.ts')).toBe(false);
+		expect(graph.dependenciesOf('pkg/src/loader.ts').sort()).toEqual([
+			'pkg/src/name.ts',
+			'pkg/src/plugins/alpha.ts',
+			'pkg/src/plugins/nested/beta.ts',
+		]);
+		const tests = testsIn(files);
+		expect(graph.affectedTests(['pkg/src/plugins/nested/beta.ts'], tests)).toEqual({
+			tests: ['pkg/test/loader.test.ts'],
+			runAll: null,
+		});
+		expect(graph.affectedTests(['pkg/src/name.ts'], tests)).toEqual({
+			tests: ['pkg/test/loader.test.ts'],
+			runAll: null,
+		});
+		expect(graph.affectedTests(['pkg/src/other.ts'], tests)).toEqual({
+			tests: [],
+			runAll: null,
+		});
+	});
+
+	test('string concatenation, require(), new URL() and a .js suffix resolve the same way', async () => {
+		const graph = await graphOf({
+			files: {
+				'app/sum.ts':
+					"export const a = (n: string) => import('./parts/' + n + '.js');\n" +
+					'export const b = (n: string) => require(`./parts/${n}`);\n' +
+					'export const c = (n: string) => new URL(`assets/${n}.svg`, import.meta.url);',
+				'app/parts/one.ts': 'export {};',
+				'app/parts/two/index.ts': 'export {};',
+				'app/elsewhere.ts': 'export {};',
+			},
+			assets: ['app/assets/icon.svg', 'app/assets/icon.png'],
+		});
+		expect(graph.opaque.has('app/sum.ts')).toBe(false);
+		expect(graph.dependenciesOf('app/sum.ts').sort()).toEqual([
+			'app/assets/icon.svg',
+			'app/parts/one.ts',
+			'app/parts/two/index.ts',
+		]);
+	});
+
+	test('a query on a computed specifier ends its path; a data: URL names no repo file', async () => {
+		const graph = await graphOf({
+			files: {
+				'pkg/a.ts':
+					'export const a = (n: string) => import(`./mods/${n}.ts?t=${Date.now()}`);\n' +
+					'export const b = (code: string) => import(`data:text/javascript,${code}`);',
+				'pkg/mods/x.ts': 'export {};',
+				'pkg/c.ts':
+					'export const c = (file: string) => import(`${file}?preview=${Date.now()}`);',
+			},
+		});
+		expect(graph.opaque.has('pkg/a.ts')).toBe(false);
+		expect(graph.dependenciesOf('pkg/a.ts')).toEqual(['pkg/mods/x.ts']);
+		expect(graph.opaque.get('pkg/c.ts')).toEqual(['a computed import()']);
+	});
+
+	test('import.meta.glob patterns are edges, a root-absolute one under any folder', async () => {
+		const graph = await graphOf({
+			files: {
+				'router/entry.ts':
+					"export const docs = import.meta.glob(['/document.tsrx']);\n" +
+					"export const pages = import.meta.glob('./pages/*.ts');",
+				'router/pages/home.ts': 'export {};',
+				'site/document.tsrx': 'export function Document() @{\n\t<html />\n}\n',
+				'router/test/entry.test.ts': "import '../entry.ts';",
+			},
+		});
+		expect(graph.opaque.has('router/entry.ts')).toBe(false);
+		expect(graph.dependenciesOf('router/entry.ts').sort()).toEqual([
+			'router/pages/home.ts',
+			'site/document.tsrx',
+		]);
+		expect(
+			graph.affectedTests(['site/document.tsrx'], ['router/test/entry.test.ts']).tests,
+		).toEqual(['router/test/entry.test.ts']);
+	});
+
+	test('a workspace package prefix links every file in that package with the right ending', async () => {
+		const graph = await graphOf({
+			files: {
+				'app/load.ts':
+					'export const load = (n: string) => import(`@markless/web/fns/${n}`);',
+				'packages/web/src/fns/format.ts': 'export {};',
+				'packages/web/src/index.ts': 'export {};',
+				'app/third.ts': 'export const t = (n: string) => import(`left-pad/${n}`);',
+			},
+			packages: [
+				{
+					dir: 'packages/web',
+					name: '@markless/web',
+					exports: { './fns/*': './src/fns/*.ts' },
+				},
+			],
+		});
+		expect(graph.opaque.size).toBe(0);
+		expect(graph.dependenciesOf('app/load.ts').sort()).toEqual([
+			'packages/web/src/fns/format.ts',
+			'packages/web/src/index.ts',
+		]);
+		expect(graph.dependenciesOf('app/third.ts')).toEqual([]);
+	});
+});
+
 describe('fails closed', () => {
 	test('an unresolved local import inside the affected set runs everything', async () => {
 		const files = {
@@ -152,10 +271,10 @@ describe('fails closed', () => {
 		});
 	});
 
-	test('a computed import() inside the affected set runs everything', async () => {
+	test('a fully dynamic import() inside the affected set runs everything', async () => {
 		const files = {
 			'pkg/src/loader.ts':
-				"import { name } from './name.ts'; export const load = () => import(`./plugins/${name}.ts`);",
+				"import { name } from './name.ts'; export const load = (file: string) => import(file);",
 			'pkg/src/name.ts': "export const name = 'x';",
 			'pkg/test/loader.test.ts': "import { load } from '../src/loader.ts'; load;",
 		};
@@ -168,7 +287,7 @@ describe('fails closed', () => {
 		const files = {
 			'pkg/src/name.ts': "export const name = 'x';",
 			'pkg/test/name.test.ts': "import { name } from '../src/name.ts'; name;",
-			'site/page.ts': "import { name } from '../pkg/src/name.ts'; import(`./${name}.ts`);",
+			'site/page.ts': "import { name } from '../pkg/src/name.ts'; import(name);",
 		};
 		expect(await select({ files }, ['pkg/src/name.ts'])).toEqual({
 			tests: ['pkg/test/name.test.ts'],
@@ -176,16 +295,18 @@ describe('fails closed', () => {
 		});
 	});
 
-	test('a computed require() and import.meta.glob() count as unknown targets', async () => {
+	test('a computed require() and a glob with no known root count as unknown targets', async () => {
 		const graph = await graphOf({
 			files: {
 				'a.cjs': 'const name = "x"; module.exports = require(name);',
-				'b.ts': "export const all = import.meta.glob('./*.ts');",
+				'b.ts': "export const all = import.meta.glob('@/pages/*.ts');",
 				'c.ts': "const fs = require('node:fs'); export { fs };",
+				'd.ts': 'const pattern = "./*.ts"; export const all = import.meta.glob(pattern);',
 			},
 		});
 		expect(graph.opaque.get('a.cjs')).toEqual(['a computed require()']);
 		expect(graph.opaque.get('b.ts')).toEqual(['import.meta.glob()']);
+		expect(graph.opaque.get('d.ts')).toEqual(['import.meta.glob()']);
 		expect(graph.opaque.has('c.ts')).toBe(false);
 	});
 
@@ -232,9 +353,51 @@ describe('path rules', () => {
 	});
 
 	test('a path no rule classifies runs everything', async () => {
-		expect((await select({ files }, ['docs/ci-process.md'])).runAll).toBe(
-			'no rule classifies the path: docs/ci-process.md',
+		expect((await select({ files }, ['assets/logo.svg'])).runAll).toBe(
+			'no rule classifies the path: assets/logo.svg',
 		);
+	});
+
+	test('prose and editor settings select no unit test', async () => {
+		expect(
+			await select({ files }, [
+				'docs/ci-process.md',
+				'specs/12-arm-rendering.md',
+				'CHANGELOG.md',
+				'packages/web/README.md',
+				'.agents/skills/x/SKILL.md',
+				'.vscode/settings.json',
+			]),
+		).toEqual({ tests: [], runAll: null });
+	});
+
+	test('a markdown file a test reads from disk still selects that test', async () => {
+		const readers = {
+			...files,
+			'packages/core/test/storage-types.test.ts': "import { readFileSync } from 'node:fs';",
+			'packages/cli/test/script-binaries.test.ts':
+				"import { readFile } from 'node:fs/promises';",
+			'packages/compiler/test/sync-policy/key-cancel-guard.test.ts': "import 'node:fs';",
+			'pkg/src/notes.ts': "import notes from './notes.md?raw'; export { notes };",
+			'pkg/test/notes.test.ts': "import { notes } from '../src/notes.ts'; notes;",
+		};
+		const project = { files: readers, assets: ['pkg/src/notes.md'] };
+		expect((await select(project, ['packages/core/agent/markless.md'])).tests).toEqual([
+			'packages/core/test/storage-types.test.ts',
+		]);
+		expect((await select(project, ['packages/cli/templates/common/README.md'])).tests).toEqual([
+			'packages/cli/test/script-binaries.test.ts',
+		]);
+		expect((await select(project, ['pkg/src/notes.md'])).tests).toEqual([
+			'pkg/test/notes.test.ts',
+		]);
+		expect((await select(project, ['website/pages/home.tsrx'])).tests).toEqual([
+			'packages/compiler/test/sync-policy/key-cancel-guard.test.ts',
+		]);
+		expect((await select(project, ['packages/web/test/fixtures/page.md'])).tests).toEqual([
+			'packages/web/test/a.test.ts',
+			'packages/web/test/b.test.ts',
+		]);
 	});
 
 	test('agent rule sources select no unit test', async () => {
