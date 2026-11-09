@@ -511,6 +511,7 @@ test('xlink: and xml: attributes survive server rendering and client updates', a
 	expect(html).toMatch(/<use[^>]*\sxlink:href="#dot"/);
 	expect(html).toMatch(/<svg[^>]*\sxmlns:xlink="http:\/\/www\.w3\.org\/1999\/xlink"/);
 	expect(html).toMatch(/<text[^>]*\sxml:space="preserve"/);
+	expect(html).toMatch(/<use data-camel="" xlink:href="#dot" stroke-width="4"/);
 	const { page, errors } = await open('/xlink');
 	const xlinkHref = (selector: string) =>
 		page.evaluate(
@@ -521,6 +522,7 @@ test('xlink: and xml: attributes survive server rendering and client updates', a
 			selector,
 		);
 	expect(await xlinkHref('[data-use]')).toBe('#dot');
+	expect(await xlinkHref('[data-camel]')).toBe('#dot');
 	expect(await xlinkHref('[data-moving]')).toBe('#dot');
 	await page.click('[data-retarget]');
 	await expect.poll(() => xlinkHref('[data-moving]')).toBe('#ring');

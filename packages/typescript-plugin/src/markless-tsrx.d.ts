@@ -566,10 +566,19 @@ declare namespace __MarklessTypeService {
 		]?: Tag extends keyof HTMLElementTagNameMap ? AttributeValue : string | number | undefined;
 	};
 
+	type RealAttributes<Tag extends PropertyKey> = TypedAttributes<Tag> & StandardAttributes<Tag>;
+
+	/** The camelCase spelling of each real attribute the tag takes, typed as that attribute. */
+	type CamelCaseAttributes<Tag extends PropertyKey> = {
+		[Spelling in keyof CamelCaseAttributeName as CamelCaseAttributeName[Spelling] extends keyof RealAttributes<Tag>
+			? Spelling
+			: never]?: RealAttributes<Tag>[CamelCaseAttributeName[Spelling] & keyof RealAttributes<Tag>];
+	};
+
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends
 		| keyof HTMLElementTagNameMap
 		| keyof SVGElementTagNameMap
-		? TypedAttributes<Tag> & StandardAttributes<Tag>
+		? RealAttributes<Tag> & CamelCaseAttributes<Tag>
 		: never;
 
 	type IntrinsicTagName = keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap;

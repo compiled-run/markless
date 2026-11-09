@@ -77,6 +77,7 @@ import {
 	objectPropertyName,
 	ssrComposedPayloadView,
 	projectsElementsIntoRows,
+	spreadsAttributes,
 } from './shared.ts';
 import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 import {
@@ -405,6 +406,7 @@ export function emitPublicSsrRenderModule(
 		...foreignScope.importLines,
 		...emitCatalogHelperImports(helperReferenceSource, [
 			{ module: 'ssr-data', names: ['renderSsrData'] },
+			{ module: 'attribute-name', names: ['marklessAttributeName'] },
 			{
 				module: 'row-qualified-view',
 				names: ['marklessSsrRowQualifiedView', 'marklessRowProjectionSegment'],
@@ -1456,7 +1458,7 @@ function emitSsrDataLines(
 		// its own template, and their seed pass reads this context, not the values map.
 		`const marklessSsrRendered=await renderSsrData({renderData:{...marklessRenderData,root:{componentName:${JSON.stringify(componentName)},templateId:${JSON.stringify(`template:${componentName}`)}}},idPrefix:marklessSsrIdPrefix,${
 			childCases.length > 0 ? 'sharedSeeds:marklessSsrRenderContext?.sharedSeeds,' : ''
-		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
+		}${projectsElementsIntoRows(chunks) ? 'projectionSegment:marklessRowProjectionSegment,' : ''}${spreadsAttributes(input.renderData.chunks) ? 'attributeName:marklessAttributeName,' : ''}read:marklessSsrReadData,selectBranchArm:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.branchSiteId){${branchCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_BRANCH_MISSING: '+marklessSsrDataSlot.branchSiteId);}},${
 			repeatCases.length > 0
 				? `repeatItems:(marklessSsrDataSlot,marklessSsrDataContext)=>{${localLines.join('')}switch(marklessSsrDataSlot.repeatId){${repeatCases.join('')}default:throw new Error('MARKLESS_SSR_DATA_REPEAT_MISSING: '+marklessSsrDataSlot.repeatId);}},`
 				: ''

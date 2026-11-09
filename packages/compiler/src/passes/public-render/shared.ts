@@ -1031,6 +1031,18 @@ function resolvePayloadNodeOwners(
 
 type RenderDataChunk = PublicRenderModuleInput['renderData']['chunks'][number];
 
+// The renderer maps a spread's camelCase keys only when handed the name table, which only a spreading module imports.
+export function spreadsAttributes(chunks: ReadonlyArray<RenderDataChunk>): boolean {
+	return chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) =>
+				slot.kind === 'spread-attributes' ||
+				(slot.kind === 'dynamic-host' &&
+					slot.attributeSlots.some((attribute) => attribute.kind === 'spread')),
+		),
+	);
+}
+
 // A keyed row renders its projected elements under the row's segment, so the owner's records for them are filed per row.
 export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>): boolean {
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));

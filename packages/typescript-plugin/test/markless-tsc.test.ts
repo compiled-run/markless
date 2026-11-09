@@ -103,18 +103,26 @@ test('standard HTML, SVG, ARIA and XML namespace attributes typecheck on the ele
 	expect(result.status).toBe(0);
 });
 
-test('a misspelled attribute, or a camelCase spelling the platform does not define, still fails', () => {
+test('a misspelled attribute, a React rename, or a wrong value for a camelCase spelling still fails', () => {
 	const result = runMarklessTsc('standard-attribute-misspellings');
 	expect(result.status).not.toBe(0);
-	for (const name of ['datetiem', 'tabIndex', 'xmlnss', 'strokeWidth', 'startOfset', 'nme'])
+	for (const name of ['datetiem', 'tabIndx', 'htmlFor', 'className', 'xmlnss', 'strokeWidht', 'startOfset', 'nme'])
 		expect(result.output).toContain(`Property '${name}' does not exist`);
+	expect(result.output).toContain(`page.tsrx(9,10): error TS2322: Type '"flat"' is not assignable`);
 });
 
-test('the generated attribute names match the attribute lists they are generated from', async () => {
-	const { generateElementAttributeNamesSource, ELEMENT_ATTRIBUTE_NAMES_FILE } =
-		await import('../scripts/generate-element-attributes.ts');
+test('the generated attribute names and camelCase spellings match the lists they are generated from', async () => {
+	const {
+		generateElementAttributeNamesSource,
+		generateCamelCaseAttributeNamesSource,
+		ELEMENT_ATTRIBUTE_NAMES_FILE,
+		CAMEL_CASE_ATTRIBUTE_NAMES_FILE,
+	} = await import('../scripts/generate-element-attributes.ts');
 	expect(readFileSync(ELEMENT_ATTRIBUTE_NAMES_FILE, 'utf8')).toBe(
 		generateElementAttributeNamesSource(),
+	);
+	expect(readFileSync(CAMEL_CASE_ATTRIBUTE_NAMES_FILE, 'utf8')).toBe(
+		generateCamelCaseAttributeNamesSource(),
 	);
 });
 

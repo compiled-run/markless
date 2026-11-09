@@ -19,6 +19,14 @@ export function Page({ when }: { readonly when: string }) @{
 		<iframe src="/embed" allow="fullscreen" title="embed"></iframe>
 		<div autocorrect="off" exportparts="label" writingsuggestions="false"></div>
 		<button type="button" aria-label="Close" aria-expanded="false" aria-controls="menu" role="tab">x</button>
+		<form acceptCharset="utf-8" noValidate>
+			<input readOnly tabIndex={0} maxLength={3} autoComplete="off" />
+		</form>
+		<meta httpEquiv="refresh" content="5" />
+		<svg viewBox="0 0 24 24" xmlnsXlink="http://www.w3.org/1999/xlink">
+			<line x1={0} y1={0} x2={24} y2={24} strokeWidth={2} strokeLinecap="round" fillOpacity="0.5" />
+			<use xlinkHref="#curve" />
+		</svg>
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			xmlns:xlink="http://www.w3.org/1999/xlink"

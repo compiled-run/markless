@@ -1453,6 +1453,9 @@ function collectDuplicateAttributeDiagnostics(
 				duplicateAttributeDiagnostic({
 					tagName,
 					attributeName: name,
+					spellings: [previous, attribute].map((written) =>
+						authoredAttributeName(written, state.source),
+					),
 					duplicate: attribute,
 					filename: state.filename,
 				}),
@@ -1461,6 +1464,11 @@ function collectDuplicateAttributeDiagnostics(
 		}
 		seen.set(name, attribute);
 	}
+}
+
+function authoredAttributeName(attribute: AnyNode, source: string): string {
+	const name = attribute.name as AnyNode;
+	return source.slice(name.start ?? 0, name.end ?? 0);
 }
 
 function collectSpreadAttribute(
