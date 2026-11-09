@@ -75,6 +75,7 @@ export type PrerenderRenderData = SsrRenderData & {
 
 export type PrerenderDataDefinition = {
 	readonly name: string;
+	readonly attributeName?: (name: string) => string;
 	readonly state: ProtocolStatePayload;
 	readonly view: import('@markless/serializer').ProtocolViewPayload;
 	readonly rootChunkId: string;
@@ -196,6 +197,7 @@ function isPrerenderLoadSymbol(value: unknown): value is PrerenderLoadSymbol {
 
 export type PrerenderPageClosure = {
 	readonly renderData: PrerenderRenderData;
+	readonly attributeName?: (name: string) => string;
 	readonly props?: unknown;
 	readonly idPrefix?: string;
 	readonly computed?: ReadonlyArray<{
@@ -260,6 +262,7 @@ export async function evaluatePrerenderClosure(
 
 	return renderSsrData({
 		renderData: closure.renderData,
+		attributeName: closure.attributeName,
 		idPrefix: closure.idPrefix,
 		read: (residue, context) => {
 			if (residue.kind === 'repeat-item') return readPath(context.repeatItem, residue.path);
@@ -1088,6 +1091,7 @@ export function evaluatePrerenderDataComponent(input: {
 				return marklessThen(
 					renderSsrData({
 						renderData,
+						attributeName: definition.attributeName,
 						idPrefix: input.idPrefix,
 						projectionSegment: definition.rowHosts?.segment,
 						...(input.freshBranchSiteId

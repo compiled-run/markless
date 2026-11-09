@@ -29,6 +29,7 @@ import {
 	componentOwnedInitialValues,
 	componentOwnedStateNodes,
 	projectsElementsIntoRows,
+	spreadsAttributes,
 	sameModuleComponentMap,
 	staticHostLocators,
 } from './shared.ts';
@@ -339,6 +340,8 @@ export function collectPublicRenderComponentDefinitions(
 					: {}),
 				// A build-time gate: the render-data module attaches the per-row record qualifier only here.
 				...(projectsElementsIntoRows(chunks) ? { projectsIntoRows: true } : {}),
+				// A build-time gate: only a module that spreads attributes hands the renderer the camelCase name table.
+				...(spreadsAttributes(input.renderData.chunks) ? { spreadsAttributes: true } : {}),
 				...rootPropEvents(componentName),
 				// This component carries these families' cells so a page that renders
 				// no designated root still has them, but composes as a part of the

@@ -1100,6 +1100,7 @@ async function prerenderDataModuleSource(
 	);
 	const componentEntries: Array<{ name: string; data: string; functions: string[] }> = [];
 	let qualifiesRows = false;
+	let namesAttributes = false;
 	for (const definition of compiled.publicRenderModule.componentDefinitions) {
 		const {
 			residueReaderSource,
@@ -1109,9 +1110,11 @@ async function prerenderDataModuleSource(
 			// gate adds no payload byte to the modules it turns the pass on for.
 			rootsWidget,
 			projectsIntoRows,
+			spreadsAttributes,
 			...record
 		} = definition as Readonly<Record<string, unknown>> & {
 			readonly projectsIntoRows?: boolean;
+			readonly spreadsAttributes?: boolean;
 			readonly residueReaderSource?: string;
 			readonly residueReaderImports?: ReadonlyArray<{
 				readonly source: string;
@@ -1171,9 +1174,11 @@ async function prerenderDataModuleSource(
 				)
 			: undefined;
 		if (projectsIntoRows) qualifiesRows = true;
+		if (spreadsAttributes) namesAttributes = true;
 		const functions = [
 			...(reader ? [`readResidue:${reader}`] : []),
 			...(projectsIntoRows ? ['rowHosts:marklessRowHosts'] : []),
+			...(spreadsAttributes ? ['attributeName:marklessAttributeName'] : []),
 			...(initializers.size
 				? [
 						`initializers:{${[...initializers].map(([id, local]) => `${JSON.stringify(id)}:${local}`).join(',')}}`,
@@ -1235,6 +1240,9 @@ async function prerenderDataModuleSource(
 		),
 		...(qualifiesRows
 			? ["import { marklessRowHosts } from '@markless/web/fns/row-qualified-view';"]
+			: []),
+		...(namesAttributes
+			? ["import { marklessAttributeName } from '@markless/web/fns/attribute-name';"]
 			: []),
 		...preludes,
 		served ? served.renderDataModuleSource : compiled.publicRenderModule.renderDataModuleSource,

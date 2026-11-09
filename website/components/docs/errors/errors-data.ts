@@ -1115,7 +1115,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'Duplicate attribute on one element: a Markless build error.',
 		printed: [
-			'MARKLESS_ATTRIBUTE_DUPLICATE: `<attributeName>` appears twice on <tag>. Only one can win, and render paths can disagree about which value is used.',
+			'MARKLESS_ATTRIBUTE_DUPLICATE: `<attributeName>`<written> appears twice on <tag>. Only one can win, and render paths can disagree about which value is used.',
 			'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
 			'Keep one `<attributeName>` attribute on this element.',
 		],

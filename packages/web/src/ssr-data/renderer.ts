@@ -235,6 +235,8 @@ export type SsrDataCoordinates = {
 
 export type RenderSsrDataInput = {
 	readonly renderData: SsrRenderData;
+	// Only a module whose markup spreads attributes passes it, so pages without a spread never load the name table.
+	readonly attributeName?: (name: string) => string;
 	// Only an owner whose keyed rows project elements passes it: the row segment those elements take.
 	readonly projectionSegment?: (context: SsrDataReadContext) => { readonly hostSegment?: string };
 	readonly idPrefix?: string;
@@ -624,7 +626,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				}));
 			case 'spread-attributes':
 				return marklessThen(input.read(slot.residue, context), (value) => ({
-					html: renderSpreadAttributes(value, slot.excludeNames),
+					html: renderSpreadAttributes(value, slot.excludeNames, input.attributeName),
 					tokens: [],
 				}));
 			case 'child-component': {
@@ -934,7 +936,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							attributes +=
 								attribute.kind === 'attribute'
 									? renderAttribute(attribute.name, value)
-									: renderSpreadAttributes(value, attribute.excludeNames);
+									: renderSpreadAttributes(value, attribute.excludeNames, input.attributeName);
 						};
 						const walkAttributes = (from: number): Awaitable<void> => {
 							for (let index = from; index < slot.attributeSlots.length; index++) {
@@ -1149,10 +1151,15 @@ function renderAttribute(name: string, value: unknown): string {
 	return text === null ? '' : ` ${name}="${escapeHtml(text)}"`;
 }
 
-function renderSpreadAttributes(value: unknown, excludeNames: ReadonlyArray<string> = []): string {
+function renderSpreadAttributes(
+	value: unknown,
+	excludeNames: ReadonlyArray<string> = [],
+	attributeName?: (name: string) => string,
+): string {
 	if (!value || typeof value !== 'object') return '';
 	let html = '';
-	for (const [name, attribute] of Object.entries(value)) {
+	for (const [key, attribute] of Object.entries(value)) {
+		const name = attributeName?.(key) ?? key;
 		if (excludeNames.includes(name)) continue;
 		// `__markless` is the framework's own reserved prefix for the channels a
 		// parent arranges with a child; none of them is an attribute anyone wrote.

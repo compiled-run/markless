@@ -1933,15 +1933,18 @@ export function attributeObjectValueDiagnostic(
 export function duplicateAttributeDiagnostic(input: {
 	readonly tagName: string | null;
 	readonly attributeName: string;
+	readonly spellings: ReadonlyArray<string>;
 	readonly duplicate: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	const tag = input.tagName ? `<${input.tagName}>` : 'this element';
+	const [first, second] = input.spellings;
+	const written = first !== second ? `, written \`${first}\` and \`${second}\`,` : '';
 	return attributeDisciplineDiagnostic(input.duplicate, input.filename, {
 		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
 		severity: 'error',
 		title: 'Duplicate attribute on one element',
-		message: `\`${input.attributeName}\` appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
+		message: `\`${input.attributeName}\`${written} appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
 		why: 'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
 		suggestion: `Keep one \`${input.attributeName}\` attribute on this element.`,
 	});
