@@ -55,20 +55,149 @@ interface ViteHmrOptions {
 // The root-relative page module ids one edit reached, or every page.
 type EditedPages = ReadonlySet<string> | 'all';
 
-interface PreflightVerdict {
-	error?: MarklessDevErrorPayload;
-	messagesSent: boolean;
+// The preflight of one saved source; the pass that starts it is the one that reports its outcome.
+export interface SourceEdit {
+	readonly source: string;
+	readonly verdict: Promise<MarklessDevErrorPayload | undefined>;
+}
+
+// The last handled edit stays on every state so a byte-identical save stays silent.
+export type SourceState =
+	| { readonly kind: 'clean'; readonly edit?: SourceEdit }
+	| {
+			readonly kind: 'preflighting';
+			readonly edit: SourceEdit;
+			readonly shownError?: MarklessDevErrorPayload;
+	  }
+	| {
+			readonly kind: 'invalid';
+			readonly error: MarklessDevErrorPayload;
+			readonly edit?: SourceEdit;
+	  };
+
+export type SourceEvent =
+	| { readonly type: 'edit'; readonly edit: SourceEdit }
+	| { readonly type: 'edit-passed'; readonly edit: SourceEdit }
+	// No error: the edit failed on an error that belongs to another file.
+	| {
+			readonly type: 'edit-failed';
+			readonly edit: SourceEdit;
+			readonly error?: MarklessDevErrorPayload;
+	  }
+	| { readonly type: 'failed'; readonly error: MarklessDevErrorPayload }
+	| { readonly type: 'passed' }
+	| { readonly type: 'deleted' }
+	| { readonly type: 'cleanup' };
+
+const CLEAN_SOURCE: SourceState = { kind: 'clean' };
+
+export function isInvalidSource(state: SourceState | undefined) {
+	return state?.kind === 'invalid' || (state?.kind === 'preflighting' && !!state.shownError);
+}
+
+function shownError(state: SourceState) {
+	return state.kind === 'invalid'
+		? state.error
+		: state.kind === 'preflighting'
+			? state.shownError
+			: undefined;
+}
+
+function withShownError(
+	state: SourceState,
+	error: MarklessDevErrorPayload | undefined,
+): SourceState {
+	if (state.kind === 'preflighting')
+		return { kind: 'preflighting', edit: state.edit, shownError: error };
+	return error
+		? { kind: 'invalid', error, edit: state.edit }
+		: { kind: 'clean', edit: state.edit };
+}
+
+export function transitionSourceState(state: SourceState, event: SourceEvent): SourceState {
+	switch (event.type) {
+		case 'edit':
+			return { kind: 'preflighting', edit: event.edit, shownError: shownError(state) };
+		case 'edit-passed':
+		case 'edit-failed': {
+			if (state.kind !== 'preflighting' || state.edit !== event.edit) {
+				throw new Error(
+					`Markless HMR: ${event.type} for an edit that is not in flight (${state.kind})`,
+				);
+			}
+			const error =
+				event.type === 'edit-failed' ? (event.error ?? state.shownError) : undefined;
+			return withShownError({ kind: 'clean', edit: state.edit }, error);
+		}
+		case 'failed':
+			return withShownError(state, event.error);
+		case 'passed':
+		case 'deleted':
+		case 'cleanup':
+			return withShownError(state, undefined);
+	}
+}
+
+type RecheckInterval = ReturnType<typeof setInterval>;
+
+// The interval runs exactly while some file is invalid, rechecking or not.
+export type RecheckState =
+	| { readonly kind: 'idle' }
+	| { readonly kind: 'armed'; readonly interval: RecheckInterval }
+	| { readonly kind: 'rechecking'; readonly interval?: RecheckInterval };
+
+export type RecheckEvent =
+	| { readonly type: 'first-invalid'; readonly interval: RecheckInterval }
+	| { readonly type: 'none-invalid' }
+	| { readonly type: 'tick' }
+	| { readonly type: 'done' }
+	| { readonly type: 'cleanup' };
+
+export function recheckInterval(state: RecheckState) {
+	return state.kind === 'idle' ? undefined : state.interval;
+}
+
+export function transitionRecheckState(
+	state: RecheckState,
+	event: RecheckEvent,
+	someInvalid: boolean,
+): RecheckState {
+	const next = nextRecheckState(state, event);
+	if (!next || !!recheckInterval(next) !== someInvalid) {
+		throw new Error(
+			`Markless HMR: recheck cannot go ${state.kind} -${event.type}-> ${next?.kind ?? '?'} with ${someInvalid ? 'an' : 'no'} invalid file`,
+		);
+	}
+	return next;
+}
+
+function nextRecheckState(state: RecheckState, event: RecheckEvent): RecheckState | undefined {
+	switch (event.type) {
+		case 'first-invalid':
+			if (state.kind === 'idle') return { kind: 'armed', interval: event.interval };
+			if (state.kind === 'rechecking' && !state.interval) {
+				return { kind: 'rechecking', interval: event.interval };
+			}
+			return undefined;
+		case 'none-invalid':
+			if (state.kind === 'armed') return { kind: 'idle' };
+			if (state.kind === 'rechecking' && state.interval) return { kind: 'rechecking' };
+			return undefined;
+		case 'tick':
+			return state.kind === 'armed'
+				? { kind: 'rechecking', interval: state.interval }
+				: undefined;
+		case 'done':
+			if (state.kind !== 'rechecking') return undefined;
+			return state.interval ? { kind: 'armed', interval: state.interval } : { kind: 'idle' };
+		case 'cleanup':
+			// A recheck already running finishes on its own; it finds nothing left to clear.
+			return state.kind === 'rechecking' ? { kind: 'rechecking' } : { kind: 'idle' };
+	}
 }
 
 export function createViteHmr(options: ViteHmrOptions) {
 	let server: ViteDevServer | undefined;
-	const invalidSources = new Set<string>();
-	let invalidSourceRecheck: ReturnType<typeof setInterval> | undefined;
-	let recheckingInvalidSources = false;
-	const preflightByFile = new Map<
-		string,
-		{ source: string; verdict: Promise<PreflightVerdict> }
-	>();
 	// Module ids each out-of-process runner still has to be told about, keyed by
 	// Vite environment name. Only environments with the fetch gate installed appear.
 	const unreportedInvalidations = new Map<string, Set<string>>();
@@ -193,59 +322,86 @@ export function createViteHmr(options: ViteHmrOptions) {
 		}
 	}
 
-	function preflight(sourceId: string, source: string) {
-		const cached = preflightByFile.get(sourceId);
-		if (cached?.source === source) return cached.verdict;
+	const sources = new Map<string, SourceState>();
+	let recheck: RecheckState = { kind: 'idle' };
 
-		const verdict = preflightTsrxModuleDiagnostics({ filename: sourceId, source }).then(
-			(): PreflightVerdict => ({ messagesSent: false }),
-			(error): PreflightVerdict => ({
-				error: normalizeMarklessDevError(error, { id: sourceId }),
-				messagesSent: false,
-			}),
-		);
-		preflightByFile.set(sourceId, { source, verdict });
-		return verdict;
+	function someSourceInvalid() {
+		for (const state of sources.values()) if (isInvalidSource(state)) return true;
+		return false;
 	}
 
-	function startInvalidSourceRecheck() {
-		if (invalidSourceRecheck || invalidSources.size === 0) return;
-		invalidSourceRecheck = setInterval(() => {
+	function setRecheck(event: RecheckEvent) {
+		const next = transitionRecheckState(recheck, event, someSourceInvalid());
+		const interval = recheckInterval(recheck);
+		if (interval && interval !== recheckInterval(next)) clearInterval(interval);
+		recheck = next;
+	}
+
+	function startRecheckInterval() {
+		const interval = setInterval(() => {
+			// A tick that lands while a recheck still runs is skipped.
+			if (recheck.kind !== 'armed') return;
+			setRecheck({ type: 'tick' });
 			void recheckInvalidSources();
 		}, options.invalidSourceRecheckMs ?? 300);
-		invalidSourceRecheck.unref?.();
+		interval.unref?.();
+		return interval;
 	}
 
-	function stopInvalidSourceRecheckIfIdle() {
-		if (!invalidSourceRecheck || invalidSources.size !== 0) return;
-		clearInterval(invalidSourceRecheck);
-		invalidSourceRecheck = undefined;
+	function commitSource(id: string, before: SourceState, after: SourceState) {
+		// Moving a file that turns invalid to the end keeps the recheck visiting files in the order they broke.
+		if (!isInvalidSource(before) && isInvalidSource(after)) sources.delete(id);
+		if (after.kind === 'clean' && !after.edit) sources.delete(id);
+		else sources.set(id, after);
 	}
 
-	function addInvalidSource(id: string) {
-		if (!isAbsolute(id) || !SOURCE_FILE_EXTENSION.test(id)) return;
-		invalidSources.add(id);
-		startInvalidSourceRecheck();
+	function updateSource(id: string, event: SourceEvent) {
+		const before = sources.get(id) ?? CLEAN_SOURCE;
+		const after = transitionSourceState(before, event);
+		commitSource(id, before, after);
+		const wasInvalid = isInvalidSource(before);
+		const isInvalid = isInvalidSource(after);
+		if (!wasInvalid && isInvalid && !recheckInterval(recheck)) {
+			setRecheck({ type: 'first-invalid', interval: startRecheckInterval() });
+		} else if (wasInvalid && !isInvalid && !someSourceInvalid()) {
+			setRecheck({ type: 'none-invalid' });
+		}
+		return wasInvalid && !isInvalid;
 	}
 
-	function deleteInvalidSource(id: string) {
-		const deleted = invalidSources.delete(id);
-		stopInvalidSourceRecheckIfIdle();
-		return deleted;
+	function markSourceFailed(error: MarklessDevErrorPayload) {
+		if (!isTrackedSource(error.id)) return;
+		updateSource(error.id, { type: 'failed', error });
+	}
+
+	function startEdit(sourceId: string, source: string) {
+		const edit: SourceEdit = {
+			source,
+			verdict: preflightTsrxModuleDiagnostics({ filename: sourceId, source }).then(
+				() => undefined,
+				(error) => normalizeMarklessDevError(error, { id: sourceId }),
+			),
+		};
+		updateSource(sourceId, { type: 'edit', edit });
+		return edit;
+	}
+
+	function editInFlight(sourceId: string, edit: SourceEdit) {
+		const state = sources.get(sourceId);
+		return state?.kind === 'preflighting' && state.edit === edit;
 	}
 
 	async function recheckInvalidSources() {
-		if (recheckingInvalidSources) return;
-		recheckingInvalidSources = true;
 		try {
 			let recovered = false;
-			for (const id of invalidSources) {
+			for (const [id, state] of sources) {
+				if (!isInvalidSource(state)) continue;
 				let source: string;
 				try {
 					source = await readFile(id, 'utf8');
 				} catch (error) {
 					if (hasErrorCode(error, 'ENOENT') || hasErrorCode(error, 'EISDIR')) {
-						if (deleteInvalidSource(id)) sendClear(id);
+						if (updateSource(id, { type: 'deleted' })) sendClear(id);
 					}
 					continue;
 				}
@@ -256,7 +412,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 					continue;
 				}
 
-				if (!deleteInvalidSource(id)) continue;
+				if (!updateSource(id, { type: 'passed' })) continue;
 				sendClear(id);
 				recovered = true;
 			}
@@ -267,8 +423,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 				});
 			}
 		} finally {
-			recheckingInvalidSources = false;
-			stopInvalidSourceRecheckIfIdle();
+			setRecheck({ type: 'done' });
 		}
 	}
 
@@ -281,9 +436,10 @@ export function createViteHmr(options: ViteHmrOptions) {
 	}
 
 	function cleanup() {
-		if (invalidSourceRecheck) clearInterval(invalidSourceRecheck);
-		invalidSourceRecheck = undefined;
-		invalidSources.clear();
+		for (const [id, state] of sources) {
+			commitSource(id, state, transitionSourceState(state, { type: 'cleanup' }));
+		}
+		setRecheck({ type: 'cleanup' });
 	}
 
 	return {
@@ -321,7 +477,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 			const hot = clientHot(server, options, environment);
 			if (!hot?.send) return;
 			const payload = normalizeMarklessDevError(error);
-			addInvalidSource(payload.id);
+			markSourceFailed(payload);
 			hot.send({ type: 'custom', event: MARKLESS_DEV_ERROR_EVENT, data: payload });
 		},
 		async hotUpdate(environment: DevEnvironment | undefined, ctx: HotUpdateOptions) {
@@ -336,7 +492,7 @@ export function createViteHmr(options: ViteHmrOptions) {
 
 	function loadedOrInvalid(environments: Iterable<DevEnvironment>, file: string) {
 		const path = parsePath(file).pathname;
-		if (invalidSources.has(path)) return true;
+		if (isInvalidSource(sources.get(path))) return true;
 		let answered = false;
 		for (const environment of environments) {
 			// Partial adapters and test doubles omit getModulesByFile; one that cannot say counts as loading it.
@@ -466,7 +622,6 @@ export function createViteHmr(options: ViteHmrOptions) {
 			return undefined;
 		}
 
-		let sendMessages = true;
 		let editedSource: string | undefined;
 		if (ctx.file && SOURCE_FILE_EXTENSION.test(ctx.file) && ctx.read) {
 			const sourceId = parsePath(ctx.file).pathname;
@@ -477,34 +632,41 @@ export function createViteHmr(options: ViteHmrOptions) {
 				// existing invalidation path handle it instead of reporting a fake compile error.
 			}
 			if (editedSource !== undefined) {
-				const verdict = await preflight(sourceId, editedSource);
-				sendMessages = !verdict.messagesSent;
-				verdict.messagesSent = true;
-				if (verdict.error) {
-					if (sendMessages) {
-						addInvalidSource(verdict.error.id);
-						hot.send({
-							type: 'custom',
-							event: MARKLESS_DEV_ERROR_EVENT,
-							data: verdict.error,
-						});
-					}
+				// The pass that started this edit's preflight reports it; the reload that races a later pass has already been sent.
+				const handled = sources.get(sourceId)?.edit;
+				if (handled?.source === editedSource) {
+					await handled.verdict;
 					return [];
 				}
+				const edit = startEdit(sourceId, editedSource);
+				const error = await edit.verdict;
+				const inFlight = editInFlight(sourceId, edit);
+				if (error) {
+					const ownError = error.id === sourceId && isTrackedSource(sourceId);
+					if (inFlight) {
+						updateSource(sourceId, {
+							type: 'edit-failed',
+							edit,
+							error: ownError ? error : undefined,
+						});
+					}
+					if (!inFlight || !ownError) markSourceFailed(error);
+					hot.send({ type: 'custom', event: MARKLESS_DEV_ERROR_EVENT, data: error });
+					return [];
+				}
+				if (
+					updateSource(
+						sourceId,
+						inFlight ? { type: 'edit-passed', edit } : { type: 'passed' },
+					)
+				) {
+					hot.send({
+						type: 'custom',
+						event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
+						data: { id: sourceId },
+					});
+				}
 			}
-			if (editedSource !== undefined && sendMessages && deleteInvalidSource(sourceId)) {
-				hot.send({
-					type: 'custom',
-					event: MARKLESS_DEV_ERROR_CLEAR_EVENT,
-					data: { id: sourceId },
-				});
-			}
-		}
-
-		// A later pass for the same edit would only redo this; the reload that races it
-		// has already been sent, so nothing is left for a later invalidation to catch.
-		if (!sendMessages) {
-			return [];
 		}
 
 		const invalidationEnvironments = [...targets.keys()];
@@ -604,6 +766,10 @@ async function fetchedModuleNode(environment: DevEnvironment, id: string) {
 		environment.moduleGraph.getModuleById(resolved) ??
 		(await environment.moduleGraph.getModuleByUrl(id).catch(() => undefined))
 	);
+}
+
+function isTrackedSource(id: string) {
+	return isAbsolute(id) && SOURCE_FILE_EXTENSION.test(id);
 }
 
 function hasErrorCode(error: unknown, code: string) {
