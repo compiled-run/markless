@@ -121,6 +121,8 @@ export type FragmentEntryModule = {
 		scroll: FragmentScroll,
 		// The state's stops when the navigation was asked for: any since cancel it.
 		stops?: number,
+		// When the click asked for it: a page fetched ahead is judged fresh as of then, not once this code arrived.
+		askedAt?: number,
 	) => Promise<void>;
 };
 
@@ -1104,6 +1106,7 @@ export async function navigate(
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
 	stops?: number,
+	askedAt?: number,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
@@ -1121,7 +1124,7 @@ export async function navigate(
 		else w.location.assign(href);
 	};
 	const started = w.performance.now();
-	const taken = take(state, url, mode === 'traverse', started);
+	const taken = take(state, url, mode === 'traverse', askedAt ?? started);
 	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
 	// live values before it is shown. A document whose instances hold no values swaps in this task.
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
