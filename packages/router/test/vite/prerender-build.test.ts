@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // Nitro builds its prerenderer separately from the Vite services; a page it cannot reach prerenders as a 404.
 const packagesRoot = resolve(import.meta.dirname, '../../..');
@@ -23,14 +21,10 @@ test('routes with a prerender route rule are written as their page HTML at build
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
 		nitro: { routeRules: { '/': { prerender: true }, '/guide': { prerender: true } } },
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 
 	const publicDir = join(root, '.output/public');
 	const home = await readFile(join(publicDir, 'index.html'), 'utf8');

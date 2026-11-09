@@ -14,11 +14,8 @@ import { createServer, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import {
 	cloudflareModule,
 	cloudflareNodeBuildsPlugin,
@@ -27,6 +24,7 @@ import {
 	workerFirstPatterns,
 } from '../../src/vite/nitro-cloudflare.ts';
 import { FRAGMENT_PATH_PREFIX } from '../../src/vite/fragment-navigation.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A Nitro `cloudflare-module` build served by wrangler's local workerd, which applies Workers static
 // assets routing: a request that names an asset file never runs the Worker, so it is free.
@@ -151,10 +149,8 @@ beforeAll(async () => {
 		'dir',
 	);
 	const prerendered = ['/', '/guide', '/docs/intro'];
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
 		nitro: {
 			preset: 'cloudflare-module',
 			// Nitro defaults to today's date, which the pinned wrangler's workerd refuses once UTC passes its release day.
@@ -167,9 +163,7 @@ beforeAll(async () => {
 				]),
 			),
 		},
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 	// A response carrying this comment came from the uploaded file, not from the Worker rendering the page again.
 	for (const file of await htmlFiles())
 		await writeFile(file, (await readFile(file, 'utf8')) + SERVED_FROM_ASSETS);

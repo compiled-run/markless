@@ -1,13 +1,11 @@
 import { cp, mkdir, mkdtemp, readFile, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { marklessBuildManifestPath } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
 import { MARKLESS_INTERACTION_CLOSURES } from '../../../bundler/src/build/chunking.ts';
 import { readInteractionClosuresAsset } from '../../../bundler/src/build/interaction-closures.ts';
-import { router } from '../../src/vite/index.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 let root = '';
@@ -21,13 +19,9 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	closures = readInteractionClosuresAsset(
 		await readFile(
 			marklessBuildManifestPath(join(root, '.output/public'), MARKLESS_INTERACTION_CLOSURES),

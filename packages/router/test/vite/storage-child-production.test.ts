@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A page with no storage() of its own renders two components that share one
 // module-scope storage() cell, built for production and served by its real server.
@@ -29,13 +27,9 @@ beforeAll(async () => {
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
 	process.env.NODE_ENV = 'production';
 	try {
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
 		});
-		await builder.buildApp();
 	} finally {
 		if (nodeEnv === undefined) delete process.env.NODE_ENV;
 		else process.env.NODE_ENV = nodeEnv;

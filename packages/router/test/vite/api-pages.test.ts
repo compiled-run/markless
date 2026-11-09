@@ -9,6 +9,7 @@ import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A site whose content lives at /api/: page files in pages/api/ are pages, the files in api/
 // stay endpoints, and the build stops only when one address is answered by both.
@@ -48,7 +49,7 @@ const build = async (root: string) =>
 
 beforeAll(async () => {
 	const root = await app();
-	await build(root);
+	await buildFixture({ root });
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
