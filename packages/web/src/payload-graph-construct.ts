@@ -19,6 +19,9 @@ type SharedInstancesHost = {
 	readonly __marklessSharedInstances?: () => Promise<typeof import('./fns/shared-start.ts')>;
 };
 
+// Installed by an MDX route, whose islands' modules have not loaded when its graph is built.
+type AsyncPlanesHost = { readonly __marklessAsyncPlanes?: (state: ProtocolStatePayload) => unknown };
+
 let runtimeModulePromise: Promise<RuntimeModule> | undefined;
 let valueDecoderPromise:
 	| Promise<typeof import('../../serializer/src/value-decode-client.ts')>
@@ -39,6 +42,7 @@ export async function createRuntimeGraphFromResumePayload(
 ): Promise<RuntimeGraph> {
 	const { createRuntimeGraph } = await runtimeModule();
 	let graph!: RuntimeGraph;
+	if (!asyncPlanes.fromPayload) await (globalThis as AsyncPlanesHost).__marklessAsyncPlanes?.(input.state);
 	const asyncComputed = asyncPlanes.fromPayload
 		? await asyncPlanes.fromPayload(input, () => graph, deserializeGraphValue)
 		: withoutAsyncValues(input.state);

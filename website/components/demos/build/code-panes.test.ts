@@ -42,7 +42,8 @@ const SOURCES = {
 	drinkPick: [{ name: 'drink-pick.tsrx', code: DRINK_PICK }],
 };
 
-describe('build preview code bands', () => {
+// A cold shiki start takes 2 to 3.3 s on an M-series Mac and passed 5 s on CI's runner.
+describe('build preview code bands', { timeout: 20_000 }, () => {
 	it('show the demo files as they are, highlighted (run with -u after editing a demo)', async () => {
 		const blocks: string[] = [];
 		for (const [name, files] of Object.entries(SOURCES)) {

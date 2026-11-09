@@ -1,9 +1,0 @@
-// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
-
-exports[`pins the current disease for for-call-expression.tsrx 1`] = `
-{
-  "diagnostics": [],
-  "directRepeatCount": 0,
-  "keyedRepeatCount": 0,
-}
-`;

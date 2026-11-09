@@ -18,6 +18,7 @@ import { decodePath, parsePath, parseURL, withQuery } from 'ufo';
 import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
 import {
 	emitQueuedResumeContainerEvent,
+	emitAsyncPlanesLoaderInstall,
 	emitRosterResumeLoaderInstall,
 	emitSharedInstancesLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
@@ -158,6 +159,7 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
 		emitSharedInstancesLoaderInstall(),
+		...(resume ? [emitAsyncPlanesLoaderInstall()] : []),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
@@ -189,6 +191,7 @@ function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 		renderOverlayLoader(),
 		emitRosterResumeLoaderInstall(),
 		emitSharedInstancesLoaderInstall(),
+		emitAsyncPlanesLoaderInstall(),
 		'',
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',

@@ -784,7 +784,7 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 	}
 });
 
-test('busy marks, the refresh announcement and the async refresh half are known runtime no record or control demands, so they load on the first refresh', async () => {
+test('busy marks, the refresh announcement and the async refresh half are demanded only by a control whose writes reach an async value', async () => {
 	const { compileTsrxModule } = await import('../src/index.ts');
 	const result = await compileTsrxModule({
 		filename: '/workspace/src/Tide.tsrx',
@@ -792,9 +792,11 @@ test('busy marks, the refresh announcement and the async refresh half are known 
 		source: `import { computed, state } from '@markless/core';
 		export default function Tide() @{
 			let port = state('Oban');
+			let likes = state(0);
 			const tide = computed(async () => ({ high: port + ' 06:10' }));
 			<section>
 				<button onClick={() => (port = 'Mallaig')}>Next port</button>
+				<button onClick={() => likes++}>Like {likes}</button>
 				@try {
 					<p>{tide.high}</p>
 				} @pending {
@@ -807,9 +809,13 @@ test('busy marks, the refresh announcement and the async refresh half are known 
 	for (const map of Object.values(result.runtimeDemandMaps)) {
 		expect(map.payloadRecords.some((record) => record.kind === 'async-boundary')).toBe(true);
 		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining(lazy));
-		for (const entry of [...map.payloadRecords, ...map.actions, ...(map.armActions ?? []), ...map.symbols])
+		for (const entry of [...map.payloadRecords, ...map.symbols])
 			for (const id of lazy) expect(entry.runtimeModuleIds).not.toContain(id);
 		for (const id of lazy) expect(map.capabilityModuleIds ?? []).not.toContain(id);
+		const clicks = map.actions.filter((action) => action.eventName === 'click');
+		expect(clicks).toHaveLength(2);
+		expect(clicks.filter((action) => lazy.every((id) => action.runtimeModuleIds.includes(id)))).toHaveLength(1);
+		expect(clicks.filter((action) => lazy.some((id) => action.runtimeModuleIds.includes(id)))).toHaveLength(1);
 	}
 });
 

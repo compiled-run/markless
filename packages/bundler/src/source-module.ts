@@ -647,6 +647,11 @@ export function emitSharedInstancesLoaderInstall(): string {
 	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-start');";
 }
 
+// An MDX page's islands never load before its resume builds the graph, so its route installs their planes on demand.
+export function emitAsyncPlanesLoaderInstall(): string {
+	return "globalThis.__marklessAsyncPlanes ??= (state) => state.computed.some((c) => c.async) && Promise.all([import('@markless/web/fns/async-plane').then((m) => m.installMarklessAsyncPlane()), state.computed.some((c) => c.holds) && import('@markless/web/fns/held-inputs-plane').then((m) => m.installMarklessHeldInputs())]);";
+}
+
 export function emitRosterResumeLoaderInstall(): string {
 	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
 }

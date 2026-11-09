@@ -1150,6 +1150,7 @@ function actionDemandRecords(
 					),
 					...branchDemand,
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+					...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 				]),
 				...(plan ? { plan } : {}),
 				firstUse: reach,
@@ -1188,6 +1189,7 @@ function actionDemandRecords(
 						...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 						...eagerBranchDemand,
 						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+						...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 					]),
 					...(plan ? { plan } : {}),
 					firstUse: reach,
@@ -1228,6 +1230,8 @@ function armActionDemandRecords(
 				...dispatchCore,
 				...recordModules(records, containerId),
 				...symbolIdsDemand(symbolIds, symbolDemand),
+				// A handler in a @try's arm can reset it or reject into its @catch, which both load the refresh half.
+				...(containerKind === 'async-boundary' || refreshesAsync(scope, symbolIds) ? REFRESH_MARKS : []),
 			]),
 			firstUse: firstUseDemand(scope, symbolIds, [containerId]),
 		});
@@ -1391,6 +1395,30 @@ function planWriteShape(
 		kind: 'assign',
 		...(localPath ? { localPath } : { value: literalPlanValue(write.valueSource) }),
 	};
+}
+
+// A handler whose writes reach an async value starts its refresh, which loads the refresh half: its first use must find it preloaded.
+function refreshesAsync(scope: FirstUseScope, symbolIds: ReadonlyArray<string>): boolean {
+	const reached = new Set(transitiveSymbolIds(symbolIds, scope.captureAnalysis));
+	const written = new Set(
+		scope.resolver.symbols.flatMap((symbol) =>
+			reached.has(symbol.id) &&
+			(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+				? (symbol.writes ?? []).map((write) => write.graphNodeId)
+				: [],
+		),
+	);
+	if (written.size === 0) return false;
+	const computed = new Map(scope.state.computed.map((node) => [node.graphNodeId, node]));
+	const reaches = (graphNodeId: string, seen: Set<string>): boolean => {
+		if (written.has(graphNodeId)) return true;
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		return (computed.get(graphNodeId)?.dependencies ?? []).some((dependency) =>
+			reaches(dependency.graphNodeId, seen),
+		);
+	};
+	return scope.state.computed.some((node) => node.async === true && reaches(node.graphNodeId, new Set()));
 }
 
 function writeSubscriberRecords(
