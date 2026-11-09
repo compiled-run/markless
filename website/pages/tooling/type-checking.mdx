@@ -43,6 +43,7 @@ These are the messages TypeScript gives in a `.tsrx` file:
 - **A misspelt name.** `{titel}`, when the state is called `title`, gets `Cannot find name 'titel'. Did you mean 'title'?`
 - **A misspelt event handler.** `<button onClik={...}>` gets `Property 'onClik' does not exist on type '…'. Did you mean 'onClick'?` The type it names is long, so it's cut here.
 - **An attribute HTML doesn't have**, like `className` (write `class`).
+  A camelCase spelling of a real attribute, like `strokeWidth` for `stroke-width`, works too: the build writes the real name.
 - **A handler whose code doesn't type-check.**
 
 ## `npm run check` checks the whole app

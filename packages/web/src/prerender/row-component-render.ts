@@ -411,6 +411,7 @@ function renderRowComponentEdge(
 						},
 						idPrefix: ownerIdPrefix,
 						projectionSegment: definition.rowHosts?.segment,
+						attributeName: definition.attributeName,
 						...(sharedSeeds ? { sharedSeeds } : {}),
 						rootContext: {
 							item: input.item,
@@ -554,6 +555,7 @@ function renderRowChunk(
 			},
 			idPrefix: scope.ownerIdPrefix,
 			projectionSegment: definition.rowHosts?.segment,
+			attributeName: definition.attributeName,
 			rootContext: { item: input.item, index: input.rowIndex, key: input.rowKey },
 			read: scope.readRow,
 			seedChild: scope.seedPart,

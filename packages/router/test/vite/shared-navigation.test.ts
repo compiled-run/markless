@@ -145,6 +145,24 @@ test.each(['region', 'document'] as const)('a value set on one page is the value
 	await page.close();
 });
 
+test('a value set on one page survives a page that never reads it and shows on the next page that does', async () => {
+	const { page, errors } = await open('/');
+	await page.click('[data-manual]');
+	await expect.poll(() => shown(page)).toBe('manual');
+	await page.click('[data-go-empty]');
+	await title(page, 'Empty');
+	expect(await shown(page)).toBeUndefined();
+	await recordFrames(page);
+	await page.click('[data-go-next]');
+	await title(page, 'Next');
+	await settleFrames(page);
+	const frames = (await recordedFrames(page)).filter((frame) => frame.title === 'Next');
+	expect(frames.length).toBeGreaterThan(0);
+	expect(frames.filter((frame) => frame.shown !== 'manual' || frame.mode !== 'chosen/chosen')).toEqual([]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('a page that only reads the instance, and a widget seeded from it, show the live value in every frame', async () => {
 	const { page, errors } = await open('/');
 	await page.click('[data-manual]');

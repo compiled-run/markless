@@ -1,23 +1,21 @@
-// Minimal Navigation API types. TypeScript 5.9's DOM lib does not ship these
-// yet, so this declares only the surface `spa-navigation.ts` and the router's
-// client entry actually touch. Delete once lib.dom.d.ts covers the Navigation
-// API and the names resolve on their own.
+// The Navigation API surface the router touches, which TypeScript 5.9's DOM lib lacks. A module, not a
+// global script, so the published declarations carry it and never collide with a lib that has it.
 
-type NavigationScrollBehavior = 'after-transition' | 'manual';
-type NavigationFocusReset = 'after-transition' | 'manual';
-type NavigationTypeString = 'push' | 'replace' | 'reload' | 'traverse';
+export type NavigationScrollBehavior = 'after-transition' | 'manual';
+export type NavigationFocusReset = 'after-transition' | 'manual';
+export type NavigationTypeString = 'push' | 'replace' | 'reload' | 'traverse';
 
-interface NavigationDestination {
+export interface NavigationDestination {
 	readonly url: string;
 }
 
-interface NavigationInterceptOptions {
+export interface NavigationInterceptOptions {
 	readonly focusReset?: NavigationFocusReset;
 	readonly scroll?: NavigationScrollBehavior;
 	readonly handler?: () => Promise<void>;
 }
 
-interface NavigateEvent extends Event {
+export interface NavigateEvent extends Event {
 	readonly canIntercept: boolean;
 	readonly destination: NavigationDestination;
 	readonly downloadRequest: string | null;
@@ -30,22 +28,22 @@ interface NavigateEvent extends Event {
 	intercept(options?: NavigationInterceptOptions): void;
 }
 
-interface NavigationNavigateOptions {
+export interface NavigationNavigateOptions {
 	readonly history?: 'auto' | 'push' | 'replace';
 	readonly info?: unknown;
 	readonly state?: unknown;
 }
 
-interface NavigationResult {
-	readonly committed: Promise<unknown>;
-	readonly finished: Promise<unknown>;
+export interface NavigationResult {
+	readonly committed?: Promise<unknown>;
+	readonly finished?: Promise<unknown>;
 }
 
-interface NavigationEventMap {
+export interface NavigationEventMap {
 	navigate: NavigateEvent;
 }
 
-interface Navigation extends EventTarget {
+export interface Navigation extends EventTarget {
 	addEventListener<K extends keyof NavigationEventMap>(
 		type: K,
 		listener: (event: NavigationEventMap[K]) => void,

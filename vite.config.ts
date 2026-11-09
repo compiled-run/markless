@@ -307,6 +307,7 @@ export default defineConfig({
 			// Editor-completion probes and deliberately unparsable inputs, not source.
 			'packages/typescript-plugin/test/fixtures/**',
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
+			'packages/typescript-plugin/src/element-attribute-names.generated.d.ts',
 		],
 		rules: {
 			'no-restricted-imports': [

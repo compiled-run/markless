@@ -5,6 +5,7 @@ import {
 	type MarklessParseOptions,
 	type MarklessParserComment,
 } from './js-ast.ts';
+import { marklessAttributeName } from '@markless/web/fns/attribute-name';
 import { rawElementText } from './ast/raw-text.ts';
 import type { CompilerDiagnostic } from './diagnostics.ts';
 import { buildSemanticGraphSync } from './passes/semantic-graph/index.ts';
@@ -124,6 +125,7 @@ export function compileTsrxForTypeService(
 	const comments: MarklessParserComment[] = [];
 	const sourceAst = parseModule(source, filename, {
 		...options,
+		authoredAttributeNames: true,
 		collect: true,
 		loose: !!options?.loose,
 		errors,
@@ -144,6 +146,11 @@ export function compileTsrxForTypeService(
 }
 
 export const compile_to_volar_mappings = compileTsrxForTypeService;
+
+/** True for a camelCase spelling, such as `strokeWidth`, that the compiler writes as a real attribute name. */
+export function isCamelCaseAttributeSpelling(name: string): boolean {
+	return marklessAttributeName(name) !== name;
+}
 
 /**
  * The warnings one file decides on its own - shapes that compile but do not

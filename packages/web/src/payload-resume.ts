@@ -68,7 +68,9 @@ async function adoptStreamedPatchesIfPresent(
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
+	if (pageLifetime(input.root) !== life) return wakeNoopResume;
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 	const retired = getRetiredResumedPayload(input.root);
@@ -76,10 +78,9 @@ export async function resumeFromPayloadScriptsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
-	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
-		(root.__mStart ??= startPayloadResume(input, decode).finally(() => {
+		(root.__mStart ??= startPayloadResume(input, decode, life).finally(() => {
 			if (pageLifetime(root) === life) delete root.__mStart;
 		})),
 	);
@@ -98,7 +99,7 @@ export async function resumeFromPrerenderRecordsImpl(
 	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
-		(root.__mStart ??= startDecodedResume(input, input).finally(() => {
+		(root.__mStart ??= startDecodedResume(input, input, life).finally(() => {
 			if (pageLifetime(root) === life) delete root.__mStart;
 		})),
 	);
@@ -122,11 +123,12 @@ const pageLifetime = (root: object): unknown => (root as { readonly __mL?: objec
 async function startPayloadResume(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
 	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
-	const result = await startDecodedResume(input, decoded);
+	const result = await startDecodedResume(input, decoded, life);
 	registerLiveDispatch(input, result.runtime);
 	return result;
 }
@@ -191,8 +193,8 @@ function registerLiveDispatch(input: ResumePayloadScriptsInput, runtime: ResumeR
 async function startDecodedResume(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'>,
 	decoded: DecodedPayloadScripts,
+	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
-	const life = pageLifetime(input.root);
 	// Composed children's symbols answer on their own instance's graph nodes.
 	const loadSymbol = heldSymbolLoader(marklessInstanceScopedLoadSymbol(input.loadSymbol));
 	const graph = await createRuntimeGraphFromResumePayload({

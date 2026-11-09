@@ -4,6 +4,11 @@ export type AsyncComputedValue<T> = T extends Promise<infer Value> ? Awaited<Val
 // never absent - so the array case carries no undefined.
 export type ElementHandle<T extends Element | readonly Element[] = Element> = T extends readonly (infer E extends Element)[] ? E[] : T | undefined;
 
+/**
+ * - `'app'` (the default): one copy per request on the server and per document in the browser, kept across in-place navigation.
+ * - `'container'`: one copy per rendered container.
+ * - `'subtree'`: one copy for the component that calls it first and everything inside it.
+ */
 export type SharedScope = 'app' | 'container' | 'subtree';
 
 export type SharedOptions = {

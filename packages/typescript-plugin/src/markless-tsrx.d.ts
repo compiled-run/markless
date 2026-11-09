@@ -1,3 +1,5 @@
+// oxlint-disable-next-line typescript/triple-slash-reference -- an import would turn this global contract into a module
+/// <reference path="./element-attribute-names.generated.d.ts" />
 type __MarklessFrameworkApiIndex = typeof import('@markless/core');
 
 declare namespace __MarklessTypeService {
@@ -381,41 +383,16 @@ declare namespace __MarklessTypeService {
 		src?: string;
 	};
 
+	/** Namespace declarations and XLink/XML attributes, which the SVG attribute list leaves to the XML specs. */
 	type SvgAttributes = {
-		clipPath?: string;
-		cx?: string | number;
-		cy?: string | number;
-		d?: string;
-		fill?: string;
-		fillOpacity?: string | number;
-		opacity?: string | number;
-		height?: string | number;
-		/** The SVG 2 link on `<use>`, `<image>` and `<a>`. */
-		href?: string;
-		markerEnd?: string;
-		markerMid?: string;
-		markerStart?: string;
-		points?: string;
-		preserveAspectRatio?: string;
-		r?: string | number;
-		rx?: string | number;
-		ry?: string | number;
-		stroke?: string;
-		strokeDasharray?: string | number;
-		strokeLinecap?: 'butt' | 'round' | 'square' | 'inherit';
-		strokeLinejoin?: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round' | 'inherit';
-		strokeOpacity?: string | number;
-		strokeWidth?: string | number;
-		transform?: string;
-		viewBox?: string;
-		width?: string | number;
-		x?: string | number;
-		x1?: string | number;
-		x2?: string | number;
-		xlinkHref?: string;
-		y?: string | number;
-		y1?: string | number;
-		y2?: string | number;
+		xmlns?: string;
+		'xmlns:xlink'?: string;
+		'xlink:href'?: string;
+		'xlink:title'?: string;
+		'xml:lang'?: string;
+		'xml:space'?: 'default' | 'preserve';
+		'stroke-linecap'?: 'butt' | 'round' | 'square' | 'inherit';
+		'stroke-linejoin'?: 'arcs' | 'bevel' | 'miter' | 'miter-clip' | 'round' | 'inherit';
 	};
 
 	type TableCellAttributes = {
@@ -491,7 +468,10 @@ declare namespace __MarklessTypeService {
 													: Tag extends 'link'
 														? AnchorAttributes & {
 																as?: string;
-																crossorigin?: '' | 'anonymous' | 'use-credentials';
+																crossorigin?:
+																	| ''
+																	| 'anonymous'
+																	| 'use-credentials';
 																disabled?: boolean;
 																sizes?: string;
 															}
@@ -558,13 +538,72 @@ declare namespace __MarklessTypeService {
 																							? SvgAttributes
 																							: {};
 
-	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+	/** HTML 4 attributes the list still carries that HTML moved to another element. */
+	type MovedAttributeName<Tag extends PropertyKey> = Tag extends 'td' ? 'abbr' | 'scope' : never;
+
+	type StandardAttributeName<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		?
+				| HtmlGlobalAttributeName
+				| (Tag extends keyof HtmlAttributeNameByTag
+						? Exclude<HtmlAttributeNameByTag[Tag], MovedAttributeName<Tag>>
+						: never)
+		: Tag extends keyof SVGElementTagNameMap
+			?
+					| SvgGlobalAttributeName
+					| (Tag extends keyof SvgAttributeNameByTag ? SvgAttributeNameByTag[Tag] : never)
+			: never;
+
+	type TypedAttributes<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
 		? Attributes<HTMLElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
 		: Tag extends keyof SVGElementTagNameMap
 			? Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
 			: never;
 
+	type CamelCaseAttributeSpelling<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		?
+				| HtmlGlobalCamelCaseAttributeName
+				| (Tag extends keyof HtmlCamelCaseAttributeNameByTag ? HtmlCamelCaseAttributeNameByTag[Tag] : never)
+		: Tag extends keyof SVGElementTagNameMap
+			?
+					| SvgGlobalCamelCaseAttributeName
+					| (Tag extends keyof SvgCamelCaseAttributeNameByTag ? SvgCamelCaseAttributeNameByTag[Tag] : never)
+			: never;
+
+	type PlainAttributeValue<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		? AttributeValue
+		: string | number | undefined;
+
+	/**
+	 * Every standard attribute of the tag that the typed attributes above leave out, with a plain
+	 * value, and the camelCase spelling of each real attribute, typed as that attribute.
+	 */
+	// Event handlers and Markless's own props are left out: no standard attribute shares their names.
+	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes & TagNameSpecificAttributes<Tag>;
+
+	type StandardAttributes<Tag extends PropertyKey> = {
+		[Name in Exclude<
+			StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
+			keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
+		>]?: Name extends keyof CamelCaseAttributeName
+			? CamelCaseAttributeName[Name] extends keyof TypedAttributeValues<Tag>
+				? TypedAttributeValues<Tag>[CamelCaseAttributeName[Name]]
+				: PlainAttributeValue<Tag>
+			: PlainAttributeValue<Tag>;
+	};
+
+	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends
+		| keyof HTMLElementTagNameMap
+		| keyof SVGElementTagNameMap
+		? TypedAttributes<Tag> & StandardAttributes<Tag>
+		: never;
+
 	type IntrinsicTagName = keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap;
+
+	/** What @markless/router's Html and Link read from this contract. */
+	interface RouterContract {
+		readonly child: Child;
+		readonly htmlAttributes: GlobalAttributes & StandardAttributes<'html'>;
+	}
 	type IntrinsicElements = {
 		[Tag in IntrinsicTagName]: IntrinsicElementFor<Tag>;
 	};

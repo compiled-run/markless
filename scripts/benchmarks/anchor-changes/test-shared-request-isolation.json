@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 195,
+			"reason": "The docs compile worker bundles the compiler, which grows by the lines that let a page body's shared seed reach the components under it (+195 B gzip vs merge-base on linux-x64, CI run 42542283592 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 195,
+			"reason": "The docs compile worker bundles the compiler, which grows by the lines that let a page body's shared seed reach the components under it (+195 B gzip vs merge-base on linux-x64, CI run 42542283592 against 42520732435)",
+			"date": "2026-11-09"
+		}
+	]
+}

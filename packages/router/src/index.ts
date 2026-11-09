@@ -93,10 +93,26 @@ export interface LinkNavigationProps {
 	readonly scroll?: boolean;
 }
 
+declare global {
+	namespace __MarklessTypeService {
+		/** Filled in by @markless/typescript-plugin's JSX contract; a plain TypeScript program loads none. */
+		interface RouterContract {}
+	}
+}
+
+type JsxChild = __MarklessTypeService.RouterContract extends { readonly child: infer Child }
+	? Child
+	: unknown;
+
+type HtmlAttributes = __MarklessTypeService.RouterContract extends {
+	readonly htmlAttributes: infer Attributes;
+}
+	? Attributes
+	: { readonly [name: string]: unknown };
+
 export type DefaultLinkProps = {
 	readonly href?: string;
-	// The JSX contract's child shape, reached ambiently: core depends on router, not the reverse.
-	readonly children?: __MarklessTypeService.Child;
+	readonly children?: JsxChild;
 	readonly class?: string;
 	readonly id?: string;
 	readonly target?: string;
@@ -162,13 +178,13 @@ export function __marklessCreateHttpContext<
 }
 
 export const Html = Object.assign(
-	function Html(props: { readonly children?: __MarklessTypeService.Child }): unknown {
+	function Html(props: HtmlAttributes & { readonly children?: JsxChild }): unknown {
 		return props.children;
 	},
 	{
 		renderSsr(
 			props: {
-				readonly children?: __MarklessTypeService.Child;
+				readonly children?: JsxChild;
 				readonly [name: string]: unknown;
 			} = {},
 			renderContext?: { readonly [HTML_ATTRIBUTES_SLOT]?: Record<string, unknown> },
