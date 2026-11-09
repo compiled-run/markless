@@ -160,8 +160,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 11998,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
+			"delta": 12019,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack; +21 B more once merged over #535, #543 and #544, measured on linux-x64 in CI run 42586948491",
 			"date": "2026-11-09"
 		},
 		{
