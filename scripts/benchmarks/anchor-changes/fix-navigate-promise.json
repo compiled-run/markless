@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 78,
+			"reason": "navigate() settles when the page the user ends up on is shown (same-page resolve, no leaked rendered listener); docs pages import navigate() via docs search, +78 B gzip on each docs page, 0 on pages without navigate()",
+			"date": "2026-11-09"
+		}
+	]
+}
