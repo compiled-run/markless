@@ -77,8 +77,9 @@ function trackFetches(page: Page) {
 
 type Fetched = (path: string) => Promise<void>;
 
-async function open(browser: Browser) {
+async function open(browser: Browser, initScript?: () => void) {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+	if (initScript) await page.addInitScript(initScript);
 	const { arrived, fetched } = trackFetches(page);
 	await page.goto(`${origin}/`);
 	await landedOn(page, 'home');
@@ -181,7 +182,15 @@ for (const [name, browserType] of [
 		});
 
 		test('a no-store page the press fetched is shown from that fetch when the navigation code arrives after it', async () => {
-			const { page } = await open(browser);
+			// The idle tier may fetch the page before the press; from the press on, the click's own fetch is the only one.
+			// Registered before the router's own capture listener, so the press is timed before that listener starts its fetch.
+			const { page } = await open(browser, () =>
+				addEventListener(
+					'pointerdown',
+					() => ((window as { pressedAt?: number }).pressedAt ??= performance.now()),
+					true,
+				),
+			);
 			const now = await bumpElsewhere();
 			await page.route(
 				(url) => url.pathname.endsWith('.js'),
@@ -189,14 +198,6 @@ for (const [name, browserType] of [
 					await new Promise((done) => setTimeout(done, 400));
 					await route.continue();
 				},
-			);
-			// The idle tier may fetch the page before the press; from the press on, the click's own fetch is the only one.
-			await page.evaluate(() =>
-				addEventListener(
-					'pointerdown',
-					() => ((window as { pressedAt?: number }).pressedAt ??= performance.now()),
-					true,
-				),
 			);
 			expect(await follow(page, '[data-live]', 'live')).toBe(now);
 			const asked = await page.evaluate(() =>
