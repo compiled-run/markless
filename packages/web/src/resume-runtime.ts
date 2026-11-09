@@ -296,9 +296,7 @@ export function createResumeRuntime(
 			{ ...registration, renderHtml: input.renderBranchHtml },
 			installArmEventType,
 		);
-		return async () => {
-			if (phase !== 2) await commit(boundary, update);
-		};
+		return () => (phase === 2 ? Promise.resolve() : commit(boundary, update));
 	}
 	async function armRegistrationDeps(
 		records: ArmCommitUpdate['armRecords'],
