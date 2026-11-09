@@ -1,17 +1,23 @@
 import { describe, expect, test } from 'vitest';
-import { createProjectGraph, type WorkspacePackage } from '../test-support/project-graph.ts';
+import {
+	createProjectGraph,
+	type DynamicImportDeclaration,
+	type WorkspacePackage,
+} from '../test-support/project-graph.ts';
 
 type Project = {
 	files: Record<string, string>;
 	assets?: string[];
 	packages?: WorkspacePackage[];
+	declarations?: DynamicImportDeclaration[];
 };
 
-const graphOf = async ({ files, assets = [], packages = [] }: Project) =>
+const graphOf = async ({ files, assets = [], packages = [], declarations }: Project) =>
 	createProjectGraph({
 		files: new Map(Object.entries(files)),
 		tracked: new Set([...Object.keys(files), ...assets]),
 		packages,
+		declarations,
 	});
 
 const testsIn = (files: Record<string, string>) =>
@@ -271,16 +277,29 @@ describe('fails closed', () => {
 		});
 	});
 
-	test('a fully dynamic import() inside the affected set runs everything', async () => {
+	test('a test that reaches an undeclared fully dynamic import runs on any non-prose change', async () => {
 		const files = {
-			'pkg/src/loader.ts':
-				"import { name } from './name.ts'; export const load = (file: string) => import(file);",
-			'pkg/src/name.ts': "export const name = 'x';",
+			'pkg/src/loader.ts': 'export const load = (file: string) => import(file);',
 			'pkg/test/loader.test.ts': "import { load } from '../src/loader.ts'; load;",
+			'pkg/src/plain.ts': 'export const plain = 1;',
+			'pkg/test/plain.test.ts': "import { plain } from '../src/plain.ts'; plain;",
+			'other/src/unrelated.ts': 'export const unrelated = 1;',
 		};
-		const selection = await select({ files }, ['pkg/src/name.ts']);
-		expect(selection.runAll).toBe('computed import: pkg/src/loader.ts has a computed import()');
-		expect(selection.tests).toEqual(['pkg/test/loader.test.ts']);
+		const graph = await graphOf({ files });
+		const tests = testsIn(files);
+		expect(graph.testsReachingUndeclaredImports(tests)).toEqual(['pkg/test/loader.test.ts']);
+		expect(graph.affectedTests(['other/src/unrelated.ts'], tests)).toEqual({
+			tests: ['pkg/test/loader.test.ts'],
+			runAll: null,
+		});
+		expect(graph.affectedTests(['pkg/src/plain.ts'], tests)).toEqual({
+			tests: ['pkg/test/loader.test.ts', 'pkg/test/plain.test.ts'],
+			runAll: null,
+		});
+		expect(graph.affectedTests(['docs/guide.md', 'CLAUDE.md'], tests)).toEqual({
+			tests: [],
+			runAll: null,
+		});
 	});
 
 	test('a computed import() off every path to a test does not force a full run', async () => {
@@ -436,5 +455,90 @@ describe('path rules', () => {
 			tests: [],
 			runAll: null,
 		});
+	});
+});
+
+describe('declared dynamic imports', () => {
+	const files = {
+		'fx/app/dev-server.ts':
+			'export const serve = (dist: string) => import(`${dist}/server.js?t=${Date.now()}`);',
+		'fx/app/root.ts': "import { web } from '@x/web'; export const root = web;",
+		'packages/web/src/index.ts': "import { inner } from './inner.ts'; export const web = inner;",
+		'packages/web/src/inner.ts': 'export const inner = 1;',
+		'packages/web/src/lazy.ts': 'export const lazy = 1;',
+		'packages/rt/src/index.ts': 'export const rt = 1;',
+		'packages/other/src/index.ts': 'export const other = 1;',
+		'pkg/test/serve.test.ts': "import { serve } from '../../fx/app/dev-server.ts'; serve;",
+		'pkg/test/web.test.ts': "import { web } from '@x/web'; web;",
+		'pkg/test/other.test.ts': "import { other } from '@x/other'; other;",
+	};
+	const packages: WorkspacePackage[] = [
+		{
+			dir: 'packages/web',
+			name: '@x/web',
+			exports: { '.': './src/index.ts', './lazy': './src/lazy.ts' },
+			dependencies: { '@x/rt': 'workspace:*' },
+		},
+		{ dir: 'packages/rt', name: '@x/rt', exports: './src/index.ts' },
+		{ dir: 'packages/other', name: '@x/other', exports: './src/index.ts' },
+	];
+	const declaration: DynamicImportDeclaration = {
+		module: 'fx/app/dev-server.ts',
+		sites: 1,
+		loads: 'the build output of fx/app',
+		buildRoots: ['fx/app'],
+		packages: ['@x/web'],
+	};
+	const tests = testsIn(files);
+
+	test('a change reachable only through a declared site selects the test', async () => {
+		const graph = await graphOf({ files, packages, declarations: [declaration] });
+		expect(graph.declared.has('fx/app/dev-server.ts')).toBe(true);
+		expect(graph.testsReachingUndeclaredImports(tests)).toEqual([]);
+		expect(graph.affectedTests(['fx/app/root.ts'], tests)).toEqual({
+			tests: ['pkg/test/serve.test.ts'],
+			runAll: null,
+		});
+		// An export no module imports, and a workspace dependency of a declared package.
+		for (const changed of ['packages/web/src/lazy.ts', 'packages/rt/src/index.ts'])
+			expect(graph.affectedTests([changed], tests), changed).toEqual({
+				tests: ['pkg/test/serve.test.ts'],
+				runAll: null,
+			});
+		expect(graph.affectedTests(['packages/web/src/inner.ts'], tests).tests).toEqual([
+			'pkg/test/serve.test.ts',
+			'pkg/test/web.test.ts',
+		]);
+	});
+
+	test('a change to an unrelated package selects no test without an opaque site', async () => {
+		const declared = await graphOf({ files, packages, declarations: [declaration] });
+		expect(declared.affectedTests(['packages/other/src/index.ts'], tests)).toEqual({
+			tests: ['pkg/test/other.test.ts'],
+			runAll: null,
+		});
+		const undeclared = await graphOf({ files, packages, declarations: [] });
+		expect(undeclared.affectedTests(['packages/other/src/index.ts'], tests)).toEqual({
+			tests: ['pkg/test/other.test.ts', 'pkg/test/serve.test.ts'],
+			runAll: null,
+		});
+	});
+
+	test('a declaration whose site count differs from the module leaves it undeclared', async () => {
+		const graph = await graphOf({
+			files: {
+				...files,
+				'fx/app/dev-server.ts':
+					'export const serve = (dist: string) => import(`${dist}/server.js`);\n' +
+					'export const again = (file: string) => import(file);',
+			},
+			packages,
+			declarations: [declaration],
+		});
+		expect(graph.declared.has('fx/app/dev-server.ts')).toBe(false);
+		expect(graph.affectedTests(['packages/other/src/index.ts'], tests).tests).toEqual([
+			'pkg/test/other.test.ts',
+			'pkg/test/serve.test.ts',
+		]);
 	});
 });
