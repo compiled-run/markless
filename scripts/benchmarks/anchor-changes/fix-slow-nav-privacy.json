@@ -1,0 +1,64 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "fragment freshness judged at click time: the router reads a fragment fetch's freshness as of the click, so a no-store page download the tap already started is reused instead of fetched twice (measured vs merge-base on linux-x64, CI run 42558892888 against 42557270157)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "fragment freshness judged at click time: the router reads a fragment fetch's freshness as of the click, so a no-store page download the tap already started is reused instead of fetched twice (measured vs merge-base on linux-x64, CI run 42558892888 against 42557270157)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 21,
+			"reason": "fragment freshness judged at click time: the router reads a fragment fetch's freshness as of the click, so a no-store page download the tap already started is reused instead of fetched twice (measured vs merge-base on linux-x64, CI run 42558892888 against 42557270157)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 22,
+			"reason": "fragment freshness judged at click time: the router reads a fragment fetch's freshness as of the click, so a no-store page download the tap already started is reused instead of fetched twice (measured vs merge-base on linux-x64, CI run 42558892888 against 42557270157)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 22,
+			"reason": "fragment freshness judged at click time: the router reads a fragment fetch's freshness as of the click, so a no-store page download the tap already started is reused instead of fetched twice (measured vs merge-base on linux-x64, CI run 42558892888 against 42557270157)",
+			"date": "2026-11-09"
+		}
+	]
+}
