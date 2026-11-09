@@ -19,23 +19,24 @@ export type RuntimeAsyncInput = {
 export type RuntimeAsyncAnswer = { readonly value: unknown; readonly inputs: ReadonlyArray<RuntimeAsyncInput> };
 
 // Where an async value is in its life. Only `moveNode` changes it; the snapshot stays the value readers see.
+// Order matters: up to planned a demand starts a run; from running up a run started or settled on the snapshot's key.
 export const NODE_IDLE = 0;
 /** Starts a run on its next demand, even on the key it already has: a payload-planned pending value or a rerun. */
 export const NODE_PLANNED = 1;
-export const NODE_RUNNING = 2;
-/** A run on the inputs the screen shows while an async input refreshes; it lands into blocked. */
-export const NODE_RUNNING_ON_SHOWN = 3;
-export const NODE_SETTLED = 4;
 /** Waits on an async input, showing pending or its error; runs again once that input settles, even on the same key. */
-export const NODE_BLOCKED = 5;
+export const NODE_BLOCKED = 2;
+export const NODE_RUNNING = 3;
+/** A run on the inputs the screen shows while an async input refreshes; it lands into blocked. */
+export const NODE_RUNNING_ON_SHOWN = 4;
+export const NODE_SETTLED = 5;
 
 export type AsyncNodePhase =
 	| typeof NODE_IDLE
 	| typeof NODE_PLANNED
+	| typeof NODE_BLOCKED
 	| typeof NODE_RUNNING
 	| typeof NODE_RUNNING_ON_SHOWN
-	| typeof NODE_SETTLED
-	| typeof NODE_BLOCKED;
+	| typeof NODE_SETTLED;
 
 /** Throws when an async value could not move from `from` to `to`. */
 export function assertAsyncNodeMove(from: AsyncNodePhase, to: AsyncNodePhase): void {
@@ -209,7 +210,7 @@ export function createAsyncPlane(
 	return {
 		nodes,
 		read(node, path) {
-			if (node.phase === NODE_PLANNED || node.phase === NODE_IDLE) withRefresh((loaded) => loaded.advance(node));
+			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node));
 			return peek(node, path);
 		},
 		invalidate(node) {

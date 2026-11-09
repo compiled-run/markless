@@ -110,7 +110,6 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const land = (snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>): void => {
 			if (node.version !== version) return;
 			const landed = snapshot.status !== 'rejected';
-			const onShown = node.phase === NODE_RUNNING_ON_SHOWN;
 			if (landed) {
 				if (inputs) {
 					const superseded = node.valueInputs && {
@@ -122,7 +121,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 				}
 				node.servedKey = undefined;
 			}
-			move(node, landed && onShown ? NODE_BLOCKED : NODE_SETTLED);
+			// Only a run on shown inputs lands pending.
+			move(node, snapshot.status === 'pending' ? NODE_BLOCKED : NODE_SETTLED);
 			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
 		};
 		const commitRejected = (error: unknown): void =>
@@ -189,7 +189,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 		const nextKey = node.key(readGraph);
 		if (
-			(node.phase === NODE_RUNNING || node.phase === NODE_RUNNING_ON_SHOWN || node.phase === NODE_SETTLED) &&
+			node.phase >= NODE_RUNNING &&
 			Object.is((node.snapshot as { readonly key?: unknown }).key, nextKey)
 		)
 			return;
@@ -198,7 +198,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	const demand = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
-		if (node.phase === NODE_PLANNED || node.phase === NODE_IDLE) advance(node, cause);
+		if (node.phase <= NODE_PLANNED) advance(node, cause);
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
@@ -239,7 +239,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			node.controller?.abort();
 			node.controller = undefined;
 			// A planned or blocked value keeps waiting for its demand or its input.
-			if (node.phase !== NODE_PLANNED && node.phase !== NODE_BLOCKED) move(node, NODE_SETTLED);
+			if (node.phase === NODE_IDLE || node.phase >= NODE_RUNNING) move(node, NODE_SETTLED);
 			const version = ++node.version;
 			const key = (node.snapshot as { readonly key?: unknown }).key;
 			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
