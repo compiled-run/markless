@@ -154,7 +154,8 @@ function marklessMug(): string {
 
 const gear = blob(12, 12, (x, y) => {
 	const a = Math.atan2(y - 12, x - 12);
-	const tooth = ((((a / TAU) * 8) % 1) + 1) % 1;
+	// Rounded: rays that land on a tooth edge otherwise flip with the platform's last float bit.
+	const tooth = Math.round((((((a / TAU) * 8) % 1) + 1) % 1) * 1e9) / 1e9;
 	return inCircle(x, y, 12, 12, tooth > 0.2 && tooth < 0.62 ? 10.5 : 7.8);
 });
 

@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 306,
-	guided: 48,
+	total: 312,
+	guided: 49,
 	groups: [
 		{
 			area: 'state',
@@ -860,14 +860,6 @@ export const errorIndex: ErrorIndex = {
 			blurb: '@try, @pending, @catch and async computed().',
 			codes: [
 				{
-					code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-					title: 'An @if re-renders its whole @try',
-					chip: 'warning',
-					kind: 'compile warning',
-					guided: true,
-					words: 'an @if re-renders its whole @try markless_try_block_toggle_rerender toggling an @if that holds a component re-renders the whole @try block.',
-				},
-				{
 					code: 'MARKLESS_ASYNC_BOUNDARY_REQUIRED',
 					title: 'An async value is read outside @try',
 					chip: 'error',
@@ -882,6 +874,22 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'an async value looks something up after an await markless_async_post_await_read an async computed() looks a value up with a key that comes from an await.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+					title: 'Text shows an input of an async value without the value',
+					chip: 'warning',
+					kind: 'compile warning',
+					guided: true,
+					words: 'text shows an input of an async value without the value markless_async_input_beside_value text inside a @try shows an input of an async value without the value itself.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+					title: 'An `@catch` is written without an `@try` before it',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'an `@catch` is written without an `@try` before it markless_async_catch_without_try an `@catch` is written without an `@try` before it: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_ASYNC_ARM_ORDER',
@@ -915,6 +923,14 @@ export const errorIndex: ErrorIndex = {
 			icon: 'puzzle',
 			blurb: 'Components, props, children, @if and markup.',
 			codes: [
+				{
+					code: 'MARKLESS_BLOCK_SIBLING_NODES',
+					title: 'A block renders one node',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'a block renders one node markless_block_sibling_nodes a block holds two or more nodes side by side.',
+				},
 				{
 					code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 					title: 'A component returns markup from two places',
@@ -1098,6 +1114,22 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'duplicate attribute on one element markless_attribute_duplicate duplicate attribute on one element: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+					title: 'Live children sit in an @if or @switch arm that redraws',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'live children sit in an @if or @switch arm that redraws markless_projection_live_in_branch a markless build tooling error from @markless/compiler.',
+				},
+				{
+					code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+					title: 'Live children sit inside a component’s @try',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'live children sit inside a component’s @try markless_projection_live_in_try a markless build tooling error from @markless/compiler.',
 				},
 				{
 					code: 'MARKLESS_COMPONENT_SPREAD_UNSUPPORTED',
@@ -1428,6 +1460,14 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
+					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
+					title: 'A @catch reset has no graph to re-run values in',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a @catch reset has no graph to re-run values in markless_catch_reset_graph_missing a markless runtime error from @markless/web.',
+				},
+				{
 					code: 'MARKLESS_CSR_BEHAVIOR_HOST_MISSING',
 					title: 'A behavior’s element is missing',
 					chip: 'error',
@@ -1698,6 +1738,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a new list row is empty markless_repeat_row_mint_empty a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_PLANE_MISSING',
+					title: 'A page reads an async value no compiled code set up',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a page reads an async value no compiled code set up markless_async_plane_missing a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_SYMBOL_UNKNOWN',

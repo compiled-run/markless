@@ -44,6 +44,7 @@ import {
 	isSymbolOnlySourceRequest,
 	materializedReachedRenderDataSource,
 } from '../virtual-ids.ts';
+import { throwDevProjectionRefusals } from '../prop-flow.ts';
 import { recoverImportedChildMetadata } from './resolve-load.ts';
 import { interfaceCompileInput, type TransformRequest } from './transform-request.ts';
 
@@ -334,7 +335,11 @@ export async function linkTransformChildren(
 			linkedTransformInput,
 			linkedChildHasBrowserTriggers,
 		);
+		// The linked compile sees the children's interfaces, so it is the one that places projected rows.
+		if (transformed.propFlow) moduleMetadata.propFlow.recordProjection(request.source, transformed.propFlow);
 	}
+	// A build checks the whole graph once; dev checks each module once the children it links have recorded theirs.
+	if (internalOptions.dev === true) throwDevProjectionRefusals(moduleMetadata.propFlow, request.source);
 	return {
 		transformed,
 		input: linkedTransformInput,

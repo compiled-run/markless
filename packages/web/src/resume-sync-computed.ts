@@ -1,4 +1,5 @@
 import type { RuntimeGraph } from '@markless/runtime';
+import { asyncPlanes } from './reconcile-plane-slot.ts';
 import type {
 	ElementHandleRegistry,
 	ResumeDomElement,
@@ -79,8 +80,12 @@ function loadDerive(
 
 type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 
+const HELD = Symbol('held');
+
 function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined) {
-	const graph = seedSourceGraph(input.graph, input.computed);
+	const shown = input.graph.asyncPlane?.()?.shownRead(input.computed.dependencies ?? []);
+	if (shown === false) return HELD;
+	const graph = seedSourceGraph(shown ? { ...input.graph, read: shown } : input.graph, input.computed);
 	return symbol({
 		graph,
 		read: graph.read,
@@ -104,11 +109,11 @@ export function deriveSyncComputedNow(
 	const roster = load && rosters.get(load);
 	if (
 		(load && !roster) ||
-		(input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph))
+		(input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph))
 	)
 		return false;
 	const write = (value: unknown) =>
-		input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
+		value === HELD || input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
 	const value = derive(input, symbol, roster || undefined);
 	if (typeof (value as PromiseLike<unknown> | null)?.then === 'function')
 		return Promise.resolve(value).then(write);
@@ -147,47 +152,14 @@ export async function refreshSyncComputed(
 			);
 	}
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
-	if (input.records && awaitsAsyncAncestor(input.computed, input.records, input.graph)) return;
+	if (input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph)) return;
 	const roster = await loadRosterResume();
-	const result = derive(
+	const result = await derive(
 		input,
 		input.derive ?? (await loadDerive(input.loadSymbol, input.computed)),
 		roster,
 	);
-	input.graph.write({
-		graphNodeId: input.computed.graphNodeId,
-		value: await result,
-	});
-}
-
-type DependencyRecord = {
-	readonly graphNodeId: string;
-	readonly async?: boolean;
-	readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }>;
-};
-
-function awaitsAsyncAncestor(
-	computed: Pick<DependencyRecord, 'dependencies'>,
-	records: ReadonlyArray<DependencyRecord>,
-	graph: RuntimeGraph,
-	visited = new Set<string>(),
-): boolean {
-	for (const { graphNodeId } of computed.dependencies ?? []) {
-		if (visited.has(graphNodeId)) continue;
-		visited.add(graphNodeId);
-		const record = records.find((candidate) => candidate.graphNodeId === graphNodeId);
-		if (record?.async === true) {
-			if (!hasReadableValue(graph.read(graphNodeId, []))) return true;
-		} else if (record && awaitsAsyncAncestor(record, records, graph, visited)) return true;
-	}
-	return false;
-}
-
-// A re-run keeps its prior settled value readable (spec D8), so only a first run or a rejection has nothing to read.
-function hasReadableValue(snapshot: unknown): boolean {
-	const { status, value } =
-		(snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
-	return status === 'fulfilled' || (status === 'pending' && value !== undefined);
+	if (result !== HELD) input.graph.write({ graphNodeId: input.computed.graphNodeId, value: result });
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to
@@ -328,12 +300,12 @@ export async function refreshWhenShown(
 				() => settled(false),
 			);
 		} else {
-			// Read before its symbol arrived: a flip reads again once it has, and a shown reader refreshes.
+			// Read before its symbol arrived: once it has, a stale reader derives.
 			graph.pullBeforeRead!(id, () => pull(node));
 			const cleared = () => void (node.pending = undefined);
 			// Held in pending, so a flip settling the write observers waits for this derive too.
 			node.pending = Promise.resolve(prepare(node))
-				.then(() => (node.stale && shown(id) ? refresh(node) : undefined))
+				.then(() => (node.stale ? refresh(node) : undefined))
 				.then(cleared, cleared);
 		}
 	};

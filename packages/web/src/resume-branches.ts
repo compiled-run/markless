@@ -112,6 +112,7 @@ export function wireBranches(input: any) {
 		materializeFlippedBranchArms,
 		disposeRemovedRangeHosts,
 		registerArmBranches,
+		armFlipReleasesByBoundary,
 	};
 }
 
@@ -178,11 +179,14 @@ function createBranchRegistration(
 			const html = branchHtmlToString(update.html);
 			// Escalated arms are arm-relative against DOM that does not exist yet.
 			// A composed child's escalated render spells its ids in the child's own space.
-			if (update.armRecords)
-				return input.commitArm(branch, {
+			// The pass's commit: the range lands in the task its text does.
+			if (update.armRecords) {
+				const armUpdate = {
 					...(composedArmRecordQualifier()?.branchUpdate?.(branch, update as never, input.graph) ?? update),
 					html,
-				});
+				};
+				return input.prepareArmCommit(branch, armUpdate);
+			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
 						html,
@@ -209,10 +213,14 @@ function createBranchRegistration(
 		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
 			const release = onceRelease(
 				input.graph.subscribe({
-					id: `branch-${kind}:${branch.id}:${read.graphNodeId}:${read.path.join('.')}`,
+					// A nested branch its outer flip rewires must not share its stale wiring's id.
+					id: `branch-${kind}:${branch.armBoundaryId ? `${branch.armBoundaryId}>` : ''}${branch.id}:${read.graphNodeId}:${read.path.join('.')}`,
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
+						// An arm another commit replaced took this flip's range with it; that commit wired its own.
+						if (branch.armBoundaryId && detached(input.root, branch.startAnchor))
+							return release();
 						// Hold the prior arm while the deciding async computed re-runs (the branch's only test read).
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
 						const arm = branch.testReads.length
@@ -322,6 +330,14 @@ function announceArm(root: ResumeDomElement, branch: ResumeBranchRecord, arm: nu
 		Object.assign(shown, { arm, start: branch.startAnchor, end: branch.endAnchor }),
 	);
 	for (const paint of shown.listeners) paint();
+}
+
+// A removed ancestor ends the parent chain short of the root; a host without parent links counts as attached.
+function detached(root: unknown, node: unknown): boolean {
+	type Linked = { readonly parentNode?: Linked | null };
+	for (let at = node as Linked | null | undefined; at; at = at.parentNode)
+		if (at === root || at.parentNode === undefined) return false;
+	return !!node;
 }
 
 function onceRelease(release: () => void): () => void {

@@ -1,0 +1,239 @@
+import type { RuntimeGraphAsyncSnapshot, RuntimeGraphRead } from './graph.ts';
+import type {
+	AsyncPlaneState,
+	AsyncRefresh,
+	RunCause,
+	RuntimeAsyncComputedNode,
+} from './graph-async-load.ts';
+
+// The most recent fulfilled value and the key it was fetched for, carried through re-runs and failures.
+function lastGood(
+	snapshot: RuntimeGraphAsyncSnapshot,
+): { readonly value: unknown; readonly valueKey: unknown } | undefined {
+	if (snapshot.status === 'fulfilled') return { value: snapshot.value, valueKey: snapshot.key };
+	if (snapshot.status !== 'idle' && 'valueKey' in snapshot)
+		return { value: snapshot.value, valueKey: snapshot.valueKey };
+}
+
+/** The refresh half of an async plane: loaded with its first run, failure, handler rejection or entry mark. */
+export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
+	const { asyncComputedNodes: nodes, computedNodes, readGraph, staleDerives } = state;
+
+	const publish = (
+		node: RuntimeAsyncComputedNode,
+		snapshot: RuntimeGraphAsyncSnapshot,
+		landed = false,
+	): void => {
+		const previous = node.snapshot;
+		node.snapshot = snapshot;
+		// Readers held at the inputs the old value was fetched with move on even when the new value equals it.
+		state.landWithoutObservers(() => {
+			if (landed && node.pinned) node.pinned = false;
+			else if (state.reconcile) return state.reconcile.publishAsync(node, previous);
+			state.markDirtyPath(node.graphNodeId, []);
+		});
+		state.scheduleFlush();
+	};
+
+	const pendingSnapshot = (
+		node: RuntimeAsyncComputedNode,
+		version: number,
+		key: unknown,
+	): RuntimeGraphAsyncSnapshot => {
+		const kept = lastGood(node.snapshot);
+		return {
+			status: 'pending',
+			version,
+			key,
+			value: (node.snapshot as { readonly value?: unknown }).value,
+			...(kept && { valueKey: kept.valueKey }),
+			...(node.quiet && { quiet: true }),
+		};
+	};
+
+	const commitDependencyBlock = (
+		node: RuntimeAsyncComputedNode,
+		status: 'pending' | 'rejected',
+		error: unknown,
+	): void => {
+		if (
+			node.gate === 2 &&
+			(status === 'pending' ||
+				(node.snapshot.status === 'rejected' && Object.is(node.snapshot.error, error)))
+		)
+			return;
+
+		node.controller?.abort();
+		node.controller = undefined;
+		node.gate = 2;
+		node.waitingFor = undefined;
+		const version = ++node.version;
+		const key = (node.snapshot as { readonly key?: unknown }).key;
+		publish(
+			node,
+			status === 'pending'
+				? pendingSnapshot(node, version, key)
+				: { status, version, key, error, ...lastGood(node.snapshot) },
+		);
+	};
+
+	const start = (
+		node: RuntimeAsyncComputedNode,
+		key: unknown,
+		read: RuntimeGraphRead = readGraph,
+		waiting?: boolean,
+		cause?: RunCause,
+	): void => {
+		node.controller?.abort();
+		node.gate = 0;
+		node.waitingFor = undefined;
+		const inputs = state.held?.capture(node, read);
+
+		const controller = new AbortController();
+		const version = ++node.version;
+		node.controller = controller;
+		// Read in the writing turn: a demanded or entry-held run is loud, and a revalidation is always quiet.
+		node.quiet =
+			cause === 'revalidate' ||
+			(!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false));
+		// A re-run keeps the last good value readable while pending and after a failure (spec D8); a first run has none.
+		const kept = lastGood(node.snapshot);
+		publish(node, pendingSnapshot(node, version, key));
+
+		const land = (snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>): void => {
+			if (node.version !== version) return;
+			const landed = snapshot.status !== 'rejected';
+			if (landed) {
+				if (inputs) {
+					const superseded = node.valueInputs && {
+						value: (node.snapshot as { readonly value?: unknown }).value,
+						inputs: node.valueInputs,
+					};
+					node.valueInputs = inputs;
+					state.held?.keep(node, superseded);
+				}
+				node.servedKey = undefined;
+				if (waiting) node.gate = 2;
+			}
+			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
+		};
+		const commitRejected = (error: unknown): void =>
+			land({ status: 'rejected', version, key, error, ...kept });
+		try {
+			Promise.resolve(node.run({ key, signal: controller.signal, read })).then(
+				(value) =>
+					land(
+						waiting
+							? { status: 'pending', version, key, value, valueKey: key }
+							: { status: 'fulfilled', version, key, value },
+					),
+				commitRejected,
+			);
+		} catch (error) {
+			commitRejected(error);
+		}
+	};
+
+	const advance = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
+		// Walk through sync computeds to the async nodes whose snapshots can block this runner.
+		const visited = new Set<string>([node.graphNodeId]);
+		let blocked: RuntimeAsyncComputedNode | undefined;
+		let shown = true;
+		let staleDerive = false;
+		const visit = (graphNodeId: string): void => {
+			if (visited.has(graphNodeId)) return;
+			visited.add(graphNodeId);
+			if (staleDerives.has(graphNodeId)) staleDerive = true;
+			const dependency = nodes.get(graphNodeId);
+			if (dependency) {
+				if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
+					blocked = dependency;
+					if (!dependency.valueInputs) shown = false;
+					demand(dependency, cause);
+				} else if (!blocked && dependency.snapshot.status === 'rejected') {
+					blocked = dependency;
+					if (!dependency.valueInputs) shown = false;
+				}
+				return;
+			}
+			for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? [])
+				visit(dependency.graphNodeId);
+		};
+		for (const dependency of node.dependencies) visit(dependency.graphNodeId);
+		for (const hop of node.syncHops ?? []) for (const graphNodeId of hop.asyncFrom) visit(graphNodeId);
+		const pinsPastFailure = blocked?.snapshot.status === 'rejected' && shown && !node.boundaryGate;
+		// A rejected blocker with a pinnable last-good value pins like a pending one (graph-held.ts `rejectedOnly`).
+		if (blocked && shown && (blocked.snapshot.status !== 'rejected' || pinsPastFailure) && state.held?.startOnShownInputs(node)) return;
+		// A sibling's failed refresh never rejects a reader whose pinned key did not move.
+		if (pinsPastFailure) return;
+		if (!blocked && staleDerive) {
+			commitDependencyBlock(node, 'pending', undefined);
+			return;
+		}
+		if (blocked) {
+			commitDependencyBlock(
+				node,
+				blocked.snapshot.status === 'rejected' ? 'rejected' : 'pending',
+				(blocked.snapshot as { readonly error?: unknown }).error,
+			);
+			return;
+		}
+
+		const nextKey = node.key(readGraph);
+		if (
+			!node.gate &&
+			node.snapshot.status !== 'idle' &&
+			Object.is((node.snapshot as { readonly key?: unknown }).key, nextKey)
+		)
+			return;
+
+		start(node, nextKey, readGraph, undefined, cause);
+	};
+
+	const demand = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
+		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, cause);
+	};
+
+	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
+	const markEntry = (node: RuntimeAsyncComputedNode): void => {
+		if (node.entryHold || node.snapshot.status === 'idle' || node.snapshot.status === 'pending')
+			return;
+		const previous = node.snapshot;
+		const version = ++node.version;
+		node.entryHold = { version, previous };
+		node.quiet = false;
+		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
+		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
+		void state.flush?.();
+	};
+
+	const endEntry = (node: RuntimeAsyncComputedNode): void => {
+		const hold = node.entryHold;
+		if (!hold) return;
+		// A cell-backed computed between the write and this key only recomputes in the next flush.
+		if (node.version === hold.version && state.hasPendingFlush?.()) {
+			void state.flush?.().then(() => {
+				if (node.entryHold === hold) endEntry(node);
+			});
+			return;
+		}
+		node.entryHold = undefined;
+		if (node.version !== hold.version) return;
+		publish(node, hold.previous);
+		void state.flush?.();
+	};
+
+	return {
+		advance,
+		start,
+		markEntry,
+		endEntry,
+		fail(node, error) {
+			node.controller?.abort();
+			node.controller = undefined;
+			const version = ++node.version;
+			const key = (node.snapshot as { readonly key?: unknown }).key;
+			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
+		},
+	};
+}

@@ -607,6 +607,355 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		title: 'An `@catch` is written without an `@try` before it',
+		area: 'async',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'An `@catch` is written without an `@try` before it: a Markless build error.',
+		printed: [
+			'MARKLESS_ASYNC_CATCH_WITHOUT_TRY: This `@catch` follows an element, not an @try block, so it is not read as a catch arm. TSRX parses it as literal text, and the block after it as a separate expression, so the page would show the words "@catch" and render the block as ordinary content.',
+			'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+			'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		],
+		structured: true,
+		why: 'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+		suggestion:
+			'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		title: 'Text shows an input of an async value without the value',
+		area: 'async',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description:
+			'Text inside a @try shows an input of an async value without the value itself.',
+		printed: [
+			'MARKLESS_ASYNC_INPUT_BESIDE_VALUE: {<read>} reads "<input>", which "<value>" is fetched with, but not "<value>" itself. During a refresh it shows the new "<input>" next to the old "<value>".',
+			'A refresh keeps the shown "<value>" until the new result lands. Text that reads "<value>" waits with it; text that reads only "<input>" changes at once.',
+			'Read it through the async value: return "<input>" from "<value>" and show {<value>.<input>}.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		],
+		structured: true,
+		why: 'A refresh keeps the shown "<value>" until the new result lands. Text that reads "<value>" waits with it; text that reads only "<input>" changes at once.',
+		suggestion:
+			'Read it through the async value: return "<input>" from "<value>" and show {<value>.<input>}.',
+		guide: {
+			summary:
+				'Text inside a @try shows an input of an async value without the value itself.',
+			what: [
+				{
+					id: 's0',
+					text: 'When an input of an async ',
+				},
+				{
+					id: 's1',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' changes, the block keeps showing the old result until the new one lands. Text that reads the result waits with it. Text that reads only the input, such as ',
+				},
+				{
+					id: 's3',
+					text: 'Sorted by {sort}',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' beside a list fetched with ',
+				},
+				{
+					id: 's5',
+					text: 'sort',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', changes at once, so for a moment it describes data that is not on screen yet.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Return the input from the async ',
+				},
+				{
+					id: 's1',
+					text: 'computed()',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' along with its data and show it from there. Controls that set the input, such as a ',
+				},
+				{
+					id: 's3',
+					text: '<select>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' or a ',
+				},
+				{
+					id: 's5',
+					text: '<button>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', are fine as they are.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r2',
+							text: 'posts',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r3',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r5',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: 'computed',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r7',
+							text: '(',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r8',
+							text: 'async',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r9',
+							text: ' () ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r10',
+							text: '=>',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r11',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'by',
+							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r6',
+							text: ' sort;',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'return',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' { sort: by, list: ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'await',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r4',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'loadPosts',
+							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+						},
+						{
+							id: 'r6',
+							text: '(by) };',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '});',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Sorted by {posts.sort}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [],
+		},
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_ASYNC_INPUT_BESIDE_VALUE: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:#6a737d',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_ASYNC_PLANE_MISSING',
+		title: 'A page reads an async value no compiled code set up',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: ['MARKLESS_ASYNC_PLANE_MISSING: no compiled module installed it'],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/payload-graph-construct.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/payload-graph-construct.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_POST_AWAIT_READ',
 		title: 'An async value looks something up after an await',
 		area: 'async',
@@ -1204,6 +1553,314 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/capture-analysis.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/capture-analysis.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_BLOCK_SIBLING_NODES',
+		title: 'A block renders one node',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A block holds two or more nodes side by side.',
+		printed: [
+			'MARKLESS_BLOCK_SIBLING_NODES: <subject> is a second node in the same block. A component body and each @if, @else, @for, @empty, @switch case, @try, @pending and @catch arm render exactly one node. (@tsrx/yuku reported: <message>)',
+			'Each block hands exactly one node to the place it renders into. A fragment `<>…</>` or one wrapping element is that node, and it can hold as many children as you need.',
+			'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><h2>Title</h2><ul>…</ul></>`. A fragment adds no element to the page. One wrapping element, like `<div>`, works too.',
+			'https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES',
+		],
+		structured: true,
+		why: 'Each block hands exactly one node to the place it renders into. A fragment `<>…</>` or one wrapping element is that node, and it can hold as many children as you need.',
+		suggestion:
+			'Wrap the nodes in one fragment: put `<>` before the first and `</>` after the last, as in `<><h2>Title</h2><ul>…</ul></>`. A fragment adds no element to the page. One wrapping element, like `<div>`, works too.',
+		guide: {
+			summary: 'A block holds two or more nodes side by side.',
+			what: [
+				{
+					id: 's0',
+					text: 'A component body renders exactly one node, and so does each ',
+				},
+				{
+					id: 's1',
+					text: '@if',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ', ',
+				},
+				{
+					id: 's3',
+					text: '@else',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', ',
+				},
+				{
+					id: 's5',
+					text: '@for',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', ',
+				},
+				{
+					id: 's7',
+					text: '@empty',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ', ',
+				},
+				{
+					id: 's9',
+					text: '@switch',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ' case, ',
+				},
+				{
+					id: 's11',
+					text: '@try',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ', ',
+				},
+				{
+					id: 's13',
+					text: '@pending',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ' and ',
+				},
+				{
+					id: 's15',
+					text: '@catch',
+					code: true,
+				},
+				{
+					id: 's16',
+					text: ' arm. A node is an element, a fragment, or another ',
+				},
+				{
+					id: 's17',
+					text: '@',
+					code: true,
+				},
+				{
+					id: 's18',
+					text: ' block. Here a second node follows the first in the same block.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Wrap the nodes in a fragment, ',
+				},
+				{
+					id: 's1',
+					text: '<>',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' … ',
+				},
+				{
+					id: 's3',
+					text: '</>',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ', which adds no element to the page. One wrapping element, like ',
+				},
+				{
+					id: 's5',
+					text: '<div>',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', works too.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '@try',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r1',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{report.title}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'h2',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>{report.total}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t</>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l5',
+					runs: [
+						{
+							id: 'r0',
+							text: '} ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@pending',
+							style: 'color:#d73a49;--shiki-dark:#f97583',
+						},
+						{
+							id: 'r2',
+							text: ' {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l6',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r2',
+							text: '>Loading…</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'p',
+							style: 'color:#22863a;--shiki-dark:#85e89d',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l7',
+					runs: [
+						{
+							id: 'r0',
+							text: '}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/compile-module.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/compile-module.ts',
 			},
 		],
 		moreSources: 0,
@@ -2272,6 +2929,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/capture-analysis.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/capture-analysis.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
+		title: 'A @catch reset has no graph to re-run values in',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_CATCH_RESET_GRAPH_MISSING: This @catch reset ran without a graph that can re-run async values.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/fns/catch-reset.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/catch-reset.ts',
 			},
 		],
 		moreSources: 0,
@@ -6596,13 +7274,13 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'Each row of this list must be one element: a Markless build error.',
 		printed: [
-			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.',
-			'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+			'MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: Each row of this @for over <itemName> renders <rowShape>, and this list <reason>. After the page loads, the browser follows a row that is not one element as everything between two comment markers, but not in a list like this one, so it would lose track of part of each row.',
+			'A row that is not one element is tracked between two comment markers. A list inside another row, a row holding a nested @for, an @if or @switch, an element() handle, a behavior or an event that cancels before code loads, a list passed as children, and a list standing straight in an @if or @try arm still find their part of a row by counting elements, which a row of several nodes breaks.',
 			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
 			'https://markless.dev/errors/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT',
 		],
 		structured: true,
-		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		why: 'A row that is not one element is tracked between two comment markers. A list inside another row, a row holding a nested @for, an @if or @switch, an element() handle, a behavior or an event that cancels before code loads, a list passed as children, and a list standing straight in an @if or @try arm still find their part of a row by counting elements, which a row of several nodes breaks.',
 		suggestion:
 			'Wrap each row in one element, such as `<span>...</span>`, so every row of <itemName> is a single element.',
 		sources: [
@@ -7173,6 +7851,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				file: 'packages/web/src/prerender/branch-arm.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/branch-arm.ts',
 			},
+			{
+				id: 'f1',
+				file: 'packages/web/src/prerender/evaluator.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/evaluator.ts',
+			},
 		],
 		moreSources: 0,
 	},
@@ -7541,6 +8224,51 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PROJECTION_LIVE_IN_BRANCH',
+		title: 'Live children sit in an @if or @switch arm that redraws',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/compiler.',
+		printed: [],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/projection-arms.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/projection-arms.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_PROJECTION_LIVE_IN_TRY',
+		title: 'Live children sit inside a component’s @try',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/compiler.',
+		printed: [
+			'MARKLESS_PROJECTION_LIVE_IN_TRY: <<childComponentName>> renders its projected children inside a @try, and those children read state or handle events. The browser redraws a @try arm from static markup, so they would render but never update or respond. Keep `{children}` outside the @try in <<childComponentName>>, or write the @try in the component that owns the projected markup.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/projection-arms.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/projection-arms.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/web/src/ssr-data/renderer.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/ssr-data/renderer.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PROJECTION_NOT_RENDERED',
 		title: 'A component never rendered the children it was given',
 		area: 'components',
@@ -7550,7 +8278,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless runtime error from @markless/web.',
 		printed: [
 			"MARKLESS_PROJECTION_NOT_RENDERED: <<componentName>> was given projected children but never rendered them, so they are counted by the served locator table and absent from the served HTML. Render `{children}` somewhere in <<componentName>>'s own markup, including inside an @if/@else arm.",
-			'https://markless.dev/errors/MARKLESS_PROJECTION_NOT_RENDERED',
 		],
 		structured: false,
 		sources: [
@@ -14341,116 +15068,6 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/web/src/fns/update-text.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/update-text.ts',
-			},
-		],
-		moreSources: 0,
-	},
-	{
-		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		title: 'An @if re-renders its whole @try',
-		area: 'async',
-		packageName: '@markless/compiler',
-		stage: 'compile',
-		severity: 'warning',
-		description: 'Toggling an @if that holds a component re-renders the whole @try block.',
-		printed: [
-			'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: Toggling this <branchLabel> re-renders the whole @try block',
-			'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
-			'Move the component outside the <branchLabel>, or keep the <branchLabel> content to plain elements, text, and state reads.',
-			'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		],
-		structured: true,
-		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
-		suggestion:
-			'Move the component outside the <branchLabel>, or keep the <branchLabel> content to plain elements, text, and state reads.',
-		guide: {
-			summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
-			what: [
-				{
-					id: 's0',
-					text: 'This ',
-				},
-				{
-					id: 's1',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's2',
-					text: ' sits inside ',
-				},
-				{
-					id: 's3',
-					text: '@try',
-					code: true,
-				},
-				{
-					id: 's4',
-					text: ' and holds a component. When it toggles, Markless renders the whole ',
-				},
-				{
-					id: 's5',
-					text: '@try',
-					code: true,
-				},
-				{
-					id: 's6',
-					text: ' block again, not only the ',
-				},
-				{
-					id: 's7',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's8',
-					text: '.',
-				},
-			],
-			how: [
-				{
-					id: 's0',
-					text: 'Move the component out of the ',
-				},
-				{
-					id: 's1',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's2',
-					text: '. Or keep the ',
-				},
-				{
-					id: 's3',
-					text: '@if',
-					code: true,
-				},
-				{
-					id: 's4',
-					text: ' content to plain elements, text, and state reads.',
-				},
-			],
-			example: [],
-			before: [],
-		},
-		allow: [
-			{
-				id: 'l0',
-				runs: [
-					{
-						id: 'r0',
-						text: '// markless-allow MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
-					},
-				],
-			},
-		],
-		sources: [
-			{
-				id: 'f0',
-				file: 'packages/compiler/src/passes/public-render/diagnostics.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/public-render/diagnostics.ts',
 			},
 		],
 		moreSources: 0,

@@ -522,6 +522,83 @@ export default function Report() @{
 	).toEqual([definitionId]);
 });
 
+test('the barrel walk carries a shared definition through an export * chain', async () => {
+	const owner = await compile('src/fam.tsrx', family);
+	const familyIndex = await compile('src/fam/index.ts', `export * from './fam.tsrx';`);
+	const packageBarrel = await compile('src/ui.ts', `export * from './fam/index.ts';`);
+
+	const artifact = walkBarrels({
+		parent: 'src/page.tsrx',
+		imports: ['./ui.ts'],
+		resolves: [
+			['./ui.ts', 'src/page.tsrx', 'src/ui.ts'],
+			['./fam/index.ts', 'src/ui.ts', 'src/fam/index.ts'],
+			['./fam.tsrx', 'src/fam/index.ts', 'src/fam.tsrx'],
+		],
+		modules: {
+			'src/ui.ts': packageBarrel.moduleGraphInterface,
+			'src/fam/index.ts': familyIndex.moduleGraphInterface,
+			'src/fam.tsrx': owner.moduleGraphInterface,
+		},
+	});
+
+	expect(artifact.interfaces['./ui.ts']?.reexports).toEqual([
+		{ exportName: 'pnl', importedName: 'pnl', source: './fam.tsrx' },
+	]);
+	expect(
+		artifact.interfaces['./ui.ts']?.linkedComponents?.map((component) => component.exportPath),
+	).toEqual([['Root']]);
+
+	const consumer = await compile(
+		'src/page.tsrx',
+		`
+import * as ui from './ui.ts';
+
+export default function Report() @{
+	const s = ui.pnl();
+	<span data-report>{s.open}</span>
+}
+`,
+		artifact.interfaces,
+	);
+
+	expect(
+		consumer.semanticGraph.diagnostics.filter((item) => item.severity === 'error'),
+	).toEqual([]);
+	expect(
+		consumer.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
+});
+
+test('a raw module interface with export * resolves the shared definition behind it', async () => {
+	const owner = await compile('src/fam.tsrx', family);
+	const consumer = await compile(
+		'src/page.tsrx',
+		`
+import * as ui from './ui.tsrx';
+
+export default function Report() @{
+	const s = ui.pnl();
+	<span data-report>{s.open}</span>
+}
+`,
+		{
+			'./ui.tsrx': {
+				passId: 'module-graph-interface',
+				filename: 'src/ui.tsrx',
+				exports: [],
+				reexports: [{ exportName: '*', importedName: '*', source: './fam.tsrx' }],
+				render: { version: 1, components: [] },
+			},
+			'./fam.tsrx': owner.moduleGraphInterface,
+		},
+	);
+
+	expect(
+		consumer.semanticGraph.sharedInstances.map((instance) => instance.definitionId),
+	).toEqual([definitionId]);
+});
+
 // Fail-closed: the walk republishes component and shared re-exports and nothing
 // else, so a barrel over a plain helper still resolves to no shared definition.
 test('the barrel walk republishes no chain for a re-export that reaches neither', async () => {

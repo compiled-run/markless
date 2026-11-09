@@ -42,7 +42,8 @@ function runsOf(markup: string): { text: string; style?: string }[] {
 	);
 }
 
-describe('browser highlighter', () => {
+// A cold shiki start takes 2 to 3.3 s on an M-series Mac and passed 5 s on CI's runner.
+describe('browser highlighter', { timeout: 20_000 }, () => {
 	it('paints each line of a .tsrx file as the build does, and returns one entry per line', async () => {
 		const highlighter = await loadHighlighter(['counter.tsrx']);
 		const pane = await codePane({ name: 'counter.tsrx', code: counter });

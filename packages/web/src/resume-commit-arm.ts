@@ -1,5 +1,5 @@
 import { runtimeResumeError } from './inline/resume-errors.ts';
-import { isArmBranchAnchorComment } from './resume-anchor-census.ts';
+import { isUncountedComment } from './resume-anchor-census.ts';
 import { boundaryArmRecordSet, materializeArmRecords } from './resume-arm-records.ts';
 import type { AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import {
@@ -23,6 +23,7 @@ import type {
 	ResumeRuntimeInput,
 } from './resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
+import type { SlotRead } from './resume-keyed-repeats.ts';
 
 // D1 tier 4: commitArm replaces the DOM range between an async boundary's
 // comment-anchor pair with freshly rendered arm content and re-registers the
@@ -43,6 +44,10 @@ export type ArmCommitUpdate = {
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	/** The async boundary arm this commit paints; rows written straight into it follow it. */
 	readonly arm?: number;
+	/** Keep the shown content and paint this arm after it, replacing only a previous `after` commit. */
+	readonly after?: boolean;
+	/** Whether a row slot's read moved since this arm's markup was rendered. */
+	readonly moved?: (read: SlotRead) => boolean;
 };
 
 export type ArmRegistrationDeps = Parameters<typeof createArmCommitter>[0];
@@ -55,6 +60,8 @@ type CommitParent = {
 type CommitAnchor = ResumeDomNode & {
 	readonly parentNode?: CommitParent | null;
 	readonly parentElement?: CommitParent | null;
+	// Busy marks read the records an arm registered.
+	__marklessArmRecords?: unknown;
 };
 type FocusableElement = ResumeDomElement & {
 	readonly focus?: () => void;
@@ -118,6 +125,7 @@ export function createArmCommitter(
 		readonly storeHostSubscription?: (hostNodeId: string, release: () => void) => void;
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
+			moved?: (read: SlotRead) => boolean,
 		) => Promise<void>;
 		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
 		readonly documentHost?: CommitDocument;
@@ -155,11 +163,7 @@ export function createArmCommitter(
 		const settled = registering.catch(() => undefined);
 		pending.add(settled);
 		const materialized = await registering.finally(() => pending.delete(settled));
-		const shown = update.arm === undefined ? undefined : deps.root.__marklessBranchArms?.get(boundary.id);
-		if (shown) {
-			Object.assign(shown, { arm: update.arm, start: boundary.startAnchor, end: boundary.endAnchor });
-			for (const paint of shown.listeners) paint();
-		}
+		if (update.arm !== undefined && !update.after) announceArm(deps.root, boundary, update.arm);
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
 }
@@ -170,7 +174,7 @@ export async function registerArmRecordSet(
 	deps: ArmRegistrationDeps,
 	installEventType: (eventType: string) => void,
 	boundary: ResumeArmRange,
-	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells'> & {
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId' | 'computed' | 'cells' | 'moved'> & {
 		// A minted row has no anchors around it, so it hands over the comments its @try records count in.
 		readonly comments?: ReadonlyArray<ResumeDomComment>;
 	},
@@ -202,6 +206,7 @@ export async function registerArmRecordSet(
 		deps.disposedHosts.delete(hostNodeId);
 		deps.elementsByHostId.set(hostNodeId, element);
 	}
+	if (boundary.startAnchor) (boundary.startAnchor as CommitAnchor).__marklessArmRecords = materialized;
 	for (const record of materialized.events) {
 		const element = materialized.elementsByHostId.get(record.hostNodeId);
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
@@ -224,11 +229,12 @@ export async function registerArmRecordSet(
 	if (computedRefreshes.length) {
 		if (!deps.registerComputedRefreshes)
 			throw new Error('Markless async arm computed-refresh registration is unavailable.');
-		await deps.registerComputedRefreshes(computedRefreshes);
+		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
+		await deps.registerComputedRefreshes(update.computed!);
 	}
 	registerArmDomUpdates(deps, materialized.domUpdates);
 	if (materialized.keyedRepeats.length)
-		await deps.registerKeyedRepeats?.(materialized.keyedRepeats);
+		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved);
 	if (deps.addBehaviors && materialized.behaviors.length) {
 		const byHost = new Map<string, ResumeBehaviorRecord[]>();
 		for (const behavior of materialized.behaviors) {
@@ -247,6 +253,7 @@ export async function registerArmRecordSet(
 			update.comments ?? commentsBetween(boundary.startAnchor, boundary.endAnchor),
 			update.armRecords.asyncBoundaries,
 			update.computed,
+			!update.comments,
 		);
 	return materialized;
 }
@@ -306,6 +313,7 @@ function registerArmDomUpdates(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
+				code: () => deps.loadSymbol!(domUpdate.symbolId!),
 				async run(value) {
 					const symbol = (await deps.loadSymbol!(domUpdate.symbolId!)) as (
 						context: unknown,
@@ -467,6 +475,7 @@ async function registerNestedAsyncBoundaries(
 	census: ReadonlyArray<ResumeDomComment>,
 	records: NonNullable<ResumeArmRecordSet['asyncBoundaries']>,
 	computed: ArmCommitUpdate['computed'],
+	inArm: boolean,
 ): Promise<void> {
 	const wiring = await deps.asyncBoundaryWiring?.();
 	if (!wiring || !deps.graph || !deps.loadSymbol)
@@ -481,14 +490,6 @@ async function registerNestedAsyncBoundaries(
 			);
 		return { ...record, startAnchor, endAnchor };
 	});
-	for (const nested of boundaries) {
-		const armRecords = boundaryArmRecordSet(nested.armRecords);
-		if (armRecords)
-			await registerArmRecordSet(deps, installEventType, nested, {
-				armRecords,
-				...(computed && { computed }),
-			});
-	}
 	const runners = new Map(
 		boundaries.flatMap((nested) =>
 			nested.asyncReads.flatMap((read) =>
@@ -500,15 +501,29 @@ async function registerNestedAsyncBoundaries(
 	for (const record of computed ?? []) {
 		const runnerSymbolId = runners.get(record.graphNodeId);
 		if (record.async !== true || !runnerSymbolId) continue;
-		const { asyncComputedFromRecord } = await import('./payload-graph-construct.ts');
+		const planes = (await import('./payload-graph-construct.ts')).asyncPlaneFactories();
 		graph.defineAsyncComputed?.(
-			await asyncComputedFromRecord(
+			await planes.fromRecord(
 				record,
 				runnerSymbolId,
 				{ root: deps.root, loadSymbol: deps.loadSymbol as ResumeRuntimeInput['loadSymbol'] },
 				() => graph,
+				undefined,
+				computed,
 			),
+			planes.async,
+			planes.held,
 		);
+		deps.graphNodeIds?.add?.(record.graphNodeId);
+	}
+	// After the runners: an arm's value bindings read them.
+	for (const nested of boundaries) {
+		const armRecords = boundaryArmRecordSet(nested.armRecords);
+		if (armRecords)
+			await registerArmRecordSet(deps, installEventType, nested, {
+				armRecords,
+				...(computed && { computed }),
+			});
 	}
 	const shown = new Map(
 		(computed ?? []).flatMap(({ async, graphNodeId, snapshot }) =>
@@ -517,7 +532,19 @@ async function registerNestedAsyncBoundaries(
 				: [],
 		),
 	);
-	for (const nested of boundaries) wiring.add(nested, shown);
+	for (const nested of boundaries) {
+		// A refresh that lands in place commits nothing, so rows written straight into this fresh range follow it now.
+		if (inArm) announceArm(deps.root, nested, nested.initiallyServedArm);
+		wiring.add(nested, shown);
+	}
+}
+
+// Rows written straight into a boundary arm follow the arm its range shows.
+function announceArm(root: ResumeDomElement, boundary: ResumeArmRange, arm: number): void {
+	const shown = root.__marklessBranchArms?.get(boundary.id);
+	if (!shown) return;
+	Object.assign(shown, { arm, start: boundary.startAnchor, end: boundary.endAnchor });
+	for (const paint of shown.listeners) paint();
 }
 
 // The page comment census restricted to the range, so indexes count from the arm start.
@@ -525,7 +552,7 @@ function commentsBetween(start: ResumeDomComment, end: ResumeDomComment): Resume
 	const comments: ResumeDomComment[] = [];
 	type Linked = ResumeDomNode & { readonly nextSibling?: Linked | null };
 	const visit = (node: Linked): void => {
-		if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))
+		if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))
 			comments.push(node as ResumeDomComment);
 		for (const child of Array.from(node.childNodes ?? [])) visit(child as Linked);
 	};

@@ -116,6 +116,10 @@ const buildOrder: PackUserConfig[] = [
 			index: './src/index.ts',
 			graph: './src/graph.ts',
 			'graph-reconcile': './src/graph-reconcile.ts',
+			'graph-async': './src/graph-async.ts',
+			'graph-async-load': './src/graph-async-load.ts',
+			'graph-async-refresh': './src/graph-async-refresh.ts',
+			'graph-held': './src/graph-held.ts',
 		},
 	}),
 	marklessPack({

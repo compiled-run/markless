@@ -258,6 +258,8 @@ export async function startResumeRuntime(input: {
 				},
 				boundary,
 				runtimeInput.graph.read(boundary.runnerGraphNodeId, []),
+				undefined,
+				true,
 			);
 		},
 		// Spec D8: a branch flip whose deciding test read goes THROUGH an async

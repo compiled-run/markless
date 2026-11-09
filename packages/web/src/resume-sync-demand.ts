@@ -1,4 +1,5 @@
 import type { RuntimeGraph } from '@markless/runtime';
+import { asyncPlanes } from './reconcile-plane-slot.ts';
 import type { ResumePreparedCore, ResumeRuntimeInput } from './resume-types.ts';
 
 type Records = NonNullable<ResumeRuntimeInput['state']>['computed'];
@@ -29,8 +30,8 @@ export function wireSyncComputedDemandTriggersWithoutLoadingCapability(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
-}): void {
-	wireSyncComputedDemandRecordsWithoutLoadingCapability({
+}): Promise<void> {
+	return wireSyncComputedDemandRecordsWithoutLoadingCapability({
 		...input,
 		computed: input.state?.computed ?? [],
 		sharedSeeds: input.state?.sharedSeeds,
@@ -46,7 +47,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ResumePreparedCore['elementHandles'];
 	readonly storeContainerSubscription: (release: () => void) => void;
-}): void {
+}): Promise<void> {
 	const records = [
 		...input.computed.filter(
 			(record) => record.async === false && typeof record.deriveSymbolId === 'string',
@@ -65,6 +66,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 					graphNodeId: dependency.graphNodeId,
 					path: dependency.path,
 					async run() {
+						const done = graph.asyncPlane?.()?.startDerive(computed.graphNodeId);
 						const module = (syncComputedModule ??=
 							await import('./resume-sync-computed.ts'));
 						const refresh = {
@@ -77,10 +79,19 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 						};
 						await (batches && computed.deriveOnRead
 							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-							: module.refreshSyncComputed(refresh));
+							: module.refreshSyncComputed(refresh)
+						).finally(done);
 					},
 				}),
 			);
 		}
 	}
+	// An async value's key may read a sync computed nothing derived yet: the async plane derives it now.
+	return (
+		asyncPlanes.deriveAsyncKeys?.(
+			{ graph, root: input.root, loadSymbol: input.loadSymbol, elementHandles: input.elementHandles },
+			records as never,
+			all,
+		) ?? Promise.resolve()
+	);
 }

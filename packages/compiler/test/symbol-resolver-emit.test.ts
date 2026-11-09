@@ -443,7 +443,7 @@ test('emitSymbolResolverModule leaves page-local instance scoping free of the wi
 	});
 
 	expect(output).not.toContain('@markless/web/fns/instance-scope');
-	expect(output).toContain('const scoped = (graphNodeId) =>');
+	expect(output).toContain('const own = (graphNodeId) =>');
 	expect(output).toContain('path + graphNodeId');
 });
 
@@ -528,4 +528,51 @@ test('loading a symbol runs the chunk initializers without reading any other exp
 	new Function(`${scan}\nrunGeneratedSymbolChunkInitializers(arguments[0]);`)(namespace);
 	expect(initialized).toBe(1);
 	expect(read).toEqual(['init__virtual_markless_symbol_a']);
+});
+
+test('emitSymbolResolverModule hands back a callable when a symbol reads a callback slot as a value', async () => {
+	const moduleUrl = `data:text/javascript,${encodeURIComponent(
+		'export async function symbol_child(context) { const tick = context.capture.read("slot:tick"); return tick?.("ping"); }',
+	)}`;
+	const output = emitSymbolResolverModule({
+		symbols: [{ id: 'symbol:child', chunk: moduleUrl, exportName: 'symbol_child' }],
+		boundSymbols: [
+			{
+				id: 'bound:tick',
+				baseSymbolId: 'symbol:child',
+				componentEdgePath: ['edge:0'],
+				ancestry: [
+					{ componentEdgeId: 'edge:0', branchScopeIds: [], keyedRepeatScopeIds: [] },
+				],
+				captureSlots: [
+					{
+						slotId: 'slot:tick',
+						path: [],
+						route: {
+							kind: 'callback-route',
+							componentEdgeId: 'edge:0',
+							callbackSymbolId: 'symbol:7',
+						},
+					},
+				],
+			},
+		],
+	} as never);
+	const generatedModule = (await import(
+		`data:text/javascript,${encodeURIComponent(output)}`
+	)) as {
+		loadSymbol(id: string): Promise<(context: unknown) => unknown>;
+	};
+	const calls: unknown[] = [];
+	const bound = await generatedModule.loadSymbol('bound:tick');
+	await expect(
+		bound({
+			graph: { read() {} },
+			invokeSymbol: (id: string, context: { args: unknown[] }) => (
+				calls.push([id, context.args]),
+				'ran'
+			),
+		}),
+	).resolves.toBe('ran');
+	expect(calls).toEqual([['symbol:7', ['ping']]]);
 });

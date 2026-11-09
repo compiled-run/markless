@@ -12,6 +12,7 @@ import {
 	semanticAliasMap,
 	uniqueBy,
 } from '../../artifact-helpers/graph-paths.ts';
+import { placeAsyncArmText } from './collect-elements.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -43,6 +44,8 @@ export function collectAsyncBoundary(
 	const boundaryId = `boundary:${state.nextBoundaryId++}`;
 	const previousBoundaryId = state.currentAsyncBoundaryId;
 	const previousArm = state.currentAsyncBoundaryArm;
+	const previousArmHost = state.currentAsyncArmHostNodeId;
+	const previousCatchBoundaryId = state.currentCatchBoundaryId;
 	// Arm index inside this boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	const armByNode = new Map<unknown, number>([
 		[node.block, 0],
@@ -50,20 +53,38 @@ export function collectAsyncBoundary(
 		[node.handler, 2],
 	]);
 
+	const handler = node.handler as AnyNode | null | undefined;
+	const errorParam = handler?.param as AnyNode | null | undefined;
 	state.graph.asyncBoundaries.push({
 		id: boundaryId,
 		anchorOrder: state.nextAnchorOrder++,
 		...(previousBoundaryId ? { parentBoundaryId: previousBoundaryId } : {}),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		...(errorParam?.type === 'Identifier' && typeof errorParam.name === 'string'
+			? { errorName: errorParam.name }
+			: {}),
+		...(typeof node.start === 'number'
+			? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + '@try'.length } }
+			: {}),
 	});
 	state.currentAsyncBoundaryId = boundaryId;
+	state.currentAsyncArmHostNodeId = state.currentHostNodeId;
+	const resetParam = handler?.resetParam as AnyNode | null | undefined;
+	if (resetParam?.type === 'Identifier' && typeof resetParam.start === 'number')
+		state.catchResetBoundaries.set(resetParam.start, boundaryId);
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;
+		state.currentCatchBoundaryId =
+			handler && child === node.block ? boundaryId : previousCatchBoundaryId;
+		placeAsyncArmText(node, child, state);
 		walk(child, state);
 	}
 
 	state.currentAsyncBoundaryId = previousBoundaryId;
 	state.currentAsyncBoundaryArm = previousArm;
+	state.currentAsyncArmHostNodeId = previousArmHost;
+	state.currentCatchBoundaryId = previousCatchBoundaryId;
 }
 
 export function propagateAsyncComputedCapability(graph: MutableSemanticGraphArtifact): void {

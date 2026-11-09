@@ -107,6 +107,37 @@ export default function Page() @{
 	expect(flag).toMatchObject({ graphNodeId: 'state:compact', graphPath: [] });
 });
 
+test('a keyed list inside a row arm rides the row template and names the arm its parent sits in', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `
+import { state } from '@markless/core';
+export default function Page() @{
+	let open = state(false);
+	let rows = state([{ id: 'a', tags: ['x'] }]);
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li>@if (open) { <span>none</span> } @else { <ol>@for (const tag of row.tags; key tag) { <li>{tag}</li> }</ol> }</li>
+		}
+	</ul>
+}`,
+		symbols: [],
+	});
+	const [outer, inner] = result.protocolView.keyedRepeats ?? [];
+	expect(outer?.rowTemplate?.branchSlots?.[0]?.arms[1]?.html).toBe('<ol><!--markless-slot:0--></ol>');
+	expect(inner?.enclosingRow).toEqual({
+		repeatId: outer?.id,
+		parentHostPath: [0],
+		itemPath: ['tags'],
+		arm: { slot: 0, arm: 1 },
+	});
+	expect(
+		result.publicRenderPlan.diagnostics.filter((diagnostic) =>
+			diagnostic.code.startsWith('MARKLESS_ROW_BRANCH') || diagnostic.code === ROW_MINT_UNSUPPORTED,
+		),
+	).toEqual([]);
+});
+
 test('an arm the row cannot rebuild keeps the served arm and says so', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/Page.tsrx',
@@ -117,7 +148,10 @@ export default function Page() @{
 	let rows = state([{ id: 'a', tags: ['x'] }]);
 	<ul>
 		@for (const row of rows; key row.id) {
-			<li>@if (open) { <ol>@for (const tag of row.tags; key tag) { <li>{tag}</li> }</ol> } @else { <span>none</span> }</li>
+			<li>@if (open) { <ol>
+				// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: tags are positions
+				@for (const tag of row.tags; index at; key at) { <li>{tag}</li> }
+			</ol> } @else { <span>none</span> }</li>
 		}
 	</ul>
 }`,

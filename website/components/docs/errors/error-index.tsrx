@@ -42,7 +42,11 @@ export default function ErrorIndex() @{
 		<p>
 			<span>New to the format? Read </span>
 			<Link href="/tooling/diagnostics">how to read a Markless error</Link>
-			<span> first.</span>
+			<span> first. The errors a </span>
+			<code>@try</code>
+			<span> block can stop the build with are listed on </span>
+			<a href="/concepts/async#build-errors-inside-try">waiting</a>
+			<span>.</span>
 		</p>
 		<div class="bar">
 			<label class="filter">

@@ -106,7 +106,7 @@ export function KilnRoster() @{
 	});
 });
 
-test('a parts-covered boundary with no authored sync gate and two async reads fails loudly', async () => {
+test('a boundary with no authored sync gate and two async reads settles on one minted gate', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/CompassCard.tsrx',
 		source: `
@@ -121,22 +121,16 @@ export function CompassCard() @{
 	});
 
 	const boundaryId = result.semanticGraph.asyncBoundaries[0]?.id;
-	expect(result.renderData.boundaries).toContainEqual(
-		expect.objectContaining({ boundaryId }),
-	);
+	const gateGraphNodeId = result.semanticGraph.asyncBoundaries[0]?.gateGraphNodeId;
+	expect(gateGraphNodeId).toBeDefined();
 	expect(
 		result.symbolResolver.symbols.find(
 			(symbol) => symbol.kind === 'async-boundary-update' && symbol.boundaryId === boundaryId,
 		)?.graphNodeId,
-	).toBeUndefined();
-	expect(collectTsrxModuleDiagnostics(result)).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				code: 'MARKLESS_PUBLIC_RENDER_GATE_PLAN_DISAGREEMENT',
-				severity: 'error',
-			}),
-		]),
-	);
+	).toBe(gateGraphNodeId);
+	expect(
+		collectTsrxModuleDiagnostics(result).filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
 });
 
 test('a supported boundary with no resolvable async runner fails loudly', async () => {

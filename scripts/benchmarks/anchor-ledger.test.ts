@@ -259,6 +259,56 @@ describe('anchor change ledger', () => {
 		).toThrow(/does not exist/);
 	});
 
+	test('a module one branch stops shipping drops the pending changes other branches recorded for it', () => {
+		const change = (name: string, op: { delta: number } | { remove: true }) => ({
+			name,
+			changes: [
+				{ surface: 'perf-guards', path: ['runtimeModules', 'web/gone'], ...op, reason: name },
+			],
+		});
+		const base = { runtimeModules: { 'web/gone': 4_110, 'web/kept': 10 } };
+		for (const files of [
+			[change('grow', { delta: 547 }), change('drop', { remove: true })],
+			[change('drop', { remove: true }), change('grow', { delta: 547 })],
+		])
+			expect(applyChanges(base, files, 'perf-guards')).toEqual({
+				runtimeModules: { 'web/kept': 10 },
+			});
+	});
+
+	test('a tree that no longer ships a module records its removal over another pending change to it', () => {
+		const pr = checkout();
+		mkdirSync(pr.dir, { recursive: true });
+		writeFileSync(
+			join(pr.dir, 'earlier.json'),
+			JSON.stringify({
+				changes: [
+					{
+						surface: 'perf-guards',
+						path: ['runtimeModules', 'web/resume'],
+						delta: -3_179,
+						reason: 'earlier',
+					},
+				],
+			}),
+		);
+		const modules = (bytes?: number) => (anchors: Anchors) => {
+			const next = structuredClone(anchors);
+			if (bytes === undefined) delete next.runtimeModules['web/resume'];
+			else next.runtimeModules['web/resume'] = bytes;
+			return next;
+		};
+		recordChange(
+			'perf-guards',
+			{ head: modules(), base: modules(3_179), covers: () => true },
+			{ name: 'later', dir: pr.dir, basePath: pr.basePath, reason: 'later' },
+		);
+		expect(readChangeFiles(pr.dir).find((file) => file.name === 'later')!.changes).toEqual([
+			expect.objectContaining({ path: ['runtimeModules', 'web/resume'], remove: true }),
+		]);
+		expect(pr.read().runtimeModules).toEqual({});
+	});
+
 	test('a change without a reason is rejected', () => {
 		const pr = checkout();
 		expect(() =>

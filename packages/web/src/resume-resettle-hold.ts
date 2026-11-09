@@ -7,6 +7,7 @@ import {
 } from './pending-timing.ts';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type { ResumeAsyncBoundaryRecord } from './resume-types.ts';
 
@@ -30,7 +31,8 @@ export function createResettleHold(deps: {
 	readonly clock?: { readonly wait?: PendingTimingClock['wait'] };
 }): ResettleHold {
 	const stalls = new Map<string, Stall>();
-	const setBusy = deps.setBusy ?? setBoundaryBusy;
+	const setBusy =
+		deps.setBusy ?? ((boundary, busy) => (asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, busy));
 	const wait = deps.clock?.wait ?? waitMs;
 	return (boundary, snapshot) => {
 		const { status, version } =
@@ -58,6 +60,7 @@ export function createResettleHold(deps: {
 			stall.fallback = true;
 			// A commit failure rejects unhandled: a broken anchor census must fail loudly (D2).
 			await deps.commitPendingArm(boundary);
+			asyncPlanes.busy?.shown(boundary, ASYNC_BOUNDARY_ARM.pending);
 			if (stalls.get(boundary.id) === stall) setBusy(boundary, true);
 		})();
 	};

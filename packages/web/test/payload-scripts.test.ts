@@ -16,6 +16,10 @@ import {
 } from '../src/index.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
 import { resumePrerenderTriggerGroup } from '../src/fns/prerender-trigger-resume.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -737,11 +741,13 @@ test('payload script resume restores fulfilled async computed snapshots before r
 	await settleMicrotasks();
 	await resumed.graph.flush();
 
+	// A plain `graph.write` outside a user action is a quiet refresh: no busy mark, no announcement.
 	expect(resumed.graph.read('computed:details')).toEqual({
 		status: 'fulfilled',
 		version: 2,
 		key: 'grace',
 		value: { title: 'User grace' },
+		quiet: true,
 	});
 });
 

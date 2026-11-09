@@ -4,11 +4,7 @@ import {
 	missingElementLocatorError,
 	runtimeResumeError,
 } from './inline/resume-errors.ts';
-import {
-	isArmBranchAnchorComment,
-	marklessElementAt,
-	pageCommentCensus,
-} from './resume-anchor-census.ts';
+import { marklessElementAt, pageCommentCensus } from './resume-anchor-census.ts';
 import type {
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
@@ -18,6 +14,13 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 } from './resume-types.ts';
+
+// Arm-branch anchors index in their owning boundary's census, never the page's.
+function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
+	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
+	return text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:');
+}
+
 export {
 	composedArmRecordQualifier,
 	installComposedArmRecordQualifier,
@@ -252,8 +255,11 @@ function materializeArmBranchRecords(
 		const startIndex = planned(record.startAnchor)?.index;
 		const endIndex = planned(record.endAnchor)?.index;
 		if (startIndex === undefined || endIndex === undefined) return record;
-		const startAnchor = census[startIndex];
-		const endAnchor = census[endIndex];
+		// A branch nested in another's arm is found by name: planned indexes count siblings only.
+		const named = (index: number, text: string) =>
+			[census[index], ...census].find((comment) => comment && commentText(comment) === text);
+		const startAnchor = named(startIndex, `markless:arm-branch:${record.id}`);
+		const endAnchor = named(endIndex, `/markless:arm-branch:${record.id}`);
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});

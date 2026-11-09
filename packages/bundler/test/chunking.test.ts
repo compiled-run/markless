@@ -45,6 +45,7 @@ const runtimeGroupNames = [
 	'markless-runtime-graph-collections',
 	'markless-runtime-graph-computed',
 	'markless-runtime-graph-async',
+	'markless-runtime-graph-async-refresh',
 	'markless-runtime-graph-scheduler',
 	'markless-runtime-graph-shared',
 	'markless-graph',

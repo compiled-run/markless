@@ -54,6 +54,7 @@ import {
 	resumeVirtualModuleId,
 	rewriteSymbolModuleExport,
 	scopedSymbolExportName,
+	payloadAsyncPlanes,
 	settleVirtualModuleId,
 	symbolGroupVirtualModuleId,
 	symbolVirtualModuleId,
@@ -470,6 +471,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.publicRenderPlan.styleScopes.length > 0
 			? `${MARKLESS_VIRTUAL_PREFIX}style:${encodedModuleId}.css`
 			: null;
+	const asyncPlanes = payloadAsyncPlanes(
+		compiled.payloadScripts.state,
+		compiled.moduleGraphInterface.asyncPlanes,
+	);
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -654,6 +659,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadId,
 				resolverId,
 				payloadState: compiled.payloadScripts.state,
+				asyncPlanes,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
@@ -707,6 +713,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							payloadId,
 							resolverId,
 							payloadState: compiled.payloadScripts.state,
+							asyncPlanes,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
 							hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
 							runtimeDemandMap: compiled.runtimeDemandMap,
@@ -883,6 +890,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					prerenderRecords: input.prerenderRecords,
 					directCsr: input.directCsr,
 					hasComputedState: compiled.payloadScripts.state.computed.length > 0,
+					asyncPlanes,
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
@@ -1038,6 +1046,20 @@ function servedDefinition(
 	);
 }
 
+// The first edge to use a name also answers by it, for walks that only know a name; a later same-named one does not.
+function bareNameImportAliases(
+	edges: ReadonlyArray<{ readonly childComponentName: string; readonly importSource?: string }>,
+	importedComponents: ReadonlyMap<string, { readonly source: string; readonly local: string }>,
+): ReadonlyArray<readonly [string, { readonly source: string; readonly local: string }]> {
+	const claimed = new Map<string, { readonly source: string; readonly local: string }>();
+	for (const edge of edges) {
+		if (!edge.importSource || claimed.has(edge.childComponentName)) continue;
+		const entry = importedComponents.get(edge.importSource);
+		if (entry) claimed.set(edge.childComponentName, entry);
+	}
+	return [...claimed];
+}
+
 async function prerenderDataModuleSource(
 	compiled: CompileTsrxModuleResult,
 	environment: TransformTsrxModuleInput['environment'],
@@ -1048,6 +1070,7 @@ async function prerenderDataModuleSource(
 	moduleId: string,
 	served?: ServedRenderDataArtifact,
 ): Promise<string> {
+	// Keyed by import source: two modules can declare a same-named component.
 	const importedComponents = new Map<
 		string,
 		{ readonly source: string; readonly local: string }
@@ -1056,12 +1079,14 @@ async function prerenderDataModuleSource(
 	const browserRenderedChildren = served
 		? new Set(
 				compiled.semanticGraph.componentEdges.flatMap((edge) =>
-					served.browserRenderedEdgeIds.includes(edge.id) ? [edge.childComponentName] : [],
+					served.browserRenderedEdgeIds.includes(edge.id) && edge.importSource
+						? [edge.importSource]
+						: [],
 				),
 			)
 		: undefined;
 	for (const edge of compiled.semanticGraph.componentEdges) {
-		if (!edge.importSource || importedComponents.has(edge.childComponentName)) continue;
+		if (!edge.importSource || importedComponents.has(edge.importSource)) continue;
 		if (artifactChildMaterializations?.[edge.id]) continue;
 		const linked = importedModuleInterfaces?.[edge.importSource];
 		if (!linked) {
@@ -1072,9 +1097,9 @@ async function prerenderDataModuleSource(
 		const full =
 			renderDataImportSources?.[edge.importSource] ??
 			`${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(linked.moduleId ?? linked.filename)}`;
-		importedComponents.set(edge.childComponentName, {
+		importedComponents.set(edge.importSource, {
 			source:
-				browserRenderedChildren && !browserRenderedChildren.has(edge.childComponentName)
+				browserRenderedChildren && !browserRenderedChildren.has(edge.importSource)
 					? servedRenderDataReference(full)
 					: full,
 			local: `marklessPrerenderImport${importedComponents.size}`,
@@ -1257,7 +1282,7 @@ async function prerenderDataModuleSource(
 		`\trootComponentName: ${JSON.stringify(compiled.renderData.root?.componentName ?? null)},`,
 		'\trenderData: marklessRenderData,',
 		'\tcomponents: marklessPrerenderComponents,',
-		`\timports: {${[...importedComponents].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
+		`\timports: {${[...importedComponents, ...bareNameImportAliases(compiled.semanticGraph.componentEdges, importedComponents)].map(([name, entry]) => `${JSON.stringify(name)}:${entry.local}`).join(',')}},`,
 		'};',
 	].join('\n');
 }

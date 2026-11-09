@@ -102,6 +102,15 @@ test('a callback with no row to take keeps the id the instance path already give
 	).toBe('r:two:c7:symbol:2');
 });
 
+test("a callback written by the module whose @for row holds the edge runs in that module's space", () => {
+	expect(
+		marklessRowBoundCallbackId(rowComponent, { marklessInstancePath: 'r:two:' }, 'symbol:2'),
+	).toBe('symbol:2');
+	expect(
+		marklessRowBoundCallbackId(rowComponent, { marklessInstancePath: 'c3:r:two:r:a:' }, 'symbol:2'),
+	).toBe('c3:symbol:2');
+});
+
 // Two nested keyed @for loops place one component: the inner rows of every outer row share one parent, so the item is found by key.
 const GROUPS = [
 	{ name: 'a', items: [{ id: 'x' }, { id: 'y w' }] },

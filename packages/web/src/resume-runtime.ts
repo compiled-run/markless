@@ -117,7 +117,7 @@ export function createResumeRuntime(
 			registeredComputedRefreshIds.add(record.graphNodeId);
 			graphNodeIds?.add(record.graphNodeId);
 		}
-		(
+		await (
 			await import('./resume-sync-demand.ts')
 		).wireSyncComputedDemandRecordsWithoutLoadingCapability({
 			graph: input.graph,
@@ -155,6 +155,16 @@ export function createResumeRuntime(
 				behaviorRuntime?.behaviorHostIdsForAncestors(element) ??
 				pendingBehaviorHostIdsForAncestors(element),
 			delegatedTriggers: input.delegatedTriggers,
+			asyncBoundaries() {
+				return asyncBoundariesById.values();
+			},
+			async failEnclosingCatch(element, error) {
+				return (
+					asyncBoundariesById.size > 0 &&
+					!!asyncBoundaryWiring &&
+					(await asyncBoundaryWiring()).failEnclosingCatch(element, error)
+				);
+			},
 		});
 		for (const eventRecord of input.view.events) {
 			if (eventRecord.eventName === PROTOCOL_VISIBLE_EVENT_NAME) continue;
@@ -183,7 +193,7 @@ export function createResumeRuntime(
 				id: `view-dom-update:${domUpdate.hostNodeId}:${JSON.stringify(domUpdate.target)}:${domUpdate.graphNodeId}:${domUpdate.path.join('.')}`,
 				graphNodeId: domUpdate.graphNodeId,
 				path: domUpdate.path,
-				ready: () => typeof input.loadSymbol(domUpdate.symbolId!) === 'function',
+				code: () => input.loadSymbol(domUpdate.symbolId!),
 				async run(value) {
 					const symbol = await input.loadSymbol(domUpdate.symbolId!);
 					return (await symbol({
@@ -248,6 +258,7 @@ export function createResumeRuntime(
 				storeHostSubscription,
 				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
 				commitArm: commitBoundaryArm,
+				prepareArmCommit: prepareBoundaryArmCommit,
 				registerServedArmRecords: registerServedBranchArmRecords,
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
@@ -272,12 +283,20 @@ export function createResumeRuntime(
 		boundary: ResumeArmRange,
 		update: ArmCommitUpdate,
 	): Promise<void> {
+		await (await prepareBoundaryArmCommit(boundary, update))();
+	}
+	// Loads first, so the returned call commits in the task that runs it.
+	async function prepareBoundaryArmCommit(
+		boundary: ResumeArmRange,
+		update: ArmCommitUpdate,
+	): Promise<() => Promise<void>> {
 		const registration = await armRegistrationDeps(update.armRecords);
 		const { createArmCommitter } = await import('./resume-commit-arm.ts');
-		await createArmCommitter(
+		const commit = createArmCommitter(
 			{ ...registration, renderHtml: input.renderBranchHtml },
 			installArmEventType,
-		)(boundary, update);
+		);
+		return () => commit(boundary, update);
 	}
 	async function armRegistrationDeps(
 		records: ArmCommitUpdate['armRecords'],
@@ -298,19 +317,20 @@ export function createResumeRuntime(
 			loadSymbol: input.loadSymbol,
 			getElementHandle: elementHandles.get,
 			storeHostSubscription,
-			registerKeyedRepeats: async (records) => {
+			registerKeyedRepeats: async (records, moved) => {
 				await eventWiring.prepareSyncPolicy(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
 				);
 				await (
 					await import('./resume-arm-keyed-repeats.ts')
-				).wireArmKeyedRepeats(input, records, {
-					elementsByHostId,
-					events: eventWiring,
-					elementHandles,
-					storeHostSubscription,
-				});
+				).wireArmKeyedRepeats(
+					input,
+					records,
+					{ elementsByHostId, events: eventWiring, elementHandles, storeHostSubscription },
+					{ runtimeInput: input, armRegistrationDeps, installArmEventType, elementsByHostId },
+					moved,
+				);
 			},
 			addBehaviors: behaviors
 				? async (hostNodeId, records) => {
@@ -342,7 +362,9 @@ export function createResumeRuntime(
 	function installArmEventType(eventType: string): void {
 		if (eventTypes.has(eventType)) return;
 		eventTypes.add(eventType);
-		if (captureListenersStarted && !input.root.__marklessDelegatedDispatch)
+		// Arm rows paint before they register, so the delegated container listens for them first.
+		if (input.root.__marklessDelegatedDispatch) input.delegatedTriggers?.registerRowEventName(eventType);
+		else if (captureListenersStarted)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
 	async function registerServedBoundaryArms(): Promise<void> {
@@ -561,6 +583,7 @@ export function createResumeRuntime(
 		getAsyncBoundary: (boundaryId: string) => asyncBoundariesById.get(boundaryId),
 		getBranch: (branchId: string) => branchRuntime?.branchesById.get(branchId),
 		disposeHost: (hostNodeId: string) => disposeHost(hostNodeId, { ignoreFutureEvents: true }),
+		armBranches: () => branchRuntime,
 		dispose,
 	};
 	return runtime;

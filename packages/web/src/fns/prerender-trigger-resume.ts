@@ -14,7 +14,12 @@ import {
 	type ResumeRuntime,
 } from '../resume.ts';
 import type { ProtocolStatePayload } from '@markless/serializer/protocol';
-import type { ResumeAsyncBoundaryPayload } from '../resume-types.ts';
+import type {
+	ResumeAsyncBoundaryPayload,
+	ResumeDomNode,
+	ResumeRemovalObserver,
+	ResumeRemovalObserverFactory,
+} from '../resume-types.ts';
 import type { ResumePayloadScriptsInput, ResumePayloadScriptsResult } from '../payload-full.ts';
 import { createRuntimeGraphFromResumePayload } from '../payload-graph-construct.ts';
 import {
@@ -120,6 +125,7 @@ export function resumePrerenderTriggerGroup(
 		};
 		stagedContainers.set(page, container);
 		attachPrerenderBoundaryAuthority(input.root);
+		releaseRemovedHosts(input, container);
 	}
 	const existing = container.groups.get(input.groupId);
 	if (existing) return existing;
@@ -384,6 +390,64 @@ async function startTriggerGroup(
 			}
 		}
 	}
+}
+
+const removalObservers = new WeakMap<object, ResumeRemovalObserver>();
+
+// A commit in one runtime replaces elements the others bound, so each lets go of what left the page.
+function releaseRemovedHosts(input: TriggerGroupInput, container: StagedContainer): void {
+	const create = input.createRemovalObserver ?? defaultRemovalObserver();
+	if (!create) return;
+	removalObservers.get(input.root)?.disconnect?.();
+	const observer = create((records) => {
+		const removed = new Set<ResumeDomNode>();
+		for (const record of records) for (const node of record.removedNodes) removed.add(node);
+		if (removed.size > 0)
+			for (const { runtime } of container.runtimes) releaseRemoved(input.root, runtime, removed);
+	});
+	observer.observe(input.root, { childList: true, subtree: true });
+	removalObservers.set(input.root, observer);
+}
+
+// A removed element outside the page goes with its host; an arm's flips go once none of its branches is left.
+function releaseRemoved(
+	root: ResumeDomElement,
+	runtime: ResumeRuntime,
+	removed: ReadonlySet<ResumeDomNode>,
+): void {
+	const gone = (node: ResumeDomNode) =>
+		!root.contains?.(node as ResumeDomElement) &&
+		[...removed].some(
+			(candidate) =>
+				candidate === node || (candidate as ResumeDomElement).contains?.(node as ResumeDomElement),
+		);
+	for (const [hostNodeId, element] of runtime.hostElements ?? [])
+		if (gone(element)) runtime.disposeHost(hostNodeId);
+	const branches = runtime.armBranches?.();
+	if (!branches) return;
+	const live = new Set<string>(),
+		left = new Set<string>();
+	for (const [id, branch] of branches.branchesById) {
+		const owner = (branch as { readonly armBoundaryId?: string }).armBoundaryId;
+		if (!owner) continue;
+		if (root.contains?.(branch.startAnchor as unknown as ResumeDomElement)) live.add(owner);
+		else {
+			left.add(owner);
+			(branches.branchesById as Map<string, unknown>).delete(id);
+		}
+	}
+	for (const owner of left) {
+		if (live.has(owner)) continue;
+		for (const release of branches.armFlipReleasesByBoundary.get(owner) ?? []) release();
+		branches.armFlipReleasesByBoundary.delete(owner);
+	}
+}
+
+function defaultRemovalObserver(): ResumeRemovalObserverFactory | undefined {
+	const Observer = (
+		globalThis as unknown as { readonly MutationObserver?: new (callback: never) => never }
+	).MutationObserver;
+	return Observer && ((callback) => new Observer(callback as never));
 }
 
 function isUnmatchedDispatchError(error: unknown): boolean {

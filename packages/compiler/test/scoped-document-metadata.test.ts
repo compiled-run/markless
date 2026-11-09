@@ -1,8 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// head and the metadata inside it are never rendered, so a scoped selector can
-// never style them: the scope class is noise there, on every served page.
+// head and its metadata never render, so a scope class there is noise on every served page.
 
 const DOCUMENT = `export default function Document({ url, children }) @{
 	const theme = url?.pathname === '/' ? 'light' : undefined;

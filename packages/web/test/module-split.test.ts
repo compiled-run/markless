@@ -108,7 +108,9 @@ test('payload graph construction stays isolated in its own module', async () => 
 	expect(payloadSource).not.toContain("from '@markless/runtime'");
 	expect(payloadSource).not.toContain('asyncRunnerSymbolsByGraphNode');
 	expect(graphSource).toContain('createRuntimeGraphFromResumePayload');
-	expect(graphSource).toContain('asyncRunnerSymbolsByGraphNode');
+	// Async records decode in the plane only a module serving async values installs.
+	expect(graphSource).not.toContain('asyncRunnerSymbolsByGraphNode');
+	expect(await readSource('../src/fns/async-plane.ts')).toContain('asyncRunnerSymbolsByGraphNode');
 });
 
 test('resume runtime split points keep capability code in separate modules', async () => {

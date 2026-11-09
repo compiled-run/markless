@@ -344,11 +344,13 @@ export function mintTemplateExpressionComputed(
 	allowConstant = false,
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
+	joinsText = false,
 ): { readonly graphNodeId: string } | null {
+	const component = state.currentComponentName ?? undefined;
 	const bindings =
-		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId);
+		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId, component);
 	const aliases =
-		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId, component);
 	const dependencies: SemanticGraphDependency[] = [];
 	for (const source of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
@@ -395,6 +397,7 @@ export function mintTemplateExpressionComputed(
 		asyncCapable: false,
 		functionSource,
 		dependencies: uniqueDependencies(dependencies),
+		...(joinsText ? { joinsText: true as const } : {}),
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 	});
 	return { graphNodeId };
@@ -447,6 +450,15 @@ export function readsUnroutedGraphCell(
 ): boolean {
 	const readSources = pureCompositeReadSources(expression, state, options);
 	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	return readsWritableGraphCell(freeReadSources(expression, state, identifiers), state, scope);
+}
+
+// Every member chain (and, when asked, bare name) in an expression that is not bound inside it.
+export function freeReadSources(
+	expression: AnyNode,
+	state: WalkState,
+	identifiers: boolean,
+): ReadonlyArray<string> {
 	const region =
 		typeof expression.start === 'number' && typeof expression.end === 'number'
 			? { start: expression.start, end: expression.end }
@@ -467,5 +479,5 @@ export function readsUnroutedGraphCell(
 	};
 	visit(expression, null);
 	if (identifiers) sources.push(...expressionReadNames(expression, state));
-	return readsWritableGraphCell(sources, state, scope);
+	return sources;
 }

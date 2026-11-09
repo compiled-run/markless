@@ -12,8 +12,8 @@ their prerequisites exist:
   is no longer deferred: it is `onIdle`, specified in
   [04-events-symbols-behaviors.md](./04-events-symbols-behaviors.md).
 - Async caching policy beyond "current dependency key" and prefetch policy.
-  Stale-while-revalidate on refresh is now specified (not implemented) in
-  [13-resume-cache.md](./13-resume-cache.md); manual
+  Stale-while-revalidate on refresh is specified in
+  [13-resume-cache.md](./13-resume-cache.md), parked 2026-11-07; manual
   refresh/invalidation stays deferred there as `revalidate(computed)`
   (void-returning, no status reads), with the bump-a-state alias idiom as the
   documented interim.

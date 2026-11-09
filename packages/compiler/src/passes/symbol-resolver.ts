@@ -46,7 +46,8 @@ import {
 	resolveSharedInstanceGraphPath,
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
-import { resolveBoundaryRunners } from './public-render/boundary-runner.ts';
+import { asyncKeyInputs, asyncReach } from './paired-async-values.ts';
+import { handlerCatchBoundaryIds, resolveBoundaryRunners } from './public-render/boundary-runner.ts';
 import { forwardedSpreadAttributeUpdates } from './spread-forwarding.ts';
 
 export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPlan {
@@ -76,11 +77,27 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
+	const entryMarksOf = entryMarksResolver(input.semanticGraph.graphBindings);
 
 	// `onClick={[a, b]}` is several records on one host and event name. Their
 	// authored order is the order they run, and `order` is where the view payload
 	// files each symbol inside that record's single `symbolIds` list.
 	const eventHandlerOrder = new Map<string, number>();
+	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
+	const handlerTargets = handlerCatchBoundaryIds(input.semanticGraph);
+	const catchRunnerFor = (boundaryId: string | undefined) =>
+		(boundaryId ? boundaryRunners.get(boundaryId)?.runnerGraphNodeId : undefined) ?? undefined;
+	// A boundary a handler can fail also re-runs its own gate, after every value it reads.
+	const boundaryResets = (boundaryId: string): ReadonlyArray<ReadonlyArray<string>> => {
+		const resets = resetOrder(
+			(boundaryRunners.get(boundaryId)?.reads ?? []).map((read) => read.graphNodeId),
+			input.semanticGraph.graphBindings,
+		);
+		const runner = catchRunnerFor(boundaryId);
+		return handlerTargets.has(boundaryId) && runner && !resets.some(([id]) => id === runner)
+			? [...resets, [runner, ...resets.map(([id]) => id!)]]
+			: resets;
+	};
 	for (const event of input.payloadArena.view.events) {
 		if (event.handlerSource === undefined) continue;
 
@@ -106,6 +123,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			semanticsReader,
 		);
 
+		const writes = eventWrites(source, input.stateLowering?.writes, [
+			sourceSpan,
+			...inlined.spans,
+			...(event.handlerDefinitionSpans ?? []),
+		]);
+		const shownReads = handlerShownReads(reads, writes, input.semanticGraph);
+		const entryMarks = entryMarksOf(ownTurnWrites(source, writes, semanticsReader));
+		const catchRunnerGraphNodeId = catchRunnerFor(event.handlerCatchBoundaryId);
+
 		symbols.push({
 			id: `symbol:${nextSymbolId++}`,
 			kind: 'event-handler',
@@ -118,13 +144,20 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 			...(crossModuleInline ? { crossModuleInline } : {}),
 			order,
 			reads,
-			writes: eventWrites(source, input.stateLowering?.writes, [
-				sourceSpan,
-				...inlined.spans,
-				...(event.handlerDefinitionSpans ?? []),
-			]),
+			writes,
+			...(shownReads ? { shownReads } : {}),
+			...(entryMarks ? { entryMarks } : {}),
 			elementHandleCalls: collectElementHandleCalls(source, reachableElementHandles),
 			elementHandleReads: handleReadsOf(reads),
+			...(event.handlerCatchResets?.length
+				? {
+						catchResets: event.handlerCatchResets.map((reset) => ({
+							name: reset.name,
+							resets: boundaryResets(reset.boundaryId),
+						})),
+					}
+				: {}),
+			...(catchRunnerGraphNodeId ? { catchRunnerGraphNodeId } : {}),
 		});
 	}
 
@@ -159,6 +192,15 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 						source,
 						semanticsReader,
 					);
+			const callbackWrites = eventWrites(source, input.stateLowering?.writes, [
+				prop.sourceSpan,
+				...inlined.spans,
+				...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
+			]);
+			const callbackEntryMarks = entryMarksOf(ownTurnWrites(source, callbackWrites, semanticsReader));
+			const catchRunnerGraphNodeId = catchRunnerFor(
+				'catchBoundaryId' in prop ? prop.catchBoundaryId : undefined,
+			);
 			symbols.push({
 				id: `symbol:${nextSymbolId++}`,
 				kind: 'callback-prop',
@@ -170,12 +212,18 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				...(moduleImports.length > 0 ? { moduleImports } : {}),
 				...(crossModuleInline ? { crossModuleInline } : {}),
 				reads,
-				writes: eventWrites(source, input.stateLowering?.writes, [
-					prop.sourceSpan,
-					...inlined.spans,
-					...('definitionSpans' in prop ? (prop.definitionSpans ?? []) : []),
-				]),
+				writes: callbackWrites,
+				...(callbackEntryMarks ? { entryMarks: callbackEntryMarks } : {}),
 				elementHandleReads: handleReadsOf(reads),
+				...(prop.catchResets?.length
+					? {
+							catchResets: prop.catchResets.map((reset) => ({
+								name: reset.name,
+								resets: boundaryResets(reset.boundaryId),
+							})),
+						}
+					: {}),
+				...(catchRunnerGraphNodeId ? { catchRunnerGraphNodeId } : {}),
 			});
 		}
 	}
@@ -313,7 +361,6 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	// Boundary settle symbols (gate-blind; protocol-view wires only boundaries
 	// with a plan arms entry).
-	const boundaryRunners = resolveBoundaryRunners(input.semanticGraph);
 	for (const boundary of input.payloadArena.view.asyncBoundaries) {
 		const graphNodeId = boundaryRunners.get(boundary.id)?.runnerGraphNodeId;
 		if (!graphNodeId) continue;
@@ -482,9 +529,9 @@ export function planBoundSymbolResolver(
 					symbol.kind !== 'event-handler' &&
 					symbol.kind !== 'callback-prop' &&
 					captureSlots.every((slot) => slot.route.kind === 'compiler-known-constant') &&
-					// A derive's constant slot is emitted as its value, which only works
-					// when every edge agrees; edges that disagree need a row each.
-					(symbol.kind !== 'sync-computed-derive' ||
+					// A derive's or runner's constant slot is emitted as its value, so edges that disagree need a row each.
+					((symbol.kind !== 'sync-computed-derive' &&
+						symbol.kind !== 'async-computed-runner') ||
 						edgeDependentSlots.every(captureSlotFoldsToConstant))
 				)
 					continue;
@@ -1050,6 +1097,69 @@ function behaviorGraphAccess(
 	};
 }
 
+// The async values a reset may re-run, each followed by the async values it reads, so a rejected input re-runs in their place.
+function resetOrder(
+	reads: ReadonlyArray<string>,
+	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
+): ReadonlyArray<ReadonlyArray<string>> {
+	const { isAsync, asyncInputs } = asyncReach(new Map(bindings.map((binding) => [binding.id, binding])));
+	const order: string[][] = [];
+	const placed = new Set<string>();
+	const place = (graphNodeId: string): void => {
+		if (placed.has(graphNodeId)) return;
+		placed.add(graphNodeId);
+		const inputs = asyncInputs(graphNodeId);
+		for (const input of inputs) place(input);
+		order.push([graphNodeId, ...inputs]);
+	};
+	for (const read of reads) for (const value of isAsync(read) ? [read] : asyncInputs(read)) place(value);
+	return order;
+}
+
+// Async values whose key reads, directly or through sync computeds, a symbol the handler writes.
+function entryMarksResolver(
+	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
+): (writes: ReadonlyArray<LoweredStateWrite>) => ReadonlyArray<string> | undefined {
+	const bindingMap = new Map(bindings.map((binding) => [binding.id, binding]));
+	const keyInputsOf = asyncKeyInputs(bindingMap);
+	const asyncIds = bindings
+		.filter((binding) => binding.kind === 'computed' && binding.async === true)
+		.map((binding) => binding.id);
+	return (writes) => {
+		if (writes.length === 0) return undefined;
+		const written = new Set(writes.map((write) => write.graphNodeId));
+		const marks = asyncIds.filter((asyncId) => {
+			for (const input of keyInputsOf(asyncId)) if (written.has(input)) return true;
+			return false;
+		});
+		return marks.length > 0 ? marks : undefined;
+	};
+}
+
+// Reads a handler pairs with an async-backed value; an input it writes stays live so a second click builds on the first.
+function handlerShownReads(
+	reads: ReadonlyArray<LoweredStateRead>,
+	writes: ReadonlyArray<LoweredStateWrite>,
+	semanticGraph: SymbolResolverInput['semanticGraph'],
+): ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> | undefined {
+	const written = new Set(writes.map((write) => write.graphNodeId));
+	const shown = new Map<string, { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>();
+	for (const read of reads)
+		if (!written.has(read.graphNodeId))
+			shown.set(`${read.graphNodeId} ${read.path.join('.')}`, {
+				graphNodeId: read.graphNodeId,
+				path: read.path,
+			});
+	const asyncBacked = new Set(
+		semanticGraph.graphBindings
+			.filter((binding) => binding.kind === 'computed' && binding.asyncCapable === true)
+			.map((binding) => binding.id),
+	);
+	const reached = [...shown.values()];
+	if (reached.length < 2 || !reached.some((read) => asyncBacked.has(read.graphNodeId))) return undefined;
+	return reached;
+}
+
 function eventWrites(
 	handlerSource: string,
 	writes: ReadonlyArray<LoweredStateWrite> | undefined,
@@ -1066,6 +1176,19 @@ function eventWrites(
 		}
 		return handlerContainsWrite(handlerSource, write);
 	});
+}
+
+// A write only a nested callback makes runs on whichever turn its callee picks, not the handler's own.
+function ownTurnWrites(
+	handlerSource: string,
+	writes: ReadonlyArray<LoweredStateWrite>,
+	semanticsReader: SymbolSourceSemanticsReader,
+): ReadonlyArray<LoweredStateWrite> {
+	const own = semanticsReader.read(handlerSource).ownTurnSource;
+	if (own === undefined || own === handlerSource) return writes;
+	return writes.filter(
+		(write) => !handlerContainsWrite(handlerSource, write) || handlerContainsWrite(own, write),
+	);
 }
 
 function eventReads(

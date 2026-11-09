@@ -1,5 +1,9 @@
 import { expect, test, vi } from 'vitest';
-import { createRuntimeGraph } from '@markless/runtime';
+import { createRuntimeGraph as createGraph } from '@markless/runtime';
+import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
+import { createHeldInputsPlane } from '@markless/runtime/graph-held';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
 import {
 	ASYNC_BOUNDARY_ARM,
 	createProtocolStatePayload,
@@ -18,6 +22,11 @@ import type {
 	ResumeKeyedRepeatRowEvent,
 	ResumeViewRecord,
 } from '../src/index.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -3986,13 +3995,13 @@ test('resume runtime starts unsettled async boundary runners at creation and set
 	// is a local demand: the runner starts during runtime startup.
 	expect(runs).toHaveLength(1);
 	expect(runs[0]).toMatchObject({ key: 'ada' });
-	expect(loadedSymbols).toEqual([]);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
 
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
 	await graph.flush();
 
-	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:boundary-update']);
 	expect(renderedHtml).toEqual(['<p>User ada</p>']);
 	expect(applied).toEqual([
 		{ type: 'removeRange', locator: 'async-boundary:boundary:0' },
@@ -4107,14 +4116,14 @@ test('resume runtime installs settled arm event listeners before exposing range 
 	});
 
 	await resume.start();
-	expect(loadedSymbols).toEqual([]);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();
 	await graph.flush();
 
 	expect(listenerTypesAtRemoval[0]).toEqual(expect.arrayContaining(['pointerdown', 'keydown']));
 	// Installing delegation enumerates record metadata only; handlers stay lazy.
-	expect(loadedSymbols).toEqual(['symbol:boundary-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:boundary-update']);
 });
 
 // One async boundary whose settled arms rebuild through an update symbol.
@@ -4619,7 +4628,7 @@ test('resume runtime disposes pending-range hosts when an async boundary settles
 	await resume.activateBehaviors('h1');
 	graph.write({ graphNodeId: 'state:tick', value: 1 });
 	await graph.flush();
-	expect(loadedSymbols).toEqual(['symbol:spinner', 'symbol:pending-update']);
+	expect(loadedSymbols).toEqual(['symbol:boundary-update', 'symbol:spinner', 'symbol:pending-update']);
 
 	result.resolve({ title: 'User ada' });
 	await drainMicrotasks();

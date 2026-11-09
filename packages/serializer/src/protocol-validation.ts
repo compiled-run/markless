@@ -268,6 +268,7 @@ export function assertProtocolViewPayload(
 		assertCommentAnchor(boundary.startAnchor, `${context}.startAnchor`);
 		assertCommentAnchor(boundary.endAnchor, `${context}.endAnchor`);
 		assertAsyncBoundaryReads(boundary.asyncReads, context);
+		assertOptionalStringArrayRecord(boundary.asyncSources, `${context}.asyncSources`);
 	}
 
 	assertOptionalKeyedRepeats(payload);
@@ -541,6 +542,11 @@ function assertOptionalKeyedRepeats(record: Record<string, unknown>): void {
 			assertNonNegativeIntegerField(repeat, 'rowStartOffset', context);
 		if (repeat.rowEndOffset !== undefined)
 			assertNonNegativeIntegerField(repeat, 'rowEndOffset', context);
+		if (repeat.rowRange !== undefined && repeat.rowRange !== true)
+			throw invalidPayloadShapeError(
+				'markless/view',
+				`Invalid ${context}: expected rowRange true when present.`,
+			);
 		assertRowEvents(repeat.rowEvents, `${context}.rowEvents`);
 		assertOptionalStringField(repeat, 'indexName', context);
 		assertOptionalRowElementHandles(repeat, `${context}.rowElementHandles`);
@@ -558,6 +564,11 @@ function assertOptionalEnclosingRow(record: Record<string, unknown>, context: st
 	assertStringField(enclosingRow, 'repeatId', context);
 	assertElementAddressField(enclosingRow, 'parentHostPath', context);
 	assertOptionalStringArrayField(enclosingRow, 'itemPath', context);
+	if (enclosingRow.arm !== undefined) {
+		assertRecordShape(enclosingRow.arm, `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'slot', `${context}.arm`);
+		assertNonNegativeIntegerField(enclosingRow.arm, 'arm', `${context}.arm`);
+	}
 }
 
 function assertOptionalPropRoutes(record: Record<string, unknown>, context: string): void {
@@ -1577,6 +1588,19 @@ function assertAsyncBoundaryReads(value: unknown, context: string): void {
 		assertStringField(read, 'graphNodeId', readContext);
 		assertStringArrayField(read, 'path', readContext);
 		assertOptionalStringField(read, 'runnerSymbolId', readContext);
+	}
+}
+
+function assertOptionalStringArrayRecord(value: unknown, context: string): void {
+	if (value === undefined) return;
+	assertRecordShape(value, context);
+	for (const [key, entry] of Object.entries(value)) {
+		if (!Array.isArray(entry) || entry.some((item) => typeof item !== 'string')) {
+			throw invalidPayloadShapeError(
+				contextPayloadType(context),
+				`Invalid ${context}.${key}: expected string array.`,
+			);
+		}
 	}
 }
 

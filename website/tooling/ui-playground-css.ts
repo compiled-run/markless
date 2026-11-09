@@ -20,7 +20,7 @@ function sticker(card: string): string {
 				position: relative;
 				display: grid;
 				grid-template-columns: minmax(0, 1fr);
-				margin-block: var(--space-m);
+				margin-block: var(--flow-block);
 				border: 1.5px solid var(--ink);
 				border-radius: 14px;
 				background: var(--paper);

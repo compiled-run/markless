@@ -36,6 +36,7 @@ export function stripExtractedSyncPolicyCalls(
 				symbol.parameters[0] ?? 'event',
 				actions,
 				semanticGraph,
+				event.componentName,
 			);
 			if (residual.elide) {
 				elided.add(symbol);
@@ -91,6 +92,7 @@ function residualHandlerSource(
 	eventParam: string,
 	actions: ReadonlySet<SemanticSyncPolicyAction>,
 	semanticGraph: SemanticGraphArtifact,
+	componentName: string | undefined,
 ): ResidualHandler {
 	const prefix = 'const __marklessHandler = ';
 	const wrappedSource = `${prefix}${source};`;
@@ -121,6 +123,7 @@ function residualHandlerSource(
 		extractedSyncPolicyActionCalls(body, eventParam, actions, {
 			graph: semanticGraph as never,
 			source: wrappedSource,
+			currentComponentName: componentName ?? null,
 		}),
 	);
 	if (extracted.size === 0) return { source, elide: false };

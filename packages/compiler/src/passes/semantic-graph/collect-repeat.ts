@@ -26,7 +26,7 @@ import {
 	repeatKeyUnstableDiagnostic,
 	repeatRowHandlersUnwiredDiagnostic,
 } from './diagnostics.ts';
-import { firstReactiveRowRead } from './repeat-reactivity.ts';
+import { firstReactiveCollectionRead, firstReactiveRowRead } from './repeat-reactivity.ts';
 import {
 	enclosingKeyedRepeat,
 	enclosingRowItemPath,
@@ -129,8 +129,16 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		? null
 		: (resolveGraphPath(
 				collectionSource,
-				graphBindingMap(state.graph, state.currentSharedDefinitionId ?? null),
-				semanticAliasMap(state.graph, state.currentSharedDefinitionId ?? null),
+				graphBindingMap(
+					state.graph,
+					state.currentSharedDefinitionId ?? null,
+					state.currentComponentName ?? undefined,
+				),
+				semanticAliasMap(
+					state.graph,
+					state.currentSharedDefinitionId ?? null,
+					state.currentComponentName ?? undefined,
+				),
 			) ??
 			resolveSharedInstanceGraphPath(
 				collectionSource,
@@ -208,8 +216,11 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 				}),
 			),
 		);
+		// A collection that itself reads movable state changes which rows exist, so it is lifted too.
+		const movesRows =
+			!reactiveRead && !enclosing && firstReactiveCollectionRead(collectionNode, state);
 		const lifted =
-			reactiveRead && !enclosing
+			(reactiveRead || movesRows) && !enclosing
 				? liftStaticCollection(node, collectionNode, itemName, state)
 				: null;
 		if (lifted?.kind === 'lifted') collection = { graphNodeId: lifted.graphNodeId, path: [] };

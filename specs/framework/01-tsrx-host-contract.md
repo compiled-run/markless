@@ -41,9 +41,10 @@ was unavailable):
   setup statements first and then renders exactly one node: an element, a
   fragment, or a control-flow construct. Several nodes go in a fragment
   `<>…</>`, which adds no element to the page. A second node is TSRX2011 and a
-  statement after the node is TSRX2012. Markless reports both as
-  `MARKLESS_PARSE_ERROR`, titled "A code block renders a single node" and "Code
-  must come before the rendered output", with the fix as the suggestion.
+  statement after the node is TSRX2012. Markless reports the first as
+  `MARKLESS_BLOCK_SIBLING_NODES` and the second as `MARKLESS_PARSE_ERROR`
+  titled "Code must come before the rendered output", each with the fix as the
+  suggestion.
 - A plain `} else {` after an `@if` body is a parse error (TSRX1009), which
   Markless reports as `MARKLESS_BRANCH_ELSE_SPELLING`.
 - `@if (a) { … } @else if (b) { … } @else { … }` is one conditional with one arm
@@ -59,7 +60,9 @@ was unavailable):
 - An `@try`'s arms go in the order `@try`, `@pending`, `@catch`. An `@pending`
   written after `@catch` is not part of the `@try`: TSRX ends the `@try` at its
   `@catch` and reads `@pending` as text. Markless reports it as
-  `MARKLESS_ASYNC_ARM_ORDER`.
+  `MARKLESS_ASYNC_ARM_ORDER`. An `@catch` written after an element rather than
+  after an `@try` block is text followed by an ordinary expression; Markless
+  reports it as `MARKLESS_ASYNC_CATCH_WITHOUT_TRY`.
 - Among template children, `//` starts a line comment after whitespace, at the
   start of a line, or right after a tag, container or block, and `/*` starts a
   comment anywhere. `http://example.com` stays text. Comments are not children.
@@ -117,6 +120,19 @@ interactive or stateful unkeyed loops and point at the `@for` header:
 The loop key applies to generated child identity for that iteration. If a child
 component or element supplies its own key, that authored key becomes the child
 identity within the keyed loop item.
+
+A key the browser has not seen before, whether the item was just added or its
+key changed, gets a new child instance. The browser renders it once from its
+compiled template, as a first render of that instance (the same kind of render
+as an arm commit in `12-arm-rendering.md`), never as a re-run of an existing
+one. A child with its own `@try` starts at its `@pending` content and loads on
+its own, so keying a child by a subject (`@for (const topic of [subject]; key
+topic)`) is how a new subject starts from its first load. When a child's async
+`computed()` runs again later, it reads the props the row passed it from that
+instance's own prop values, which the payload carries for every prop an async
+`computed()` reads. A collection expression that reads state, such as
+`[subject]`, is tracked like any other value built from state, so its rows
+follow it.
 
 ### Conditional identity
 

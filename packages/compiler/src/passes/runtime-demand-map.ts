@@ -89,7 +89,13 @@ const ASYNC_BOUNDARY = [
 	'web/resume-async-wiring',
 	'web/resume-resettle-hold',
 	'web/resume-stream-patches',
+	'web/resume-refresh-busy',
+	'web/fns/async-plane',
 ];
+// Per-element busy marks, their announcement and an async value's refresh half: no record demands them, so they load on the first refresh.
+const REFRESH_MARKS = ['web/fns/busy-elements', 'web/fns/refresh-announcer', 'web/fns/async-refresh'];
+// Matched values load only where a reader pairs an async value with an input of its key.
+const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
 // A shared() instance that outlives the page: its binding at wake.
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
@@ -99,6 +105,7 @@ const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...BEHAVIOR,
 	...ASYNC_BOUNDARY,
+	...HELD_INPUTS,
 	...SHARED_INSTANCES,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
@@ -121,6 +128,9 @@ const ROW_SLOT_MINT = ['web/fns/row-slot-mint'];
 const NESTED_REPEATS = ['web/fns/nested-repeats'];
 // The per-row @if flip, folded only into a repeat whose row template carries one.
 const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
+// Rows that are comment ranges, and rows an @if arm renders, each wired only for a repeat that has them.
+const ROW_RANGES = ['web/fns/served-row-ranges'];
+const ARM_ROWS = ['web/resume-repeat-branch-arm'];
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -303,11 +313,15 @@ export function createRuntimeDemandMap(
 			'web/dom-update',
 			'web/dom-journal',
 			...KEYED_REPEAT,
+			...ROW_RANGES,
+			...ARM_ROWS,
 			...BRANCH,
 			...ASYNC_BOUNDARY,
+			...HELD_INPUTS,
 			...BEHAVIOR,
 			...SHARED_INSTANCES,
 			...SHARED_SWAP,
+			...REFRESH_MARKS,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -436,6 +450,7 @@ function capabilityModuleIds(
 	return [
 		...(behavior ? BEHAVIOR : []),
 		...(asyncBoundary ? ASYNC_BOUNDARY : []),
+		...(state.computed.some((computed) => computed.holds) ? HELD_INPUTS : []),
 		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
 	];
 }
@@ -1006,6 +1021,8 @@ function payloadDemandRecords(
 				...(!record.rowComponent && record.rowTemplate?.componentName ? ROW_SLOT_MINT : []),
 				...(record.rowTemplate?.branchSlots ? ROW_BRANCH_MINT : []),
 				...(record.enclosingRow ? NESTED_REPEATS : []),
+				...(record.rowRange ? ROW_RANGES : []),
+				...(record.branchArm ? ARM_ROWS : []),
 				...(replacement.scalarRows || record.fixed ? [] : renderRuntimeModuleIds),
 			]),
 		})),
@@ -1133,6 +1150,7 @@ function actionDemandRecords(
 					),
 					...branchDemand,
 					...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+					...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 				]),
 				...(plan ? { plan } : {}),
 				firstUse: reach,
@@ -1171,6 +1189,7 @@ function actionDemandRecords(
 						...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
 						...eagerBranchDemand,
 						...subscriberRecords.flatMap((record) => record.runtimeModuleIds),
+						...(refreshesAsync(scope, event.symbolIds ?? []) ? REFRESH_MARKS : []),
 					]),
 					...(plan ? { plan } : {}),
 					firstUse: reach,
@@ -1211,6 +1230,8 @@ function armActionDemandRecords(
 				...dispatchCore,
 				...recordModules(records, containerId),
 				...symbolIdsDemand(symbolIds, symbolDemand),
+				// A handler in a @try's arm can reset it or reject into its @catch, which both load the refresh half.
+				...(containerKind === 'async-boundary' || refreshesAsync(scope, symbolIds) ? REFRESH_MARKS : []),
 			]),
 			firstUse: firstUseDemand(scope, symbolIds, [containerId]),
 		});
@@ -1374,6 +1395,30 @@ function planWriteShape(
 		kind: 'assign',
 		...(localPath ? { localPath } : { value: literalPlanValue(write.valueSource) }),
 	};
+}
+
+// A handler whose writes reach an async value starts its refresh, which loads the refresh half: its first use must find it preloaded.
+function refreshesAsync(scope: FirstUseScope, symbolIds: ReadonlyArray<string>): boolean {
+	const reached = new Set(transitiveSymbolIds(symbolIds, scope.captureAnalysis));
+	const written = new Set(
+		scope.resolver.symbols.flatMap((symbol) =>
+			reached.has(symbol.id) &&
+			(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+				? (symbol.writes ?? []).map((write) => write.graphNodeId)
+				: [],
+		),
+	);
+	if (written.size === 0) return false;
+	const computed = new Map(scope.state.computed.map((node) => [node.graphNodeId, node]));
+	const reaches = (graphNodeId: string, seen: Set<string>): boolean => {
+		if (written.has(graphNodeId)) return true;
+		if (seen.has(graphNodeId)) return false;
+		seen.add(graphNodeId);
+		return (computed.get(graphNodeId)?.dependencies ?? []).some((dependency) =>
+			reaches(dependency.graphNodeId, seen),
+		);
+	};
+	return scope.state.computed.some((node) => node.async === true && reaches(node.graphNodeId, new Set()));
 }
 
 function writeSubscriberRecords(

@@ -5,8 +5,7 @@ import {
 } from '../../src/vite/runtime/create-server-entry.ts';
 import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 
-// A document.tsrx may write the <html> element itself instead of <Html>: the
-// served document then has that one root, never a second one around it.
+// A document.tsrx that writes <html> itself is served with that one root, never a second around it.
 
 const shells = {
 	authored:

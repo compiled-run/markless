@@ -30,6 +30,7 @@ export { formatCompilerArtifactDump, runCompilerPassPipeline } from './pass-pipe
 export { defaultCompilerPasses } from './pass-registry.ts';
 
 export { analyzeCaptures } from './passes/capture-analysis.ts';
+export { PROJECTION_LIVE_IN_BRANCH_CODE } from './passes/projection-arms.ts';
 export { computeExecutionAttribution } from './passes/link/attribution.ts';
 export {
 	CLAIM_MANIFEST_PASS_ID,

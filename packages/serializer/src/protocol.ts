@@ -201,6 +201,12 @@ export type ProtocolStatePayload = {
 		// Only subscriptions and other such computeds read it, so resume re-derives it
 		// when it is read rather than on every dependency write.
 		readonly deriveOnRead?: true;
+		// Async only: some reader pairs this value with an input of its key, so the page loads matched values.
+		readonly holds?: true;
+		// Sync only: the nearest async values it derives from, through other sync computeds of its module.
+		readonly asyncFrom?: ReadonlyArray<string>;
+		// Async only: a @try's own gate over the values it shows, so it fails whenever one of them fails.
+		readonly boundaryGate?: true;
 	}>;
 	// A shared node a component seeds from its own props. The node keeps its own
 	// value (a part's write stands until the next prop moves), and these say which
@@ -537,6 +543,8 @@ export type ProtocolViewPayload = {
 			readonly repeatId: string;
 			readonly parentHostPath: ProtocolElementAddress;
 			readonly itemPath?: ReadonlyArray<string>;
+			/** The parent sits in an arm of the enclosing row's `@if`/`@switch`, as on a row event: `parentHostPath` is then arm-relative. */
+			readonly arm?: { readonly slot: number; readonly arm: number };
 		};
 		readonly collectionGraphNodeId?: string;
 		readonly collectionPath: ReadonlyArray<string>;
@@ -575,6 +583,11 @@ export type ProtocolViewPayload = {
 		 * `items.length` element children ending `rowEndOffset` before the last.
 		 */
 		readonly rowEndOffset?: number;
+		/**
+		 * Each row renders between a pair of row comments because its top level is not one element;
+		 * offsets count only elements outside rows, and `hostPath`s start inside the comments.
+		 */
+		readonly rowRange?: true;
 		/**
 		 * The browser can never change these rows: the collection and every value a
 		 * row shows are fixed once the page is served, so the record carries no row
@@ -807,6 +820,10 @@ export type ProtocolViewPayload = {
 		readonly runnerGraphNodeId: string | null;
 		readonly initiallyServedArm: ProtocolAsyncBoundaryArm;
 		readonly updateSymbolId?: string;
+		/** The @try arm holds keyed rows the browser cannot build, so a refresh that lands re-renders the arm. */
+		readonly rerendersOnRefresh?: true;
+		/** A handler inside the @try arm that rejects fails this boundary's own runner, so its @catch shows the error. */
+		readonly catchesHandlers?: true;
 		// A single set is the armized truth for the arm the render actually
 		// served (SSR compose / arm-render modules); an array is the compiler's
 		// per-arm plan (index 0 = @try, 1 = @pending, 2 = @catch), which is not
@@ -826,6 +843,13 @@ export type ProtocolViewPayload = {
 			readonly path: ReadonlyArray<string>;
 			readonly runnerSymbolId?: string;
 		}>;
+		/**
+		 * For each sync computed whose value depends on one of this boundary's async
+		 * reads, the async graph nodes it depends on. A refresh marks busy the elements
+		 * whose bindings read a refreshing async node directly or through one of these.
+		 * Absent when no sync computed sits between a binding and an async read.
+		 */
+		readonly asyncSources?: Readonly<Record<string, ReadonlyArray<string>>>;
 		/** As on a branch: the part instance that authored this boundary and where its live props now live, for the arm its own module re-renders on settle. */
 		readonly composedInstancePath?: string;
 		readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;

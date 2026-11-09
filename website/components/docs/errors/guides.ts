@@ -203,6 +203,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'const item = computed(() => items[picked.id]);',
 		],
 	},
+	MARKLESS_ASYNC_INPUT_BESIDE_VALUE: {
+		summary: 'Text inside a @try shows an input of an async value without the value itself.',
+		what: 'When an input of an async `computed()` changes, the block keeps showing the old result until the new one lands. Text that reads the result waits with it. Text that reads only the input, such as `Sorted by {sort}` beside a list fetched with `sort`, changes at once, so for a moment it describes data that is not on screen yet.',
+		how: 'Return the input from the async `computed()` along with its data and show it from there. Controls that set the input, such as a `<select>` or a `<button>`, are fine as they are.',
+		example: [
+			'const posts = computed(async () => {',
+			'\tconst by = sort;',
+			'\treturn { sort: by, list: await loadPosts(by) };',
+			'});',
+			'<p>Sorted by {posts.sort}</p>',
+		],
+	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
 		summary: 'An event handler reads a local variable that does not exist in the browser.',
 		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a class instance, a DOM node, a function declared with `let`, or another value that is not plain data.',
@@ -270,11 +282,6 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'}',
 		],
 	},
-	MARKLESS_TRY_BLOCK_TOGGLE_RERENDER: {
-		summary: 'Toggling an @if that holds a component re-renders the whole @try block.',
-		what: 'This `@if` sits inside `@try` and holds a component. When it toggles, Markless renders the whole `@try` block again, not only the `@if`.',
-		how: 'Move the component out of the `@if`. Or keep the `@if` content to plain elements, text, and state reads.',
-	},
 	MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: {
 		summary: 'Several components share a shared() definition that has no scope.',
 		what: 'Several components in one file use the same `shared()` value, and it has no scope. So every copy of the widget on the page shares one value.',
@@ -332,6 +339,21 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			"const label = computed(() => (open ? 'Hide' : 'Show'));",
 			'',
 			'<button>{label}</button>',
+		],
+	},
+	MARKLESS_BLOCK_SIBLING_NODES: {
+		summary: 'A block holds two or more nodes side by side.',
+		what: 'A component body renders exactly one node, and so does each `@if`, `@else`, `@for`, `@empty`, `@switch` case, `@try`, `@pending` and `@catch` arm. A node is an element, a fragment, or another `@` block. Here a second node follows the first in the same block.',
+		how: 'Wrap the nodes in a fragment, `<>` … `</>`, which adds no element to the page. One wrapping element, like `<div>`, works too.',
+		example: [
+			'@try {',
+			'\t<>',
+			'\t\t<h2>{report.title}</h2>',
+			'\t\t<p>{report.total}</p>',
+			'\t</>',
+			'} @pending {',
+			'\t<p>Loading…</p>',
+			'}',
 		],
 	},
 	MARKLESS_PARSE_ERROR: {

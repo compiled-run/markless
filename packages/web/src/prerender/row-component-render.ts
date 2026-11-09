@@ -24,11 +24,14 @@ import {
 	marklessWithEnclosingWidgetRoots,
 } from '../fns/instance-scope.ts';
 import { marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
+export { marklessNoteMintedRow } from './evaluator.ts';
 import { marklessRosterSeedPass, sharedSeedPass } from './shared-seed-slot.ts';
 import {
+	childEdgeSurface,
 	evaluatePrerenderDataComponent,
 	marklessBoundGraphValues,
 	readPath,
+	runtimeEdgeProps,
 	type PrerenderDataDefinition,
 	type PrerenderDataSurface,
 	type PrerenderLoadSymbol,
@@ -242,9 +245,7 @@ function renderRowComponentEdge(
 		);
 		if (!projectedEdge)
 			throw new Error(`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`);
-		const partSurface = input.surface.components[projectedEdge.childComponentName]
-			? input.surface
-			: input.surface.imports[projectedEdge.childComponentName];
+		const partSurface = childEdgeSurface(input.surface, projectedEdge);
 		if (!partSurface)
 			throw new Error(
 				`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${projectedEdge.childComponentName}`,
@@ -269,7 +270,7 @@ function renderRowComponentEdge(
 				symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 				boundSymbols: projectedEdge.boundSymbols,
 				composer: { symbolPrefix: ownerSymbolPrefix, read },
-				graphProps: projectedEdge.props,
+				graphProps: runtimeEdgeProps(projectedEdge.props, definition.state.computed),
 				loadSymbol: input.loadSymbol,
 				graph: undefined,
 				requireHtml: true,
@@ -287,7 +288,7 @@ function renderRowComponentEdge(
 					output: partOutput as SsrComposableChildOutput,
 					hostPrefix: rowSegment + projectedEdge.hostPrefix,
 					symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
-					graphProps: projectedEdge.props,
+					graphProps: runtimeEdgeProps(projectedEdge.props, definition.state.computed),
 					asyncBoundaryId: projectedEdge.asyncBoundaryId,
 					boundSymbols: projectedEdge.boundSymbols ?? {},
 					callbackProps: part.callbacks,
@@ -374,9 +375,7 @@ function renderRowComponentEdge(
 		undefined,
 		input.itemPropName,
 	);
-	const childSurface = input.surface.components[edge.childComponentName]
-		? input.surface
-		: input.surface.imports[edge.childComponentName];
+	const childSurface = childEdgeSurface(input.surface, edge);
 	if (!childSurface)
 		throw new Error(`MARKLESS_PRERENDER_DATA_COMPONENT_MISSING: ${edge.childComponentName}`);
 	return marklessThen(
@@ -435,7 +434,7 @@ function renderRowComponentEdge(
 					symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 					boundSymbols: edge.boundSymbols,
 					composer: { symbolPrefix: ownerSymbolPrefix, read },
-					graphProps: edge.props,
+					graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 					loadSymbol: input.loadSymbol,
 					graph: undefined,
 					requireHtml: true,
@@ -468,7 +467,7 @@ function renderRowComponentEdge(
 						// Host ids take the owner's prefix through composition's own
 						// argument; symbol ids have no such channel and take it here.
 						symbolPrefix: ownerSymbolPrefix + symbolPrefix,
-						graphProps: edge.props,
+						graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 						asyncBoundaryId: edge.asyncBoundaryId,
 						boundSymbols: edge.boundSymbols ?? {},
 						callbackProps: callbacks,

@@ -38,7 +38,10 @@ export const corpus: Block[] = mdxFiles(pages)
 const TEXT_NODE = />([^<>{}@;=]*[A-Za-z][^<>{}@;=]*)<\//;
 // Element text that runs into a `{value}`, as in `Count {count}`.
 const TEXT_BEFORE_VALUE = />(\s*[A-Za-z][^<>{}@;=]*?)\s*\{/;
-const STRING_LITERAL = /^(?!\s*import\b).*?('[^'\n]*[A-Za-z][^'\n]*'|"[^"\n]*[A-Za-z][^"\n]*")/m;
+const STRING_LITERAL = /'[^'\n]*'|"[^"\n]*"/g;
+const IMPORT_LINE = /^\s*(?:import\b|\}\s*from\b)/;
+// A lone lowercase word such as 'subtree' or 'button' is usually a keyword the compiler checks, not text.
+const KEYWORD_LITERAL = /^.[a-z][\w-]*.$/;
 // Where an element can go: after element text, before a `{name}` child, or inside a plain tag.
 const ELEMENT_PLACES = [
 	TEXT_NODE,
@@ -53,10 +56,15 @@ export function editText(code: string): string | undefined {
 		const at = text.index + 1 + text[1]!.trimEnd().length;
 		return `${code.slice(0, at)} edited${code.slice(at)}`;
 	}
-	const literal = STRING_LITERAL.exec(code);
-	if (literal) {
-		const at = literal.index + literal[0].length - 1;
-		return `${code.slice(0, at)} edited${code.slice(at)}`;
+	let lineStart = 0;
+	for (const line of code.split('\n')) {
+		if (!IMPORT_LINE.test(line))
+			for (const literal of line.matchAll(STRING_LITERAL))
+				if (/[A-Za-z]/.test(literal[0]) && !KEYWORD_LITERAL.test(literal[0])) {
+					const at = lineStart + literal.index + literal[0].length - 1;
+					return `${code.slice(0, at)} edited${code.slice(at)}`;
+				}
+		lineStart += line.length + 1;
 	}
 	return undefined;
 }

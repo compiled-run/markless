@@ -1,5 +1,22 @@
 import type { PrerenderDataSurface } from './evaluator.ts';
 
+// Lives here, not in evaluator.ts, so a browser row mint never loads the evaluator.
+export function surfaceImportKey(edge: {
+	readonly childComponentName: string;
+	readonly importSource?: string;
+}): string {
+	return edge.importSource ?? edge.childComponentName;
+}
+
+export function childEdgeSurface(
+	surface: PrerenderDataSurface,
+	edge: { readonly childComponentName: string; readonly importSource?: string },
+): PrerenderDataSurface | undefined {
+	return surface.components[edge.childComponentName]
+		? surface
+		: surface.imports[surfaceImportKey(edge)];
+}
+
 export type OwningSurfaceReach = {
 	readonly surface: PrerenderDataSurface;
 	readonly hostPrefix: string;
@@ -33,10 +50,8 @@ export function marklessOwningSurface(
 			seen.add(reach.surface);
 			for (const definition of Object.values(reach.surface.components))
 				for (const edge of definition.edges ?? []) {
-					const imported = reach.surface.components[edge.childComponentName]
-						? undefined
-						: reach.surface.imports[edge.childComponentName];
-					if (imported)
+					const imported = childEdgeSurface(reach.surface, edge);
+					if (imported && imported !== reach.surface)
 						next.push({
 							surface: imported,
 							hostPrefix: reach.hostPrefix + edge.hostPrefix,

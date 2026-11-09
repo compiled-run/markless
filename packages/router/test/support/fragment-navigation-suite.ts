@@ -1199,6 +1199,63 @@ export function fragmentNavigationSuite(name: string, browserType: BrowserType):
 			await page.close();
 		});
 
+		test('a box the router placed or kept is still known as scrolled when the next navigation runs before its scroll event', async () => {
+			const { page, errors } = await open(browser, '/', docOrigin);
+			// Holds back the box's scroll events after the first landing, as a busy frame does before a quick next click or Back.
+			await page.addInitScript(() => {
+				window.addEventListener(
+					'scroll',
+					(event) => {
+						const held = (window as unknown as Record<string, unknown>).__holdBoxScroll;
+						if (held && (event.target as Element).id === 'side') event.stopImmediatePropagation();
+					},
+					true,
+				);
+			});
+			await page.reload();
+			await page.evaluate(
+				() =>
+					new Promise<void>((settled) => {
+						const side = document.querySelector('[data-side]')!;
+						const heard = (event: Event) => {
+							if (event.target !== side) return;
+							window.removeEventListener('scroll', heard, true);
+							settled();
+						};
+						window.addEventListener('scroll', heard, true);
+						side.scrollTop = 900;
+						const seen: number[] = [];
+						(window as unknown as Record<string, unknown>).__landed = seen;
+						document.addEventListener('marklessrouterrendered', () => {
+							(window as unknown as Record<string, unknown>).__holdBoxScroll = true;
+							seen.push(document.querySelector('[data-side]')!.scrollTop);
+						});
+					}),
+			);
+			const rendered = (count: number) =>
+				page.waitForFunction(
+					(expected) =>
+						((window as unknown as Record<string, unknown[]>).__landed ?? []).length ===
+						expected,
+					count,
+				);
+			const follow = async (link: string, name: string, count: number) => {
+				await page.locator(`[data-side-link="${link}"]`).evaluate((anchor) => (anchor as HTMLElement).click());
+				await landedOn(page, name);
+				await rendered(count);
+			};
+			await follow('beta', 'beta', 1);
+			await follow('gamma', 'gamma', 2);
+			await page.goBack();
+			await landedOn(page, 'beta');
+			await rendered(3);
+			expect(
+				await page.evaluate(() => (window as unknown as Record<string, unknown>).__landed),
+			).toEqual([900, 900, 900]);
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+
 		test('at idle, every page link in view fetches its fragment once, none cancelled, never a dead link', async () => {
 			const { page, requests, errors } = await open(browser);
 			const cancelled: string[] = [];

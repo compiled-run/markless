@@ -135,6 +135,10 @@ jobs:
             - name: Typecheck on TypeScript 7.1
               run: pnpm typecheck:ts7
 
+            # The site's component and page tests (about 6 s); its tooling tests ride the website-boxes lane.
+            - name: Run the website tests
+              run: pnpm --dir website exec vp test run --project website
+
     # Content-hash gate in front of every lane. Each lane's inputs are hashed
     # into a cache key and probed read-only; a lane whose key already has a
     # green marker saved against it is skipped instead of re-run. `.github/**`

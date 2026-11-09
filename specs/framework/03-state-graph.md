@@ -250,6 +250,36 @@ const item = computed(() => items[picked.id]);
   by the key phase are demanded in parallel; they are not serialized by source
   or document order. If any required dependency rejects, the dependent rejects
   without running its function.
+- Values shown together never mix old and new data (2026-11-04,
+  async-error-states). While an async value refreshes, anything that reads it
+  together with an input of its key reads that input as it was when the shown
+  value was fetched: a sync computed, a composite template expression, a list
+  row, a child prop expression, an event handler, and the key of an async
+  value that reads it. The key closes through async inputs, so a value read
+  by a key also carries the inputs that value was fetched with. When the new
+  value lands, every such reader moves to the new inputs in the same commit,
+  even if the new value equals the old one. Inputs outside the key stay live,
+  and a value that reads no async value is never held, so a write shows at
+  once wherever only that state is read. The pairs come from the static
+  dependency records (each reader's dependencies and each async value's key
+  reads); the runtime only remembers, per async value, the inputs its shown
+  value was fetched with (`valueInputs`) and the key that produced it.
+  - A value whose async inputs were fetched for different versions of one
+    input (one landed, the other is still on its way) keeps its last result
+    until they agree. So does a value that reads a held input through a sync
+    computed with no async input of its own, or that reads a whole object
+    whose field is held: neither can be recomputed with the held version.
+  - An async value whose own key moved while an async input refreshes (an
+    input that the refreshing value's key does not read) runs at once on the
+    held inputs, publishes its answer while still pending, and runs again for
+    the new inputs when its async input lands. If its key did not move, it
+    waits as before.
+  - An event handler reads the inputs it pairs with an async-backed value the
+    same way, except an input the handler writes: that stays live, so two
+    clicks count as two.
+  - Mixing on purpose: read an input the fetch does not read. A search box
+    that writes both `query` and `searched`, with the fetch reading
+    `searched`, can compare `results.q !== query` to dim stale results.
 - A sync context — a template read, sync computed, or dependency record — reads
   an async computed as the boundary-guarded snapshot value. A bare read is that
   value, never status or snapshot metadata. Sync computeds may depend on async

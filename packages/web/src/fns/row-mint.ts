@@ -3,7 +3,12 @@ import type { ProtocolRowTemplateSlotValue } from '@markless/serializer';
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessAttributeValue, marklessWriteAttribute } from '../dom-attribute.ts';
 import { pageNodes } from '../resume-anchor-census.ts';
-import type { ResumeDomElement, ResumeDomNode, ResumeKeyedRepeatRecord } from '../resume-types.ts';
+import type {
+	ResumeDomElement,
+	ResumeDomNode,
+	ResumeKeyedRepeatRecord,
+	ResumeRowRoot,
+} from '../resume-types.ts';
 
 /**
  * The nodes a resumed client BUILDS for a keyed repeat, and nothing else.
@@ -110,9 +115,18 @@ export function mintRow(
 	item: unknown,
 	graph?: RowMintGraph,
 	values?: ReadonlyArray<unknown>,
-): ResumeDomElement {
-	return mintRowNodes(parent, repeat, item, graph, values).rowRoot;
+	// From `fns/served-row-ranges`, which a page loads only when a list's rows are not one element each.
+	wrapRange?: RowRangeWrap,
+): ResumeRowRoot {
+	if (!repeat.rowRange) return mintRowNodes(parent, repeat, item, graph, values).rowRoot;
+	// A row that is not one element is placed between its own row comments; text alone is a row too.
+	return wrapRange!(parent, buildRowNodes(parent, repeat, item, graph, values))[0] as ResumeRowRoot;
 }
+
+export type RowRangeWrap = (
+	parent: ResumeDomElement,
+	nodes: ReadonlyArray<ResumeDomNode>,
+) => ResumeDomNode[];
 
 /**
  * The same mint, answering with the whole fragment as well as the row root.
@@ -129,6 +143,27 @@ export function mintRowNodes(
 	// Text slots first, then attribute slots, as the repeat runtime reads them.
 	values?: ReadonlyArray<unknown>,
 ): { readonly rowRoot: ResumeDomElement; readonly nodes: ReadonlyArray<ResumeDomNode> } {
+	const built = buildRowNodes(parent, repeat, item, graph, values);
+	const rowRoot = built.find((node) => node.nodeType === 1) as ResumeDomElement | undefined;
+	if (!rowRoot) throw emptyRowError(repeat);
+	return { rowRoot, nodes: built };
+}
+
+function emptyRowError(repeat: ResumeKeyedRepeatRecord): Error {
+	return repeatRuntimeError(
+		repeat,
+		'MARKLESS_REPEAT_ROW_MINT_EMPTY',
+		'built no row from its markup, and half a row is worse than none.',
+	);
+}
+
+function buildRowNodes(
+	parent: ResumeDomElement,
+	repeat: ResumeKeyedRepeatRecord,
+	item: unknown,
+	graph?: RowMintGraph,
+	values?: ReadonlyArray<unknown>,
+): ReadonlyArray<ResumeDomNode> {
 	const rowTemplate = repeat.rowTemplate!,
 		host = parent.ownerDocument as MintingDocument | undefined,
 		template = host?.createElement?.('template');
@@ -147,17 +182,11 @@ export function mintRowNodes(
 		hosts = attributeSlots.map(
 			(slot) => nodeAtPath(nodes, slot.path) as AttributableNode | undefined,
 		);
-	const empty = () =>
-		repeatRuntimeError(
-			repeat,
-			'MARKLESS_REPEAT_ROW_MINT_EMPTY',
-			'built no row from its markup, and half a row is worse than none.',
-		);
 	if (
 		anchors.some((anchor) => !anchor?.replaceWith) ||
 		hosts.some((element) => !element?.setAttribute)
 	)
-		throw empty();
+		throw emptyRowError(repeat);
 	const valueAt = (at: number, slot: ProtocolRowTemplateSlotValue) =>
 		values ? values[at] : slotValue(slot, item, graph);
 	for (const [at, slot] of attributeSlots.entries())
@@ -167,15 +196,18 @@ export function mintRowNodes(
 			valueAt(slots.length + at, slot),
 			hosts[at]!.getAttribute?.(slot.name),
 		);
-	for (const [at, slot] of slots.entries())
-		anchors[at]!.replaceWith!(host.createTextNode(String(valueAt(at, slot) ?? '')));
+	// A ranged row's own text can stand at its top level, so the list names the text that replaced its marker.
+	const filled = new Map<ResumeDomNode, ResumeDomNode>();
+	for (const [at, slot] of slots.entries()) {
+		const text = host.createTextNode(String(valueAt(at, slot) ?? ''));
+		anchors[at]!.replaceWith!(text);
+		filled.set(anchors[at]!, text);
+	}
+	const built = nodes.map((node) => filled.get(node) ?? node);
 	// A filled text slot is one node for one marker, so a branch marker's path still holds.
-	const built = rowTemplate.branchSlots
-		? rowBranches!.mint(parent, repeat, nodes, item, graph, values)
-		: nodes;
-	const rowRoot = built.find((node) => node.nodeType === 1) as ResumeDomElement | undefined;
-	if (!rowRoot) throw empty();
-	return { rowRoot, nodes: built };
+	return rowTemplate.branchSlots
+		? rowBranches!.mint(parent, repeat, built, item, graph, values)
+		: built;
 }
 
 /** What an `@if` in a row adds to the mint, installed by `fns/row-branch-mint` on a page whose rows hold one. */
@@ -339,6 +371,19 @@ function focusAt(row: ResumeDomElement, path: ReadonlyArray<number>): boolean {
 }
 
 // A slot value when the repeat runtime handed none; a write to what it reads rebuilds the row.
+// While the collection refreshes, its rows read the inputs it was fetched with as the rows on screen show them; false holds them.
+export function shownRowGraph(
+	graph: RuntimeGraph,
+	repeat: ResumeKeyedRepeatRecord,
+	reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path?: ReadonlyArray<string> }>,
+): RuntimeGraph | false {
+	const read = graph.asyncPlane?.()?.shownRead([
+		{ graphNodeId: repeat.collectionGraphNodeId!, path: repeat.collectionPath },
+		...reads,
+	]);
+	return read === false ? false : read ? { ...graph, read } : graph;
+}
+
 export function slotValue(
 	slot: ProtocolRowTemplateSlotValue,
 	item: unknown,

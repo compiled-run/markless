@@ -153,7 +153,7 @@ export async function paintValues(input: {
 		sharedDefinitions: state.sharedDefinitions,
 	});
 	const releases: Array<() => void> = [];
-	wireSyncComputedDemandRecordsWithoutLoadingCapability({
+	void wireSyncComputedDemandRecordsWithoutLoadingCapability({
 		graph,
 		computed: sync,
 		allComputed: state.computed,

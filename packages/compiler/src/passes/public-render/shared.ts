@@ -99,7 +99,12 @@ function collectModuleScopeDeclarations(
 		// A shared() definition is graph data, not module code: its factory ships
 		// as payload nodes, so the authored call never reaches emitted source.
 		if (isSharedDefinitionDeclaration(declaration, sharedImports)) return [];
-		const sourceText = lowerModuleStorageDeclaration(declaration, source, storageImports);
+		const lowered = lowerModuleStorageDeclaration(declaration, source, storageImports);
+		// A carry splices declarations ahead of `(expression)`, which a semicolon-less one would call.
+		const sourceText =
+			declaration.type === 'VariableDeclaration' && lowered && !lowered.trimEnd().endsWith(';')
+				? `${lowered};`
+				: lowered;
 		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
 	});
 }
@@ -419,6 +424,18 @@ export type ComponentReference = {
 	readonly localName: string;
 };
 
+// A component name can repeat across modules, so an import is keyed by name and source.
+export function componentReferenceKey(componentName: string, importSource?: string): string {
+	return `${importSource ?? ''}\0${componentName}`;
+}
+
+export function edgeReferenceKey(edge: {
+	readonly childComponentName: string;
+	readonly importSource?: string;
+}): string {
+	return componentReferenceKey(edge.childComponentName, edge.importSource);
+}
+
 export function componentReferences(
 	componentEdges: PublicRenderModuleInput['semanticGraph']['componentEdges'],
 	localPrefix: string,
@@ -426,7 +443,12 @@ export function componentReferences(
 	const references: ComponentReference[] = [];
 
 	for (const edge of componentEdges) {
-		if (references.some((item) => item.componentName === edge.childComponentName)) continue;
+		if (
+			references.some(
+				(item) => componentReferenceKey(item.componentName, item.importSource) === edgeReferenceKey(edge),
+			)
+		)
+			continue;
 		references.push({
 			componentName: edge.childComponentName,
 			...(edge.importSource ? { importSource: edge.importSource } : {}),

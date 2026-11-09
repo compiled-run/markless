@@ -38,6 +38,12 @@ export type CompilerDiagnostic = {
 	readonly suppressionReason?: string;
 	/** True only while every caller passes these props values that never change; a build checks each caller. */
 	readonly decidedByProps?: { readonly componentName: string; readonly props: ReadonlyArray<string> };
+	/** A component renders `{children}` in an arm that redraws; a build refuses each caller that passes live children. `props: null` means the arm changes on its own. */
+	readonly projectionArm?: {
+		readonly componentName: string;
+		readonly construct: string;
+		readonly props: ReadonlyArray<string> | null;
+	};
 };
 
 type AllowInput<T extends CompilerDiagnostic = CompilerDiagnostic> = {
@@ -103,7 +109,7 @@ export function applyMarklessAllowDirectives<T extends CompilerDiagnostic>(
 		}
 		used.add(directive.index);
 		output.push(
-			directive.reason && diagnostic.severity === 'warning'
+			directive.reason && diagnostic.severity !== 'error'
 				? { ...diagnostic, suppressed: true as const, suppressionReason: directive.reason }
 				: diagnostic,
 		);
