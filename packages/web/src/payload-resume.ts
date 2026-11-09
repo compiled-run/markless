@@ -47,6 +47,7 @@ function containWakeBoot(
 async function adoptStreamedPatchesIfPresent(
 	decoded: ReturnType<typeof decodePayloadScripts>,
 	root: ResumePayloadScriptsInput['root'],
+	life: unknown,
 ): Promise<ReturnType<typeof decodePayloadScripts>> {
 	const documentHost = (
 		root as {
@@ -62,7 +63,7 @@ async function adoptStreamedPatchesIfPresent(
 		return decoded;
 	}
 	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
-	return adoptStreamedArmPatches(decoded, root);
+	return adoptStreamedArmPatches(decoded, root, life);
 }
 
 export async function resumeFromPayloadScriptsImpl(
@@ -127,9 +128,9 @@ async function startPayloadResume(
 ): Promise<ResumePayloadScriptsResult> {
 	// Streamed settles left records + snapshot patches in the document; adopt
 	// them before graph construction so the settled DOM resumes interactive.
-	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root);
+	const decoded = await adoptStreamedPatchesIfPresent(decode(input), input.root, life);
 	const result = await startDecodedResume(input, decoded, life);
-	registerLiveDispatch(input, result.runtime);
+	if (pageLifetime(input.root) === life) registerLiveDispatch(input, result.runtime);
 	return result;
 }
 
@@ -248,16 +249,17 @@ async function startDecodedResume(
 		renderData: input.renderData,
 	});
 	const retiring = runtime;
-	(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
-		deleteResumedPayload(input.root);
-		retiring.dispose();
-	};
-	if (!swapped)
+	if (!swapped) {
+		(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
+			deleteResumedPayload(input.root);
+			retiring.dispose();
+		};
 		try {
 			await runtime.start();
 		} catch (error) {
 			if (!stale()) throw error;
 		}
+	}
 	if (stale()) {
 		runtime.dispose();
 		return { decoded, graph, runtime };

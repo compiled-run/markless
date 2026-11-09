@@ -11,6 +11,7 @@ import {
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
 import { resumeFromPrerenderRecordsImpl } from '../payload-resume.ts';
+import { wakeNoopResume } from '../payload-resume-registry.ts';
 import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
 import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
@@ -106,7 +107,7 @@ export function mergePrerenderPayloadRecords(
 // byte-identical for gated (channel-off) production builds.
 async function adoptStreamedForWake<
 	T extends DecodedPayloadScripts & { readonly root: ResumePayloadScriptsInput['root'] },
->(input: T): Promise<T> {
+>(input: T, life: unknown): Promise<T> {
 	const documentHost = (
 		input.root as {
 			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
@@ -121,17 +122,27 @@ async function adoptStreamedForWake<
 		return input;
 	}
 	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
-	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
+	return { ...input, ...(await adoptStreamedArmPatches(input, input.root, life)) };
 }
+
+const pageLifetime = (root: object): unknown => (root as { readonly __mL?: object }).__mL;
 
 export async function resumeFromPrerenderRecords(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & DecodedPayloadScripts,
 ) {
-	const adopted = await adoptStreamedForWake({
-		...input,
-		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
-	});
-	return resumeFromPrerenderRecordsImpl(
-		await adoptFilledArms(adopted, adopted.root as never, adopted.renderAsyncBoundary as never),
+	const life = pageLifetime(input.root);
+	const adopted = await adoptStreamedForWake(
+		{
+			...input,
+			renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
+		},
+		life,
 	);
+	const filled = await adoptFilledArms(
+		adopted,
+		adopted.root as never,
+		adopted.renderAsyncBoundary as never,
+	);
+	if (pageLifetime(input.root) !== life) return wakeNoopResume;
+	return resumeFromPrerenderRecordsImpl(filled);
 }

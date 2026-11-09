@@ -21,6 +21,7 @@ import type { ResumeDomOwnerDocument } from './resume-types.ts';
 
 type StreamPatchDocumentRoot = {
 	readonly ownerDocument?: ResumeDomOwnerDocument;
+	readonly __mL?: object;
 	__mAdopted?: boolean;
 };
 
@@ -29,7 +30,10 @@ type StreamedStateDelta = Pick<ProtocolStatePayload, 'cells' | 'computed'>;
 export function adoptStreamedArmPatches(
 	decoded: DecodedPayloadScripts,
 	root: StreamPatchDocumentRoot,
+	// The page lifetime the caller saw before its awaited import; a newer page is not this wake's to adopt.
+	life: unknown = root.__mL,
 ): DecodedPayloadScripts {
+	if (root.__mL !== life) return decoded;
 	// From here the stream executor leaves every later commit to the runtime.
 	root.__mAdopted = true;
 	const query = root.ownerDocument?.querySelectorAll?.bind(root.ownerDocument);
