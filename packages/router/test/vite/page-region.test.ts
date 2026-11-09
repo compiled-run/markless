@@ -2,13 +2,11 @@ import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // The page's markup lands where its author put it: a document whose body holds only {children}
 // serves the page as body's own children, so the site's `body > footer` CSS keeps matching on
@@ -95,14 +93,10 @@ async function serve(
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
 		...(prerender && { nitro: { routeRules: { '/': { prerender: true } } } }),
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 	let server: BuiltServer;
 	try {
 		server = await startBuiltServer(join(root, '.output/server/index.mjs'), {

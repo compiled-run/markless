@@ -3,11 +3,9 @@ import { isBuiltin } from 'node:module';
 import { tmpdir } from 'node:os';
 import { brotliCompressSync, constants } from 'node:zlib';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A Vercel function ships without node_modules, so the server bundle may import only
 // its own files and Node built-ins, even for an app with api/ and middleware/ files.
@@ -19,18 +17,14 @@ let output = '';
 
 beforeAll(async () => {
 	output = await mkdtemp(join(tmpdir(), 'markless-vercel-output-'));
-	const builder = await createBuilder({
+	await buildFixture({
 		root: fixture,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 		nitro: {
 			preset: 'vercel',
 			buildDir: join(fixture, 'node_modules/.nitro-vercel-output-test'),
 			output: { dir: output },
 		},
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 });
 
 afterAll(async () => {

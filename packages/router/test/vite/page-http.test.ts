@@ -1,15 +1,13 @@
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import {
 	FRAGMENT_REGION_END,
 	fragmentRequestUrl,
 } from '../../src/vite/fragment-navigation.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A built router app whose pages read the server-only `http` prop.
 
@@ -36,13 +34,9 @@ async function fixtureCopy(): Promise<string> {
 }
 
 async function build(root: string): Promise<void> {
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 }
 
 beforeAll(async () => {

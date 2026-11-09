@@ -4,12 +4,10 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A streamed @try arm the woken runtime adopts before the stream commits it, on a production build in Chromium.
 
@@ -28,13 +26,9 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
