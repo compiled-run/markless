@@ -9,7 +9,7 @@ import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
-// A page-scoped shared value seeded from request data, rendered by overlapping requests on one built server.
+// An app-scoped shared value seeded from request data, rendered by overlapping requests on one built server.
 
 vi.setConfig({ testTimeout: 60_000, hookTimeout: 120_000 });
 
@@ -74,7 +74,7 @@ function expectOnlyOwn(name: string, html: string) {
 	for (const other of names) if (other !== name) expect(html).not.toContain(other);
 }
 
-test('overlapping renders each see only their own page-scoped shared value', async () => {
+test('overlapping renders each see only their own app-scoped shared value', async () => {
 	const pages = await renderBatch();
 	for (const [name, html] of pages) expectOnlyOwn(name, html);
 });

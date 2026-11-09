@@ -753,6 +753,50 @@ export function sharedSeedMarkerLine(
 		: null;
 }
 
+/** The render-context field carrying the request's seeded values of shared instances that are not subtree-scoped. */
+export const MARKLESS_SHARED_INSTANCE_VALUES_KEY = 'marklessSharedInstanceValues';
+
+/** The non-subtree shared state nodes a component's body resolves an instance of. */
+function sharedInstanceStateNodeIds(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyArray<string> {
+	const definitionIds = new Set(
+		(input.semanticGraph.sharedInstances ?? []).flatMap((instance) =>
+			instance.componentName === componentName ? [instance.definitionId] : [],
+		),
+	);
+	const nonSubtree = new Set(
+		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
+			definitionIds.has(definition.id) && definition.scope !== 'subtree' ? [definition.id] : [],
+		),
+	);
+	return [
+		...new Set(
+			input.semanticGraph.graphBindings.flatMap((binding) =>
+				binding.kind === 'state' &&
+				binding.sharedDefinitionId !== undefined &&
+				nonSubtree.has(binding.sharedDefinitionId)
+					? [binding.id]
+					: [],
+			),
+		),
+	];
+}
+
+/** A component reading a non-subtree shared instance renders from the values an enclosing body seeded this request. */
+export function sharedInstanceValuesConsumeLine(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	valuesName: string,
+	payloadName: string,
+): string | null {
+	const nodeIds = sharedInstanceStateNodeIds(input, componentName);
+	if (nodeIds.length === 0) return null;
+	const seeded = `marklessSsrRenderContext?.${MARKLESS_SHARED_INSTANCE_VALUES_KEY}`;
+	return `	for (const marklessSeedId of ${JSON.stringify(nodeIds)}) if (${seeded}?.has(marklessSeedId)) marklessStateValue(${valuesName}, ${payloadName}, marklessSeedId, ${seeded}.get(marklessSeedId));`;
+}
+
 /** A component that reads a subtree-scoped shared instance renders from the seeds its widget root wrote. */
 export function sharedSeedConsumeLine(
 	input: PublicRenderModuleInput,

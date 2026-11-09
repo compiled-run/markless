@@ -5,5 +5,5 @@ export const viewer = shared(
 		const v = state({ name: 'nobody' });
 		return { ...v };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
