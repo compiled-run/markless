@@ -24,15 +24,25 @@ export {
 export type { RuntimeResumeDiagnostic, RuntimeResumeErrorCode } from './inline/resume-errors.ts';
 export type * from './resume-types.ts';
 
+const LOADING = 1,
+	LIVE = 2,
+	DISPOSED = 3;
+/** The facade's one lifecycle, unset until the runtime module is first asked for; `p` is the phase, `r` its runtime or the load of it. A dispose in any phase is final. */
+type FacadeState =
+	| { readonly p: typeof LOADING; readonly r: Promise<ResumeRuntime | undefined> }
+	| { readonly p: typeof LIVE; readonly r: ResumeRuntime }
+	| { readonly p: typeof DISPOSED; readonly r?: undefined };
+
 export function createResumeRuntime(
-	runtimeInput: ResumeRuntimeInput,
+	input: ResumeRuntimeInput,
 	onRegisterComputedRefreshes?: (
 		register: (records: ProtocolStatePayload['computed']) => Promise<void>,
 	) => void,
 ): ResumeRuntime {
-	const boundaries = runtimeInput.view.asyncBoundaries;
-	const asyncBoundariesById = materializeAsyncBoundaryLocators(runtimeInput.root, boundaries);
-	const input = runtimeInput;
+	const asyncBoundariesById = materializeAsyncBoundaryLocators(
+		input.root,
+		input.view.asyncBoundaries,
+	);
 	const elementsByHostId = input.liveHostNodes
 		? new Map(input.liveHostNodes)
 		: materializeDomLocators(input.root, input.view.locators);
@@ -43,58 +53,67 @@ export function createResumeRuntime(
 		input.view.keyedRepeats,
 	);
 	const prepared = { elementsByHostId, elementHandles, asyncBoundariesById };
-	let runtime: ResumeRuntime | undefined;
-	let starting: Promise<ResumeRuntime> | undefined;
+	let state: FacadeState | undefined;
+	const live = () => (state?.p === LIVE ? state.r : undefined);
 
-	async function loadRuntime(): Promise<ResumeRuntime> {
-		if (runtime) return runtime;
-		if (!starting) {
-			starting = import('./resume-runtime.ts').then((module) => {
-				runtime = module.createResumeRuntime(input, prepared, onRegisterComputedRefreshes);
-				return runtime;
-			});
-		}
-		return starting;
+	function loadRuntime() {
+		state ??= {
+			p: LOADING,
+			r: import('./resume-runtime.ts').then((module) =>
+				state?.p === LOADING
+					? (state = {
+							p: LIVE,
+							r: module.createResumeRuntime(
+								input,
+								prepared,
+								onRegisterComputedRefreshes,
+							),
+						}).r
+					: undefined,
+			),
+		};
+		return state.r;
 	}
 
 	const facade: ResumeRuntime = {
 		async start() {
-			await (await loadRuntime()).start();
+			await (await loadRuntime())?.start();
 		},
 		async dispatch(event: ResumeDomEvent, options?: ResumeDispatchOptions) {
 			if (!event) return;
-			await (await loadRuntime()).dispatch(event, options);
+			await (await loadRuntime())?.dispatch(event, options);
 		},
 		async activateBehaviors(hostNodeId: string) {
-			await (await loadRuntime()).activateBehaviors(hostNodeId);
+			await (await loadRuntime())?.activateBehaviors(hostNodeId);
 		},
 		getElement(hostNodeId: string) {
 			return (
-				runtime?.getElement(hostNodeId) ??
+				live()?.getElement(hostNodeId) ??
 				connectedElement(input.root, elementsByHostId.get(hostNodeId))
 			);
 		},
 		getAsyncBoundary(boundaryId: string) {
-			return runtime?.getAsyncBoundary(boundaryId) ?? asyncBoundariesById.get(boundaryId);
+			return live()?.getAsyncBoundary(boundaryId) ?? asyncBoundariesById.get(boundaryId);
 		},
 		getBranch(branchId: string) {
-			return runtime?.getBranch(branchId);
+			return live()?.getBranch(branchId);
 		},
 		disposeHost(hostNodeId: string) {
-			runtime?.disposeHost(hostNodeId);
+			live()?.disposeHost(hostNodeId);
 			elementsByHostId.delete(hostNodeId);
 			elementHandles.deleteHost(hostNodeId);
 		},
 		hostElements: elementsByHostId,
-		armBranches: () => runtime?.armBranches?.(),
+		armBranches: () => live()?.armBranches?.(),
 		dispose() {
-			runtime?.dispose();
+			live()?.dispose();
+			state = { p: DISPOSED };
 			elementsByHostId.clear();
 		},
 		whenAsyncBoundariesSettled: async () =>
-			(await loadRuntime()).whenAsyncBoundariesSettled?.(),
+			(await loadRuntime())?.whenAsyncBoundariesSettled?.(),
 		holdPendingSettleCommits: async (ms: number) =>
-			(await loadRuntime()).holdPendingSettleCommits?.(ms),
+			(await loadRuntime())?.holdPendingSettleCommits?.(ms),
 	};
 	return facade;
 }
