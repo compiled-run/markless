@@ -3,6 +3,7 @@ import SiteNavbar from '../../components/docs/navbar/site-navbar.tsrx';
 import Sidebar from '../../components/docs/sidebar.tsrx';
 import Subtitle from '../../components/docs/subtitle.tsrx';
 import InkCards from '../../components/docs/ink-cards.tsrx';
+import Collapsible from '../../components/docs/collapsible.tsrx';
 import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';
 
 <SiteNavbar />
@@ -10,7 +11,7 @@ import PlayerAnatomy from '../../components/figures/player/player-anatomy.tsrx';
 
 # Shared state
 
-<PageMeta time="3 min" assumes="state, components" />
+<PageMeta time="5 min" assumes="state, components" />
 
 <Subtitle text="shared() is state with a name: every component that calls the name gets the same copy." terms="shared state" />
 
@@ -79,19 +80,210 @@ export default function NowPlaying() @{
 ```
 </Code>
 
-## The scope picks who shares a copy
+## One signed-in user for the whole app
 
-The second argument is the *scope*: who shares one copy.
+A real app shows the same data in places far apart. Here the header shows who is signed in, and a settings form elsewhere edits the name. Neither passes the user to the other: both call **`viewer()`**, so there is one user.
 
-<InkCards label="The three scopes" cards={[
-	{ icon: 'book', name: "'app'", line: 'The whole app shares one copy: a fresh one for each request on the server, and one per browser tab. This is the default.' },
-	{ icon: 'parcel', name: "'container'", line: 'One copy per Markless app on the page, not shared with the others.' },
-	{ icon: 'puzzle', name: "'subtree'", line: 'One copy per rendered subtree, like each player or each menu.' },
+<Code steps={[{ label: "Type Grace in the form. The header changes as you type.", shows: 'Signed in as Grace' }, { label: "Change `'Ada'` to `'Linus'`. Both places start with the new name.", source: "name: 'Linus'" }]}>
+```tsrx title="account.tsrx"
+import { shared, state } from '@markless/core';
+
+export const viewer = shared(
+	() => {
+		const box = state({ name: 'Ada' });
+		return {
+			...box,
+			rename(name: string) {
+				box.name = name;
+			},
+		};
+	},
+	{ scope: 'app' },
+);
+
+function Header() @{
+	const v = viewer();
+
+	<header>Signed in as {v.name}</header>
+}
+
+function Settings() @{
+	const v = viewer();
+
+	<label>
+		Name
+		<input
+			value={v.name}
+			onInput={(event) =>
+				v.rename(event.currentTarget.value)
+			}
+		/>
+	</label>
+}
+
+export default function Account() @{
+	<section>
+		<Header />
+		<Settings />
+	</section>
+}
+```
+</Code>
+
+## Who shares one copy
+
+The second argument, the *scope*, says who shares one copy. You never write down where the sharing starts: the compiler finds it when it builds your app.
+
+<InkCards label="Who shares one copy" cards={[
+	{ icon: 'book', name: "{ scope: 'app' }", line: 'One copy per user: on the server, the request rendering the page; in the browser, until a reload. This is the default.' },
+	{ icon: 'puzzle', name: "{ scope: 'subtree' }", line: 'One copy for the component that calls it first and everything inside it, so each tab group gets its own.' },
 ]} />
 
-The scope is one of these three words, and the player above shows what happens with any other. Leave the option out and you get `'app'`.
+Any other word stops the build, as the last step of the player example shows.
 
-A *subtree* is the first component that calls the definition, plus everything it renders inside itself. The volume knobs above are `'subtree'`, and so are the [UI components](/ui), so two menus open and close on their own.
+## One copy per tab group
+
+A tab group is several components that work as one: a root, a list, triggers and panels. Each tab group needs its own copy, shared by its parts. A *subtree* is a component plus everything rendered inside it, and with one copy per subtree:
+
+- the outermost component that calls the definition gets a new copy
+- everything rendered inside it shares that copy
+- place the tab group twice, and you get two copies
+
+Below, `Tabs`, `Tab` and `Panel` all call **`tabs()`**. `Tabs` is the outermost, so each recipe card keeps its own open tab.
+
+<Code entry="recipes.tsrx" steps={[{ label: 'Press Cook on Pancakes. Soup stays on Prep.', shows: 'Fry.' }, { label: 'Add a third `<Tabs open="Cook">` card. It starts with its own copy.', source: 'open="Cook"' }]}>
+```tsrx title="tabs.tsrx"
+import type { Children } from '@markless/core';
+import {
+	computed,
+	shared,
+	state,
+} from '@markless/core';
+
+export const tabs = shared(
+	() => {
+		const box = state({ open: '' });
+		return {
+			...box,
+			show(name: string) {
+				box.open = name;
+			},
+		};
+	},
+	{ scope: 'subtree' },
+);
+
+type Props = {
+	name: string;
+	children?: Children;
+};
+
+export function Tabs({
+	open,
+	children,
+}: {
+	open: string;
+	children?: Children;
+}) @{
+	const t = tabs();
+	t.open = open;
+
+	<div>{children}</div>
+}
+
+export function TabList({
+	children,
+}: {
+	children?: Children;
+}) @{
+	<div role="tablist">{children}</div>
+}
+
+export function Tab({ name }: Props) @{
+	const t = tabs();
+	const on = computed(() => t.open === name);
+
+	<button
+		role="tab"
+		aria-selected={on ? 'true' : 'false'}
+		onClick={() => t.show(name)}
+	>
+		<style>
+			[aria-selected='true'] {
+				font-weight: bold;
+			}
+		</style>
+		{name}
+	</button>
+}
+
+export function Panel(props: Props) @{
+	const t = tabs();
+
+	@if (t.open === props.name) {
+		<p role="tabpanel">{props.children}</p>
+	}
+}
+```
+
+```tsrx title="recipes.tsrx"
+import {
+	Panel,
+	Tab,
+	TabList,
+	Tabs,
+} from './tabs.tsrx';
+
+export default function Recipes() @{
+	<section>
+		<Tabs open="Prep">
+			<h3>Pancakes</h3>
+			<TabList>
+				<Tab name="Prep" />
+				<Tab name="Cook" />
+			</TabList>
+			<Panel name="Prep">Flour, eggs.</Panel>
+			<Panel name="Cook">Fry.</Panel>
+		</Tabs>
+		<Tabs open="Prep">
+			<h3>Soup</h3>
+			<TabList>
+				<Tab name="Prep" />
+				<Tab name="Cook" />
+			</TabList>
+			<Panel name="Prep">Leeks.</Panel>
+			<Panel name="Cook">Simmer.</Panel>
+		</Tabs>
+	</section>
+}
+```
+</Code>
+
+The [UI components](/ui) work the same way, so two menus on one page open and close on their own.
+
+A tab group inside another tab group gets its own copy too. Put a `Tabs` inside another one's `Panel`, and the inner `Tabs` starts a new copy, so its tabs never move the outer ones:
+
+```tsrx title="week.tsrx"
+import {
+	Panel,
+	Tab,
+	TabList,
+	Tabs,
+} from './tabs.tsrx';
+
+export default function Week() @{
+	<Tabs open="Plan">
+		<Panel name="Plan">
+			<Tabs open="Monday">
+				<TabList>
+					<Tab name="Monday" />
+					<Tab name="Tuesday" />
+				</TabList>
+			</Tabs>
+		</Panel>
+	</Tabs>
+}
+```
 
 ## A copy lasts until a reload
 
@@ -101,8 +293,16 @@ A *subtree* is the first component that calls the definition, plus everything it
 
 ## Two apps on one page share by name
 
-Two separately built apps on one page that call the same definition read and write one copy. The name is the file plus its export, like `lib/player.tsrx#player`, so both must import it from the same place.
+Two separately built apps on one page that call the same definition read and write one copy. This happens with *micro-frontends*: parts of one page that different teams build and ship on their own. The name is the file plus its export, like `lib/player.tsrx#player`, so both must import it from the same place.
 
-Both apps must also give the value the same shape: the same field names and types.
+Both apps must also give the value the same shape: the same field names and types. To give each app its own copy instead, use `{ scope: 'container' }`.
+
+<Collapsible sprite="star-badge" summary="Coming from React context?">
+
+A subtree definition is context with no `Provider` to write. The outermost component that calls it is the provider, and the compiler sees which one that is at build time. Some component is always the outermost caller, so there is no missing-provider error to guard against.
+
+An app definition is one copy per user. On the server each request gets its own, so two requests rendering at once never share it. In the browser it is kept until a reload, across in-place navigation, and it starts from the values the server rendered.
+
+</Collapsible>
 
 Use `state()` when one component owns a value, and `shared()` when several need it. Next, [turn files into pages](/router/pages).
