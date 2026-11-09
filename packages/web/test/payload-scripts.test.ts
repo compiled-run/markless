@@ -2285,3 +2285,36 @@ test('a resume whose page an in-place navigation swapped while it loaded leaves 
 	expect(resumed.runtime).toBeDefined();
 	expect(root.listeners).toEqual([]);
 });
+
+test('a navigation that swaps the page while the resume module loads leaves the new page alone', async () => {
+	const root = element('SECTION', [element('DIV')]) as FakeElement & {
+		__mL?: object;
+		__mStart?: unknown;
+	};
+	root.__mL = {};
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'input' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'keydown', symbolIds: ['symbol:key'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state: createProtocolStatePayload({ cells: [] }), view });
+	const resuming = resumeFromPayloadScripts({
+		root,
+		stateScript: scripts.stateScript,
+		viewScript: scripts.viewScript,
+		loadSymbol: () => () => {},
+	});
+	// The router's swap gives the container a new page lifetime and drops the leaving page's runtime state.
+	root.__mL = {};
+	const resumed = await resuming;
+	expect(resumed.runtime).toBeDefined();
+	expect(root.listeners).toEqual([]);
+	expect(root.__mStart).toBeUndefined();
+});

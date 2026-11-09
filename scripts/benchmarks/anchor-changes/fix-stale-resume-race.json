@@ -1,0 +1,86 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": 19,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 6,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "A resume reads the page lifetime with its payload scripts and returns a no-op when a navigation swapped the page while the resume module loaded (measured vs merge-base on linux-x64, CI run 42543155106 against 42520732435)",
+			"date": "2026-11-09"
+		}
+	]
+}
