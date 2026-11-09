@@ -2,11 +2,9 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { MARKLESS_BUILD_PREFIX } from '@markless/bundler/rolldown';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // The browser code is the app's, not the host's: building for another Nitro preset only moves where it is written.
 
@@ -40,18 +38,14 @@ beforeAll(async () => {
 	for (const [preset, clientDir] of Object.entries(presets)) {
 		// Each build compiles from scratch, as a fresh checkout on CI does.
 		await rm(join(root, 'node_modules/.vite'), { recursive: true, force: true });
-		const builder = await createBuilder({
+		await buildFixture({
 			root,
-			configFile: false,
-			logLevel: 'silent',
 			nitro: {
 				preset,
 				compatibilityDate: '2026-10-01',
 				routeRules: { '/**': { prerender: true } },
 			},
-			plugins: [markless(), router()],
-		} as Parameters<typeof createBuilder>[0]);
-		await builder.buildApp();
+		});
 		chunks[preset] = await clientChunks(join(root, clientDir));
 	}
 }, 240_000);
