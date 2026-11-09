@@ -178,6 +178,94 @@ declare namespace __MarklessTypeService {
 		view: 'externalResourcesRequired' | 'preserveAspectRatio' | 'viewBox' | 'viewTarget' | 'zoomAndPan';
 		vkern: 'g1' | 'g2' | 'k' | 'u1' | 'u2';
 	};
+	/** camelCase spellings of the HTML global attributes. */
+	type HtmlGlobalCamelCaseAttributeName = 'accessKey' | 'autoCapitalize' | 'autoCorrect' | 'autoFocus' | 'contentEditable' | 'enterKeyHint' | 'inputMode' | 'itemID' | 'itemProp' | 'itemRef' | 'itemScope' | 'itemType' | 'spellCheck' | 'tabIndex';
+	/** camelCase spellings of each HTML element's own attributes. */
+	type HtmlCamelCaseAttributeNameByTag = {
+		a: 'charSet' | 'hrefLang' | 'referrerPolicy';
+		area: 'hrefLang' | 'referrerPolicy';
+		audio: 'autoPlay' | 'crossOrigin';
+		button: 'formAction' | 'formEncType' | 'formMethod' | 'formNoValidate' | 'formTarget' | 'popoverTarget' | 'popoverTargetAction';
+		del: 'dateTime';
+		form: 'acceptCharset' | 'autoComplete' | 'encType' | 'noValidate';
+		frame: 'frameBorder' | 'marginHeight' | 'marginWidth';
+		iframe: 'allowFullScreen' | 'frameBorder' | 'marginHeight' | 'marginWidth' | 'referrerPolicy' | 'srcDoc';
+		img: 'crossOrigin' | 'fetchPriority' | 'referrerPolicy' | 'srcSet' | 'useMap';
+		input: 'autoComplete' | 'formAction' | 'formEncType' | 'formMethod' | 'formNoValidate' | 'formTarget' | 'maxLength' | 'minLength' | 'popoverTarget' | 'popoverTargetAction' | 'readOnly' | 'useMap';
+		ins: 'dateTime';
+		link: 'charSet' | 'crossOrigin' | 'fetchPriority' | 'hrefLang' | 'imageSizes' | 'imageSrcSet' | 'referrerPolicy';
+		meta: 'charSet' | 'httpEquiv';
+		object: 'classID' | 'useMap';
+		script: 'charSet' | 'crossOrigin' | 'fetchPriority' | 'noModule' | 'referrerPolicy';
+		select: 'autoComplete';
+		source: 'srcSet';
+		table: 'cellPadding' | 'cellSpacing';
+		td: 'colSpan' | 'rowSpan';
+		textarea: 'autoComplete' | 'maxLength' | 'minLength' | 'readOnly';
+		th: 'colSpan' | 'rowSpan';
+		time: 'dateTime';
+		track: 'srcLang';
+		video: 'autoPlay' | 'crossOrigin' | 'playsInline';
+	};
+	/** camelCase spellings of the SVG global and XML namespace attributes. */
+	type SvgGlobalCamelCaseAttributeName = 'alignmentBaseline' | 'baselineShift' | 'clipPath' | 'clipRule' | 'colorInterpolation' | 'colorInterpolationFilters' | 'colorRendering' | 'dominantBaseline' | 'fillOpacity' | 'fillRule' | 'floodColor' | 'floodOpacity' | 'fontFamily' | 'fontSize' | 'fontSizeAdjust' | 'fontStretch' | 'fontStyle' | 'fontVariant' | 'fontWeight' | 'glyphOrientationHorizontal' | 'glyphOrientationVertical' | 'imageRendering' | 'letterSpacing' | 'lightingColor' | 'markerEnd' | 'markerMid' | 'markerStart' | 'paintOrder' | 'pointerEvents' | 'shapeRendering' | 'stopColor' | 'stopOpacity' | 'strokeDasharray' | 'strokeDashoffset' | 'strokeLinecap' | 'strokeLinejoin' | 'strokeMiterlimit' | 'strokeOpacity' | 'strokeWidth' | 'tabIndex' | 'textAnchor' | 'textDecoration' | 'textRendering' | 'unicodeBidi' | 'vectorEffect' | 'wordSpacing' | 'writingMode' | 'xlinkActuate' | 'xlinkArcrole' | 'xlinkHref' | 'xlinkRole' | 'xlinkShow' | 'xlinkTitle' | 'xlinkType' | 'xmlBase' | 'xmlLang' | 'xmlSpace' | 'xmlnsXlink';
+	/** camelCase spellings of each SVG element's own attributes. */
+	type SvgCamelCaseAttributeNameByTag = {
+		a: 'colorProfile' | 'enableBackground' | 'hrefLang' | 'referrerPolicy';
+		altGlyph: 'colorProfile' | 'enableBackground';
+		animate: 'colorProfile' | 'enableBackground';
+		animateColor: 'colorProfile' | 'enableBackground';
+		circle: 'colorProfile' | 'enableBackground';
+		clipPath: 'colorProfile' | 'enableBackground';
+		'color-profile': 'renderingIntent';
+		defs: 'colorProfile' | 'enableBackground';
+		ellipse: 'colorProfile' | 'enableBackground';
+		feBlend: 'colorProfile' | 'enableBackground';
+		feColorMatrix: 'colorProfile' | 'enableBackground';
+		feComponentTransfer: 'colorProfile' | 'enableBackground';
+		feComposite: 'colorProfile' | 'enableBackground';
+		feConvolveMatrix: 'colorProfile' | 'enableBackground';
+		feDiffuseLighting: 'colorProfile' | 'enableBackground';
+		feDisplacementMap: 'colorProfile' | 'enableBackground';
+		feFlood: 'colorProfile' | 'enableBackground';
+		feGaussianBlur: 'colorProfile' | 'enableBackground';
+		feImage: 'colorProfile' | 'crossOrigin' | 'enableBackground';
+		feMerge: 'colorProfile' | 'enableBackground';
+		feMorphology: 'colorProfile' | 'enableBackground';
+		feOffset: 'colorProfile' | 'enableBackground';
+		feSpecularLighting: 'colorProfile' | 'enableBackground';
+		feTile: 'colorProfile' | 'enableBackground';
+		feTurbulence: 'colorProfile' | 'enableBackground';
+		filter: 'colorProfile' | 'enableBackground';
+		font: 'colorProfile' | 'enableBackground' | 'horizAdvX' | 'horizOriginX' | 'vertAdvY' | 'vertOriginX' | 'vertOriginY';
+		'font-face': 'accentHeight' | 'capHeight' | 'overlinePosition' | 'overlineThickness' | 'panose1' | 'strikethroughPosition' | 'strikethroughThickness' | 'underlinePosition' | 'underlineThickness' | 'unicodeRange' | 'unitsPerEm' | 'vAlphabetic' | 'vHanging' | 'vIdeographic' | 'vMathematical' | 'xHeight';
+		foreignObject: 'colorProfile' | 'enableBackground';
+		g: 'colorProfile' | 'enableBackground';
+		glyph: 'arabicForm' | 'colorProfile' | 'enableBackground' | 'glyphName' | 'horizAdvX' | 'vertAdvY' | 'vertOriginX' | 'vertOriginY';
+		glyphRef: 'colorProfile' | 'enableBackground';
+		image: 'colorProfile' | 'crossOrigin' | 'enableBackground';
+		line: 'colorProfile' | 'enableBackground';
+		linearGradient: 'colorProfile' | 'enableBackground';
+		marker: 'colorProfile' | 'enableBackground';
+		mask: 'colorProfile' | 'enableBackground';
+		'missing-glyph': 'colorProfile' | 'enableBackground' | 'horizAdvX' | 'vertAdvY' | 'vertOriginX' | 'vertOriginY';
+		path: 'colorProfile' | 'enableBackground';
+		pattern: 'colorProfile' | 'enableBackground';
+		polygon: 'colorProfile' | 'enableBackground';
+		polyline: 'colorProfile' | 'enableBackground';
+		radialGradient: 'colorProfile' | 'enableBackground';
+		rect: 'colorProfile' | 'enableBackground';
+		script: 'crossOrigin';
+		stop: 'colorProfile' | 'enableBackground';
+		svg: 'colorProfile' | 'enableBackground';
+		switch: 'colorProfile' | 'enableBackground';
+		symbol: 'colorProfile' | 'enableBackground';
+		text: 'colorProfile' | 'enableBackground';
+		textPath: 'colorProfile' | 'enableBackground';
+		tref: 'colorProfile' | 'enableBackground';
+		tspan: 'colorProfile' | 'enableBackground';
+		use: 'colorProfile' | 'enableBackground';
+	};
 	/** camelCase spellings the compiler writes as the real attribute name. */
 	type CamelCaseAttributeName = {
 		accentHeight: 'accent-height';

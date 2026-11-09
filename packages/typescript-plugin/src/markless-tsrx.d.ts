@@ -559,26 +559,39 @@ declare namespace __MarklessTypeService {
 			? Attributes<SVGElementTagNameMap[Tag]> & TagNameSpecificAttributes<Tag>
 			: never;
 
-	/** Every standard attribute of the tag that the typed attributes above leave out, with a plain value. */
+	type CamelCaseAttributeSpelling<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		?
+				| HtmlGlobalCamelCaseAttributeName
+				| (Tag extends keyof HtmlCamelCaseAttributeNameByTag ? HtmlCamelCaseAttributeNameByTag[Tag] : never)
+		: Tag extends keyof SVGElementTagNameMap
+			?
+					| SvgGlobalCamelCaseAttributeName
+					| (Tag extends keyof SvgCamelCaseAttributeNameByTag ? SvgCamelCaseAttributeNameByTag[Tag] : never)
+			: never;
+
+	type PlainAttributeValue<Tag extends PropertyKey> = Tag extends keyof HTMLElementTagNameMap
+		? AttributeValue
+		: string | number | undefined;
+
+	/**
+	 * Every standard attribute of the tag that the typed attributes above leave out, with a plain
+	 * value, and the camelCase spelling of each real attribute, typed as that attribute.
+	 */
 	type StandardAttributes<Tag extends PropertyKey> = {
-		[
-			Name in Exclude<StandardAttributeName<Tag>, keyof TypedAttributes<Tag>>
-		]?: Tag extends keyof HTMLElementTagNameMap ? AttributeValue : string | number | undefined;
-	};
-
-	type RealAttributes<Tag extends PropertyKey> = TypedAttributes<Tag> & StandardAttributes<Tag>;
-
-	/** The camelCase spelling of each real attribute the tag takes, typed as that attribute. */
-	type CamelCaseAttributes<Tag extends PropertyKey> = {
-		[Spelling in keyof CamelCaseAttributeName as CamelCaseAttributeName[Spelling] extends keyof RealAttributes<Tag>
-			? Spelling
-			: never]?: RealAttributes<Tag>[CamelCaseAttributeName[Spelling] & keyof RealAttributes<Tag>];
+		[Name in Exclude<
+			StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
+			keyof TypedAttributes<Tag>
+		>]?: Name extends keyof CamelCaseAttributeName
+			? CamelCaseAttributeName[Name] extends keyof TypedAttributes<Tag>
+				? TypedAttributes<Tag>[CamelCaseAttributeName[Name]]
+				: PlainAttributeValue<Tag>
+			: PlainAttributeValue<Tag>;
 	};
 
 	type IntrinsicElementFor<Tag extends PropertyKey> = Tag extends
 		| keyof HTMLElementTagNameMap
 		| keyof SVGElementTagNameMap
-		? RealAttributes<Tag> & CamelCaseAttributes<Tag>
+		? TypedAttributes<Tag> & StandardAttributes<Tag>
 		: never;
 
 	type IntrinsicTagName = keyof HTMLElementTagNameMap | keyof SVGElementTagNameMap;

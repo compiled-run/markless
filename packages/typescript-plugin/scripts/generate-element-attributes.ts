@@ -64,6 +64,27 @@ function byTag(list: AttributeList): string[] {
 		});
 }
 
+// The camelCase spellings of each tag's real names, keyed like byTag so the contract never filters a spelling per element.
+function camelCaseByTag(list: AttributeList, globals: ReadonlySet<string>): string[] {
+	const spellings = [...camelCaseAttributeNames()];
+	return Object.keys(list)
+		.filter((tag) => tag !== '*')
+		.sort()
+		.flatMap((tag) => {
+			const names = new Set(list[tag]!.filter((name) => !globals.has(name)));
+			const camel = spellings.filter(([, name]) => names.has(name)).map(([spelling]) => spelling);
+			if (camel.length === 0) return [];
+			const key = /^[a-z][a-zA-Z0-9]*$/.test(tag) ? tag : `'${tag}'`;
+			return [`\t\t${key}: ${union(camel)};`];
+		});
+}
+
+function camelCaseGlobals(globals: ReadonlySet<string>): string {
+	return union(
+		[...camelCaseAttributeNames()].filter(([, name]) => globals.has(name)).map(([spelling]) => spelling),
+	);
+}
+
 function realAttributeNames(): Set<string> {
 	return new Set([
 		...Object.values(htmlElementAttributes).flat(),
@@ -138,6 +159,18 @@ export function generateElementAttributeNamesSource(): string {
 		'\t/** Attributes particular to each SVG element, on top of the global ones. */',
 		'\ttype SvgAttributeNameByTag = {',
 		...byTag(svgElementAttributes),
+		'\t};',
+		'\t/** camelCase spellings of the HTML global attributes. */',
+		`\ttype HtmlGlobalCamelCaseAttributeName = ${camelCaseGlobals(new Set(htmlElementAttributes['*']))};`,
+		'\t/** camelCase spellings of each HTML element\'s own attributes. */',
+		'\ttype HtmlCamelCaseAttributeNameByTag = {',
+		...camelCaseByTag(htmlElementAttributes, new Set(htmlElementAttributes['*'])),
+		'\t};',
+		'\t/** camelCase spellings of the SVG global and XML namespace attributes. */',
+		`\ttype SvgGlobalCamelCaseAttributeName = ${camelCaseGlobals(new Set([...svgElementAttributes['*']!, ...XML_NAMESPACE_ATTRIBUTE_NAMES]))};`,
+		'\t/** camelCase spellings of each SVG element\'s own attributes. */',
+		'\ttype SvgCamelCaseAttributeNameByTag = {',
+		...camelCaseByTag(svgElementAttributes, new Set([...svgElementAttributes['*']!, ...XML_NAMESPACE_ATTRIBUTE_NAMES])),
 		'\t};',
 		'\t/** camelCase spellings the compiler writes as the real attribute name. */',
 		'\ttype CamelCaseAttributeName = {',
