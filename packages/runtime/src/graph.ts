@@ -831,7 +831,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		hasPendingFlush,
 		holdFlush() {
 			flushHolds++;
+			let held = true;
 			return () => {
+				if (!held) return;
+				held = false;
 				if (!--flushHolds && flushScheduled) queueMicrotask(runScheduledFlush);
 			};
 		},
