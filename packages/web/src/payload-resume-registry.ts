@@ -16,14 +16,75 @@ export type ResumeAlreadyResumedWarning = {
 // elements while resume-side callers hold the structural element surface.
 export type ResumeContainerKey = ResumeDomElement | Element;
 
-const resumedPayloadContainers = new WeakMap<ResumeContainerKey, ResumePayloadScriptsResult>();
-const disposedPayloadContainers = new WeakMap<ResumeContainerKey, ResumePayloadScriptsResult>();
+// A container root's boot is one record; `nextBoot` is the only thing that changes it.
+// Each event is numbered after the phase it moves to; SETTLE (a start promise settling) resolves to
+// ABANDONED when the page lifetime changed under it, else back to DISPOSED or UNWOKEN.
+export const UNWOKEN = 0;
+export const BOOTING = 1;
+export const LIVE = 2;
+export const DISPOSED = 3;
+export const ABANDONED = 4;
+export const WAKE = BOOTING;
+export const GO_LIVE = LIVE;
+export const DISPOSE = DISPOSED;
+export const SETTLE = 5;
+
+export type BootPhase =
+	| typeof UNWOKEN
+	| typeof BOOTING
+	| typeof LIVE
+	| typeof DISPOSED
+	| typeof ABANDONED;
+export type BootEvent = typeof WAKE | typeof GO_LIVE | typeof DISPOSE | typeof SETTLE;
+
+// Short field names: these are rendered into every page that resumes.
+export type ContainerBoot = {
+	/** The phase; missing means unwoken. */
+	p?: BootPhase;
+	/** The page lifetime (`__mL`) the latest boot started for. */
+	l?: unknown;
+	/** The latest boot's start promise. */
+	s?: Promise<ResumePayloadScriptsResult>;
+	/** The live result while live, else the last disposed one. */
+	r?: ResumePayloadScriptsResult;
+};
+
+/** Moves `boot` on `event` and returns the phase it left. WAKE takes the start promise, GO_LIVE the result, SETTLE the settling start. */
+export function nextBoot(
+	boot: ContainerBoot,
+	event: BootEvent,
+	life?: unknown,
+	value?: unknown,
+): BootPhase | undefined {
+	const phase = boot.p;
+	if (event === WAKE) {
+		if (import.meta.env?.DEV && (phase === LIVE || (phase === BOOTING && boot.l === life)))
+			throw new Error(`Container boot cannot wake in phase ${phase}`);
+		boot.l = life;
+		boot.s = value as ContainerBoot['s'];
+	} else if (event === GO_LIVE) {
+		if (import.meta.env?.DEV && phase !== BOOTING)
+			throw new Error(`Container boot cannot go live in phase ${phase}`);
+		boot.r = value as ContainerBoot['r'];
+	} else if (event === DISPOSE ? phase !== LIVE : phase !== BOOTING || boot.s !== value)
+		return phase;
+	boot.p = event !== SETTLE ? event : boot.l !== life ? ABANDONED : boot.r ? DISPOSED : UNWOKEN;
+	return phase;
+}
+
+const boots = new WeakMap<object, ContainerBoot>();
+
+export function readBoot(root: object): ContainerBoot {
+	let boot = boots.get(root);
+	if (!boot) boots.set(root, (boot = {}));
+	return boot;
+}
 
 export function getAlreadyResumedPayload(
 	root: ResumeDomElement,
 ): ResumePayloadScriptsResult | undefined {
-	const resumed = resumedPayloadContainers.get(root);
-	return resumed && { ...resumed, warnings: [alreadyResumedWarning] };
+	const { p, r } = readBoot(root);
+	return p === LIVE ? { ...r!, warnings: [alreadyResumedWarning] } : undefined;
 }
 
 /**
@@ -36,7 +97,7 @@ export function getAlreadyResumedPayload(
  *
  * A wake gets the same answer on any out-of-document root, filed or not: a
  * container torn down before its first resume finished never reached
- * `setResumedPayload`, so nothing files it, and the late wake would boot a whole
+ * the live record, so nothing files it, and the late wake would boot a whole
  * runtime against a dead page. The generated wake handoff marks the root with
  * `__asyncResumeRuntimeStarted` before calling in; an explicit
  * `resumeFromPayloadDocument` carries no such mark and stays loud on a detached
@@ -46,8 +107,8 @@ export function getRetiredResumedPayload(
 	root: ResumeContainerKey,
 ): ResumePayloadScriptsResult | undefined {
 	if ((root as { readonly isConnected?: boolean }).isConnected !== false) return undefined;
-	const disposed = disposedPayloadContainers.get(root);
-	if (disposed)
+	const { p, r: disposed } = readBoot(root);
+	if (p !== LIVE && disposed)
 		return { ...disposed, runtime: { ...disposed.runtime, dispatch: () => Promise.resolve() } };
 	return (root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted
 		? wakeNoopResume
@@ -60,21 +121,11 @@ export const wakeNoopResume = {
 	runtime: { dispatch: () => Promise.resolve() },
 } as unknown as ResumePayloadScriptsResult;
 
-export function setResumedPayload(
-	root: ResumeDomElement,
-	result: ResumePayloadScriptsResult,
-): void {
-	disposedPayloadContainers.delete(root);
-	resumedPayloadContainers.set(root, result);
-}
-
 export function deleteResumedPayload(
 	root: ResumeContainerKey,
 ): ResumePayloadScriptsResult | undefined {
-	const resumed = resumedPayloadContainers.get(root);
-	resumedPayloadContainers.delete(root);
-	if (resumed) disposedPayloadContainers.set(root, resumed);
-	return resumed;
+	const boot = readBoot(root);
+	return nextBoot(boot, DISPOSE) === LIVE ? boot.r : undefined;
 }
 
 const alreadyResumedWarning: ResumeAlreadyResumedWarning = {
