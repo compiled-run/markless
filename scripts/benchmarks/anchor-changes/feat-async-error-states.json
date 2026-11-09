@@ -29,7 +29,7 @@
 				"executedChars"
 			],
 			"delta": 26,
-			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI read +29 to +252, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
 			"date": "2026-11-09"
 		},
 		{
@@ -40,8 +40,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 154,
-			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"delta": 193,
+			"reason": "+193 B gzip downloaded: the shared runtime chunks carry the async error and refresh model, the link config names the Back/Forward re-ask mark, and graph construction asks an MDX route's loader for the async planes",
 			"date": "2026-11-09"
 		},
 		{
@@ -53,7 +53,7 @@
 				"executedChars"
 			],
 			"delta": 26,
-			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI read +29 to +252, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
 			"date": "2026-11-09"
 		},
 		{
@@ -64,8 +64,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 154,
-			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"delta": 193,
+			"reason": "+193 B gzip downloaded: the shared runtime chunks carry the async error and refresh model, the link config names the Back/Forward re-ask mark, and graph construction asks an MDX route's loader for the async planes",
 			"date": "2026-11-09"
 		},
 		{
@@ -77,7 +77,7 @@
 				"executedChars"
 			],
 			"delta": 26,
-			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI read +29 to +252, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
 			"date": "2026-11-09"
 		},
 		{
@@ -88,8 +88,8 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 154,
-			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"delta": 193,
+			"reason": "+193 B gzip downloaded: the shared runtime chunks carry the async error and refresh model, the link config names the Back/Forward re-ask mark, and graph construction asks an MDX route's loader for the async planes",
 			"date": "2026-11-09"
 		},
 		{
@@ -100,8 +100,8 @@
 				"docs /",
 				"executedChars"
 			],
-			"delta": 28,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 26,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
 			"date": "2026-11-09"
 		},
 		{
@@ -112,8 +112,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 11160,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 18037,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
 			"date": "2026-11-09"
 		},
 		{
@@ -124,8 +124,8 @@
 				"docs /concepts/state",
 				"executedChars"
 			],
-			"delta": 28,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 26,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
 			"date": "2026-11-09"
 		},
 		{
@@ -136,8 +136,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 32614,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 34440,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
 			"date": "2026-11-09"
 		},
 		{
@@ -148,8 +148,8 @@
 				"docs /ui/accordion",
 				"executedChars"
 			],
-			"delta": 28,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 26,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
 			"date": "2026-11-09"
 		},
 		{
@@ -160,8 +160,18 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 6915,
-			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"delta": 11998,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes; MDX routes name the async planes their islands' resume needs, and the pack cost model merges the refresh half, which async pages' controls preload, into the MDX runtime pack",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": 19,
+			"reason": "+19 B rendered against main, which already measures 5608 against the 5490 anchor: its imports' shortened names moved when graph construction gained the MDX planes loader; its source is unchanged",
 			"date": "2026-11-09"
 		}
 	]
