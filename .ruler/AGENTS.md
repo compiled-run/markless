@@ -6,19 +6,12 @@ A change known to affect a consuming application must pass that application's ch
 Every write-task verify array must include `pnpm run typecheck`, the Markless-aware TypeScript checker; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
 Every write-task verify array must also include `pnpm ci:local --fast`, which runs CI's fast jobs with the exact commands from `.github/workflows/ci.yml` (the pre-commit hook runs them too). Everything heavier (browser, boxes-*, build-scale, perf-guards, benchmark, demo and website boxes, migrate checks) runs on GitHub Actions: the pull request's green CI run is the receipt, and no task is reported done before that run is green. Run a heavy job locally (`pnpm ci:local --job <id>`) only to debug a specific failure. Passing only the tests for your own change is not verification.
 When your PR merges or your task ends, remove your git worktree (`git worktree remove`) and your /tmp scratch, and stop any servers you started.
+Before adding a boolean, nullable field, timer or promise that tracks a lifecycle, or another flag beside an existing one, read `docs/rules/one-state.md`.
 
 ## One analysis, used everywhere
 
 The yuku analyzer analyzes the whole project once: modules, imports and exports, scopes, bindings, references and the semantic graph. That analysis is the single source of truth. Every later stage (compiler, bundler, router, migrator, editor tooling) consumes those facts and never re-derives them by scanning text, matching regexes or re-parsing its own output. Emit correct output from the facts rather than editing output afterwards. If a stage needs a fact the analysis lacks, add it to the analyzer once so every stage gets it.
 Agents: before writing any check, scan, probe or rewrite over code or build output, name the analyzer or build fact that answers it and use that. A regex, string search or ad hoc parse over code is an architecture violation, not a shortcut; if the fact is missing, add it to the analyzer or return blocked.
-
-## One state, not many flags
-
-When something has a lifecycle (a navigation, a resume, a pending fetch, a queue job), store it as one state value with named states. Don't spread it across booleans, nullable fields and timers that must agree. Every change of state goes through one transition function, and a move the lifecycle doesn't allow throws in development. Tests cover every allowed transition, and each impossible combination is unrepresentable, not just unlikely. A new flag that changes how existing code behaves means a new named state, not another boolean.
-Why: the same page-lifetime race was fixed three times (#209, #218, #541) and four more of its siblings in #542; 13 of the 19 lifecycle bugs since July would have been prevented by one explicit state, and every one of those fixes added a flag instead. An HMR cycle end guessed with a zero-delay timer had to be reverted for the same reason.
-Runtime hot paths keep the rule cheaply: a small-integer phase and a `switch`, no table lookup per write. In browser code, production phases are small integers, not strings.
-Copy the existing machines: `SourceState`/`transitionSourceState` and `RecheckState`/`transitionRecheckState` in `packages/bundler/src/vite/hmr.ts`, and the container `lifecycle` union in `packages/web/src/debug-channel.ts`. To refactor an existing implicit machine, first add characterisation tests that pin the old code's behaviour, then refactor with those tests unchanged and green.
-No analyzer check enforces this yet; a follow-up goal will add one. Until then, reviewers and agents apply it by hand.
 
 ## CI discipline
 
