@@ -577,13 +577,16 @@ declare namespace __MarklessTypeService {
 	 * Every standard attribute of the tag that the typed attributes above leave out, with a plain
 	 * value, and the camelCase spelling of each real attribute, typed as that attribute.
 	 */
+	// Event handlers and Markless's own props are left out: no standard attribute shares their names.
+	type TypedAttributeValues<Tag extends PropertyKey> = GlobalAttributes & TagNameSpecificAttributes<Tag>;
+
 	type StandardAttributes<Tag extends PropertyKey> = {
 		[Name in Exclude<
 			StandardAttributeName<Tag> | CamelCaseAttributeSpelling<Tag>,
-			keyof TypedAttributes<Tag>
+			keyof GlobalAttributes | keyof TagNameSpecificAttributes<Tag>
 		>]?: Name extends keyof CamelCaseAttributeName
-			? CamelCaseAttributeName[Name] extends keyof TypedAttributes<Tag>
-				? TypedAttributes<Tag>[CamelCaseAttributeName[Name]]
+			? CamelCaseAttributeName[Name] extends keyof TypedAttributeValues<Tag>
+				? TypedAttributeValues<Tag>[CamelCaseAttributeName[Name]]
 				: PlainAttributeValue<Tag>
 			: PlainAttributeValue<Tag>;
 	};
