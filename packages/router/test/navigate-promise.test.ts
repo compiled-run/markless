@@ -31,6 +31,7 @@ export default function Drive() @{
 			expose
 		</button>
 		<a data-wake href="/toggle">a link whose focus wakes the router code</a>
+		<a data-here href="/drive">a link to this page</a>
 		<p id="spot">spot</p>
 	</main>
 }
@@ -172,8 +173,22 @@ for (const [name, browserType] of [
 			await page.close();
 		});
 
-		// navigate() alone cannot see a click on a Link to the page shown, which cancels its navigation without a render.
-		test.todo('a navigation cancelled by a click on a Link to the page shown settles with it');
+		test('a navigation cancelled by a click on a Link to the page shown settles with it', async () => {
+			const { page, errors } = await open(browser);
+			await runHalfLoaded(page);
+			const release = await holdArrival(page, '/recipe?u=2');
+			await start(page, '/recipe?u=2', 'recipe');
+			await page.waitForTimeout(100);
+			await page.locator('[data-here]').click();
+			await expect.poll(() => settled(page), { timeout: 2000 }).toEqual(['recipe drive']);
+			release();
+			await page.waitForTimeout(1200);
+			expect(
+				await page.evaluate(() => document.querySelector('[data-page]')?.getAttribute('data-page')),
+			).toBe('drive');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
 
 		test('two quick navigate() calls both settle once the second page is shown, never earlier', async () => {
 			const { page, errors } = await open(browser);

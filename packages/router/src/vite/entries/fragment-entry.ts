@@ -24,6 +24,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// Dispatched on the document once the page the user ends up on is in place.
+	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;

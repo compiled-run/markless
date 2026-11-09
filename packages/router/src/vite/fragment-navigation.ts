@@ -853,6 +853,7 @@ export function runFragmentNavigation(
 		// A link to the page already shown keeps it, scroll and state included, as client routers do.
 		if (pageKey(url) === pageKey(new URL(location.href))) {
 			state.stops = (state.stops ?? 0) + 1;
+			d.dispatchEvent(new CustomEvent(config.renderedEvent));
 			return true;
 		}
 		const replace = anchor.hasAttribute(config.replaceAttribute);
