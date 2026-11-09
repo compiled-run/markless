@@ -75,6 +75,7 @@ import {
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
 	STYLESHEET_KEY_ATTRIBUTE,
+	checkBridgeMove,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
@@ -1087,7 +1088,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS});`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent

@@ -10,6 +10,22 @@ import type {
 
 export type { FragmentNavigationConfig } from './entries/fragment-entry.ts';
 
+/** The load-time link bridge's phases: bit 1 = a press fetch is held, bit 2 = the run half is loading. */
+export const BRIDGE_PHASE = {
+	idle: 0,
+	pressed: 1,
+	starting: 2,
+	startingPressed: 3,
+	running: 4,
+} as const;
+
+// The bridge's legal moves; self-contained, because the dev bridge carries its source.
+export function checkBridgeMove(from: number, to: number): void {
+	const moves = [[1, 2], [3], [0, 3, 4], [0, 4], []][from];
+	if (!moves?.includes(to))
+		throw new Error(`Markless router link bridge: no move from phase ${from} to phase ${to}.`);
+}
+
 // Serialized into the SSR link bridge (must not reference anything outside its own body): the part of fragment navigation that runs at load.
 // It only listens; the first link intent, a Back/Forward, or idle loads `runFragmentNavigation` (matching, intent, fetch).
 export function startFragmentNavigation(
@@ -23,6 +39,8 @@ export function startFragmentNavigation(
 	intentOf: () => FragmentIntent | null,
 	// How long a failed run-half load waits for pagehide before it loads the clicked page as a document.
 	leaveDeadlineMs: number,
+	// Development only: throws on a phase move the bridge does not allow. The production bridge passes none.
+	checkMove?: (from: number, to: number) => void,
 ): void {
 	const w = d.defaultView as (Window & typeof globalThis) | null;
 	if (!w) return;
@@ -107,8 +125,19 @@ export function startFragmentNavigation(
 	});
 	const scrolled = new Set<Element>();
 	const arriving = new Map<string, Promise<unknown>>();
-	let running: FragmentNavigationApi | undefined;
+	// BRIDGE_PHASE, restated because this body is serialized: bit 1 = a press fetch held, bit 2 = the run half loading.
+	const IDLE = 0,
+		PRESSED = 1,
+		STARTING = 2,
+		RUNNING = 4;
+	let phase = IDLE;
+	const move = (next: number) => {
+		checkMove?.(phase, next);
+		phase = next;
+	};
+	// Set from STARTING on, cleared when the load fails.
 	let starting: Promise<FragmentNavigationApi> | undefined;
+	// Held while phase has the PRESSED bit.
 	let pressed: FragmentEarly | undefined;
 	const preload = (item: FragmentPreload) => {
 		const href = new URL(typeof item === 'string' ? item : item.href, d.baseURI).href;
@@ -144,7 +173,8 @@ export function startFragmentNavigation(
 	// A press, or a mouse resting on a link, fetches its page and code at once, alongside the run half.
 	const press = (anchor: HTMLAnchorElement) => {
 		const intent = intentOf();
-		if (!intent || pressed || anchor.getAttribute(intent.prefetchAttribute) === 'none') return;
+		if (!intent || phase & PRESSED || anchor.getAttribute(intent.prefetchAttribute) === 'none')
+			return;
 		const url = followed(anchor);
 		const code = url && routes[url.pathname];
 		if (!code || here(url)) return;
@@ -161,16 +191,25 @@ export function startFragmentNavigation(
 		// After the page fetch, so an origin's per-host connection limit never queues the page behind its code.
 		for (const item of [...intent.code, ...code]) preload(item);
 		pressed = { url: url.href, at: w.performance.now(), controller, response };
+		move(phase | PRESSED);
 	};
 	const wake = (event?: Event) => {
-		starting ??= loadRun().then((run) => {
-			return (running = run(d, routes, importModule, scrolled, arriving, pressed));
-		});
+		if (!starting) {
+			move(phase | STARTING);
+			starting = loadRun().then((run) => {
+				const api = run(d, routes, importModule, scrolled, arriving, pressed);
+				pressed = undefined;
+				move(RUNNING);
+				return api;
+			});
+		}
 		starting.then(
 			(api) => api.replay(event),
 			() => {
+				if (!(phase & STARTING)) return;
 				pressed?.controller.abort();
 				starting = pressed = undefined;
+				move(IDLE);
 			},
 		);
 		return starting;
@@ -191,9 +230,9 @@ export function startFragmentNavigation(
 			const pointer = event as PointerEvent;
 			w.clearTimeout(rest);
 			if (at === (at = `${pointer.clientX},${pointer.clientY}`)) return;
-			const anchor = !running && pointer.pointerType === 'mouse' && anchorOf(event);
+			const anchor = phase < RUNNING && pointer.pointerType === 'mouse' && anchorOf(event);
 			const dwell = anchor && intentOf()?.hoverDwellMs;
-			if (dwell) rest = w.setTimeout(() => running || press(anchor), dwell);
+			if (dwell) rest = w.setTimeout(() => phase < RUNNING && press(anchor), dwell);
 		} else if (event.type === 'scroll') {
 			if (target !== (d as Node)) scrolled.add(target);
 		} else if (event.type === 'popstate') {
@@ -202,7 +241,7 @@ export function startFragmentNavigation(
 				(api) => api.traverse(event as PopStateEvent),
 				() => here(shown) || fall(() => w.location.reload()),
 			);
-		} else if (!running) {
+		} else if (phase < RUNNING) {
 			const anchor = anchorOf(event);
 			if (!anchor) return;
 			// A router link is taken ahead of page handlers; a plain anchor after them, once its click reaches the document.
@@ -231,14 +270,14 @@ export function startFragmentNavigation(
 	// A click that beats the woken code holds the link until it can swap, or follows it as the browser would.
 	const early = (event: Event) => {
 		const mouse = event as MouseEvent;
-		if (running || mouse.defaultPrevented || mouse.button !== 0) return;
+		if (phase === RUNNING || mouse.defaultPrevented || mouse.button !== 0) return;
 		if (mouse.metaKey || mouse.altKey || mouse.ctrlKey || mouse.shiftKey) return;
 		const anchor = anchorOf(event)!;
 		const url = followed(anchor);
 		if (!url || url.hash.startsWith('#/') || (url.href.includes('#') && here(url))) return;
 		event.preventDefault();
 		// A click on the page shown keeps it; once a navigation was woken, the run half also cancels that one.
-		if (here(url) && !starting) return;
+		if (here(url) && !(phase & STARTING)) return;
 		const at = w.performance.now();
 		w.clearTimeout(leaving);
 		wake().then(
