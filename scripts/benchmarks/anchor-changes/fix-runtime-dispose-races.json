@@ -6,34 +6,10 @@
 				"loadWeight",
 				"linux-x64",
 				"bench /",
-				"executedChars"
-			],
-			"delta": 224,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
-			"date": "2026-11-09"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
 				"jsGzipBytes"
 			],
 			"delta": 32,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
-			"date": "2026-11-09"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		},
 		{
@@ -45,19 +21,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 32,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
-			"date": "2026-11-09"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		},
 		{
@@ -69,7 +33,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 32,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		},
 		{
@@ -81,7 +45,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 56,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		},
 		{
@@ -93,7 +57,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 56,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		},
 		{
@@ -105,7 +69,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 56,
-			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits (+32 B gzip downloaded on bench, +56 on docs; dispose and refresh-time code)",
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
 			"date": "2026-11-09"
 		}
 	]
