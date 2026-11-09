@@ -106,7 +106,7 @@ export function mergePrerenderPayloadRecords(
 // byte-identical for gated (channel-off) production builds.
 async function adoptStreamedForWake<
 	T extends DecodedPayloadScripts & { readonly root: ResumePayloadScriptsInput['root'] },
->(input: T): Promise<T> {
+>(input: T, life: unknown): Promise<T> {
 	const documentHost = (
 		input.root as {
 			readonly ownerDocument?: { readonly querySelector?: (selector: string) => unknown };
@@ -121,17 +121,25 @@ async function adoptStreamedForWake<
 		return input;
 	}
 	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
+	if (pageLifetime(input.root) !== life) return input;
 	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
 }
+
+const pageLifetime = (root: object): unknown => (root as { readonly __mL?: object }).__mL;
 
 export async function resumeFromPrerenderRecords(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & DecodedPayloadScripts,
 ) {
-	const adopted = await adoptStreamedForWake({
-		...input,
-		renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
-	});
+	const life = pageLifetime(input.root);
+	const adopted = await adoptStreamedForWake(
+		{
+			...input,
+			renderBranchHtml: input.renderBranchHtml ?? documentTemplateBranchHtml(input.root),
+		},
+		life,
+	);
 	return resumeFromPrerenderRecordsImpl(
 		await adoptFilledArms(adopted, adopted.root as never, adopted.renderAsyncBoundary as never),
+		life,
 	);
 }
