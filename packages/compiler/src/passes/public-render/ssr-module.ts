@@ -35,6 +35,7 @@ import {
 	rowProjectedEdgeIdsUnder,
 	staticProjectionChildren,
 	sharedSeedConsumeLine,
+	sharedInstanceValuesConsumeLine,
 	sharedSeedMarkerLine,
 	adoptedWidgetDefinitionIds,
 	sharedSeedPassLines,
@@ -310,6 +311,12 @@ export function emitPublicSsrRenderModule(
 			: `	const marklessSsrPayloadState = marklessSelectStateNodes(marklessCloneState(payloadState), ${selectedStateNodeArguments(ownedNodes)});`,
 		'	const marklessSsrRenderStateValues = new Map(marklessSsrStateValues);',
 		sharedSeedConsumeLine(input, rootInfo.componentName, 'marklessSsrRenderStateValues'),
+		sharedInstanceValuesConsumeLine(
+			input,
+			rootInfo.componentName,
+			'marklessSsrRenderStateValues',
+			'marklessSsrPayloadState',
+		),
 		...rootDataLines.carriedSeed,
 		...renderBodyLines(
 			input,
