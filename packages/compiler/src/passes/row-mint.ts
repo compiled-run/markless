@@ -62,12 +62,8 @@ export type RowComponentMint = {
  * chain the row render walks - so an imported child mints on the same terms as a
  * local one.
  *
- * A branch or a boundary (`@try`) is admitted: its anchors are a comment pair
- * the minted row counts in its own fragment, exactly as it counts its own
- * elements, and a boundary registers against those anchors as one an arm commit
- * rendered. That question must be ANSWERED, not assumed: a child whose tree this
- * module cannot reach is refused, because nothing proves the row render can
- * build it.
+ * A branch or a boundary (`@try`) is admitted: the minted row counts its comment
+ * anchors like its own elements. A child whose tree this module cannot reach is refused.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.

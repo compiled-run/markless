@@ -584,12 +584,8 @@ export type ProtocolViewPayload = {
 		 */
 		readonly rowEndOffset?: number;
 		/**
-		 * Each row renders between a pair of row comments, because its top level is
-		 * not exactly one element: a fragment, text, a bare `@try`, or a component
-		 * whose template is one of those. The browser finds, moves, adds and removes
-		 * a row as everything between its comments; offsets still count only the
-		 * elements outside every row, and `hostPath`s are row-relative from the
-		 * first node inside the comments. Pay-per-use: one-element rows omit it.
+		 * Each row renders between a pair of row comments because its top level is not one element;
+		 * offsets count only elements outside rows, and `hostPath`s start inside the comments.
 		 */
 		readonly rowRange?: true;
 		/**
