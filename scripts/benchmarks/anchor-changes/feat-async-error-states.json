@@ -1,0 +1,168 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"set": 909,
+			"reason": "Back and Forward re-ask a page's async values quietly; loaded only by a page with async values",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 384,
+			"reason": "marks a page Back or Forward restores so its async values re-ask, and keeps a box the router scrolled known before its scroll event",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 154,
+			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 154,
+			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "+26 chars run on every bench route, measured the same on main and this tree locally (CI's one run read +28 to +251, inside the guard's run-to-run swing): the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 154,
+			"reason": "+154 B gzip downloaded: the shared runtime chunks carry the async error and refresh model and the link config names the Back/Forward re-ask mark",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 28,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 11160,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 28,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 32614,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 28,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 6915,
+			"reason": "downloaded, not run (+28 chars run): the compile worker carries the async compiler passes (+13.4 KB gzip), and preloaded render data and row mints build rows with @if, @switch and @try arms in the browser",
+			"date": "2026-11-09"
+		}
+	]
+}
