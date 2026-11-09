@@ -71,9 +71,11 @@ function decodeWithDevValidation(
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
+	const life = (input.root as { readonly __mL?: object }).__mL;
 	return (await import('./payload-resume-lazy.ts')).resumeFromPayloadScriptsImpl(
 		input,
 		decodePayloadScripts,
+		life,
 	);
 }
 
