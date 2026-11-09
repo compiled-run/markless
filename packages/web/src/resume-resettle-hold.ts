@@ -28,9 +28,12 @@ export function createResettleHold(deps: {
 	readonly readStatus: (graphNodeId: string) => unknown;
 	readonly commitPendingArm: (boundary: ResumeAsyncBoundaryRecord) => Promise<void>;
 	readonly setBusy?: (boundary: ResumeAsyncBoundaryRecord, busy: boolean) => void;
+	// Disposal ends every stall, so a stall task that wakes after it finds no stall of its own.
+	readonly storeContainerSubscription?: (release: () => void) => void;
 	readonly clock?: { readonly wait?: PendingTimingClock['wait'] };
 }): ResettleHold {
 	const stalls = new Map<string, Stall>();
+	deps.storeContainerSubscription?.(() => stalls.clear());
 	const setBusy =
 		deps.setBusy ?? ((boundary, busy) => (asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, busy));
 	const wait = deps.clock?.wait ?? waitMs;
@@ -77,6 +80,7 @@ export function wireResettleHold(input: {
 		update: ArmCommitUpdate,
 	) => Promise<void>;
 	readonly hasHtmlRenderer: boolean;
+	readonly storeContainerSubscription: (release: () => void) => void;
 }): ResettleHold {
 	const pendingArmHtmlById = new Map<string, string>();
 	for (const boundary of input.hasHtmlRenderer ? input.boundaries : []) {
@@ -88,6 +92,7 @@ export function wireResettleHold(input: {
 		tracker: input.tracker,
 		hasPendingArm: (boundaryId) => pendingArmHtmlById.has(boundaryId),
 		readStatus: input.readStatus,
+		storeContainerSubscription: input.storeContainerSubscription,
 		commitPendingArm: (boundary) =>
 			input.commitArm(boundary, {
 				html: pendingArmHtmlById.get(boundary.id)!,

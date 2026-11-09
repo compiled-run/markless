@@ -353,6 +353,11 @@ export async function startResumeRuntime(input: {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
 			capture: true,
 		});
+		storeContainerSubscription(() =>
+			runtimeInput.root.removeEventListener?.(sharedPatchEventType, receiveSharedPatch, {
+				capture: true,
+			}),
+		);
 	}
 	// A getter: the tracker is created when the first @try is wired, which can be after start.
 	return () => settleTracker;

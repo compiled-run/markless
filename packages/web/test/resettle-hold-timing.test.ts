@@ -1,9 +1,10 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
 import {
 	createAsyncBoundarySettleTracker,
 	settleAsyncBoundaryRange,
+	wireAsyncBoundariesWithoutLoadingCapability,
 } from '../src/resume-async-wiring.ts';
 import { createResettleHold } from '../src/resume-resettle-hold.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
@@ -45,6 +46,7 @@ type ResettleRun = {
 
 function createHarness(available: boolean, commitWaitMs = 0, settledAtStart = true) {
 	const clock = createFakeClock();
+	const releases: Array<() => void> = [];
 	const boundary = boundaryRecord('report');
 	if (!settledAtStart)
 		Object.assign(boundary, { initiallyServedArm: ASYNC_BOUNDARY_ARM.pending });
@@ -66,6 +68,7 @@ function createHarness(available: boolean, commitWaitMs = 0, settledAtStart = tr
 			pendingCommittedAt.push(clock.now());
 		},
 		setBusy: (_, next) => void busy.push({ at: clock.now(), busy: next }),
+		storeContainerSubscription: (release) => void releases.push(release),
 		clock,
 	});
 	const settle = (snapshot: unknown) =>
@@ -103,6 +106,9 @@ function createHarness(available: boolean, commitWaitMs = 0, settledAtStart = tr
 			status = next;
 		},
 		currentVersion: () => version,
+		dispose: () => {
+			for (const release of releases.splice(0)) release();
+		},
 		pendingShownAt,
 		pendingCommittedAt,
 		busy,
@@ -237,4 +243,57 @@ test('a run during the first load is neither held nor marked busy', async () => 
 	await clock.advanceTo(4 * STALL);
 	expect(harness.busy).toEqual([]);
 	expect(harness.pendingShownAt).toEqual([]);
+});
+
+test('a runtime disposed during a refresh never commits the stall fallback', async () => {
+	const harness = createHarness(true);
+	const { clock } = harness;
+	harness.startRun();
+	await clock.advanceTo(1_000);
+	harness.dispose();
+	await clock.advanceTo(3 * STALL);
+	expect(harness.pendingShownAt).toEqual([]);
+	expect(harness.busy).toEqual([{ at: 0, busy: true }]);
+	expect(clock.pendingWaits()).toBe(0);
+});
+
+test('a settle in flight when the runtime is disposed commits nothing and flushes nothing', async () => {
+	const boundary = Object.assign(boundaryRecord('report'), { rerendersOnRefresh: true });
+	const runs: Array<(snapshot: unknown) => unknown> = [];
+	const releases: Array<() => void> = [];
+	let flushes = 0;
+	let loadUpdate: ((symbol: unknown) => void) | undefined;
+	const commitArm = vi.fn(async () => {});
+	wireAsyncBoundariesWithoutLoadingCapability({
+		asyncBoundariesById: new Map([[boundary.id, boundary]]),
+		graph: {
+			subscribe: (subscription: { run: (snapshot: unknown) => unknown }) => {
+				runs.push(subscription.run);
+				return () => {};
+			},
+			read: () => 'fulfilled',
+			flush: async () => void flushes++,
+		} as never,
+		root: {} as never,
+		loadSymbol: () =>
+			new Promise((resolve) => {
+				loadUpdate = resolve;
+			}) as never,
+		renderBranchHtml: undefined,
+		elementHandles: { get: () => undefined } as never,
+		storeContainerSubscription: (release) => void releases.push(release),
+		commitArm,
+	});
+	const settled = runs[0]!({ status: 'fulfilled', version: 2 }) as Promise<unknown>;
+	await vi.waitFor(() => expect(loadUpdate).toBeDefined());
+	for (const release of releases.splice(0)) release();
+	loadUpdate!(async () => ({
+		arm: ASYNC_BOUNDARY_ARM.try,
+		html: '<p>late</p>',
+		armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+	}));
+	await settled;
+	await new Promise((resolve) => setTimeout(resolve, 0));
+	expect(commitArm).not.toHaveBeenCalled();
+	expect(flushes).toBe(0);
 });
