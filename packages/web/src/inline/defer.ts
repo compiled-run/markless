@@ -149,17 +149,31 @@ export function createMarklessDefer(
 			root.__marklessCensus ||= census(root);
 			root.__marklessDelegatedDispatch ||= eventName;
 			pending++;
+			const release = () => {
+				if (!--pending && root.__marklessDelegatedDispatch === eventName)
+					root.__marklessDelegatedDispatch = undefined;
+			};
 			(queue
 				? Promise.resolve(queue(input))
 				: (root.__mResume ||= loadModule(url)).then(
 						(module) => root.__mL === life && module.resumeContainerEvent(input),
+						(error) => {
+							// A failed import is not kept: the next forward or wake imports again.
+							root.__mResume = undefined;
+							throw error;
+						},
 					)
-			).then(() => {
-				if (root.__asyncResumeRuntimeStarted) return;
-				fired.add(host);
-				if (!--pending && root.__marklessDelegatedDispatch === eventName)
-					root.__marklessDelegatedDispatch = undefined;
-			});
+			).then(
+				() => {
+					if (root.__asyncResumeRuntimeStarted) return;
+					fired.add(host);
+					release();
+				},
+				(error) => {
+					release();
+					throw error;
+				},
+			);
 		};
 		const hosts: Element[] = ownsRoot ? [root] : [];
 		hosts.push(
