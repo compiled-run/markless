@@ -58,8 +58,9 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	): void => {
 		if (
 			node.gate === 2 &&
-			(status === 'pending' ||
-				(node.snapshot.status === 'rejected' && Object.is(node.snapshot.error, error)))
+			(status === 'pending'
+				? node.snapshot.status === 'pending'
+				: node.snapshot.status === 'rejected' && Object.is(node.snapshot.error, error))
 		)
 			return;
 
