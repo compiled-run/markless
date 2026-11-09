@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 910,
+			"reason": "runtime graph: the flush scheduler keeps one phase, and fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check (production drops it: +37 B gzip minified)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -4,
+			"reason": "runtime graph: the flush scheduler keeps one phase, and fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check (production drops it: +37 B gzip minified)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 910,
+			"reason": "runtime graph: the flush scheduler keeps one phase, and fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check (production drops it: +37 B gzip minified)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "runtime graph: the flush scheduler keeps one phase, and fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check (production drops it: +37 B gzip minified)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 11,
+			"reason": "runtime graph: the flush scheduler keeps one phase, and fixture builds run with import.meta.env.DEV on, so they also carry its development-only move check (production drops it: +37 B gzip minified)",
+			"date": "2026-11-09"
+		}
+	]
+}

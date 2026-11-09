@@ -335,6 +335,10 @@ export type RuntimeGraph = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 	/** Available only in debug-enabled builds (`__MARKLESS_DEBUG_ENABLED__`). */
 	readonly peekAsyncSnapshot?: (graphNodeId: string) => RuntimeGraphAsyncSnapshot | undefined;
+	/** Debug builds only: the flush scheduler's phase, 0 idle, 1 scheduled, 2 running, 3 tail, 4 rearmed. */
+	readonly peekFlushPhase?: () => number;
+	/** Debug builds only: throws when the flush scheduler could not move from its phase now to `to`; moves nothing. */
+	readonly checkFlushMove?: (to: number) => void;
 	readonly readShared: (
 		definitionId: string,
 		propertyName: string,
@@ -398,6 +402,41 @@ export type RuntimeGraph = {
 
 type RuntimeSharedDefinition = NonNullable<ProtocolStatePayload['sharedDefinitions']>[number];
 
+// Flush scheduler phases. Scheduled and rearmed mean a microtask is queued to start a pass;
+// rearmed is a write landing while journal listeners run, before the pass ends.
+const FLUSH_IDLE = 0;
+const FLUSH_SCHEDULED = 1;
+const FLUSH_RUNNING = 2;
+const FLUSH_TAIL = 3;
+const FLUSH_REARMED = 4;
+type FlushPhase =
+	| typeof FLUSH_IDLE
+	| typeof FLUSH_SCHEDULED
+	| typeof FLUSH_RUNNING
+	| typeof FLUSH_TAIL
+	| typeof FLUSH_REARMED;
+
+function assertFlushMove(from: FlushPhase, to: FlushPhase): void {
+	let allowed: boolean;
+	switch (from) {
+		case FLUSH_IDLE:
+			allowed = to === FLUSH_SCHEDULED || to === FLUSH_RUNNING;
+			break;
+		case FLUSH_SCHEDULED:
+			allowed = to === FLUSH_RUNNING;
+			break;
+		case FLUSH_RUNNING:
+			allowed = to === FLUSH_TAIL;
+			break;
+		case FLUSH_TAIL:
+			allowed = to === FLUSH_REARMED || to === FLUSH_IDLE;
+			break;
+		case FLUSH_REARMED:
+			allowed = to === FLUSH_IDLE;
+	}
+	if (!allowed) throw new Error(`Illegal flush phase move ${from} -> ${to}`);
+}
+
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
@@ -412,17 +451,21 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
 	const journal: DomJournalEntry[] = [];
-	let flushScheduled = false;
-	let flushing = false;
+	let flushPhase: FlushPhase = FLUSH_IDLE;
 	// Nests: a handler whose own wait overlaps another handler's stays counted until both end.
 	let userActionDepth = 0;
 	// A handler ended with its writes still queued: they stay loud for that one flush pass only.
 	let flushUserAction = false;
 	let quietDepth = 0;
 	let notifyingWrite = false;
+	// The awaitable for the pass the phase says is active; never read to decide anything.
 	let activeFlush: Promise<void> | undefined;
 	let flushHolds = 0;
-	const hasPendingFlush = () => flushScheduled || dirtyPaths.length > 0 || activeFlush !== undefined;
+	const moveFlush = (to: FlushPhase): void => {
+		if (import.meta.env?.DEV) assertFlushMove(flushPhase, to);
+		flushPhase = to;
+	};
+	const hasPendingFlush = () => flushPhase !== FLUSH_IDLE || dirtyPaths.length > 0;
 
 	for (const cell of input.cells) {
 		cells.set(cell.graphNodeId, cell.value);
@@ -510,7 +553,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	const notifyWriteObservers = (graphNodeId: string, path: ReadonlyArray<string>): void => {
-		if (writeObservers.length === 0 || flushing || notifyingWrite) return;
+		if (writeObservers.length === 0 || flushPhase === FLUSH_RUNNING || notifyingWrite) return;
 
 		const write: DirtyPath = { graphNodeId, path };
 		if (codeThePassWaitsOn().length > 0) return;
@@ -540,9 +583,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		);
 
 	const scheduleFlush = (): void => {
-		if (flushScheduled || flushing) return;
-
-		flushScheduled = true;
+		if (flushPhase === FLUSH_IDLE) moveFlush(FLUSH_SCHEDULED);
+		else if (flushPhase === FLUSH_TAIL) moveFlush(FLUSH_REARMED);
+		else return;
 		queueMicrotask(runScheduledFlush);
 	};
 
@@ -611,7 +654,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	});
 
 	const flush = (): Promise<void> => {
-		if (activeFlush) return activeFlush;
+		if (flushPhase > FLUSH_SCHEDULED) return activeFlush!;
 
 		// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
 		let settle!: (pass: Promise<void>) => void;
@@ -621,8 +664,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	const runFlush = async (): Promise<void> => {
-		flushScheduled = false;
-		flushing = true;
+		moveFlush(FLUSH_RUNNING);
 
 		try {
 			try {
@@ -665,22 +707,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				}
 			} finally {
 				plane?.settleBaselines();
-				flushing = false;
+				moveFlush(FLUSH_TAIL);
 			}
 
 			await notifyJournalListeners();
 		} finally {
 			activeFlush = undefined;
-			// A write landing while this pass is active arms flushScheduled, then
-			// finds flush() short-circuit on activeFlush, so the flag outlives the
-			// pass that would clear it and every later scheduleFlush no-ops. Clearing
-			// it here keeps it truthful, so the re-arm below can wake: any write that
-			// reached the graph is applied by a flush nobody had to call explicitly.
-			flushScheduled = false;
-
-			if (dirtyPaths.length > 0) {
-				scheduleFlush();
-			}
+			// A tail write's own microtask found this pass still active, so the pass end wakes it.
+			moveFlush(FLUSH_IDLE);
+			if (dirtyPaths.length > 0) scheduleFlush();
 		}
 	};
 
@@ -716,6 +751,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			? {
 					peekAsyncSnapshot: (graphNodeId: string) =>
 						asyncPlane?.nodes.get(graphNodeId)?.snapshot,
+					peekFlushPhase: () => flushPhase,
+					checkFlushMove: (to: number) => assertFlushMove(flushPhase, to as FlushPhase),
 				}
 			: {}),
 		readShared: sharedGraph.readShared,
@@ -778,7 +815,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		markUserActionEnd() {
 			userActionDepth = Math.max(0, userActionDepth - 1);
-			if (userActionDepth === 0 && (flushScheduled || flushing || dirtyPaths.length > 0)) {
+			if (
+				userActionDepth === 0 &&
+				((flushPhase !== FLUSH_IDLE && flushPhase !== FLUSH_TAIL) || dirtyPaths.length > 0)
+			) {
 				flushUserAction = true;
 				// The dispatch awaits and reports this same flush; here it only ends the latch.
 				const end = () => void (flushUserAction = false);
@@ -835,7 +875,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return () => {
 				if (!held) return;
 				held = false;
-				if (!--flushHolds && flushScheduled) queueMicrotask(runScheduledFlush);
+				if (!--flushHolds && (flushPhase === FLUSH_SCHEDULED || flushPhase === FLUSH_REARMED))
+					queueMicrotask(runScheduledFlush);
 			};
 		},
 		settleWriteObservers() {
