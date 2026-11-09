@@ -1396,7 +1396,7 @@ export async function navigate(
 		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
-	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
+	d.dispatchEvent(new CustomEvent(state.config.renderedEvent));
 	state.rescan();
 	const key = state.shown;
 	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(
