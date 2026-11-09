@@ -63,8 +63,7 @@ async function adoptStreamedPatchesIfPresent(
 		return decoded;
 	}
 	const { adoptStreamedArmPatches } = await import('./resume-stream-patches.ts');
-	if (pageLifetime(root) !== life) return decoded;
-	return adoptStreamedArmPatches(decoded, root);
+	return adoptStreamedArmPatches(decoded, root, life);
 }
 
 export async function resumeFromPayloadScriptsImpl(
@@ -90,9 +89,7 @@ export async function resumeFromPayloadScriptsImpl(
 
 export async function resumeFromPrerenderRecordsImpl(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & DecodedPayloadScripts,
-	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
-	if (pageLifetime(input.root) !== life) return wakeNoopResume;
 	const resumed = getAlreadyResumedPayload(input.root);
 	if (resumed) return resumed;
 	const retired = getRetiredResumedPayload(input.root);
@@ -100,6 +97,7 @@ export async function resumeFromPrerenderRecordsImpl(
 	const root = input.root as typeof input.root & {
 		__mStart?: Promise<ResumePayloadScriptsResult>;
 	};
+	const life = pageLifetime(root);
 	return containWakeBoot(
 		root,
 		(root.__mStart ??= startDecodedResume(input, input, life).finally(() => {

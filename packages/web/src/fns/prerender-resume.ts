@@ -11,6 +11,7 @@ import {
 	type PayloadScriptDocument,
 } from '../payload-document-common.ts';
 import { resumeFromPrerenderRecordsImpl } from '../payload-resume.ts';
+import { wakeNoopResume } from '../payload-resume-registry.ts';
 import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
 import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
@@ -121,8 +122,7 @@ async function adoptStreamedForWake<
 		return input;
 	}
 	const { adoptStreamedArmPatches } = await import('../resume-stream-patches.ts');
-	if (pageLifetime(input.root) !== life) return input;
-	return { ...input, ...(await adoptStreamedArmPatches(input, input.root)) };
+	return { ...input, ...(await adoptStreamedArmPatches(input, input.root, life)) };
 }
 
 const pageLifetime = (root: object): unknown => (root as { readonly __mL?: object }).__mL;
@@ -138,8 +138,11 @@ export async function resumeFromPrerenderRecords(
 		},
 		life,
 	);
-	return resumeFromPrerenderRecordsImpl(
-		await adoptFilledArms(adopted, adopted.root as never, adopted.renderAsyncBoundary as never),
-		life,
+	const filled = await adoptFilledArms(
+		adopted,
+		adopted.root as never,
+		adopted.renderAsyncBoundary as never,
 	);
+	if (pageLifetime(input.root) !== life) return wakeNoopResume;
+	return resumeFromPrerenderRecordsImpl(filled);
 }
