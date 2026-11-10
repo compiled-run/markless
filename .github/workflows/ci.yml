@@ -25,7 +25,7 @@ permissions:
 jobs:
     agent-files:
         runs-on: ubuntu-26.04
-        timeout-minutes: 5
+        timeout-minutes: 10
         steps:
             - uses: actions/checkout@v4
               with:
@@ -38,6 +38,7 @@ jobs:
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
+                  cache: pnpm
 
             - name: Verify committed agent files match .ruler/ sources
               run: |
@@ -50,6 +51,14 @@ jobs:
                       echo "$DRIFT"
                       exit 1
                   fi
+
+            - name: Install Markless dependencies
+              run: pnpm install --frozen-lockfile
+
+            # A node-project test whose imports reach an app build or a browser launch is listed in
+            # scripts/ci/heavy-tests.json, so heavy work enters the unit lane only on purpose.
+            - name: Check that heavy unit tests are declared
+              run: node scripts/ci/test-placement.mjs
 
     # Fast static gate in front of the 30-minute `test` job, so type red kills
     # the run in seconds instead of half an hour. tsc is the gate of record;
@@ -621,7 +630,18 @@ jobs:
               run: pnpm --dir packages/vitest-browser exec playwright install chromium webkit
 
             - name: Run unit and integration tests
-              run: pnpm exec vp test --project node --shard=${{ matrix.shard }}
+              env:
+                  MARKLESS_UNIT_BUDGET_OUT: ${{ runner.temp }}/unit-budget/measurement.json
+                  MARKLESS_UNIT_BUDGET_SHARD: ${{ matrix.shard }}
+              run: node scripts/ci/unit-budget.mjs measure -- pnpm exec vp test --project node --shard=${{ matrix.shard }}
+
+            - name: Upload the unit budget measurement
+              if: ${{ !cancelled() }}
+              uses: actions/upload-artifact@v4
+              with:
+                  name: unit-budget-shard${{ strategy.job-index }}-attempt${{ github.run_attempt }}
+                  path: ${{ runner.temp }}/unit-budget/measurement.json
+                  if-no-files-found: error
 
     # The real-Chromium browser and @markless/ui projects, each split by test file across three runners.
     # @markless/ui runs 670 s of files serially, 125 s of it in one conformance file; on one shard it
@@ -1557,9 +1577,22 @@ jobs:
             # for a runner again after the box lanes (9 minutes on 2026-10-27). A skipped box lane's receipts come
             # back out of the cache entry its last green run saved under the key whose hit skipped it.
             - uses: actions/checkout@v4
-              if: env.RUN_RECEIPTS == 'true'
+              if: env.RUN_RECEIPTS == 'true' || needs.unit.result == 'success'
               with:
                   persist-credentials: false
+
+            # The unit shards' CPU-seconds and peak memory against the Linux anchors in
+            # scripts/ci/unit-budget.json; it runs only when the unit lane ran in this run.
+            - name: Download the unit budget measurements
+              if: needs.unit.result == 'success'
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: unit-budget-*
+                  path: ${{ runner.temp }}/unit-budget
+
+            - name: Check the unit shards against their CPU and memory budget
+              if: needs.unit.result == 'success'
+              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
 
             - uses: pnpm/action-setup@v4
               if: env.RUN_RECEIPTS == 'true'
