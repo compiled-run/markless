@@ -873,6 +873,10 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					executionLog: input.executionLog,
 					headInjections: headInjections.length > 0 ? headInjections : undefined,
 					storageSeeds: storageSeeds.length > 0 ? storageSeeds : undefined,
+					storageSeedImports: importedStorageSeedSources(
+						compiled.semanticGraph.componentEdges,
+						input.importedModuleInterfaces,
+					),
 					inlineResumerSources,
 					prerenderBoot,
 					...(input.environment === 'server'
@@ -1044,6 +1048,24 @@ function servedDefinition(
 	return Object.fromEntries(
 		Object.entries(rest).filter(([field]) => !UNEVALUATED_DEFINITION_FIELDS.includes(field)),
 	);
+}
+
+// Imported children whose linked interface says their tree serves storage() cells; each child's artifact carries its own collected seeds.
+function importedStorageSeedSources(
+	edges: CompileTsrxModuleResult['semanticGraph']['componentEdges'],
+	importedModuleInterfaces: TransformTsrxModuleInput['importedModuleInterfaces'],
+): ReadonlyArray<string> {
+	const sources = new Set<string>();
+	for (const edge of edges) {
+		if (!edge.importSource) continue;
+		const reachesStorage = importedModuleInterfaces?.[edge.importSource]?.render.components.some(
+			(component) =>
+				component.componentName === (edge.importedName ?? edge.childComponentName) &&
+				component.storageCells === true,
+		);
+		if (reachesStorage) sources.add(edge.importSource);
+	}
+	return [...sources];
 }
 
 // The first edge to use a name also answers by it, for walks that only know a name; a later same-named one does not.

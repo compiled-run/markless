@@ -414,7 +414,7 @@ ${tipLook('.pg-tip')}
 
 			.pg-showall:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 
@@ -682,7 +682,7 @@ export const CODE_CSS = `			.pg-panel-outer {
 
 			.pg-expand:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 

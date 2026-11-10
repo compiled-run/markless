@@ -49,6 +49,7 @@
 		"packages/bundler/test/direct-render-startup.test.ts",
 		"packages/bundler/test/export-collision-fixture.test.ts",
 		"packages/bundler/test/failed-build-compile-store.test.ts",
+		"packages/bundler/test/fixture-builds.test.ts",
 		"packages/bundler/test/interaction-closures-build.test.ts",
 		"packages/bundler/test/music-player-csr-budget.test.ts",
 		"packages/bundler/test/music-player-ssr-budget.test.ts",
@@ -151,6 +152,7 @@
 		"packages/router/test/vite/unminified-build.test.ts",
 		"packages/router/test/vite/vercel-isr-navigation.test.ts",
 		"packages/router/test/vite/vercel-output.test.ts",
+		"packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
 		"packages/web/test/served-census.test.ts"
@@ -165,10 +167,6 @@
 			"why": "starts the bundler's build-worker pool, whose worker file src/build-workers.ts picks at run time (.ts or .js)"
 		},
 		{
-			"test": "packages/bundler/test/fixture-builds.test.ts",
-			"why": "runs `vite build` on the bundler fixtures through execFile"
-		},
-		{
 			"test": "packages/router/test/navigation-chunk.test.ts",
 			"why": "runs `pnpm --filter @markless/fixture-router build` through execFile"
 		},
@@ -179,10 +177,6 @@
 		{
 			"test": "packages/typescript-plugin/test/language.test.ts",
 			"why": "runs `vp pack` through spawnSync"
-		},
-		{
-			"test": "packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
-			"why": "runs a Vitest browser-mode project in a child process, which launches Chromium"
 		},
 		{
 			"test": "scripts/benchmarks/perf-guards/first-use.test.ts",

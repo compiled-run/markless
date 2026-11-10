@@ -69,6 +69,37 @@ test('CSR: the site demo follows its switch after a failed refresh', async () =>
 	await demo();
 });
 
+// Each @try arm loads its own code once the page data lands; a switch click while one is still loading must not freeze it on @pending.
+test('CSR: a @try arm whose code lands after a switch click still reveals its settled content', async () => {
+	const base = SitePage as unknown as { readonly loadSymbol: (symbolId: string) => unknown };
+	const mount = async (late: (symbolId: string) => boolean) => {
+		const armCode: string[] = [];
+		let settling = false;
+		await render({
+			...base,
+			loadSymbol: async (symbolId: string) => {
+				if (settling) armCode.push(symbolId);
+				if (late(symbolId)) await new Promise((resolve) => setTimeout(resolve, 300));
+				return base.loadSymbol(symbolId);
+			},
+		} as typeof SitePage);
+		await expect.poll(() => asked('site:1:0')).toBe(true);
+		settling = true;
+		answer('site:1:0');
+		await expect.poll(() => texts('[data-amount]').length).toBe(4);
+		settling = false;
+		usd().click();
+		await expect.poll(() => texts('[data-amount]')[0]).toBe('$275.00');
+		await expect.poll(() => (button('Next') as HTMLButtonElement).disabled).toBe(false);
+		cleanup();
+		forgetRequests();
+		return armCode;
+	};
+	const symbols = [...new Set(await mount(() => false))];
+	expect(symbols.length).toBeGreaterThan(1);
+	for (const symbol of symbols) await mount((symbolId) => symbolId === symbol);
+});
+
 test('SSR: the site demo follows its switch after a failed refresh after resume', async () => {
 	await renderSSR(SitePage);
 	await demo();
