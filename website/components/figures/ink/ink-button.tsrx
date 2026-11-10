@@ -88,7 +88,7 @@ export default function InkButton({
 			}
 
 			.ink-button[aria-pressed='true'] .label {
-				color: oklch(28% 0.015 90);
+				color: var(--on-accent);
 			}
 
 			.ink-button:hover .wash {

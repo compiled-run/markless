@@ -195,11 +195,19 @@ export default function ListsSketch() @{
 			}
 
 			.row:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.row:has(:checked) {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.none {

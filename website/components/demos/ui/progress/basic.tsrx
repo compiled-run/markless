@@ -43,12 +43,23 @@ export default function ProgressBasic() @{
 			.bar-fill {
 				width: 100%;
 				height: 100%;
-				background: color-mix(in srgb, var(--purple) 60%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 60%, var(--cream));
 				transition: transform 140ms ease;
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.bar-fill[ui-progress='complete'] {
-				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--on-accent);
+				}
 			}
 
 			.bar-fill[ui-progress='indeterminate'] {

@@ -124,11 +124,13 @@ export default function Code({ files }: { readonly files: readonly CodePane[] })
 			}
 
 			.pg-tab:hover {
-				background: color-mix(in oklch, var(--pg-wash) 50%, var(--paper));
+				background: color-mix(in oklch, var(--pg-wash) 50%, var(--cream));
+				color: var(--on-accent);
 			}
 
 			.pg-tab[ui-selected] {
 				background: var(--pg-wash);
+				color: var(--on-accent);
 			}
 
 			.pg-tab + .pg-tab {

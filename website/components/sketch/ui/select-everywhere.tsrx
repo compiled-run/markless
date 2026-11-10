@@ -130,11 +130,19 @@ export default function SelectEverywhere() @{
 			}
 
 			.trigger:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger[ui-open] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger:focus-visible,
@@ -160,11 +168,19 @@ export default function SelectEverywhere() @{
 			}
 
 			.option:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.option[ui-selected] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.option * {

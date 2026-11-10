@@ -357,6 +357,7 @@ export default function StickersAnatomy() @{
 					<path class="face" d={art.sticker.face} />
 					<path class="hatch" d={art.sticker.faceShade} />
 					<path class="ink" d={art.sticker.ink} />
+					<path class="ink face-ink" d={art.sticker.faceInk} />
 					<path class="ink empty" d={art.sticker.empty} />
 					<text class="num" x={art.sticker.number.x} y={art.sticker.number.y}>{name}</text>
 					<path class="liner" d={art.sticker.curlUnder} />
@@ -451,6 +452,7 @@ export default function StickersAnatomy() @{
 					<path class="face" d={art.sticker.face} />
 					<path class="hatch" d={art.sticker.faceShade} />
 					<path class="ink" d={art.sticker.ink} />
+					<path class="ink face-ink" d={art.sticker.faceInk} />
 					<path class="ink empty" d={art.sticker.empty} />
 					<text class="num" x={art.sticker.number.x} y={art.sticker.number.y}>{name}</text>
 					<path class="liner" d={art.sticker.curlUnder} />
@@ -545,6 +547,7 @@ export default function StickersAnatomy() @{
 					<path class="face" d={art.sticker.face} />
 					<path class="hatch" d={art.sticker.faceShade} />
 					<path class="ink" d={art.sticker.ink} />
+					<path class="ink face-ink" d={art.sticker.faceInk} />
 					<path class="ink empty" d={art.sticker.empty} />
 					<text class="num" x={art.sticker.number.x} y={art.sticker.number.y}>{name}</text>
 					<path class="liner" d={art.sticker.curlUnder} />
@@ -639,6 +642,7 @@ export default function StickersAnatomy() @{
 					<path class="face" d={art.sticker.face} />
 					<path class="hatch" d={art.sticker.faceShade} />
 					<path class="ink" d={art.sticker.ink} />
+					<path class="ink face-ink" d={art.sticker.faceInk} />
 					<path class="ink empty" d={art.sticker.empty} />
 					<text class="num" x={art.sticker.number.x} y={art.sticker.number.y}>{name}</text>
 					<path class="liner" d={art.sticker.curlUnder} />
@@ -683,11 +687,44 @@ export default function StickersAnatomy() @{
 				--line: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--liner: color-mix(in oklch, var(--ink) 88%, oklch(70% 0.05 85));
-					--sticker: color-mix(in oklch, var(--ink) 96%, white);
-					--knob: color-mix(in oklch, var(--ink) 85%, oklch(60% 0.02 250));
-					--line: var(--paper);
+					--sheet: var(--figure-sheet);
+					--liner: var(--slab);
+					--sticker: var(--figure-sheet);
+					--knob: var(--raised);
+				}
+			}
+
+			html.dark .scene {
+				.wash {
+					mix-blend-mode: normal;
+				}
+
+				.pick-spot {
+					fill: color-mix(in srgb, var(--yellow) 35%, var(--cream));
+				}
+
+				&[data-who='0'] .pick-spot.p0,
+				&[data-who='1'] .pick-spot.p1,
+				&[data-who='2'] .pick-spot.p2 {
+					opacity: 1;
+				}
+
+				&[data-who='0'] .pick.p0,
+				&[data-who='1'] .pick.p1,
+				&[data-who='2'] .pick.p2 {
+					fill: var(--on-accent);
+				}
+
+				path.face {
+					fill: color-mix(in oklch, color-mix(in oklch, var(--cream) 20%, white) 70%, var(--pink));
+				}
+
+				path.face + .hatch {
+					stroke: var(--on-accent);
+				}
+
+				.face-ink {
+					fill: var(--on-accent);
 				}
 			}
 

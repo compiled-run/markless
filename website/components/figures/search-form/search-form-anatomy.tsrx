@@ -163,10 +163,8 @@ export default function SearchFormAnatomy() @{
 				--pencil: color-mix(in oklch, var(--ink) 72%, var(--paper));
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--field: color-mix(in oklch, var(--ink) 97%, white);
-					--text: var(--paper);
-					--pencil: color-mix(in oklch, var(--paper) 72%, var(--ink));
+					--sheet: var(--figure-sheet);
+					--field: var(--slab);
 				}
 			}
 
@@ -197,18 +195,27 @@ export default function SearchFormAnatomy() @{
 				opacity: 0.45;
 
 				html.dark & {
-					stroke: black;
-					opacity: 0.6;
+					stroke: var(--figure-hatch);
+					opacity: 0.8;
 				}
 			}
 
 			.wash {
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					mix-blend-mode: normal;
+				}
 			}
 
 			.pink {
 				fill: var(--pink);
 				opacity: 0.55;
+
+				html.dark & {
+					fill: color-mix(in srgb, var(--pink) 55%, var(--cream));
+					opacity: 1;
+				}
 			}
 
 			.yellow {
@@ -218,6 +225,10 @@ export default function SearchFormAnatomy() @{
 
 			.track {
 				fill: color-mix(in oklch, var(--yellow) 70%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 70%, var(--cream));
+				}
 			}
 
 			.anatomy[data-present='no'] .track {
@@ -388,11 +399,6 @@ export default function SearchFormAnatomy() @{
 				caret-color: var(--ink);
 				-webkit-appearance: none;
 				appearance: none;
-
-				html.dark & {
-					color: var(--paper);
-					caret-color: var(--paper);
-				}
 			}
 
 			.real-input::-webkit-search-cancel-button {
@@ -410,7 +416,7 @@ export default function SearchFormAnatomy() @{
 				cursor: pointer;
 
 				html.dark & {
-					color: var(--paper);
+					color: var(--on-accent);
 				}
 			}
 

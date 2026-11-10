@@ -2,15 +2,10 @@
 
 function accent(card: string): string {
 	return `			${card} {
-				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--paper));
-				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--cream));
+				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				--pg-edge: color-mix(in oklch, var(--ink) 80%, transparent);
 				--pg-font: 'Shantell Sans', system-ui, sans-serif;
-
-				html.dark & {
-					--pg-accent: color-mix(in srgb, var(--purple) 42%, var(--paper));
-					--pg-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-				}
 			}`;
 }
 
@@ -197,6 +192,11 @@ const PICK_CSS = `			.pg-pick-trigger {
 
 			.pg-pick-item[ui-selected] {
 				background: var(--pg-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}`;
 
 /** One focus ring for every control the chrome draws: the site's yellow, as its hover docs use. */
@@ -294,7 +294,13 @@ export const CONTROLS_CSS = `${sticker('.pg')}
 			}
 
 			.pg-switch[ui-checked] {
-				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--on-accent);
+				}
 			}
 
 			.pg-switch:disabled {
@@ -569,11 +575,13 @@ export const CODE_CSS = `			.pg-panel-outer {
 			}
 
 			.pg-tab:hover {
-				background: color-mix(in oklch, var(--pg-wash) 50%, var(--paper));
+				background: color-mix(in oklch, var(--pg-wash) 50%, var(--cream));
+				color: var(--on-accent);
 			}
 
 			.pg-tab[ui-selected] {
 				background: var(--pg-wash);
+				color: var(--on-accent);
 			}
 
 			.pg-tab + .pg-tab {
@@ -836,10 +844,12 @@ function binder(card: string): string {
 				border-block-end: 0;
 				border-radius: 22px 24px 5px 4px / 18px 20px 5px 4px;
 				background: color-mix(in oklch, var(--ink) 9%, var(--paper));
+				color: var(--ink);
 			}
 
 			${card} .pg-tab[ui-selected] {
 				background: var(--paper);
+				color: var(--ink);
 				font-weight: 700;
 			}
 

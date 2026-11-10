@@ -12,7 +12,7 @@ export default function NothingFound() @{
 				--nothing-glass: var(--yellow);
 				--nothing-glass-opacity: 0.55;
 				--nothing-glass-blend: multiply;
-				--nothing-pencil: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				--nothing-pencil: var(--pencil);
 				--nothing-pencil-opacity: 0.5;
 				inline-size: min(13rem, 70%);
 				block-size: auto;
@@ -20,7 +20,7 @@ export default function NothingFound() @{
 
 				html.dark & {
 					--nothing-paper: var(--code-surface);
-					--nothing-glass-opacity: 0.3;
+					--nothing-glass-opacity: 0.85;
 					--nothing-glass-blend: normal;
 					--nothing-pencil-opacity: 0.32;
 				}

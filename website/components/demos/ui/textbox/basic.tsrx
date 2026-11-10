@@ -68,7 +68,12 @@ export default function Username() @{
 			}
 
 			.input:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.input:focus-visible {
@@ -99,10 +104,15 @@ export default function Username() @{
 				padding: 0.05em 0.5em;
 				border: 1px solid var(--ink);
 				border-radius: 6px;
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				color: var(--ink);
 				font-family: var(--font-mono);
 				font-size: var(--step--1);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.field[ui-empty] .hook-empty,

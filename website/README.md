@@ -177,7 +177,8 @@ resume against the right nodes.
 Supported fences: `tsrx`, `ts`, `tsx`, `js`, `json`, `css`, `sh`, `bash`, `html`. A fence in any
 other language is left as plain `<pre><code>`.
 
-`tooling/highlight-code.ts` runs shiki with two themes, `github-light` and `github-dark`. It drops
+`tooling/highlight-code.ts` runs shiki with two themes, `github-light` and `markless-dark` (github-dark's scopes painted with
+the site's `--syntax-*` tokens, from `tooling/shiki-surface.ts`). It drops
 each theme's background and default text colour, so a block sits on the site's own ground and ink.
 
 In a `tsrx` fence, the TSRX constructs and the framework calls carry a hover doc: point at `@if`,

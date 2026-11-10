@@ -328,8 +328,9 @@ export default function JCardAnatomy() @{
 				--hot: oklch(70% 0.17 60);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
-					--card: color-mix(in oklch, var(--ink) 78%, oklch(60% 0.08 85));
+					--shade: var(--figure-shade);
+					--sheet: var(--figure-sheet);
+					--card: color-mix(in oklch, var(--figure-sheet) 62%, oklch(58% 0.09 70));
 				}
 			}
 
@@ -347,10 +348,6 @@ export default function JCardAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark &:not(.desk) {
-					fill: var(--paper);
-				}
 			}
 
 			.faint {
@@ -363,6 +360,10 @@ export default function JCardAnatomy() @{
 
 			.spine {
 				fill: color-mix(in oklch, var(--card) 75%, var(--ink));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--card) 55%, var(--slab));
+				}
 			}
 
 			.paper {
@@ -390,6 +391,10 @@ export default function JCardAnatomy() @{
 				letter-spacing: 0.25em;
 				text-anchor: middle;
 				fill: var(--paper);
+
+				html.dark & {
+					fill: var(--ink);
+				}
 			}
 
 			.num {
@@ -501,10 +506,18 @@ export default function JCardAnatomy() @{
 
 			.pen-body {
 				fill: color-mix(in oklch, var(--paper) 60%, oklch(55% 0.15 260));
+
+				html.dark & {
+					fill: color-mix(in oklch longer hue, var(--paper) 35%, oklch(55% 0.15 260));
+				}
 			}
 
 			.rubber {
 				fill: color-mix(in oklch, var(--paper) 60%, oklch(70% 0.12 10));
+
+				html.dark & {
+					fill: color-mix(in oklab, var(--paper) 35%, oklch(70% 0.12 10));
+				}
 			}
 
 			@keyframes ink-in {
@@ -546,15 +559,6 @@ export default function JCardAnatomy() @{
 				100% {
 					opacity: 1;
 					stroke-dashoffset: -260;
-				}
-			}
-
-			.title,
-			.num,
-			.song,
-			.line {
-				html.dark & {
-					fill: var(--paper);
 				}
 			}
 

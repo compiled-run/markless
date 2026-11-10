@@ -184,18 +184,17 @@ export default function EditorFigure() @{
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
-				--c-kw: #d73a49;
-				--c-fn: #6f42c1;
-				--c-str: #032f62;
-				--c-tag: #22863a;
-				--c-num: #005cc5;
-				--c-err: #cb2431;
+				--c-kw: var(--syntax-kw);
+				--c-fn: var(--syntax-fn);
+				--c-str: var(--syntax-str);
+				--c-tag: var(--syntax-tag);
+				--c-num: var(--syntax-num);
+				--c-err: var(--figure-error);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 

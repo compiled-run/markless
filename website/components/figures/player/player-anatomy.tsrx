@@ -405,12 +405,29 @@ export default function PlayerAnatomy() @{
 				--sheet-ink: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--band: color-mix(in oklch, var(--ink) 86%, oklch(70% 0.04 250));
-					--steel: color-mix(in oklch, var(--ink) 80%, oklch(70% 0.01 250));
-					--sleeve: color-mix(in oklch, var(--ink) 75%, oklch(72% 0.06 220));
-					--sun: color-mix(in oklch, var(--ink) 55%, oklch(74% 0.12 55));
-					--sheet-ink: var(--paper);
+					--sheet: var(--figure-sheet);
+					--band: var(--slab);
+					--steel: var(--slab);
+					--sleeve: color-mix(in oklch, var(--cream) 60%, oklch(72% 0.06 220));
+					--sun: color-mix(in oklch, var(--cream) 45%, oklch(74% 0.12 55));
+				}
+			}
+
+			html.dark .scene {
+				.cover + .hatch,
+				.sun + .ink,
+				.press .wash ~ .ink {
+					fill: var(--on-accent);
+					stroke: var(--on-accent);
+				}
+
+				.wash {
+					mix-blend-mode: normal;
+				}
+
+				.pink {
+					fill: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
 				}
 			}
 

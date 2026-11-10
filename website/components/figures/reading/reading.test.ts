@@ -72,11 +72,10 @@ describe('the figures are coloured exactly like the page’s code blocks', () =>
 
 	it('draws each token in the colour the renderer gave it, with no mixing', () => {
 		const tinted = art.lines.flatMap((line) => line.pieces).filter((piece) => piece.tint);
-		const colours = new Set(tokens.flat().map((token) => token.color).filter(Boolean));
-		expect(tinted.length).toBeGreaterThan(10);
-		for (const piece of tinted) expect(colours).toContain(piece.tint.replace('--c:', ''));
-		const sketched = Object.values(sketches).flatMap((pair) => [pair.wide, pair.tall]).flatMap((layout) => layout.texts).filter((text) => text.style.startsWith('--c:'));
 		const pairs = new Set(tokens.flat().filter((token) => token.color).map((token) => `--c:${token.color};--cd:${token.dark || 'var(--ink)'}`));
+		expect(tinted.length).toBeGreaterThan(10);
+		for (const piece of tinted) expect(pairs).toContain(piece.tint);
+		const sketched = Object.values(sketches).flatMap((pair) => [pair.wide, pair.tall]).flatMap((layout) => layout.texts).filter((text) => text.style.startsWith('--c:'));
 		expect(sketched.length).toBeGreaterThan(10);
 		for (const text of sketched) expect(pairs).toContain(text.style);
 		expect(printout).toMatch(/\.tint \{\s*fill: var\(--c\);/);

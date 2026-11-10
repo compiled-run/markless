@@ -6,16 +6,14 @@
 	--purple: oklch(75.4% 0.165 310);
 	--green-soft: oklch(84% 0.1 140);
 	--green-star: oklch(80% 0.155 148);
-	--paper: oklch(91.4% 0.033 79);
+	--cream: oklch(91.4% 0.033 79);
+	--paper: var(--cream);
 	/* Code surface: paper, a shade lighter than the page, with a quiet edge. */
 	--code-surface: oklch(96% 0.02 79);
 	--code-edge: color-mix(in oklch, var(--ink) 22%, transparent);
 
-	/* Every pastel accent is light in both themes, so anything printed on one is
-	   always the dark ink, never the page's foreground. */
+	/* Accents keep their light values in both themes, so anything printed on one is the dark ink. */
 	--on-accent: oklch(28% 0.015 90);
-	/* The highlighter pen behind inline code: solid on paper, a translucent
-	   wash on the chalkboard. */
 	--mark: var(--yellow);
 	--on-mark: var(--on-accent);
 	/* Raised surfaces: the playground frame, the callout, the collapsible. */
@@ -41,27 +39,74 @@
 	--sprite-light: inline-block;
 	--sprite-dark: none;
 
-	/* Dark: the same paper design with the ground and the ink swapped, a warm
-	   near-black chalkboard, off-white chalk, the same four pastel accents. */
+	--figure-sheet: color-mix(in oklch, var(--paper) 50%, white);
+	--figure-shade: color-mix(in oklch, var(--ink) 24%, transparent);
+	--figure-hatch: var(--ink);
+	--pencil: color-mix(in srgb, var(--pink) 70%, #e0603c);
+	--marker: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+	--highlight: oklch(72% 0.15 75);
+	--figure-ring: oklch(55% 0.17 30);
+	--figure-error: #cb2431;
+	--figure-ok: oklch(48% 0.13 150);
+	--wood: oklch(72% 0.07 65);
+	--figure-kraft: color-mix(in oklch, oklch(78% 0.06 70) 70%, var(--cream));
+	--syntax-kw: #d73a49;
+	--syntax-fn: #6f42c1;
+	--syntax-str: #032f62;
+	--syntax-tag: #22863a;
+	--syntax-num: #005cc5;
+	--syntax-var: #e36209;
+	--syntax-comment: #6a737d;
+	--shadow-h1: var(--pink);
+	--shadow-h2: var(--purple);
+	--shadow-h3: var(--green-soft);
+	color-scheme: light;
+
+	/* Dark: ink and paper swap; the accents stay exactly as in light. */
 	&.dark {
-		--ink: oklch(93% 0.012 85);
-		--paper: oklch(18% 0.007 70);
-		--code-surface: oklch(32% 0.011 70);
+		color-scheme: dark;
+		--ink: var(--cream);
+		--paper: var(--on-accent);
+		--code-surface: oklch(33% 0.015 90);
 		--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
-		--raised: oklch(26% 0.01 70);
-		--mark: color-mix(in oklch, var(--yellow) 26%, transparent);
-		--on-mark: var(--yellow);
-		--tinted: color-mix(in oklch, var(--yellow) 14%, var(--paper));
-		--tinted-quiet: color-mix(in oklch, var(--yellow) 9%, var(--paper));
+		--raised: oklch(31.5% 0.015 90);
+		--tinted: color-mix(in oklch, var(--yellow) 45%, var(--cream));
+		--tinted-quiet: color-mix(in oklch, var(--yellow) 35%, var(--cream));
 		--hover-wash: 11%;
-		--slab: oklch(11% 0.008 70);
-		--slab-ink: oklch(92% 0.012 85);
-		--grain-fiber-blend: soft-light;
-		--grain-fiber-opacity: 0.3;
-		--grain-speck-blend: screen;
-		--grain-speck-opacity: 0.06;
+		--slab: oklch(21% 0.014 90);
+		--slab-ink: var(--ink);
+		/* Noise drives alpha over a fixed colour, so no blend mode can lift the ground and every engine agrees. */
+		--grain-fiber: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.33 0.33 0.33 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='1.5' intercept='-0.25'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url%28%23grain%29'/%3E%3C/svg%3E");
+		--grain-speck: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.92 0 0 0 0 0.886 0 0 0 0 0.8 0.33 0.33 0.33 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='4' intercept='-2'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url%28%23grain%29'/%3E%3C/svg%3E");
+		--grain-fiber-blend: normal;
+		--grain-fiber-opacity: 0.08;
+		--grain-speck-blend: normal;
+		--grain-speck-opacity: 0.25;
+		--shadow-h1: oklch(62% 0.07 315);
+		--shadow-h2: oklch(62% 0.07 240);
+		--shadow-h3: oklch(62% 0.07 135);
+		--shadow-x: -0.06em;
+		--shadow-y: 0.06em;
 		--sprite-light: none;
 		--sprite-dark: inline-block;
+		--figure-sheet: var(--code-surface);
+		--figure-shade: oklch(12% 0.012 90 / 0.3);
+		--figure-hatch: oklch(10% 0.012 90 / 0.85);
+		--pencil: color-mix(in srgb, var(--pink) 85%, #e0603c);
+		--highlight: oklch(80% 0.15 85);
+		--figure-ring: oklch(72% 0.14 35);
+		--figure-error: oklch(74% 0.15 22);
+		--figure-ok: oklch(80% 0.13 150);
+		--wood: var(--slab);
+		--figure-kraft: var(--slab);
+		--syntax-kw: var(--pink);
+		--syntax-fn: var(--purple);
+		--syntax-str: var(--yellow);
+		--syntax-tag: var(--green-soft);
+		--syntax-num: color-mix(in oklch, var(--yellow) 50%, var(--cream));
+		--syntax-var: color-mix(in oklch, var(--pink) 45%, var(--cream));
+		--syntax-comment: color-mix(in oklch, var(--ink) 66%, var(--paper));
+		/* Cream letters need a darker-than-page layer beyond the pastel to stay apart from it. */
 	}
 }
 
@@ -75,6 +120,7 @@
 	--shadow-x: -0.09em;
 	--shadow-y: -0.01em;
 	--shadow-grow: 0.02em;
+	--shadow-under: transparent;
 	--shadow-color: transparent;
 
 	/* The navbar's fixed top bar, which the sidebar and the right rail sit below.
@@ -92,7 +138,7 @@
 	/* The hover card every tooltip on the site draws: defined terms, code hovers, playground hints. */
 	--tip-border: 1.5px solid var(--ink);
 	--tip-radius: 10px;
-	--tip-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--paper));
+	--tip-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--cream));
 	--tip-font: 'Shantell Sans', system-ui, sans-serif;
 	/* @markless/ui tooltip's default open delay, for the tips CSS opens on its own. */
 	--tip-delay: 600ms;
@@ -234,7 +280,8 @@ body {
 }
 
 /* The base offset plus its four corners at --shadow-grow: a solid silhouette
-   grown outward on every side. Invisible until an element sets --shadow-color. */
+   grown outward on every side, then the same at twice the offset in --shadow-under.
+   Invisible until an element sets --shadow-color. */
 h1:where(:not(.code-stage *)),
 h2:where(:not(.code-stage *)),
 h3:where(:not(.code-stage *)),
@@ -250,19 +297,22 @@ h6:where(:not(.code-stage *)) {
 		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) - var(--shadow-grow)) 0
 			var(--shadow-color),
 		calc(var(--shadow-x) + var(--shadow-grow)) calc(var(--shadow-y) + var(--shadow-grow)) 0
-			var(--shadow-color);
+			var(--shadow-color),
+		calc(var(--shadow-x) * 2) calc(var(--shadow-y) * 2) 0 var(--shadow-under),
+		calc(var(--shadow-x) * 2 - var(--shadow-grow)) calc(var(--shadow-y) * 2 - var(--shadow-grow)) 0
+			var(--shadow-under),
+		calc(var(--shadow-x) * 2 - var(--shadow-grow)) calc(var(--shadow-y) * 2 + var(--shadow-grow)) 0
+			var(--shadow-under),
+		calc(var(--shadow-x) * 2 + var(--shadow-grow)) calc(var(--shadow-y) * 2 - var(--shadow-grow)) 0
+			var(--shadow-under),
+		calc(var(--shadow-x) * 2 + var(--shadow-grow)) calc(var(--shadow-y) * 2 + var(--shadow-grow)) 0
+			var(--shadow-under);
 }
 
 h1:where(:not(.code-stage *)) {
 	font-size: var(--step-5);
-	--shadow-color: var(--pink);
+	--shadow-color: var(--shadow-h1);
 	line-height: 115%;
-
-	/* Dark ground: a deep muted purple silhouette, sampled from the poster reference. */
-	html.dark & {
-		color: var(--ink);
-		--shadow-color: oklch(34% 0.05 307);
-	}
 }
 
 /* Paper grain over the whole page. Absolute, not fixed: a fixed layer with a
@@ -513,14 +563,9 @@ markless-outline { display: contents; }
 
 .prose h2:where(:not(.code-stage *)) {
 	font-size: var(--step-3);
-	--shadow-color: var(--purple);
+	--shadow-color: var(--shadow-h2);
 	margin-top: calc(var(--space-2xl) * 1.5);
 	margin-bottom: var(--space-s);
-
-	html.dark & {
-		color: var(--ink);
-		--shadow-color: oklch(34% 0.05 307);
-	}
 }
 
 .prose h2:has(+ .keyboard-study) {
@@ -531,14 +576,9 @@ markless-outline { display: contents; }
 
 .prose h3:where(:not(.code-stage *)) {
 	font-size: var(--step-2);
-	--shadow-color: var(--green-soft);
+	--shadow-color: var(--shadow-h3);
 	margin-top: var(--space-m);
 	margin-bottom: var(--space-xs);
-
-	html.dark & {
-		color: var(--ink);
-		--shadow-color: oklch(34% 0.05 307);
-	}
 }
 
 .prose a:where(:not(.code-stage *)) {
@@ -814,7 +854,7 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	background:
 		linear-gradient(to bottom left, transparent 50%, color-mix(in oklch, var(--raised) 82%, var(--ink)) 50%) 100% 0 / var(--fold) var(--fold) no-repeat,
 		var(--raised);
-	box-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--paper));
+	box-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--cream));
 	clip-path: polygon(-1px -1px, calc(100% - var(--fold)) -1px, calc(100% + 6px) calc(var(--fold) + 6px), calc(100% + 6px) calc(100% + 6px), -1px calc(100% + 6px));
 }
 
@@ -892,9 +932,8 @@ html {
 }
 
 html.dark .prose .torn-strip {
-	--sheet: color-mix(in oklch, var(--paper) 88%, var(--ink));
-	--torn-shade: color-mix(in oklch, var(--paper) 35%, black);
-	--torn-guide: color-mix(in oklch, var(--pink) 35%, transparent);
+	--sheet: var(--code-surface);
+	--torn-shade: var(--slab);
 }
 
 .prose .torn-strip > pre {
@@ -975,10 +1014,6 @@ html.dark .prose .torn-strip {
 .torn-middle::after {
 	content: '';
 	background: var(--ink);
-
-	html.dark & {
-		opacity: 0.6;
-	}
 }
 
 .torn-middle::before {

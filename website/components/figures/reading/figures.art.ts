@@ -236,7 +236,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": "p",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 2,
@@ -244,7 +244,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": "class",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 3,
@@ -252,7 +252,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 4,
@@ -268,7 +268,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": "===",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 6,
@@ -276,7 +276,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": " 'Ada'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 7,
@@ -284,7 +284,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": " ?",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 8,
@@ -292,7 +292,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": " 'host'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 9,
@@ -300,7 +300,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": " :",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 10,
@@ -308,7 +308,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 58,
 					"text": " ''",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 11,
@@ -340,7 +340,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 118,
 					"text": "p",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 15,
@@ -364,7 +364,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 148,
 					"text": "button",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 18,
@@ -372,7 +372,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 148,
 					"text": "onClick",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 19,
@@ -380,7 +380,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 148,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 20,
@@ -396,7 +396,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 148,
 					"text": "button",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 22,
@@ -673,7 +673,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": "p",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 2,
@@ -681,7 +681,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": "class",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 3,
@@ -689,7 +689,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 4,
@@ -705,7 +705,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": "===",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 6,
@@ -713,7 +713,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": " 'Ada'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 7,
@@ -721,7 +721,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": " ?",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 8,
@@ -729,7 +729,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": " 'host'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 9,
@@ -737,7 +737,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": " :",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 10,
@@ -745,7 +745,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 42,
 					"text": " ''",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 11,
@@ -777,7 +777,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 106,
 					"text": "p",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 15,
@@ -801,7 +801,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 138,
 					"text": "button",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 18,
@@ -809,7 +809,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 138,
 					"text": "onClick",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 19,
@@ -817,7 +817,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 138,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 20,
@@ -833,7 +833,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 138,
 					"text": "button",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 22,
@@ -1092,7 +1092,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "let",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 1,
@@ -1108,7 +1108,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 3,
@@ -1116,7 +1116,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "state",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 4,
@@ -1132,7 +1132,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "'Ada'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 6,
@@ -1148,7 +1148,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "'Grace'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 8,
@@ -1172,7 +1172,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 120,
 					"text": "const",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 11,
@@ -1180,7 +1180,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 120,
 					"text": "clear",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 12,
@@ -1188,7 +1188,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 120,
 					"text": " =",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 13,
@@ -1204,7 +1204,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 120,
 					"text": "=>",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 15,
@@ -1220,7 +1220,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 120,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 17,
@@ -1252,7 +1252,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 194,
 					"text": "section",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 21,
@@ -1292,7 +1292,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 194,
 					"text": "section",
 					"cls": "code tint lift",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 26,
@@ -1565,7 +1565,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "let",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 1,
@@ -1581,7 +1581,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 3,
@@ -1589,7 +1589,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "state",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 4,
@@ -1605,7 +1605,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "'Ada'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 6,
@@ -1621,7 +1621,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 46,
 					"text": "'Grace'",
 					"cls": "code tint",
-					"style": "--c:#032f62;--cd:#9ecbff"
+					"style": "--c:#032f62;--cd:var(--syntax-str)"
 				},
 				{
 					"key": 8,
@@ -1645,7 +1645,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 112,
 					"text": "const",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 11,
@@ -1653,7 +1653,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 112,
 					"text": "clear",
 					"cls": "code tint",
-					"style": "--c:#6f42c1;--cd:#b392f0"
+					"style": "--c:#6f42c1;--cd:var(--syntax-fn)"
 				},
 				{
 					"key": 12,
@@ -1661,7 +1661,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 112,
 					"text": " =",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 13,
@@ -1677,7 +1677,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 112,
 					"text": "=>",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 15,
@@ -1693,7 +1693,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 112,
 					"text": "=",
 					"cls": "code tint",
-					"style": "--c:#d73a49;--cd:#f97583"
+					"style": "--c:#d73a49;--cd:var(--syntax-kw)"
 				},
 				{
 					"key": 17,
@@ -1725,7 +1725,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 178,
 					"text": "section",
 					"cls": "code tint",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 21,
@@ -1765,7 +1765,7 @@ export const art: ReturnType<typeof drawings> = {
 					"y": 178,
 					"text": "section",
 					"cls": "code tint lift",
-					"style": "--c:#22863a;--cd:#85e89d"
+					"style": "--c:#22863a;--cd:var(--syntax-tag)"
 				},
 				{
 					"key": 26,

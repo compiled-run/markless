@@ -204,6 +204,11 @@ export default function ExplorerFigure() @{
 				background: color-mix(in oklch, var(--yellow) 45%, transparent);
 				border-radius: 4px;
 				padding: 0 0.2rem;
+
+				html.dark & {
+					background: color-mix(in srgb, var(--yellow) 45%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.open-spec:hover,
@@ -306,6 +311,11 @@ export default function ExplorerFigure() @{
 			.edit-src:hover,
 			.write:hover {
 				background: color-mix(in oklch, var(--pink) 30%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--pink) 30%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.cmd {
@@ -395,6 +405,23 @@ export default function ExplorerFigure() @{
 				color: oklch(55% 0.19 25);
 			}
 
+			html.dark .specs-steps {
+				.scrawl,
+				.stage[data-check='red'] .check {
+					color: var(--figure-error);
+				}
+
+				.stage[data-check='red'] .mark {
+					border-color: var(--figure-error);
+					background: color-mix(in oklch, var(--figure-error) 45%, transparent);
+				}
+
+				.stage[data-check='green'] .mark {
+					border-color: var(--figure-ok);
+					background: color-mix(in oklch, var(--figure-ok) 45%, transparent);
+				}
+			}
+
 			.controls {
 				display: flex;
 				flex-wrap: wrap;
@@ -434,6 +461,11 @@ export default function ExplorerFigure() @{
 
 			.pip:hover {
 				background: color-mix(in oklch, var(--pink) 40%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--pink) 40%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.caption {

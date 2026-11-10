@@ -57,7 +57,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -118,7 +118,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: the list never reorders',
-							style: 'color:#6a737d;--shiki-dark:#6a737d',
+							style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 						},
 					],
 				},
@@ -193,7 +193,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ALLOW_STALE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -356,7 +356,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ASYNC_ARM_RENDER_UNSUPPORTED: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -445,7 +445,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '@try',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -465,7 +465,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -475,7 +475,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -495,7 +495,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@pending',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -515,7 +515,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -525,7 +525,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -545,7 +545,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@catch',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -565,7 +565,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -575,7 +575,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -733,7 +733,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -743,7 +743,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'posts',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -753,7 +753,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -763,7 +763,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'computed',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -773,7 +773,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'async',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -783,7 +783,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -803,7 +803,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -813,7 +813,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'by',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r4',
@@ -823,7 +823,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -843,7 +843,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'return',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -853,7 +853,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'await',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -863,7 +863,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'loadPosts',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -893,7 +893,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -903,7 +903,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -922,7 +922,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ASYNC_INPUT_BESIDE_VALUE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -1039,7 +1039,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -1049,7 +1049,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'picked',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -1059,7 +1059,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -1069,7 +1069,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'computed',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -1079,7 +1079,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'async',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -1089,7 +1089,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'signal',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r11',
@@ -1099,7 +1099,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r13',
@@ -1109,7 +1109,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: 'loadPick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r15',
@@ -1124,7 +1124,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -1134,7 +1134,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'item',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -1144,7 +1144,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -1154,7 +1154,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'computed',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -1164,7 +1164,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -1339,7 +1339,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'canvas',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 					],
 				},
@@ -1354,12 +1354,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'attach',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -1369,7 +1369,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'canvas',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r5',
@@ -1379,7 +1379,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -1389,7 +1389,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'drawChart',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r9',
@@ -1409,12 +1409,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'onVisible',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -1424,7 +1424,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -1704,7 +1704,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '@try',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -1734,7 +1734,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'h2',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -1744,7 +1744,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'h2',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -1764,7 +1764,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -1774,7 +1774,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -1804,7 +1804,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@pending',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -1824,7 +1824,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -1834,7 +1834,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -1912,7 +1912,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -1951,7 +1951,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -2044,7 +2044,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '@if',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -2064,7 +2064,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -2074,7 +2074,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -2094,7 +2094,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@else',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -2114,7 +2114,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -2124,7 +2124,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -2151,7 +2151,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -2161,7 +2161,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -2171,7 +2171,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -2190,7 +2190,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -2200,7 +2200,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -2210,7 +2210,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Menu',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -2220,7 +2220,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -2235,7 +2235,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -2245,7 +2245,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -2255,7 +2255,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -2265,7 +2265,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r8',
@@ -2289,7 +2289,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@if',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -2309,7 +2309,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -2319,7 +2319,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -2339,7 +2339,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'else',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -2359,7 +2359,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -2369,7 +2369,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -2394,7 +2394,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -2523,7 +2523,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_CALLBACK_SLOT_UNBOUND: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -2708,7 +2708,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -2718,7 +2718,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'Key',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r3',
@@ -2728,7 +2728,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'onPress',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r5',
@@ -2738,7 +2738,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -2748,7 +2748,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'readonly',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -2758,12 +2758,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'onPress',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r11',
 							text: '?:',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r12',
@@ -2773,12 +2773,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r13',
 							text: 'event',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r14',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r15',
@@ -2788,7 +2788,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: 'MouseEvent',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r17',
@@ -2798,7 +2798,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r18',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r19',
@@ -2808,7 +2808,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r20',
 							text: 'void',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r21',
@@ -2818,7 +2818,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r22',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -2833,7 +2833,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -2843,12 +2843,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -2858,7 +2858,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r7',
@@ -2873,7 +2873,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -3275,7 +3275,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -3285,7 +3285,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'default',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -3295,7 +3295,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -3305,7 +3305,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'Comment',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -3315,7 +3315,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'item',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r9',
@@ -3325,7 +3325,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -3340,7 +3340,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'div',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -3350,7 +3350,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'Replies',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r4',
@@ -3360,12 +3360,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'items',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -3375,7 +3375,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'div',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r9',
@@ -3390,7 +3390,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -3404,7 +3404,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -3414,7 +3414,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -3424,7 +3424,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Replies',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -3434,7 +3434,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'items',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r7',
@@ -3444,7 +3444,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -3459,7 +3459,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -3479,7 +3479,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@for',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -3489,7 +3489,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -3499,7 +3499,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'of',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -3509,7 +3509,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'key',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r8',
@@ -3529,7 +3529,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -3539,7 +3539,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'Comment',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r4',
@@ -3549,12 +3549,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'item',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -3564,7 +3564,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r9',
@@ -3594,7 +3594,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -3609,7 +3609,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -4934,7 +4934,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -4944,7 +4944,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'field',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -4954,7 +4954,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -4964,7 +4964,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'element',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -4974,7 +4974,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'HTMLInputElement',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r9',
@@ -4998,7 +4998,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'input',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -5008,12 +5008,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'el',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -5059,7 +5059,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ELEMENT_HANDLE_UNBOUND: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -5221,7 +5221,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -5231,7 +5231,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -5241,7 +5241,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'NavLink',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -5251,7 +5251,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'children',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r7',
@@ -5261,12 +5261,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '...',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
 							text: 'rest',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r10',
@@ -5276,7 +5276,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r11',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r12',
@@ -5286,7 +5286,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r13',
 							text: 'PropsOf',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r14',
@@ -5296,7 +5296,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r15',
 							text: "'a'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r16',
@@ -5306,7 +5306,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r17',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -5321,7 +5321,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'a',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -5331,7 +5331,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '...',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -5341,7 +5341,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'a',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r6',
@@ -5356,7 +5356,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -5375,7 +5375,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'NavLink',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r2',
@@ -5385,17 +5385,17 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'href',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
 							text: '"/logout"',
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r6',
@@ -5405,12 +5405,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'prefetch',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -5420,7 +5420,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r11',
@@ -5430,7 +5430,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'NavLink',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r13',
@@ -5709,7 +5709,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -5719,12 +5719,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -5734,7 +5734,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -5744,7 +5744,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -5754,7 +5754,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'true',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r11',
@@ -5764,7 +5764,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r13',
@@ -5781,7 +5781,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -5791,7 +5791,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -5801,7 +5801,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -5820,7 +5820,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -5830,7 +5830,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -5840,7 +5840,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Save',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -5850,7 +5850,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -5865,7 +5865,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -5875,7 +5875,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -5885,7 +5885,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -5895,7 +5895,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r8',
@@ -5919,7 +5919,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -5929,12 +5929,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -5944,7 +5944,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -5954,7 +5954,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'true',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -5964,7 +5964,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r11',
@@ -5979,7 +5979,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -6068,7 +6068,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -6078,7 +6078,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'defaults',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r3',
@@ -6088,7 +6088,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -6098,7 +6098,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -6108,7 +6108,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -6127,7 +6127,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -6137,7 +6137,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -6147,7 +6147,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Menu',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -6157,7 +6157,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -6172,7 +6172,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -6182,7 +6182,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'menu',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r4',
@@ -6192,7 +6192,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -6202,7 +6202,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r8',
@@ -6212,7 +6212,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r9',
 							text: 'defaults',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r10',
@@ -6236,7 +6236,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -6246,12 +6246,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -6261,7 +6261,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -6271,7 +6271,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -6281,7 +6281,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '!',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -6291,7 +6291,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: '?',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r13',
@@ -6301,7 +6301,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: "'Close'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r15',
@@ -6311,7 +6311,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r17',
@@ -6321,7 +6321,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r18',
 							text: "'Open'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r19',
@@ -6331,7 +6331,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r20',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r21',
@@ -6346,7 +6346,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -6552,7 +6552,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -6562,7 +6562,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -6572,7 +6572,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -6589,7 +6589,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -6599,7 +6599,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -6609,7 +6609,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Profile',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -6619,7 +6619,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -6634,7 +6634,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -6644,7 +6644,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -6654,7 +6654,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -6664,7 +6664,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: "'Ada'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r8',
@@ -6688,7 +6688,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'h2',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -6698,7 +6698,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'h2',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -6713,7 +6713,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -6869,7 +6869,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -6879,7 +6879,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -6889,7 +6889,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -6899,7 +6899,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '1',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r7',
@@ -6909,7 +6909,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '2',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -6929,7 +6929,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -6939,12 +6939,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -6954,7 +6954,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -6964,7 +6964,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -6974,7 +6974,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '...',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -6984,7 +6984,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'length',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r13',
@@ -6994,7 +6994,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: '+',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r15',
@@ -7004,7 +7004,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: '1',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r17',
@@ -7014,7 +7014,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r18',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r19',
@@ -7246,7 +7246,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -7527,7 +7527,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '// starter-ports.ts imports nothing from Node',
-							style: 'color:#6a737d;--shiki-dark:#6a737d',
+							style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 						},
 					],
 				},
@@ -7537,7 +7537,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -7547,7 +7547,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -7557,7 +7557,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'STARTER_DEV_PORTS',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r5',
@@ -7567,7 +7567,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -7577,7 +7577,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '5173',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -7587,7 +7587,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'as',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -7597,7 +7597,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r13',
@@ -7616,7 +7616,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -7626,7 +7626,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -7636,7 +7636,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'./starter-ports.ts'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -8370,7 +8370,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_PUBLIC_RENDER_ROOT_UNSUPPORTED: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -8784,7 +8784,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -8799,7 +8799,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '\t// markless-allow MARKLESS_REPEAT_KEY_IS_INDEX: the list never reorders',
-							style: 'color:#6a737d;--shiki-dark:#6a737d',
+							style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 						},
 					],
 				},
@@ -8814,7 +8814,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@for',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -8824,7 +8824,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -8834,7 +8834,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'of',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -8844,7 +8844,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'index',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r8',
@@ -8854,7 +8854,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r9',
 							text: 'key',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r10',
@@ -8874,7 +8874,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -8884,7 +8884,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -8914,7 +8914,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -8983,7 +8983,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '@for',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -8993,7 +8993,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -9003,7 +9003,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'of',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -9013,7 +9013,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'key',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -9033,7 +9033,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -9043,7 +9043,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -9070,7 +9070,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -9080,7 +9080,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -9090,7 +9090,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -9109,7 +9109,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -9119,7 +9119,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -9129,7 +9129,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Guests',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -9139,7 +9139,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -9154,7 +9154,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -9164,7 +9164,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -9174,7 +9174,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -9184,7 +9184,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: '1',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r8',
@@ -9194,7 +9194,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r9',
 							text: "'Ada'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r10',
@@ -9218,7 +9218,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -9238,7 +9238,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: '@for',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -9248,7 +9248,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -9258,7 +9258,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'of',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -9278,7 +9278,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -9288,7 +9288,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'li',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -9318,7 +9318,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'ul',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -9333,7 +9333,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -10316,7 +10316,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_ROW_BRANCH_FLIP_UNSUPPORTED: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -10824,7 +10824,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -10834,7 +10834,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'default',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -10844,7 +10844,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -10854,7 +10854,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'Search',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -10864,7 +10864,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'http',
-							style: 'color:#e36209;--shiki-dark:#ffab70',
+							style: 'color:#e36209;--shiki-dark:var(--syntax-var)',
 						},
 						{
 							id: 'r9',
@@ -10874,7 +10874,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -10884,7 +10884,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'PageProps',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r13',
@@ -10894,7 +10894,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -10909,7 +10909,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -10919,7 +10919,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -10929,7 +10929,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -10939,7 +10939,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'get',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r8',
@@ -10949,7 +10949,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r9',
 							text: "'q'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r10',
@@ -10959,7 +10959,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r11',
 							text: '??',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r12',
@@ -10969,7 +10969,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r13',
 							text: "''",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r14',
@@ -10993,7 +10993,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -11003,12 +11003,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -11018,7 +11018,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -11028,7 +11028,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'log',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r9',
@@ -11038,7 +11038,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r11',
@@ -11053,7 +11053,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -11380,7 +11380,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -11650,7 +11650,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -11660,7 +11660,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -11670,7 +11670,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'menu',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r5',
@@ -11680,7 +11680,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -11690,7 +11690,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'shared',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r9',
@@ -11700,7 +11700,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -11710,7 +11710,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r13',
@@ -11720,7 +11720,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r15',
@@ -11730,7 +11730,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: "'subtree'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r17',
@@ -11747,7 +11747,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -11757,7 +11757,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -11767,7 +11767,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -11786,7 +11786,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -11796,7 +11796,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -11806,7 +11806,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'menu',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r5',
@@ -11816,7 +11816,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -11826,7 +11826,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'shared',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r9',
@@ -11836,7 +11836,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -11846,7 +11846,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r13',
@@ -11856,7 +11856,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r15',
@@ -11866,7 +11866,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: "'widget'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r17',
@@ -12081,7 +12081,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_SPREAD_STATIC_SNAPSHOT: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -12512,7 +12512,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -12522,7 +12522,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -12532,7 +12532,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -12542,7 +12542,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r7',
@@ -12557,7 +12557,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -12567,7 +12567,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'menu',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -12577,7 +12577,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -12587,7 +12587,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -12597,7 +12597,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: 'false',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -12614,7 +12614,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -12624,7 +12624,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -12634,7 +12634,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -12653,7 +12653,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -12663,7 +12663,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -12673,7 +12673,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Settings',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -12683,7 +12683,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -12698,7 +12698,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -12708,7 +12708,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'theme',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r4',
@@ -12718,7 +12718,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r6',
@@ -12728,7 +12728,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r8',
@@ -12738,7 +12738,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r9',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r10',
@@ -12762,7 +12762,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -12772,12 +12772,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -12787,7 +12787,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -12797,7 +12797,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -12807,7 +12807,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: "'dark'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r11',
@@ -12817,7 +12817,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r13',
@@ -12832,7 +12832,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -13282,7 +13282,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13292,7 +13292,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -13302,7 +13302,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Settings',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -13312,7 +13312,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -13327,7 +13327,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -13337,7 +13337,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -13347,7 +13347,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r6',
@@ -13357,7 +13357,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r7',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r8',
@@ -13381,7 +13381,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -13391,7 +13391,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -13406,7 +13406,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -13418,7 +13418,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'import',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13428,7 +13428,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'from',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -13438,7 +13438,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: "'@markless/core'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r5',
@@ -13457,7 +13457,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13467,7 +13467,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -13477,7 +13477,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -13487,7 +13487,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r7',
@@ -13506,7 +13506,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13516,7 +13516,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -13526,7 +13526,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Settings',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -13536,7 +13536,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -13551,7 +13551,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -13561,7 +13561,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'p',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -13576,7 +13576,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -13647,7 +13647,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13657,7 +13657,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'x',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -13667,7 +13667,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -13677,7 +13677,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -13687,7 +13687,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '5',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r9',
@@ -13959,7 +13959,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -13969,7 +13969,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -13979,7 +13979,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'state',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -13989,7 +13989,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r7',
@@ -14013,7 +14013,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -14023,12 +14023,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -14038,7 +14038,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -14048,7 +14048,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -14058,7 +14058,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: "'dark'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r11',
@@ -14068,7 +14068,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r13',
@@ -14085,7 +14085,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'export',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -14095,7 +14095,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'function',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r3',
@@ -14105,7 +14105,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: 'Settings',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r5',
@@ -14115,7 +14115,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '@{',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -14130,7 +14130,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'let',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r2',
@@ -14140,7 +14140,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r4',
@@ -14150,7 +14150,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r5',
 							text: "'light'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r6',
@@ -14174,7 +14174,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -14184,12 +14184,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'onClick',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -14199,7 +14199,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r7',
@@ -14209,7 +14209,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -14219,7 +14219,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: "'dark'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r11',
@@ -14229,7 +14229,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r13',
@@ -14244,7 +14244,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: '}',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 					],
 				},
@@ -14284,7 +14284,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_STATE_UNRESOLVED_WRITE: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
@@ -14846,7 +14846,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r0',
 							text: 'const',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r1',
@@ -14856,7 +14856,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r2',
 							text: 'label',
-							style: 'color:#005cc5;--shiki-dark:#79b8ff',
+							style: 'color:#005cc5;--shiki-dark:var(--syntax-num)',
 						},
 						{
 							id: 'r3',
@@ -14866,7 +14866,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r4',
 							text: '=',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r5',
@@ -14876,7 +14876,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r6',
 							text: 'computed',
-							style: 'color:#6f42c1;--shiki-dark:#b392f0',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
 						},
 						{
 							id: 'r7',
@@ -14886,7 +14886,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r8',
 							text: '=>',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r9',
@@ -14896,7 +14896,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r10',
 							text: '?',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r11',
@@ -14906,7 +14906,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r12',
 							text: "'Hide'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r13',
@@ -14916,7 +14916,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r14',
 							text: ':',
-							style: 'color:#d73a49;--shiki-dark:#f97583',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
 						},
 						{
 							id: 'r15',
@@ -14926,7 +14926,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r16',
 							text: "'Show'",
-							style: 'color:#032f62;--shiki-dark:#9ecbff',
+							style: 'color:#032f62;--shiki-dark:var(--syntax-str)',
 						},
 						{
 							id: 'r17',
@@ -14950,7 +14950,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r1',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r2',
@@ -14960,7 +14960,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 						{
 							id: 'r3',
 							text: 'button',
-							style: 'color:#22863a;--shiki-dark:#85e89d',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
 						},
 						{
 							id: 'r4',
@@ -14979,7 +14979,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 					{
 						id: 'r0',
 						text: '// markless-allow MARKLESS_TEMPLATE_EXPRESSION_STATIC: the reason you accept it',
-						style: 'color:#6a737d;--shiki-dark:#6a737d',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
 					},
 				],
 			},
