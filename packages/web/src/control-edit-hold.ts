@@ -35,7 +35,8 @@ export function marklessEditableControl(target: unknown): ControlLike | undefine
  * Remember what this dispatch's own control read like before its handlers run,
  * and hand back the release its commit closes with.
  */
-export function marklessNoteControlEdits(target: unknown): () => void {
+export function marklessNoteControlEdits(target: unknown, event?: object): () => void {
+	if (event && arrived.has(event)) return noRelease;
 	const element = marklessEditableControl(target);
 	if (!element) return noRelease;
 	let properties: Map<string, unknown> | undefined;
@@ -56,6 +57,27 @@ export function marklessNoteControlEdits(target: unknown): () => void {
 
 function noRelease(): void {}
 
+// A note taken as its event arrives holds every write that changes the control until a handler reads the edit.
+const arrived = new WeakMap<object, Map<string, unknown>>();
+const unread = new WeakSet<Map<string, unknown>>();
+
+export function marklessNoteArrivingControlEdits(event: { readonly target?: unknown }): () => void {
+	const release = marklessNoteControlEdits(event.target);
+	const properties = noted.get(event.target as ControlLike)?.at(-1);
+	if (release === noRelease || !properties) return release;
+	arrived.set(event, properties);
+	unread.add(properties);
+	return () => {
+		arrived.delete(event);
+		release();
+	};
+}
+
+export function marklessControlEditsRead(event: object): void {
+	const properties = arrived.get(event);
+	if (properties) unread.delete(properties);
+}
+
 /**
  * Whether writing `name` would discard edits made since the handlers ran.
  *
@@ -69,6 +91,7 @@ export function marklessControlWriteHeld(target: unknown, name: string, value: u
 	if (!newest?.has(name)) return false;
 	const live = (target as ControlLike)[name];
 	if (live !== newest.get(name)) return true;
+	if (value !== live && unread.has(newest)) return true;
 	if (
 		value !== live &&
 		notes!.some((note) => note !== newest && note.has(name) && note.get(name) !== live)
