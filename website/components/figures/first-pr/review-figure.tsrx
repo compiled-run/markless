@@ -365,6 +365,57 @@ export default function ReviewFigure() @{
 				}
 			}
 
+			html.dark .pr-steps {
+				.open {
+					background: color-mix(in srgb, oklch(70% 0.14 150) 35%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.merged {
+					background: color-mix(in srgb, oklch(60% 0.16 300) 35%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.stage[data-step='3'] .dot,
+				.stage[data-step='4'] .dot,
+				.stage[data-step='5'] .dot {
+					border-color: var(--figure-ok);
+					background: color-mix(in oklch, var(--figure-ok) 45%, transparent);
+				}
+
+				.resolved {
+					color: var(--figure-ok);
+				}
+
+				.act:hover {
+					background: color-mix(in srgb, var(--pink) 25%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.merge-button {
+					background: color-mix(in srgb, oklch(70% 0.14 150) calc(clamp(0, var(--step) - 2, 1) * 45%), var(--cream));
+					color: var(--on-accent);
+				}
+
+				.merge-button:hover {
+					background: color-mix(in srgb, oklch(70% 0.14 150) 55%, var(--cream));
+				}
+
+				.arrow {
+					color: var(--figure-error);
+				}
+
+				.blocked-finding .finding,
+				.blocked-checks .checks {
+					outline-color: var(--figure-error);
+				}
+
+				.pip:hover {
+					background: color-mix(in srgb, var(--pink) 40%, var(--cream));
+					color: var(--on-accent);
+				}
+			}
+
 			.controls {
 				display: flex;
 				flex-wrap: wrap;

@@ -105,9 +105,9 @@ export default function DeskFigure({
 				width: 100%;
 				height: auto;
 				overflow: visible;
-				--sheet: color-mix(in oklch, var(--paper) 50%, white);
+				--sheet: var(--figure-sheet);
 				--sheet-ink: var(--ink);
-				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
+				--shade: var(--figure-shade);
 				--shade-ink: var(--ink);
 				--kraft: color-mix(in oklch, oklch(78% 0.06 70) 70%, var(--paper));
 				--c-kw: #d73a49;
@@ -118,11 +118,16 @@ export default function DeskFigure({
 				--c-err: #cb2431;
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 					--kraft: oklch(70% 0.05 70);
+					--c-kw: #f97583;
+					--c-fn: #b392f0;
+					--c-str: #9ecbff;
+					--c-tag: #85e89d;
+					--c-num: #79b8ff;
+					--c-err: #f97583;
 				}
 			}
 
@@ -173,7 +178,7 @@ export default function DeskFigure({
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

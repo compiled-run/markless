@@ -305,8 +305,13 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 				padding: 1em 1.2em;
 				border: 1.5px solid var(--ink);
 				border-radius: 14px;
-				background: color-mix(in srgb, var(--green-star) 22%, var(--paper));
+				background: color-mix(in srgb, var(--green-star) 22%, var(--cream));
 				box-shadow: 5px 5px 0 var(--muted-ink);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.stat span {
@@ -383,7 +388,12 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 
 			.pill:hover,
 			.pill:focus-visible {
-				background: color-mix(in srgb, var(--yellow) 40%, var(--paper));
+				background: color-mix(in srgb, var(--yellow) 40%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.pill.main {
@@ -419,9 +429,14 @@ export default function AppPage({ slug }: { readonly slug: string }) @{
 			}
 
 			.metrics thead th {
-				background: color-mix(in srgb, var(--yellow) 30%, var(--paper));
+				background: color-mix(in srgb, var(--yellow) 30%, var(--cream));
 				font-weight: 700;
 				white-space: nowrap;
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.metrics tbody tr:last-child > * {

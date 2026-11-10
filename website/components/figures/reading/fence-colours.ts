@@ -28,7 +28,7 @@ export function fenceRuns(html: string): Token[][] {
 			const tip = /class="(?:[^"]*\s)?tsrx-tip(?:\s[^"]*)?"/.test(part);
 			kinds.push(tip ? 'tip' : colour ? 'colour' : 'plain');
 			if (tip) hidden++;
-			const own = (value: string) => (value.startsWith('var(') ? '' : value.toLowerCase());
+			const own = (value: string) => (value === 'var(--ink)' ? '' : value.toLowerCase());
 			if (colour && !tip) colours.push([own(colour), own(dark)]);
 			if (/class="line"/.test(part) && lines.at(-1)!.length) lines.push([]);
 			continue;

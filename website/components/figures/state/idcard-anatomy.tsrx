@@ -131,8 +131,9 @@ export default function IdCardAnatomy() @{
 				--hot: oklch(70% 0.17 60);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
-					--plastic: color-mix(in oklch, var(--ink) 80%, oklch(60% 0.05 230));
+					--shade: var(--figure-shade);
+					--sheet: var(--figure-sheet);
+					--plastic: color-mix(in oklab, var(--figure-sheet) 55%, oklch(55% 0.1 235));
 				}
 			}
 
@@ -150,10 +151,6 @@ export default function IdCardAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark &:not(.desk) {
-					fill: var(--paper);
-				}
 			}
 
 			.paper {
@@ -166,6 +163,10 @@ export default function IdCardAnatomy() @{
 
 			.band {
 				fill: color-mix(in oklch, var(--plastic) 70%, var(--ink));
+
+				html.dark & {
+					fill: color-mix(in oklab, var(--plastic) 55%, var(--slab));
+				}
 			}
 
 			.photo,
@@ -188,6 +189,10 @@ export default function IdCardAnatomy() @{
 				letter-spacing: 0.2em;
 				text-anchor: middle;
 				fill: var(--paper);
+
+				html.dark & {
+					fill: var(--ink);
+				}
 			}
 
 			.key {
@@ -356,14 +361,6 @@ export default function IdCardAnatomy() @{
 				font-size: 0.95rem;
 				text-align: center;
 				opacity: 0.8;
-			}
-
-			.key,
-			.value,
-			.spot {
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {

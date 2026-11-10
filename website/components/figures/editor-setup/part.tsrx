@@ -56,7 +56,7 @@ export default function Part({ art }: { readonly art: DeskArt }) @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -86,11 +86,22 @@ export default function Part({ art }: { readonly art: DeskArt }) @{
 				fill: var(--yellow);
 				opacity: 0.6;
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					fill: color-mix(in srgb, var(--yellow) 60%, var(--cream));
+					opacity: 1;
+					mix-blend-mode: normal;
+				}
 			}
 
 			.pink-wash {
 				fill: var(--pink);
 				opacity: 0.75;
+
+				html.dark & {
+					fill: color-mix(in srgb, var(--pink) 75%, var(--cream));
+					opacity: 1;
+				}
 			}
 
 			.squiggle {

@@ -168,8 +168,7 @@ export default function ComputedSketch() @{
 				pointer-events: none;
 
 				html.dark & {
-					background: color-mix(in srgb, var(--purple) 45%, var(--paper));
-					mix-blend-mode: screen;
+					background: color-mix(in srgb, var(--purple) 70%, var(--cream));
 				}
 			}
 

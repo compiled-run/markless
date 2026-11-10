@@ -27,6 +27,10 @@ import type {
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
+import {
+	marklessControlEditsRead,
+	marklessNoteArrivingControlEdits,
+} from './control-edit-hold.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 
 // Even an evaluated module's import() costs a task.
@@ -442,6 +446,7 @@ function installDelegatedTriggers(
 					? actionKind === PROTOCOL_EVENT_ACTION_KIND.event && record.syncPolicy
 					: !syncPolicyApplied && rowPolicy(element as RowNode, event.type, path);
 				if (policy) {
+					marklessControlEditsRead(event);
 					runSyncPolicyActions(
 						policy,
 						syncPolicyGraph,
@@ -479,14 +484,19 @@ function installDelegatedTriggers(
 		};
 		// addEventListener drops the returned promise, so a rejection would escape
 		// the flush unhandled: contain it here and report it instead.
-		const listener = (event: DelegatedEvent) =>
-			route(event).catch((error) =>
-				reportRuntimeErrorToHost(error, {
-					phase: 'event',
-					eventName: event.type,
-					selector: delegatedTargetTag(event.target),
-				}),
-			);
+		const listener = (event: DelegatedEvent) => {
+			// A row placed before its records register takes edits a waiting route has not dispatched yet.
+			const releaseControlEdits = marklessNoteArrivingControlEdits(event);
+			return route(event)
+				.catch((error) =>
+					reportRuntimeErrorToHost(error, {
+						phase: 'event',
+						eventName: event.type,
+						selector: delegatedTargetTag(event.target),
+					}),
+				)
+				.finally(releaseControlEdits);
+		};
 		output.root.addEventListener?.(eventName, listener, { capture: true });
 		releases.push(() =>
 			output.root.removeEventListener?.(eventName, listener, { capture: true }),

@@ -165,10 +165,15 @@ export default function EditorDemo() @{
 				padding: 0.45em 0.7em;
 				border: 1px solid var(--ink);
 				border-radius: 6px;
-				background: color-mix(in srgb, var(--pink) 18%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 18%, var(--cream));
 				font-family: var(--font-mono);
 				font-size: 0.8em;
 				line-height: 1.45;
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.menu {
@@ -189,7 +194,12 @@ export default function EditorDemo() @{
 			}
 
 			.menu li:first-child {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 		</style>
 	</PreviewCard>

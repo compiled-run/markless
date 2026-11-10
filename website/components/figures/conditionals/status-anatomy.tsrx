@@ -203,8 +203,8 @@ export default function StatusAnatomy() @{
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);
 
 				html.dark & {
-					--shade: rgb(0 0 0 / 0.5);
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					--shade: var(--figure-shade);
+					--sheet: var(--figure-sheet);
 				}
 			}
 
@@ -315,17 +315,16 @@ export default function StatusAnatomy() @{
 
 			.card-paper {
 				fill: color-mix(in oklch, var(--yellow) 40%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 40%, color-mix(in oklch, var(--cream) 55%, white));
+				}
 			}
 
 			.wash {
 				fill: var(--yellow);
 				opacity: 0.55;
 				mix-blend-mode: multiply;
-
-				html.dark & {
-					mix-blend-mode: normal;
-					opacity: 0.3;
-				}
 			}
 
 			.button-wash {
@@ -334,17 +333,18 @@ export default function StatusAnatomy() @{
 				mix-blend-mode: multiply;
 
 				html.dark & {
+					fill: color-mix(in srgb, var(--pink) 45%, var(--cream));
 					mix-blend-mode: normal;
-					opacity: 0.35;
+					opacity: 1;
 				}
+			}
+
+			html.dark .scene .card :is(.ink, .word) {
+				fill: var(--on-accent);
 			}
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.faint {
@@ -357,10 +357,6 @@ export default function StatusAnatomy() @{
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
-
-				html.dark & {
-					stroke: var(--paper);
-				}
 			}
 
 			.light {
@@ -372,10 +368,6 @@ export default function StatusAnatomy() @{
 				font-size: 24px;
 				font-weight: 700;
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			@keyframes build {

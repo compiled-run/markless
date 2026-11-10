@@ -6,6 +6,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Plugin } from 'vite';
 import { guides, type GuideSource } from '../components/docs/errors/guides.ts';
+import { DARK_THEME, LIGHT_THEME } from './shiki-surface.ts';
 import { AREA_ORDER, AREAS, areaOf, TITLES } from '../components/docs/errors/titles.ts';
 import type {
 	CodeLine,
@@ -849,12 +850,12 @@ export type Highlight = (code: string) => Promise<CodeLine[]>;
 export async function shikiHighlight(): Promise<Highlight> {
 	const { getHighlighter } = await import('./highlight-code.ts');
 	const highlighter = await getHighlighter();
-	const light = highlighter.getTheme('github-light').fg.toLowerCase();
-	const dark = highlighter.getTheme('github-dark').fg.toLowerCase();
+	const light = highlighter.getTheme(LIGHT_THEME).fg.toLowerCase();
+	const dark = highlighter.getTheme(DARK_THEME).fg.toLowerCase();
 	return async (code) => {
 		const lines = highlighter.codeToTokens(code, {
 			lang: 'tsrx',
-			themes: { light: 'github-light', dark: 'github-dark' },
+			themes: { light: LIGHT_THEME, dark: DARK_THEME },
 			defaultColor: 'light',
 		}).tokens;
 		return lines.map((tokens, li) => ({

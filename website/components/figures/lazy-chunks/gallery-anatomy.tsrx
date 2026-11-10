@@ -264,9 +264,8 @@ export default function GalleryAnatomy() @{
 				--shade-fill: color-mix(in oklch, var(--ink) 20%, transparent);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade-fill: rgb(0 0 0 / 0.5);
+					--sheet: var(--figure-sheet);
+					--shade-fill: var(--figure-shade);
 				}
 			}
 
@@ -275,7 +274,7 @@ export default function GalleryAnatomy() @{
 			}
 
 			.kraft-fill {
-				fill: color-mix(in oklch, var(--sheet) 70%, oklch(72% 0.07 65));
+				fill: color-mix(in oklch, var(--sheet) 70%, var(--wood));
 			}
 
 			.ink {
@@ -329,7 +328,7 @@ export default function GalleryAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
@@ -342,7 +341,7 @@ export default function GalleryAnatomy() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.8;
 				stroke-linecap: round;
 				opacity: 0.6;
@@ -375,7 +374,7 @@ export default function GalleryAnatomy() @{
 			.pencil-text {
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: 4.6px;
-				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				fill: var(--pencil);
 			}
 
 			.note {
@@ -538,6 +537,31 @@ export default function GalleryAnatomy() @{
 
 			.row[data-ran='no'] .ran {
 				opacity: 0.45;
+			}
+
+			html.dark .scene {
+				.wash.yellow:not(.glow, .dot, .pick) {
+					opacity: 1;
+				}
+
+				.wash.pink {
+					fill: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					stroke: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
+				}
+
+				.row[data-ran='yes'] .row-spot {
+					opacity: 1;
+				}
+
+				.row[data-ran='yes']:not([data-fresh='yes']) .yellow {
+					fill: color-mix(in srgb, var(--yellow) 55%, var(--cream));
+				}
+
+				.row[data-ran='yes'] .ran,
+				.button-label {
+					fill: var(--on-accent);
+				}
 			}
 		</style>
 	</figure>

@@ -335,6 +335,11 @@ export default function ReloadAnatomy() @{
 				stroke: var(--ink);
 				stroke-width: 0.75;
 				stroke-linecap: round;
+
+				html.dark & {
+					stroke: var(--figure-hatch);
+					opacity: 1;
+				}
 			}
 
 			.light {

@@ -98,7 +98,7 @@ export default function KeycardAnatomy() @{
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					--sheet: var(--figure-sheet);
 				}
 			}
 
@@ -131,6 +131,10 @@ export default function KeycardAnatomy() @{
 
 			.key-base {
 				fill: color-mix(in oklch, var(--ink) 35%, var(--paper));
+
+				html.dark & {
+					fill: var(--slab);
+				}
 			}
 
 			.key-cap,
@@ -157,9 +161,14 @@ export default function KeycardAnatomy() @{
 				mix-blend-mode: multiply;
 
 				html.dark & {
+					fill: color-mix(in srgb, var(--yellow) 70%, var(--cream));
 					mix-blend-mode: normal;
-					opacity: 0.35;
+					opacity: 1;
 				}
+			}
+
+			html.dark .card :is(.card-head, .card-text, .ink) {
+				fill: var(--on-accent);
 			}
 
 			.key-letter,
@@ -169,13 +178,6 @@ export default function KeycardAnatomy() @{
 				fill: var(--ink);
 			}
 
-			.key-letter,
-			.card-head,
-			.card-text {
-				html.dark & {
-					fill: var(--paper);
-				}
-			}
 
 			.key-letter {
 				font-size: 54px;

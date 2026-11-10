@@ -23,7 +23,7 @@ export default function Commands({ kind, only, copy }: { readonly kind: CommandK
 					</span>
 					<pre
 						data-lang="bash"
-						class="shiki shiki-themes github-light github-dark"
+						class="shiki shiki-themes github-light markless-dark"
 						tabindex="0"
 					>
 						<code>

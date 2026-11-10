@@ -145,9 +145,9 @@ export default function ThermometerAnatomy() @{
 				--hot: oklch(58% 0.2 27);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
-					--wood: color-mix(in oklch, var(--ink) 75%, oklch(55% 0.07 65));
-					--glass: color-mix(in oklch, var(--ink) 85%, oklch(60% 0.03 220));
+					--sheet: var(--figure-sheet);
+					--wood: var(--slab);
+					--glass: var(--figure-sheet);
 				}
 			}
 
@@ -207,10 +207,6 @@ export default function ThermometerAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark &:not(.desk) {
-					fill: var(--paper);
-				}
 			}
 
 			.card {
@@ -272,11 +268,6 @@ export default function ThermometerAnatomy() @{
 				font-size: 24px;
 			}
 
-			.value {
-				html.dark & {
-					fill: var(--paper);
-				}
-			}
 
 			.scene[data-beat='odd'] .tag .value {
 				animation: reink-a 480ms ease-out;

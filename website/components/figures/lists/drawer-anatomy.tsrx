@@ -92,9 +92,9 @@ export default function DrawerAnatomy() @{
 				--brass: color-mix(in oklch, var(--paper) 55%, oklch(78% 0.12 85));
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
-					--wood: color-mix(in oklch, var(--ink) 72%, oklch(50% 0.08 55));
-					--brass: color-mix(in oklch, var(--ink) 70%, oklch(70% 0.12 85));
+					--sheet: var(--figure-sheet);
+					--wood: var(--slab);
+					--brass: var(--figure-sheet);
 				}
 			}
 
@@ -116,10 +116,6 @@ export default function DrawerAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.paper {
@@ -159,10 +155,6 @@ export default function DrawerAnatomy() @{
 				font-weight: 700;
 				text-anchor: middle;
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.label {
@@ -183,8 +175,8 @@ export default function DrawerAnatomy() @{
 				box-shadow: inset 0 1px 3px color-mix(in oklch, var(--ink) 25%, transparent);
 
 				html.dark & {
-					background: var(--ink);
-					color: var(--paper);
+					background: var(--slab);
+					color: var(--ink);
 				}
 			}
 

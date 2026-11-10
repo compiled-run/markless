@@ -327,17 +327,14 @@ export default function StateAnatomy({
 				width: 100%;
 				height: auto;
 				overflow: visible;
-				--sheet: color-mix(in oklch, var(--paper) 50%, white);
+				--sheet: var(--figure-sheet);
 				--sheet-ink: var(--ink);
-				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
+				--shade: var(--figure-shade);
 				--shade-ink: var(--ink);
 				--bean: oklch(44% 0.08 50);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-				--shade-ink: rgb(0 0 0 / 0.85);
+					--shade-ink: var(--figure-hatch);
 					--bean: oklch(48% 0.08 55);
 				}
 			}
@@ -422,22 +419,34 @@ export default function StateAnatomy({
 			.wash {
 				stroke-width: 1.2;
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					mix-blend-mode: normal;
+				}
 			}
 
 			.yellow {
 				fill: var(--yellow);
 				stroke: var(--yellow);
 				opacity: 0.85;
+
+				html.dark & {
+					opacity: 1;
+				}
 			}
 
 			.pink {
 				fill: var(--pink);
 				stroke: var(--pink);
 				opacity: 0.6;
+
+				html.dark & {
+					opacity: 1;
+				}
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
@@ -449,7 +458,7 @@ export default function StateAnatomy({
 
 			.wash-edge {
 				fill: none;
-				stroke: oklch(72% 0.15 75);
+				stroke: var(--highlight);
 				stroke-width: 1;
 				opacity: 0.55;
 				mix-blend-mode: multiply;
@@ -462,6 +471,7 @@ export default function StateAnatomy({
 
 				html.dark & {
 					mix-blend-mode: normal;
+					opacity: 1;
 				}
 			}
 
@@ -533,6 +543,11 @@ export default function StateAnatomy({
 				opacity: 0.75;
 			}
 
+			.button-text,
+			.digit.now {
+				fill: var(--on-accent);
+			}
+
 			.button-text {
 				font-size: 8.4px;
 				font-weight: 700;
@@ -571,7 +586,7 @@ export default function StateAnatomy({
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

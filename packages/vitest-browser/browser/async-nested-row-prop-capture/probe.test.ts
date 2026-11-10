@@ -50,6 +50,30 @@ for (const { name, Probe } of depths) {
 	});
 }
 
+// The row is in the document before its records register; the first flush after them must not rewind text no handler has read.
+test('CSR: text typed into an owner row the moment it is placed is the text its draft saves', async () => {
+	const container = (await render(ProbeDepth1)).container as HTMLElement;
+	const typedAtPlacement = new Promise<HTMLElement>((resolve) => {
+		const observer = new MutationObserver(() => {
+			const list = container.querySelectorAll<HTMLElement>('[data-todos]')[1];
+			if (!list) return;
+			observer.disconnect();
+			const input = list.querySelector('[data-title]') as HTMLInputElement;
+			input.value = 'Typed at placement';
+			input.dispatchEvent(new Event('input', { bubbles: true }));
+			resolve(list);
+		});
+		observer.observe(container, { childList: true, subtree: true });
+	});
+	container.querySelector<HTMLButtonElement>('[data-add-list]')!.click();
+	const list = await typedAtPlacement;
+	list.querySelector<HTMLButtonElement>('[data-add]')!.click();
+	await expect
+		.poll(() => list.querySelector('[data-saving-row] [data-confirmed]')?.textContent, LOADS)
+		.toBe('Typed at placement');
+	expect(saveCalls().map((call) => call.title)).toEqual(['Typed at placement']);
+});
+
 // renderSSR resolves its component by static import name, so each fixture gets its own call.
 test('SSR depth 1: a draft row inside a served owner row saves its own prop', async () => {
 	const container = (await renderSSR(ProbeDepth1)).container as HTMLElement;

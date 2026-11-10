@@ -52,8 +52,10 @@ Ink fills (`fill`) for `stroke`/`outline`/`line` output; hatching is `fill: none
 0.55–0.75 width with round caps. Washes use `mix-blend-mode: multiply`. Colours come from the site
 tokens: ink `var(--ink)`, paper `color-mix(in oklch, var(--paper) 50%, white)`, washes
 `var(--yellow)` and `var(--pink)`, shadows a translucent mix of `--ink`. Under `html.dark &` the
-sheet goes dark, its ink turns to `--paper`, and shadows go to translucent black. Pencil lines
-drop to about a third opacity in dark.
+sheet becomes `--figure-sheet`, line work stays `--ink` (cream), shadow hatching uses
+`--figure-hatch` over `--figure-shade`, and washes switch to `mix-blend-mode: normal` at full
+opacity with `--on-accent` ink on top. The full dark rule is in `SKILL.md`, "Dark mode: chalk on
+a dark ground".
 
 ## Things that make it look wrong
 

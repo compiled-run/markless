@@ -101,7 +101,12 @@ export default function ApiAnswers() @{
 			}
 
 			.board[data-file='none'] .reply .body {
-				background: color-mix(in srgb, var(--pink) 18%, var(--paper));
+				background: color-mix(in srgb, var(--pink) 18%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.files {
@@ -123,7 +128,12 @@ export default function ApiAnswers() @{
 
 			.board[data-file='health'] .health,
 			.board[data-file='user'] .user {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.arrow {

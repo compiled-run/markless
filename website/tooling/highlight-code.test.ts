@@ -3,10 +3,26 @@ import {
 	addQuickInfoHovers,
 	addTsrxHovers,
 	getHighlighter,
+	renderFence,
 	signaturePainter,
 } from './highlight-code.ts';
 import { plainDoc } from './twoslash-quickinfo.ts';
 import { ColourTable, DocRegistry, paneLines } from './ui-code-runs.ts';
+
+test('dark code is painted only in the site palette, never in a theme hex colour', async () => {
+	const html = (await renderFence("const x = 'a'; // note\nfunction f(n: number) { return <div class={n}>{1}</div>; }", 'tsx'))!;
+	const dark = [...new Set([...html.matchAll(/--shiki-dark:([^;"]+)/g)].map((match) => match[1]))].sort();
+	expect(dark).toEqual([
+		'var(--ink)',
+		'var(--syntax-comment)',
+		'var(--syntax-fn)',
+		'var(--syntax-kw)',
+		'var(--syntax-num)',
+		'var(--syntax-str)',
+		'var(--syntax-tag)',
+		'var(--syntax-var)',
+	]);
+});
 
 test('a type hover paints its signature in the code colours, and the doc stays plain text', async () => {
 	const paint = signaturePainter(await getHighlighter());
@@ -20,7 +36,7 @@ test('a type hover paints its signature in the code colours, and the doc stays p
 		html,
 	)![1]!;
 	expect(title).toContain(
-		'<span class="tsrx-tip-code" style="color:#D73A49;--shiki-dark:#F97583">const</span>',
+		'<span class="tsrx-tip-code" style="color:#D73A49;--shiki-dark:var(--syntax-kw)">const</span>',
 	);
 	expect(title.replace(/<[^>]*>/g, '')).toBe('const count: number');
 	expect(html).toContain('<span class="tsrx-tip-body">How many.</span>');
@@ -70,7 +86,7 @@ test('a card hover keeps its signature colours as runs, and the tip copy still n
 	const colours = new ColourTable();
 	const html =
 		'<pre><code><span style="color:#24292E"><span class="tsrx-hover" tabindex="0" role="img" aria-label="x" data-doc-title="const x: number" data-doc="">x' +
-		'<span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title"><span class="tsrx-tip-code" style="color:#D73A49;--shiki-dark:#F97583">const</span>' +
+		'<span class="tsrx-tip" aria-hidden="true"><span class="tsrx-tip-title"><span class="tsrx-tip-code" style="color:#D73A49;--shiki-dark:var(--syntax-kw)">const</span>' +
 		'<span class="tsrx-tip-code" style="color:var(--ink);--shiki-dark:var(--ink)"> x: number</span></span><span class="tsrx-tip-body"></span></span></span></span></code></pre>';
 	const lines = paneLines(html, registry, colours);
 	expect(lines[0]!.runs.map((run) => run.text)).toEqual(['x']);
@@ -78,7 +94,7 @@ test('a card hover keeps its signature colours as runs, and the tip copy still n
 		{
 			id: 's0',
 			text: 'const',
-			class: `${colours.classFor('color:#D73A49;--shiki-dark:#F97583')} tsrx-tip-code`,
+			class: `${colours.classFor('color:#D73A49;--shiki-dark:var(--syntax-kw)')} tsrx-tip-code`,
 		},
 		{
 			id: 's1',
