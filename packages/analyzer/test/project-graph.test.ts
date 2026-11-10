@@ -4,7 +4,9 @@ import {
 	createProjectGraph,
 	DYNAMIC_IMPORT_DECLARATIONS,
 	loadProjectGraph,
+	SPAWNED_APP_BUILDS,
 	type DynamicImportDeclaration,
+	type SpawnedAppBuild,
 	type WorkspacePackage,
 } from '../test-support/project-graph.ts';
 
@@ -13,14 +15,22 @@ type Project = {
 	assets?: string[];
 	packages?: WorkspacePackage[];
 	declarations?: DynamicImportDeclaration[];
+	spawnedAppBuilds?: SpawnedAppBuild[];
 };
 
-const graphOf = async ({ files, assets = [], packages = [], declarations }: Project) =>
+const graphOf = async ({
+	files,
+	assets = [],
+	packages = [],
+	declarations,
+	spawnedAppBuilds,
+}: Project) =>
 	createProjectGraph({
 		files: new Map(Object.entries(files)),
 		tracked: new Set([...Object.keys(files), ...assets]),
 		packages,
 		declarations,
+		spawnedAppBuilds,
 	});
 
 const testsIn = (files: Record<string, string>) =>
@@ -610,6 +620,71 @@ describe('declared dynamic imports', () => {
 	});
 });
 
+describe('tests that host an app', () => {
+	const files = {
+		'packages/core/src/index.ts':
+			"import { web } from '@markless/web'; export const core = web;",
+		'packages/web/src/index.ts': 'export const web = 1;',
+		'packages/ui/src/index.ts': 'export const ui = 1;',
+		'packages/other/src/index.ts': 'export const other = 1;',
+		'fx/app/root.ts': 'export const root = 1;',
+		'pkg/test/serve.test.ts':
+			"import { createServer as serve } from 'vite'; serve({ root: 'fx/app' });",
+		'pkg/test/vite-ns.test.ts': "import * as vite from 'vite'; vite.build();",
+		'pkg/test/config.test.ts':
+			"import { defineConfig } from 'vite'; import type { ViteDevServer } from 'vite'; defineConfig({});",
+		'pkg/test/spawn.test.ts':
+			"import { execFile } from 'node:child_process'; execFile('vp', ['build']);",
+	};
+	const packages: WorkspacePackage[] = [
+		{
+			dir: 'packages/core',
+			name: '@markless/core',
+			exports: './src/index.ts',
+			dependencies: { '@markless/web': 'workspace:*' },
+		},
+		{ dir: 'packages/web', name: '@markless/web', exports: './src/index.ts' },
+		{ dir: 'packages/ui', name: '@markless/ui', exports: './src/index.ts' },
+		{ dir: 'packages/other', name: '@markless/other', exports: './src/index.ts' },
+	];
+	const spawnedAppBuilds: SpawnedAppBuild[] = [
+		{ test: 'pkg/test/spawn.test.ts', runs: '`vp build` in fx/app', buildRoots: ['fx/app'] },
+	];
+	const tests = testsIn(files);
+
+	test("a test that starts Vite's server or builder is selected by the packages an app build bundles", async () => {
+		const graph = await graphOf({ files, packages, spawnedAppBuilds: [] });
+		for (const changed of [
+			'packages/web/src/index.ts',
+			'packages/core/src/index.ts',
+			'packages/ui/src/index.ts',
+		])
+			expect(graph.affectedTests([changed], tests).tests, changed).toEqual([
+				'pkg/test/serve.test.ts',
+				'pkg/test/vite-ns.test.ts',
+			]);
+		expect(graph.affectedTests(['packages/other/src/index.ts'], tests).tests).toEqual([]);
+	});
+
+	test('a declared spawned build is selected by its app folder and the app-build packages while it still starts a child process', async () => {
+		const graph = await graphOf({ files, packages, spawnedAppBuilds });
+		expect(graph.appBuilds.has('pkg/test/spawn.test.ts')).toBe(true);
+		expect(graph.affectedTests(['fx/app/root.ts'], tests).tests).toEqual([
+			'pkg/test/spawn.test.ts',
+		]);
+		expect(graph.affectedTests(['packages/web/src/index.ts'], tests).tests).toContain(
+			'pkg/test/spawn.test.ts',
+		);
+		const stale = await graphOf({
+			files: { ...files, 'pkg/test/spawn.test.ts': "import 'node:fs';" },
+			packages,
+			spawnedAppBuilds,
+		});
+		expect(stale.appBuilds.has('pkg/test/spawn.test.ts')).toBe(false);
+		expect(stale.affectedTests(['fx/app/root.ts'], tests).tests).toEqual([]);
+	});
+});
+
 describe("this repo's declarations", () => {
 	const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
 
@@ -625,6 +700,42 @@ describe("this repo's declarations", () => {
 					`${declaration.module}: ${declaration.sites} declared, ${graph.opaque.get(declaration.module)?.length ?? 0} found`,
 			);
 			expect(lapsed).toEqual([]);
+		},
+	);
+
+	test('every spawned app build still starts a child process', { timeout: 60_000 }, async () => {
+		const { graph } = await loadProjectGraph(repoRoot);
+		expect(SPAWNED_APP_BUILDS.filter((build) => !graph.appBuilds.has(build.test))).toEqual([]);
+	});
+
+	test(
+		'tests that build an app from a folder they name are selected by bundler, router and compiler changes',
+		{ timeout: 60_000 },
+		async () => {
+			const { graph } = await loadProjectGraph(repoRoot);
+			// Each of these failed when an export of the changed module threw.
+			const building = [
+				'packages/bundler/test/direct-render-startup.test.ts',
+				'packages/bundler/test/native-packing-fixtures.test.ts',
+				'packages/bundler/test/node-in-browser-fixture.test.ts',
+				'packages/bundler/test/prerender-arm-children.test.ts',
+				'packages/bundler/test/prerender-late-event-types.test.ts',
+				'packages/bundler/test/stream-adoption-race.test.ts',
+				'packages/cli/test/starter-build.test.ts',
+				'packages/router/test/vite/dev-server-close.test.ts',
+				'packages/router/test/vite/vite-future-deprecations.test.ts',
+				'packages/vitest-browser/test/ssr-module-cache-rerun.test.ts',
+			];
+			for (const changed of [
+				'packages/bundler/src/hooks/resolve-load.ts',
+				'packages/router/src/vite/index.ts',
+				'packages/compiler/src/compile-module.ts',
+			])
+				expect(
+					graph.affectedTests([changed], building, { ignoreUndeclaredImports: true })
+						.tests,
+					changed,
+				).toEqual(building);
 		},
 	);
 

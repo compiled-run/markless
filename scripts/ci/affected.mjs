@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Picks the node-project unit tests a change can reach, from the yuku module graph. The pre-commit hook only logs the pick (shadow mode).
+// Picks the node-project unit tests a change can reach, from the yuku module graph. The pre-commit hook runs the pick and logs it.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs';
@@ -14,7 +14,7 @@ const SHADOW_LOG =
 	process.env.MARKLESS_AFFECTED_SHADOW_LOG ?? join(homedir(), '.markless/affected-shadow.jsonl');
 
 const USAGE = `usage: node scripts/ci/affected.mjs (--staged | --files <path>...) [--print | --json]
-       node scripts/ci/affected.mjs --shadow-log <selection.json> [--unit-report <vitest.json>]
+       node scripts/ci/affected.mjs --shadow-log <selection.json> [--unit-report <vitest.json>] [--unit-scope selected|all]
        node scripts/ci/affected.mjs --history <count> [--rev <ref>] [--durations <vitest.json>] [--durations-root <dir>]
 
   --staged          select for the staged change (git diff --cached)
@@ -23,6 +23,7 @@ const USAGE = `usage: node scripts/ci/affected.mjs (--staged | --files <path>...
   --json            print the selection as JSON (default)
   --shadow-log      append one line to ${SHADOW_LOG}: the selection, and the unit
                     job's failing files from its JSON report; never fails
+  --unit-scope      whether the unit job ran the selection or every test (default all)
   --history <n>     dry run: select for each of the last <n> commits of --rev (default origin/main)
   --durations       a Vitest JSON report whose per-file durations price the dry run
   --durations-root  the checkout that report ran in (default: this one)`;
@@ -81,22 +82,28 @@ async function select(changed) {
 	};
 }
 
-const failedFiles = (reportPath) => {
+const unitResults = (reportPath) => {
 	if (!reportPath || !existsSync(reportPath)) return null;
-	const report = JSON.parse(readFileSync(reportPath, 'utf8'));
-	return (report.testResults ?? [])
-		.filter((result) => result.status === 'failed')
-		.map((result) => relative(repoRoot, result.name))
-		.sort();
+	const results = JSON.parse(readFileSync(reportPath, 'utf8')).testResults ?? [];
+	const files = (status) =>
+		results
+			.filter((result) => !status || result.status === status)
+			.map((result) => relative(repoRoot, result.name))
+			.sort();
+	return { ran: files(), failed: files('failed') };
 };
 
-function shadowLog(selectionPath, reportPath) {
+function shadowLog(selectionPath, reportPath, unitScope = 'all') {
 	const selection = existsSync(selectionPath)
 		? JSON.parse(readFileSync(selectionPath, 'utf8'))
 		: { error: 'no selection was computed' };
-	const failed = failedFiles(reportPath);
+	const results = unitResults(reportPath);
+	const failed = results?.failed ?? null;
 	const picked = new Set(selection.selected ?? []);
 	const misses = failed && selection.selected ? failed.filter((file) => !picked.has(file)) : [];
+	const ran = new Set(results?.ran ?? []);
+	const scope =
+		unitScope === 'selected' && Array.isArray(selection.selected) ? 'selected' : 'all';
 	const entry = {
 		at: new Date().toISOString(),
 		head: git('rev-parse', '--verify', '-q', 'HEAD').trim() || null,
@@ -105,6 +112,11 @@ function shadowLog(selectionPath, reportPath) {
 		...selection,
 		selectedCount: selection.selected?.length ?? null,
 		unitRan: failed !== null,
+		unitScope: scope,
+		unitFiles: results?.ran.length ?? 0,
+		ranUnselected: scope === 'selected' ? [...ran].filter((file) => !picked.has(file)) : [],
+		selectedNotRun:
+			scope === 'selected' && results ? [...picked].filter((file) => !ran.has(file)) : [],
 		failed,
 		misses,
 	};
@@ -229,7 +241,7 @@ if (flag('--help') || flag('-h') || !argv.length) {
 
 if (flag('--shadow-log')) {
 	try {
-		shadowLog(value('--shadow-log'), value('--unit-report'));
+		shadowLog(value('--shadow-log'), value('--unit-report'), value('--unit-scope'));
 	} catch (error) {
 		console.error(
 			`affected: shadow log skipped: ${error instanceof Error ? error.message : error}`,
