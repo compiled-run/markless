@@ -805,7 +805,9 @@ function runInlineResumerSelfWake(
 	defer.idle(root, async () => {
 		if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
 		root.__marklessDelegatedDispatch = true;
-		const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
+		const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		}));
 		if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 	});
 }
@@ -830,7 +832,9 @@ function runInlineResumerReturnWake(
 			// A runtime that wired since re-asked as it did; the router leaves the started mark of the page it replaced.
 			if (typeof root[reaskProperty] === 'function' || root.__mL !== life) return;
 			root.__marklessDelegatedDispatch = true;
-			const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
+			const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+				throw ((root.__mResume = undefined), error);
+			}));
 			if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 		});
 	if (root[reaskProperty] === true) wake();
@@ -961,9 +965,10 @@ function runInlineResumer(
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
 		pin();
-		return (root.__mResume ||= loadModule(resumeModuleUrl)).then(
-			(module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }),
-		);
+		// A failed import is not kept: the next forward or wake imports again.
+		return (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		})).then((module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }));
 	};
 	// The entry for this event name on one element: [ref, policy], either possibly undefined.
 	const entryOf = (element: Element, eventName: string) => {
