@@ -221,7 +221,7 @@ Each `unit` shard runs under `scripts/ci/unit-budget.mjs measure`, which records
 - The gated numbers are the shards' summed scaled CPU-seconds and the largest shard's peak RSS. Vitest assigns files to shards by path, so adding a test file moves work between shards; the sum and the largest shard move only with real work.
 - A number above its anchor by more than the noise margin fails as over budget. A number below it by more than the margin fails as a stale anchor, so a landed win is recorded instead of leaving slack behind.
 - The margin is measured, not chosen: `unit-budget.mjs margin --from <run>... --reason "..."` takes every attempt of every shard in the given runs (at least three samples a shard, all on the same set of test files) and stores the largest deviation of a sample from its shard's median, with the samples, in the budget file.
-- Anchors are Linux numbers from CI, never from a Mac: `unit-budget.mjs accept --from <run> --reason "..."` downloads that run's artifacts with `gh run download` and anchors each shard at its median across the runs given. The reason says what the extra CPU buys, or which win the lower anchor records.
+- Anchors are Linux numbers from CI, never from a Mac: `unit-budget.mjs accept --from <run> --reason "..."` downloads that run's artifacts with `gh run download` and anchors each shard at its median over every attempt of the runs given. The reason says what the extra CPU buys, or which win the lower anchor records.
 - The check runs only in a run whose unit lane ran; a lane skipped on its content hash measured nothing.
 
 ### Heavy unit tests

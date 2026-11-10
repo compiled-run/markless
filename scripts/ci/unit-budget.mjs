@@ -29,7 +29,7 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
            CPU-seconds and sampled peak RSS there, for MARKLESS_UNIT_BUDGET_SHARD (Linux only)
   check    fails when the shards' summed CPU-seconds or their largest peak RSS leaves the anchor's
            noise band: above it is over budget, below it is a stale anchor
-  accept   takes new anchors from CI artifacts (the median per shard across the given runs)
+  accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
   margin   derives the noise band from repeated CI measurements of one test set`;
 
 const flags = (args, name) => {
@@ -333,7 +333,7 @@ const writeBudget = (path, budget) =>
 	writeFileSync(path, `${JSON.stringify(budget, null, '\t')}\n`);
 const today = () => new Date().toISOString().slice(0, 10);
 
-/** New anchors: per shard, the median of each run's latest attempt. */
+/** New anchors: per shard, the median work over every attempt of every given run, at the median runner speed. */
 export function acceptAnchors(budget, runs, reason, date = today()) {
 	if (!reason?.trim())
 		throw new Error('accept needs --reason "<one line: the measured reason the cost moved>"');
@@ -349,7 +349,8 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 			throw new Error(
 				`run ${source} measured shards [${shardList(latest.keys())}], another run [${expected}]`,
 			);
-		for (const [shard, m] of latest) {
+		for (const m of measurements) {
+			const shard = m.shard;
 			const list = perShard.get(shard) ?? [];
 			list.push(m);
 			perShard.set(shard, list);
