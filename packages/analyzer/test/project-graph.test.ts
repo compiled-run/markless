@@ -1,10 +1,11 @@
 import { fileURLToPath } from 'node:url';
-import { describe, expect, test } from 'vitest';
+import { beforeAll, describe, expect, test } from 'vitest';
 import {
 	createProjectGraph,
 	DYNAMIC_IMPORT_DECLARATIONS,
 	loadProjectGraph,
 	SPAWNED_APP_BUILDS,
+	type ProjectGraph,
 	type DynamicImportDeclaration,
 	type SpawnedAppBuild,
 	type WorkspacePackage,
@@ -687,12 +688,15 @@ describe('tests that host an app', () => {
 
 describe("this repo's declarations", () => {
 	const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+	let graph: ProjectGraph;
+	beforeAll(async () => {
+		({ graph } = await loadProjectGraph(repoRoot));
+	}, 60_000);
 
 	test(
 		'every declaration matches the fully dynamic site count of its module',
 		{ timeout: 60_000 },
 		async () => {
-			const { graph } = await loadProjectGraph(repoRoot);
 			const lapsed = DYNAMIC_IMPORT_DECLARATIONS.filter(
 				(declaration) => !graph.declared.has(declaration.module),
 			).map(
@@ -704,7 +708,6 @@ describe("this repo's declarations", () => {
 	);
 
 	test('every spawned app build still starts a child process', { timeout: 60_000 }, async () => {
-		const { graph } = await loadProjectGraph(repoRoot);
 		expect(SPAWNED_APP_BUILDS.filter((build) => !graph.appBuilds.has(build.test))).toEqual([]);
 	});
 
@@ -712,7 +715,6 @@ describe("this repo's declarations", () => {
 		'tests that build an app from a folder they name are selected by bundler, router and compiler changes',
 		{ timeout: 60_000 },
 		async () => {
-			const { graph } = await loadProjectGraph(repoRoot);
 			// Each of these failed when an export of the changed module threw.
 			const building = [
 				'packages/bundler/test/direct-render-startup.test.ts',
@@ -743,7 +745,6 @@ describe("this repo's declarations", () => {
 		'a runtime file only the build loads selects the tests that reach the resume loader',
 		{ timeout: 60_000 },
 		async () => {
-			const { graph } = await loadProjectGraph(repoRoot);
 			const reaching = 'packages/web/test/inline-defer-rejected-resume.test.ts';
 			const fixtureTest = 'packages/bundler/test/ssr-updates-fixture.test.ts';
 			const tests = [reaching, fixtureTest, 'packages/analyzer/test/project-graph.test.ts'];

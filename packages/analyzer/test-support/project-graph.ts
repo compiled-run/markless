@@ -771,6 +771,29 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		return [...files];
 	};
 
+	const packageFiles = new Map<string, string[]>();
+	const filesOfPackages = (packages: readonly string[]) => {
+		const key = packages.join('\0');
+		const known = packageFiles.get(key);
+		if (known) return known;
+		const files = new Set<string>();
+		const names = [...packages];
+		const seen = new Set<string>();
+		while (names.length) {
+			const name = names.pop()!;
+			const pkg = packagesByName.get(name);
+			if (!pkg || seen.has(name)) continue;
+			seen.add(name);
+			for (const path of exportedFiles(pkg)) files.add(path);
+			// A build also loads source no export reaches: forked worker entries and runtime files the bundler maps by path.
+			for (const path of trackedPaths)
+				if (path.startsWith(`${pkg.dir}/src/`) && isCodePath(path)) files.add(path);
+			names.push(...Object.keys(pkg.dependencies ?? {}));
+		}
+		packageFiles.set(key, [...files]);
+		return packageFiles.get(key)!;
+	};
+
 	const linkBuild = (
 		module: string,
 		buildRoots: readonly string[],
@@ -781,19 +804,7 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		};
 		for (const root of buildRoots)
 			for (const path of trackedPaths) if (path.startsWith(`${root}/`)) link(path);
-		const names = [...packages];
-		const seen = new Set<string>();
-		while (names.length) {
-			const name = names.pop()!;
-			const pkg = packagesByName.get(name);
-			if (!pkg || seen.has(name)) continue;
-			seen.add(name);
-			for (const path of exportedFiles(pkg)) link(path);
-			// A build also loads source no export reaches: forked worker entries and runtime files the bundler maps by path.
-			for (const path of trackedPaths)
-				if (path.startsWith(`${pkg.dir}/src/`) && isCodePath(path)) link(path);
-			names.push(...Object.keys(pkg.dependencies ?? {}));
-		}
+		for (const path of filesOfPackages(packages)) link(path);
 	};
 
 	const declare = (declaration: DynamicImportDeclaration) => {
