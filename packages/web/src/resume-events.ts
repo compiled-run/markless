@@ -574,7 +574,7 @@ export function createEventWiring(input: {
 		}
 		const propagation = trackPropagationStops(event, options.propagationStopped);
 		let stopAfterElement: ResumeDomElement | undefined;
-		const releaseControlEdits = marklessNoteControlEdits(target, event);
+		const releaseControlEdits = marklessNoteControlEdits(target);
 		try {
 			for (const matched of path) {
 				if (stopAfterElement && matched.element !== stopAfterElement) return;

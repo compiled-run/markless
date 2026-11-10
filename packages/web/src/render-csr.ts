@@ -27,7 +27,10 @@ import type {
 } from './resume-types.ts';
 import type { ResumeRuntime, ResumeRuntimeInput, ResumeSymbol } from './resume.ts';
 import { reportRuntimeErrorToHost } from './runtime-error-reporting.ts';
-import { marklessControlEditsRead, marklessNoteArrivingControlEdits } from './control-edit-hold.ts';
+import {
+	marklessControlEditsRead,
+	marklessNoteArrivingControlEdits,
+} from './control-edit-hold.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 
 // Even an evaluated module's import() costs a task.

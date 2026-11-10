@@ -50,7 +50,7 @@ for (const { name, Probe } of depths) {
 	});
 }
 
-// The row is in the document before its records register; the registration's first flush must not rewind the field.
+// The row is in the document before its records register; the first flush after them must not rewind text no handler has read.
 test('CSR: text typed into an owner row the moment it is placed is the text its draft saves', async () => {
 	const container = (await render(ProbeDepth1)).container as HTMLElement;
 	const typedAtPlacement = new Promise<HTMLElement>((resolve) => {
@@ -68,7 +68,9 @@ test('CSR: text typed into an owner row the moment it is placed is the text its 
 	container.querySelector<HTMLButtonElement>('[data-add-list]')!.click();
 	const list = await typedAtPlacement;
 	list.querySelector<HTMLButtonElement>('[data-add]')!.click();
-	await expect.poll(() => list.querySelector('[data-saving-row] [data-confirmed]')?.textContent, LOADS).toBe('Typed at placement');
+	await expect
+		.poll(() => list.querySelector('[data-saving-row] [data-confirmed]')?.textContent, LOADS)
+		.toBe('Typed at placement');
 	expect(saveCalls().map((call) => call.title)).toEqual(['Typed at placement']);
 });
 

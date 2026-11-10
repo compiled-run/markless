@@ -7,8 +7,8 @@
 				"@fixtures/vite-csr",
 				"web/control-edit-hold"
 			],
-			"delta": 684,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 1396,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -19,7 +19,7 @@
 				"web/render-csr"
 			],
 			"delta": 188,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -29,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 126,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 119,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -41,8 +41,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 135,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 253,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -52,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"web/control-edit-hold"
 			],
-			"delta": 684,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 1396,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -64,7 +64,7 @@
 				"web/render-csr"
 			],
 			"delta": 188,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -74,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 126,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 119,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -86,8 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 117,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 231,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		},
 		{
@@ -98,8 +98,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 150,
-			"reason": "control-edit hold covers edits typed into a row placed before its records register (+684 B control-edit-hold, +188 B render-csr rendered); fixes lost first input on freshly minted rows",
+			"delta": 259,
+			"reason": "control-edit hold keeps text typed into a control until a handler reads it, so a row's first flush cannot wipe it; fixes the lost first input on freshly minted rows",
 			"date": "2026-11-10"
 		}
 	]
