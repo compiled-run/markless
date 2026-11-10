@@ -504,6 +504,7 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 
 function SearchButton() @{
 	const drawing = art.magnifier;
+	const prefix = 'search-art-';
 
 	<navbar.trigger
 		class="search-button"
@@ -517,7 +518,20 @@ function SearchButton() @{
 	>
 		<svg class="search-icon" viewBox={'0 0 ' + drawing.width + ' ' + drawing.height} aria-hidden="true">
 			@for (const layer of drawing.layers; key layer.d) {
-				<path class={'theme-toggle-' + layer.kind} d={layer.d} />
+				@if (layer.kind === 'over-wash') {
+					<>
+						<clipPath id={prefix + 'c' + layer.uses![0]}>
+							<path d={layer.d} />
+						</clipPath>
+						<g class="theme-toggle-over-wash" clip-path={'url(#' + prefix + 'c' + layer.uses![0] + ')'}>
+							@for (const id of layer.uses!; key id) {
+								<use href={'#' + prefix + id} />
+							}
+						</g>
+					</>;
+				} @else {
+					<path class={'theme-toggle-' + layer.kind} id={layer.id ? prefix + layer.id : undefined} d={layer.d} />;
+				}
 			}
 		</svg>
 
@@ -575,8 +589,11 @@ function CardArt({ card, class: className }: { readonly card: NavCard; readonly 
 				--decor-wash-blend: multiply;
 
 				html.dark & {
-					--decor-wash-opacity: 0.9;
+					--decor-wash: color-mix(in srgb, var(--yellow) 60%, var(--cream));
+					--decor-wash-opacity: 1;
 					--decor-wash-blend: normal;
+					--decor-on-wash: var(--on-accent);
+					--decor-on-wash-display: inline;
 				}
 			}
 		</style>
@@ -1056,6 +1073,7 @@ function ThemeButton({ to }: { readonly to: 'dark' | 'light' }) @{
 
 function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 	const drawing = to === 'dark' ? art.sun : art.moon;
+	const prefix = 'theme-art-' + to + '-';
 
 	<svg
 		class={to === 'dark' ? 'theme-toggle-icon theme-toggle-sun' : 'theme-toggle-icon theme-toggle-moon'}
@@ -1063,7 +1081,20 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 		aria-hidden="true"
 	>
 		@for (const layer of drawing.layers; key layer.d) {
-			<path class={'theme-toggle-' + layer.kind} d={layer.d} />
+			@if (layer.kind === 'over-wash') {
+				<>
+					<clipPath id={prefix + 'c' + layer.uses![0]}>
+						<path d={layer.d} />
+					</clipPath>
+					<g class="theme-toggle-over-wash" clip-path={'url(#' + prefix + 'c' + layer.uses![0] + ')'}>
+						@for (const id of layer.uses!; key id) {
+							<use href={'#' + prefix + id} />
+						}
+					</g>
+				</>;
+			} @else {
+				<path class={'theme-toggle-' + layer.kind} id={layer.id ? prefix + layer.id : undefined} d={layer.d} />;
+			}
 		}
 
 		<style>
@@ -1104,7 +1135,8 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 				}
 
 				html.dark & {
-					opacity: 0.9;
+					fill: color-mix(in srgb, var(--yellow) 60%, var(--cream));
+					opacity: 1;
 					mix-blend-mode: normal;
 				}
 			}
@@ -1119,6 +1151,15 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 
 			.theme-toggle-ink {
 				fill: currentColor;
+			}
+
+			.theme-toggle-over-wash {
+				display: none;
+
+				html.dark & {
+					display: inline;
+					color: var(--on-accent);
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {
