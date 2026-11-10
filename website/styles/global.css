@@ -67,14 +67,14 @@
 	&.dark {
 		color-scheme: dark;
 		--ink: var(--cream);
-		--paper: var(--on-accent);
-		--code-surface: oklch(33% 0.015 90);
+		--paper: oklch(19% 0.012 90);
+		--code-surface: oklch(24.5% 0.012 90);
 		--code-edge: color-mix(in oklch, var(--ink) 30%, transparent);
-		--raised: oklch(31.5% 0.015 90);
+		--raised: oklch(23% 0.012 90);
 		--tinted: color-mix(in oklch, var(--yellow) 45%, var(--cream));
 		--tinted-quiet: color-mix(in oklch, var(--yellow) 35%, var(--cream));
 		--hover-wash: 11%;
-		--slab: oklch(21% 0.014 90);
+		--slab: oklch(14% 0.012 90);
 		--slab-ink: var(--ink);
 		/* Noise drives alpha over a fixed colour, so no blend mode can lift the ground and every engine agrees. */
 		--grain-fiber: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='grain' color-interpolation-filters='sRGB'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.33 0.33 0.33 0 0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='linear' slope='1.5' intercept='-0.25'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url%28%23grain%29'/%3E%3C/svg%3E");
