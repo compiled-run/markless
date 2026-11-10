@@ -635,7 +635,7 @@ export function Action({
 
 			.pv-action:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 
