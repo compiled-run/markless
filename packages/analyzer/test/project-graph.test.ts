@@ -1,6 +1,9 @@
+import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 import {
 	createProjectGraph,
+	DYNAMIC_IMPORT_DECLARATIONS,
+	loadProjectGraph,
 	type DynamicImportDeclaration,
 	type WorkspacePackage,
 } from '../test-support/project-graph.ts';
@@ -230,6 +233,29 @@ describe('computed specifiers with static parts', () => {
 		expect(
 			graph.affectedTests(['site/document.tsrx'], ['router/test/entry.test.ts']).tests,
 		).toEqual(['router/test/entry.test.ts']);
+	});
+
+	test("a root-absolute glob in a library package's src names the consumer app's files, not the repo's", async () => {
+		const graph = await graphOf({
+			files: {
+				'packages/router/src/entry.ts':
+					"export const pages = import.meta.glob('/pages/**/*.tsrx');\n" +
+					"export const near = import.meta.glob('./parts/*.ts');",
+				'packages/router/src/parts/a.ts': 'export {};',
+				'website/pages/home.tsrx': 'export function Home() @{\n\t<p />\n}\n',
+				'demos/app/src/entry.ts':
+					"export const pages = import.meta.glob('/pages/**/*.tsrx');",
+			},
+			packages: [
+				{ dir: 'packages/router', name: '@markless/router', exports: './src/entry.ts' },
+				{ dir: 'demos/app', name: '@markless/demo-app' },
+			],
+		});
+		expect(graph.opaque.has('packages/router/src/entry.ts')).toBe(false);
+		expect(graph.dependenciesOf('packages/router/src/entry.ts')).toEqual([
+			'packages/router/src/parts/a.ts',
+		]);
+		expect(graph.dependenciesOf('demos/app/src/entry.ts')).toEqual(['website/pages/home.tsrx']);
 	});
 
 	test('a workspace package prefix links every file in that package with the right ending', async () => {
@@ -463,7 +489,8 @@ describe('declared dynamic imports', () => {
 		'fx/app/dev-server.ts':
 			'export const serve = (dist: string) => import(`${dist}/server.js?t=${Date.now()}`);',
 		'fx/app/root.ts': "import { web } from '@x/web'; export const root = web;",
-		'packages/web/src/index.ts': "import { inner } from './inner.ts'; export const web = inner;",
+		'packages/web/src/index.ts':
+			"import { inner } from './inner.ts'; export const web = inner;",
 		'packages/web/src/inner.ts': 'export const inner = 1;',
 		'packages/web/src/lazy.ts': 'export const lazy = 1;',
 		'packages/rt/src/index.ts': 'export const rt = 1;',
@@ -524,6 +551,23 @@ describe('declared dynamic imports', () => {
 		});
 	});
 
+	test('a declared package also links src files no export reaches, but not its tests or fixtures', async () => {
+		const graph = await graphOf({
+			files: {
+				...files,
+				'packages/web/src/worker.ts': 'export const worker = 1;',
+				'packages/web/test/fixtures/app.ts': 'export const app = 1;',
+			},
+			packages,
+			declarations: [declaration],
+		});
+		const tests = testsIn(files);
+		expect(graph.affectedTests(['packages/web/src/worker.ts'], tests).tests).toEqual([
+			'pkg/test/serve.test.ts',
+		]);
+		expect(graph.affectedTests(['packages/web/test/fixtures/app.ts'], tests).tests).toEqual([]);
+	});
+
 	test('a declaration whose site count differs from the module leaves it undeclared', async () => {
 		const graph = await graphOf({
 			files: {
@@ -540,5 +584,69 @@ describe('declared dynamic imports', () => {
 			'pkg/test/other.test.ts',
 			'pkg/test/serve.test.ts',
 		]);
+	});
+});
+
+describe("this repo's declarations", () => {
+	const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+
+	test(
+		'every declaration matches the fully dynamic site count of its module',
+		{ timeout: 60_000 },
+		async () => {
+			const { graph } = await loadProjectGraph(repoRoot);
+			const lapsed = DYNAMIC_IMPORT_DECLARATIONS.filter(
+				(declaration) => !graph.declared.has(declaration.module),
+			).map(
+				(declaration) =>
+					`${declaration.module}: ${declaration.sites} declared, ${graph.opaque.get(declaration.module)?.length ?? 0} found`,
+			);
+			expect(lapsed).toEqual([]);
+		},
+	);
+
+	test(
+		'a runtime file only the build loads selects the tests that reach the resume loader',
+		{ timeout: 60_000 },
+		async () => {
+			const { graph } = await loadProjectGraph(repoRoot);
+			const reaching = 'packages/web/test/inline-defer-rejected-resume.test.ts';
+			const fixtureTest = 'packages/bundler/test/ssr-updates-fixture.test.ts';
+			const tests = [reaching, fixtureTest, 'packages/analyzer/test/project-graph.test.ts'];
+			for (const changed of [
+				'packages/web/src/inline/payload-document.ts',
+				'packages/bundler/src/build-worker.ts',
+				'packages/headless/components/src/index.ts',
+			])
+				expect(
+					graph.affectedTests([changed], tests, { ignoreUndeclaredImports: true }).tests,
+					changed,
+				).toEqual([fixtureTest, reaching]);
+			expect(
+				graph.affectedTests(
+					['packages/bundler/fixtures/vite-ssr-updates/src/root.tsrx'],
+					tests,
+					{
+						ignoreUndeclaredImports: true,
+					},
+				).tests,
+			).toEqual([fixtureTest]);
+		},
+	);
+});
+
+describe('disk readers found by tracing the declared tests', () => {
+	const files = {
+		'packages/bundler/test/fixture-builds.test.ts': "import 'node:fs';",
+		'packages/bundler/test/render-order-sweep.test.ts': "import 'node:fs';",
+	};
+
+	test('anchor-change records select fixture-builds, headless component files select the sweep', async () => {
+		expect(
+			(await select({ files }, ['scripts/benchmarks/anchor-changes/fix-x.json'])).tests,
+		).toEqual(['packages/bundler/test/fixture-builds.test.ts']);
+		expect(
+			(await select({ files }, ['packages/headless/components/chaos/run.json'])).tests,
+		).toEqual(['packages/bundler/test/render-order-sweep.test.ts']);
 	});
 });

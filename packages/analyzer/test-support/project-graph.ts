@@ -23,7 +23,7 @@ export type DynamicImportDeclaration = {
 	loads: string;
 	/** Vite roots whose build output the sites load: an edge to every tracked file under each. */
 	buildRoots: readonly string[];
-	/** Workspace packages the build bundles: an edge to each export target, then the same for their workspace dependencies. */
+	/** Workspace packages the build bundles: an edge to each export target and `src/` code file, then the same for their workspace dependencies. */
 	packages: readonly string[];
 };
 
@@ -113,21 +113,126 @@ export const DISK_INPUT_READERS: readonly { glob: string; tests: readonly string
 		tests: ['packages/bundler/test/render-data-literals.test.ts'],
 	},
 	{
-		glob: 'packages/headless/components/**/*.md',
+		glob: 'packages/headless/components/**',
 		tests: ['packages/bundler/test/render-order-sweep.test.ts'],
+	},
+	{
+		glob: 'scripts/benchmarks/anchor-changes/**',
+		tests: ['packages/bundler/test/fixture-builds.test.ts'],
 	},
 	{ glob: '**/*.tsrx', tests: ['packages/compiler/test/sync-policy/key-cancel-guard.test.ts'] },
 	// No node-project test reads the website from disk; its modules still reach tests through imports.
 	{ glob: 'website/**', tests: [] },
 ];
 
+// What a Markless app build can bundle: core's dependencies cover the runtime and the build tooling, ui the headless families tests build.
+const APP_BUILD_PACKAGES = ['@markless/core', '@markless/ui'] as const;
+
+// The app's own sources are the test's disk inputs, which the test-area and DISK_INPUT_READERS rules select.
+const appBuildOutput = (
+	module: string,
+	sites: number,
+	loads: string,
+): DynamicImportDeclaration => ({
+	module,
+	sites,
+	loads: `${loads} The app root is whichever one the running test builds or serves, so it adds no edge here.`,
+	buildRoots: [],
+	packages: APP_BUILD_PACKAGES,
+});
+
+const fixtureServerBuild = (
+	test: string,
+	sites: number,
+	roots: readonly string[],
+): DynamicImportDeclaration => ({
+	module: test,
+	sites,
+	loads: `imports <fixture>/dist/server-render/server.js, the server build that \`vp build --app\` (or Vite's builder) writes for ${roots.join(' and ')}.`,
+	buildRoots: roots,
+	packages: APP_BUILD_PACKAGES,
+});
+
+const bundlerFixtureTests: readonly [name: string, sites: number, roots: readonly string[]][] = [
+	['export-collision-fixture', 1, ['vite-csr-export-collision', 'vite-ssr-export-collision']],
+	['ssr-action-scoped-lean-fixture', 1, ['vite-ssr-action-scoped-lean']],
+	['ssr-arm-attribute-fixture', 1, ['vite-ssr-arm-attribute']],
+	['ssr-body-local-rows-fixture', 1, ['vite-ssr-body-local-rows']],
+	['ssr-closure-actions-fixture', 1, ['vite-ssr-closure-actions']],
+	['ssr-constant-props-fixture', 1, ['vite-ssr-constant-props']],
+	['ssr-idle-fixture', 2, ['vite-ssr-idle', 'vite-ssr-idle-wake']],
+	['ssr-imported-rows-fixture', 1, ['vite-ssr-imported-rows']],
+	['ssr-nested-rows-fixture', 1, ['vite-ssr-nested-rows']],
+	['ssr-prerender-wake-fixture', 1, ['vite-ssr-prerender-wake']],
+	['ssr-row-writes-fixture', 1, ['vite-ssr-row-writes']],
+	['ssr-scalar-wake-fixture', 1, ['vite-ssr-scalar-wake']],
+	['ssr-updates-fixture', 1, ['vite-ssr-updates']],
+	['ssr-visible-element-fixture', 1, ['vite-ssr-visible-element']],
+	['ssr-visible-fixture', 1, ['vite-ssr-visible']],
+	['ssr-visible-wake-fixture', 1, ['vite-ssr-visible-wake']],
+];
+
 /** Fully dynamic import sites whose loads are known; a test that reaches an undeclared one runs on any non-prose change. */
 export const DYNAMIC_IMPORT_DECLARATIONS: readonly DynamicImportDeclaration[] = [
+	appBuildOutput(
+		'packages/web/src/inline/defer.ts',
+		1,
+		"marklessDefer()'s loader imports the data-markless-resume-module URL of the running script: the resume module of a served Markless page, a client build of its app.",
+	),
+	appBuildOutput(
+		'packages/web/src/fns/shared-instances.ts',
+		1,
+		"publish() wakes a dormant container by importing its script's data-markless-resume-module URL: the page's resume module.",
+	),
+	appBuildOutput(
+		'packages/web/src/shared-swap.ts',
+		1,
+		"A swap imports the incoming page's resume-module attribute URL: the page's resume module.",
+	),
+	appBuildOutput(
+		'packages/web/src/kept-swap.ts',
+		1,
+		"A kept swap imports the incoming page's resume-module attribute URL: the page's resume module.",
+	),
+	appBuildOutput(
+		'packages/router/src/vite/entries/resume-entry.ts',
+		1,
+		"loadRouteResumeModule() imports the route script's built chunk URL, or the dev loader's URL for the route file: the route's resume module from the app build.",
+	),
+	appBuildOutput(
+		'packages/bundler/src/build/delegate-loader.ts',
+		3,
+		'importSpecifier() imports what a delegate the build is compiling imports, once resolved: modules of the app being built or of the packages it depends on.',
+	),
+	appBuildOutput(
+		'packages/bundler/src/link-driver.ts',
+		1,
+		'nodeImport() imports a delegate source file of the app being built, or of a package it depends on.',
+	),
+	appBuildOutput(
+		'packages/bundler/src/build/prerender.ts',
+		1,
+		"withBuiltPrerenderPage() imports the prerender.js it just wrote: a rolldown build of the app's prerender entry with the server plugin.",
+	),
+	appBuildOutput(
+		'packages/bundler/src/vite/client-build-process.ts',
+		1,
+		"imports request.vite, the installed vite entry resolved from the app root or beside the plugin (a lockfile change), then builds the app's client from its reloaded config.",
+	),
+	...bundlerFixtureTests.map(([name, sites, roots]) =>
+		fixtureServerBuild(
+			`packages/bundler/test/${name}.test.ts`,
+			sites,
+			roots.map((root) => `packages/bundler/fixtures/${root}`),
+		),
+	),
+	fixtureServerBuild('packages/bundler/test/ssr-row-outer-read-fixture.test.ts', 1, [
+		'packages/bundler/test/fixtures/vite-ssr-row-outer-read',
+	]),
 	{
 		module: 'packages/bundler/fixtures/vite-ssr/src/dev-server.ts',
 		sites: 1,
-		loads:
-			"fixtureSsrHost's preview server imports <config.root>/<build.outDir>/<builtRenderEntry ?? 'server/root.js'>: the server build of the Vite root that installs the host. Those roots are the folders of the Vite configs that import this module; tests that install it with a temp root bundle their own inline sources plus the workspace packages.",
+		loads: "fixtureSsrHost's preview server imports <config.root>/<build.outDir>/<builtRenderEntry ?? 'server/root.js'>: the server build of the Vite root that installs the host. Those roots are the folders of the Vite configs that import this module; tests that install it with a temp root bundle their own inline sources plus the workspace packages.",
 		buildRoots: [
 			'packages/bundler/fixtures/vite-ssr',
 			'packages/bundler/fixtures/vite-ssr-async',
@@ -144,8 +249,7 @@ export const DYNAMIC_IMPORT_DECLARATIONS: readonly DynamicImportDeclaration[] = 
 	{
 		module: 'packages/bundler/test/render-data-capabilities.test.ts',
 		sites: 1,
-		loads:
-			"imports <mkdtemp root>/out/<chunk>: the output of a vite build() over sources the test writes itself, compiled by markless() with marklessSourceAliases, which maps @markless/core, web, runtime, serializer and the bundler's rolldown/preload/vite subpaths to their sources.",
+		loads: "imports <mkdtemp root>/out/<chunk>: the output of a vite build() over sources the test writes itself, compiled by markless() with marklessSourceAliases, which maps @markless/core, web, runtime, serializer and the bundler's rolldown/preload/vite subpaths to their sources.",
 		buildRoots: [],
 		packages: [
 			'@markless/bundler',
@@ -544,6 +648,14 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 			: [];
 	};
 
+	const librarySources = input.packages
+		.filter(
+			(pkg) =>
+				pkg.name.startsWith('@markless/') && /^packages\/(headless\/)?[^/]+$/.test(pkg.dir),
+		)
+		.map((pkg) => `${pkg.dir}/src/`);
+	const packageSourceOf = (path: string) => librarySources.some((dir) => path.startsWith(dir));
+
 	const globTargets = (importer: string, patterns: string[]): string[] | null => {
 		const targets = new Set<string>();
 		for (const pattern of patterns) {
@@ -552,6 +664,8 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 			let glob: string;
 			if (pattern.startsWith('./') || pattern.startsWith('../'))
 				glob = normalize(posix.join(posix.dirname(importer), pattern));
+			// Package source compiles into a consumer app's graph, whose root is a test's disk input.
+			else if (pattern.startsWith('/') && packageSourceOf(importer)) continue;
 			else if (pattern.startsWith('/')) glob = `**/${pattern.slice(1)}`;
 			else return null;
 			for (const path of trackedPaths) if (matchesGlob(path, glob)) targets.add(path);
@@ -603,6 +717,9 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 			if (!pkg || seen.has(name)) continue;
 			seen.add(name);
 			for (const path of exportedFiles(pkg)) link(path);
+			// A build also loads source no export reaches: forked worker entries and runtime files the bundler maps by path.
+			for (const path of trackedPaths)
+				if (path.startsWith(`${pkg.dir}/src/`) && isCodePath(path)) link(path);
 			names.push(...Object.keys(pkg.dependencies ?? {}));
 		}
 		graph.declared.add(declaration.module);
@@ -614,7 +731,8 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		const module = analyzer.setFile(path, source);
 		scanImportSites(graph, module, { resolve, templateTargets, globTargets });
 	}
-	for (const declaration of input.declarations ?? DYNAMIC_IMPORT_DECLARATIONS) declare(declaration);
+	for (const declaration of input.declarations ?? DYNAMIC_IMPORT_DECLARATIONS)
+		declare(declaration);
 	analyzer.link();
 	return graph;
 }
