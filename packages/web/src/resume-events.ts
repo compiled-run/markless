@@ -16,6 +16,7 @@ import type { MarklessIdleHost } from './fns/idle-trigger.ts';
 import {
 	marklessControlEditsRead,
 	marklessEditableControl,
+	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
@@ -492,7 +493,12 @@ export function createEventWiring(input: {
 		runPolicy = (await import('./inline/sync-policy-core-lazy.ts'))
 			.runSyncPolicyActions as never;
 	}
-	async function dispatch(
+	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
+		// Another dispatch's flush may land while this one's handler still loads.
+		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
+		return dispatchArrived(event, dispatchOptions).finally(releaseArrivingEdits);
+	}
+	async function dispatchArrived(
 		event: ResumeDomEvent,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {

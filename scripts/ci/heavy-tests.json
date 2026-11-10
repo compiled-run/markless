@@ -1,0 +1,186 @@
+{
+	"entries": [
+		{
+			"module": "packages/router/test/support/fixture-build.ts",
+			"why": "builds a router fixture app in a child process (fixture-build-child.ts)"
+		},
+		{
+			"module": "scripts/test-utils/browser.ts",
+			"why": "launchBrowser starts a Playwright browser"
+		},
+		{
+			"module": "scripts/test-utils/built-server.ts",
+			"why": "serves a production build, which the caller built first"
+		},
+		{
+			"from": [
+				"@playwright/test",
+				"playwright",
+				"playwright-core"
+			],
+			"names": [
+				"chromium",
+				"webkit",
+				"firefox"
+			],
+			"why": "a browser type: the importer launches a browser"
+		},
+		{
+			"from": [
+				"vite"
+			],
+			"names": [
+				"build",
+				"createBuilder"
+			],
+			"why": "Vite's build API: the importer builds an app in process"
+		}
+	],
+	"tests": [
+		"packages/bundler/test/arm-flip-same-task.test.ts",
+		"packages/bundler/test/browser-node-guard.test.ts",
+		"packages/bundler/test/build-directory-independence.test.ts",
+		"packages/bundler/test/build-emit-burst.test.ts",
+		"packages/bundler/test/bundle-size-symbol-table.test.ts",
+		"packages/bundler/test/chunk-import-map.test.ts",
+		"packages/bundler/test/compile-cache-size.test.ts",
+		"packages/bundler/test/computed-chain-growth.test.ts",
+		"packages/bundler/test/dense-async-symbol-table.test.ts",
+		"packages/bundler/test/direct-render-startup.test.ts",
+		"packages/bundler/test/export-collision-fixture.test.ts",
+		"packages/bundler/test/failed-build-compile-store.test.ts",
+		"packages/bundler/test/fixture-builds.test.ts",
+		"packages/bundler/test/interaction-closures-build.test.ts",
+		"packages/bundler/test/music-player-csr-budget.test.ts",
+		"packages/bundler/test/music-player-ssr-budget.test.ts",
+		"packages/bundler/test/mutual-recursion-build.test.ts",
+		"packages/bundler/test/native-packing-fixtures.test.ts",
+		"packages/bundler/test/nested-child-compile-error.test.ts",
+		"packages/bundler/test/node-in-browser-fixture.test.ts",
+		"packages/bundler/test/prerender-arm-children.test.ts",
+		"packages/bundler/test/prerender-late-event-types.test.ts",
+		"packages/bundler/test/projection-live-arm.test.ts",
+		"packages/bundler/test/prop-decided-arm-callers.test.ts",
+		"packages/bundler/test/prop-decided-row-callers.test.ts",
+		"packages/bundler/test/render-data-capabilities.test.ts",
+		"packages/bundler/test/rolldown.test.ts",
+		"packages/bundler/test/separate-client-build.test.ts",
+		"packages/bundler/test/server-chunk-size.test.ts",
+		"packages/bundler/test/ssr-action-scoped-lean-fixture.test.ts",
+		"packages/bundler/test/ssr-arm-attribute-fixture.test.ts",
+		"packages/bundler/test/ssr-body-local-rows-fixture.test.ts",
+		"packages/bundler/test/ssr-browser-hmr-program-reload.test.ts",
+		"packages/bundler/test/ssr-browser-hmr.test.ts",
+		"packages/bundler/test/ssr-closure-actions-fixture.test.ts",
+		"packages/bundler/test/ssr-constant-props-fixture.test.ts",
+		"packages/bundler/test/ssr-idle-fixture.test.ts",
+		"packages/bundler/test/ssr-imported-rows-fixture.test.ts",
+		"packages/bundler/test/ssr-nested-rows-fixture.test.ts",
+		"packages/bundler/test/ssr-prerender-wake-fixture.test.ts",
+		"packages/bundler/test/ssr-row-outer-read-fixture.test.ts",
+		"packages/bundler/test/ssr-row-writes-fixture.test.ts",
+		"packages/bundler/test/ssr-scalar-wake-fixture.test.ts",
+		"packages/bundler/test/ssr-updates-fixture.test.ts",
+		"packages/bundler/test/ssr-visible-element-fixture.test.ts",
+		"packages/bundler/test/ssr-visible-fixture.test.ts",
+		"packages/bundler/test/ssr-visible-wake-fixture.test.ts",
+		"packages/bundler/test/stable-chunk-names.test.ts",
+		"packages/bundler/test/stream-adoption-race.test.ts",
+		"packages/bundler/test/template-dynamic-import.test.ts",
+		"packages/bundler/test/transform-memos-released.test.ts",
+		"packages/cli/test/starter-build.test.ts",
+		"packages/router/test/navigate-promise.test.ts",
+		"packages/router/test/vite/api-pages.test.ts",
+		"packages/router/test/vite/async-child-ssr.test.ts",
+		"packages/router/test/vite/async-graph.test.ts",
+		"packages/router/test/vite/back-revalidate.test.ts",
+		"packages/router/test/vite/child-async-catch.test.ts",
+		"packages/router/test/vite/child-component-styles.test.ts",
+		"packages/router/test/vite/cloudflare-output.test.ts",
+		"packages/router/test/vite/compile-error-cascade.test.ts",
+		"packages/router/test/vite/component-link-build.test.ts",
+		"packages/router/test/vite/compressed-assets.test.ts",
+		"packages/router/test/vite/document-components.test.ts",
+		"packages/router/test/vite/document-html-attributes.test.ts",
+		"packages/router/test/vite/document-html-element-build.test.ts",
+		"packages/router/test/vite/document-navigation.test.ts",
+		"packages/router/test/vite/fixed-route-rows.test.ts",
+		"packages/router/test/vite/foreign-dom-before-wake.test.ts",
+		"packages/router/test/vite/fragment-cache.test.ts",
+		"packages/router/test/vite/fragment-entry-write-after-take.test.ts",
+		"packages/router/test/vite/fragment-head-merge.test.ts",
+		"packages/router/test/vite/fragment-media.test.ts",
+		"packages/router/test/vite/fragment-navigation-edges.test.ts",
+		"packages/router/test/vite/fragment-navigation-webkit.test.ts",
+		"packages/router/test/vite/fragment-navigation.test.ts",
+		"packages/router/test/vite/fragment-redirect.test.ts",
+		"packages/router/test/vite/fragment-scripts.test.ts",
+		"packages/router/test/vite/hash-route-settle.test.ts",
+		"packages/router/test/vite/inline-css.test.ts",
+		"packages/router/test/vite/intent-preloads.test.ts",
+		"packages/router/test/vite/kept-part-state.test.ts",
+		"packages/router/test/vite/landing-resume-size.test.ts",
+		"packages/router/test/vite/link-bridge-static.test.ts",
+		"packages/router/test/vite/lookup-table-imports.test.ts",
+		"packages/router/test/vite/many-interactions.test.ts",
+		"packages/router/test/vite/migration-defects.test.ts",
+		"packages/router/test/vite/migration-shapes.test.ts",
+		"packages/router/test/vite/native-packing-build.test.ts",
+		"packages/router/test/vite/navigation-release.test.ts",
+		"packages/router/test/vite/navigation-restyle.test.ts",
+		"packages/router/test/vite/navigation-stream.test.ts",
+		"packages/router/test/vite/page-http.test.ts",
+		"packages/router/test/vite/page-region.test.ts",
+		"packages/router/test/vite/palette-port.test.ts",
+		"packages/router/test/vite/prefetch-placement-build.test.ts",
+		"packages/router/test/vite/prerender-build.test.ts",
+		"packages/router/test/vite/prerender-stale-output.test.ts",
+		"packages/router/test/vite/preset-client-output.test.ts",
+		"packages/router/test/vite/resume-first-gestures.test.ts",
+		"packages/router/test/vite/route-bound-kept-part.test.ts",
+		"packages/router/test/vite/route-href-build.test.ts",
+		"packages/router/test/vite/route-preload-data.test.ts",
+		"packages/router/test/vite/shared-import.test.ts",
+		"packages/router/test/vite/shared-layout-navigation.test.ts",
+		"packages/router/test/vite/shared-navigation.test.ts",
+		"packages/router/test/vite/shared-request-isolation.test.ts",
+		"packages/router/test/vite/static-prop-arm-build.test.ts",
+		"packages/router/test/vite/storage-child-production.test.ts",
+		"packages/router/test/vite/stream-arm-adopted.test.ts",
+		"packages/router/test/vite/stream-settle-failure.test.ts",
+		"packages/router/test/vite/top-level-control-flow.test.ts",
+		"packages/router/test/vite/unminified-build.test.ts",
+		"packages/router/test/vite/vercel-isr-navigation.test.ts",
+		"packages/router/test/vite/vercel-output.test.ts",
+		"packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
+		"packages/web/test/early-stream-events.test.ts",
+		"packages/web/test/native-census.test.ts",
+		"packages/web/test/served-census.test.ts"
+	],
+	"declared": [
+		{
+			"test": "packages/bundler/test/build-determinism.test.ts",
+			"why": "runs `pnpm --dir <demo> build` through execFile"
+		},
+		{
+			"test": "packages/bundler/test/build-workers.test.ts",
+			"why": "starts the bundler's build-worker pool, whose worker file src/build-workers.ts picks at run time (.ts or .js)"
+		},
+		{
+			"test": "packages/router/test/navigation-chunk.test.ts",
+			"why": "runs `pnpm --filter @markless/fixture-router build` through execFile"
+		},
+		{
+			"test": "packages/router/test/package-build.test.ts",
+			"why": "runs `pnpm exec vp pack` on @markless/router through execFile"
+		},
+		{
+			"test": "packages/typescript-plugin/test/language.test.ts",
+			"why": "runs `vp pack` through spawnSync"
+		},
+		{
+			"test": "scripts/benchmarks/perf-guards/first-use.test.ts",
+			"why": "launches Chromium from `require('playwright')` through createRequire, which is not an import"
+		}
+	]
+}

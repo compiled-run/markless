@@ -27,6 +27,15 @@ export type DynamicImportDeclaration = {
 	packages: readonly string[];
 };
 
+/** A test that builds or serves an app through a child process, which no import shows. */
+export type SpawnedAppBuild = {
+	test: string;
+	/** What the child process runs. */
+	runs: string;
+	/** The app folders it builds: an edge to every tracked file under each. */
+	buildRoots: readonly string[];
+};
+
 export type ProjectGraphInput = {
 	/** Repo-relative path to source, for every tracked file the analyzer parses. */
 	files: ReadonlyMap<string, string | Uint8Array>;
@@ -35,6 +44,8 @@ export type ProjectGraphInput = {
 	packages: readonly WorkspacePackage[];
 	/** Defaults to `DYNAMIC_IMPORT_DECLARATIONS`. */
 	declarations?: readonly DynamicImportDeclaration[];
+	/** Defaults to `SPAWNED_APP_BUILDS`. */
+	spawnedAppBuilds?: readonly SpawnedAppBuild[];
 };
 
 export type Selection = { tests: string[]; runAll: string | null };
@@ -261,6 +272,62 @@ export const DYNAMIC_IMPORT_DECLARATIONS: readonly DynamicImportDeclaration[] = 
 	},
 ];
 
+/** Imports that start a Vite or Vitest host in process; the app config it loads, which no import names, bundles the Markless packages. */
+export const APP_HOST_IMPORTS: Readonly<Record<string, readonly string[]>> = {
+	vite: ['build', 'createBuilder', 'createServer', 'preview'],
+	'vite-plus': ['build', 'createBuilder', 'createServer', 'preview'],
+	'vitest/node': ['createVitest', 'startVitest'],
+};
+
+// A namespace, dynamic or required import of a host module can reach the host API without naming it.
+const HOST_IMPORT_KINDS = new Set(['namespace', 'dynamic', 'require', 'importEquals']);
+
+const CHILD_PROCESS_MODULES = new Set(['node:child_process', 'child_process']);
+
+/** Tests that build or serve an app through a child process; an entry whose test no longer imports node:child_process is not applied. */
+export const SPAWNED_APP_BUILDS: readonly SpawnedAppBuild[] = [
+	{
+		test: 'packages/bundler/test/stream-adoption-race.test.ts',
+		runs: '`vp build --app` in its fixture folder',
+		buildRoots: ['packages/bundler/test/fixtures/stream-adoption-race'],
+	},
+	{
+		test: 'packages/vitest-browser/test/ssr-module-cache-rerun.test.ts',
+		runs: "Vitest on packages/vitest-browser/vitest.config.ts, whose plugin builds a browser test's app",
+		buildRoots: ['packages/vitest-browser'],
+	},
+	{
+		test: 'packages/bundler/test/build-determinism.test.ts',
+		runs: '`pnpm --dir demos/music-player build`',
+		buildRoots: ['demos/music-player'],
+	},
+	{
+		test: 'packages/bundler/test/fixture-builds.test.ts',
+		runs: '`pnpm --filter <fixture> build` over the bundler fixtures',
+		buildRoots: ['packages/bundler/fixtures'],
+	},
+	{
+		test: 'packages/router/test/navigation-chunk.test.ts',
+		runs: '`pnpm --filter @markless/fixture-router build`',
+		buildRoots: ['packages/router/fixtures/router'],
+	},
+];
+
+const hostsApp = (module: Module) =>
+	module.imports.some(
+		(record) =>
+			!record.typeOnly &&
+			record.specifier in APP_HOST_IMPORTS &&
+			(record.kind === 'named'
+				? APP_HOST_IMPORTS[record.specifier].includes(record.name ?? '')
+				: HOST_IMPORT_KINDS.has(record.kind)),
+	);
+
+const startsChildProcess = (module: Module) =>
+	module.imports.some(
+		(record) => !record.typeOnly && CHILD_PROCESS_MODULES.has(record.specifier),
+	);
+
 // A file under one of these folders of a package can be a fixture that a test reads from disk.
 const TEST_AREAS = new Set(['test', 'tests', 'fixtures', 'test-support', '__snapshots__']);
 const SNAPSHOT = /^(.*)\/__snapshots__\/([^/]+)\.snap$/;
@@ -375,6 +442,8 @@ export class ProjectGraph {
 	readonly opaque = new Map<string, string[]>();
 	/** Modules in `opaque` whose sites a `DynamicImportDeclaration` covers. */
 	readonly declared = new Set<string>();
+	/** Modules linked to the app-build packages: Vite or Vitest hosts, and applied `SpawnedAppBuild` tests. */
+	readonly appBuilds = new Set<string>();
 	/** Edges yuku does not model: non-code imports, extra export conditions and `new URL(..., import.meta.url)`. */
 	readonly extraDependents = new Map<string, Set<string>>();
 	private readonly tracked: ReadonlySet<string>;
@@ -702,26 +771,45 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		return [...files];
 	};
 
-	const declare = (declaration: DynamicImportDeclaration) => {
-		if (graph.opaque.get(declaration.module)?.length !== declaration.sites) return;
-		const link = (target: string) => {
-			if (target !== declaration.module) graph.addExtraEdge(declaration.module, target);
-		};
-		for (const root of declaration.buildRoots)
-			for (const path of trackedPaths) if (path.startsWith(`${root}/`)) link(path);
-		const names = [...declaration.packages];
+	const packageFiles = new Map<string, string[]>();
+	const filesOfPackages = (packages: readonly string[]) => {
+		const key = packages.join('\0');
+		const known = packageFiles.get(key);
+		if (known) return known;
+		const files = new Set<string>();
+		const names = [...packages];
 		const seen = new Set<string>();
 		while (names.length) {
 			const name = names.pop()!;
 			const pkg = packagesByName.get(name);
 			if (!pkg || seen.has(name)) continue;
 			seen.add(name);
-			for (const path of exportedFiles(pkg)) link(path);
+			for (const path of exportedFiles(pkg)) files.add(path);
 			// A build also loads source no export reaches: forked worker entries and runtime files the bundler maps by path.
 			for (const path of trackedPaths)
-				if (path.startsWith(`${pkg.dir}/src/`) && isCodePath(path)) link(path);
+				if (path.startsWith(`${pkg.dir}/src/`) && isCodePath(path)) files.add(path);
 			names.push(...Object.keys(pkg.dependencies ?? {}));
 		}
+		packageFiles.set(key, [...files]);
+		return packageFiles.get(key)!;
+	};
+
+	const linkBuild = (
+		module: string,
+		buildRoots: readonly string[],
+		packages: readonly string[],
+	) => {
+		const link = (target: string) => {
+			if (target !== module) graph.addExtraEdge(module, target);
+		};
+		for (const root of buildRoots)
+			for (const path of trackedPaths) if (path.startsWith(`${root}/`)) link(path);
+		for (const path of filesOfPackages(packages)) link(path);
+	};
+
+	const declare = (declaration: DynamicImportDeclaration) => {
+		if (graph.opaque.get(declaration.module)?.length !== declaration.sites) return;
+		linkBuild(declaration.module, declaration.buildRoots, declaration.packages);
 		graph.declared.add(declaration.module);
 	};
 
@@ -729,10 +817,26 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 	graph = new ProjectGraph(analyzer, input.tracked);
 	for (const [path, source] of input.files) {
 		const module = analyzer.setFile(path, source);
-		scanImportSites(graph, module, { resolve, templateTargets, globTargets });
+		scanImportSites(graph, module, {
+			resolve,
+			templateTargets,
+			globTargets,
+			tracked: input.tracked,
+		});
 	}
 	for (const declaration of input.declarations ?? DYNAMIC_IMPORT_DECLARATIONS)
 		declare(declaration);
+	for (const [path, module] of analyzer.modules)
+		if (hostsApp(module)) {
+			linkBuild(path, [], APP_BUILD_PACKAGES);
+			graph.appBuilds.add(path);
+		}
+	for (const build of input.spawnedAppBuilds ?? SPAWNED_APP_BUILDS) {
+		const module = analyzer.module(build.test);
+		if (!module || !startsChildProcess(module)) continue;
+		linkBuild(build.test, build.buildRoots, APP_BUILD_PACKAGES);
+		graph.appBuilds.add(build.test);
+	}
 	analyzer.link();
 	return graph;
 }
@@ -747,13 +851,41 @@ type ImportSites = {
 	) => string[] | null;
 	/** Tracked files an `import.meta.glob` pattern list matches; null for a pattern with no known root. */
 	globTargets: (importer: string, patterns: string[]) => string[] | null;
+	tracked: ReadonlySet<string>;
 };
 
 const isPlainLiteral = (node: AstNode | undefined) =>
 	node?.type === 'Literal' ||
 	(node?.type === 'TemplateLiteral' && node.expressions?.length === 0);
 
-// Reads AST facts the import records lack: computed import targets, globs and `new URL(..., import.meta.url)` files.
+const PATH_MODULES = new Set(['node:path', 'path', 'pathe']);
+
+/** `resolve(import.meta.dirname, 'helpers/build.ts')` with `resolve` or `join` from a path module: a file the module runs by path, such as a spawned script. */
+const spawnedScriptTarget = (
+	module: Module,
+	node: AstNode,
+	tracked: ReadonlySet<string>,
+): string | null => {
+	const callee = node.callee as AstNode;
+	if (callee.type !== 'Identifier') return null;
+	const binding = module.referenceOf(callee as never)?.binding;
+	if (!binding) return null;
+	const imported = module.imports.find((record) => record.local?.id === binding.id);
+	if (
+		!imported ||
+		!PATH_MODULES.has(imported.specifier) ||
+		!['resolve', 'join'].includes(imported.name ?? '')
+	)
+		return null;
+	const [first, ...rest] = node.arguments as AstNode[];
+	if (!isImportMetaMember(first, 'dirname') || first.computed || rest.length === 0) return null;
+	const parts = rest.map((part) => (isPlainLiteral(part) ? specifierParts(part)![0] : null));
+	if (parts.some((part) => part === null)) return null;
+	const target = posix.normalize(posix.join(posix.dirname(module.path), ...(parts as string[])));
+	return isCodePath(target) && tracked.has(target) ? target : null;
+};
+
+// Reads AST facts the import records lack: computed import targets, globs, `new URL(..., import.meta.url)` files and scripts run by path.
 const scanImportSites = (graph: ProjectGraph, module: Module, sites: ImportSites) => {
 	const opaque: string[] = [];
 	const link = (targets: string[] | null, label: string) => {
@@ -771,6 +903,8 @@ const scanImportSites = (graph: ProjectGraph, module: Module, sites: ImportSites
 	for (const node of module.findAll('CallExpression') as AstNode[]) {
 		const callee = node.callee as AstNode;
 		const [first] = node.arguments as AstNode[];
+		const script = spawnedScriptTarget(module, node, sites.tracked);
+		if (script && script !== module.path) graph.addExtraEdge(module.path, script);
 		if (isImportMetaMember(callee, 'glob')) {
 			const patterns = (first?.type === 'ArrayExpression' ? first.elements : [first]).map(
 				(element: AstNode | undefined) => specifierParts(element),

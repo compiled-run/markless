@@ -308,7 +308,7 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 				inset: auto;
 				position-anchor: --pg-hint;
 				position-area: block-end span-inline-end;
-				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline;
+				position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline, block-end span-all, block-start span-all;
 					margin-block: 0.35em;
 				}
 			}

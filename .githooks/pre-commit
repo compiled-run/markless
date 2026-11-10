@@ -1,33 +1,45 @@
 #!/bin/sh
 # Block commits that introduce lint errors or unused imports/vars.
 # Managed via: git config core.hooksPath .githooks (set by pnpm prepare).
+selection_dir="$(mktemp -d "${TMPDIR:-/tmp}/markless-affected.XXXXXX")"
+if [ "${MARKLESS_HOOK_ALL:-}" != "1" ]; then
+	node scripts/ci/affected.mjs --staged --json >"$selection_dir/selection.json" 2>/dev/null &
+	selection_pid=$!
+fi
+
 pnpm exec vp lint --deny-warnings 2>/dev/null
 status=$?
 if [ $status -ne 0 ]; then
+	[ -n "${selection_pid:-}" ] && wait "$selection_pid" 2>/dev/null
+	rm -rf "$selection_dir"
 	echo ""
 	echo "pre-commit: vp lint failed (unused imports/vars or lint errors)."
 	echo "Fix with: pnpm exec vp lint --fix --fix-suggestions --fix-dangerously"
 	exit $status
 fi
 
-# Shadow mode: compute the yuku-selected unit tests beside the full run and log them; the full run still decides.
-shadow_dir="$(mktemp -d "${TMPDIR:-/tmp}/markless-affected.XXXXXX")"
-node scripts/ci/affected.mjs --staged --json >"$shadow_dir/selection.json" 2>/dev/null &
-shadow_pid=$!
-export MARKLESS_CI_JSON_REPORT_DIR="$shadow_dir"
-
-# Run CI's fast jobs (agent files, typecheck, unit) with the exact commands from ci.yml.
-node scripts/ci/local.mjs --fast --bail
-status=$?
-
+# CI's fast jobs with the exact commands from ci.yml; the unit job runs the yuku-selected tests unless MARKLESS_HOOK_ALL=1.
+export MARKLESS_CI_JSON_REPORT_DIR="$selection_dir"
+if [ -n "${selection_pid:-}" ]; then
+	wait "$selection_pid"
+	node scripts/ci/local.mjs --fast --bail --unit-selection "$selection_dir/selection.json"
+	status=$?
+	unit_scope=selected
+else
+	node scripts/ci/local.mjs --fast --bail
+	status=$?
+	unit_scope=all
+fi
 unset MARKLESS_CI_JSON_REPORT_DIR
-wait "$shadow_pid" 2>/dev/null
-node scripts/ci/affected.mjs --shadow-log "$shadow_dir/selection.json" --unit-report "$shadow_dir/unit.json" >/dev/null 2>&1
-rm -rf "$shadow_dir"
+
+if [ -n "${selection_pid:-}" ] || node scripts/ci/affected.mjs --staged --json >"$selection_dir/selection.json" 2>/dev/null; then
+	node scripts/ci/affected.mjs --shadow-log "$selection_dir/selection.json" --unit-report "$selection_dir/unit.json" --unit-scope "$unit_scope" >/dev/null 2>&1
+fi
+rm -rf "$selection_dir"
 if [ $status -ne 0 ]; then
 	echo ""
 	echo "pre-commit: CI fast jobs failed (see above)."
-	echo "Re-run with: pnpm ci:local --fast"
+	echo "Re-run with: pnpm ci:local --fast   (MARKLESS_HOOK_ALL=1 makes the hook run every unit test)"
 	exit $status
 fi
 
