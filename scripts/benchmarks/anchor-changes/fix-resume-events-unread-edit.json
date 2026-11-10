@@ -57,6 +57,16 @@
 			"delta": 17,
 			"reason": "served-page resume holds a flush that would rewind text typed into a control whose input handler is still loading",
 			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 207,
+			"reason": "served-page resume holds a flush that would rewind text typed into a control whose input handler is still loading",
+			"date": "2026-11-10"
 		}
 	]
 }
