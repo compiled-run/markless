@@ -1,10 +1,13 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { Page } from './page.tsrx';
-import { holdSearches } from './search-fruit.ts';
+import { holdSearches, releaseSearches } from './search-fruit.ts';
 
-// A child declared beside its parent, whose async value and staleness check read a prop, behaves like the one-component form.
-afterEach(() => cleanup());
+// A child declared beside its parent, whose async value and staleness check read props, behaves like the one-component form.
+afterEach(() => {
+	releaseSearches();
+	cleanup();
+});
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -37,7 +40,8 @@ async function exercise(container: HTMLElement) {
 	await expect
 		.poll(() => container.textContent?.includes('Search is down'), { timeout: 5_000 })
 		.toBe(true);
-	expect(list()).toBeNull();
+	expect(list()?.textContent).toBe('appleapricotgrape');
+	expect(list()!.nextElementSibling?.textContent).toBe('Search is down');
 	await expect.poll(busy).toBe(0);
 	[...container.querySelectorAll('button')]
 		.find((button) => button.textContent === 'Try again')!
@@ -46,18 +50,12 @@ async function exercise(container: HTMLElement) {
 	await expect.poll(() => [list()?.style.opacity, busy()]).toEqual(['1', 0]);
 }
 
-// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": a keystroke over a settled answer sometimes paints @pending instead of the dimmed list.
-const quarantined = Date.now() < Date.parse('2026-11-17');
-test.runIf(!quarantined)('the quarantine is still in date', () => {
-	expect.fail('Quarantine expired on 2026-11-17: fix the settleAsyncBoundaryRange race (#322 merged and both tests still failed) and drop the quarantine.');
-});
-
-test.skipIf(quarantined)('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
+test('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
 	const screen = await render(Page);
 	await exercise(screen.container as HTMLElement);
 });
 
-test.skipIf(quarantined)('SSR: a child reading its query prop searches, fails, retries and recovers after resume', async () => {
+test('SSR: a child reading its query prop searches, fails, retries and recovers after resume', async () => {
 	const screen = await renderSSR(Page);
 	await exercise(screen.container as HTMLElement);
 });
