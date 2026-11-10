@@ -151,7 +151,11 @@ export default function PlanAnywhere() @{
 			}
 
 			.board[data-env='Browser'][data-clicked='yes'] .lit-on-click {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.id,
@@ -247,11 +251,19 @@ export default function PlanAnywhere() @{
 			}
 
 			.live:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.live:active {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.live:focus-visible {

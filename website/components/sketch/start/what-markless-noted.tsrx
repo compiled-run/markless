@@ -140,7 +140,11 @@ export default function WhatMarklessNoted() @{
 			}
 
 			.board[data-used='yes'] .click {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.page {
@@ -163,11 +167,19 @@ export default function WhatMarklessNoted() @{
 			}
 
 			.count:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.count:active {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.count:focus-visible {

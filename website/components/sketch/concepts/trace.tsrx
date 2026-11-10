@@ -72,7 +72,11 @@ export function Row({ name, children }: { readonly name: string; readonly childr
 			}
 
 			.tr-row:has([data-hot='true']) {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.tr-id {
