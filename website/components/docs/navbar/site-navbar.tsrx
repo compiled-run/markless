@@ -159,6 +159,11 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					opacity 300ms ease;
 			}
 
+			/* The parser can paint between nav items; space-between would then move the items once the rest arrives, so the bar shows only once it is whole. */
+			.nav-shade:not(:has(+ *)) .nav-pill {
+				visibility: hidden;
+			}
+
 			/* public/navbar.js marks the page while the reader scrolls down it; focus brings the bar back. */
 			html[data-nav-away] .nav-pill:not([ui-open]) {
 				translate: -50% calc(-100% - 1.5rem);
