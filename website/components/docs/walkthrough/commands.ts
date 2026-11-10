@@ -7,12 +7,12 @@ import {
 	scriptCommand,
 } from './facts.ts';
 
-/** shiki's github-light and github-dark colours for the four kinds of shell word these commands use; walkthrough.test.ts pins them to the site's fence highlighter. */
+/** shiki's github-light colours and the site's dark syntax tokens for the four kinds of shell word these commands use; walkthrough.test.ts pins them to the site's fence highlighter. */
 export const SHELL_STYLES = {
-	command: 'color:#6F42C1;--shiki-dark:#B392F0',
-	word: 'color:#032F62;--shiki-dark:#9ECBFF',
-	flag: 'color:#005CC5;--shiki-dark:#79B8FF',
-	comment: 'color:#6A737D;--shiki-dark:#6A737D',
+	command: 'color:#6F42C1;--shiki-dark:var(--syntax-fn)',
+	word: 'color:#032F62;--shiki-dark:var(--syntax-str)',
+	flag: 'color:#005CC5;--shiki-dark:var(--syntax-num)',
+	comment: 'color:#6A737D;--shiki-dark:var(--syntax-comment)',
 } as const;
 
 export type ShellRun = { readonly id: string; readonly text: string; readonly style: string };

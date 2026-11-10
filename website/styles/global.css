@@ -55,6 +55,8 @@
 	--syntax-str: #032f62;
 	--syntax-tag: #22863a;
 	--syntax-num: #005cc5;
+	--syntax-var: #e36209;
+	--syntax-comment: #6a737d;
 	--shadow-h1: var(--pink);
 	--shadow-h2: var(--purple);
 	--shadow-h3: var(--green-soft);
@@ -97,11 +99,13 @@
 		--figure-ok: oklch(80% 0.13 150);
 		--wood: var(--slab);
 		--figure-kraft: var(--slab);
-		--syntax-kw: #f97583;
-		--syntax-fn: #b392f0;
-		--syntax-str: #9ecbff;
-		--syntax-tag: #85e89d;
-		--syntax-num: #79b8ff;
+		--syntax-kw: var(--pink);
+		--syntax-fn: var(--purple);
+		--syntax-str: var(--yellow);
+		--syntax-tag: var(--green-soft);
+		--syntax-num: color-mix(in oklch, var(--yellow) 50%, var(--cream));
+		--syntax-var: color-mix(in oklch, var(--pink) 45%, var(--cream));
+		--syntax-comment: color-mix(in oklch, var(--ink) 66%, var(--paper));
 		/* Cream letters need a darker-than-page layer beyond the pastel to stay apart from it. */
 	}
 }
