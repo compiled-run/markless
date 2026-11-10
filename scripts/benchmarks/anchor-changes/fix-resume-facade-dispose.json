@@ -1,0 +1,74 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/resume"],
+			"delta": 63,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-csr", "maxEmittedRuntimeGzipBytes", "measured"],
+			"delta": 37,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/resume"],
+			"delta": 63,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-plus", "maxEmittedRuntimeGzipBytes", "measured"],
+			"delta": 37,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 43,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 43,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 43,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 62,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 62,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 62,
+			"reason": "the resume wrapper keeps one lifecycle value so a dispose before its runtime module loads sticks",
+			"date": "2026-11-10"
+		}
+	]
+}

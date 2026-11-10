@@ -74,6 +74,7 @@ async function select(changed) {
 		selected: selection.runAll ? null : selection.tests,
 		runAll: selection.runAll,
 		total: project.files.length,
+		undeclaredTests: graph.testsReachingUndeclaredImports(project.files).length,
 		graphMs: Math.round(buildMs),
 		totalMs: Math.round(performance.now() - started),
 		graphFiles: fileCount,
@@ -142,8 +143,8 @@ async function history(count, rev, durationsPath, durationsRoot = repoRoot) {
 		const { graph, buildMs } = await loadProjectGraph(repoRoot, { rev: sha });
 		const tests = testsInTree(lines(git('ls-tree', '-r', '--name-only', sha)), project);
 		const strict = graph.affectedTests(changed, tests);
-		// The same change if computed imports did not force a full run, for comparison only.
-		const lenient = graph.affectedTests(changed, tests, { ignoreComputedImports: true });
+		// The same change if undeclared fully dynamic imports added no tests, for comparison only.
+		const lenient = graph.affectedTests(changed, tests, { ignoreUndeclaredImports: true });
 		rows.push({
 			sha: sha.slice(0, 10),
 			subject: git('log', '-1', '--format=%s', sha).trim(),
@@ -155,6 +156,7 @@ async function history(count, rev, durationsPath, durationsRoot = repoRoot) {
 			lenientSelected: lenient.runAll ? tests.length : lenient.tests.length,
 			lenientRunAll: lenient.runAll,
 			lenientShare: share(lenient, tests),
+			undeclaredTests: graph.testsReachingUndeclaredImports(tests).length,
 			graphMs: Math.round(buildMs),
 		});
 		console.error(
@@ -204,6 +206,7 @@ async function history(count, rev, durationsPath, durationsRoot = repoRoot) {
 			0.9,
 		),
 		lenientMeanCostShare: mean(shares('lenientShare')),
+		undeclaredTestsAtHead: rows[0]?.undeclaredTests ?? null,
 		graphMsP50: percentile(
 			rows.map((row) => row.graphMs),
 			0.5,

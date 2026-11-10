@@ -9,8 +9,9 @@ import {
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript';
 import css from 'shiki/langs/css.mjs';
 import githubLight from 'shiki/themes/github-light.mjs';
-import tsrxGrammar from '../../../tooling/tsrx.tmLanguage.json';
+// Kept beside github-light: it brings github-dark, and the two themes gzip well only when adjacent in the chunk.
 import { DARK_THEME, LIGHT_THEME, siteDarkTheme, useSiteSurface } from '../../../tooling/shiki-surface.ts';
+import tsrxGrammar from '../../../tooling/tsrx.tmLanguage.json';
 import { languageOf } from './languages.ts';
 
 type ShikiInternal = Awaited<ReturnType<typeof createShikiInternal>>;

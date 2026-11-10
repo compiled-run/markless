@@ -71,6 +71,17 @@ const BUNDLER_SWAP_SOURCE = new RegExp(
 		.join('|')})$|(?:^|/)event-loop\\.ts$`,
 );
 
+// The playground compiles for the browser only, so the bundler never builds a server page's inline scripts there.
+const BUNDLER_INLINE_RESUMER = fileURLToPath(
+	new URL('../../packages/bundler/src/inline-resumer.ts', import.meta.url),
+);
+const PLAYGROUND_INLINE_RESUMER = `const serverOnly = async () => {
+	throw new Error('A Code block compiles for the browser and builds no inline resumer.');
+};
+export const compileInlineResumerSources = serverOnly;
+export const compilePrerenderInlineResumerSources = serverOnly;
+`;
+
 /** The file the frame is served as, under the site's base path. */
 export const CODE_FRAME_FILE = '_code-frame.html';
 
@@ -115,6 +126,12 @@ export function codeCompilerSwaps(): Plugin {
 					return (await this.resolve('pathe', importer, { skipSelf: true }))?.id ?? null;
 				if (/(?:^|\/)event-loop\.ts$/.test(source)) return `${CODE_DIR}bundler-shims.ts`;
 				return BUNDLER_SWAPS[source] ?? null;
+			},
+		},
+		load: {
+			filter: { id: new RegExp(`^${BUNDLER_INLINE_RESUMER.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}$`) },
+			handler() {
+				return this.environment?.config.consumer === 'server' ? null : PLAYGROUND_INLINE_RESUMER;
 			},
 		},
 	};
