@@ -24,6 +24,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// Dispatched on the document once the page the user ends up on is in place.
+	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -1394,7 +1396,7 @@ export async function navigate(
 		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
-	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
+	d.dispatchEvent(new CustomEvent(state.config.renderedEvent));
 	state.rescan();
 	const key = state.shown;
 	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(
