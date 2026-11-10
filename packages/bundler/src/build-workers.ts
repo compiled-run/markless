@@ -180,8 +180,8 @@ function addWorker(lane: Lane): void {
 		// Retired while it booted: the exit sent then reached no listener yet.
 		if (!lane.workers.includes(entry)) return entry.handle.exit();
 		entry.online = true;
-		addWorker(lane);
 		dispatch(lane);
+		grow(lane);
 	});
 	started.on('message', (message: WorkerMessage) => {
 		if (message.ready) return;
@@ -219,6 +219,11 @@ function addWorker(lane: Lane): void {
 	};
 	started.on('error', retire);
 	started.on('exit', retire);
+}
+
+// A lane boots another worker only while jobs wait that no online or booting worker can take, so a small build starts few.
+function grow(lane: Lane): void {
+	if (lane.queue.length > 0 && lane.workers.every((entry) => entry.online)) addWorker(lane);
 }
 
 function dispatch(lane: Lane): void {
@@ -293,12 +298,6 @@ export function runChunkJob<T extends ChunkTaskName>(
 			return Promise.reject(error);
 		}
 	}
-	const { workers } = chunkReads;
-	if (
-		!workers.length ||
-		(workers.length < chunkReads.size && workers.every((entry) => entry.online))
-	)
-		addWorker(chunkReads);
 	return new Promise((resolve, reject) => {
 		chunkReads.queue.push({
 			kind: 'chunk',
@@ -311,6 +310,7 @@ export function runChunkJob<T extends ChunkTaskName>(
 			reject,
 		});
 		dispatch(chunkReads);
+		grow(chunkReads);
 	});
 }
 
@@ -352,11 +352,7 @@ export function createCompileWorkerPool(options: {
 		run(input, key) {
 			if (closed || options.size === 0) return undefined;
 			const { workers } = compiles;
-			if (
-				!workers.length ||
-				(workers.length < compiles.size && workers.every((entry) => entry.online))
-			)
-				addWorker(compiles);
+			if (!workers.length) addWorker(compiles);
 			// Until a worker is online the calling thread compiles, so booting never idles the build.
 			if (!workers.some((entry) => entry.online)) return undefined;
 			const run = new Promise<CompileTsrxModuleResult | undefined>((resolve) => {
@@ -374,6 +370,7 @@ export function createCompileWorkerPool(options: {
 					},
 				});
 				dispatch(compiles);
+				grow(compiles);
 			});
 			runs.add(run);
 			compileRuns.add(run);
