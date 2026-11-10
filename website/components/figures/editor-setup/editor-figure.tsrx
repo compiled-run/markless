@@ -196,18 +196,17 @@ export default function EditorFigure() @{
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
-				--c-kw: #d73a49;
-				--c-fn: #6f42c1;
-				--c-str: #032f62;
-				--c-tag: #22863a;
-				--c-num: #005cc5;
-				--c-err: #cb2431;
+				--c-kw: var(--syntax-kw);
+				--c-fn: var(--syntax-fn);
+				--c-str: var(--syntax-str);
+				--c-tag: var(--syntax-tag);
+				--c-num: var(--syntax-num);
+				--c-err: var(--figure-error);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -281,6 +280,11 @@ export default function EditorFigure() @{
 				position: relative;
 			}
 
+			html.dark :is(.btn-install, .btn-uninstall) {
+				--ink: var(--on-accent);
+				--sheet-ink: var(--on-accent);
+			}
+
 			.search {
 				position: absolute;
 				box-sizing: border-box;
@@ -290,10 +294,6 @@ export default function EditorFigure() @{
 				background: transparent;
 				font: 500 clamp(9px, 1.4vw, 0.8rem) / 1 var(--font-mono);
 				color: var(--ink);
-
-				html.dark & {
-					color: var(--paper);
-				}
 				outline: none;
 				-webkit-appearance: none;
 				appearance: none;
@@ -303,10 +303,6 @@ export default function EditorFigure() @{
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				letter-spacing: 0.04em;
 				color: color-mix(in oklch, var(--ink) 45%, transparent);
-
-				html.dark & {
-					color: color-mix(in oklch, var(--paper) 55%, transparent);
-				}
 			}
 
 			.search:focus-visible {
@@ -336,6 +332,10 @@ export default function EditorFigure() @{
 			.tokens:has(.press:hover) .entry,
 			.use:hover {
 				fill: color-mix(in oklch, var(--yellow) 30%, transparent);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--ink) 10%, transparent);
+				}
 			}
 
 			.hover-line {

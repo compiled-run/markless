@@ -2,13 +2,11 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, webkit, type Browser, type BrowserType, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { FRAGMENT_HOVER_DWELL_MS, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A page fetched ahead of a click is shown only while it can still be what the server would send:
 // a write the page makes, or the page's own Cache-Control, sends the click to the server again.
@@ -32,13 +30,10 @@ beforeAll(async () => {
 		join(root, 'node_modules/nitro'),
 		'dir',
 	);
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless({ experimentalNativePacking: true }), router()],
+		markless: { experimentalNativePacking: true },
 	});
-	await builder.buildApp();
 	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -77,8 +72,9 @@ function trackFetches(page: Page) {
 
 type Fetched = (path: string) => Promise<void>;
 
-async function open(browser: Browser) {
+async function open(browser: Browser, initScript?: () => void) {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+	if (initScript) await page.addInitScript(initScript);
 	const { arrived, fetched } = trackFetches(page);
 	await page.goto(`${origin}/`);
 	await landedOn(page, 'home');
@@ -177,6 +173,37 @@ for (const [name, browserType] of [
 			await fetchedAhead(page, fetched, '[data-live]', '/live');
 			const now = await bumpElsewhere();
 			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			await page.close();
+		});
+
+		test('a no-store page the press fetched is shown from that fetch when the navigation code arrives after it', async () => {
+			// The idle tier may fetch the page before the press; from the press on, the click's own fetch is the only one.
+			// Registered before the router's own capture listener, so the press is timed before that listener starts its fetch.
+			const { page } = await open(browser, () =>
+				addEventListener(
+					'pointerdown',
+					() => ((window as { pressedAt?: number }).pressedAt ??= performance.now()),
+					true,
+				),
+			);
+			const now = await bumpElsewhere();
+			await page.route(
+				(url) => url.pathname.endsWith('.js'),
+				async (route) => {
+					await new Promise((done) => setTimeout(done, 400));
+					await route.continue();
+				},
+			);
+			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			const asked = await page.evaluate(() =>
+				performance
+					.getEntriesByType('resource')
+					.filter((entry) => entry.startTime >= (window as { pressedAt?: number }).pressedAt!)
+					.map((entry) => entry.name),
+			);
+			expect(
+				asked.filter((name) => fragmentPageUrl(new URL(name))?.pathname === '/live'),
+			).toHaveLength(1);
 			await page.close();
 		});
 

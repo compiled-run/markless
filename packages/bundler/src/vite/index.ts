@@ -128,7 +128,7 @@ const TSRX_INPUT_FILE = /\.tsrx(?:[?#].*)?$/;
 export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	let command: 'build' | 'serve' = 'build';
 	const bundleGraphAdders = new Set<BundleGraphAdder>();
-	const transformedTsrxSources = new Map<string, string>();
+	const acceptedTsrxSources = new Map<string, AcceptedTsrxSource>();
 	const prerenderRecordsBySource = new Map<string, BuiltPrerenderRecords>();
 	const { experimentalNativePacking: _deprecatedPacking, ...rest } = options;
 	const rolldownOptions: InternalMarklessRolldownOptions = {
@@ -210,7 +210,8 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 				() => basePlugin.api.runtimeDemandSources(),
 				() => basePlugin.api.directCsrOnly(),
 				() => chunkSizeWarningBytes,
-				(files, roots, importers) => basePlugin.api.unreachableChildren(files, roots, importers),
+				(files, roots, importers) =>
+					basePlugin.api.unreachableChildren(files, roots, importers),
 			)
 		: undefined;
 	const packOwnership = packingPlugins?.[0]?.api;
@@ -507,7 +508,10 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 					TSRX_INPUT_FILE.test(id) &&
 					!STRING_EXPORT_QUERY.test(id)
 				) {
-					transformedTsrxSources.set(parsePath(id).pathname, code);
+					const path = parsePath(id).pathname;
+					if (acceptedTsrxSources.get(path)?.source !== code) {
+						acceptedTsrxSources.set(path, { source: code });
+					}
 				}
 				try {
 					const context =
@@ -530,7 +534,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 			// Watcher events for content-identical writes (e.g. editor saves without
 			// changes, or delayed FSEvents for a restored file) must not invalidate
 			// generated virtual modules or trigger a full reload.
-			if (await matchesTransformedTsrxSource(ctx, transformedTsrxSources)) {
+			if (await repeatsAcceptedTsrxSource(ctx, acceptedTsrxSources)) {
 				return [];
 			}
 			return hmr.hotUpdate(this.environment, ctx);
@@ -799,22 +803,35 @@ function configEnvironmentKind(
 	return null;
 }
 
-async function matchesTransformedTsrxSource(
-	ctx: { file?: string; type?: string; read?: () => string | Promise<string> },
-	transformedSources: ReadonlyMap<string, string>,
+// The latest source each .tsrx file was transformed from or hot-updated to; Vite gives every
+// environment pass of one edit the same timestamp, so only a later edit counts as a repeat.
+type AcceptedTsrxSource = { readonly source: string; readonly timestamp?: number };
+
+async function repeatsAcceptedTsrxSource(
+	ctx: {
+		file?: string;
+		type?: string;
+		timestamp?: number;
+		read?: () => string | Promise<string>;
+	},
+	acceptedSources: Map<string, AcceptedTsrxSource>,
 ): Promise<boolean> {
-	if (!ctx.file || ctx.type === 'delete' || typeof ctx.read !== 'function') {
+	if (!ctx.file || !TSRX_INPUT_FILE.test(ctx.file)) return false;
+	if (ctx.type === 'delete' || typeof ctx.read !== 'function') {
+		acceptedSources.delete(ctx.file);
 		return false;
 	}
-	const transformedSource = transformedSources.get(ctx.file);
-	if (transformedSource === undefined) {
-		return false;
-	}
+	let source: string;
 	try {
-		return (await ctx.read()) === transformedSource;
+		source = await ctx.read();
 	} catch {
+		acceptedSources.delete(ctx.file);
 		return false;
 	}
+	const accepted = acceptedSources.get(ctx.file);
+	if (accepted?.source === source && accepted.timestamp !== ctx.timestamp) return true;
+	acceptedSources.set(ctx.file, { source, timestamp: ctx.timestamp });
+	return false;
 }
 
 function runHook(hook: unknown, context: unknown, ...args: unknown[]) {

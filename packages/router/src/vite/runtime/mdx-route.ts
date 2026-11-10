@@ -13,7 +13,7 @@ import {
 	protocolInstanceQualifies,
 	protocolStateVersion,
 } from '../../../../serializer/src/protocol-constants.ts';
-import { isArmBranchAnchorComment } from '../../../../web/src/resume-anchor-census.ts';
+import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
 export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
@@ -641,7 +641,7 @@ function mdxDomCensus(root: MdxCensusNode): MdxNodeCensus {
 	let comments = 0;
 	(function visit(node: MdxCensusNode): void {
 		if (node.nodeType === 1) elements++;
-		else if (node.nodeType === 8 && !isArmBranchAnchorComment({ nodeType: 8, data: node.data }))
+		else if (node.nodeType === 8 && !isUncountedComment({ nodeType: 8, data: node.data }))
 			comments++;
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	})(root);
@@ -663,7 +663,7 @@ function mdxHtmlCensus(html: string): MdxNodeCensus {
 		if (html.startsWith('<!--', open)) {
 			const close = html.indexOf('-->', open + 4);
 			const text = html.slice(open + 4, close < 0 ? html.length : close);
-			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data: text }))
+			if (templateDepth === 0 && !isUncountedComment({ nodeType: 8, data: text }))
 				comments++;
 			at = close < 0 ? html.length : close + 3;
 			continue;

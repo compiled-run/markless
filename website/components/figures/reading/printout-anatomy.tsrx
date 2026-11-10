@@ -65,7 +65,7 @@ export default function PrintoutAnatomy() @{
 				@for (const line of art.lines; key line.key) {
 					<g>
 						@for (const piece of line.pieces; key piece.key) {
-							<text class={piece.tint === '' ? 'code' : 'code tint'} style={piece.tint} transform={piece.matrix}>{piece.text}</text>
+							<text class={(piece.tint === '' ? 'code' : 'code tint') + (piece.washed ? ' washed' : '')} style={piece.tint} transform={piece.matrix}>{piece.text}</text>
 						}
 					</g>
 				}
@@ -121,10 +121,9 @@ export default function PrintoutAnatomy() @{
 				--shade-ink: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -157,7 +156,7 @@ export default function PrintoutAnatomy() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -190,14 +189,9 @@ export default function PrintoutAnatomy() @{
 				stroke-dasharray: var(--l);
 
 				html.dark & {
-					opacity: 0.45;
+					stroke: var(--mark);
+					opacity: 1;
 					mix-blend-mode: normal;
-				}
-			}
-
-			.swipe.on-desk {
-				html.dark & {
-					opacity: 0.85;
 				}
 			}
 
@@ -301,6 +295,16 @@ export default function PrintoutAnatomy() @{
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .scene {
+				.tint {
+					fill: var(--cd);
+				}
+
+				.washed {
+					fill: var(--on-accent);
+				}
 			}
 		</style>
 	</figure>

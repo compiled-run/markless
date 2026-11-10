@@ -113,11 +113,19 @@ export default function StateGraphSketch() @{
 			}
 
 			.write:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.write[aria-pressed='true'] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.write:focus-visible {
@@ -182,7 +190,11 @@ export default function StateGraphSketch() @{
 
 			.board[data-last='count'] .on-count:is(.node, .slot),
 			.board[data-last='label'] .on-label:is(.node, .slot) {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-last='count'] .wire.on-count,

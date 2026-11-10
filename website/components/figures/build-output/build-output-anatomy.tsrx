@@ -451,10 +451,9 @@ export default function BuildOutput() @{
 				--line: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
+					--sheet: var(--figure-sheet);
 					--screen: color-mix(in oklch, black 70%, oklch(35% 0.03 250));
 					--screen-text: var(--ink);
-					--line: var(--paper);
 				}
 			}
 
@@ -767,6 +766,25 @@ export default function BuildOutput() @{
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .scene {
+				.wash {
+					mix-blend-mode: normal;
+				}
+
+				&[data-preset='node'] .key-node,
+				&[data-preset='vercel'] .key-vercel,
+				&[data-preset='cloudflare'] .key-cloudflare {
+					.pink {
+						fill: color-mix(in srgb, var(--pink) 75%, color-mix(in oklch, var(--cream) 50%, white));
+						opacity: 1;
+					}
+
+					.key-label {
+						fill: var(--on-accent);
+					}
+				}
 			}
 		</style>
 	</figure>

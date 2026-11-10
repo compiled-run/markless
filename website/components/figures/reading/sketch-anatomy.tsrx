@@ -89,9 +89,9 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 				--glass: color-mix(in oklch, var(--paper) 25%, white);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--paper) 88%, white);
-					--body: color-mix(in oklch, var(--paper) 70%, var(--ink));
-					--glass: color-mix(in oklch, var(--paper) 80%, white);
+					--sheet: var(--figure-sheet);
+					--body: var(--slab);
+					--glass: var(--raised);
 				}
 			}
 
@@ -149,7 +149,7 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 
 				html.dark & {
 					mix-blend-mode: normal;
-					opacity: 0.5;
+					opacity: 1;
 				}
 			}
 
@@ -365,6 +365,10 @@ export default function SketchAnatomy({ figure }: { readonly figure: string }) @
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .name.bold {
+				fill: var(--on-accent);
 			}
 		</style>
 	</figure>

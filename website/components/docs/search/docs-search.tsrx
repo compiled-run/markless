@@ -65,7 +65,7 @@ export default function DocsSearch() @{
 				backdrop-filter: blur(3px);
 
 				html.dark & {
-					background: rgb(0 0 0 / 0.5);
+					background: color-mix(in oklch, var(--slab) 60%, transparent);
 				}
 			}
 
@@ -89,7 +89,7 @@ export default function DocsSearch() @{
 
 				html.dark & {
 					background: var(--raised);
-					box-shadow: 0.35rem 0.4rem 0 rgb(0 0 0 / 0.45);
+					box-shadow: 0.35rem 0.4rem 0 var(--slab);
 				}
 			}
 
@@ -335,6 +335,8 @@ function SearchBox({ onOpen }: { readonly onOpen: () => void }) @{
 			.hit[ui-highlighted] {
 				background: var(--tinted);
 				box-shadow: inset 0.2rem 0 0 var(--pink);
+				color: var(--on-accent);
+				--ink: var(--on-accent);
 			}
 
 			.heading {
@@ -353,7 +355,7 @@ function SearchBox({ onOpen }: { readonly onOpen: () => void }) @{
 			}
 
 			mark {
-				color: var(--ink);
+				color: var(--on-mark);
 				background: var(--mark);
 				border-radius: 0.2em;
 				box-decoration-break: clone;

@@ -14,6 +14,8 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Set on a container Back or Forward shows again as it was left, so its async values re-ask once its runtime wires.
+	readonly reaskProperty: string;
 	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
 	// and the resumer script attribute naming the module that binds the next page to them.
 	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
@@ -121,6 +123,8 @@ export type FragmentEntryModule = {
 		scroll: FragmentScroll,
 		// The state's stops when the navigation was asked for: any since cancel it.
 		stops?: number,
+		// When the click asked for it: a page fetched ahead is judged fresh as of then, not once this code arrived.
+		askedAt?: number,
 	) => Promise<void>;
 };
 
@@ -1104,6 +1108,7 @@ export async function navigate(
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
 	stops?: number,
+	askedAt?: number,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
@@ -1121,7 +1126,8 @@ export async function navigate(
 		else w.location.assign(href);
 	};
 	const started = w.performance.now();
-	const taken = take(state, url, mode === 'traverse', started);
+	const restored = mode === 'traverse' && state.visited.has(pageKey(url));
+	const taken = take(state, url, mode === 'traverse', askedAt ?? started);
 	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
 	// live values before it is shown. A document whose instances hold no values swaps in this task.
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
@@ -1338,13 +1344,13 @@ export async function navigate(
 		scripts = fresh.flatMap(scriptsIn);
 		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
-		for (const box of offsets)
-			if (!box.element.isConnected)
-				sameBox(scope, box)?.scrollTo({
-					top: box.top,
-					left: box.left,
-					behavior: 'instant',
-				});
+		for (const box of offsets) {
+			const kept = box.element.isConnected;
+			const placed = kept ? box.element : sameBox(scope, box);
+			if (!kept) placed?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
+			// No scroll event says so before the next navigation may need it.
+			if (placed) state.scrolled.add(placed);
+		}
 		head.show();
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
@@ -1353,6 +1359,10 @@ export async function navigate(
 	};
 	const committed = commit();
 	if (!committed) return;
+	if (restored)
+		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
+			if (isContainer(container))
+				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
 	const controller = new AbortController();
 	session.streaming = controller;
 	const host = d as unknown as Record<string, unknown>;

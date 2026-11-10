@@ -13,7 +13,11 @@ export default function ChalkTag({ lit }: { readonly lit: boolean }) @{
 			}
 
 			.lit {
-				background: color-mix(in srgb, var(--purple) 40%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 40%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {

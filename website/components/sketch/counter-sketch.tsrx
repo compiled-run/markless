@@ -174,7 +174,7 @@ export default function CounterSketch() @{
 				font-size: 0.8rem;
 				line-height: inherit;
 				tab-size: 2;
-				color: oklch(28% 0.015 90);
+				color: var(--ink);
 			}
 
 			.line {
@@ -375,6 +375,32 @@ export default function CounterSketch() @{
 
 				.mug-spot {
 					margin: 0 1.2rem -1.6rem 0;
+				}
+			}
+
+			html.dark .code {
+				.k {
+					color: var(--syntax-kw);
+				}
+
+				.f {
+					color: var(--syntax-fn);
+				}
+
+				.s {
+					color: var(--syntax-str);
+				}
+
+				.t {
+					color: var(--syntax-tag);
+				}
+
+				.a {
+					color: var(--syntax-num);
+				}
+
+				.runs {
+					color: var(--pink);
 				}
 			}
 		</style>

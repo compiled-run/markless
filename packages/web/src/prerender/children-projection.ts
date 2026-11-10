@@ -26,8 +26,9 @@ export function widgetRootsOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
 	placement?: WidgetPlacement,
+	importSource?: string,
 ): string[] {
-	const child = childSurfaceOf(surface, componentName)?.components[componentName];
+	const child = childSurfaceOf(surface, componentName, importSource)?.components[componentName];
 	const state = child?.state;
 	if (!child || !state) return [];
 	const cellLess = child.cellLessWidgetRoots ?? [];
@@ -37,7 +38,7 @@ export function widgetRootsOf(
 	const owned = new Set(ownedCellIds(child));
 	// A carrier holds an unseeded family's cells without rooting it, so ownership
 	// alone would read every part of such a family as a widget root of its own.
-	const carried = new Set(widgetFallbacksOf(surface, componentName) ?? []);
+	const carried = new Set(widgetFallbacksOf(surface, componentName, importSource) ?? []);
 	const rooted = (state.sharedDefinitions ?? []).flatMap((definition) => {
 		if (definition.scope !== 'subtree') return [];
 		if (![...owned].some((graphNodeId) => graphNodeId.startsWith(definition.id + '/'))) return [];
@@ -62,6 +63,8 @@ export function widgetRootsOf(
 export type PlacedChild = {
 	readonly surface: PrerenderDataSurface;
 	readonly componentName: string;
+	/** Set when the placing edge crossed a module boundary; see `childSurfaceOf`. */
+	readonly importSource?: string;
 };
 
 /**
@@ -106,17 +109,16 @@ function widgetSiteOf(
 	definitionId: string,
 	path: string,
 ): MarklessWidgetSite | undefined {
-	const child = childSurfaceOf(placed.surface, placed.componentName)?.components[
-		placed.componentName
-	];
+	const child = childSurfaceOf(placed.surface, placed.componentName, placed.importSource)
+		?.components[placed.componentName];
 	if (!child) return undefined;
 	if (!ownedCellIds(child).some((graphNodeId) => graphNodeId.startsWith(definitionId + '/')))
 		return undefined;
 	return {
 		path,
-		designates: !(widgetFallbacksOf(placed.surface, placed.componentName) ?? []).includes(
-			definitionId,
-		),
+		designates: !(
+			widgetFallbacksOf(placed.surface, placed.componentName, placed.importSource) ?? []
+		).includes(definitionId),
 		inRow: false,
 	};
 }
@@ -130,8 +132,10 @@ function widgetSiteOf(
 export function widgetFallbacksOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	importSource?: string,
 ): ReadonlyArray<string> | undefined {
-	return childSurfaceOf(surface, componentName)?.components[componentName]?.widgetFallbacks;
+	return childSurfaceOf(surface, componentName, importSource)?.components[componentName]
+		?.widgetFallbacks;
 }
 
 /**
@@ -148,11 +152,14 @@ export function renderedWidgetRootsOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
 	placement?: WidgetPlacement,
+	importSource?: string,
 ): string[] {
-	const composed = childrenProjectionChain(surface, componentName).flatMap((link) =>
-		widgetRootsOf(link.surface, link.edge.childComponentName),
+	const composed = childrenProjectionChain(surface, componentName, importSource).flatMap(
+		(link) => widgetRootsOf(link.surface, link.edge.childComponentName, undefined, link.edge.importSource),
 	);
-	return [...new Set([...widgetRootsOf(surface, componentName, placement), ...composed])];
+	return [
+		...new Set([...widgetRootsOf(surface, componentName, placement, importSource), ...composed]),
+	];
 }
 
 // The escaper's own table, read back off it, so the decode cannot drift from the
@@ -207,13 +214,15 @@ export function staticProjectionChildren(
 	return projectionTextContent(projection.statics);
 }
 
-// The surface that publishes a placed child: its own module when the child is
-// declared there, otherwise the module it was imported from.
+// The surface that publishes a placed child: its own module, else the import its edge names.
 export function childSurfaceOf(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	importSource?: string,
 ): PrerenderDataSurface | undefined {
-	return surface.components[componentName] ? surface : surface.imports[componentName];
+	return surface.components[componentName]
+		? surface
+		: surface.imports[importSource ?? componentName];
 }
 
 /**
@@ -227,8 +236,9 @@ export function childSurfaceOf(
 export function childrenProjectionChain(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	importSource?: string,
 ): ChildrenProjectionLink[] {
-	const own = childSurfaceOf(surface, componentName);
+	const own = childSurfaceOf(surface, componentName, importSource);
 	const definition = own?.components[componentName];
 	if (!own || !definition) return [];
 	const chunks = own.renderData.chunks.filter((chunk) => chunk.componentName === componentName);
@@ -246,7 +256,7 @@ export function childrenProjectionChain(
 			if (!edge || edge.materialized) continue;
 			const owner = chain[chain.length - 1];
 			const ownerSurface = owner
-				? childSurfaceOf(owner.surface, owner.edge.childComponentName)
+				? childSurfaceOf(owner.surface, owner.edge.childComponentName, owner.edge.importSource)
 				: own;
 			const ownerDefinition = owner
 				? ownerSurface?.components[owner.edge.childComponentName]
@@ -256,7 +266,9 @@ export function childrenProjectionChain(
 				edge,
 				surface: ownerSurface,
 				definition: ownerDefinition,
-				rootsWidget: widgetRootsOf(ownerSurface, edge.childComponentName).length > 0,
+				rootsWidget:
+					widgetRootsOf(ownerSurface, edge.childComponentName, undefined, edge.importSource)
+						.length > 0,
 			});
 			if (walk(slot.projectionChunkId)) {
 				const rooted = chain.map((link) => link.rootsWidget).lastIndexOf(true);
@@ -275,8 +287,9 @@ export function childrenProjectionChain(
 export function childrenWidgetRootPath(
 	surface: PrerenderDataSurface,
 	componentName: string,
+	importSource?: string,
 ): string {
-	return childrenProjectionChain(surface, componentName)
+	return childrenProjectionChain(surface, componentName, importSource)
 		.map((link) => link.edge.symbolPrefix)
 		.join('');
 }

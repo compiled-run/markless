@@ -193,7 +193,12 @@ export default function RepoMap() @{
 			}
 
 			.pkg:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.pkg:focus-visible {
@@ -203,7 +208,12 @@ export default function RepoMap() @{
 
 
 			.board[data-picked='compiler'] .compiler {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='compiler'] :is(.serializer) {
 				background: var(--mark);
@@ -215,7 +225,12 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='bundler'] .bundler {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='bundler'] :is(.compiler, .serializer, .web) {
 				background: var(--mark);
@@ -227,14 +242,24 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='ts'] .ts {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='ts'] :is(.compiler) {
 				background: var(--mark);
 				color: var(--on-mark);
 			}
 			.board[data-picked='web'] .web {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='web'] :is(.runtime, .serializer) {
 				background: var(--mark);
@@ -246,7 +271,12 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='runtime'] .runtime {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='runtime'] :is(.serializer) {
 				background: var(--mark);
@@ -258,7 +288,12 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='serializer'] .serializer {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='serializer'] :is(.compiler, .bundler, .web, .runtime) {
 				border-style: dashed;
@@ -266,7 +301,12 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='core'] .core {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='core'] :is(.web, .bundler, .router) {
 				background: var(--mark);
@@ -278,7 +318,12 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='router'] .router {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='router'] :is(.bundler, .web) {
 				background: var(--mark);
@@ -290,10 +335,20 @@ export default function RepoMap() @{
 				text-underline-offset: 0.2em;
 			}
 			.board[data-picked='cli'] .cli {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='vitest'] .vitest {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 			.board[data-picked='vitest'] :is(.core, .web) {
 				background: var(--mark);
@@ -316,7 +371,12 @@ export default function RepoMap() @{
 			}
 
 			.swatch.picked {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.swatch.uses {

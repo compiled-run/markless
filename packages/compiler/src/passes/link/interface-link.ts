@@ -296,7 +296,7 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	return [
 		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBoundary'),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol);`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol, context.asyncBoundary?.id);`,
 		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
 		'}',
 	].join('\n');
@@ -340,7 +340,7 @@ function linkedRenderDataSymbolPreamble(
 			`\tif (symbolId.startsWith(${JSON.stringify(route.prefix)})) {`,
 			'importSource' in route
 				? `\t\treturn import(${JSON.stringify(linkedRenderDataSymbolRouteSource(route.importSource))}).then((module) => module.loadSymbol(symbolId.slice(${route.prefix.length})));`
-				: `\t\treturn marklessLoadLocalSymbol(symbolId.slice(${route.prefix.length}));`,
+				: `\t\treturn marklessLoadLinkedSymbol(symbolId.slice(${route.prefix.length}));`,
 			'\t}',
 		]),
 		'\treturn marklessLoadLocalSymbol(symbolId);',

@@ -143,8 +143,8 @@ export default function PauseNoteAnatomy() @{
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);
 
 				html.dark & {
-					--shade: rgb(0 0 0 / 0.5);
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					--shade: var(--figure-shade);
+					--sheet: var(--figure-sheet);
 				}
 			}
 
@@ -242,10 +242,6 @@ export default function PauseNoteAnatomy() @{
 				color: var(--ink);
 				animation: blink 1s steps(1) infinite;
 				pointer-events: none;
-
-				html.dark & {
-					color: var(--paper);
-				}
 			}
 
 			.field:focus-within .caret,
@@ -268,11 +264,6 @@ export default function PauseNoteAnatomy() @{
 				color: var(--ink);
 				caret-color: var(--ink);
 				outline: none;
-
-				html.dark & {
-					color: var(--paper);
-					caret-color: var(--paper);
-				}
 			}
 
 			.note-input::placeholder {
@@ -280,21 +271,16 @@ export default function PauseNoteAnatomy() @{
 				opacity: 0.45;
 				font-style: italic;
 				font-weight: 500;
+			}
 
-				html.dark & {
-					color: var(--paper);
-					opacity: 0.65;
-				}
+			html.dark .note-input::placeholder {
+				color: var(--on-accent);
 			}
 
 			.field:focus-within .field-paper {
 				stroke: var(--ink);
 				stroke-dasharray: 5 5;
 				stroke-width: 1.5;
-
-				html.dark & {
-					stroke: var(--paper);
-				}
 			}
 
 			.under {
@@ -317,21 +303,24 @@ export default function PauseNoteAnatomy() @{
 
 			.card-paper {
 				fill: color-mix(in oklch, var(--yellow) 40%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 40%, color-mix(in oklch, var(--cream) 55%, white));
+				}
 			}
 
 			.field-paper {
 				fill: color-mix(in oklch, var(--yellow) 55%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 55%, color-mix(in oklch, var(--cream) 55%, white));
+				}
 			}
 
 			.wash {
 				fill: var(--yellow);
 				opacity: 0.55;
 				mix-blend-mode: multiply;
-
-				html.dark & {
-					mix-blend-mode: normal;
-					opacity: 0.3;
-				}
 			}
 
 			.button-wash {
@@ -340,17 +329,28 @@ export default function PauseNoteAnatomy() @{
 				mix-blend-mode: multiply;
 
 				html.dark & {
+					fill: color-mix(in srgb, var(--pink) 45%, var(--cream));
 					mix-blend-mode: normal;
-					opacity: 0.35;
+					opacity: 1;
+				}
+			}
+
+			html.dark .scene {
+				.card .ink,
+				.card .word,
+				.field-art .ink {
+					fill: var(--on-accent);
+				}
+
+				.note-input,
+				.caret {
+					color: var(--on-accent);
+					caret-color: var(--on-accent);
 				}
 			}
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.faint {
@@ -363,10 +363,6 @@ export default function PauseNoteAnatomy() @{
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
-
-				html.dark & {
-					stroke: var(--paper);
-				}
 			}
 
 			.light {
@@ -378,10 +374,6 @@ export default function PauseNoteAnatomy() @{
 				font-size: 24px;
 				font-weight: 700;
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			@keyframes build {

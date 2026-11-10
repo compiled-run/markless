@@ -674,6 +674,22 @@ importers:
         specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
         version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
 
+  packages/bundler/fixtures/vite-csr-export-collision:
+    dependencies:
+      '@markless/bundler':
+        specifier: workspace:*
+        version: link:../..
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../../../core
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vite:
+        specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
+        version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
+
   packages/bundler/fixtures/vite-csr-preloader:
     dependencies:
       '@markless/bundler':
@@ -1218,6 +1234,13 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+    devDependencies:
+      html-element-attributes:
+        specifier: 3.5.0
+        version: 3.5.0
+      svg-element-attributes:
+        specifier: 2.2.0
+        version: 2.2.0
 
   packages/vitest-browser:
     dependencies:
@@ -3761,6 +3784,9 @@ packages:
   html-aria@0.5.3:
     resolution: {integrity: sha512-2SkCacsjXJu0e6D5vLSHlLs7KEdPZ7pIJqLh9EFedPqrAaywthe7jJWQ+PjEyB7bpmWMMOsBJuV4WlYd9WRiug==}
 
+  html-element-attributes@3.5.0:
+    resolution: {integrity: sha512-rU2BFhp0kQla9sqPBI46C+zbP6PFOtD7z6XNAJ6as+cGecCDXLx0W3aIs6XdPLmBBG/Fy1meRi/n65Exofz4Qw==}
+
   html-void-elements@3.0.0:
     resolution: {integrity: sha512-bEqo66MRXsUGxWHV5IP0PUiAWwoEjba4VCzg0LjFJBpchPaTfyfCKTG6bc5F8ucKec3q5y6qOdGyYTSBEvhCrg==}
 
@@ -4252,6 +4278,9 @@ packages:
   supports-color@10.2.2:
     resolution: {integrity: sha512-SS+jx45GF1QjgEXQx4NJZV9ImqmO2NPz5FNsIHrsDjh2YsHnawpan7SNQ1o8NuhrbHZy9AZhIoCUiCeaW/C80g==}
     engines: {node: '>=18'}
+
+  svg-element-attributes@2.2.0:
+    resolution: {integrity: sha512-t/7bOuynnY9XNkGAiMFq7nNsSqzoBQj4PZ1luVaSE1l2iZqAb1HctffddeQcKbXgYtBcHuzp6oauj5FWwo/mOw==}
 
   tinybench@6.2.2:
     resolution: {integrity: sha512-nIZ2N2dFpjBsg2hgitKu7mA+FvsIJuGJOwysRngmVRRmWgR/UyPjwJj8c/fT/dhm8EkHnF5EOogRf+0Z2qrimA==}
@@ -6530,6 +6559,8 @@ snapshots:
 
   html-aria@0.5.3: {}
 
+  html-element-attributes@3.5.0: {}
+
   html-void-elements@3.0.0: {}
 
   httpxy@0.5.5: {}
@@ -7124,6 +7155,8 @@ snapshots:
       character-entities-legacy: 3.0.0
 
   supports-color@10.2.2: {}
+
+  svg-element-attributes@2.2.0: {}
 
   tinybench@6.2.2: {}
 

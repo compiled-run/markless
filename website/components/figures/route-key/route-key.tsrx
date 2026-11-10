@@ -160,10 +160,10 @@ export default function RouteKey() @{
 				--metal: color-mix(in oklch, var(--paper) 55%, oklch(74% 0.09 85));
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--wood: color-mix(in oklch, var(--paper) 22%, oklch(48% 0.08 55));
-					--frame: color-mix(in oklch, var(--paper) 18%, oklch(40% 0.07 55));
-					--metal: color-mix(in oklch, var(--paper) 30%, oklch(62% 0.09 85));
+					--sheet: var(--figure-sheet);
+					--wood: var(--figure-sheet);
+					--frame: var(--slab);
+					--metal: var(--raised);
 				}
 			}
 

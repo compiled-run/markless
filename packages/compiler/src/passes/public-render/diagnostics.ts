@@ -84,38 +84,6 @@ export function asyncArmRenderUnsupportedDiagnostic(input: {
 	};
 }
 
-// D2/D4: a toggle inside @try/@catch content whose branch cannot flip on its
-// own (it needs component execution) still WORKS — the whole @try content
-// re-renders — but the cost is never silent, and the wording stays in the
-// author's vocabulary (never compiler internals).
-export function tryBlockToggleRerenderDiagnostic(input: {
-	readonly branchLabel: '@if' | '@switch';
-	readonly componentName: string | null;
-	readonly node: AnyNode;
-	readonly filename: string;
-}): CompilerDiagnostic {
-	const message = input.componentName
-		? `this ${input.branchLabel} contains <${input.componentName}>, so toggling it re-renders the whole @try block — move the component outside the ${input.branchLabel} to keep the toggle cheap.`
-		: `this ${input.branchLabel} contains content the toggle cannot rebuild on its own, so toggling it re-renders the whole @try block — simplify the ${input.branchLabel} content to plain elements, text, and state reads to keep the toggle cheap.`;
-	return {
-		code: 'MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-		severity: 'warning',
-		phase: 'public-render',
-		title: `Toggling this ${input.branchLabel} re-renders the whole @try block`,
-		message,
-		why: 'Content with a component cannot be rebuilt from static parts and value slots, so the toggle falls back to re-rendering the whole @try block. That works, but it re-runs the component and replaces DOM the toggle did not touch.',
-		primarySpan: sourceSpan(input.node, input.filename),
-		passId: 'public-render-plan',
-		artifactKeys: ['publicRenderPlan'],
-		suggestions: [
-			{
-				message: `Move the component outside the ${input.branchLabel}, or keep the ${input.branchLabel} content to plain elements, text, and state reads.`,
-			},
-		],
-		docsUrl: 'https://markless.dev/errors/MARKLESS_TRY_BLOCK_TOGGLE_RERENDER',
-	};
-}
-
 // A list that renders its served rows but can never grow still ships, and the
 // set of shapes that reach this shrinks as row growth covers more of them, so
 // this warns rather than blocks. Change this one constant to move it.
@@ -267,6 +235,7 @@ export function keyedRepeatRowsUnplacedDiagnostic(input: {
 export function keyedRepeatRowNotOneElementDiagnostic(input: {
 	readonly itemName: string;
 	readonly rowShape: string;
+	readonly reason: string;
 	readonly node: AnyNode;
 	readonly filename: string;
 }): CompilerDiagnostic {
@@ -275,8 +244,8 @@ export function keyedRepeatRowNotOneElementDiagnostic(input: {
 		severity: 'error',
 		phase: PUBLIC_RENDER_PHASE,
 		title: 'Each row of this list must be one element',
-		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}. After the page loads, the browser adds, moves and removes a list’s rows as single elements, so it would build only part of each new row and lose track of the rest.`,
-		why: 'The browser finds a list’s rows by counting the parent’s child elements, one element per row, and builds a new row from that one element’s markup. Text beside it, or a second element, has no place in that count.',
+		message: `Each row of this @for over ${input.itemName} renders ${input.rowShape}, and this list ${input.reason}. After the page loads, the browser follows a row that is not one element as everything between two comment markers, but not in a list like this one, so it would lose track of part of each row.`,
+		why: 'A row that is not one element is tracked between two comment markers. A list inside another row, a row holding a nested @for, an @if or @switch, an element() handle, a behavior or an event that cancels before code loads, a list passed as children, and a list standing straight in an @if or @try arm still find their part of a row by counting elements, which a row of several nodes breaks.',
 		primarySpan: sourceSpan(input.node, input.filename),
 		passId: PUBLIC_RENDER_PLAN_PASS_ID,
 		artifactKeys: ['publicRenderPlan'],

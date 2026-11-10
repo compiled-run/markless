@@ -31,7 +31,9 @@ test('a branch reading through a pending async re-run holds its prior arm until 
 	const settled = waitForTargetCommit(container, 'target-1', samples);
 
 	// Cycle 1 settles: Idle + target-1 (the flip itself is legitimate AT settle).
+	// The settle updates in place within one task, so the check runs where the browser paints: before the next frame.
 	await settled;
+	await new Promise(requestAnimationFrame);
 	expect(container.querySelector('[data-idle-pill]')).not.toBeNull();
 	expect(container.querySelector('[data-tracking-pill]')).toBeNull();
 

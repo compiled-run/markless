@@ -10,6 +10,7 @@ export default function XlinkPage() @{
 			<use data-use xlink:href="#dot" href="#dot" />
 			<use data-moving xlink:href={target} />
 			<text data-space xml:space="preserve">{'a  b'}</text>
+			<use data-camel xlinkHref="#dot" strokeWidth={4} />
 			@if (shown) {
 				<use data-arm xlink:href="#ring" />
 			}

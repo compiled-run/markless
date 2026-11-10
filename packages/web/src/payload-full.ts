@@ -116,8 +116,9 @@ export {
 export async function resumeFromPayloadScripts(
 	input: ResumePayloadScriptsInput,
 ): Promise<ResumePayloadScriptsResult> {
+	const life = (input.root as { readonly __mL?: object }).__mL;
 	const resume = await import('./payload-resume-lazy.ts');
-	return resume.resumeFromPayloadScriptsImpl(input, decodePayloadScripts);
+	return resume.resumeFromPayloadScriptsImpl(input, decodePayloadScripts, life);
 }
 
 export async function resumeFromPayloadDocument(

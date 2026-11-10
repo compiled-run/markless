@@ -7,7 +7,7 @@ export default function PaperTag({ size }: { readonly size: string }) @{
 				border: 1.5px solid var(--ink);
 				border-radius: 6px;
 				background: var(--tinted);
-				color: var(--ink);
+				color: var(--on-accent);
 				font-size: var(--step-0);
 			}
 

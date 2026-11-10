@@ -265,8 +265,8 @@ export default function ExplorerAnatomy() @{
 				padding: 0.15rem 0.9rem;
 				border: 1.5px solid var(--ink);
 				border-radius: 0.7rem;
-				background: color-mix(in oklch, var(--pink) 55%, var(--paper));
-				color: var(--ink);
+				background: color-mix(in oklch, var(--pink) 55%, var(--cream));
+				color: var(--on-accent);
 				font: inherit;
 				box-shadow: 2px 2px 0 var(--ink);
 				cursor: pointer;
@@ -324,6 +324,10 @@ export default function ExplorerAnatomy() @{
 			.sheet[data-editing='yes']::before {
 				background: color-mix(in oklch, var(--yellow) 22%, var(--raised));
 				box-shadow: 4px 4px 0 var(--yellow);
+			}
+
+			html.dark .sheet[data-editing='yes']::before {
+				background: var(--raised);
 			}
 
 			.lines,
@@ -387,6 +391,11 @@ export default function ExplorerAnatomy() @{
 
 			.wash:not([data-kind='none']) {
 				background: color-mix(in oklch, var(--c) 60%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--c) 60%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			li[data-on='yes'] .wash:not([data-kind='none']) {
@@ -396,6 +405,10 @@ export default function ExplorerAnatomy() @{
 
 			li[data-on='no'] .wash:not([data-kind='none']) {
 				background: color-mix(in oklch, var(--c) 25%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--c) 35%, var(--cream));
+				}
 			}
 
 			.gutter {
@@ -451,6 +464,10 @@ export default function ExplorerAnatomy() @{
 				transition:
 					opacity 250ms ease,
 					translate 150ms ease;
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.slip:nth-child(2n) {
@@ -459,6 +476,10 @@ export default function ExplorerAnatomy() @{
 
 			.slip::before {
 				background: color-mix(in oklch, var(--c, var(--raised)) 45%, var(--raised));
+			}
+
+			html.dark .slip::before {
+				background: color-mix(in oklch, var(--c, var(--cream)) 45%, color-mix(in oklch, var(--cream) 80%, white));
 			}
 
 			.slip[data-kind='state'] {
@@ -481,12 +502,22 @@ export default function ExplorerAnatomy() @{
 				translate: -0.3rem 0;
 			}
 
-			.slip[data-on='yes']::before {
+			.slip[data-on='yes']::before,
+			html.dark .slip[data-on='yes']::before {
 				background: var(--c);
 			}
 
 			.slip[data-on='no'] {
 				opacity: 0.55;
+
+				html.dark & {
+					opacity: 1;
+					color: color-mix(in oklch, var(--on-accent) 55%, var(--cream));
+				}
+			}
+
+			html.dark .slip[data-on='no']::before {
+				background: color-mix(in oklch, var(--c, var(--cream)) 20%, color-mix(in oklch, var(--cream) 80%, white));
 			}
 
 			.slip code {
@@ -496,6 +527,7 @@ export default function ExplorerAnatomy() @{
 				font-size: var(--step--1);
 				font-weight: 700;
 				white-space: nowrap;
+				color: inherit;
 			}
 
 			.slip span {
@@ -528,6 +560,10 @@ export default function ExplorerAnatomy() @{
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				font-size: 0.9rem;
 				color: color-mix(in srgb, var(--pink) 70%, #c0403c);
+
+				html.dark & {
+					color: var(--figure-error);
+				}
 			}
 
 			@container explorer (max-width: 560px) {

@@ -80,7 +80,7 @@ export default function Pager({ pathname }: { readonly pathname: string }) @{
 				--doodle-wash-blend: multiply;
 
 				html.dark & {
-					--doodle-wash-opacity: 0.4;
+					--doodle-wash-opacity: 0.9;
 					--doodle-wash-blend: normal;
 				}
 			}

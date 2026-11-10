@@ -95,12 +95,22 @@ export default function Workspace() @{
 			}
 
 			.divider:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.divider[ui-dragging],
 			.divider:active {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.divider[ui-disabled]:hover {
@@ -110,7 +120,12 @@ export default function Workspace() @{
 			.divider:focus-visible {
 				outline: 2px solid var(--ink);
 				outline-offset: -3px;
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			@media (prefers-reduced-motion: reduce) {

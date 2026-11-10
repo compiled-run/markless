@@ -274,7 +274,11 @@ export default function CompilerPasses() @{
 			}
 
 			.chip.read {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					color: var(--on-accent);
+				}
 			}
 
 			.chip.new {
@@ -290,7 +294,7 @@ export default function CompilerPasses() @{
 				border-radius: 999px;
 				background:
 					linear-gradient(var(--ink), var(--ink)) 0 0 / calc(100% * var(--done) / var(--total)) 100% no-repeat,
-					linear-gradient(color-mix(in srgb, var(--purple) 55%, var(--paper)), color-mix(in srgb, var(--purple) 55%, var(--paper))) calc(100% * var(--done) / (var(--total) - 1)) 0 / calc(100% / var(--total)) 100% no-repeat,
+					linear-gradient(color-mix(in srgb, var(--purple) 55%, var(--cream)), color-mix(in srgb, var(--purple) 55%, var(--cream))) calc(100% * var(--done) / (var(--total) - 1)) 0 / calc(100% / var(--total)) 100% no-repeat,
 					var(--paper);
 			}
 

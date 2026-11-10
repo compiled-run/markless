@@ -85,6 +85,8 @@ export function createResumeRuntime(
 			elementsByHostId.delete(hostNodeId);
 			elementHandles.deleteHost(hostNodeId);
 		},
+		hostElements: elementsByHostId,
+		armBranches: () => runtime?.armBranches?.(),
 		dispose() {
 			runtime?.dispose();
 			elementsByHostId.clear();

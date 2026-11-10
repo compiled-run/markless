@@ -35,7 +35,8 @@ const JOB_POLICY = {
 		'agent-files': { mode: 'fast' },
 		typecheck: { mode: 'fast' },
 		'typecheck-ts7': { mode: 'fast' },
-		unit: { mode: 'fast' },
+		// MARKLESS_CI_JSON_REPORT_DIR adds a JSON reporter beside the default one; the tests that run are unchanged.
+		unit: { mode: 'fast', vitestJsonReport: true },
 		browser: { mode: 'full', needsBrowser: true },
 		'completion-matrix': { mode: 'full' },
 		'boxes-bundler': { mode: 'full', needsBrowser: true },
@@ -308,6 +309,12 @@ const runShell = (command, { cwd, env }) =>
 		stdio: 'inherit',
 	}).status ?? 1;
 
+const withJsonReport = (job, command) => {
+	const dir = process.env.MARKLESS_CI_JSON_REPORT_DIR;
+	if (!dir || !job.policy.vitestJsonReport || !/\bvp test\b/.test(command)) return command;
+	return `${command} --reporter=default --reporter=json --outputFile.json=${JSON.stringify(join(dir, `${job.id}.json`))}`;
+};
+
 const selectJobs = (workflow, options) => {
 	const unknown = workflow.jobs.filter((job) => job.mode === 'unknown');
 	if (unknown.length) {
@@ -379,9 +386,10 @@ const runJobs = (workflow, options) => {
 				if (step.kind !== 'check' || ran.has(step.command)) continue;
 				ran.add(step.command);
 				const label = `${job.id}${comboLabel(run.combo)} :: ${step.name}`;
-				console.log(`\n=== ${label}\n$ ${step.command}`);
+				const command = withJsonReport(job, step.command);
+				console.log(`\n=== ${label}\n$ ${command}`);
 				if (options.dryRun) continue;
-				const status = runShell(step.command, {
+				const status = runShell(command, {
 					cwd: step.cwd ? resolve(repoRoot, step.cwd) : repoRoot,
 					env: { ...baseEnv, ...job.env, ...step.env },
 				});

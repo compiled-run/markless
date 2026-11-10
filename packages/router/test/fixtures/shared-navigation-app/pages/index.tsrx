@@ -11,5 +11,6 @@ export default function Home() @{
 		<Link href="/next" data-go-next>next</Link>
 		<Link href="/async" data-go-async>async</Link>
 		<Link href="/plain" data-go-plain>plain</Link>
+		<Link href="/empty" data-go-empty>empty</Link>
 	</main>
 }

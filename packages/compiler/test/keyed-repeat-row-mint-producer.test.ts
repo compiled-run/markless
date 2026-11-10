@@ -147,16 +147,16 @@ test('a row whose element wraps a component stays silent - both halves ship', as
 
 // The wrapper is minted from markup, so a wrapper slot markup cannot finish
 // still refuses the whole row - the child's identity does not rescue it.
-test('a wrapper whose value only rendering produces warns, component inside or not', async () => {
+test('a wrapper whose value the owner reads from page state builds around its component', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li data-row={shout(chosen)}><Cell label={row.label} /></li> }</ul>`,
 	);
 
-	expect(rowMintWarnings(compiled)).toEqual([
-		['warning', expect.stringContaining('This @for row renders <Cell>')],
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowComponent).toMatchObject({ slotPath: [0, 0] });
+	expect(rowRecord(compiled)?.rowTemplate?.attributeSlots).toEqual([
+		expect.objectContaining({ name: 'data-row', source: 'shout(chosen)' }),
 	]);
-	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
-	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
 });
 
 // A wrapper holding a construct is refused by the same clause for the same

@@ -532,6 +532,77 @@ test('linkBarrelComponents follows an export * as chain to the .tsrx components 
 	]);
 });
 
+const twoComponents = (filename: string): ModuleGraphInterfaceArtifact => ({
+	passId: 'module-graph-interface',
+	filename,
+	exports: [],
+	render: {
+		version: 1,
+		components: [
+			{ componentName: 'Tabs', exportName: 'Tabs', rootChunkId: 'chunk:0', childChunks: [] },
+			{ componentName: 'TabPanel', exportName: 'default', rootChunkId: 'chunk:1', childChunks: [] },
+		],
+	},
+});
+
+test('linkBarrelComponents flattens an export * chain into the barrel the app imports', () => {
+	const artifact = walkBarrels({
+		parent: '/app/App.tsrx',
+		moduleImports: [{ source: './index.ts' }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/index.ts': barrelInterface('/app/index.ts', [
+				{ exportName: '*', source: './widgets/index.ts', importedName: '*' },
+			]),
+			'/app/widgets/index.ts': barrelInterface('/app/widgets/index.ts', [
+				{ exportName: '*', source: './tabs.tsrx', importedName: '*' },
+				{ exportName: 'Pane', source: './tabs.tsrx', importedName: 'default' },
+			]),
+			'/app/widgets/tabs.tsrx': twoComponents('/app/widgets/tabs.tsrx'),
+		},
+	});
+
+	expect(artifact.diagnostics).toEqual([]);
+	expect(artifact.children.map((child) => child.source)).toEqual(['/app/widgets/tabs.tsrx']);
+	// `export *` never carries `default`; the named re-export of it still does.
+	expect(artifact.interfaces['./index.ts']?.linkedComponents).toEqual([
+		{
+			exportPath: ['Tabs'],
+			source: './widgets/tabs.tsrx',
+			importKind: 'named',
+			importedName: 'Tabs',
+			componentName: 'Tabs',
+		},
+		{
+			exportPath: ['Pane'],
+			source: './widgets/tabs.tsrx',
+			importKind: 'default',
+			componentName: 'TabPanel',
+		},
+	]);
+});
+
+test('linkBarrelComponents keeps only the selected export behind an export *', () => {
+	const artifact = walkBarrels({
+		parent: '/app/App.tsrx',
+		moduleImports: [{ source: './index.ts', kind: 'named', importedName: 'Tabs' }],
+		resolve: joinResolve,
+		interfaces: {
+			'/app/index.ts': barrelInterface('/app/index.ts', [
+				{ exportName: '*', source: './tabs.tsrx', importedName: '*' },
+				{ exportName: '*', source: './other.tsrx', importedName: '*' },
+			]),
+			'/app/tabs.tsrx': twoComponents('/app/tabs.tsrx'),
+			'/app/other.tsrx': componentInterface('/app/other.tsrx', 'Other', 'Other'),
+		},
+	});
+
+	expect(artifact.children.map((child) => child.source)).toEqual(['/app/tabs.tsrx']);
+	expect(
+		artifact.interfaces['./index.ts']?.linkedComponents?.map((linked) => linked.exportPath),
+	).toEqual([['Tabs']]);
+});
+
 test('linkBarrelComponents reports a re-export that resolves to no module', () => {
 	const artifact = walkBarrels({
 		parent: '/app/App.tsrx',

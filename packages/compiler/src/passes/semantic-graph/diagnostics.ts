@@ -191,14 +191,18 @@ export function handlerReadsRenderLocalDiagnostic(input: {
 	readonly localName: string;
 	readonly handler: AnyNode;
 	readonly filename: string;
+	// A handler named by the local itself, with the reason its function cannot be rebuilt.
+	readonly unroutable?: { readonly why: string; readonly rewrite: string };
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
 		title: 'A handler reads a component-body local the browser cannot recompute',
 		message: `The \`${input.handlerLabel}\` handler reads \`${input.localName}\`, a local of the component body. The body runs only during the initial render, so the browser copy of this handler would name a variable that does not exist there.`,
-		why: 'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		why:
+			input.unroutable?.why ??
+			'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
 		span: sourceSpan(input.handler, input.filename),
-		suggestion: `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
+		suggestion: input.unroutable?.rewrite ?? `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_HANDLER_READS_RENDER_LOCAL',
 	});
 }
@@ -701,6 +705,32 @@ function unstableCreationSiteText(
 			fix: "Move the row into a component in its own file and declare the cell there, e.g. <BookRow book={book} />. Each row then gets its own value, and it stays with the row's key when the list reorders.",
 		},
 	}[site];
+}
+
+export function asyncInputBesideValueDiagnostic(input: {
+	readonly read: string;
+	readonly input: string;
+	readonly value: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'Text shows an input of an async value without the value',
+		message: `{${input.read}} reads "${input.input}", which "${input.value}" is fetched with, but not "${input.value}" itself. During a refresh it shows the new "${input.input}" next to the old "${input.value}".`,
+		why: `A refresh keeps the shown "${input.value}" until the new result lands. Text that reads "${input.value}" waits with it; text that reads only "${input.input}" changes at once.`,
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.read,
+		suggestions: [
+			{
+				message: `Read it through the async value: return "${input.input}" from "${input.value}" and show {${input.value}.${input.input}}.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+	};
 }
 
 export function asyncPostAwaitDependentReadDiagnostic(
@@ -1933,15 +1963,18 @@ export function attributeObjectValueDiagnostic(
 export function duplicateAttributeDiagnostic(input: {
 	readonly tagName: string | null;
 	readonly attributeName: string;
+	readonly spellings: ReadonlyArray<string>;
 	readonly duplicate: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	const tag = input.tagName ? `<${input.tagName}>` : 'this element';
+	const [first, second] = input.spellings;
+	const written = first !== second ? `, written \`${first}\` and \`${second}\`,` : '';
 	return attributeDisciplineDiagnostic(input.duplicate, input.filename, {
 		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
 		severity: 'error',
 		title: 'Duplicate attribute on one element',
-		message: `\`${input.attributeName}\` appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
+		message: `\`${input.attributeName}\`${written} appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
 		why: 'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
 		suggestion: `Keep one \`${input.attributeName}\` attribute on this element.`,
 	});
@@ -2073,6 +2106,31 @@ export function asyncArmOrderDiagnostic(input: {
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
+	};
+}
+
+export function asyncCatchWithoutTryDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'An `@catch` is written without an `@try` before it',
+		message:
+			'This `@catch` follows an element, not an @try block, so it is not read as a catch arm. TSRX parses it as literal text, and the block after it as a separate expression, so the page would show the words "@catch" and render the block as ordinary content.',
+		why: 'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 	};
 }
 

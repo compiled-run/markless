@@ -64,6 +64,26 @@ function branchTest(
 		: { testSource };
 }
 
+// A branch in a row of a repeat inside the same @try belongs to the row, which flips it per row.
+function branchAsyncBoundary(
+	state: WalkState,
+): { readonly asyncBoundaryId?: string; readonly asyncBoundaryArm?: number } {
+	if (!state.currentAsyncBoundaryId) return {};
+	const rowId = state.currentKeyedRepeatScopeIds.at(-1);
+	const row = rowId ? state.graph.keyedRepeats.find((repeat) => repeat.id === rowId) : undefined;
+	if (row?.asyncBoundaryId === state.currentAsyncBoundaryId) return {};
+	return {
+		asyncBoundaryId: state.currentAsyncBoundaryId,
+		asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+	};
+}
+
+function branchKeywordSpan(node: AnyNode, keyword: string, state: WalkState) {
+	return typeof node.start === 'number'
+		? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + keyword.length } }
+		: {};
+}
+
 // Records @if/@switch sites as first-class branch records sharing the unified
 // document-order comment-anchor allocator with async boundaries. The
 // public-render plan gates which sites become reactive; ungated sites keep
@@ -90,12 +110,8 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-			...(state.currentAsyncBoundaryId
-				? {
-						asyncBoundaryId: state.currentAsyncBoundaryId,
-						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-					}
-				: {}),
+			...branchKeywordSpan(node, '@if', state),
+			...branchAsyncBoundary(state),
 		});
 		return;
 	}
@@ -124,12 +140,8 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
-			...(state.currentAsyncBoundaryId
-				? {
-						asyncBoundaryId: state.currentAsyncBoundaryId,
-						asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-					}
-				: {}),
+			...branchKeywordSpan(node, '@switch', state),
+			...branchAsyncBoundary(state),
 		});
 	}
 }
@@ -158,12 +170,8 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 		armTests: chain.arms.map((_, index) => index),
 		anchorOrder: state.nextAnchorOrder++,
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-		...(state.currentAsyncBoundaryId
-			? {
-					asyncBoundaryId: state.currentAsyncBoundaryId,
-					asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-				}
-			: {}),
+		...branchKeywordSpan(node, '@if', state),
+		...branchAsyncBoundary(state),
 	});
 }
 

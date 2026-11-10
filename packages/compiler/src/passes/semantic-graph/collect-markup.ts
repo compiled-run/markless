@@ -38,6 +38,7 @@ import type {
 import { resolveSharedInstanceGraphPath, sharedInstanceVisibleFrom } from './collect-shared.ts';
 import {
 	asyncArmOrderDiagnostic,
+	asyncCatchWithoutTryDiagnostic,
 	branchElseSpellingDiagnostic,
 	idrefElementHandleIdConflictDiagnostic,
 } from './diagnostics.ts';
@@ -50,7 +51,7 @@ import {
 	type StyleConstResolver,
 } from './style-object.ts';
 import { componentMarkupRoot } from '../public-render/component-markup-root.ts';
-import { collectStyleScopes } from '../public-render/style-scopes.ts';
+import { collectStyleScopes, takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import { PROJECTION_PROP_NAME } from '../public-render/shared-seed-pass.ts';
 import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
@@ -58,7 +59,7 @@ import { rawElementText } from '../../ast/raw-text.ts';
 import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
-const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
+export const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
 	'area',
 	'base',
 	'br',
@@ -461,6 +462,8 @@ function emitNode(
 		});
 	}
 
+	const moduleScopeClass = context.styleScopeClass;
+	if (!takesStyleScopeClass(tagName)) context.styleScopeClass = null;
 	append(builder, `<${tagName}`);
 	let classSeen = false;
 	const elementAttributes = getElementAttributes(node);
@@ -636,6 +639,7 @@ function emitNode(
 			append(builder, '"');
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
+	context.styleScopeClass = moduleScopeClass;
 	append(builder, '>');
 	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
 	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);
@@ -1037,8 +1041,13 @@ function emitNodes(
 	const startIndex = startPath[startPath.length - 1] ?? 0;
 	let childIndex = startIndex;
 	let previous: AnyNode | null = null;
-	for (const node of nodes) {
+	for (const [at, node] of nodes.entries()) {
 		if (isIgnorableStaticTextNode(node)) continue;
+		if (isCatchWithoutTry(node, nodes[at + 1])) {
+			context.graph.diagnostics.push(
+				asyncCatchWithoutTryDiagnostic({ node, filename: context.filename }),
+			);
+		}
 		if (isPlainElseSpelling(previous, node)) {
 			context.graph.diagnostics.push(
 				branchElseSpellingDiagnostic({ node, filename: context.filename }),
@@ -1077,6 +1086,17 @@ function isPlainElseSpelling(previous: AnyNode | null, node: AnyNode): boolean {
 function isPendingAfterCatch(previous: AnyNode | null, node: AnyNode): boolean {
 	if (!previous || previous.type !== 'JSXTryExpression' || !previous.handler) return false;
 	return isStaticTextNode(node) && staticTextValue(node).trim() === '@pending';
+}
+
+// A `@catch` not attached to an @try parses as this text, and its block as the expression after it.
+const CATCH_AS_TEXT = /^@catch(?:\s*\([^)]*\))?$/;
+
+function isCatchWithoutTry(node: AnyNode, next: AnyNode | undefined): boolean {
+	return (
+		next?.type === 'JSXExpressionContainer' &&
+		isStaticTextNode(node) &&
+		CATCH_AS_TEXT.test(staticTextValue(node).trim())
+	);
 }
 
 function emitAsyncArm(

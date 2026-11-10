@@ -6,6 +6,7 @@ import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 
@@ -75,13 +76,9 @@ beforeAll(async () => {
 		await mkdir(dirname(join(root, file)), { recursive: true });
 		await writeFile(join(root, file), source);
 	}
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});

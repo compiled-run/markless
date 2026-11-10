@@ -116,6 +116,10 @@ const buildOrder: PackUserConfig[] = [
 			index: './src/index.ts',
 			graph: './src/graph.ts',
 			'graph-reconcile': './src/graph-reconcile.ts',
+			'graph-async': './src/graph-async.ts',
+			'graph-async-load': './src/graph-async-load.ts',
+			'graph-async-refresh': './src/graph-async-refresh.ts',
+			'graph-held': './src/graph-held.ts',
 		},
 	}),
 	marklessPack({
@@ -303,6 +307,7 @@ export default defineConfig({
 			// Editor-completion probes and deliberately unparsable inputs, not source.
 			'packages/typescript-plugin/test/fixtures/**',
 			'demos/chained-async-comparison/**/routeTree.gen.ts',
+			'packages/typescript-plugin/src/element-attribute-names.generated.d.ts',
 		],
 		rules: {
 			'no-restricted-imports': [

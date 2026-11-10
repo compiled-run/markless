@@ -162,20 +162,88 @@ across all three cases:
 - Re-settle (mutation refresh, recompute; revised 2026-10-25, owner, on the
   async-refresh proof): the boundary keeps its last settled content
   (snapshots are versioned with status, so the prior value is always
-  addressable) and its host carries `aria-busy="true"` from the moment the
-  refresh starts until the new `@try` or `@catch` content commits. `@pending`
+  addressable) and every element whose binding reads a refreshing async
+  value carries `aria-busy="true"` from the moment that value's refresh
+  starts. A binding is a text or attribute update, a prop a child component
+  shows, or a keyed list (its parent element is marked); it reads the value
+  directly or through sync computeds, which the compiler records per
+  boundary (per-element marks, 2026-11-04). Elements that read only sync state are never marked,
+  even inside the block. Two async values in one block mark their own
+  elements; a value that settles while another is still running clears its
+  own marks, and the last one clears with the commit that shows it. `@pending`
   replaces the held content only when the NEWEST run has been pending longer
   than the stall threshold (5000 ms); the stall clock restarts on every newer
-  run, so a typing burst never reaches it. The host is the boundary's parent
-  element when the boundary is that element's only content, otherwise each
-  top-level element of the shown arm; a text-only arm in a shared parent gets
-  no marking. The runtime decides the host because a component whose root is
-  the boundary cannot see its parent at build time. Server-rendered and
+  run, so a typing burst never reaches it. A refreshing value no arm record
+  binds (bare text at the block's top level, an arm that registered no
+  records, a `@catch` arm reading only the error) falls back to the block's
+  host: its parent element when the block is that element's only content,
+  otherwise each top-level element of the shown arm. That fallback is decided
+  at runtime because a component whose root is the boundary cannot see its
+  parent at build time. Server-rendered and
   resumed boundaries get the busy marking but no stall fallback: their
   `@pending` arm is not shipped to the browser, and 13-resume-cache step 3
   requires seeded content to stay visible. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
+- Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
+  Q2): a refresh starts quiet when the write that changed the async value's
+  key did not happen inside an event handler's own turn — a `setInterval`/
+  `setTimeout` callback, a socket or `EventSource` message, or a promise
+  continuation no handler started. A quiet refresh gets neither the busy
+  mark above nor the announcement (`refresh-announcer.ts`); it still swaps
+  in the new content the moment it lands, and a quiet refresh that rejects
+  still follows the failed-refresh rule below (the kept content stays, the
+  `@catch` arm opens right after it) and still announces, because a silent
+  failure is worse than an unexpected one. A write inside an event handler
+  is loud — marked and announced as above — including a write the handler
+  makes after an `await`: the compiler wraps the whole handler body, start
+  to its eventual return or throw, in one mark, so a write anywhere in that
+  body is loud regardless of which statement made it. Only a real DOM
+  event's dispatch opens a user action, and it reaches other code through
+  an explicit token the dispatch hands to every symbol it runs, not through
+  wall-clock nesting: a callback prop the handler calls (directly, through
+  any number of wrapper components, or fired and forgotten) inherits it at
+  the moment of the call and keeps it for its whole body, awaits included;
+  the same callback called by a timer or socket message after the dispatch
+  ended carries a closed token and is quiet, even while an unrelated click
+  is still open. So the same value is quiet when a poll bumps its key and
+  loud when a button does. Known gap, not yet closed: JavaScript carries no
+  context across an `await` by itself, so plain (non-symbol) code such as
+  a timer callback that writes directly, firing while some handler is still
+  waiting on its own `await`, is counted loud too. Closing it needs the
+  compiler to rewrap each `await`, or a platform async context.
+- Matched values during a re-settle (2026-11-04, async-error-states): the
+  held content keeps showing pairs that belong together. A binding in the
+  arm that reads the refreshing value beside an input of its key shows that
+  input as the shown value was fetched with it, and a binding that reads an
+  input outside the key updates in place at once (03-state-graph "Values
+  shown together never mix"). So a client-settled arm registers update
+  records for any binding whose value can change between settles: a sync
+  computed or template expression that reads a live input, and an async
+  value that reads one beside an async input.
+- Failed refresh (2026-11-04, async-error-states): a refresh that rejects
+  keeps the last good value. The rejected snapshot carries the previous
+  settled `value` and the `valueKey` it was fetched for; a first-load failure
+  has neither. A boundary showing `@try` content does not replace it: the
+  content stays, its busy mark clears, and the `@catch` arm renders right
+  after it, inside the same boundary, in a range opened by a runtime comment
+  anchor that page-level comment walks skip. A later refresh that fulfills
+  commits the `@try` arm over the whole boundary, which removes the `@catch`
+  content; one that rejects again replaces only that range. On the first load
+  `@catch` is still the only content. Every boundary follows this rule, nested
+  or not; a nested boundary's failure is handled by that boundary and never
+  reaches an outer `@catch`, because the outer boundary does not read the
+  inner one's async values.
+- Reset: `@catch (error, reset)` binds `reset` to a function an event handler
+  in that arm may name or call (`onClick={reset}`, `() => reset()`). The
+  compiler lowers it to a call that retries the boundary's async reads with
+  their current keys: it lists them upstream first, each with the async values
+  it reads, and a rejected value re-runs, or, when it is rejected because an
+  async input is, that input re-runs instead. It is
+  not a closure over the body, so it survives server render and resume.
+  While the retry runs the shown content is held busy under the same rule as
+  any refresh. Handlers outside a DOM event (callback props) still refuse it
+  as a body local.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). Deadline,

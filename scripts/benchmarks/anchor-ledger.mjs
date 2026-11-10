@@ -96,6 +96,7 @@ const opOf = (entry) => OPS.find((op) => op in entry);
 const isPlainObject = (value) =>
 	value !== null && typeof value === 'object' && !Array.isArray(value);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+const within = (path, prefix) => prefix.every((key, i) => path[i] === key);
 const where = (entry) => `${entry.surface} ${JSON.stringify(entry.path)}`;
 
 function surfaceOf(name) {
@@ -185,6 +186,7 @@ export function applyChanges(base, files, surfaceName) {
 			.map((entry) => ({ ...entry, file: file.name })),
 	);
 	const owner = new Map();
+	const removed = [];
 	for (const entry of entries) {
 		const op = opOf(entry);
 		if (op === 'delta' || op === 'append') continue;
@@ -204,6 +206,7 @@ export function applyChanges(base, files, surfaceName) {
 					`${entry.file}: ${where(entry)} removes an anchor that does not exist`,
 				);
 			delete parent[leaf];
+			removed.push(entry.path);
 		} else {
 			if (typeof current === 'number')
 				throw new Error(
@@ -214,6 +217,8 @@ export function applyChanges(base, files, surfaceName) {
 	}
 	for (const entry of entries) {
 		const op = opOf(entry);
+		// A module or page that stopped shipping takes every other branch's pending change to it along.
+		if (removed.some((path) => within(entry.path, path))) continue;
 		if (op === 'append') {
 			const parent = parentOf(anchors, entry.path, true);
 			const leaf = entry.path.at(-1);
@@ -359,7 +364,6 @@ export function recordChange(
 	return { file, changes: ops };
 }
 
-const within = (path, prefix) => prefix.every((key, i) => path[i] === key);
 
 // An anchor main has no value for starts at this tree's measurement; every other anchor moves by head minus base.
 function ownOps(others, baseAnchors, headAnchors) {

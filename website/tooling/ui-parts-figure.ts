@@ -231,11 +231,7 @@ ${items}
 			.parts-figure {
 				container: parts-figure / inline-size;
 				margin: var(--space-m) 0;
-				--ring: oklch(55% 0.17 30);
-
-				html.dark & {
-					--ring: oklch(72% 0.14 35);
-				}
+				--ring: var(--figure-ring);
 			}
 
 			.layout {

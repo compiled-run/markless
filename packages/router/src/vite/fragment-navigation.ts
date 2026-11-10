@@ -168,10 +168,21 @@ export function startFragmentNavigation(
 		});
 		starting.then(
 			(api) => api.replay(event),
-			() => (starting = undefined),
+			() => {
+				pressed?.controller.abort();
+				starting = pressed = undefined;
+			},
 		);
 		return starting;
 	};
+	// The one document load a failed run half falls back to; pagehide cancels it, as leaving aborts the import just before.
+	let leaving = 0;
+	w.addEventListener('pagehide', () => w.clearTimeout(leaving));
+	const fall = (load: () => void) => {
+		w.clearTimeout(leaving);
+		leaving = w.setTimeout(load, leaveDeadlineMs);
+	};
+	const shown = new URL(w.location.href);
 	let rest = 0;
 	let at = '';
 	const listen = (event: Event) => {
@@ -185,9 +196,13 @@ export function startFragmentNavigation(
 			if (dwell) rest = w.setTimeout(() => running || press(anchor), dwell);
 		} else if (event.type === 'scroll') {
 			if (target !== (d as Node)) scrolled.add(target);
-		} else if (event.type === 'popstate')
-			void wake().then((api) => api.traverse(event as PopStateEvent));
-		else if (!running) {
+		} else if (event.type === 'popstate') {
+			w.clearTimeout(leaving);
+			wake().then(
+				(api) => api.traverse(event as PopStateEvent),
+				() => here(shown) || fall(() => w.location.reload()),
+			);
+		} else if (!running) {
 			const anchor = anchorOf(event);
 			if (!anchor) return;
 			// A router link is taken ahead of page handlers; a plain anchor after them, once its click reaches the document.
@@ -224,18 +239,11 @@ export function startFragmentNavigation(
 		event.preventDefault();
 		// A click on the page shown keeps it; once a navigation was woken, the run half also cancels that one.
 		if (here(url) && !starting) return;
+		const at = w.performance.now();
+		w.clearTimeout(leaving);
 		wake().then(
-			(api) => api.go(anchor) || w.location.assign(url.href),
-			() => {
-				// Leaving the document aborts the import a few ms before pagehide; loading the page then would cancel that navigation.
-				let left = false;
-				const leave = () => (left = true);
-				w.addEventListener('pagehide', leave);
-				w.setTimeout(() => {
-					w.removeEventListener('pagehide', leave);
-					if (!left) w.location.assign(url.href);
-				}, leaveDeadlineMs);
-			},
+			(api) => api.go(anchor, at) || w.location.assign(url.href),
+			() => fall(() => w.location.assign(url.href)),
 		);
 	};
 	// The idle tier only fetches destinations the server listed, so a page listing none never schedules it.
@@ -270,7 +278,7 @@ export type FragmentEarly = {
 export type FragmentNavigationApi = {
 	readonly traverse: (event: PopStateEvent) => void;
 	readonly replay: (event: Event | undefined) => void;
-	readonly go: (anchor: Element) => boolean;
+	readonly go: (anchor: Element, askedAt?: number) => boolean;
 };
 
 // The run half with its config bound: the bridge file that holds it carries the config, the page bridge does not.
@@ -358,7 +366,8 @@ export function runFragmentNavigation(
 				const rest = page.indexOf('**');
 				if (rest === -1 ? page.length !== parts.length : parts.length <= rest) return false;
 				return page.every(
-					(segment, index) => segment === '**' || segment === ':' || segment === parts[index],
+					(segment, index) =>
+						segment === '**' || segment === ':' || segment === parts[index],
 				);
 			});
 		known.set(pathname, answer);
@@ -798,7 +807,7 @@ export function runFragmentNavigation(
 		d.addEventListener(type, press, { passive: true });
 
 	// Links are taken in the capture phase, ahead of page handlers; a plain anchor after them, as the browser would follow it.
-	const go = (anchor: Element): boolean => {
+	const go = (anchor: Element, askedAt = w.performance.now()): boolean => {
 		const url = eligible(anchor, true);
 		if (!url) return false;
 		stopRest();
@@ -811,7 +820,14 @@ export function runFragmentNavigation(
 		const manual = anchor.getAttribute(config.scrollAttribute) === 'manual';
 		const stops = state.stops;
 		const swap = (entry: FragmentEntryModule) =>
-			entry.navigate(d, url, replace ? 'replace' : 'push', manual ? 'manual' : 'reset', stops);
+			entry.navigate(
+				d,
+				url,
+				replace ? 'replace' : 'push',
+				manual ? 'manual' : 'reset',
+				stops,
+				askedAt,
+			);
 		if (loaded) void swap(loaded);
 		else
 			load().then(swap, () => {

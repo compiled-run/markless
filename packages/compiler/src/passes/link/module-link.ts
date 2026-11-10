@@ -444,7 +444,9 @@ function republishedClaimInputs(
 		// A render symbol's forwarded prop reads compose through the edge's graph props already.
 		const extracted = captureMetadata.extractedSymbols.find(
 			(symbol) =>
-				(symbol.kind === 'event-handler' || symbol.kind === 'sync-computed-derive') &&
+				(symbol.kind === 'event-handler' ||
+					symbol.kind === 'sync-computed-derive' ||
+					symbol.kind === 'async-computed-runner') &&
 				(row.loaderSymbolId
 					? symbol.loaderSymbolId === row.loaderSymbolId
 					: !symbol.loaderSymbolId && symbol.symbolId === row.baseSymbolId) &&
@@ -720,6 +722,12 @@ export function linkBarrelComponents(
 			}
 			const exportPath = [...prefix, reexport.exportName];
 			const specifier = input.rebase(target);
+			if (reexport.exportName === '*') {
+				const flattened = walkStar(target, specifier, prefix, new Set([...seen, filename]), selectedExport);
+				linkedComponents.push(...flattened.linkedComponents);
+				sharedReexports.push(...flattened.sharedReexports);
+				continue;
+			}
 			if (!TSRX_SOURCE_FILE.test(target)) {
 				const nested = walkBarrel(
 					target,
@@ -790,6 +798,51 @@ export function linkBarrelComponents(
 				});
 			}
 		}
+		return { linkedComponents, sharedReexports };
+	};
+
+	// `export * from`: every named export of the target joins this module's own names; `default` never does.
+	const walkStar = (
+		target: string,
+		specifier: string,
+		prefix: ReadonlyArray<string>,
+		seen: ReadonlySet<string>,
+		selectedExport?: string,
+	): BarrelWalk => {
+		const named = (exportName: string | undefined): exportName is string =>
+			exportName !== undefined &&
+			exportName !== 'default' &&
+			(selectedExport === undefined || exportName === selectedExport);
+		if (selectedExport === 'default') return { linkedComponents: [], sharedReexports: [] };
+		const nested = walkBarrel(target, prefix, seen, selectedExport);
+		const linkedComponents = nested.linkedComponents.filter((linked) =>
+			named(linked.exportPath[prefix.length]),
+		);
+		const sharedReexports = nested.sharedReexports.filter((reexport) =>
+			named(reexport.exportName),
+		);
+		const targetInterface = TSRX_SOURCE_FILE.test(target) ? readInterface(target) : null;
+		if (!targetInterface) return { linkedComponents, sharedReexports };
+		const components = targetInterface.render.components.filter((component) =>
+			named(component.exportName),
+		);
+		const sharedNames = (targetInterface.sharedDefinitions ?? [])
+			.map((candidate) => candidate.exportName)
+			.filter(named);
+		if (components.length === 0 && sharedNames.length === 0)
+			return { linkedComponents, sharedReexports };
+		publishInterface(specifier, targetInterface);
+		linkChild(target, specifier);
+		for (const component of components)
+			linkedComponents.push({
+				exportPath: [...prefix, component.exportName!],
+				source: specifier,
+				importKind: 'named',
+				importedName: component.exportName!,
+				componentName: component.componentName,
+			});
+		for (const exportName of sharedNames)
+			sharedReexports.push({ exportName, importedName: exportName, source: specifier });
 		return { linkedComponents, sharedReexports };
 	};
 

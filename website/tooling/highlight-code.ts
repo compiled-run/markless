@@ -9,7 +9,7 @@ import {
 	type QuickInfoService,
 } from './twoslash-quickinfo.ts';
 import { sharedFencePool } from './fence-pool.ts';
-import { DARK_THEME, LIGHT_THEME, useSiteSurface } from './shiki-surface.ts';
+import { DARK_THEME, LIGHT_THEME, siteDarkTheme, useSiteSurface } from './shiki-surface.ts';
 
 /** Fence language -> the language shiki is asked for. */
 const FENCE_ALIASES: Readonly<Record<string, string>> = {
@@ -41,7 +41,7 @@ export function getHighlighter(): Promise<HighlighterGeneric<string, string>> {
 			await readFile(fileURLToPath(TSRX_GRAMMAR_URL), 'utf8'),
 		) as LanguageRegistration;
 		return createHighlighter({
-			themes: [LIGHT_THEME, DARK_THEME],
+			themes: [LIGHT_THEME, siteDarkTheme],
 			langs: [
 				'javascript',
 				'typescript',

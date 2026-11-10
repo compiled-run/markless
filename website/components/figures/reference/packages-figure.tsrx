@@ -190,14 +190,12 @@ export default function PackagesFigure() @{
 				--ok: oklch(52% 0.13 150);
 				--bad: oklch(55% 0.19 25);
 				--wait: oklch(68% 0.14 75);
-				--kraft: color-mix(in oklch, oklch(78% 0.06 70) 70%, var(--paper));
+				--kraft: var(--figure-kraft);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
-					--kraft: oklch(70% 0.05 70);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -220,6 +218,10 @@ export default function PackagesFigure() @{
 
 			.folder-fill {
 				fill: color-mix(in oklch, var(--yellow) 45%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 45%, color-mix(in oklch, var(--cream) 50%, white));
+				}
 			}
 
 			.faint {
@@ -252,7 +254,7 @@ export default function PackagesFigure() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

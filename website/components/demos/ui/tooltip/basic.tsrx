@@ -35,11 +35,21 @@ export default function TooltipBasic() @{
 			}
 
 			.save:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.save:active {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.save:focus-visible {
@@ -61,7 +71,7 @@ export default function TooltipBasic() @{
 				padding: 0.35em 0.75em;
 				border-radius: 6px;
 				background: var(--slab);
-				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--paper));
+				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--cream));
 				color: var(--slab-ink);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 			}

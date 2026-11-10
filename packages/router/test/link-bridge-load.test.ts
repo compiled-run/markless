@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'vitest';
 import { createServerEntry } from '../src/vite/runtime/create-server-entry.ts';
+import {
+	startFragmentNavigation,
+	type FragmentEarly,
+	type FragmentNavigationApi,
+} from '../src/vite/fragment-navigation.ts';
 import { servedLinkBridge } from './support/link-bridge.ts';
 
 type BridgeOptions = Pick<
@@ -132,5 +137,165 @@ describe('router link bridge', () => {
 		expect(source).not.toContain('documentLoads');
 		expect(clickTakenOver(source, 'http://router.test/about')).toBe(false);
 		expect(clickTakenOver(source, 'http://router.test/#/about')).toBe(true);
+	});
+});
+
+type Listener = (event: unknown) => void;
+
+// The load-time bridge in a minimal window whose run half fails to load, or loads, in the order given.
+function bridgeBeforeRunHalf(loads: ('fails' | 'loads')[]) {
+	const listeners = new Map<string, Set<Listener>>();
+	const timers = new Map<number, () => void>();
+	let timer = 0;
+	let now = 0;
+	const fetched: string[] = [];
+	const left: string[] = [];
+	const handed: (FragmentEarly | undefined)[] = [];
+	const went: string[] = [];
+	const location = {
+		origin: 'http://router.test',
+		href: 'http://router.test/',
+		pathname: '/',
+		search: '',
+		assign: (href: string) => void left.push(href),
+		reload: () => void left.push('reload'),
+	};
+	const w = {
+		location,
+		navigator: {},
+		performance: { now: () => ++now, getEntriesByName: () => [], getEntriesByType: () => [] },
+		addEventListener: (type: string, listener: Listener) => {
+			const set = listeners.get(type) ?? new Set();
+			listeners.set(type, set.add(listener));
+		},
+		removeEventListener: (type: string, listener: Listener) =>
+			void listeners.get(type)?.delete(listener),
+		setTimeout: (callback: () => void) => (timers.set(++timer, callback), timer),
+		clearTimeout: (id: number) => void timers.delete(id),
+		fetch: (href: string) => (fetched.push(href), new Promise<Response>(() => {})),
+	};
+	const table = { textContent: JSON.stringify([['/c/about.js'], { '/about': [0] }]) };
+	const d = {
+		defaultView: w,
+		baseURI: 'http://router.test/',
+		readyState: 'loading',
+		head: { querySelectorAll: () => [], appendChild: () => {} },
+		createElement: () => ({}),
+		querySelectorAll: () => [table],
+		querySelector: () => null,
+		addEventListener: () => {},
+	};
+	const anchor: Record<string, unknown> = {
+		nodeType: 1,
+		href: 'http://router.test/about',
+		target: '',
+		relList: { contains: () => false },
+		hasAttribute: (name: string) => name === 'data-link',
+		getAttribute: () => null,
+	};
+	anchor.closest = () => anchor;
+	const api: FragmentNavigationApi = {
+		traverse: () => {},
+		replay: () => {},
+		go: (link) => (went.push((link as unknown as { href: string }).href), true),
+	};
+	startFragmentNavigation(
+		d as unknown as Document,
+		() => 'data-link',
+		'data-links',
+		async () => ({}),
+		() =>
+			loads.shift() === 'loads'
+				? Promise.resolve(
+						(...args: unknown[]) => (handed.push(args[5] as FragmentEarly), api),
+					)
+				: Promise.reject(new Error('the run half failed to load')),
+		() => ({
+			code: [],
+			hoverDwellMs: 100,
+			requestPrefix: '/_fragment',
+			prefetchAttribute: 'data-prefetch',
+			idleBytesPerSecond: 1,
+			idleMeasuredBytes: 1,
+		}),
+		1000,
+	);
+	const dispatch = (type: string, event: Record<string, unknown> = {}) => {
+		for (const listener of listeners.get(type) ?? [])
+			listener({
+				type,
+				button: 0,
+				target: anchor,
+				composedPath: () => [anchor],
+				preventDefault: () => {},
+				...event,
+			});
+	};
+	return {
+		fetched,
+		left,
+		handed,
+		went,
+		location,
+		dispatch,
+		settled: () => new Promise((done) => setTimeout(done, 0)),
+		deadline: () => {
+			for (const [id, callback] of timers) {
+				timers.delete(id);
+				callback();
+			}
+		},
+	};
+}
+
+describe('router link bridge after a failed run-half load', () => {
+	test('a press after a failed load fetches its page and hands the next run that fetch, not the stale one', async () => {
+		const bridge = bridgeBeforeRunHalf(['fails', 'loads']);
+		bridge.dispatch('pointerdown');
+		await bridge.settled();
+		bridge.dispatch('pointerdown');
+		await bridge.settled();
+		expect(bridge.fetched).toEqual([
+			'http://router.test/_fragment/about',
+			'http://router.test/_fragment/about',
+		]);
+		expect(bridge.handed).toHaveLength(1);
+		expect(bridge.handed[0]?.controller.signal.aborted).toBe(false);
+	});
+
+	test('Back during a failed load reloads the page its address names, and a hash-only Back keeps it', async () => {
+		const bridge = bridgeBeforeRunHalf(['fails', 'fails']);
+		bridge.dispatch('popstate', { target: {}, composedPath: () => [] });
+		await bridge.settled();
+		bridge.deadline();
+		expect(bridge.left).toEqual([]);
+		Object.assign(bridge.location, { pathname: '/about', href: 'http://router.test/about' });
+		bridge.dispatch('popstate', { target: {}, composedPath: () => [] });
+		await bridge.settled();
+		bridge.deadline();
+		expect(bridge.left).toEqual(['reload']);
+	});
+
+	test('two clicks after a failed load load the last clicked page once', async () => {
+		const bridge = bridgeBeforeRunHalf(['fails', 'fails', 'fails']);
+		bridge.dispatch('click');
+		await bridge.settled();
+		bridge.dispatch('click');
+		await bridge.settled();
+		bridge.dispatch('click');
+		await bridge.settled();
+		bridge.deadline();
+		expect(bridge.left).toEqual(['http://router.test/about']);
+	});
+
+	test('a click whose retried load succeeds swaps, and the failed click before it never loads its page', async () => {
+		const bridge = bridgeBeforeRunHalf(['fails', 'loads']);
+		bridge.dispatch('click');
+		await bridge.settled();
+		bridge.dispatch('click');
+		await bridge.settled();
+		bridge.deadline();
+		expect(bridge.went).toEqual(['http://router.test/about']);
+		expect(bridge.left).toEqual([]);
 	});
 });

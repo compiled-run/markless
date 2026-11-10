@@ -197,9 +197,9 @@ export default function LinkAnatomy() @{
 				--bean: oklch(48% 0.08 50);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--board: color-mix(in oklch, var(--paper) 25%, oklch(48% 0.07 60));
-					--steel: color-mix(in oklch, var(--paper) 35%, oklch(55% 0.01 250));
+					--sheet: var(--figure-sheet);
+					--board: var(--slab);
+					--steel: var(--raised);
 					--bean: oklch(52% 0.08 55);
 				}
 			}

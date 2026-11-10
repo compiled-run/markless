@@ -64,7 +64,9 @@ for (let run = 1; run <= 8; run++) {
 		click('[data-toggle]');
 		await expect.poll(summaryText).toBe('beta summary');
 		click('[data-next]');
-		await expect.poll(summaryText).toBe('No summary');
+		// A failed refresh keeps the summary and adds its @catch content after it.
+		await expect.poll(() => document.querySelector('[data-trouble]')?.textContent).toBe('No summary');
+		expect(summaryText()).toBe('beta summary');
 		expect(errors).toEqual([]);
 	});
 }

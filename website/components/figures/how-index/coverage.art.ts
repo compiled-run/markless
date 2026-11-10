@@ -137,7 +137,7 @@ export const art: ReturnType<typeof drawing> = {
 		},
 		{
 			"key": "c14",
-			"cls": "label button-label",
+			"cls": "label button-label go-label",
 			"matrix": "translate(46 248)",
 			"text": "Get Started"
 		},

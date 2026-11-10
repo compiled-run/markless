@@ -16,7 +16,7 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Lean scalar payload decoding accepts innerHTML only as a legacy script-text fallback.',
 	'packages/web/src/event-resume.ts :: const text = script?.textContent ?? script?.text ?? script?.innerHTML;':
 		'Event payload decoding accepts innerHTML only as a legacy script-text fallback.',
-	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+	'packages/web/src/fns/row-component-mint.ts :: if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))':
 		'A client-minted row censuses the compiler-emitted branch anchors in the fragment it just built, before the row joins the page.',
 	'packages/web/src/fns/row-branch-mint.ts :: return node.nodeType === 8 && (node as { readonly data?: string }).data === data;':
 		"A row flips its @if between the compiler-emitted anchor pair among one element's children inside that row, never the page.",
@@ -48,12 +48,18 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		'The streamed-arm executor finds its compiler-emitted boundary comment anchors.',
 	'packages/web/src/resume-arm-records.ts :: if (within && node.nodeType === 8 && isArmBranchAnchorComment(node as ResumeDomComment)) {':
 		'Arm-record adoption censuses compiler-emitted branch anchors within an explicit range.',
-	'packages/web/src/resume-commit-arm.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+	'packages/web/src/resume-commit-arm.ts :: if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))':
 		"A settled arm's nested @try blocks find their anchors among the comments inside that arm's own range, never the page.",
 	"packages/web/src/resume-arm-records.ts :: const data = sibling.nodeType === 8 ? sibling.data! : '';":
 		"A CSR event's own target claims a painted arm's hosts: it reads only the target's ancestors and their preceding siblings for the arm's start anchor, never the page.",
 	'packages/web/src/resume-arm-records.ts :: next && !(next.nodeType === 8 && next.data === `/${data}`);':
 		"The same claim collects that arm's own nodes up to its end anchor, never the page.",
+	'packages/web/src/fns/row-locals.ts :: const data = at.nodeType === 8 ? at.data : undefined;':
+		"A handler's row locals walk back from the row's own top-level node to its start comment, past whole sibling rows, never the page.",
+	'packages/web/src/fns/served-row-ranges.ts :: if (at.nodeType !== 8) continue;':
+		"A ranged row's nodes are walked from its own start comment to its matching end comment, never the page.",
+	'packages/web/src/fns/served-row-ranges.ts :: const data = node.nodeType === 8 ? (node as ResumeDomComment).data : undefined;':
+		"A list's served ranged rows are found among its parent's own children by their row comments.",
 	'packages/web/src/resume-branches.ts :: (value as { readonly nodeType?: number }).nodeType === 8':
 		'Branch adoption validates that a supplied live anchor is a comment node.',
 	'packages/web/src/resume-census.ts :: const walker = (node as Node).ownerDocument?.createTreeWalker?.(node as Node, 1);':
@@ -92,7 +98,7 @@ const RUNTIME_MOUNT_SCAN_ALLOWLIST: Readonly<Record<string, string>> = {
 		"The page's top-level nodes are found by the start and end comments among the container's own children.",
 	'packages/web/src/resume-anchor-census.ts :: const data = child.nodeType === 8 ? (child as ResumeDomComment).data : undefined;':
 		"An element address step reads one parent's own children, telling a block's start and end comments from the elements it counts, never the page.",
-	'packages/web/src/resume-anchor-census.ts :: if (node.nodeType === 8 && !isArmBranchAnchorComment(node as ResumeDomComment))':
+	'packages/web/src/resume-anchor-census.ts :: if (node.nodeType === 8 && !isUncountedComment(node as ResumeDomComment))':
 		"Async-boundary and branch adoption map serialized indexes to compiler-emitted comment anchors among the page's nodes.",
 };
 

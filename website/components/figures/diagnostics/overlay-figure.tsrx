@@ -352,6 +352,40 @@ export default function OverlayFigure() @{
 				color: LinkText;
 			}
 
+			html.dark .overlay-toy {
+				.error .code {
+					text-decoration-color: var(--figure-error);
+				}
+
+				.problems.error {
+					color: var(--figure-error);
+				}
+
+				.problems.warn {
+					color: oklch(80% 0.12 75);
+				}
+
+				.src:hover {
+					background: color-mix(in srgb, var(--yellow) 25%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.edit:hover {
+					background: color-mix(in srgb, var(--pink) 25%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.edit.on {
+					background: color-mix(in srgb, var(--pink) 70%, var(--cream));
+				}
+
+				/* The depicted dev overlay is a light page in the browser, so it keeps its own light ink. */
+				.dev-overlay {
+					--ink: var(--on-accent);
+					color-scheme: light;
+				}
+			}
+
 			@media (prefers-reduced-motion: reduce) {
 				.overlay-toy * {
 					animation: none !important;

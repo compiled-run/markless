@@ -96,7 +96,7 @@ test('M1 real tsserver completes and hovers Markless framework APIs', async () =
 	expect(
 		displayText(computedInfo),
 		'M1 missing capability: computed hover must preserve its generic derived-value type.',
-	).toMatch(/computed<T>\(derive: \(\) => T\).*AsyncComputedValue<T>/);
+	).toMatch(/computed<T>\(derive: \(recipe: AsyncComputedRecipe\) => Promise<T>\): Awaited<T> \(\+1 overload\)/);
 }, 20_000);
 
 test('M2 real tsserver completes members through state() and computed() inference', async () => {
@@ -873,16 +873,19 @@ test('M10 intrinsic contract accepts Markless spellings, native events, element 
 
 test('M10 intrinsic attributes complete both event casings the compiler binds', async () => {
 	const fixture = openFixture('intrinsic-event-completions.tsrx');
-	const names = completionNames(
-		await server.completionInfo(
-			fixture.file,
-			positionAfterMarker(fixture.marked, '/*M10_EVENT_ATTRIBUTES*/'),
-		),
+	const completion = await server.completionInfo(
+		fixture.file,
+		positionAfterMarker(fixture.marked, '/*M10_EVENT_ATTRIBUTES*/'),
 	);
+	const names = completionNames(completion);
 
 	expect(names).toEqual(
 		expect.arrayContaining(['onKeyDown', 'onKeydown', 'onPointerDown', 'onClick', 'tabindex']),
 	);
+	const sortText = (name: string) =>
+		completionEntries(completion).find((entry: any) => entry.name === name)?.sortText;
+	expect(sortText('tabIndex')! > sortText('tabindex')!).toBe(true);
+	expect(sortText('accessKey')! > sortText('accesskey')!).toBe(true);
 }, 20_000);
 
 test('M10 intrinsic contract rejects className, bogus and tag-wrong attributes, and object children at authored tokens', async () => {
@@ -940,6 +943,25 @@ test('M16 PropsOf and Children import into a plain .ts file and PropsOf is exact
 		diagnostics,
 		'M16 missing capability: the authoring types must resolve from @markless/core in .ts, and PropsOf<Tag> must stay mutually assignable with JSX.IntrinsicElements[Tag].',
 	).toEqual([]);
+}, 20_000);
+
+test('M19 hovering @try or an async read says what a refresh does there', async () => {
+	const fixture = openFixture('refresh-hover.tsrx');
+	const block = await server.quickinfo(fixture.file, positionAtSearch(fixture.source, '@try', 1));
+	expect(
+		documentationText(block),
+		'M19 missing capability: a @try hover must name the input, the kept content and the busy element.',
+	).toBe(
+		'When `aisle` changes, `stock` runs again: this block keeps its content and marks `<ol>` busy until the new result lands. Text here that reads `stock` keeps the `aisle` it was fetched with.',
+	);
+	const read = await server.quickinfo(
+		fixture.file,
+		positionAtSearch(fixture.source, 'stock.items', 1),
+	);
+	expect(displayText(read), 'M19: the native type hover must stay.').toContain('stock');
+	expect(documentationText(read)).toContain('When `aisle` changes, `stock` runs again');
+	const plain = await server.quickinfo(fixture.file, positionAtSearch(fixture.source, 'aisle;', 1));
+	expect(documentationText(plain)).not.toContain('runs again');
 }, 20_000);
 
 test('M17 real tsserver serves a part inlay hint naming the element each part renders', async () => {
@@ -1593,6 +1615,13 @@ function completionEntries(completion: any): any[] {
 
 function completionNames(completion: any): string[] {
 	return completionEntries(completion).map((entry) => entry.name);
+}
+
+function documentationText(info: any): string {
+	const documentation = info?.documentation;
+	return typeof documentation === 'string'
+		? documentation
+		: (documentation?.map((part: any) => part.text).join('') ?? '');
 }
 
 function displayText(info: any): string {

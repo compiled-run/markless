@@ -1,6 +1,7 @@
 import { createProtocolStatePayload, protocolInstanceQualifies } from '@markless/serializer';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import type { ProtocolStatePayloadInput, SemanticSharedReturnProperty } from '../artifacts.ts';
+import { asyncReach, componentEdgeReads, pairedAsyncValues } from './paired-async-values.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
 import { componentPropReads } from './symbol-modules.ts';
 import { planSymbolResolver } from './symbol-resolver.ts';
@@ -21,6 +22,13 @@ export function createProtocolStatePayloadFromArena(
 		});
 	const deriveSymbolIds = syncDeriveSymbolIds(symbolResolver);
 	const readOnlyBySubscriptions = deriveOnReadGraphNodeIds(input, symbolResolver);
+	const held = heldAsyncGraphNodeIds(input, symbolResolver);
+	const asyncFrom = asyncAncestors(input.payloadArena.state.computed);
+	const boundaryGates = new Set(
+		input.semanticGraph.asyncBoundaries.flatMap((boundary) =>
+			boundary.gateGraphNodeId ? [boundary.gateGraphNodeId] : [],
+		),
+	);
 	const computed = input.payloadArena.state.computed.map((computed) => ({
 		graphNodeId: computed.graphNodeId,
 		name: computed.name,
@@ -38,6 +46,13 @@ export function createProtocolStatePayloadFromArena(
 			: {}),
 		...(readOnlyBySubscriptions.has(computed.graphNodeId)
 			? { deriveOnRead: true as const }
+			: {}),
+		...(held.has(computed.graphNodeId) ? { holds: true as const } : {}),
+		...(computed.async && boundaryGates.has(computed.graphNodeId)
+			? { boundaryGate: true as const }
+			: {}),
+		...(asyncFrom.get(computed.graphNodeId)?.length
+			? { asyncFrom: asyncFrom.get(computed.graphNodeId)! }
 			: {}),
 	}));
 	const callbackSlots = callbackSlotNodes(input);
@@ -181,6 +196,32 @@ function deriveOnReadGraphNodeIds(
 			node.async || current.has(node.graphNodeId) ? [] : [node.graphNodeId],
 		),
 	);
+}
+
+// For each sync computed, the nearest async values it derives from through other sync computeds.
+function asyncAncestors(
+	computed: ProtocolStatePayloadInput['payloadArena']['state']['computed'],
+): ReadonlyMap<string, ReadonlyArray<string>> {
+	const { asyncInputs } = asyncReach(new Map(computed.map((node) => [node.graphNodeId, node])));
+	return new Map(
+		computed.flatMap((node) => (node.async ? [] : [[node.graphNodeId, asyncInputs(node.graphNodeId)]])),
+	);
+}
+
+function heldAsyncGraphNodeIds(
+	input: ProtocolStatePayloadInput,
+	symbolResolver: NonNullable<ProtocolStatePayloadInput['symbolResolver']>,
+): ReadonlySet<string> {
+	const { computed } = input.payloadArena.state;
+	return pairedAsyncValues(new Map(computed.map((node) => [node.graphNodeId, node])), [
+		...computed.map((node) => (node.dependencies ?? []).map((read) => read.graphNodeId)),
+		...symbolResolver.symbols.flatMap((symbol) =>
+			symbol.kind === 'event-handler' && symbol.shownReads
+				? [symbol.shownReads.map((read) => read.graphNodeId)]
+				: [],
+		),
+		...componentEdgeReads(input.semanticGraph.componentEdges),
+	]);
 }
 
 function syncDeriveSymbolIds(

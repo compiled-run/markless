@@ -378,6 +378,17 @@ function resolvePublishedSharedDefinition(input: {
 	}
 
 	for (const reexport of moduleInterface.reexports ?? []) {
+		if (reexport.exportName === '*') {
+			if (segment === 'default') continue;
+			const resolved = resolvePublishedSharedDefinition({
+				moduleInterface: interfaceForSource(reexport.source, input.state),
+				exportPath,
+				state: input.state,
+				seen: new Set([...input.seen, moduleInterface.filename]),
+			});
+			if (resolved) return resolved;
+			continue;
+		}
 		if (reexport.exportName !== segment) continue;
 		// `export * as ns from` binds a namespace, so the segment is spent on the
 		// namespace and the rest of the path walks inside it; a named re-export
@@ -513,9 +524,9 @@ function reachableSharedExportPaths(input: {
 				return reachableSharedExportPaths({
 					moduleInterface: target,
 					state: input.state,
-					prefix: [...input.prefix, reexport.exportName],
+					prefix: reexport.exportName === '*' ? input.prefix : [...input.prefix, reexport.exportName],
 					seen,
-				});
+				}).filter((path) => reexport.exportName !== '*' || path.split('.')[input.prefix.length] !== 'default');
 			}
 			// A named re-export renames one export, so it contributes that one name
 			// under this module's spelling of it.

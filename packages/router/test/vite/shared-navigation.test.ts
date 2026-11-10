@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // An app-scoped shared() in lib/choice.tsrx read by three routes; its browser instance lives for the document.
 
@@ -36,13 +34,9 @@ async function serveApp(mode: 'region' | 'document'): Promise<BuiltServer> {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	return startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -141,6 +135,24 @@ test.each(['region', 'document'] as const)('a value set on one page is the value
 	expect(frames.length).toBeGreaterThan(0);
 	expect(frames.filter((frame) => frame.shown !== 'manual')).toEqual([]);
 	expect(frames.filter((frame) => frame.mode !== 'chosen/chosen')).toEqual([]);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a value set on one page survives a page that never reads it and shows on the next page that does', async () => {
+	const { page, errors } = await open('/');
+	await page.click('[data-manual]');
+	await expect.poll(() => shown(page)).toBe('manual');
+	await page.click('[data-go-empty]');
+	await title(page, 'Empty');
+	expect(await shown(page)).toBeUndefined();
+	await recordFrames(page);
+	await page.click('[data-go-next]');
+	await title(page, 'Next');
+	await settleFrames(page);
+	const frames = (await recordedFrames(page)).filter((frame) => frame.title === 'Next');
+	expect(frames.length).toBeGreaterThan(0);
+	expect(frames.filter((frame) => frame.shown !== 'manual' || frame.mode !== 'chosen/chosen')).toEqual([]);
 	expect(errors).toEqual([]);
 	await page.close();
 });

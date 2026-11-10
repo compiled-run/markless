@@ -6,6 +6,7 @@ A change known to affect a consuming application must pass that application's ch
 Every write-task verify array must include `pnpm run typecheck`, the Markless-aware TypeScript checker; type red or test red blocks task completion, so never report a write task complete on a tree that does not typecheck or whose tests fail.
 Every write-task verify array must also include `pnpm ci:local --fast`, which runs CI's fast jobs with the exact commands from `.github/workflows/ci.yml` (the pre-commit hook runs them too). Everything heavier (browser, boxes-*, build-scale, perf-guards, benchmark, demo and website boxes, migrate checks) runs on GitHub Actions: the pull request's green CI run is the receipt, and no task is reported done before that run is green. Run a heavy job locally (`pnpm ci:local --job <id>`) only to debug a specific failure. Passing only the tests for your own change is not verification.
 When your PR merges or your task ends, remove your git worktree (`git worktree remove`) and your /tmp scratch, and stop any servers you started.
+Before adding a boolean, nullable field, timer or promise that tracks a lifecycle, or another flag beside an existing one, read `docs/rules/one-state.md`.
 
 ## One analysis, used everywhere
 

@@ -847,6 +847,47 @@ test('a button group whose cell a settled arm reads owns that arm and its render
 	expect(groups.find((group) => group.id === 'self-wake')?.armRendererModuleId).toBeUndefined();
 });
 
+test('a button that refetches the value a settled arm shows owns that arm and the symbols its hosts name', () => {
+	const input = settledArmPageInput(false);
+	const again = { hostNodeId: 'h:again', strategy: 'dom-order', index: 2, tagName: 'button' };
+	const click = { hostNodeId: 'h:again', eventName: 'click', symbolIds: ['symbol:again'] };
+	const groups = planPrerenderTriggerGroups({
+		...input,
+		view: { ...input.view, locators: [...input.view.locators, again], events: [click] },
+		completeView: {
+			...input.completeView,
+			locators: [...input.completeView.locators, again],
+			events: [click],
+		},
+		componentEdges: [],
+		boundRows: [],
+		symbolResolver: {
+			...input.symbolResolver,
+			symbols: [
+				...input.symbolResolver.symbols,
+				{
+					id: 'symbol:again',
+					kind: 'event-handler',
+					hostNodeId: 'h:again',
+					eventName: 'click',
+					source: '() => seed++',
+					parameters: [],
+					order: 0,
+					writes: [{ source: 'seed++', graphNodeId: 'state:seed', path: [], operation: 'update' }],
+				},
+			],
+		},
+	} as unknown as Parameters<typeof planPrerenderTriggerGroups>[0]);
+
+	const refetch = groups.find((group) => group.id === 'h:again:click');
+	// The settle commits the arm through this group's runtime, so the records its hosts carry must resolve here.
+	expect(refetch?.view.asyncBoundaries.map((boundary) => boundary.id)).toEqual(['async:feed']);
+	expect(Array.isArray(refetch?.view.asyncBoundaries[0]?.armRecords)).toBe(true);
+	expect(refetch?.symbolIds).toEqual(
+		expect.arrayContaining(['symbol:again', 'symbol:row', 'symbol:runner', 'symbol:settle', 'symbol:weighted-patch']),
+	);
+});
+
 test('a page with no settled-arm reader leaves the self-wake group sole arm owner', () => {
 	const groups = planPrerenderTriggerGroups(settledArmPageInput(false));
 
