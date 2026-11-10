@@ -28,7 +28,7 @@ export default function AnatomyBranch({ part, label, name, shapeId, level, leaf,
 		<style>
 			.structure-node { outline: none; }
 			.structure-row { display: flex; align-items: center; gap: 6px; height: 30px; box-sizing: border-box; padding: 0 10px 0 calc(6px + (var(--layer-level) - 1) * 12px); color: var(--ink); cursor: default; }
-			.structure-row:hover { background: color-mix(in srgb, var(--purple) 12%, var(--paper)); }
+			.structure-row:hover { --ink: var(--on-accent); background: color-mix(in srgb, var(--purple) 12%, var(--cream)); }
 			.structure-node:focus-visible > .structure-row { outline: 2px solid var(--ink); outline-offset: -2px; }
 			.structure-trigger { display: grid; place-items: center; flex: none; width: 12px; height: 24px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer; }
 			.structure-trigger[ui-open] { transform: rotate(90deg); }

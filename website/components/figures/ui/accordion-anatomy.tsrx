@@ -272,6 +272,10 @@ export default function AccordionAnatomy() @{
 
 			.tag {
 				fill: color-mix(in oklch, var(--tone) 55%, var(--ink));
+
+				html.dark & {
+					fill: var(--tone);
+				}
 			}
 
 			.controls {

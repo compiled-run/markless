@@ -177,7 +177,7 @@ export default function Code({
 		<style>
 			.code-block {
 				--code-band: color-mix(in oklch, var(--ink) 70%, transparent);
-				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				--code-wash: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				--code-tab-back: color-mix(in oklch, var(--ink) 9%, var(--paper));
 				--code-tab-h: 2.7rem;
 				--code-bleed: min(4.6rem, 2 * var(--space-s-l));
@@ -320,6 +320,11 @@ export default function Code({
 
 			.tool:active {
 				background: var(--code-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.tool[data-code-action='lines'][aria-pressed='false'] {

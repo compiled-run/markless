@@ -69,7 +69,12 @@ export default function DrinkPick() @{
 			}
 
 			button:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			button:focus-visible {
@@ -79,19 +84,34 @@ export default function DrinkPick() @{
 
 			button.tea {
 				html[data-docs-drink='tea'] & {
-					background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+					background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+					html.dark & {
+						--ink: var(--on-accent);
+						color: var(--on-accent);
+					}
 				}
 			}
 
 			button.coffee {
 				html[data-docs-drink='coffee'] & {
-					background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+					background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+					html.dark & {
+						--ink: var(--on-accent);
+						color: var(--on-accent);
+					}
 				}
 			}
 
 			button.cocoa {
 				html[data-docs-drink='cocoa'] & {
-					background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+					background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+					html.dark & {
+						--ink: var(--on-accent);
+						color: var(--on-accent);
+					}
 				}
 			}
 

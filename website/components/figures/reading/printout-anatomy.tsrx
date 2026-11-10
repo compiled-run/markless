@@ -189,14 +189,9 @@ export default function PrintoutAnatomy() @{
 				stroke-dasharray: var(--l);
 
 				html.dark & {
-					opacity: 0.45;
+					stroke: var(--mark);
+					opacity: 1;
 					mix-blend-mode: normal;
-				}
-			}
-
-			.swipe.on-desk {
-				html.dark & {
-					opacity: 0.85;
 				}
 			}
 
@@ -305,10 +300,6 @@ export default function PrintoutAnatomy() @{
 			html.dark .scene {
 				.tint {
 					fill: var(--cd);
-				}
-
-				.swipe:not(.on-desk) {
-					opacity: 1;
 				}
 
 				.washed {

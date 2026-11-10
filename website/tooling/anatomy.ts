@@ -23,7 +23,7 @@ ${selected} .part-shape${target} .shape-face { fill: color-mix(in srgb, var(--pu
 		return `.anatomy-study[data-shape="${id}"] .part-shape[data-selection-id="${id}"] { opacity: 1; }
 .anatomy-study[data-shape="${id}"] .part-shape[data-selection-id="${id}"] .shape-face { fill: color-mix(in srgb, var(--purple) 70%, var(--paper)); stroke: var(--ink); stroke-width: 2.5; }`;
 	});
-	const treeRules = shapeIds.map((id) => `.anatomy-study[data-shape="${id}"] .structure-row[data-shape="${id}"] { background: color-mix(in srgb, var(--purple) 35%, var(--paper)); font-weight: 700; }`);
+	const treeRules = shapeIds.map((id) => `.anatomy-study[data-shape="${id}"] .structure-row[data-shape="${id}"] { --ink: var(--on-accent); background: color-mix(in srgb, var(--purple) 35%, var(--cream)); font-weight: 700; }`);
 	return source.replace(directive, (shapeIds.length ? instances : rules).join('\n')).replace(treeDirective, treeRules.join('\n'));
 }
 

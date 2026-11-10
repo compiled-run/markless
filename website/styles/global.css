@@ -138,7 +138,7 @@
 	/* The hover card every tooltip on the site draws: defined terms, code hovers, playground hints. */
 	--tip-border: 1.5px solid var(--ink);
 	--tip-radius: 10px;
-	--tip-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--paper));
+	--tip-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--cream));
 	--tip-font: 'Shantell Sans', system-ui, sans-serif;
 	/* @markless/ui tooltip's default open delay, for the tips CSS opens on its own. */
 	--tip-delay: 600ms;
@@ -854,7 +854,7 @@ html.dark .shiki span:not(.tsrx-tip):not(.tsrx-tip-title):not(.tsrx-tip-body) {
 	background:
 		linear-gradient(to bottom left, transparent 50%, color-mix(in oklch, var(--raised) 82%, var(--ink)) 50%) 100% 0 / var(--fold) var(--fold) no-repeat,
 		var(--raised);
-	box-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--paper));
+	box-shadow: 4px 4px 0 color-mix(in srgb, var(--pink) 45%, var(--cream));
 	clip-path: polygon(-1px -1px, calc(100% - var(--fold)) -1px, calc(100% + 6px) calc(var(--fold) + 6px), calc(100% + 6px) calc(100% + 6px), -1px calc(100% + 6px));
 }
 

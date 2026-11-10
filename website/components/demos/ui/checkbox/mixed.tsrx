@@ -84,12 +84,22 @@ export default function CheckboxMixed() @{
 			}
 
 			.box:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.box[ui-checked],
 			.box[ui-mixed] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.box:focus-visible {
