@@ -71,9 +71,11 @@
 		--grain-fiber-opacity: 0.08;
 		--grain-speck-blend: normal;
 		--grain-speck-opacity: 0.25;
+		--shadow-h1: oklch(62% 0.07 315);
+		--shadow-h2: oklch(62% 0.07 240);
+		--shadow-h3: oklch(62% 0.07 135);
 		--shadow-x: -0.06em;
 		--shadow-y: 0.06em;
-		--shadow-under: oklch(17% 0.012 90);
 		--sprite-light: none;
 		--sprite-dark: inline-block;
 		--figure-sheet: var(--code-surface);

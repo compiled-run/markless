@@ -148,6 +148,8 @@ export default function StartWithAgent() @{
 
 				html.dark & {
 					--slip: var(--figure-sheet);
+					--stamp-mix: 38%;
+					--stamp-wash: color-mix(in srgb, var(--stamp) var(--stamp-mix), color-mix(in oklch, var(--cream) 40%, white));
 					--slip-shade: var(--figure-shade);
 				}
 			}
@@ -212,6 +214,8 @@ export default function StartWithAgent() @{
 				mix-blend-mode: multiply;
 
 				html.dark & {
+					fill: var(--stamp-wash);
+					stroke: var(--stamp-wash);
 					opacity: 1;
 					mix-blend-mode: normal;
 				}
@@ -308,6 +312,7 @@ export default function StartWithAgent() @{
 				opacity: 0.6;
 
 				html.dark & {
+					--stamp-mix: 55%;
 					opacity: 1;
 				}
 			}
