@@ -44,6 +44,21 @@ function armBindings(startAnchor: object | undefined): Array<readonly [BusyNode,
 	return bindings;
 }
 
+// Hosts whose aria-busy the author binds: that attribute is theirs, so marks neither set nor strip it there.
+function authorBusyHosts(anchors: ReadonlyArray<object | undefined>): Set<BusyNode> {
+	const hosts = new Set<BusyNode>();
+	for (const anchor of anchors) {
+		const materialized = (anchor as { __marklessArmRecords?: ArmRecords } | undefined)
+			?.__marklessArmRecords;
+		for (const update of materialized?.domUpdates ?? []) {
+			if (update.target?.kind !== 'attribute' || update.target.name !== 'aria-busy') continue;
+			const host = materialized!.elementsByHostId.get(update.hostNodeId);
+			if (host) hosts.add(host as BusyNode);
+		}
+	}
+	return hosts;
+}
+
 const busyByRange = new WeakMap<object, BoundaryBusy>();
 
 // Marks follow reads still running under settled content; a first load or a quiet refresh marks nothing.
@@ -105,8 +120,10 @@ function apply(boundary: BusyBoundary): void {
 		};
 		for (const host of boundaryBusyHosts(range)) hosts.add(host);
 	}
-	for (const host of busy.marked) if (!hosts.has(host)) host.removeAttribute?.('aria-busy');
-	for (const host of hosts) host.setAttribute?.('aria-busy', 'true');
+	const authored = authorBusyHosts([boundary.startAnchor, after]);
+	for (const host of busy.marked)
+		if (!hosts.has(host) && !authored.has(host)) host.removeAttribute?.('aria-busy');
+	for (const host of hosts) if (!authored.has(host)) host.setAttribute?.('aria-busy', 'true');
 	if (hosts.size > 0 !== busy.marked.size > 0) announce(busy, hosts.size > 0 ? hosts : busy.marked);
 	busy.marked = hosts;
 }
