@@ -132,7 +132,7 @@ export default function InkCards({ cards, label }: { readonly cards: readonly In
 
 			.link {
 				color: inherit;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-decoration-thickness: 0.12em;
 				text-underline-offset: 0.16em;
 			}

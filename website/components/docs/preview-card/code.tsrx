@@ -231,7 +231,7 @@ export default function Code({ files }: { readonly files: readonly CodePane[] })
 
 			.pg-expand:hover {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-underline-offset: 0.15em;
 			}
 
