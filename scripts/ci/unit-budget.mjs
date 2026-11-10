@@ -82,18 +82,42 @@ function treeRssBytes(rootPid, pageSize) {
 	return total;
 }
 
+// A fixed JavaScript workload; the shard's CPU-seconds divided by its CPU-seconds is the work done,
+// whatever the speed of the runner's CPU model.
+function calibrationRound() {
+	const started = process.cpuUsage();
+	let seed = 1;
+	const rows = [];
+	for (let index = 0; index < 400_000; index += 1) {
+		seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+		rows.push({ id: seed, name: `row-${seed.toString(36)}`, tags: [seed % 7, seed % 11] });
+	}
+	rows.sort((a, b) => a.name.localeCompare(b.name));
+	const text = JSON.stringify(rows);
+	const counts = new Map();
+	for (const match of text.matchAll(/"row-([a-z0-9]{2})/g))
+		counts.set(match[1], (counts.get(match[1]) ?? 0) + 1);
+	if (JSON.parse(text).length !== rows.length || counts.size === 0)
+		throw new Error('calibration workload went wrong');
+	const spent = process.cpuUsage(started);
+	return (spent.user + spent.system) / 1e6;
+}
+
+const calibrate = () => Math.min(...Array.from({ length: 5 }, calibrationRound));
+
 async function measure(command) {
 	if (!command.length) throw new Error(USAGE);
 	const out = process.env.MARKLESS_UNIT_BUDGET_OUT;
+	if (out && process.platform !== 'linux')
+		throw new Error(
+			'measure records Linux anchors only; unset MARKLESS_UNIT_BUDGET_OUT to run the command plainly',
+		);
+	const calibrationS = out ? calibrate() : null;
 	const child = spawn(command[0], command.slice(1), { stdio: 'inherit' });
 	for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 	if (!out)
 		return new Promise((done) =>
 			child.on('close', (code, signal) => done(code ?? (signal ? 1 : 0))),
-		);
-	if (process.platform !== 'linux')
-		throw new Error(
-			'measure records Linux anchors only; unset MARKLESS_UNIT_BUDGET_OUT to run the command plainly',
 		);
 	const ticks = Number(execFileSync('getconf', ['CLK_TCK'], { encoding: 'utf8' }));
 	const pageSize = Number(execFileSync('getconf', ['PAGESIZE'], { encoding: 'utf8' }));
@@ -115,7 +139,7 @@ async function measure(command) {
 	const cpuModel =
 		/model name\s*:\s*(.*)/.exec(readFileSync('/proc/cpuinfo', 'utf8'))?.[1] ?? 'unknown';
 	const measurement = {
-		version: 1,
+		version: 2,
 		shard: process.env.MARKLESS_UNIT_BUDGET_SHARD ?? 'all',
 		platform: PLATFORM,
 		cpuModel,
@@ -130,12 +154,13 @@ async function measure(command) {
 		userS: round(userS),
 		sysS: round(sysS),
 		peakRssMb: Math.round(peak / 2 ** 20),
-		samplerCpuS: round((own.user + own.system) / 1e6, 2),
+		calibrationS: Math.round(calibrationS * 1000) / 1000,
+		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
 	};
 	mkdirSync(dirname(out), { recursive: true });
 	writeFileSync(out, `${JSON.stringify(measurement, null, '\t')}\n`);
 	console.log(
-		`unit budget: shard ${measurement.shard} used ${measurement.cpuS} CPU-s, peak RSS ${measurement.peakRssMb} MB, in ${measurement.wallS} s (${cpuModel})`,
+		`unit budget: shard ${measurement.shard} used ${measurement.cpuS} CPU-s, peak RSS ${measurement.peakRssMb} MB, in ${measurement.wallS} s (${cpuModel}, calibration ${measurement.calibrationS} CPU-s)`,
 	);
 	return exitCode;
 }
@@ -169,9 +194,9 @@ export function latestPerShard(measurements) {
 function validate(measurements, budget) {
 	const problems = [];
 	for (const measurement of measurements) {
-		if (measurement.version !== 1)
+		if (measurement.version !== 2 || !(measurement.calibrationS > 0))
 			problems.push(
-				`${measurement.file}: unknown measurement version ${measurement.version}`,
+				`${measurement.file}: measurement version ${measurement.version} without a calibration; this script reads version 2`,
 			);
 		if (measurement.platform !== budget.platform)
 			problems.push(
@@ -201,11 +226,13 @@ export function evaluate(budget, measurements) {
 		failures.push(
 			`stale anchor: the anchors cover shards [${shardList(Object.keys(budget.anchors.shards))}] but this run measured [${shardList(measured)}]; re-anchor from this run`,
 		);
-	const cpuS = round([...latest.values()].reduce((sum, m) => sum + m.cpuS, 0));
+	const speed = budget.anchors?.calibrationS ?? 1;
+	const scaled = (m) => (m.cpuS / m.calibrationS) * speed;
+	const cpuS = round([...latest.values()].reduce((sum, m) => sum + scaled(m), 0));
 	const peakRssMb = Math.max(0, ...[...latest.values()].map((m) => m.peakRssMb));
 	for (const [shard, m] of [...latest].sort(([a], [b]) => a.localeCompare(b)))
 		lines.push(
-			`  shard ${shard}: ${m.cpuS} CPU-s, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall, ${m.cpuModel}${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
+			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
 		);
 	if (budget.margin && budget.anchors) {
 		const band = (name, value, anchor, margin, unit) => {
@@ -222,7 +249,13 @@ export function evaluate(budget, measurements) {
 					`stale anchor: ${name} ${change}. The suite got lighter, so the anchor no longer protects anything; re-anchor from this run`,
 				);
 		};
-		band('total CPU', cpuS, budget.anchors.cpuS, budget.margin.cpu, 'CPU-s');
+		band(
+			"total CPU at the anchors' speed",
+			cpuS,
+			budget.anchors.cpuS,
+			budget.margin.cpu,
+			'CPU-s',
+		);
 		band(
 			'largest shard peak RSS',
 			peakRssMb,
@@ -293,18 +326,20 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 			perShard.set(shard, list);
 		}
 	}
+	const speed = median([...perShard.values()].flat().map((m) => m.calibrationS));
 	const shards = Object.fromEntries(
 		[...perShard]
 			.sort(([a], [b]) => a.localeCompare(b))
 			.map(([shard, list]) => [
 				shard,
 				{
-					cpuS: round(median(list.map((m) => m.cpuS))),
+					cpuS: round(median(list.map((m) => m.cpuS / m.calibrationS)) * speed),
 					peakRssMb: Math.round(median(list.map((m) => m.peakRssMb))),
 				},
 			]),
 	);
 	const anchors = {
+		calibrationS: speed,
 		cpuS: round(Object.values(shards).reduce((sum, s) => sum + s.cpuS, 0)),
 		peakRssMb: Math.max(...Object.values(shards).map((s) => s.peakRssMb)),
 		shards,
@@ -330,7 +365,7 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 	};
 }
 
-/** The noise band: the largest deviation of any shard sample from its shard's median, over every attempt given. */
+/** The noise band: the largest deviation of any shard sample from its shard's median, over every attempt given; CPU as work (CPU-s over calibration CPU-s). */
 export function deriveMargin(budget, runs, reason, date = today(), minimumSamples = 3) {
 	if (!reason?.trim())
 		throw new Error('margin needs --reason "<one line: what the samples are>"');
@@ -345,6 +380,8 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 				attempt: m.attempt,
 				sha: m.sha,
 				cpuS: m.cpuS,
+				calibrationS: m.calibrationS,
+				work: Math.round((m.cpuS / m.calibrationS) * 10) / 10,
 				peakRssMb: m.peakRssMb,
 				cpuModel: m.cpuModel,
 			});
@@ -366,7 +403,7 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 		return Math.ceil(largest * 1000) / 1000;
 	};
 	const margin = {
-		cpu: spread('cpuS'),
+		cpu: spread('work'),
 		rss: spread('peakRssMb'),
 		samples: Object.fromEntries([...perShard].sort(([a], [b]) => a.localeCompare(b))),
 	};

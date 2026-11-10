@@ -1581,19 +1581,6 @@ jobs:
               with:
                   persist-credentials: false
 
-            # The unit shards' CPU-seconds and peak memory against the Linux anchors in
-            # scripts/ci/unit-budget.json; it runs only when the unit lane ran in this run.
-            - name: Download the unit budget measurements
-              if: needs.unit.result == 'success'
-              uses: actions/download-artifact@v4
-              with:
-                  pattern: unit-budget-*
-                  path: ${{ runner.temp }}/unit-budget
-
-            - name: Check the unit shards against their CPU and memory budget
-              if: needs.unit.result == 'success'
-              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
-
             - uses: pnpm/action-setup@v4
               if: env.RUN_RECEIPTS == 'true'
               with:
@@ -1727,6 +1714,19 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_receipts }}
                   path: receipts-completed.txt
+
+            # The unit shards' CPU-seconds and peak memory against the Linux anchors in
+            # scripts/ci/unit-budget.json; it runs only when the unit lane ran in this run.
+            - name: Download the unit budget measurements
+              if: needs.unit.result == 'success'
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: unit-budget-*
+                  path: ${{ runner.temp }}/unit-budget
+
+            - name: Check the unit shards against their CPU and memory budget
+              if: needs.unit.result == 'success'
+              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
 
     # Separate from `test` on purpose. The CLI workspace matrix needs npm, pnpm,
     # yarn (via corepack) and bun all on PATH and runs real installs, so it

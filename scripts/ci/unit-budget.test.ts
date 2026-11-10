@@ -15,6 +15,7 @@ type Shard = {
 	shard: string;
 	cpuS: number;
 	peakRssMb: number;
+	calibrationS?: number;
 	attempt?: number;
 	exitCode?: number;
 	platform?: string;
@@ -29,7 +30,7 @@ const measurementsDir = (shards: Shard[]) => {
 		writeFileSync(
 			join(folder, 'measurement.json'),
 			JSON.stringify({
-				version: 1,
+				version: 2,
 				platform: 'linux-x64',
 				cpuModel: 'test cpu',
 				cpus: 4,
@@ -39,6 +40,7 @@ const measurementsDir = (shards: Shard[]) => {
 				exitCode: 0,
 				wallS: 100,
 				attempt: 1,
+				calibrationS: 1,
 				...shard,
 			}),
 		);
@@ -59,6 +61,7 @@ const anchored = {
 	platform: 'linux-x64',
 	margin: { cpu: 0.05, rss: 0.1, samples: {} },
 	anchors: {
+		calibrationS: 1,
 		cpuS: 300,
 		peakRssMb: 2000,
 		shards: { '1/2': { cpuS: 100, peakRssMb: 2000 }, '2/2': { cpuS: 200, peakRssMb: 1500 } },
@@ -82,7 +85,9 @@ describe('check', () => {
 			{ shard: '1/2', cpuS: 104, peakRssMb: 2150 },
 			{ shard: '2/2', cpuS: 205, peakRssMb: 1400 },
 		]);
-		expect(result.output).toContain('total CPU: 309 CPU-s against an anchor of 300 CPU-s (+3%');
+		expect(result.output).toContain(
+			"total CPU at the anchors' speed: 309 CPU-s against an anchor of 300 CPU-s (+3%",
+		);
 		expect(result.status).toBe(0);
 	});
 
@@ -92,7 +97,7 @@ describe('check', () => {
 			{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
 		]);
 		expect(result.status).toBe(1);
-		expect(result.output).toContain('over budget: total CPU 320 CPU-s');
+		expect(result.output).toContain("over budget: total CPU at the anchors' speed 320 CPU-s");
 		expect(result.output).toContain('accept --from 42 --reason');
 	});
 
@@ -111,7 +116,7 @@ describe('check', () => {
 			{ shard: '2/2', cpuS: 190, peakRssMb: 1500 },
 		]);
 		expect(result.status).toBe(1);
-		expect(result.output).toContain('stale anchor: total CPU 270 CPU-s');
+		expect(result.output).toContain("stale anchor: total CPU at the anchors' speed 270 CPU-s");
 	});
 
 	test('fails when the shards differ from the anchored ones', () => {
@@ -124,6 +129,15 @@ describe('check', () => {
 		expect(result.output).toContain(
 			'stale anchor: the anchors cover shards [1/2, 2/2] but this run measured [1/3, 2/3, 3/3]',
 		);
+	});
+
+	test('scales each shard by its runner speed: a slower CPU model spends more CPU-seconds on the same work', () => {
+		const result = check(anchored, [
+			{ shard: '1/2', cpuS: 150, calibrationS: 1.5, peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+		]);
+		expect(result.output).toContain("total CPU at the anchors' speed: 300 CPU-s");
+		expect(result.status).toBe(0);
 	});
 
 	test('reads the latest attempt of a rerun shard', () => {
@@ -198,6 +212,25 @@ describe('accept and margin', () => {
 			to: { cpuS: 300, peakRssMb: 1900 },
 			reason: 'first anchors',
 		});
+	});
+
+	test('accept anchors at the median runner speed of the samples', () => {
+		const path = budgetFile({ ...anchored, anchors: null });
+		const fast = runs[0].map((shard) => ({
+			...shard,
+			cpuS: shard.cpuS / 2,
+			calibrationS: 0.5,
+		}));
+		const args = [fast, runs[1], runs[2]].flatMap((shards) => [
+			'--from',
+			measurementsDir(shards),
+		]);
+		expect(run('accept', '--budget', path, ...args, '--reason', 'mixed runners').status).toBe(
+			0,
+		);
+		const budget = JSON.parse(readFileSync(path, 'utf8'));
+		expect(budget.anchors.calibrationS).toBe(1);
+		expect(budget.anchors.cpuS).toBe(300);
 	});
 
 	test('margin is the largest deviation of a shard sample from its median, and needs three samples a shard', () => {
