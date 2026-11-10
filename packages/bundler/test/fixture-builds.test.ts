@@ -245,7 +245,9 @@ async function runtimeModulesIn(dist: string, entryHtml?: string): Promise<strin
 		if (loaded.has(file) || !file.endsWith('.js')) continue;
 		loaded.add(file);
 		const code = await readFile(file, 'utf8').catch(() => '');
-		for (const match of code.matchAll(/\b(?:import|export)\s*(?:[\w$*{}\s,]+?\s*from\s*)?["'](\.\.?\/[^"']+\.js)["']/g))
+		for (const match of code.matchAll(
+			/\b(?:import|export)\s*(?:[\w$*{}\s,]+?\s*from\s*)?["'](\.\.?\/[^"']+\.js)["']/g,
+		))
 			pending.push(resolve(file, '..', match[1]!));
 	}
 	const names = new Set([...loaded].map((file) => file.split('/').pop()));
@@ -274,7 +276,8 @@ async function measureRuntime(checkout: string, filter: string, dist: string) {
 
 async function execPnpm(args: string[], env: Record<string, string> = {}, cwd = root) {
 	try {
-		await exec('pnpm', args, { cwd, env: { ...process.env, ...env } });
+		// Vitest sets NODE_ENV=test, which would build development-only checks into the measured output.
+		await exec('pnpm', args, { cwd, env: { ...process.env, NODE_ENV: 'production', ...env } });
 	} catch (error) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));

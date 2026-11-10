@@ -186,7 +186,8 @@ Byte walls and budgets failed 54 runs, usually by a few bytes to a few hundred. 
 - Changing a budget or anchor requires a one-line reason in the same commit (`pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"` for the perf guards and `MARKLESS_ACCEPT_FIXTURE_RUNTIME=1 MARKLESS_ACCEPT_REASON="<one line>"` for the `fixture-builds` anchors and walls, both recorded as a change file (below); the same shape for the music-player budgets, box byte walls, and the `reason` beside each budget in `scripts/benchmarks/build-scale/budgets.json`).
 - Re-anchoring is a decision, not a fix: the reason says what the extra bytes buy, or which win the lower anchor records.
 - A big win re-anchors in the same change set, so the anchor stays close to reality.
-- Byte walls must be measured the way CI measures them (`NODE_ENV=test` from vitest, a clean tree). `ci:local --clean` does that; a hand-run demo build does not.
+- Byte walls must be measured the way CI measures them (a clean tree, through the same test). `ci:local --clean` does that; a hand-run demo build does not.
+- The `fixture-builds` child builds run with `NODE_ENV=production`, although vitest sets `NODE_ENV=test`. Under `test`, `import.meta.env.DEV` is true, so development-only checks (and the modules only they import) are built and counted in the per-module figures though they never ship; under `production` they fold away, so the lane counts only shipped code.
 
 The `fixture-builds` walls have been seen to differ between worktrees on the same Mac. Until that is explained, a wall that passes in one checkout and fails in another is treated as an environment bug to fix, not as slack to spend.
 
