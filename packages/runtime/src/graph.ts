@@ -658,9 +658,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 		// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
 		let settle!: (pass: Promise<void>) => void;
-		activeFlush = new Promise<void>((resolve) => (settle = resolve));
+		const pass = (activeFlush = new Promise<void>((resolve) => (settle = resolve)));
 		settle(runFlush());
-		return activeFlush;
+		return pass;
 	};
 
 	const runFlush = async (): Promise<void> => {
@@ -706,8 +706,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					}
 				}
 			} finally {
-				plane?.settleBaselines();
-				moveFlush(FLUSH_TAIL);
+				try {
+					plane?.settleBaselines();
+				} finally {
+					moveFlush(FLUSH_TAIL);
+				}
 			}
 
 			await notifyJournalListeners();
