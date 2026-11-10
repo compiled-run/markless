@@ -17,6 +17,7 @@ import {
 } from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
 import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import { childRootIsOneElement } from './row-range.ts';
 import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
 export type RowComponentMint = {
@@ -61,16 +62,8 @@ export type RowComponentMint = {
  * chain the row render walks - so an imported child mints on the same terms as a
  * local one.
  *
- * Still refused when the component's body carries a boundary (`@try`): its
- * settle bookkeeping reads a census the page counted once, at boot, for the rows
- * it served, and a row born after resume has none of it - the mint would index
- * into another row's, which is why the runtime refuses such a row loudly.
- * Refusing here means the page never gets that far: it falls back to today's
- * no-growth behaviour instead. A branch is admitted: its anchors are a comment
- * pair the minted row counts in its own fragment, exactly as it counts its own
- * elements. That question must be ANSWERED, not assumed: a child whose tree this
- * module cannot reach is refused too, because the chunk it could not read might
- * have held a boundary.
+ * A branch or a boundary (`@try`) is admitted: the minted row counts its comment
+ * anchors like its own elements. A child whose tree this module cannot reach is refused.
  *
  * The public render plan pass asks the same question to decide whether a row
  * that cannot grow deserves a diagnostic, so the answer lives here once.
@@ -80,6 +73,7 @@ export function resolveRowComponentMint(
 		readonly rowChunkId: string;
 		readonly rowElementCount: number;
 		readonly itemName: string;
+		readonly indexName?: string;
 	},
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
@@ -89,15 +83,21 @@ export function resolveRowComponentMint(
 	const slot = componentSlots[0]!;
 	if (slot.kind !== 'child-component') return null;
 	const wraps = input.rowElementCount > 0;
-	if (wraps) {
-		// The wrapper is minted from markup, so its own slots have to be ones that
-		// markup plus the item can finish - and the child needs a marker to land on.
-		if (slot.coordinate.kind !== 'comment-anchor') return null;
-		if (!chunk.slots.every((candidate) => candidate === slot || mintableSlotValue(candidate) !== null))
-			return null;
-	} else if (chunk.slots.length !== 1) return null;
 	const componentName = chunk.componentName;
 	if (!componentName) return null;
+	if (wraps) {
+		// The wrapper is minted from markup, so its own slots have to be ones that
+		// markup, the item and the owner's reader can finish - and the child needs a marker to land on.
+		if (slot.coordinate.kind !== 'comment-anchor') return null;
+		const rowNames = new Set([input.itemName, ...(input.indexName ? [input.indexName] : [])]);
+		const finishes = (candidate: SemanticMarkupSlot) =>
+			candidate === slot ||
+			mintableSlotValue(candidate) !== null ||
+			(!!input.semanticGraph &&
+				!isLoweredStyleObject(candidate) &&
+				expressionSlotValue(candidate, input.semanticGraph, componentName, rowNames) !== null);
+		if (!chunk.slots.every(finishes)) return null;
+	} else if (chunk.slots.length !== 1) return null;
 	const edge = input.componentEdges.find((candidate) => candidate.id === slot.componentEdgeId);
 	if (!edge || edge.parentComponentName !== componentName) return null;
 	if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return null;
@@ -287,6 +287,7 @@ export function rowBranchMints(
 	componentName: string,
 	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }>,
 	rowNames: ReadonlySet<string>,
+	repeatMints?: (repeatId: string) => boolean,
 ): boolean {
 	const graph = input.semanticGraph;
 	const site = graph.branchSites.find((candidate) => candidate.id === slot.branchSiteId);
@@ -314,9 +315,10 @@ export function rowBranchMints(
 		if (chunk.hosts.some((host) => input.unregistrableHostIds?.has(host.hostNodeId))) return false;
 		return chunk.slots.every(
 			(armSlot) =>
-				(armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
-				(mintableSlotValue(armSlot) !== null ||
-					expressionSlotValue(armSlot, graph, componentName, rowNames) !== null),
+				(armSlot.kind === 'repeat' && repeatMints?.(armSlot.repeatId) === true) ||
+				((armSlot.kind === 'text' || armSlot.kind === 'attribute') &&
+					(mintableSlotValue(armSlot) !== null ||
+						expressionSlotValue(armSlot, graph, componentName, rowNames) !== null)),
 		);
 	});
 }
@@ -541,13 +543,12 @@ function memberReads(source: string, name: string): ReadonlySet<string> | null {
 }
 
 /**
- * Whether one component the row reaches is PROVABLY free of an async boundary,
- * whose settle bookkeeping the page counted only for the rows it served. A nested
- * @for or a render-chosen tag is admitted: the row renders whole in the browser,
- * so its own fragment counts their nodes and its records wire the nested rows.
+ * Whether one component the row reaches has a tree this module can answer for. A
+ * nested @for, a render-chosen tag or a boundary is admitted: the row renders
+ * whole in the browser, so its own fragment counts their nodes and its records
+ * wire the nested rows and boundaries.
  *
- * Provably is the whole point: a tree this module cannot reach is a refusal,
- * never a pass. A child declared here is answered from this module's own chunks.
+ * A tree this module cannot reach is a refusal, never a pass. A child declared here is answered from this module's own chunks.
  * A child behind an import has no chunks here, so the answer comes from the
  * construct reach its module published PER COMPONENT - a fact about that
  * component's own tree, so a boundary in a sibling of it says nothing about this
@@ -568,11 +569,11 @@ function childIsMintable(
 	}
 	const reach = childConstructReach(input, edge, childTemplateId, seen);
 	if (reach === 'unknown') return false;
-	// A row moves as its one element, so a @try beside that element would be left behind.
-	return !(
-		isWholeRow &&
-		reach === 'boundaries' &&
-		childRootBoundary(input, edge, childTemplateId, new Set())
+	if (!isWholeRow || reach !== 'boundaries') return true;
+	// A row whose child renders more than one element moves as its whole row range, @try anchors included.
+	return (
+		!childRootIsOneElement(input, edge, childTemplateId) ||
+		!childRootBoundary(input, edge, childTemplateId, new Set())
 	);
 }
 
@@ -582,8 +583,9 @@ export function stepsAfterNestedRows(
 	path: ReadonlyArray<number>,
 	text: boolean,
 ): number[] | null {
+	// A component a row wraps renders its own nodes in place of its marker, as nested rows do.
 	const anchors = chunk.slots.flatMap((slot) =>
-		slot.kind === 'repeat' ? [slot.coordinate.path] : [],
+		slot.kind === 'repeat' || slot.kind === 'child-component' ? [slot.coordinate.path] : [],
 	);
 	const fromEnd: number[] = [];
 	for (let depth = 1; depth < path.length - (text ? 1 : 0); depth++) {

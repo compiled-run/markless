@@ -137,7 +137,33 @@ export default function FormAnatomy() @{
 				--go: oklch(62% 0.14 150);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					--sheet: var(--figure-sheet);
+				}
+			}
+
+			html.dark .scene {
+				--light-sheet: color-mix(in oklch, var(--cream) 55%, white);
+
+				.button-fill {
+					fill: color-mix(in oklch, var(--light-sheet) 60%, var(--go));
+				}
+
+				.on .track {
+					fill: color-mix(in oklch, var(--light-sheet) 50%, var(--go));
+				}
+
+				.field-fill,
+				.field:hover .field-fill,
+				.field:focus-visible .field-fill {
+					fill: var(--slab);
+				}
+
+				.button-text {
+					fill: var(--on-accent);
+				}
+
+				.join .hatch {
+					stroke: var(--on-accent);
 				}
 			}
 
@@ -155,10 +181,6 @@ export default function FormAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark &:not(.desk) {
-					fill: var(--paper);
-				}
 			}
 
 			.faint {
@@ -375,15 +397,6 @@ export default function FormAnatomy() @{
 				}
 			}
 
-			.address,
-			.label,
-			.typed,
-			.button-text,
-			.entry {
-				html.dark & {
-					fill: var(--paper);
-				}
-			}
 
 			@media (prefers-reduced-motion: reduce) {
 				.scene * {

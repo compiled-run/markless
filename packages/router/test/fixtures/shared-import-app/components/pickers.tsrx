@@ -6,7 +6,7 @@ export const picker = shared(
 		const view = state({ v: viewOf(cfg) });
 		return view;
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 
 export function Picker() @{

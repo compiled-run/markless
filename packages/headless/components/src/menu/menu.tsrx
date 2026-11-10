@@ -125,7 +125,7 @@ export const menuState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by every `menu.item`, so an item written inside another item's submenu
@@ -150,7 +150,7 @@ export const menuItemState = shared(
 
 		return { ...item, itemEl, itemContentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function MenuRoot({

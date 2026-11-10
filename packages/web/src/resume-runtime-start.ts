@@ -258,6 +258,8 @@ export async function startResumeRuntime(input: {
 				},
 				boundary,
 				runtimeInput.graph.read(boundary.runnerGraphNodeId, []),
+				undefined,
+				true,
 			);
 		},
 		// Spec D8: a branch flip whose deciding test read goes THROUGH an async
@@ -351,6 +353,11 @@ export async function startResumeRuntime(input: {
 		runtimeInput.root.addEventListener?.(sharedPatchEventType, receiveSharedPatch, {
 			capture: true,
 		});
+		storeContainerSubscription(() =>
+			runtimeInput.root.removeEventListener?.(sharedPatchEventType, receiveSharedPatch, {
+				capture: true,
+			}),
+		);
 	}
 	// A getter: the tracker is created when the first @try is wired, which can be after start.
 	return () => settleTracker;

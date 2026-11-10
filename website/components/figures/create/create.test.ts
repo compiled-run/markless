@@ -254,7 +254,7 @@ describe('the create figure plays the real CLI', () => {
 		expect(template('common/gitignore')).toContain('node_modules/');
 		expect(template('common/scripts/markless-doctor.mjs')).toContain('hint:');
 		expect(template('common/.vscode/extensions.json')).toContain(
-			'ripple-ts.ripple-ts-vscode-plugin',
+			'TSRX.tsrx-vscode-plugin',
 		);
 		expect(template('common/.vscode/settings.json')).toContain('emmet.includeLanguages');
 		expect(template('common/.zed/settings.json')).toContain('@markless/typescript-plugin');

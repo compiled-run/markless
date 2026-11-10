@@ -20,7 +20,7 @@ export const widgetState = shared(() => {
 	const s = state({ open: false, label: 'a' });
 	const loud = computed(() => s.label.toUpperCase());
 	return { ...s, loud };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Widget() @{
 	const w = widgetState();
@@ -116,7 +116,7 @@ export const box = shared(() => {
 	const s = state({ label: 'a' });
 	const loud = computed(() => shout(s.label));
 	return { ...s, loud };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export default function Family() @{
 	const b = box();

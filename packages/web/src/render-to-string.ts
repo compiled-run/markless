@@ -40,6 +40,7 @@ import {
 	createPrerenderInlineResumerSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerSource,
+	createInlineResumerReturnWakeSource,
 	createInlineResumerStorageWakeSource,
 	createInlineResumerSharedWakeSource,
 	renderPrerenderInlineResumerSource,
@@ -48,6 +49,7 @@ import {
 	INLINE_PAGE_SCOPED,
 	type InlineResumerPage,
 	type InlineResumerSourceVariants,
+	type InlineWakeSources,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
@@ -65,10 +67,12 @@ import {
 import { marklessRosterPositions } from './prerender/shared-seed-slot.ts';
 import { derivePrerenderResumeRecords } from './prerender/evaluator.ts';
 import { createEarlyEventCaptureSource } from './inline/early-events.ts';
+import { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 import { servedElementTree, servedLocatorPaths, withElementAttributes } from './locator-paths.ts';
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
+export { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 
 type RosterResumeHost = {
 	__marklessRosterResume?: () => Promise<typeof import('./fns/roster-resume.ts')>;
@@ -80,7 +84,7 @@ export type SsrRenderOutput = {
 	readonly view?: ProtocolViewPayload;
 	readonly structure?: {
 		readonly anchors: ReadonlyArray<{
-			readonly kind: 'branch' | 'async';
+			readonly kind: 'branch' | 'async' | 'arm-branch';
 			readonly id: string;
 			readonly html: string;
 		}>;
@@ -291,9 +295,13 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
-						sharedWakeSource(state),
+						(selfWake
+							? ''
+							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
+						sharedWakeSource(state) +
+						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes),
 					artifactSources?.defer,
+					artifactSources?.wakes,
 				)
 			: '';
 	const policyTable = createSyncPolicyTable();
@@ -306,12 +314,12 @@ export async function assembleSsrContainer(
 	);
 
 	return [
-		storageSeedScript,
-		renderHeadInjections(artifactHeadInjections(component), options.nonce),
-		renderModulePreloadLinks(modulePreloads, options.nonce),
 		resumerScript && selectedResumeModuleUrl && !wakeChannelEnabled && !options.resumerSource
 			? `<script${options.nonce ? ` nonce="${escapeAttribute(options.nonce)}"` : ''}>${escapeInlineScript(createEarlyEventCaptureSource(browserEventNames(view)))}</script>`
 			: '',
+		storageSeedScript,
+		renderHeadInjections(artifactHeadInjections(component), options.nonce),
+		renderModulePreloadLinks(modulePreloads, options.nonce),
 		renderContainer(
 			options.containerId,
 			[
@@ -360,6 +368,7 @@ export async function assemblePrerenderPageParts(
 	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
+	const wakes = artifactInlineResumerSources(component)?.wakes;
 	// The settle path replaces the self-wake: it fills the arm from the plan and
 	// never imports the resume module, so a page only takes it when the build
 	// produced BOTH the plan this document ships and the settle module it needs.
@@ -384,9 +393,11 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
-						sharedWakeSource(state),
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl, wakes)) +
+						sharedWakeSource(state) +
+						returnWakeSource(view, resumeModuleUrl, wakes),
 					artifactInlineResumerSources(component)?.defer,
+					wakes,
 				)
 			: '';
 
@@ -567,10 +578,10 @@ function renderStorageSeedScript(
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
-// Only page- and request-scoped instances are shared with other containers; container and widget instances are a container's own.
+// Only app-scoped instances are shared with other containers; container and subtree instances are a container's own.
 function sharedWakeSource(state: ProtocolStatePayload): string {
 	return (state.sharedDefinitions ?? []).some(
-		(definition) => definition.scope !== 'widget' && definition.scope !== 'container',
+		(definition) => definition.scope !== 'subtree' && definition.scope !== 'container',
 	)
 		? createInlineResumerSharedWakeSource(
 				PROTOCOL_SHARED_INSTANCES_PROPERTY,
@@ -580,10 +591,22 @@ function sharedWakeSource(state: ProtocolStatePayload): string {
 		: '';
 }
 
+function returnWakeSource(
+	view: ProtocolViewPayload,
+	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
+): string {
+	return Object.keys(view.asyncRunners ?? {}).length > 0 ||
+		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
+		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY, wakes)
+		: '';
+}
+
 // Each storage cell's slot key and the value this render gave it.
 function storageWakeSource(
 	state: ProtocolStatePayload,
 	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
 ): string {
 	const rendered = (state.storage ?? []).flatMap((record) => {
 		const value = renderedCellValue(
@@ -598,6 +621,7 @@ function storageWakeSource(
 		resumeModuleUrl,
 		STORAGE_SLOT_SYMBOL_KEY,
 		escapeScriptJson(JSON.stringify(rendered)),
+		wakes,
 	);
 }
 
@@ -1089,6 +1113,23 @@ function renderContainer(
 	return `${CONTAINER_OPEN}${id}${located}>${inner}${CONTAINER_CLOSE}`;
 }
 
+/**
+ * Splits the early-event capture script off the front of the html that precedes the container.
+ * A document host serves it ahead of its stylesheets: a classic script waits for every stylesheet
+ * above it, and the parser waits for the script.
+ */
+export function splitEarlyEventCapture(head: string): {
+	readonly capture: string;
+	readonly rest: string;
+} {
+	// Built here, not at module scope, so a bundle that never splits drops this function whole.
+	const captureStart = `>${escapeInlineScript(createEarlyEventCaptureSource([]).slice(0, -'[]);'.length))}`;
+	const start = head.startsWith('<script') ? head.indexOf(captureStart) : -1;
+	if (start === -1 || head.lastIndexOf('<', start) !== 0) return { capture: '', rest: head };
+	const end = head.indexOf('</script>', start) + '</script>'.length;
+	return { capture: head.slice(0, end), rest: head.slice(end) };
+}
+
 const CONTAINER_OPEN = `<div ${CONTAINER_ATTRIBUTE}`;
 const CONTAINER_CLOSE = '</div>';
 
@@ -1149,6 +1190,7 @@ function renderInlineResumerScript(
 	overlayPrimer = false,
 	appendedSource = '',
 	deferFactory?: string,
+	wakes?: InlineWakeSources,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
@@ -1159,7 +1201,7 @@ function renderInlineResumerScript(
 		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
 	const selfWakeSource =
-		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl, wakes) : '';
 	const overlayPrimerSource = overlayPrimer
 		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
 		: '';

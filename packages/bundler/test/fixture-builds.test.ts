@@ -6,7 +6,11 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { openMergeBaseCheckout } from '../../../scripts/benchmarks/anchor-ledger.mjs';
 import { buildInternalFilesInPublicOutput } from '../../../scripts/test-utils/public-build-output.ts';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
-import { MARKLESS_BUNDLE_GRAPH, MARKLESS_EXECUTION_SIZES } from '../src/build/chunking.ts';
+import {
+	MARKLESS_BUNDLE_GRAPH,
+	MARKLESS_BYTE_ATTRIBUTION,
+	MARKLESS_EXECUTION_SIZES,
+} from '../src/build/chunking.ts';
 import { runtimeSizeReport } from '../test-support/runtime-size.ts';
 import {
 	acceptFixtureRuntime,
@@ -117,6 +121,14 @@ describe('fixture builds', () => {
 			}
 
 			if ('runtimeBudget' in fixture) {
+				// None of these fixtures has an async value: their planes are never emitted, and busy marks never load.
+				const dist = resolve(root, fixture.runtimeBudget.dist);
+				expect(
+					(await runtimeModulesIn(dist)).filter((id) => ASYNC_PLANES.includes(id)),
+				).toEqual([]);
+				expect(
+					await runtimeModulesIn(dist, resolve(root, fixture.runtimeBudget.entryHtml)),
+				).not.toContain('web/resume-refresh-busy');
 				await buildUnpacked(root, fixture.filter, fixture.runtimeBudget.dist);
 				await expectNoAppChunkStaticallyImportsInstrumentChunk(
 					resolve(root, fixture.runtimeBudget.dist),
@@ -205,6 +217,45 @@ async function expectNoMachinePathInOutput(directory: string): Promise<void> {
 	expect(leaks, `build output must not carry ${fixturesDirectory}`).toEqual([]);
 }
 
+const ASYNC_PLANES = [
+	'runtime/graph-async',
+	'runtime/graph-async-load',
+	'runtime/graph-async-refresh',
+	'runtime/graph-held',
+	'web/fns/async-plane',
+	'web/fns/held-inputs-plane',
+];
+
+// Runtime modules the build emits; with `entryHtml`, only those the page preloads or loads, plus their static imports.
+async function runtimeModulesIn(dist: string, entryHtml?: string): Promise<string[]> {
+	const attribution = JSON.parse(
+		await readFile(marklessBuildManifestPath(dist, MARKLESS_BYTE_ATTRIBUTION), 'utf8'),
+	) as { chunks: Record<string, { modules: ReadonlyArray<readonly [string, string, number]> }> };
+	const runtime = (chunk: { modules: ReadonlyArray<readonly [string, string, number]> }) =>
+		chunk.modules.flatMap(([category, id]) => (category === 'runtime' ? [id] : []));
+	if (!entryHtml) return Object.values(attribution.chunks).flatMap(runtime);
+	const html = await readFile(entryHtml, 'utf8');
+	const pending = [
+		...html.matchAll(/<link\b[^>]*\brel=["']?modulepreload["']?[^>]*\bhref=["']?([^"'\s>]+)/g),
+		...html.matchAll(/<script\b[^>]*\bsrc=["']?([^"'\s>]+)/g),
+	].map((match) => resolve(dist, `.${new URL(match[1]!, 'http://x/').pathname}`));
+	const loaded = new Set<string>();
+	while (pending.length) {
+		const file = pending.pop()!;
+		if (loaded.has(file) || !file.endsWith('.js')) continue;
+		loaded.add(file);
+		const code = await readFile(file, 'utf8').catch(() => '');
+		for (const match of code.matchAll(
+			/\b(?:import|export)\s*(?:[\w$*{}\s,]+?\s*from\s*)?["'](\.\.?\/[^"']+\.js)["']/g,
+		))
+			pending.push(resolve(file, '..', match[1]!));
+	}
+	const names = new Set([...loaded].map((file) => file.split('/').pop()));
+	return Object.entries(attribution.chunks).flatMap(([name, chunk]) =>
+		names.has(name.split('/').pop()) ? runtime(chunk) : [],
+	);
+}
+
 // The runtime walls price the library by its own chunks, which only an unpacked build keeps apart.
 async function buildUnpacked(checkout: string, filter: string, dist: string) {
 	await rm(resolve(checkout, dist), { force: true, recursive: true });
@@ -225,7 +276,8 @@ async function measureRuntime(checkout: string, filter: string, dist: string) {
 
 async function execPnpm(args: string[], env: Record<string, string> = {}, cwd = root) {
 	try {
-		await exec('pnpm', args, { cwd, env: { ...process.env, ...env } });
+		// Vitest sets NODE_ENV=test, which would build development-only checks into the measured output.
+		await exec('pnpm', args, { cwd, env: { ...process.env, NODE_ENV: 'production', ...env } });
 	} catch (error) {
 		const next = error as Error & { stdout?: string; stderr?: string };
 		throw new Error([next.message, next.stdout, next.stderr].filter(Boolean).join('\n'));

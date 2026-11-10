@@ -85,6 +85,12 @@ export type MutableSemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly componentName?: string;
+		/** The name `@catch (name)` binds the rejection to. */
+		readonly errorName?: string;
+		readonly gateGraphNodeId?: string;
+		/** Where the `@try` keyword is written. */
+		readonly keywordSpan?: SourceSpan;
 	}>;
 	branchSites: SemanticBranchSite[];
 	markup: SemanticMarkupArtifact;
@@ -165,6 +171,10 @@ export type WalkState = {
 	currentAsyncBoundaryId: string | null;
 	// Arm index inside the current boundary: 0 = @try, 1 = @pending, 2 = @catch.
 	currentAsyncBoundaryArm: number | null;
+	// The enclosing host at the current boundary's entry, the async twin of `currentArmScope.hostNodeId`.
+	currentAsyncArmHostNodeId: string | null;
+	// The nearest `@try` with a `@catch` whose @try arm holds the current node.
+	currentCatchBoundaryId: string | null;
 	currentSharedDefinitionId: string | null;
 	// 'branch' is a plain `if` statement in the body; 'arm' is an @if/@switch arm, where a state() can be arm-local.
 	currentCreationSite: 'computed' | 'handler' | 'helper' | 'branch' | 'arm' | 'loop' | 'row' | null;
@@ -199,6 +209,8 @@ export type WalkState = {
 	nextHostId: number;
 	nextEventId: number;
 	nextBoundaryId: number;
+	/** The boundary each `@catch (error, reset)` reset binding resets, by the binding's declaration offset. */
+	catchResetBoundaries: Map<number, string>;
 	nextBranchSiteId: number;
 	nextAnchorOrder: number;
 };
@@ -312,6 +324,8 @@ export function createWalkState(input: {
 		currentTextTarget: null,
 		currentAsyncBoundaryId: null,
 		currentAsyncBoundaryArm: null,
+		currentAsyncArmHostNodeId: null,
+		currentCatchBoundaryId: null,
 		currentSharedDefinitionId: null,
 		currentCreationSite: null,
 		currentFunctionSite: null,
@@ -330,6 +344,7 @@ export function createWalkState(input: {
 		nextHostId: 0,
 		nextEventId: 0,
 		nextBoundaryId: 0,
+		catchResetBoundaries: new Map(),
 		nextBranchSiteId: 0,
 		nextAnchorOrder: 0,
 	};

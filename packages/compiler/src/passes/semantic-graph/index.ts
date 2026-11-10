@@ -2,6 +2,8 @@ import { parseModule } from '../../js-ast.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import type {
+	ModuleAsyncPlanes,
+	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceElementCount,
 	SemanticGraphArtifact,
 	SemanticGraphInput,
@@ -30,6 +32,7 @@ import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callb
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
 import { componentConstructReach, componentRootBoundary } from '../construct-reach.ts';
+import { componentEdgeReads, pairedAsyncValues } from '../paired-async-values.ts';
 import {
 	chunkElementCount,
 	componentAddressSteps,
@@ -85,6 +88,10 @@ import { collectSemanticMarkup, componentStyleScopeClass } from './collect-marku
 import { moduleIdOf } from '../../module-id.ts';
 import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
+import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
+import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './rejecting-handlers.ts';
+import { collectAsyncInputBesideValueDiagnostics } from './async-refresh-facts.ts';
+import { chunkRootIsOneElement } from '../row-range.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -195,6 +202,8 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
+	keepRejectingChildCatches(graph, input.importedModuleInterfaces);
+	mintAsyncBoundaryGates(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
 	// Before the handle diagnostics: these decide which derive-time handle reads
 	// are a roster question, and the refusal below reads that answer.
@@ -202,6 +211,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectElementRosterCounts(state);
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
+	collectAsyncInputBesideValueDiagnostics(graph);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,
@@ -246,14 +256,20 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			? { importedModuleInterfaces: input.importedModuleInterfaces }
 			: {}),
 	};
+	for (const [at, repeat] of graph.keyedRepeats.entries())
+		if (!chunkRootIsOneElement(constructReachInput, `repeat:${repeat.id}:row`))
+			graph.keyedRepeats[at] = { ...repeat, rowRange: true };
 	// Published for a module that routes a roster count into one of these props:
 	// the count is a placeholder until the page composes, and only this module
 	// knows what its own components do with the value once it lands.
 	const propSpends = collectComponentPropSpends(state);
 	const handlerProps = moduleHandlerProps(state);
+	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
+	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
+		...(planes ? { asyncPlanes: planes } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {
@@ -309,9 +325,11 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							rootChunkId: root.id,
 						}),
 						...armMaterialField(graph, component.name, chunks),
+						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),
+						...(chunkRootIsOneElement(constructReachInput, root.id) ? {} : { rangeRoot: true as const }),
 						...(propSpends.get(component.name)?.length
 							? { propSpends: propSpends.get(component.name)! }
 							: {}),
@@ -844,4 +862,24 @@ function addressStepsField(steps: ModuleGraphInterfaceElementCount): {
 	readonly addressSteps?: number;
 } {
 	return typeof steps === 'number' ? { addressSteps: steps } : {};
+}
+
+// Read by the bundler, which installs the async planes in every module that serves or composes async values.
+function moduleAsyncPlanes(
+	graph: SemanticGraphArtifact,
+	imported: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): ModuleAsyncPlanes | undefined {
+	const computed = graph.graphBindings.filter((binding) => binding.kind === 'computed');
+	const fromImports = Object.values(imported ?? {}).map((module) => module?.asyncPlanes ?? {});
+	const async =
+		computed.some((binding) => binding.async === true) ||
+		fromImports.some((planes) => planes.async);
+	if (!async) return undefined;
+	const held =
+		fromImports.some((planes) => planes.held) ||
+		pairedAsyncValues(new Map(computed.map((binding) => [binding.id, binding])), [
+			...computed.map((binding) => (binding.dependencies ?? []).map((read) => read.graphNodeId)),
+			...componentEdgeReads(graph.componentEdges),
+		]).size > 0;
+	return { async: true, ...(held ? { held: true as const } : {}) };
 }

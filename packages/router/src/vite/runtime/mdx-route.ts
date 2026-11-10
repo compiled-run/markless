@@ -13,7 +13,7 @@ import {
 	protocolInstanceQualifies,
 	protocolStateVersion,
 } from '../../../../serializer/src/protocol-constants.ts';
-import { isArmBranchAnchorComment } from '../../../../web/src/resume-anchor-census.ts';
+import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
 export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
@@ -434,7 +434,7 @@ export function composeMdxState(children: readonly MdxChild[]): MdxStatePayload 
 }
 
 /**
- * The island segment every id this child owns takes, plus the widget-scoped
+ * The island segment every id this child owns takes, plus the subtree-scoped
  * definitions that segment is allowed to reach.
  *
  * The segment is read back out of the child's own prefix rather than minted
@@ -453,7 +453,7 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
 		segment: prefix && protocolInstancePath(prefix) === prefix ? prefix : '',
 		widgetDefinitionIds: new Set(
 			(state.sharedDefinitions ?? [])
-				.filter((definition) => definition.scope === 'widget')
+				.filter((definition) => definition.scope === 'subtree')
 				.map((definition) => definition.id),
 		),
 	};
@@ -466,11 +466,11 @@ function islandScope(child: MdxChild, state: MdxStatePayload): MdxIslandScope {
  * same `c`/`p` path and their cells, computeds and element-handle rosters land
  * on one node unless the island segment separates them. What must NOT take the
  * segment is the page-space families that mean one node per page on purpose: a
- * `scope: 'page' | 'container' | 'request'` shared() graph and a storage slot
+ * `scope: 'app' | 'container'` shared() graph and a storage slot
  * are shared BETWEEN islands, and prefixing them gives each island a private
  * copy of state the author asked to be common.
  *
- * A widget-scoped shared() id is the exception inside the exception — one graph
+ * A subtree-scoped shared() id is the exception inside the exception — one graph
  * per rendered widget, so it is the island's — and a bare one (no path, because
  * no registered widget root claimed it at compose) is recognised by asking the
  * child's own definitions which scope it was declared at.
@@ -489,7 +489,7 @@ function islandScopedGraphNodeId(graphNodeId: string, island: MdxIslandScope): s
 /**
  * The registering half of a handle key, mirrored on the reading half.
  *
- * Resume re-spells only a widget-scoped `shared:` handle id per rendered widget;
+ * Resume re-spells only a subtree-scoped `shared:` handle id per rendered widget;
  * a component-local handle is already one element per key and the reading symbol
  * asks for it exactly as its module compiled it. Segmenting that second kind
  * here would file it under a key nothing ever asks for.
@@ -641,7 +641,7 @@ function mdxDomCensus(root: MdxCensusNode): MdxNodeCensus {
 	let comments = 0;
 	(function visit(node: MdxCensusNode): void {
 		if (node.nodeType === 1) elements++;
-		else if (node.nodeType === 8 && !isArmBranchAnchorComment({ nodeType: 8, data: node.data }))
+		else if (node.nodeType === 8 && !isUncountedComment({ nodeType: 8, data: node.data }))
 			comments++;
 		for (const child of Array.from(node.childNodes ?? [])) visit(child);
 	})(root);
@@ -663,7 +663,7 @@ function mdxHtmlCensus(html: string): MdxNodeCensus {
 		if (html.startsWith('<!--', open)) {
 			const close = html.indexOf('-->', open + 4);
 			const text = html.slice(open + 4, close < 0 ? html.length : close);
-			if (templateDepth === 0 && !isArmBranchAnchorComment({ nodeType: 8, data: text }))
+			if (templateDepth === 0 && !isUncountedComment({ nodeType: 8, data: text }))
 				comments++;
 			at = close < 0 ? html.length : close + 3;
 			continue;
@@ -811,7 +811,7 @@ function appendMdxChildView(context: {
 	for (const behavior of childView.behaviors ?? []) {
 		context.behaviors.push(prefixMdxSymbolRecord(behavior, context.child, island));
 	}
-	// A widget-scoped handle id IS the roster key, so an island-blind one merges
+	// A subtree-scoped handle id IS the roster key, so an island-blind one merges
 	// two islands' plural handles into one roster and the arrow walk leaves the
 	// island it was pressed in.
 	for (const handle of childView.elementHandles ?? []) {

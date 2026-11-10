@@ -217,9 +217,9 @@ export default function BoardAnatomy() @{
 				--letter: var(--paper);
 
 				html.dark & {
-					--plate: color-mix(in oklch, var(--paper) 62%, var(--ink));
-					--well: color-mix(in oklch, var(--paper) 80%, black);
-					--flap: color-mix(in oklch, var(--paper) 72%, var(--ink));
+					--plate: var(--slab);
+					--well: oklch(15% 0.012 90);
+					--flap: var(--raised);
 					--letter: var(--ink);
 				}
 			}

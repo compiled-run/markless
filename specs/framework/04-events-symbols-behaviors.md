@@ -54,7 +54,7 @@ The minted id is emitted per module that has such a record; a module with none
 carries no minting code at all. What the id is derived from depends on where the
 handle is declared. A handle declared in a component is one element per rendered
 component, so the id carries that render's own instance prefix. A handle
-declared in a `shared()` factory with `{ scope: 'widget' }` is one element per
+declared in a `shared()` factory with `{ scope: 'subtree' }` is one element per
 rendered widget, so the id carries the token the widget root registers - from
 static edge data, before any HTML is written - into the seed map it hands the
 parts placed inside it. Two widgets on one page therefore mint different ids for
@@ -66,7 +66,7 @@ this lowering cannot recover:
 - A handle named by an IDREF inside a keyed list. One authored handle would name
   one element per row.
 - An IDREF read from inside the widget root itself, or from a `shared()` factory
-  that is not `{ scope: 'widget' }`. The widget token does not exist yet in the
+  that is not `{ scope: 'subtree' }`. The widget token does not exist yet in the
   first case and names nothing per-widget in the second.
 - An authored `id` on the element an IDREF names. Two id attributes would leave
   the relationship pointing at whichever one the parser kept.
@@ -272,7 +272,7 @@ callback prop, so:
 
 - each instance runs the callback its own parent passed, with the DOM event as
   the callback's first argument, and its writes land on the graph nodes of the
-  parent that passed it, including widget-scoped `shared()` state;
+  parent that passed it, including subtree-scoped `shared()` state;
 - an instance whose parent passed no callback runs nothing;
 - a parent that passes something other than a callback, such as a function
   call's result or a `let`, still stops the build with

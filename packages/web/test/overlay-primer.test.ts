@@ -25,7 +25,7 @@ function boot(shown: boolean) {
 	const resumeContainerEvent = vi.fn();
 	const load = vi.fn(async () => ({ resumeContainerEvent }));
 	const source = createInlineResumerOverlayPrimerSource('/build/resume.js').replace(
-		'(url) => import(/* @vite-ignore */ url)',
+		INLINE_DEFER_LOADER_SOURCE,
 		'load',
 	);
 	new Function(

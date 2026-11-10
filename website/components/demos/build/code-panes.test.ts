@@ -25,24 +25,25 @@ export default function DrinkPick() @{
 
 const SOURCES = {
 	namePicker: [{ name: 'name-picker.tsrx', code: shown(here('./name-picker.tsrx')) }],
-	talliesPage: [
-		{ name: 'tally.tsrx', code: shown(here('./tally-page.tsrx')) },
+	talliesApp: [
+		{ name: 'tally.tsrx', code: shown(here('./tally-app.tsrx')) },
 		{
 			name: 'tallies.tsrx',
-			code: shown(here('./tallies-page.tsrx')).replace('./tally-page.tsrx', './tally.tsrx'),
+			code: shown(here('./tallies-app.tsrx')).replace('./tally-app.tsrx', './tally.tsrx'),
 		},
 	],
-	talliesWidget: [
-		{ name: 'tally.tsrx', code: shown(here('./tally-widget.tsrx')) },
+	talliesSubtree: [
+		{ name: 'tally.tsrx', code: shown(here('./tally-subtree.tsrx')) },
 		{
 			name: 'tallies.tsrx',
-			code: shown(here('./tallies-widget.tsrx')).replace('./tally-widget.tsrx', './tally.tsrx'),
+			code: shown(here('./tallies-subtree.tsrx')).replace('./tally-subtree.tsrx', './tally.tsrx'),
 		},
 	],
 	drinkPick: [{ name: 'drink-pick.tsrx', code: DRINK_PICK }],
 };
 
-describe('build preview code bands', () => {
+// A cold shiki start takes 2 to 3.3 s on an M-series Mac and passed 5 s on CI's runner.
+describe('build preview code bands', { timeout: 20_000 }, () => {
 	it('show the demo files as they are, highlighted (run with -u after editing a demo)', async () => {
 		const blocks: string[] = [];
 		for (const [name, files] of Object.entries(SOURCES)) {

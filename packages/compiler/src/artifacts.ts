@@ -3,7 +3,7 @@ import type {
 	ProtocolStatePayload,
 	ProtocolViewPayload,
 } from '@markless/serializer';
-import type { RenderedPayloadScripts } from '@markless/serializer';
+import type { ProtocolSharedScope, RenderedPayloadScripts } from '@markless/serializer';
 import type { CompilerDiagnostic, SourceSpan } from './diagnostics.ts';
 
 export type { CompilerDiagnostic, DiagnosticSuggestion, SourceSpan } from './diagnostics.ts';
@@ -78,6 +78,32 @@ export type ServerOnlyPropsArtifact = {
 	readonly diagnostics: ReadonlyArray<ServerOnlyPropsDiagnostic>;
 };
 
+/** What makes children written at a call site stop working when an arm redraws them from fixed HTML. */
+export type ProjectionLiveness = {
+	/** Live on their own, in words: what handles an event or shows changing state. */
+	readonly reason?: string;
+	/** Props of the component that wrote the children: live while a caller can change one. */
+	readonly props?: ReadonlyArray<string>;
+	/** They pass on the writer's own `children`, so they are live when its callers' children are. */
+	readonly forwardsChildren?: true;
+	/** Components rendered inside them, live when that component handles events or shows changing state. */
+	readonly componentEdgeIds?: ReadonlyArray<string>;
+};
+
+export type ProjectionArmsArtifact = {
+	readonly passId: 'projection-arms';
+	readonly liveChildren: ReadonlyArray<
+		ProjectionLiveness & {
+			readonly componentEdgeId: string;
+			/** The verdict for an @if/@switch arm, when it differs: a keyed @for retargeted into the hole re-grows its rows there. Empty when nothing stays live. */
+			readonly inBranch?: ProjectionLiveness;
+		}
+	>;
+	/** Per component: whether its own markup handles events or shows changing state. */
+	readonly components: ReadonlyArray<ProjectionLiveness & { readonly componentName: string }>;
+	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+};
+
 export type ArtifactChildMaterialization = {
 	readonly html: string;
 	readonly elementCount: number;
@@ -128,11 +154,18 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
+			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
+			readonly catchBoundaryId?: string;
+			readonly returnsPromise?: true;
 			// A callback the compiler wrote around a prop its composer received through a props spread: the read no authored span holds.
 			readonly relayedRead?: LoweredStateRead;
 			// An opaque prop that is plain constant data: the render still runs the
 			// expression, and browser code reads this value instead.
 			readonly buildTimeValue?: { readonly value: unknown };
+			// A body local named as a handler whose function the browser cannot rebuild, and the rewrite that it can.
+			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 			// Imported `const` values an opaque prop reads that this compile was not
 			// given; the bundler evaluates those modules and compiles again.
 			readonly importedConstants?: ReadonlyArray<{
@@ -189,6 +222,8 @@ export type SemanticComponentEdge = {
 	// props are boundary reads (need 10 — the arm may touch the async computed
 	// only through child props).
 	readonly asyncBoundaryId?: string;
+	// The nearest `@try` with a `@catch` whose @try arm holds this component: its handlers' rejections render there.
+	readonly catchBoundaryId?: string;
 	readonly importSource?: string;
 	readonly importKind?: SemanticModuleImport['kind'];
 	readonly importedName?: string;
@@ -263,12 +298,15 @@ export type SemanticGraphBinding = {
 	readonly asyncCapable?: boolean;
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	readonly functionSource?: string;
+	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
+	readonly joinsText?: true;
 	// element() only: the declared type argument was written as an array, so this
 	// handle names an ordered SET of elements rather than one.
 	readonly plural?: boolean;
-	// state() declared in an @if/@switch arm body: the cell is written back to
-	// `initialValue` each time that arm opens (spec 01, "Conditional identity").
+	// state() in an @if/@switch arm body: written back to `initialValue` each time that arm opens.
 	readonly armScope?: SemanticBranchArm;
+	// The arms around `armScope`'s site, outermost first: opening any of them rebuilds this arm, so it restarts the cell too.
+	readonly enclosingArms?: ReadonlyArray<SemanticBranchArm>;
 };
 
 export type ModuleGraphInterfaceHelperReturn = {
@@ -304,6 +342,7 @@ export type ModuleGraphInterfaceExport =
 
 /** `export { default as root } from './x.tsrx'` as the module authored it. */
 export type ModuleGraphInterfaceReexport = {
+	/** The name this module exports it as, or `*` for `export * from`, which republishes every named export. */
 	readonly exportName: string;
 	readonly source: string;
 	/** `default`, a named export, or `*` for `export * as ns from`. */
@@ -359,6 +398,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly reexports?: ReadonlyArray<ModuleGraphInterfaceReexport>;
 	readonly linkedComponents?: ReadonlyArray<ModuleGraphInterfaceLinkedComponent>;
 	readonly sharedDefinitions?: ReadonlyArray<ModuleGraphInterfaceSharedDefinition>;
+	/** This module or one it imports serves async computeds; `held` when a reader pairs one with an input of its key. */
+	readonly asyncPlanes?: ModuleAsyncPlanes;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
@@ -387,6 +428,8 @@ export type ModuleGraphInterfaceArtifact = {
 			/** Props this component files into a widget callback slot. */
 			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
+			/** A handler this component or one it renders can reject past every @catch of its own, into its parent's. */
+			readonly rejectingHandlers?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
@@ -411,6 +454,8 @@ export type ModuleGraphInterfaceArtifact = {
 			 * rows need the container as their parent.
 			 */
 			readonly containerRepeat?: true;
+			/** Present when the template's top level is not exactly one element: a fragment, text, or an @try with no element around it. */
+			readonly rangeRoot?: true;
 			/**
 			 * Present when this component's tree holds a keyed repeat whose rows fill
 			 * expression slots through a render-data reader, so a page placing it
@@ -561,6 +606,8 @@ export type ModuleGraphInterfaceElementCount = number | 'unknown';
  * importer that cannot see a component's tree must refuse rather than assume -
  * an unseen chunk could hold a boundary, so `'unknown'` outranks `'branches'`.
  */
+export type ModuleAsyncPlanes = { readonly async?: true; readonly held?: true };
+
 export type ModuleGraphInterfaceConstructReach =
 	| 'free'
 	| 'branches'
@@ -600,7 +647,7 @@ export type ModuleGraphInterfaceProjection = {
 	readonly parentHostNodeId?: string;
 };
 
-export type SemanticSharedScope = 'request' | 'container' | 'page' | 'widget';
+export type SemanticSharedScope = ProtocolSharedScope;
 
 export type SemanticSharedDependency = {
 	readonly definitionId: string;
@@ -687,7 +734,7 @@ export type SemanticSharedInstance = {
 	readonly definitionId: string;
 	readonly definitionName: string;
 	readonly localName: string;
-	// The component whose body resolved the definition; widget scope needs it to
+	// The component whose body resolved the definition; subtree scope needs it to
 	// decide which composed instances belong to one rendered widget.
 	readonly componentName?: string;
 	readonly source: string;
@@ -754,6 +801,8 @@ export type SemanticKeyedRepeat = {
 	readonly enclosingRepeatId?: string;
 	// Set when the collection is a path on the enclosing row item (`group.items`).
 	readonly enclosingItemPath?: ReadonlyArray<string>;
+	// Set when a row's top level is not exactly one element: the browser tracks each row between row comments.
+	readonly rowRange?: true;
 };
 
 // A reactive branch site (@if or @switch) sharing the unified document-order
@@ -785,6 +834,8 @@ export type SemanticBranchSite = {
 	// resolves module-wide and a bare instance local matches a same-named local
 	// declared in a sibling component (defect 46). Absent outside every component.
 	readonly componentName?: string;
+	/** Where the `@if` or `@switch` keyword is written. */
+	readonly keywordSpan?: SourceSpan;
 };
 
 export type SemanticSyncPolicyCondition =
@@ -834,11 +885,23 @@ export type SemanticEvent = {
 	readonly id: string;
 	readonly hostNodeId: string;
 	readonly eventName: string;
+	// The component whose markup wrote the handler, so its names resolve to that component's bindings.
+	readonly componentName?: string;
 	// One handler per event attribute; absent when the attribute carries no value.
 	readonly handlerSource?: string;
 	readonly handlerSpan?: SourceSpan;
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
+	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
+	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
+	readonly handlerCatchBoundaryId?: string;
+	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
+	readonly handlerReturnsPromise?: true;
+	/** The handler's result is out of sight here (a received prop, an imported or computed function), so it may reject. */
+	readonly handlerMayReject?: true;
+	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
+	readonly dispatchCatchBoundaryId?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
@@ -847,6 +910,7 @@ export type SemanticEvent = {
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 	readonly code:
 		| 'MARKLESS_PARSE_ERROR'
+		| 'MARKLESS_BLOCK_SIBLING_NODES'
 		| 'MARKLESS_UI_IMPORT_SHAPE'
 		| 'MARKLESS_FRAMEWORK_IMPORT_REQUIRED'
 		| 'MARKLESS_FRAMEWORK_API_ALIAS_UNSUPPORTED'
@@ -862,6 +926,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_HANDLER_READS_RENDER_LOCAL'
 		| 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
+		| 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'
@@ -876,6 +941,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_RETURN_UNNAMED'
 		| 'MARKLESS_SHARED_SEED_UNRESOLVED_VALUE'
 		| 'MARKLESS_SHARED_SCOPE_INVALID'
+		| 'MARKLESS_SHARED_SCOPE_RENAMED'
 		| 'MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT'
 		| 'MARKLESS_ELEMENT_HANDLE_REQUIRED'
 		| 'MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED'
@@ -921,6 +987,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED'
 		| 'MARKLESS_BRANCH_ELSE_SPELLING'
 		| 'MARKLESS_ASYNC_ARM_ORDER'
+		| 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY'
 		| 'MARKLESS_BARE_ARM_INTERPOLATION'
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
@@ -1061,6 +1128,8 @@ export type SemanticTemplateRead = {
 	// The branch site whose arm body holds this read directly, with no host of
 	// its own. Such a read drives the arm's range, never the enclosing element.
 	readonly armScopeBranchSiteId?: string;
+	// The @try whose arm body holds this read with no host of its own; the arm re-renders on refresh.
+	readonly armScopeBoundaryId?: string;
 	// The component edge whose children hold this read directly. It is projected
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
@@ -1071,6 +1140,8 @@ export type SemanticTemplateRead = {
 	readonly authoredSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
+	// The async values a row expression reads beside its row item, which its @try waits on.
+	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -1466,6 +1537,13 @@ export type SemanticGraphArtifact = {
 		readonly id: string;
 		readonly anchorOrder: number;
 		readonly parentBoundaryId?: string;
+		readonly componentName?: string;
+		/** The name `@catch (name)` binds the rejection to. */
+		readonly errorName?: string;
+		/** The minted sync computed a boundary reading several async values settles on. */
+		readonly gateGraphNodeId?: string;
+		/** Where the `@try` keyword is written. */
+		readonly keywordSpan?: SourceSpan;
 	}>;
 	readonly branchSites: ReadonlyArray<SemanticBranchSite>;
 	readonly markup: SemanticMarkupArtifact;
@@ -1518,6 +1596,8 @@ export type RenderDataRepeat = {
 	readonly rowChunkId: string;
 	readonly emptyChunkId?: string;
 	readonly rowElementCount: number;
+	// Each row renders between a pair of row comments: its top level is not exactly one element.
+	readonly rowRange?: true;
 	// How many element children of the parent the rows start after. Absent is the
 	// ordinary case - the rows start the parent - so it costs nothing to say.
 	// 'unknown' means the prefix holds a sibling whose element count is not a
@@ -1892,6 +1972,20 @@ export type PlannedSymbol =
 				readonly endOffset: number;
 			}>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+			// Reads that answer as the screen shows them while an async value they pair with refreshes.
+			readonly shownReads?: ReadonlyArray<{
+				readonly graphNodeId: string;
+				readonly path: ReadonlyArray<string>;
+			}>;
+			// Async values whose key reads a symbol this handler writes, marked busy from its entry.
+			readonly entryMarks?: ReadonlyArray<string>;
+			// `@catch (error, reset)` handler calls, each with the async values its block reads, upstream first.
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+			}>;
+			// A rejection from this handler publishes the runner of its nearest `@catch` boundary as failed.
+			readonly catchRunnerGraphNodeId?: string;
 	  }
 	| {
 			readonly id: string;
@@ -1906,6 +2000,14 @@ export type PlannedSymbol =
 			readonly reads?: ReadonlyArray<LoweredStateRead>;
 			readonly writes?: ReadonlyArray<LoweredStateWrite>;
 			readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+			// Async values whose key reads a symbol this callback writes, marked busy from its entry.
+			readonly entryMarks?: ReadonlyArray<string>;
+			// This callback prop's `@catch (error, reset)` source calls, each with the async values its block reads, upstream first.
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+			}>;
+			readonly catchRunnerGraphNodeId?: string;
 	  }
 	| {
 			readonly id: string;
@@ -2190,6 +2292,7 @@ export type CaptureSlotRoute =
 			readonly absentProp?: true;
 			// The expression reads only the keyed row's item or index: rendered with the row, never live.
 			readonly rowValue?: true;
+			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 	  };
 
 // A slot belongs to one authored binding in one component and may have one
@@ -2280,7 +2383,8 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_SHARED_METHOD_CROSS_MODULE'
 		| 'MARKLESS_SHARED_INSTANCE_EXPORTED_FUNCTION'
 		| 'MARKLESS_SHARED_COMPUTED_CROSS_MODULE'
-		| 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE';
+		| 'MARKLESS_SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE'
+		| 'MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT';
 	readonly phase: 'public-render';
 	readonly passId: 'symbol-modules';
 };
@@ -2977,6 +3081,7 @@ export type CompileTsrxModuleResult = {
 	readonly publicRenderPlan: PublicRenderPlanArtifact;
 	readonly publicRenderModule: PublicRenderModuleArtifact;
 	readonly serverOnlyProps: ServerOnlyPropsArtifact;
+	readonly projectionArms?: ProjectionArmsArtifact;
 	readonly symbolModules: SymbolModulesArtifact;
 	readonly runtimeDemandMap: RuntimeDemandMapArtifact;
 	readonly runtimeDemandMaps: RuntimeDemandMapsArtifact;

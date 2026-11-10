@@ -463,7 +463,7 @@ export const numberboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function NumberboxRoot({

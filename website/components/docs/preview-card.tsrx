@@ -37,15 +37,10 @@ export default function PreviewCard({
 			}
 
 			.pg {
-				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--paper));
-				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				--pg-accent: color-mix(in srgb, var(--purple) 45%, var(--cream));
+				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--cream));
 				--pg-edge: color-mix(in oklch, var(--ink) 80%, transparent);
 				--pg-font: 'Shantell Sans', system-ui, sans-serif;
-
-				html.dark & {
-					--pg-accent: color-mix(in srgb, var(--purple) 42%, var(--paper));
-					--pg-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-				}
 			}
 
 			@media (max-width: 600px) {
@@ -162,7 +157,7 @@ export function Watch({ children }: { readonly children?: Children }) @{
 				padding: 0.8em 1.35em;
 				border-block-start: 1px dashed var(--code-edge);
 				background: var(--tinted);
-				color: var(--ink);
+				color: var(--on-accent);
 				font-family: var(--pg-font);
 				font-size: var(--step--1);
 				line-height: 1.5;
@@ -258,12 +253,20 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 			}
 
 			.pg-tip .tsrx-tip-title,
-			.pg-tip .tsrx-tip-body {
+			.pg-tip .tsrx-tip-body,
+			.pg-tip .tsrx-tip-type {
 				display: block;
+				background: transparent;
+				border: 0;
+				color: inherit;
 				overflow-wrap: anywhere;
 			}
 
 			.pg-tip .tsrx-tip-title {
+				font-weight: 700;
+			}
+
+			.pg-tip .tsrx-tip-code {
 				font-family: var(--font-mono);
 				font-weight: 500;
 			}
@@ -276,6 +279,15 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 
 			.pg-tip .tsrx-tip-body:empty {
 				display: none;
+			}
+
+			.pg-tip .tsrx-tip-type {
+				margin-block-start: 0.45rem;
+				padding-block-start: 0.4rem;
+				border-block-start: 1px dashed color-mix(in oklch, var(--ink) 35%, transparent);
+				font-family: var(--font-mono);
+				font-size: var(--step--2);
+				opacity: 0.8;
 			}
 
 			.pg-tip:is([ui-closed], [hidden]) {
@@ -378,7 +390,13 @@ export function Switch({
 			}
 
 			.pg-switch[ui-checked] {
-				background: color-mix(in srgb, var(--switch-on) 65%, var(--paper));
+				background: color-mix(in srgb, var(--switch-on) 65%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					--paper: var(--cream);
+					color: var(--on-accent);
+				}
 			}
 
 			.pg-switch:disabled {
@@ -552,11 +570,21 @@ export function Choice({
 			}
 
 			.pv-seg-item:hover .pv-seg-label {
-				background: color-mix(in oklch, var(--pg-wash) 50%, var(--paper));
+				background: color-mix(in oklch, var(--pg-wash) 50%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.pv-seg-item:has(:checked) .pv-seg-label {
 				background: var(--pg-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.pv-seg-item:has(:focus-visible) .pv-seg-label {

@@ -2,7 +2,7 @@
 /**
  * report-upstream-extension.mjs
  *
- * Names the single `ripple-ts.ripple-ts-vscode-plugin` version VS Code would actually
+ * Names the single `TSRX.tsrx-vscode-plugin` version VS Code would actually
  * activate, and extracts the upstream facts other tooling needs straight out of that
  * version's own bundle.
  *
@@ -27,7 +27,7 @@ import os from 'node:os';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-export const UPSTREAM_EXTENSION_ID = 'ripple-ts.ripple-ts-vscode-plugin';
+export const UPSTREAM_EXTENSION_ID = 'tsrx.tsrx-vscode-plugin';
 
 /** Where VS Code (stable, non-portable) keeps user-installed extensions. */
 export function defaultExtensionsDir() {

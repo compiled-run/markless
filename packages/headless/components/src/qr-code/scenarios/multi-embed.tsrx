@@ -20,7 +20,7 @@ export default function MultiEmbed() @{
 	</section>
 }
 
-// Inside the root, where the widget scope is meant to hand it this code rather than
+// Inside the root, where the subtree scope is meant to hand it this code rather than
 // a new one — a prop cannot do that job, because the root seeds its cell from
 // `value` once and a later prop change never reaches it.
 function Rotate() @{

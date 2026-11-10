@@ -2,8 +2,17 @@
 import { ellipse, roundRect } from '../../figures/ink/desk.ts';
 import { hatch, hull, line, outline, type P, pathOf, resample, seeded, stroke, wash } from '../../figures/ink/ink.ts';
 
-/** What a layer paints: the paper an object is cut from, its wash, its hatching or its ink. */
-export type LayerKind = 'paper' | 'wash' | 'hatch' | 'ink';
+/** What a layer paints: the paper an object is cut from, its wash, its hatching or its ink; `over-wash` repaints that hatching and ink cut to the wash. */
+export type LayerKind = 'paper' | 'wash' | 'hatch' | 'ink' | 'over-wash';
+
+/** One painted layer. An `over-wash` layer's `d` is the wash it is cut to, and `uses` names the layers it repaints by their `id`. */
+export interface Layer {
+	readonly kind: LayerKind;
+	readonly d: string;
+	readonly motion?: Motion;
+	readonly id?: string;
+	readonly uses?: readonly string[];
+}
 
 /** One drawing, as layers painted in order: each object's paper, wash, hatching and ink, back to front. */
 /** How an object moves while its card is hovered: a transform scaled by `--hover` (0 or 1), about a point on the sheet. */
@@ -25,7 +34,7 @@ export interface Drawing {
 	readonly height: number;
 	/** The box the drawing actually covers, `[x, y, width, height]`: a card fits this, not the sheet, into its picture area. */
 	readonly box: readonly [number, number, number, number];
-	readonly layers: readonly { readonly kind: LayerKind; readonly d: string; readonly motion?: Motion }[];
+	readonly layers: readonly Layer[];
 }
 
 /** The order one object paints in: the shadow it casts on what is behind it, then itself. */
@@ -57,21 +66,24 @@ function wander(points: P[], seed: number, amount = 0.8, step = 14): P[] {
  * hides what lies behind it before its own wash, hatching and ink go on.
  */
 export class Sheet {
-	#layers: { kind: LayerKind; d: string; motion?: Motion }[] = [];
+	#layers: { kind: LayerKind; d: string; motion?: Motion; id?: string; uses?: string[] }[] = [];
 	#motion: Motion | undefined;
 	#parts: Record<Part, string> = { cast: '', paper: '', wash: '', hatch: '', ink: '' };
 	#seed: number;
 	#min: P = [Infinity, Infinity];
 	#max: P = [-Infinity, -Infinity];
 	readonly #paper: boolean;
+	readonly #overWash: boolean;
 	readonly width: number;
 	readonly height: number;
 
-	constructor(width: number, height: number, seed: number, paper = true) {
+	/** `overWash` adds an `over-wash` layer after each washed object, for a renderer that repaints its ink over a solid wash. */
+	constructor(width: number, height: number, seed: number, paper = true, overWash = false) {
 		this.width = width;
 		this.height = height;
 		this.#seed = seed * 1000;
 		this.#paper = paper;
+		this.#overWash = overWash;
 	}
 
 	#next() {
@@ -87,6 +99,8 @@ export class Sheet {
 
 	/** Ends the object being drawn and starts the next, which moves by `motion` while its card is hovered. */
 	object(motion?: Motion): this {
+		const washed = this.#overWash ? this.#parts.wash : '';
+		const over: string[] = [];
 		for (const part of OBJECT_ORDER) {
 			const d = this.#parts[part];
 			if (!d) continue;
@@ -94,8 +108,14 @@ export class Sheet {
 			const last = this.#layers.at(-1);
 			if (last && last.kind === kind && last.motion === this.#motion) last.d += d;
 			else this.#layers.push(this.#motion ? { kind, d, motion: this.#motion } : { kind, d });
+			if (washed && (part === 'hatch' || part === 'ink')) {
+				const layer = this.#layers.at(-1)!;
+				layer.id ??= 'l' + (this.#layers.length - 1);
+				over.push(layer.id);
+			}
 			this.#parts[part] = '';
 		}
+		if (over.length) this.#layers.push(this.#motion ? { kind: 'over-wash', d: washed, uses: over, motion: this.#motion } : { kind: 'over-wash', d: washed, uses: over });
 		this.#motion = motion;
 		return this;
 	}
@@ -176,7 +196,7 @@ function edge(width: number, height: number, seed: number, radius: number): Draw
 
 /** Start here: a fingerpost by a path, its top board pointing the way in. */
 function start(): Drawing {
-	const s = new Sheet(276, 128, 1);
+	const s = new Sheet(276, 128, 1, true, true);
 	s.line(wander([[96, 112], [272, 108]], 3, 1.2), 1.6);
 	s.line(wander([[120, 120], [168, 119]], 4, 1), 1);
 	for (const x of [132, 236, 254]) for (let k = 0; k < 4; k++) s.line([[x + k * 3, 112], [x + k * 3 + (k - 1.5) * 2.2, 103 - (k % 2) * 4]], 0.9, 0.2);
@@ -207,7 +227,7 @@ function start(): Drawing {
 
 /** Core concepts: the State figure's jar of beans with its tag wired out; hovering crosses out the tag's number and inks the new one in. */
 function concepts(): Drawing {
-	const s = new Sheet(276, 128, 2);
+	const s = new Sheet(276, 128, 2, true, true);
 	s.line(wander([[110, 117], [262, 117]], 6, 1), 1.5);
 	s.line(wander([[223, 54], [246, 50], [258, 38], [264, 22], [272, 10]], 7, 1.2, 8), 1.6, 0.8);
 	s.object();
@@ -243,7 +263,7 @@ function concepts(): Drawing {
 
 /** Router: a folded street map with a dashed route and a pin where it ends. */
 function router(): Drawing {
-	const s = new Sheet(276, 128, 4);
+	const s = new Sheet(276, 128, 4, true, true);
 	const folds = [120, 162, 204, 246];
 	const tops = [20, 26, 20, 26];
 	const bottoms = [96, 90, 96, 90];
@@ -268,7 +288,7 @@ function router(): Drawing {
 
 /** UI components: a sheet of controls, a switch, a ticked box and a button, laid out like a parts card. */
 function ui(): Drawing {
-	const s = new Sheet(276, 128, 5);
+	const s = new Sheet(276, 128, 5, true, true);
 	const card = roundRect(118, 14, 254, 100, 8);
 	s.cast(card, 6, 6, 2.6);
 	s.shape(card, 2);
@@ -294,7 +314,7 @@ function ui(): Drawing {
 
 /** How it works: two gears meshing, the small one driving the large. */
 function how(): Drawing {
-	const s = new Sheet(276, 280, 6);
+	const s = new Sheet(276, 280, 6, true, true);
 	const gear = (cx: number, cy: number, r: number, teeth: number, phase: number): P[] => {
 		const pts: P[] = [];
 		const n = teeth * 8;
@@ -333,7 +353,7 @@ function how(): Drawing {
 
 /** Native targets: a laptop with a phone propped against it, both showing the same screen. */
 function native(): Drawing {
-	const s = new Sheet(276, 128, 10);
+	const s = new Sheet(276, 128, 10, true, true);
 	s.line(wander([[96, 108], [272, 108]], 41, 1), 1.5);
 	s.object();
 	const lid = roundRect(134, 28, 226, 90, 5, 3);
@@ -362,7 +382,7 @@ function native(): Drawing {
 
 /** Contributing: a pencil laid across a notebook page that already carries a tick. */
 function contributing(): Drawing {
-	const s = new Sheet(276, 128, 7);
+	const s = new Sheet(276, 128, 7, true, true);
 	const tilt = (pts: P[]) => turn(pts, -5, [186, 58]);
 	const page = tilt(roundRect(124, 10, 248, 106, 4, 3));
 	s.cast(page, 7, 6, 2.4);
@@ -386,7 +406,7 @@ function contributing(): Drawing {
 
 /** Migrate an app: a moving box, flaps open, the app's page lifting out of it. */
 function migrate(): Drawing {
-	const s = new Sheet(276, 280, 11);
+	const s = new Sheet(276, 280, 11, true, true);
 	s.line(wander([[28, 236], [250, 236]], 51, 1.2), 1.6);
 	s.object();
 	const leftFlap: P[] = [[64, 132], [36, 100], [112, 96], [138, 132]];
@@ -421,7 +441,7 @@ function migrate(): Drawing {
 
 /** Apps being moved: a clipboard log of ports, every line ticked off. */
 function apps(): Drawing {
-	const s = new Sheet(276, 128, 12);
+	const s = new Sheet(276, 128, 12, true, true);
 	s.line(wander([[110, 118], [272, 118]], 61, 1), 1.4);
 	s.object(sway(5, [196, 118]));
 	const tilt = (pts: P[]) => turn(pts, 5, [196, 64]);
@@ -443,7 +463,7 @@ function apps(): Drawing {
 
 /** Markless Migrate on GitHub: a repository folder with its branch graph, and the arrow out to another site. */
 function repo(): Drawing {
-	const s = new Sheet(276, 128, 13);
+	const s = new Sheet(276, 128, 13, true, true);
 	const folder: P[] = [[132, 30], [168, 30], [176, 40], [244, 40], [244, 112], [132, 112]];
 	s.cast(folder, 7, 5, 2.4);
 	s.shape(folder, 2.1, 1.5);
@@ -464,7 +484,7 @@ function repo(): Drawing {
 
 /** The sun the light theme's toggle shows: a disc and a ring of tapered rays. */
 function sun(): Drawing {
-	const s = new Sheet(48, 48, 8, false);
+	const s = new Sheet(48, 48, 8, false, true);
 	const disc = ellipse(24, 24, 9, 9, 32);
 	s.wash(disc, 1.5, 1.5);
 	s.shape(disc, 1.9, 1.2);
@@ -479,7 +499,7 @@ function sun(): Drawing {
 
 /** The search button's magnifying glass: a washed lens and a hatched handle. */
 function magnifier(): Drawing {
-	const s = new Sheet(48, 48, 14, false);
+	const s = new Sheet(48, 48, 14, false, true);
 	const handle = turn(roundRect(27, 26, 44, 33, 3, 3), 45, [30, 30]);
 	s.shape(handle, 1.8, 1.2);
 	s.tone(handle, -45, 1.6);
@@ -507,7 +527,7 @@ function crescent(o: P, r: number, i: P, ri: number): P[] {
 
 /** The moon the dark theme's toggle shows: a crescent hatched on its inner edge, and two stars. */
 function moon(): Drawing {
-	const s = new Sheet(48, 48, 9, false);
+	const s = new Sheet(48, 48, 9, false, true);
 	const body = crescent([22, 26], 16, [31, 19], 13);
 	s.wash(body, 1.2, 1.5);
 	s.shape(body, 1.9, 1.2);

@@ -19,6 +19,10 @@ import { marklessBoundSymbolId } from '../src/fns/bound-symbol.ts';
 import { renderCsrRuntime } from '../src/render-csr.ts';
 import { INLINE_RESUMER_PAGE_TOKEN } from '../src/inline/resumer.ts';
 import { decodeProtocolPayloadLists } from '../../serializer/src/protocol-record-templates.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -2635,7 +2639,8 @@ test('renderToString envelope-encodes live directValue state cells before servin
 // 1,354 -> 1,514: the primer's census counts only the page's elements between the page-start and page-end comments.
 // 1,514 -> 1,590: the primer goes quiet once a navigation that keeps the container in place starts the next page.
 // 1,590 -> 1,612: its wake checks the page again once the resume module has arrived.
-const OVERLAY_PRIMER_BYTES = 1612;
+// 1,612 -> 1,791: its module loader settles a failure the runtime already reported instead of rejecting unhandled.
+const OVERLAY_PRIMER_BYTES = 1791;
 
 function inlineResumerSourceOf(html: string): string {
 	const found = /<script data-async-resumer[^>]*>([\s\S]*?)<\/script>/.exec(html);

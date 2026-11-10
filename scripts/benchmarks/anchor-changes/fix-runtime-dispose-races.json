@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 32,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 32,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 32,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "a resume runtime disposed mid-start or mid-refresh releases its late listeners and skips stall and settle commits: +32 B gzip downloaded on bench, +56 on docs",
+			"date": "2026-11-09"
+		}
+	]
+}

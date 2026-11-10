@@ -16,6 +16,8 @@ export const RECORD_KEYS_FILE = resolve(packageDirectory, 'src/protocol-record-k
 
 // Templated lists that spell their field names out: a key table pays only where records rarely repeat a shape.
 const UNKEYED_LISTS = new Set(['cells', 'sharedRecords', 'locators', 'events', 'keyedRepeats']);
+// Fields only records of async values carry: spelled out, so the table every page downloads stays as it was without them.
+const SPELLED_FIELDS = new Set(['holds', 'asyncFrom', 'boundaryGate']);
 // Fields typed `unknown` that carry a serialized graph value envelope; only state records hold one.
 const ENVELOPE_FIELDS = new Set(['value', 'key', 'error']);
 const PAYLOAD_TYPES = {
@@ -60,7 +62,7 @@ export function generateRecordKeysSource(): string {
 		for (const property of checker.getPropertiesOfType(type)) {
 			const name = property.getName();
 			if (/\d/.test(name)) throw new Error(`MARKLESS_RECORD_KEYS_DIGIT: ${name}`);
-			if (!keys.includes(name)) keys.push(name);
+			if (!keys.includes(name) && !SPELLED_FIELDS.has(name)) keys.push(name);
 			const propertyType = checker.getTypeOfSymbol(property);
 			if (propertyType.flags & ts.TypeFlags.Unknown) {
 				if (envelopes && ENVELOPE_FIELDS.has(name))

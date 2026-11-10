@@ -13,6 +13,11 @@ file-routing and typed-route ideas, but its authoring contract is Markless-first
 - The router TypeScript plugin lives inside `packages/router`.
 - Top-level `api/`, `middleware/`, `pages/`, `document.tsrx`, and `public/`
   remain the app shape.
+- `document.tsrx` either renders `<Html>` from `@markless/router`, whose
+  attributes the router writes on the one `<html>` it serves (default
+  `lang="en"`), or writes the `<html>` element itself, which is then served as
+  the document root exactly as written. Either way the served document,
+  prerendered file, fragment response and dev response carry one `<html>`.
 - MDX is supported as a route file type. MDX routes may default-import `.tsrx`
   component artifacts and render them as MDX JSX elements. Router MDX lowers
   component props from Satteri MDX/ESTree data for string attributes, boolean

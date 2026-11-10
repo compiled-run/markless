@@ -1,4 +1,4 @@
-// A family-like module: ONE widget-scoped shared definition plus the parts that
+// A family-like module: ONE subtree-scoped shared definition plus the parts that
 // resolve it. The barrel next to this file aliases `nscShared` to `state`, which
 // is the consumer surface a namespace-member call reaches.
 import { shared, state } from '@markless/core';
@@ -12,7 +12,7 @@ export const nscShared = shared(() => {
 			s.open = !s.open;
 		},
 	};
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const s = nscShared();

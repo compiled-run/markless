@@ -34,7 +34,7 @@ export async function registerDormantContainer(
  */
 export async function bindSharedCells(root: object, state: ProtocolStatePayload, cells: Cell[]) {
 	const records = (state.sharedDefinitions ?? [])
-		.filter((definition) => definition.scope !== 'widget')
+		.filter((definition) => definition.scope !== 'subtree')
 		.map((definition): [Definition, ProtocolSharedInstances | undefined] => {
 			const place = (
 				definition.scope === 'container'

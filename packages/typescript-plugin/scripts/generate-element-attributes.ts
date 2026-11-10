@@ -1,0 +1,190 @@
+// Writes src/element-attribute-names.generated.d.ts, the content attribute names of every standard
+// HTML and SVG element, from the html-element-attributes and svg-element-attributes lists, and the
+// camelCase spellings of those names, from react-dom's possibleStandardNames, into the d.ts and
+// @markless/web. Run after upgrading either package or re-vendoring the React table:
+//   node packages/typescript-plugin/scripts/generate-element-attributes.ts
+import { writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { htmlElementAttributes } from 'html-element-attributes';
+import { svgElementAttributes } from 'svg-element-attributes';
+import { possibleStandardNames } from './vendor/react-possible-standard-names.ts';
+
+const packageDirectory = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+export const ELEMENT_ATTRIBUTE_NAMES_FILE = resolve(
+	packageDirectory,
+	'src/element-attribute-names.generated.d.ts',
+);
+export const CAMEL_CASE_ATTRIBUTE_NAMES_FILE = resolve(
+	packageDirectory,
+	'../web/src/camel-case-attribute-names.generated.ts',
+);
+
+/** The XML namespace attributes, which neither attribute list carries. */
+const XML_NAMESPACE_ATTRIBUTE_NAMES = [
+	'xmlns',
+	'xmlns:xlink',
+	'xlink:actuate',
+	'xlink:arcrole',
+	'xlink:href',
+	'xlink:role',
+	'xlink:show',
+	'xlink:title',
+	'xlink:type',
+	'xml:base',
+	'xml:lang',
+	'xml:space',
+];
+
+// React renames whose word differs from the attribute's stay errors; the generator fails if React adds one.
+const REJECTED_REACT_RENAMES: Readonly<Record<string, string>> = {
+	className: 'class',
+	htmlFor: 'for',
+};
+
+type AttributeList = Readonly<Record<string, readonly string[]>>;
+
+function union(names: readonly string[]): string {
+	return [...new Set(names)]
+		.sort()
+		.map((name) => `'${name}'`)
+		.join(' | ');
+}
+
+function byTag(list: AttributeList): string[] {
+	const globals = new Set(list['*']);
+	return Object.keys(list)
+		.filter((tag) => tag !== '*')
+		.sort()
+		.flatMap((tag) => {
+			const names = list[tag]!.filter((name) => !globals.has(name));
+			if (names.length === 0) return [];
+			const key = /^[a-z][a-zA-Z0-9]*$/.test(tag) ? tag : `'${tag}'`;
+			return [`\t\t${key}: ${union(names)};`];
+		});
+}
+
+// The camelCase spellings of each tag's real names, keyed like byTag so the contract never filters a spelling per element.
+function camelCaseByTag(list: AttributeList, globals: ReadonlySet<string>): string[] {
+	const spellings = [...camelCaseAttributeNames()];
+	return Object.keys(list)
+		.filter((tag) => tag !== '*')
+		.sort()
+		.flatMap((tag) => {
+			const names = new Set(list[tag]!.filter((name) => !globals.has(name)));
+			const camel = spellings.filter(([, name]) => names.has(name)).map(([spelling]) => spelling);
+			if (camel.length === 0) return [];
+			const key = /^[a-z][a-zA-Z0-9]*$/.test(tag) ? tag : `'${tag}'`;
+			return [`\t\t${key}: ${union(camel)};`];
+		});
+}
+
+function camelCaseGlobals(globals: ReadonlySet<string>): string {
+	return union(
+		[...camelCaseAttributeNames()].filter(([, name]) => globals.has(name)).map(([spelling]) => spelling),
+	);
+}
+
+function realAttributeNames(): Set<string> {
+	return new Set([
+		...Object.values(htmlElementAttributes).flat(),
+		...Object.values(svgElementAttributes).flat(),
+		...XML_NAMESPACE_ATTRIBUTE_NAMES,
+	]);
+}
+
+// A React prop is a camelCase spelling when lowercasing it, plus the real name's dashes or colon, gives a real attribute.
+export function camelCaseAttributeNames(): ReadonlyMap<string, string> {
+	const real = realAttributeNames();
+	const spellings = new Map<string, string[]>();
+	for (const [spelling, prop] of Object.entries(possibleStandardNames))
+		spellings.set(prop, [...(spellings.get(prop) ?? []), spelling]);
+	const names = new Map<string, string>();
+	const renames: Record<string, string> = {};
+	for (const [prop, candidates] of [...spellings].sort(([left], [right]) =>
+		left < right ? -1 : 1,
+	)) {
+		if (real.has(prop)) continue;
+		const known = candidates.filter((candidate) => real.has(candidate));
+		const name = known.find(
+			(candidate) => candidate.replaceAll(/[-:]/g, '') === prop.toLowerCase(),
+		);
+		if (name) names.set(prop, name);
+		else if (known.length > 0) renames[prop] = known.join(' ');
+	}
+	if (JSON.stringify(renames) !== JSON.stringify(REJECTED_REACT_RENAMES))
+		throw new Error(`React renames changed: ${JSON.stringify(renames)}`);
+	return names;
+}
+
+// A real name with a dash or colon is listed as itself, its spelling derived; any other as its spelling.
+function camelCaseAttributeTokens(names: ReadonlyMap<string, string>): string {
+	const tokens = [...names].map(([spelling, name]) => (/[-:]/.test(name) ? name : spelling));
+	const derived = new Map(
+		tokens.map((token) =>
+			/[-:]/.test(token)
+				? [token.replaceAll(/[-:]([a-z0-9])/g, (_, next: string) => next.toUpperCase()), token]
+				: [token, token.toLowerCase()],
+		),
+	);
+	if (JSON.stringify([...derived].sort()) !== JSON.stringify([...names].sort()))
+		throw new Error('camelCase attribute tokens do not derive the spellings they encode');
+	return tokens.join(' ');
+}
+
+export function generateCamelCaseAttributeNamesSource(): string {
+	return [
+		'// Generated by packages/typescript-plugin/scripts/generate-element-attributes.ts from',
+		"// react-dom's possibleStandardNames and the HTML and SVG attribute lists; do not edit.",
+		'// A token with a dash or colon is a real name whose camelCase spelling drops them and uppercases',
+		'// the next letter; any other token is a camelCase spelling of the real name it lowercases to.',
+		`export const CAMEL_CASE_ATTRIBUTE_TOKENS = '${camelCaseAttributeTokens(camelCaseAttributeNames())}';`,
+		'',
+	].join('\n');
+}
+
+export function generateElementAttributeNamesSource(): string {
+	return [
+		'// Generated by packages/typescript-plugin/scripts/generate-element-attributes.ts from',
+		'// html-element-attributes and svg-element-attributes; do not edit.',
+		'declare namespace __MarklessTypeService {',
+		'\t/** Content attributes every HTML element accepts. */',
+		`\ttype HtmlGlobalAttributeName = ${union(htmlElementAttributes['*']!)};`,
+		'\t/** Content attributes particular to each HTML element, on top of the global ones. */',
+		'\ttype HtmlAttributeNameByTag = {',
+		...byTag(htmlElementAttributes),
+		'\t};',
+		'\t/** Attributes every SVG element accepts. */',
+		`\ttype SvgGlobalAttributeName = ${union(svgElementAttributes['*']!)};`,
+		'\t/** Attributes particular to each SVG element, on top of the global ones. */',
+		'\ttype SvgAttributeNameByTag = {',
+		...byTag(svgElementAttributes),
+		'\t};',
+		'\t/** camelCase spellings of the HTML global attributes. */',
+		`\ttype HtmlGlobalCamelCaseAttributeName = ${camelCaseGlobals(new Set(htmlElementAttributes['*']))};`,
+		'\t/** camelCase spellings of each HTML element\'s own attributes. */',
+		'\ttype HtmlCamelCaseAttributeNameByTag = {',
+		...camelCaseByTag(htmlElementAttributes, new Set(htmlElementAttributes['*'])),
+		'\t};',
+		'\t/** camelCase spellings of the SVG global and XML namespace attributes. */',
+		`\ttype SvgGlobalCamelCaseAttributeName = ${camelCaseGlobals(new Set([...svgElementAttributes['*']!, ...XML_NAMESPACE_ATTRIBUTE_NAMES]))};`,
+		'\t/** camelCase spellings of each SVG element\'s own attributes. */',
+		'\ttype SvgCamelCaseAttributeNameByTag = {',
+		...camelCaseByTag(svgElementAttributes, new Set([...svgElementAttributes['*']!, ...XML_NAMESPACE_ATTRIBUTE_NAMES])),
+		'\t};',
+		'\t/** camelCase spellings the compiler writes as the real attribute name. */',
+		'\ttype CamelCaseAttributeName = {',
+		...[...camelCaseAttributeNames()].map(
+			([spelling, name]) => `\t\t${spelling}: '${name}';`,
+		),
+		'\t};',
+		'}',
+		'',
+	].join('\n');
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+	writeFileSync(ELEMENT_ATTRIBUTE_NAMES_FILE, generateElementAttributeNamesSource());
+	writeFileSync(CAMEL_CASE_ATTRIBUTE_NAMES_FILE, generateCamelCaseAttributeNamesSource());
+	console.log(`wrote ${ELEMENT_ATTRIBUTE_NAMES_FILE} and ${CAMEL_CASE_ATTRIBUTE_NAMES_FILE}`);
+}

@@ -84,11 +84,21 @@ export default function AccordionBasic() @{
 			}
 
 			.trigger[ui-open] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger:focus-visible {

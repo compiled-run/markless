@@ -276,10 +276,31 @@ This page is static markdown.
 		}
 	});
 
-	it('static markdown routes name no overlay or roster loader', async () => {
+	it('composed and resume routes install the async planes loader before any island resumes', async () => {
+		for (const id of ['/project/pages/docs/weather.mdx', '/project/pages/docs/weather.mdx?markless-resume']) {
+			const code = await transformMdxRoute(
+				`import Forecast from '../../components/Forecast.tsrx';
+
+# Weather
+
+<Forecast />
+`,
+				id,
+			);
+
+			expect(code).toContain("import('@markless/web/fns/async-plane')");
+			expect(code.indexOf('globalThis.__marklessAsyncPlanes ??=')).toBeGreaterThan(-1);
+			expect(code.indexOf('globalThis.__marklessAsyncPlanes ??=')).toBeLessThan(
+				code.indexOf('export function resumeContainerEvent'),
+			);
+		}
+	});
+
+	it('static markdown routes name no overlay, roster or async planes loader', async () => {
 		const code = await transformMdxRoute('# Docs\n', '/project/pages/docs.mdx');
 		expect(code).not.toContain('__marklessOverlay');
 		expect(code).not.toContain('__marklessRosterResume');
+		expect(code).not.toContain('__marklessAsyncPlanes');
 	});
 
 	it('links MDX child render data through the materialized route context', async () => {

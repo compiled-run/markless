@@ -9,7 +9,12 @@ import {
 } from '@markless/serializer/record-templates';
 import { marklessAttributeValue, marklessWriteAttribute } from './dom-attribute.ts';
 import { pageNodes } from './resume-anchor-census.ts';
-import { marklessControlWriteHeld, marklessNoteControlEdits } from './control-edit-hold.ts';
+import {
+	marklessControlEditsRead,
+	marklessControlWriteHeld,
+	marklessNoteArrivingControlEdits,
+	marklessNoteControlEdits,
+} from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type {
 	DomJournalEntry,
@@ -396,6 +401,8 @@ async function dispatchEvent(input: {
 	const propagation = trackPropagationStops(input.event);
 	let stopAfterElement: EventResumeDomElement | undefined;
 	const releaseControlEdits = marklessNoteControlEdits(input.event.target);
+	// Another dispatch's flush may land while this one's handler still loads.
+	const releaseArrivingEdits = marklessNoteArrivingControlEdits(input.event);
 	try {
 		for (const matched of path) {
 			if (!matched.element) return;
@@ -415,6 +422,7 @@ async function dispatchEvent(input: {
 	} finally {
 		propagation.release();
 		releaseControlEdits();
+		releaseArrivingEdits();
 	}
 }
 
@@ -437,8 +445,12 @@ async function runEventRecord(
 			element,
 			getElementHandle: input.getElementHandle,
 		};
-		const invokeSymbol = async (symbolId: string, context: EventResumeSymbolContext) => {
-			const loaded = input.loadSymbol(symbolId);
+		const invokeSymbol = async (
+			symbolId: string,
+			context: EventResumeSymbolContext,
+			ready?: EventResumeSymbol,
+		) => {
+			const loaded = ready ?? input.loadSymbol(symbolId);
 			const symbol = isPromiseLike(loaded) ? await loaded : loaded;
 			const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 				...context,
@@ -450,7 +462,10 @@ async function runEventRecord(
 		const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 			invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
 		for (const symbolId of eventRecord.symbolIds) {
-			const result = invokeSymbol(symbolId, baseContext);
+			const loaded = input.loadSymbol(symbolId);
+			const symbol = isPromiseLike(loaded) ? await loaded : loaded;
+			marklessControlEditsRead(input.event);
+			const result = invokeSymbol(symbolId, baseContext, symbol);
 			applyDomJournalResult(
 				isPromiseLike(result) ? await result : result,
 				input.elementsByHostId,

@@ -19,6 +19,7 @@ import {
 } from '../../route-manifest.ts';
 import {
 	renderToString,
+	splitEarlyEventCapture,
 	type ModulePreloadInput,
 	type RenderHeadInjection,
 	type SsrRenderArtifact,
@@ -28,7 +29,7 @@ import {
 	STREAM_ARM_EXECUTOR_GLOBAL,
 	STREAMED_ARM_SELECTOR,
 } from '@markless/web/render-to-stream';
-import { CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
+import { CONTAINER_REASK_PROPERTY, CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
 import {
 	CONTAINER_ATTRIBUTE,
 	PROTOCOL_CONTAINER_END_COMMENT,
@@ -60,6 +61,7 @@ import {
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
 import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
+import { MARKLESS_ROUTER_RENDERED_EVENT } from '../../route-state.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
 	FRAGMENT_APPEND_END,
@@ -74,6 +76,7 @@ import {
 	FRAGMENT_REGION_END,
 	FRAGMENT_PATH_PREFIX,
 	STYLESHEET_KEY_ATTRIBUTE,
+	checkBridgeMove,
 	fragmentPageUrl,
 	runFragmentNavigation,
 	startFragmentNavigation,
@@ -874,6 +877,9 @@ function addModulePreloads(
 	}
 }
 
+// A document.tsrx that writes <html> itself (rather than <Html>) renders the root element.
+const AUTHORED_HTML_ROOT = /^\s*<html[\s>]/i;
+
 // The document with the children placeholder INTACT: blocking responses fill
 // it in one piece; streaming responses split at it so everything after the
 // page (and the closing tags) flushes only when the last boundary settled.
@@ -890,12 +896,19 @@ async function renderDocumentShell(
 		written,
 	);
 	const attributes = htmlAttributes(documentModule, pageProps, written);
+	const { capture, rest } = splitEarlyEventCapture(headHtml);
+	const headStart = importMap + capture;
 	if (documentHtml !== undefined) {
-		const { html, preloads } = takeHeadModulePreloads(insertHeadHtml(documentHtml, headHtml));
+		const authoredRoot = AUTHORED_HTML_ROOT.test(documentHtml);
+		const { html, preloads } = takeHeadModulePreloads(
+			insertHeadHtml(authoredRoot ? documentHtml.trim() : documentHtml, rest),
+		);
+		const content = insertHeadModulePreloads(insertImportMap(html, headStart), headStart, preloads);
+		if (authoredRoot) return `<!doctype html>${content}`;
 		return [
 			'<!doctype html>',
 			`<html${renderAttributes(attributes)}>`,
-			insertHeadModulePreloads(insertImportMap(html, importMap), importMap, preloads),
+			content,
 			'</html>',
 		].join('');
 	}
@@ -905,9 +918,9 @@ async function renderDocumentShell(
 		`<html${renderAttributes(attributes)}>`,
 		'<head>',
 		'<meta charset="utf-8">',
-		importMap,
+		headStart,
 		'<meta name="viewport" content="width=device-width, initial-scale=1">',
-		headHtml,
+		rest,
 		'</head>',
 		'<body>',
 		DOCUMENT_CHILDREN_PLACEHOLDER,
@@ -1076,7 +1089,7 @@ function linkBridgeBody(
 	const fragmentNavigation = fragment !== undefined;
 	const fragmentSource = fragment
 		? `
-(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS});`
+(${fragment.source})(d,()=>${JSON.stringify(LINK_ATTRIBUTE)},${JSON.stringify(LINK_TABLE_SCRIPT_ATTRIBUTE)},(href)=>import(href),${'runPath' in page && page.runPath ? `()=>import(${JSON.stringify(page.runPath)}).then((m)=>m.default)` : `()=>Promise.resolve(${boundFragmentRun(fragment, documentLoads)})`},()=>(${fragment.prefetch ? escapeScriptJson({ code: [fragment.entry, ...fragment.entryImports], hoverDwellMs: FRAGMENT_HOVER_DWELL_MS, requestPrefix: FRAGMENT_PATH_PREFIX, prefetchAttribute: PREFETCH_ATTRIBUTE, idleBytesPerSecond: FRAGMENT_IDLE_BYTES_PER_SECOND, idleMeasuredBytes: FRAGMENT_IDLE_MEASURED_BYTES }) : 'null'}),${MARKLESS_NAV_SETTLE_DEADLINE_MS}${inline ? `,${checkBridgeMove.toString()}` : ''});`
 		: '';
 	const indexed =
 		!fragmentNavigation && linkIntent
@@ -1302,11 +1315,13 @@ function fragmentConfig(
 		servedBodyAttributesProperty: SERVED_BODY_ATTRIBUTES_PROPERTY,
 		stylesheetKeyAttribute: STYLESHEET_KEY_ATTRIBUTE,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
+		reaskProperty: CONTAINER_REASK_PROPERTY,
 		sharedInstances: [PROTOCOL_SHARED_INSTANCES_PROPERTY, RESUME_MODULE_ATTRIBUTE],
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
 		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
 		pendingDeadlineMs: MARKLESS_NAV_SETTLE_DEADLINE_MS,
+		renderedEvent: MARKLESS_ROUTER_RENDERED_EVENT,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,
 		appendMarker: FRAGMENT_APPEND_END,

@@ -14,6 +14,8 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Set on a container Back or Forward shows again as it was left, so its async values re-ask once its runtime wires.
+	readonly reaskProperty: string;
 	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
 	// and the resumer script attribute naming the module that binds the next page to them.
 	readonly sharedInstances: readonly [property: string, resumeModuleAttribute: string];
@@ -22,6 +24,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// Dispatched on the document once the page the user ends up on is in place.
+	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -121,6 +125,8 @@ export type FragmentEntryModule = {
 		scroll: FragmentScroll,
 		// The state's stops when the navigation was asked for: any since cancel it.
 		stops?: number,
+		// When the click asked for it: a page fetched ahead is judged fresh as of then, not once this code arrived.
+		askedAt?: number,
 	) => Promise<void>;
 };
 
@@ -632,6 +638,20 @@ function nodesBetween(parent: Node, after: Node | undefined, before: Node | null
 const scriptsIn = (element: Element): Element[] =>
 	element.localName === 'script' ? [element] : [...element.querySelectorAll('script')];
 
+const isMedia = (element: Element): boolean =>
+	element.localName === 'video' || element.localName === 'audio';
+
+// A media element starts loading where it is parsed, and the parsed page has no window to load into: the live document makes each one anew.
+function adoptArriving<T extends ChildNode>(d: Document, node: T): T {
+	const adopted = d.adoptNode(node);
+	if (adopted.nodeType !== 1) return adopted;
+	const element = adopted as unknown as Element;
+	if (isMedia(element)) return d.importNode(element, true) as unknown as T;
+	for (const media of element.querySelectorAll('video, audio'))
+		media.replaceWith(d.importNode(media, true));
+	return adopted;
+}
+
 const serverHostAttributes = new WeakMap<Document, Set<string>>();
 
 // A container kept in place takes the server's attributes; one a script set on it, and the server never served, stays.
@@ -694,7 +714,7 @@ function morphRange(
 			cursor = after;
 			continue;
 		}
-		const node = d.adoptNode(next);
+		const node = adoptArriving(d, next);
 		parent.insertBefore(node, cursor && cursor !== stop ? cursor : stop);
 		if (node.nodeType === 1) fresh.push(node as Element);
 	}
@@ -781,18 +801,18 @@ function kept(d: Document, from: ChildNode, to: ChildNode, fresh: Element[]): bo
 		}
 	});
 	leaving.forEach((slot, index) => {
-		const nodes = [...arriving[index]!.childNodes].map((node) => d.adoptNode(node));
+		const nodes = [...arriving[index]!.childNodes].map((node) => adoptArriving(d, node));
 		slot.replaceChildren(...nodes);
 		for (const node of nodes) if (node.nodeType === 1) fresh.push(node as Element);
 	});
 	return true;
 }
 
-// A template's content is not its children, so a morph cannot see it; a custom element owns its own state.
+// A template's content is not its children, so a morph cannot see it; a custom element owns its own state; a media element picks its source once.
 const replacedWhole = (element: Element, incoming: Element, page: boolean): boolean =>
 	element.localName === 'template' ||
 	(element.localName === 'script' && (page || !element.isEqualNode(incoming))) ||
-	(element.localName.includes('-') && !element.isEqualNode(incoming));
+	((element.localName.includes('-') || isMedia(element)) && !element.isEqualNode(incoming));
 
 type MorphRange = readonly [
 	parent: Node,
@@ -872,7 +892,7 @@ function morphNode(
 	const name = element.localName;
 	page ||= isContainer(element);
 	if (replacedWhole(element, incoming, page)) {
-		const node = d.adoptNode(incoming);
+		const node = adoptArriving(d, incoming);
 		element.replaceWith(node);
 		fresh.push(node);
 		return;
@@ -1090,6 +1110,7 @@ export async function navigate(
 	mode: 'push' | 'replace' | 'traverse',
 	scroll: FragmentScroll,
 	stops?: number,
+	askedAt?: number,
 ): Promise<void> {
 	const state = (d as FragmentHost).__marklessFragmentNav;
 	const w = d.defaultView;
@@ -1107,7 +1128,8 @@ export async function navigate(
 		else w.location.assign(href);
 	};
 	const started = w.performance.now();
-	const taken = take(state, url, mode === 'traverse', started);
+	const restored = mode === 'traverse' && state.visited.has(pageKey(url));
+	let taken = take(state, url, mode === 'traverse', askedAt ?? started);
 	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
 	// live values before it is shown. A document whose instances hold no values swaps in this task.
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
@@ -1131,14 +1153,20 @@ export async function navigate(
 	keptSwapping?.catch(() => {});
 	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
-	try {
-		fetched = await taken.result;
-	} catch {
-		// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
-		w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
-		return;
+	for (let again = false; ; again = true) {
+		try {
+			fetched = await taken.result;
+		} catch {
+			// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
+			w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
+			return;
+		}
+		if (stale()) return abandon();
+		// A write since the fetch began may change the page: fetch it once more, never in a loop.
+		if (again || taken.writes === state.writes) break;
+		abandon();
+		taken = state.request(url, false);
 	}
-	if (stale()) return abandon();
 	let arrived = !fetched.rest;
 	if (fetched.rest) {
 		const held = await holdStream(
@@ -1324,13 +1352,13 @@ export async function navigate(
 		scripts = fresh.flatMap(scriptsIn);
 		// A box the swap kept still has its offset; scrolling it again would lay out the page before it paints.
 		// 'instant': a `scroll-behavior: smooth` page would otherwise animate every landing.
-		for (const box of offsets)
-			if (!box.element.isConnected)
-				sameBox(scope, box)?.scrollTo({
-					top: box.top,
-					left: box.left,
-					behavior: 'instant',
-				});
+		for (const box of offsets) {
+			const kept = box.element.isConnected;
+			const placed = kept ? box.element : sameBox(scope, box);
+			if (!kept) placed?.scrollTo({ top: box.top, left: box.left, behavior: 'instant' });
+			// No scroll event says so before the next navigation may need it.
+			if (placed) state.scrolled.add(placed);
+		}
 		head.show();
 		for (const element of head.stale) element.remove();
 		if (next.title && d.title !== next.title) d.title = next.title;
@@ -1339,6 +1367,10 @@ export async function navigate(
 	};
 	const committed = commit();
 	if (!committed) return;
+	if (restored)
+		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
+			if (isContainer(container))
+				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
 	const controller = new AbortController();
 	session.streaming = controller;
 	const host = d as unknown as Record<string, unknown>;
@@ -1370,7 +1402,7 @@ export async function navigate(
 		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
-	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
+	d.dispatchEvent(new CustomEvent(state.config.renderedEvent));
 	state.rescan();
 	const key = state.shown;
 	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(

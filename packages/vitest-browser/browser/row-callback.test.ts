@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import ShapesPage from './row-callback/shapes.tsrx';
 import TreePage from './row-callback/page.tsrx';
+import UnshadowedTreePage from './row-callback/page-unshadowed.tsrx';
 
 // A component a constant @for renders gets its props from the row, so a callback it passes on runs with that row's values.
 afterEach(() => cleanup());
@@ -40,6 +41,15 @@ test('CSR: a tree item callback in a child a constant @for renders reads its row
 
 test('SSR: a tree item callback in a child a constant @for renders reads its row prop', async () => {
 	await treeCallbackReadsItsRow((await renderSSR(TreePage)).container);
+});
+
+// The page's const and the child's prop no longer share a name, so nothing but the callback slot lifts the list.
+test('CSR: the tree item callback reads its row when no page name matches a child prop', async () => {
+	await treeCallbackReadsItsRow((await render(UnshadowedTreePage)).container);
+});
+
+test('SSR: the tree item callback reads its row when no page name matches a child prop', async () => {
+	await treeCallbackReadsItsRow((await renderSSR(UnshadowedTreePage)).container);
 });
 
 for (const [shape, entry] of Object.entries(shapes)) {

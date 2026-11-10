@@ -13,7 +13,7 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 				inline-size: 100%;
 				min-inline-size: 0;
 				z-index: 25;
-				--select-wash: color-mix(in srgb, var(--purple) 22%, var(--paper));
+				--select-wash: color-mix(in srgb, var(--purple) 22%, var(--cream));
 			}
 
 			.mode-select-control {
@@ -99,6 +99,11 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 			.mode-select-item[ui-selected] {
 				background: var(--select-wash);
 				font-weight: 600;
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.mode-select-trigger:focus-visible {
@@ -114,6 +119,11 @@ export default function ModeSelect({ mode }: { readonly mode: Mode }) @{
 
 			.mode-select-item[ui-selected]:is(:hover, :focus-visible) {
 				background: var(--select-wash);
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.mode-select-item[ui-disabled] {

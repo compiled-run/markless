@@ -1,0 +1,132 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 44,
+			"reason": "evaluator passes each component definition's optional camelCase attribute-name mapper to the renderer (+44 B rendered), so the 2.6 KB name table loads only in modules that spread attributes",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 95,
+			"reason": "renderer takes an optional camelCase attribute-name mapper at its two spread sites (+211 B rendered, ~55 B minified) so the 2.6 KB name table loads only in modules that spread attributes",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "emitted runtime gzip measured 2 B smaller: the camelCase name table stays out of this fixture, which has no spread",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 44,
+			"reason": "evaluator passes each component definition's optional camelCase attribute-name mapper to the renderer (+44 B rendered), so the 2.6 KB name table loads only in modules that spread attributes",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 95,
+			"reason": "renderer takes an optional camelCase attribute-name mapper at its two spread sites (+211 B rendered, ~55 B minified) so the 2.6 KB name table loads only in modules that spread attributes",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 3035,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 3136,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 168,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1492,
+			"reason": "pages whose components spread props now download the camelCase attribute-name table (1.9 KB raw, 0.9 KB gzip) and the docs playground's in-browser compiler carries it too; measured against the previous PR head, same file count, executed at load +1 to +168 chars",
+			"date": "2026-11-09"
+		}
+	]
+}

@@ -55,6 +55,8 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessComments?: ResumeDomComment[];
 	// The arm each flipping branch shows, for rows written straight into an arm.
 	__marklessBranchArms?: Map<string, ResumeBranchArmEntry>;
+	// Set on a keyed row's root when its repeat wires the row: the items that row names, read at dispatch.
+	__marklessRowLocals?: () => Record<string, unknown>;
 	// Resume reads the host document off the root element (streamed arm patch
 	// scripts, template rendering); the DOM guarantees it, so the surface does too.
 	readonly ownerDocument?: ResumeDomOwnerDocument;
@@ -76,7 +78,12 @@ export type ResumeDomCreatedElement = {
 	innerHTML: string;
 	readonly content?: { readonly childNodes?: ArrayLike<unknown> };
 };
-export type ResumeDomComment = ResumeDomNode & { readonly nodeType: 8; readonly data?: string };
+export type ResumeDomComment = ResumeDomNode & {
+	readonly nodeType: 8;
+	readonly data?: string;
+	readonly parentElement?: ResumeDomElement | null;
+	__marklessRowLocals?: () => Record<string, unknown>;
+};
 export type ResumeBranchArmEntry = {
 	arm?: number;
 	start?: ResumeDomComment;
@@ -134,9 +141,12 @@ export type ResumeAsyncBoundaryRecord = {
 	readonly runnerGraphNodeId: ProtocolViewPayload['asyncBoundaries'][number]['runnerGraphNodeId'];
 	readonly initiallyServedArm: ProtocolViewPayload['asyncBoundaries'][number]['initiallyServedArm'];
 	readonly updateSymbolId?: string;
+	readonly rerendersOnRefresh?: true;
+	readonly catchesHandlers?: true;
 	readonly startAnchor: ResumeDomComment;
 	readonly endAnchor: ResumeDomComment;
 	readonly asyncReads: ProtocolViewPayload['asyncBoundaries'][number]['asyncReads'];
+	readonly asyncSources?: ProtocolViewPayload['asyncBoundaries'][number]['asyncSources'];
 	readonly armRecords?: ResumeArmRecordSet | ReadonlyArray<unknown>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ProtocolViewPayload['asyncBoundaries'][number]['composedGraphProps'];
@@ -145,6 +155,8 @@ export type ResumeAsyncBoundaryRecord = {
 };
 // The range an arm commit addresses: boundaries and escalating branches alike.
 export type ResumeArmRange = Pick<ResumeAsyncBoundaryRecord, 'id' | 'startAnchor' | 'endAnchor'>;
+// A keyed row: its one element, or the start comment of a row that renders between row comments.
+export type ResumeRowRoot = ResumeDomElement | ResumeDomComment;
 export type ResumeBehaviorRecord = ProtocolViewPayload['behaviors'][number];
 export type ResumeKeyedRepeatRecord = NonNullable<ProtocolViewPayload['keyedRepeats']>[number];
 /** Wires the nested repeats inside one row a keyed repeat registered. */
@@ -152,6 +164,10 @@ export type ResumeRepeatRowHook = (
 	repeat: ResumeKeyedRepeatRecord,
 	rowRoot: ResumeDomElement,
 	rowKey: unknown,
+	/** The element an arm-relative address names while the row shows that arm. */
+	armHost?: (at: ResumeKeyedRepeatRecord['rowEvents'][number]) => ResumeDomElement | undefined,
+	/** Only the row's arms changed: rewire what sits in them. */
+	armsOnly?: true,
 ) => void;
 /** The app's own module installs this only when a repeat nests inside another's rows. */
 export type ResumeNestedRepeatsHost = {
@@ -258,13 +274,15 @@ export type ElementHandleQualifier = (
 
 type ComposedBoundary = Pick<
 	ResumeAsyncBoundaryRecord,
-	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix'
+	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix' | 'updateSymbolId'
 >;
 export type ComposedArmRecordQualifier = ((
 	boundary: ComposedBoundary,
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
+	/** The id the boundary's render spelled, when it already carries part of the page path. */
+	renderedBoundaryId?: string,
 ) => ResumeArmRecordSet) & {
 	/** The graph a composed part's settle symbol reads, its routed props answered from the caller's nodes. */
 	readonly graph?: (graph: RuntimeGraph, boundary: ComposedBoundary) => RuntimeGraph;
@@ -273,6 +291,13 @@ export type ComposedArmRecordQualifier = ((
 		branch: ComposedBoundary & { readonly symbolId?: string },
 		update: U,
 		graph: RuntimeGraph | undefined,
+	) => U;
+	/** A composed part's settled arm, its records, cells and computeds re-spelled in page space. */
+	readonly boundaryUpdate?: <U extends { readonly armRecords: ResumeArmRecordSet }>(
+		boundary: ComposedBoundary,
+		update: U,
+		graph: RuntimeGraph | undefined,
+		renderedBoundaryId?: string,
 	) => U;
 };
 
@@ -324,12 +349,19 @@ export type ResumeSymbolContext = {
 	readonly rosterCount?: (rosterGraphNodeId: string) => number;
 	readonly locals?: Readonly<Record<string, unknown>>;
 	readonly arm?: number;
+	// Asks an async-boundary update symbol for its arms' records alone.
+	readonly armRecordsOnly?: true;
 	readonly branchId?: string;
 	readonly composedBranchId?: string;
 	readonly behaviorInputs?: ReadonlyArray<unknown>;
 	readonly domUpdate?: ProtocolViewPayload['domUpdates'][number];
 	readonly value?: unknown;
 	readonly asyncBoundary?: ResumeAsyncBoundaryRecord;
+	/** The page's @try blocks and the page graph, so a handler's rejection finds the nearest @catch around its element. */
+	readonly catchScope?: {
+		readonly graph: Pick<RuntimeGraph, 'read'>;
+		readonly boundaries: () => Iterable<ResumeAsyncBoundaryRecord>;
+	};
 	readonly asyncRead?: ResumeAsyncBoundaryRead;
 	readonly status?: 'fulfilled' | 'rejected';
 	readonly args?: ReadonlyArray<unknown>;
@@ -337,6 +369,8 @@ export type ResumeSymbolContext = {
 	readonly invokeSymbol?: (symbolId: string, context: ResumeSymbolContext) => Promise<unknown>;
 	// Called at an authored `await` in a handler: the page's next event may start.
 	readonly releaseQueue?: () => void;
+	// Open while this call runs inside a real DOM event's dispatch.
+	readonly userActionToken?: { readonly open: boolean };
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (
@@ -436,6 +470,14 @@ export type ResumeRuntime = {
 	readonly getAsyncBoundary: (boundaryId: string) => ResumeAsyncBoundaryRecord | undefined;
 	readonly getBranch: (branchId: string) => ResumeBranchRecord | undefined;
 	readonly disposeHost: (hostNodeId: string) => void;
+	/** What a staged sibling runtime releases when its commit removes them. */
+	readonly hostElements?: ReadonlyMap<string, ResumeDomElement>;
+	readonly armBranches?: () =>
+		| {
+				readonly branchesById: ReadonlyMap<string, ResumeBranchRecord>;
+				readonly armFlipReleasesByBoundary: Map<string, Array<() => void>>;
+		  }
+		| undefined;
 	readonly dispose: () => void;
 	readonly whenAsyncBoundariesSettled?: () => Promise<void>;
 	readonly holdPendingSettleCommits?: (minVisibleMs: number) => Promise<void> | void;

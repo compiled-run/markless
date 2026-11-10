@@ -2,14 +2,12 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { FRAGMENT_REGION_END, fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { urlKeyedCache } from '../support/url-keyed-cache.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A Nitro `vercel` build served through Vercel's routing (test/support/vercel-sim.mjs), with a
 // cache keyed on the URL in front. An ISR route reaches the function through Nitro's ISR rewrite,
@@ -38,14 +36,10 @@ async function serveOnVercel(isrRoute: string): Promise<string> {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
 		nitro: { preset: 'vercel', routeRules: { [isrRoute]: { isr: true } } },
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	});
 	const server = await startBuiltServer(simulator, {
 		env: {
 			PATH: process.env.PATH,

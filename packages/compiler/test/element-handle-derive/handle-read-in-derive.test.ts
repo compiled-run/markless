@@ -58,7 +58,7 @@ export const plural = shared(
 		const itemEls = element<HTMLDivElement[]>();
 		return { ...s, itemEls };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PluralRoot({ children }) @{
@@ -95,7 +95,7 @@ export const factory = shared(
 		const shownCount = computed(() => \`\${s.tick}|\${itemEls}\`);
 		return { ...s, itemEls, shownCount };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function FactoryItem({ value }) @{

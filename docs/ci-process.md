@@ -41,7 +41,7 @@ Measured on `origin/main` at `1f6d2cd3` (Apple Silicon, warm pnpm store):
 
 | Mode      | Jobs                                                                                                                                               | Time                                                                                                                                                                          |
 | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
+| `--fast`  | `agent-files` (2 s), `typecheck` (workflow check, `pnpm typecheck`, `vp check --no-fmt`: 9 s), `typecheck-ts7` (`pnpm typecheck:ts7`, TypeScript 7.1 over the root and `website/`: about 3 s, then the site's component and page tests, the `website` project in `website/`: about 6 s, both added later), `unit` (`vp test --project node`: 52 s)             | **64 s**                                                                                                                                                                      |
 | `--full`  | fast, plus `browser` (browser + `ui` projects, `api:check`), `completion-matrix` (measured alone: 6 s), the four box jobs, `test` (the analyzer receipt set), `website-boxes`, `perf-guards`, `demo-boxes`, `package-manager-matrix` | not timed end to end in this task: the box jobs bind fixed ports that another worker on this machine was using; expect roughly the sum of the CI lane times, 20 to 40 minutes |
 | `--clean` | any mode, in a fresh worktree of `HEAD`                                                                                                            | adds about 5 s (worktree + offline `pnpm install`)                                                                                                                            |
 
@@ -119,7 +119,7 @@ Every job in `ci.yml` runs on pull requests, in the merge queue and on pushes to
 | --- | --- | --- | --- | --- |
 | `agent-files` | agent files match `.ruler/` | always | always | always |
 | `typecheck` | `ci.yml` structure, `pnpm typecheck`, lint | always | always | always |
-| `typecheck-ts7` | the same type gate on TypeScript 7.1 | always | always | always |
+| `typecheck-ts7` | the same type gate on TypeScript 7.1, then the website's component and page tests (its tooling tests run in `website-boxes`) | always | always | always |
 | `unit` (3 shards) | the node test project, including Chromium and WebKit fixture tests | when its inputs changed | same | skipped if the queue tested the commit |
 | `browser` (3 shards) | the real-Chromium `browser` and `ui` projects, the `@markless/ui` API manifest | when its inputs changed | same | same |
 | `completion-matrix` | the packaged editor plugin's completions | when its inputs changed | same | same |
@@ -152,9 +152,7 @@ A flake is a test that fails and passes on the same code. Rules:
 
 ### Quarantined tests
 
-| Test | Expires | Owner | Why |
-| --- | --- | --- | --- |
-| `packages/vitest-browser/browser/child-async-prop/child-async-prop.test.ts`, both tests | 2026-11-10 | author of #322 (`test/hold-search-in-stale-checks`) | Failed 8 CI runs on 2026-10-27 (merge groups for #265, #294, #303, #304 and #310; pull request runs of `fix/rl-state-escapes`, `fix/rl-state-snapshots` and `fix/maieul-row-prop`), each `expected [ null, '1' ] to deeply equal [ 'true', '0.5' ]`: after the second keystroke the dimmed list never showed. On this Mac at load average 44 the SSR test failed the same way 7 of 10 runs. With the fixture search held until the test releases it (#322's test change), the list is missing instead (`[ null, undefined ]`, 2 of 5 runs): the settle drew the `@pending` arm for an answer a newer search had superseded. That is a runtime race in `settleAsyncBoundaryRange` (`packages/web/src/resume-async-wiring.ts`), which #322 fixes. On the expiry date both tests run again and a guard test in the same file fails. |
+None right now. An entry is a table row naming the test, its expiry date, its owner and why it is skipped.
 
 ### Quarantine list
 
@@ -166,7 +164,7 @@ A test listed here failed and then passed on a rerun of the same commit at least
 | `packages/router/test/vite/fragment-cache.test.ts` (chromium) | "the move that woke the navigation code over a link still counts as resting on it" (30 s timeout), "a page that answers Cache-Control: no-store is fetched again at the click" | CI runs 40193557743, 40075780850 | thejackshelton | 2026-11-09 |
 | `packages/bundler/test/ssr-browser-hmr.test.ts` | "reports an invalid real edit without reload and clears it before the corrected reload", "a new .tsrx file nothing loaded imports sends no reload and no error" (watcher events, see the mechanisms above) | CI runs 39978464580, 39404383274 | thejackshelton | 2026-11-09 |
 | `benchmark-guard` | "The benchmark shards disagree on whether the app changed": two shards built different apps from one commit | CI runs 40195481656, 40017342977 | thejackshelton | 2026-11-09 |
-| `packages/router/test/vite/navigation-release.test.ts` | "in-place navigations leave no window or document listeners behind and retain no page beyond the visit cache": retained nodes past the allowance (1267 vs 343, about seven held pages), on a fixture with no child components | CI run 42042489083 (passed on rerun); also seen in 40401426019 | thejackshelton | 2026-11-19 |
+| `packages/router/test/vite/navigation-release.test.ts` | "in-place navigations leave no window or document listeners behind and retain no page beyond the visit cache": retained nodes past the allowance (1267 vs 343, about seven held pages), on a fixture with no child components | CI run 42042489083 (passed on rerun); also seen in 40401426019, 42096673239, 42100423455, 42416048773, 42501156310, 42542921106 and 42574774623 (twice) | thejackshelton | 2026-11-19 |
 | `packages/cli/test/workspace-matrix.test.ts` (`package-manager-matrix`) | npm installs time out at 90 s ("a non-member app installs on its own", "an app that already matches a member declaration") | CI run 39741280055; the 0.9.0 release pull request run | thejackshelton | 2026-11-09 |
 
 Seen once in the same window and watched, not listed: `fragment-navigation.test.ts` (40070980873), `music-player-ssr-budget.test.ts` (40100142200), `node-in-browser-fixture.test.ts` (39908441660), `item-collections.test.ts` (39903780595), `resizable.browser.ts` (39936516624), `toaster.browser.ts` (39117438419), `component-row-refresh.test.ts` (39110964263), `completion-matrix.test.ts` M10 (39404383274), `website/boxes/reload-stability.box.ts` (41939839344, the warm reload shifted layout by CLS 0.0044). Locally under heavy load (load average 50 to 70) the pre-commit run of `--fast` also timed out in `fixed-route-rows.test.ts` (its `afterAll` past the 10 s hook timeout), `markless-tsc.test.ts`, `language.test.ts` and several bundler tests; each passed alone in seconds.
@@ -186,7 +184,8 @@ Byte walls and budgets failed 54 runs, usually by a few bytes to a few hundred. 
 - Changing a budget or anchor requires a one-line reason in the same commit (`pnpm perf:guard:accept <guard> "<subject>" --reason "<one line>"` for the perf guards and `MARKLESS_ACCEPT_FIXTURE_RUNTIME=1 MARKLESS_ACCEPT_REASON="<one line>"` for the `fixture-builds` anchors and walls, both recorded as a change file (below); the same shape for the music-player budgets, box byte walls, and the `reason` beside each budget in `scripts/benchmarks/build-scale/budgets.json`).
 - Re-anchoring is a decision, not a fix: the reason says what the extra bytes buy, or which win the lower anchor records.
 - A big win re-anchors in the same change set, so the anchor stays close to reality.
-- Byte walls must be measured the way CI measures them (`NODE_ENV=test` from vitest, a clean tree). `ci:local --clean` does that; a hand-run demo build does not.
+- Byte walls must be measured the way CI measures them (a clean tree, through the same test). `ci:local --clean` does that; a hand-run demo build does not.
+- The `fixture-builds` child builds run with `NODE_ENV=production`, although vitest sets `NODE_ENV=test`. Under `test`, `import.meta.env.DEV` is true, so development-only checks (and the modules only they import) are built and counted in the per-module figures though they never ship; under `production` they fold away, so the lane counts only shipped code.
 
 The `fixture-builds` walls have been seen to differ between worktrees on the same Mac. Until that is explained, a wall that passes in one checkout and fails in another is treated as an environment bug to fix, not as slack to spend.
 
@@ -213,6 +212,21 @@ The `fixture-builds` walls have been seen to differ between worktrees on the sam
 **What still costs a round.** Gzip is not exactly additive when two pull requests change the same file: the tree with both can measure a few bytes more or less than the sum of their two changes. More fails loudly, as it should, since those bytes are recorded nowhere; the second pull request accepts once more on a tree with both, which records its change against a merge-base that includes the first. Less leaves the limit that many bytes above the tree until the next accept on that anchor. The `fixture-builds` walls keep their 12 to 21 B margins, which already exist for gzip variance between runs. A pull request that moves a Linux-only G16 number still needs a Linux measurement of both trees: its own CI run's artifact for `--from`, and for `--base` the artifact of the merge-queue run that tested the merge-base commit (the queue's commit is the one that lands). When that run skipped the perf-guards lane because its inputs had not changed, the last run that did measure those inputs has the same numbers.
 
 **Scope.** The perf-guard anchors and the `fixture-builds` runtime anchors and gzip walls use this from 2026-11-03. The music-player budgets, the build-scale budgets and box byte walls change a few times a month and still edit their own files; they move onto the same ledger if they start to collide.
+
+### Unit CPU and memory budget
+
+Each `unit` shard runs under `scripts/ci/unit-budget.mjs measure`, which records the CPU-seconds of the whole process tree it waited for (Linux `cutime` + `cstime`) and the tree's peak RSS, sampled once a second, and uploads them as a `unit-budget-shard<n>-attempt<n>` artifact. The `test` job then runs `unit-budget.mjs check` on the latest attempt of every shard against `scripts/ci/unit-budget.json`:
+
+- GitHub hands out runners with different CPU models, and the same shard spent 543 CPU-seconds on an AMD EPYC 9V45 and 831 on an EPYC 7763. Before the tests, `measure` times a fixed JavaScript workload in one process per CPU at once (the fastest of three rounds in each, so shared cores slow it as they slow the tests), and the check scales each shard's CPU-seconds to the anchors' speed by that calibration. The calibration's own CPU is not counted.
+- The gated numbers are the shards' summed scaled CPU-seconds and the largest shard's peak RSS. Vitest assigns files to shards by path, so adding a test file moves work between shards; the sum and the largest shard move only with real work.
+- A number above its anchor by more than the noise margin fails as over budget. A number below it by more than the margin fails as a stale anchor, so a landed win is recorded instead of leaving slack behind.
+- The margin is measured, not chosen: `unit-budget.mjs margin --from <run>... --reason "..."` takes every attempt of every shard in the given runs (at least three samples a shard, all on the same set of test files) and stores the largest deviation of a sample from its shard's median, with the samples, in the budget file.
+- Anchors are Linux numbers from CI, never from a Mac: `unit-budget.mjs accept --from <run> --reason "..."` downloads that run's artifacts with `gh run download` and anchors each shard at its median over every attempt of the runs given. The reason says what the extra CPU buys, or which win the lower anchor records.
+- The check runs only in a run whose unit lane ran; a lane skipped on its content hash measured nothing.
+
+### Heavy unit tests
+
+`scripts/ci/test-placement.mjs`, in the `agent-files` job, lists the node project's test files through Vitest and walks their imports on the yuku project graph (`packages/analyzer/test-support/test-placement.ts`, parsing only the modules the tests reach). A test whose imports reach an entry in `scripts/ci/heavy-tests.json` (the router fixture-build helper, the browser launch and built-server helpers, a Playwright browser type, Vite's build API) must be listed under `tests`; a listed test that no longer reaches one fails as stale. A script a test spawns by `resolve(import.meta.dirname, '<file>')` counts as an import. A test that is heavy by a route no import shows, such as running `pnpm build` or `vp pack` in a child process, is listed under `declared` with the reason. `node scripts/ci/test-placement.mjs --write` rewrites `tests` from the graph for review; `--json` prints the import chain that makes each test heavy.
 
 ### Build warnings
 

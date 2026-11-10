@@ -16,6 +16,10 @@ import {
 } from '../src/index.ts';
 import type { ProtocolViewPayload } from '@markless/serializer';
 import { resumePrerenderTriggerGroup } from '../src/fns/prerender-trigger-resume.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
+
+// Each module serving async values installs their plane; these tests build such graphs by hand.
+installMarklessAsyncPlane();
 
 type FakeElement = {
 	readonly nodeType: 1;
@@ -238,7 +242,7 @@ test('runtime decodes shared definition metadata from async state payload script
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [
@@ -280,7 +284,7 @@ test('runtime decodes shared definition metadata from async state payload script
 			id: 'shared:src/session.tsrx#session',
 			name: 'session',
 			exportedName: 'session',
-			scope: 'page',
+			scope: 'app',
 			version: 0,
 			graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 			returnProperties: [
@@ -327,7 +331,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([
 		{
 			id: 'shared:src/session.tsrx#session',
-			scope: 'page',
+			scope: 'app',
 			version: 1,
 			patch: [['set', ['status'], 'ready']],
 		},
@@ -351,7 +355,7 @@ test('runtime decodes shared definition metadata from async state payload script
 	expect(graph.takeSharedPatches()).toEqual([
 		{
 			id: 'shared:src/session.tsrx#session',
-			scope: 'page',
+			scope: 'app',
 			version: 2,
 			patch: [['set', ['user', 'name'], 'Grace']],
 		},
@@ -390,7 +394,7 @@ test('runtime folds received shared patch records into decoded graph state', asy
 				id: 'shared:src/session.tsrx#session',
 				name: 'session',
 				exportedName: 'session',
-				scope: 'page',
+				scope: 'app',
 				version: 0,
 				graphNodeIds: ['shared:src/session.tsrx#session/state:data'],
 				returnProperties: [
@@ -737,11 +741,13 @@ test('payload script resume restores fulfilled async computed snapshots before r
 	await settleMicrotasks();
 	await resumed.graph.flush();
 
+	// A plain `graph.write` outside a user action is a quiet refresh: no busy mark, no announcement.
 	expect(resumed.graph.read('computed:details')).toEqual({
 		status: 'fulfilled',
 		version: 2,
 		key: 'grace',
 		value: { title: 'User grace' },
+		quiet: true,
 	});
 });
 
@@ -2284,4 +2290,37 @@ test('a resume whose page an in-place navigation swapped while it loaded leaves 
 	});
 	expect(resumed.runtime).toBeDefined();
 	expect(root.listeners).toEqual([]);
+});
+
+test('a navigation that swaps the page while the resume module loads leaves the new page alone', async () => {
+	const root = element('SECTION', [element('DIV')]) as FakeElement & {
+		__mL?: object;
+		__mStart?: unknown;
+	};
+	root.__mL = {};
+	const view: ProtocolViewPayload = {
+		version: 1,
+		locators: [
+			{ hostNodeId: 'h0', strategy: 'dom-order', index: 0, tagName: 'section' },
+			{ hostNodeId: 'h1', strategy: 'dom-order', index: 1, tagName: 'input' },
+		],
+		events: [{ hostNodeId: 'h1', eventName: 'keydown', symbolIds: ['symbol:key'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const scripts = renderPayloadScripts({ state: createProtocolStatePayload({ cells: [] }), view });
+	const resuming = resumeFromPayloadScripts({
+		root,
+		stateScript: scripts.stateScript,
+		viewScript: scripts.viewScript,
+		loadSymbol: () => () => {},
+	});
+	// The router's swap gives the container a new page lifetime and drops the leaving page's runtime state.
+	root.__mL = {};
+	const resumed = await resuming;
+	expect(resumed.runtime).toBeDefined();
+	expect(root.listeners).toEqual([]);
+	expect(root.__mStart).toBeUndefined();
 });

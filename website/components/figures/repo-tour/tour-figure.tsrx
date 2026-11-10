@@ -172,10 +172,9 @@ export default function TourFigure() @{
 				--line: color-mix(in oklch, var(--purple, oklch(60% 0.12 300)) 55%, var(--ink));
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -213,7 +212,7 @@ export default function TourFigure() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -236,6 +235,10 @@ export default function TourFigure() @{
 			.folder-fill,
 			.map-fill {
 				fill: color-mix(in oklch, var(--yellow) 30%, var(--sheet));
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--yellow) 30%, color-mix(in oklch, var(--cream) 50%, white));
+				}
 			}
 
 			.pin-fill {
@@ -245,6 +248,10 @@ export default function TourFigure() @{
 			.here-wash {
 				fill: var(--yellow);
 				opacity: 0.8;
+
+				html.dark & {
+					opacity: 1;
+				}
 			}
 
 			text {
@@ -313,6 +320,10 @@ export default function TourFigure() @{
 			.stop-hit:hover,
 			.side-hit.on {
 				fill: color-mix(in oklch, var(--yellow) 28%, transparent);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--ink) 12%, transparent);
+				}
 			}
 
 			.side-hit {
@@ -351,6 +362,11 @@ export default function TourFigure() @{
 			.dot.on {
 				border-color: var(--ink);
 				background: color-mix(in oklch, var(--yellow) 55%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--yellow) 55%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.next {
@@ -364,6 +380,11 @@ export default function TourFigure() @{
 
 			.next:hover {
 				background: color-mix(in oklch, var(--pink) 25%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--pink) 25%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.next:active {

@@ -233,11 +233,44 @@ export function App() @{
 	const result = await compileTsrxModule({ filename: 'src/Siblings.tsrx', source, symbols: [] });
 
 	const [diagnostic] = result.semanticGraph.diagnostics;
-	expect(diagnostic?.code).toBe('MARKLESS_PARSE_ERROR');
-	expect(diagnostic?.title).toBe('A code block renders a single node');
-	expect(diagnostic?.message).toContain('`<main>` on line 4 follows another node');
+	expect(diagnostic?.code).toBe('MARKLESS_BLOCK_SIBLING_NODES');
+	expect(diagnostic?.phase).toBe('parse');
+	expect(diagnostic?.title).toBe('A block renders one node');
+	expect(diagnostic?.message).toContain('`<main>` on line 4 is a second node in the same block');
 	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
+	expect(diagnostic?.docsUrl).toBe('https://markless.dev/errors/MARKLESS_BLOCK_SIBLING_NODES');
 	expect(diagnostic?.primarySpan?.start).toBe(source.indexOf('<main>'));
+	expect(result.publicRenderModule.ssrModuleSource).toBe('');
+});
+
+test('two nodes in an @try, @pending or @catch arm name the arm rule and the fragment fix', async () => {
+	for (const arm of ['try', 'pending', 'catch'] as const) {
+		const body = (name: string) =>
+			arm === name ? '<h2>Report</h2>\n\t\t\t<ul><li>a</li></ul>' : '<p>x</p>';
+		const source = `import { computed } from '@markless/core';
+export default function Report() @{
+	const report = computed(async () => ({ total: 1 }));
+	<section>
+		@try {
+			${body('try')}
+		} @pending {
+			${body('pending')}
+		} @catch {
+			${body('catch')}
+		}
+	</section>
+}
+`;
+		const result = await compileTsrxModule({ filename: 'src/Report.tsrx', source, symbols: [] });
+
+		const [diagnostic] = result.semanticGraph.diagnostics;
+		expect(diagnostic?.code).toBe('MARKLESS_BLOCK_SIBLING_NODES');
+		const line = source.slice(0, source.indexOf('<ul>')).split('\n').length;
+		expect(diagnostic?.message).toContain(`\`<ul>\` on line ${line} is a second node`);
+		expect(diagnostic?.message).toContain('@try, @pending and @catch arm');
+		expect(diagnostic?.suggestions[0]?.message).toContain('`<><h2>Title</h2><ul>…</ul></>`');
+		expect(diagnostic?.primarySpan?.start).toBe(source.indexOf('<ul>'));
+	}
 });
 
 test('a statement after the rendered markup names the reorder that fixes it', async () => {
@@ -2834,13 +2867,13 @@ test('sibling top-level elements without a fragment are refused with the fragmen
 
 	expect(result.semanticGraph.diagnostics).toEqual([
 		expect.objectContaining({
-			code: 'MARKLESS_PARSE_ERROR',
-			title: 'A code block renders a single node',
+			code: 'MARKLESS_BLOCK_SIBLING_NODES',
+			title: 'A block renders one node',
 			primarySpan: expect.objectContaining({ start: source.indexOf('<button') }),
 		}),
 	]);
 	const [diagnostic] = result.semanticGraph.diagnostics;
-	expect(diagnostic?.message).toContain('`<button>` on line 9 follows another node');
+	expect(diagnostic?.message).toContain('`<button>` on line 9 is a second node in the same block');
 	expect(diagnostic?.suggestions[0]?.message).toContain('put `<>` before the first and `</>` after the last');
 	expect(result.publicRenderModule.ssrModuleSource).toBe('');
 });

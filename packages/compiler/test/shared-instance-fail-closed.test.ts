@@ -26,7 +26,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = !s.checked; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();
@@ -66,7 +66,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, toggle() { s.checked = !s.checked; s.onChange?.(s.checked); } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Box() @{
 	const s = spike();
@@ -98,7 +98,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true, disabled: false });
 	return { ...s, toggle() { s.checked = !s.disabled && !s.checked; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();
@@ -123,7 +123,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, set(key, value) { s[key] = value; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();
@@ -148,7 +148,7 @@ import { shared, state } from '@markless/core';
 export const spike = shared(() => {
 	const s = state({ checked: true });
 	return { ...s, mirror(key) { s.checked = s[key] === true; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root(props) @{
 	const s = spike();

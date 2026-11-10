@@ -1,11 +1,13 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 import type {
 	SemanticElementHandleBinding,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticSharedDependency,
+	SemanticSharedScope,
 	SemanticStateRead,
 	SemanticTemplateRead,
 	SourceSpan,
@@ -189,14 +191,18 @@ export function handlerReadsRenderLocalDiagnostic(input: {
 	readonly localName: string;
 	readonly handler: AnyNode;
 	readonly filename: string;
+	// A handler named by the local itself, with the reason its function cannot be rebuilt.
+	readonly unroutable?: { readonly why: string; readonly rewrite: string };
 }): SemanticGraphDiagnostic {
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_HANDLER_READS_RENDER_LOCAL',
 		title: 'A handler reads a component-body local the browser cannot recompute',
 		message: `The \`${input.handlerLabel}\` handler reads \`${input.localName}\`, a local of the component body. The body runs only during the initial render, so the browser copy of this handler would name a variable that does not exist there.`,
-		why: 'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
+		why:
+			input.unroutable?.why ??
+			'A handler runs in the browser from graph reads, props, and module values. A `const` local built only from those is recomputed in place; any other local has no value the browser can reach.',
 		span: sourceSpan(input.handler, input.filename),
-		suggestion: `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
+		suggestion: input.unroutable?.rewrite ?? `Declare \`${input.localName}\` as \`const ${input.localName} = ...\` built only from module values, props, and state; move it to module scope; or make it state: \`const ${input.localName} = state(...)\`.`,
 		docsUrl: 'https://markless.dev/errors/MARKLESS_HANDLER_READS_RENDER_LOCAL',
 	});
 }
@@ -701,6 +707,32 @@ function unstableCreationSiteText(
 	}[site];
 }
 
+export function asyncInputBesideValueDiagnostic(input: {
+	readonly read: string;
+	readonly input: string;
+	readonly value: string;
+	readonly span?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'Text shows an input of an async value without the value',
+		message: `{${input.read}} reads "${input.input}", which "${input.value}" is fetched with, but not "${input.value}" itself. During a refresh it shows the new "${input.input}" next to the old "${input.value}".`,
+		why: `A refresh keeps the shown "${input.value}" until the new result lands. Text that reads "${input.value}" waits with it; text that reads only "${input.input}" changes at once.`,
+		primarySpan: input.span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		source: input.read,
+		suggestions: [
+			{
+				message: `Read it through the async value: return "${input.input}" from "${input.value}" and show {${input.value}.${input.input}}.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
+	};
+}
+
 export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,
@@ -958,7 +990,8 @@ export function invalidSharedScopeDiagnostic(input: {
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
 }): SemanticGraphDiagnostic {
-	const valid = '"request", "container", "page", and "widget"';
+	const quoted = PROTOCOL_SHARED_SCOPES.map((scope) => `"${scope}"`);
+	const valid = `${quoted.slice(0, -1).join(', ')}, and ${quoted.at(-1)}`;
 	const literal = input.valueSource?.startsWith("'") || input.valueSource?.startsWith('"');
 	const valueText = literal ? `"${input.valueSource?.slice(1, -1)}"` : input.valueSource;
 	return semanticGraphDiagnostic({
@@ -967,11 +1000,27 @@ export function invalidSharedScopeDiagnostic(input: {
 		message: literal
 			? `Unknown shared() scope ${valueText}. Valid scopes are ${valid}.`
 			: `shared() scope must be a string literal. Valid scopes are ${valid}.`,
-		why: 'shared() scope controls graph lifetime. Silently dropping an unknown scope changes whether data is request, container, page, or widget owned.',
+		why: 'shared() scope controls how long the data lives and who shares it. Silently dropping an unknown scope would change whether one app, one container, or one rendered subtree owns the data.',
 		span: input.valueSpan,
 		suggestion:
-			'Use `shared(factory, { scope: "request" })`, `shared(factory, { scope: "container" })`, `shared(factory, { scope: "page" })`, or `shared(factory, { scope: "widget" })`.',
+			'Use `shared(factory)` for one copy per app, `shared(factory, { scope: "container" })` for one copy per container, or `shared(factory, { scope: "subtree" })` for one copy per rendered subtree.',
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_INVALID',
+	});
+}
+
+export function renamedSharedScopeDiagnostic(input: {
+	readonly from: string;
+	readonly to: SemanticSharedScope;
+	readonly valueSpan?: SourceSpan;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_SHARED_SCOPE_RENAMED',
+		title: 'shared() scope was renamed',
+		message: `shared() scope "${input.from}" is now "${input.to}".`,
+		why: 'The shared() scopes are app, container, and subtree. "page" and "request" became "app", and "widget" became "subtree", with the same behaviour. The old names no longer compile, so no build keeps a scope by accident.',
+		span: input.valueSpan,
+		suggestion: `Write \`{ scope: "${input.to}" }\`. "app" is the default, so an app-wide shared() can also drop the option.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_SCOPE_RENAMED',
 	});
 }
 
@@ -1080,7 +1129,7 @@ export function sharedSeedUnresolvedValueDiagnostic(input: {
 }
 
 // A shared() definition that several components of its own module resolve is a
-// widget family shape. Left without a scope it is page-scoped, so two of those
+// widget family shape. Left without a scope it is app-scoped, so two of those
 // widgets on one page silently share one graph. The warning makes the scope a
 // choice instead of an omission; either spelling silences it.
 export function implicitFamilyScopeDiagnostic(input: {
@@ -1094,18 +1143,18 @@ export function implicitFamilyScopeDiagnostic(input: {
 		severity: 'warning',
 		phase: 'semantic-graph',
 		title: 'shared() family has no declared scope',
-		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it is page-scoped.`,
-		why: 'A page-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
+		message: `${input.componentNames.length} components in this module resolve shared() "${input.definitionName}" (${components}), which is the shape of a widget family, but no scope is declared so it has one copy for the whole app.`,
+		why: 'An app-scoped family gives every widget of that family on one page the same graph, so two of them move together. That is a real choice, but silence makes it a surprise.',
 		primarySpan: input.span,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],
 		source: input.definitionName,
 		suggestions: [
 			{
-				message: `Add { scope: 'widget' } to give each rendered widget its own graph.`,
+				message: `Add { scope: 'subtree' } to give each rendered widget its own graph.`,
 			},
 			{
-				message: `Write { scope: 'page' } explicitly to keep one graph shared across the page.`,
+				message: `Write { scope: 'app' } explicitly to keep one graph shared across the app.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_SHARED_FAMILY_SCOPE_IMPLICIT',
@@ -1384,7 +1433,7 @@ export function rowOwnedIdrefElementHandleDiagnostic(
  * The widget root is the component that resolves the factory, and it renders
  * BEFORE the token naming its own instance exists: that token is written into
  * the seed map the root hands its parts. A part reads it; the root cannot. The
- * same holds for a factory whose scope is not `widget`, where one handle would
+ * same holds for a factory whose scope is not `subtree`, where one handle would
  * name one element per page rather than one per rendered widget.
  */
 export function widgetRootIdrefElementHandleDiagnostic(
@@ -1393,11 +1442,11 @@ export function widgetRootIdrefElementHandleDiagnostic(
 	return semanticGraphDiagnostic({
 		code: 'MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 		title: 'This shared() element() handle cannot be named by an IDREF here',
-		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'widget' }.`,
-		why: 'A widget-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for a page-wide factory.',
+		message: `Cannot resolve ${reference.attributeName}={${reference.source}} because "${reference.handleName}" is declared in a shared() factory that is not { scope: 'subtree' }.`,
+		why: 'A subtree-scoped factory is one graph per rendered widget, so the minted id has to carry which widget it belongs to. That token exists for every rendered widget, its root included, and never exists for an app-wide factory.',
 		span: reference.sourceSpan,
 		suggestion:
-			"Give the factory { scope: 'widget' } and keep both ends of the relationship inside one rendered widget.",
+			"Give the factory { scope: 'subtree' } and keep both ends of the relationship inside one rendered widget.",
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ELEMENT_HANDLE_IDREF_WIDGET_ROOT',
 	});
 }
@@ -1914,15 +1963,18 @@ export function attributeObjectValueDiagnostic(
 export function duplicateAttributeDiagnostic(input: {
 	readonly tagName: string | null;
 	readonly attributeName: string;
+	readonly spellings: ReadonlyArray<string>;
 	readonly duplicate: AnyNode;
 	readonly filename: string;
 }): SemanticGraphDiagnostic {
 	const tag = input.tagName ? `<${input.tagName}>` : 'this element';
+	const [first, second] = input.spellings;
+	const written = first !== second ? `, written \`${first}\` and \`${second}\`,` : '';
 	return attributeDisciplineDiagnostic(input.duplicate, input.filename, {
 		code: 'MARKLESS_ATTRIBUTE_DUPLICATE',
 		severity: 'error',
 		title: 'Duplicate attribute on one element',
-		message: `\`${input.attributeName}\` appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
+		message: `\`${input.attributeName}\`${written} appears twice on ${tag}. Only one can win, and render paths can disagree about which value is used.`,
 		why: 'Duplicate attributes ship invalid HTML and make the element depend on parser and update semantics instead of one authored value.',
 		suggestion: `Keep one \`${input.attributeName}\` attribute on this element.`,
 	});
@@ -2054,6 +2106,31 @@ export function asyncArmOrderDiagnostic(input: {
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARM_ORDER',
+	};
+}
+
+export function asyncCatchWithoutTryDiagnostic(input: {
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'An `@catch` is written without an `@try` before it',
+		message:
+			'This `@catch` follows an element, not an @try block, so it is not read as a catch arm. TSRX parses it as literal text, and the block after it as a separate expression, so the page would show the words "@catch" and render the block as ordinary content.',
+		why: 'An `@catch` arm belongs to the `@try` block written directly before it. Without one there is no block for it to catch errors from, and building it anyway would ship visible text instead of failing.',
+		primarySpan: sourceSpan(input.node, input.filename),
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Wrap the content that can fail in an @try and put the arm after it: `@try { ... } @catch (error) { ... }`.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_CATCH_WITHOUT_TRY',
 	};
 }
 

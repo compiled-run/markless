@@ -83,7 +83,7 @@ export const tableState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One instance per row, rooted by `table.item`. */
@@ -93,7 +93,7 @@ export const tableItemState = shared(
 
 		return { ...item };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TableRoot({

@@ -81,6 +81,8 @@ Each side of an `@if` holds one element. For more, wrap them in `<>` and `</>`:
 }
 ```
 
+Two elements side by side stop the build with [`MARKLESS_BLOCK_SIBLING_NODES`](/errors/MARKLESS_BLOCK_SIBLING_NODES). The same goes for every `@` block: `@for`, `@switch` cases, `@try`, `@pending` and `@catch`.
+
 ## `@else if` asks the next condition
 
 Conditions are asked top to bottom. The first true one wins, and `@else` catches the rest.
@@ -212,6 +214,21 @@ When an element should stay on the page, with its scroll position and its typed 
 	Play
 </button>
 ```
+
+## An attribute that comes and goes
+
+For one attribute, you don't need an `@if`. Give it a value that can be missing:
+
+| Value | What the element gets |
+| --- | --- |
+| `undefined`, `null` | no attribute |
+| `false` | no attribute, except the names listed below, which get `"false"` |
+| `true` | the bare attribute, as in `disabled=""`; `aria-*`, `data-*`, `draggable`, `contenteditable` and `spellcheck` get `"true"` |
+| a string or number | that text |
+
+`aria-pressed={false}` writes `aria-pressed="false"`, because for these states "false" and missing mean different things to a screen reader: `aria-atomic`, `aria-busy`, `aria-checked`, `aria-current`, `aria-disabled`, `aria-expanded`, `aria-grabbed`, `aria-haspopup`, `aria-invalid`, `aria-modal`, `aria-multiline`, `aria-multiselectable`, `aria-pressed`, `aria-readonly`, `aria-required` and `aria-selected`. `draggable`, `contenteditable` and `spellcheck` write `"false"` too. Every other attribute, `aria-hidden` included, is removed by `false`. To drop one of those states, pass `undefined`: `aria-busy={saving ? true : undefined}`.
+
+You rarely write `aria-busy` yourself. While an async value loads again, Markless marks the elements that show it. See [Async values](/concepts/async#the-old-answer-stays-until-the-new-one-is-ready).
 
 Not yet: a `computed()` can't be written inside a side; declare it above.
 

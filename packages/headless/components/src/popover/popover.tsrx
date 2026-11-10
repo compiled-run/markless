@@ -47,7 +47,7 @@ export const popoverState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function PopoverRoot({

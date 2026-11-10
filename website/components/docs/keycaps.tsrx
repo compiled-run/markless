@@ -163,7 +163,18 @@ export default function KeyCaps({ family, lit }: {
 			.keycaps[data-lit='5'] .row[data-row='5'] .face,
 			.keycaps[data-lit='6'] .row[data-row='6'] .face,
 			.keycaps[data-lit='7'] .row[data-row='7'] .face {
-				fill: color-mix(in srgb, var(--yellow) 75%, var(--paper));
+				fill: color-mix(in srgb, var(--yellow) 75%, var(--cream));
+			}
+
+			html.dark .keycaps[data-lit='0'] .row[data-row='0'] .text,
+			html.dark .keycaps[data-lit='1'] .row[data-row='1'] .text,
+			html.dark .keycaps[data-lit='2'] .row[data-row='2'] .text,
+			html.dark .keycaps[data-lit='3'] .row[data-row='3'] .text,
+			html.dark .keycaps[data-lit='4'] .row[data-row='4'] .text,
+			html.dark .keycaps[data-lit='5'] .row[data-row='5'] .text,
+			html.dark .keycaps[data-lit='6'] .row[data-row='6'] .text,
+			html.dark .keycaps[data-lit='7'] .row[data-row='7'] .text {
+				color: var(--on-accent);
 			}
 
 

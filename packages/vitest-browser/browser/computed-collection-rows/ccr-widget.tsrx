@@ -62,7 +62,7 @@ export const ccr = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function CcrRoot({ month = '2026-08', children }) @{

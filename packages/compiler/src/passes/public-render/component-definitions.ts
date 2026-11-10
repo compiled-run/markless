@@ -29,6 +29,7 @@ import {
 	componentOwnedInitialValues,
 	componentOwnedStateNodes,
 	projectsElementsIntoRows,
+	spreadsAttributes,
 	sameModuleComponentMap,
 	staticHostLocators,
 } from './shared.ts';
@@ -94,6 +95,7 @@ export function collectPublicRenderComponentDefinitions(
 				),
 				id: edge.id,
 				childComponentName: edge.childComponentName,
+				...(edge.importSource ? { importSource: edge.importSource } : {}),
 				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
 				hostPrefix: componentEdgeHostSegment(edge, input.semanticGraph.componentEdges),
 				symbolPrefix: componentEdgeInstanceSegment(
@@ -178,11 +180,11 @@ export function collectPublicRenderComponentDefinitions(
 			...chunkGraphNodeIds(childChunks),
 			...branchDecisionGraphNodeIds(childChunks, input.renderData.branches),
 		]);
-		// A widget-scoped shared() graph is one instance per rendered widget, so its
+		// A subtree-scoped shared() graph is one instance per rendered widget, so its
 		// nodes travel with the components that resolve it, not with the module root.
 		const widgetScoped = new Set(
 			input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-				definition.scope === 'widget' ? [definition.id] : [],
+				definition.scope === 'subtree' ? [definition.id] : [],
 			),
 		);
 		const resolvedDefinitionIds = new Set(
@@ -339,6 +341,8 @@ export function collectPublicRenderComponentDefinitions(
 					: {}),
 				// A build-time gate: the render-data module attaches the per-row record qualifier only here.
 				...(projectsElementsIntoRows(chunks) ? { projectsIntoRows: true } : {}),
+				// A build-time gate: only a module that spreads attributes hands the renderer the camelCase name table.
+				...(spreadsAttributes(input.renderData.chunks) ? { spreadsAttributes: true } : {}),
 				...rootPropEvents(componentName),
 				// This component carries these families' cells so a page that renders
 				// no designated root still has them, but composes as a part of the

@@ -308,6 +308,21 @@ export default function AccordionExamples() @{
 				margin: 0.5rem 0 0 0.4rem;
 			}
 
+			html.dark .accordion-examples {
+				.trigger[ui-open],
+				.searching .found:not([hidden]) {
+					color: var(--on-accent);
+				}
+
+				.trigger[ui-open] {
+					background: color-mix(in srgb, var(--yellow) 45%, color-mix(in oklch, var(--cream) 50%, white));
+				}
+
+				.searching .found:not([hidden]) {
+					background: color-mix(in srgb, var(--yellow) 40%, color-mix(in oklch, var(--cream) 50%, white));
+				}
+			}
+
 			@media (prefers-reduced-motion: reduce) {
 				.chevron {
 					transition: none;

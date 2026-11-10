@@ -1,6 +1,7 @@
 import { isEventAttribute, normalizeEventName } from '../../ast/events.ts';
 import { ownedModuleAst } from './shared-ast.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../../ast/nodes.ts';
+import { handlerMayReturnPromise, isFunctionNode } from './handler-returns-promise.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
 	getElementAttributes,
@@ -22,6 +23,7 @@ import type {
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticTemplateBindingTarget,
+	SemanticTemplateRead,
 	SourceSpan,
 } from '../../artifacts.ts';
 import {
@@ -31,6 +33,7 @@ import {
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
 import { collectComponentEdge, receivedHandlerRelay } from './collect-components.ts';
+import { namedHandler } from './named-handler.ts';
 import {
 	detachedContentMode,
 	isDeclarativeShadowRoot,
@@ -47,6 +50,7 @@ import {
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
+	freeReadSources,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
@@ -56,6 +60,7 @@ import {
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import { collectRowLocalReads } from './row-local-reads.ts';
+import { takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import {
 	extractSyncPolicy,
 	firstDetachedSyncPolicyReference,
@@ -87,11 +92,13 @@ import {
 	unboundIdrefElementHandleDiagnostic,
 	cssAnchorAttributeDiagnostic,
 	templateExpressionUnsupportedDiagnostic,
+	handlerReadsRenderLocalDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	collectDefinitionReads,
+	factoryHandlerSource,
 	inlineHandlerRenderLocals,
 	inlineRenderLocals,
 	liftRenderLocalComposite,
@@ -164,6 +171,8 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
+	const moduleScopeClass = state.currentStyleScopeClass;
+	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
 		collectAttribute(
 			attribute,
@@ -174,6 +183,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			isHostElement,
 		);
 	}
+	state.currentStyleScopeClass = moduleScopeClass;
 
 	if (isHostElement) {
 		joinHostText(node, state);
@@ -193,6 +203,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			isHostElement && isTemplateExpressionChild(child)
 				? textExpressionTarget(node, child)
 				: null;
+		if (isHostElement && child.type === 'JSXTryExpression') placeAsyncBoundary(node, child);
 		walk(child, state);
 	}
 	state.currentProjectionScope = previousProjectionScope;
@@ -230,9 +241,17 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 	collectRowLocalReads(expression, state);
 	const armScoped =
 		!!state.currentArmScope && state.currentArmScope.hostNodeId === state.currentHostNodeId;
+	const armText = asyncArmTextTargets.get(expression);
+	const asyncArmScoped =
+		!armScoped &&
+		!armText &&
+		!!state.currentAsyncBoundaryId &&
+		!!state.currentHostNodeId &&
+		state.currentAsyncArmHostNodeId === state.currentHostNodeId;
 	// An arm re-renders its whole range, child edges included, so the arm wins.
 	const projected =
 		!armScoped &&
+		!asyncArmScoped &&
 		!!state.currentProjectionScope &&
 		state.currentProjectionScope.hostNodeId === state.currentHostNodeId;
 
@@ -241,16 +260,39 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
 		sourceSpan: sourceSpan(expression, state.filename),
-		target: state.currentTextTarget ?? { kind: 'text' },
+		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
 		...(armScoped ? { armScopeBranchSiteId: state.currentArmScope!.branchSiteId } : {}),
+		...(asyncArmScoped ? { armScopeBoundaryId: state.currentAsyncBoundaryId! } : {}),
 		...(projected
 			? { projectedComponentEdgeId: state.currentProjectionScope!.componentEdgeId }
 			: {}),
 		computedGraphNodeId: composite?.graphNodeId,
+		...(composite ? {} : rowAsyncGateReads(expression, state)),
 		...unroutedReadNames(expression, composite, state),
 		componentName: state.currentComponentName ?? undefined,
 	});
+}
+
+function rowAsyncGateReads(
+	expression: AnyNode,
+	state: WalkState,
+): Pick<SemanticTemplateRead, 'asyncGateReads'> {
+	if (!state.currentAsyncBoundaryId || state.currentKeyedRepeatScopeIds.length === 0) return {};
+	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId);
+	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId);
+	const reads = new Map<string, string>();
+	for (const source of freeReadSources(expression, state, true)) {
+		if (repeatRowBindsName(source, state)) continue;
+		const binding = resolveGraphPath(source, bindings, aliases)?.binding;
+		if (binding?.kind === 'computed' && binding.asyncCapable === true)
+			reads.set(binding.id, binding.name);
+	}
+	return reads.size === 0
+		? {}
+		: {
+				asyncGateReads: [...reads].map(([graphNodeId, source]) => ({ source, graphNodeId })),
+			};
 }
 
 // What a read with no route names, so state lowering can say which binding it leaves stale.
@@ -393,19 +435,23 @@ function joinTextParts(
 	]);
 	if (!readSources) return null;
 	const asyncReads = readSources.filter((source) => readsAsyncComputed(source, state));
-	// Joined with other reads, an async value is gated by the @try block it renders in.
-	if (
-		asyncReads.length > 0 &&
-		(asyncReads.length === readSources.length || !state.currentAsyncBoundaryId)
-	)
-		return null;
+	// Joined in one text node, an async value is gated by the @try block it renders in.
+	if (asyncReads.length > 0 && !state.currentAsyncBoundaryId) return null;
 	const parts = children.map((child) =>
 		isTemplateExpressionChild(child)
 			? `\${(${inlined.get(child.expression as AnyNode)!.source}) ?? ''}`
 			: textPartValue(child).replace(/[\\`]|\$\{/g, (match) => `\\${match}`),
 	);
 	const source = `\`${parts.join('')}\``;
-	const composite = mintTemplateExpressionComputed(`() => ${source}`, readSources, state);
+	const composite = mintTemplateExpressionComputed(
+		`() => ${source}`,
+		readSources,
+		state,
+		undefined,
+		false,
+		undefined,
+		true,
+	);
 	if (!composite) return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
@@ -553,6 +599,70 @@ function staticNodeCount(shapes: ReadonlyArray<HostChildShape>): number | null {
 		previous = shape;
 	}
 	return count;
+}
+
+// Static nodes before and after a @try among its host's children; null where only the render knows the count.
+const asyncBoundaryPlacements = new WeakMap<
+	AnyNode,
+	{ readonly before: number | null; readonly after: number | null }
+>();
+
+const asyncArmTextTargets = new WeakMap<AnyNode, SemanticTemplateBindingTarget>();
+
+function placeAsyncBoundary(host: AnyNode, boundary: AnyNode): void {
+	const children = asNodes(host.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const at = children.indexOf(boundary);
+	if (at < 0) return;
+	const shapes = children.map(hostChildShape);
+	asyncBoundaryPlacements.set(boundary, {
+		before: staticNodeCount(shapes.slice(0, at)),
+		after: staticNodeCount(shapes.slice(at + 1)),
+	});
+}
+
+/** Text written straight into a @try arm owns its own text node past the anchor comment, so a refresh rewrites it in place. Call inside the arm. */
+export function placeAsyncArmText(boundary: AnyNode, arm: AnyNode, state: WalkState): void {
+	const placement = asyncBoundaryPlacements.get(boundary);
+	const body = asNodes(arm.body).filter((child) => !isIgnorableJsxTextNode(child));
+	const fragment = body.length === 1 ? body[0] : undefined;
+	if (!placement || fragment?.type !== 'JSXFragment') return;
+	const children = asNodes(fragment.children).filter((child) => !isIgnorableJsxTextNode(child));
+	const shapes = children.map(hostChildShape);
+	for (const run of textRuns(shapes)) {
+		const armBefore = staticNodeCount(shapes.slice(0, run.start));
+		const armAfter = staticNodeCount(shapes.slice(run.end));
+		const textNode =
+			placement.before !== null && armBefore !== null
+				? placement.before + 1 + armBefore
+				: placement.after !== null && armAfter !== null
+					? -(placement.after + armAfter + 2)
+					: null;
+		if (textNode === null) continue;
+		const parts = children
+			.slice(run.start, run.end)
+			.filter((_, at) => shapes[run.start + at] !== 'none');
+		const holes = parts.filter(isTemplateExpressionChild);
+		if (run.holes > 1) {
+			if (!joinTextParts(parts, state)) continue;
+			asyncArmTextTargets.set(holes[0]!.expression as AnyNode, { kind: 'text', textNode });
+			continue;
+		}
+		const hole = holes[0]!;
+		let prefix = '';
+		let suffix = '';
+		let seen = false;
+		for (const part of parts) {
+			if (part === hole) seen = true;
+			else if (seen) suffix += textPartValue(part);
+			else prefix += textPartValue(part);
+		}
+		asyncArmTextTargets.set(hole.expression as AnyNode, {
+			kind: 'text',
+			...(prefix ? { prefix } : {}),
+			...(suffix ? { suffix } : {}),
+			textNode,
+		});
+	}
 }
 
 // A text hole beside other children owns only its text node; the whole-element write would delete them.
@@ -950,7 +1060,7 @@ function resolveElementHandleIdrefs(
 			continue;
 		}
 		// A page-wide factory is one graph per PAGE, so its handle names one element
-		// however many widgets render; only a widget-scoped one mints per instance.
+		// however many widgets render; only a subtree-scoped one mints per instance.
 		if (
 			handleBinding.sharedDefinitionId !== undefined &&
 			widgetRootComponentName(graph, handleBinding.sharedDefinitionId) === undefined
@@ -968,7 +1078,7 @@ function resolveElementHandleIdrefs(
 }
 
 /**
- * The component that resolves a widget-scoped factory first owns its nodes, so
+ * The component that resolves a subtree-scoped factory first owns its nodes, so
  * its rendered instance is the widget root every other part is seeded from.
  */
 function widgetRootComponentName(
@@ -978,7 +1088,7 @@ function widgetRootComponentName(
 	const definition = graph.sharedDefinitions.find(
 		(candidate) => candidate.id === sharedDefinitionId,
 	);
-	if (definition?.scope !== 'widget') return undefined;
+	if (definition?.scope !== 'subtree') return undefined;
 	return graph.sharedInstances.find(
 		(instance) => instance.definitionId === sharedDefinitionId && instance.componentName,
 	)?.componentName;
@@ -1067,7 +1177,34 @@ function collectAttribute(
 				continue;
 			}
 
-			const handler = eventHandlerExpression(entry, state);
+			const named = entry ? namedHandler(entry, state, attributeName) : null;
+			if (named?.kind === 'unroutable') {
+				state.graph.diagnostics.push(
+					handlerReadsRenderLocalDiagnostic({
+						handlerLabel: attributeName,
+						localName: expressionSource(entry!, state.source) ?? '',
+						handler: entry!,
+						filename: state.filename,
+						unroutable: named,
+					}),
+				);
+				continue;
+			}
+			const handler =
+				named?.kind === 'function'
+					? {
+							node: named.node,
+							source: expressionSource(named.node, state.source),
+							span: sourceSpan(named.node, state.filename),
+						}
+					: named?.kind === 'factory'
+						? {
+								node: named.returned,
+								source: expressionSource(entry!, state.source),
+								span: sourceSpan(entry!, state.filename),
+							}
+						: eventHandlerExpression(entry, state);
+			const factoryCall = named?.kind === 'factory' ? entry : undefined;
 			const syncPolicy = extractSyncPolicy(handler?.node, state);
 			const hasSyncPolicyCandidate = handler
 				? hasSyncEventPolicyCandidate(handler.node) ||
@@ -1089,15 +1226,29 @@ function collectAttribute(
 					secondSyncPolicyCancelDiagnostic(attributeName, strayCancel, state),
 				);
 			}
-			const relayed = handler ? receivedHandlerRelay(handler.node, state) : undefined;
-			const inlined =
-				handler && !relayed
+			const relayed =
+				handler && !factoryCall ? receivedHandlerRelay(handler.node, state) : undefined;
+			const factory = factoryCall
+				? factoryHandlerSource(
+						factoryCall,
+						asNodes(handler!.node.params).length,
+						state,
+						attributeName,
+					)
+				: null;
+			const inlined = factoryCall
+				? factory
+				: handler && !relayed
 					? inlineHandlerRenderLocals(handler.node, state, attributeName)
 					: null;
+			// A handler named by a body function reads at its definition, which the attribute walk never visits.
+			if (handler && !relayed && !factoryCall && handler.node !== entry)
+				collectDefinitionReads(handler.node, state);
 			state.graph.events.push({
 				id: `event:${state.nextEventId++}`,
 				hostNodeId,
 				eventName: normalizeEventName(attributeName),
+				...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 				...(handler
 					? {
 							handlerSource: relayed?.source ?? inlined?.source ?? handler.source,
@@ -1107,8 +1258,34 @@ function collectAttribute(
 				...(inlined?.definitionSpans.length
 					? { handlerDefinitionSpans: inlined.definitionSpans }
 					: {}),
+				...(inlined?.catchResets.size
+					? {
+							handlerCatchResets: [...inlined.catchResets].map(([name, boundaryId]) => ({
+								name,
+								boundaryId,
+							})),
+						}
+					: {}),
+				...(handler && !relayed && handlerMayReturnPromise(handler.node)
+					? {
+							handlerReturnsPromise: true as const,
+							...(state.currentCatchBoundaryId
+								? { handlerCatchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
+					: {}),
+				...(handler && (relayed || !isFunctionNode(handler.node))
+					? {
+							handlerMayReject: true as const,
+							...(state.currentCatchBoundaryId
+								? { dispatchCatchBoundaryId: state.currentCatchBoundaryId }
+								: {}),
+						}
+					: {}),
 				handlerParameters: relayed
 					? [relayed.parameter]
+					: factory
+						? factory.parameters
 					: handler
 						? handlerParameterNames(handler.node)
 						: [],
@@ -1453,6 +1630,9 @@ function collectDuplicateAttributeDiagnostics(
 				duplicateAttributeDiagnostic({
 					tagName,
 					attributeName: name,
+					spellings: [previous, attribute].map((written) =>
+						authoredAttributeName(written, state.source),
+					),
 					duplicate: attribute,
 					filename: state.filename,
 				}),
@@ -1461,6 +1641,11 @@ function collectDuplicateAttributeDiagnostics(
 		}
 		seen.set(name, attribute);
 	}
+}
+
+function authoredAttributeName(attribute: AnyNode, source: string): string {
+	const name = attribute.name as AnyNode;
+	return source.slice(name.start ?? 0, name.end ?? 0);
 }
 
 function collectSpreadAttribute(

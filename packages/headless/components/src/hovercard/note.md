@@ -213,7 +213,7 @@ green the day the tier lands instead of surprising someone.
 
 ## What v1 refuses
 
-No nesting (a same-family `shared({ scope: 'widget' })` nest is unproven anywhere
+No nesting (a same-family `shared({ scope: 'subtree' })` nest is unproven anywhere
 in this library, and two surfaces holding focus on one overlay stack is
 unresolvable); no touch reveal; no arrow, portal, positioner or viewport part; no
 focus trap; no modality or scroll lock; no auto-hide (WCAG 1.4.13 persistent); no

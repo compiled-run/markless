@@ -60,7 +60,7 @@ Five parts: `accordion.root`, `.item`, `.itemlabel`, `.itemtrigger`,
 `.itemcontent`. Qwik UI's five are Root, Item, Trigger, Content, Header; the
 `item` prefix on the three inner parts is our grammar's, matching `tree`.
 
-Two `shared()` definitions, both widget-scoped:
+Two `shared()` definitions, both subtree-scoped:
 
 - `accordionState` — the root's seeded fields, the consumer's `onChange`, the
   plural trigger handle, and the two rules (`toggle`, `reveal`).

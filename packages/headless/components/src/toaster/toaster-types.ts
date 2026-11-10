@@ -48,7 +48,7 @@ export type ToasterRootProps = PropsOf<'div'>;
  * The cells every toaster part reads and writes. One graph per page.
  *
  * `visible` is deliberately absent: it is a prop of `toaster.root`, and a
- * page-scoped factory is never handed props (`MARKLESS_SHARED_SEED_UNKNOWN_FIELD`).
+ * app-scoped factory is never handed props (`MARKLESS_SHARED_SEED_UNKNOWN_FIELD`).
  * The showing slice is a cell of the root component instead.
  */
 export type ToasterInstanceState = {

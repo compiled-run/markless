@@ -3,7 +3,7 @@ import { computed, shared, state } from '@markless/core';
 /**
  * The smallest widget carrying the calendar title's shape: a part whose whole
  * body is an `@if/@else` inside an `aria-live` element, where the `@else` arm
- * renders a `computed()` off widget-scoped state, and a root that copies its
+ * renders a `computed()` off subtree-scoped state, and a root that copies its
  * props into that same state on every pass.
  */
 export const lrbStore = shared(
@@ -31,7 +31,7 @@ export const lrbStore = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function LrbRoot({ month = '', picked = '', children, ...rest }) @{

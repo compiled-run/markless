@@ -106,7 +106,12 @@ export default function TestPathsDemo() @{
 			.board[data-step='2'] .s2,
 			.board[data-step='3'] .s3,
 			.board[data-step='4'] .s4 {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 
@@ -128,7 +133,12 @@ export default function TestPathsDemo() @{
 			}
 
 			.board[data-step='2'] .count-button {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-step='3'] .count-button {

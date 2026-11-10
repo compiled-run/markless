@@ -17,7 +17,7 @@ export const box = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function App() @{

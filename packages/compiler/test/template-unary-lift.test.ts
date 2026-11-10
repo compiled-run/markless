@@ -23,7 +23,7 @@ function moduleSource(body: string) {
 export const boardState = shared(() => {
 	const board = state({ wide: false, items: [1, 2] });
 	return { ...board };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel() @{
 	const board = boardState();

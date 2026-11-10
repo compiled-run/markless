@@ -454,3 +454,18 @@ function formatParseDiagnostics(source: string): string[] {
 			ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
 		);
 }
+
+test('compileTsrxForTypeService declares the @catch reset binding as a function', () => {
+	const source = `export function Retry(props: { load: () => Promise<string> }) @{
+	<section>
+		@try { <span>{props.load()}</span> } @catch (failure, again) { <button onClick={again}>{String(failure)}</button> }
+	</section>
+}`;
+
+	const result = compileTsrxForTypeService(source, 'Retry.tsrx', { loose: false });
+
+	expect(result.errors).toEqual([]);
+	expect(formatParseDiagnostics(result.code)).toEqual([]);
+	expect(result.code.replace(/\s+/g, ' ')).toContain('const again = (): void => {};');
+	expectExactMapping(result, source, 'again');
+});

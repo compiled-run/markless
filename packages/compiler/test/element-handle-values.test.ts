@@ -55,7 +55,7 @@ export const tabs = shared(
 		const panelEl = element<HTMLDivElement>();
 		return { ...t, panelEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function Panel() @{

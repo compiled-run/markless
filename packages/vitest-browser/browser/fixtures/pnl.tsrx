@@ -6,7 +6,7 @@ export const pnl = shared(() => {
 	const p = state({ tone: '' });
 
 	return { ...p };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function PanelRoot({ tone, children }) @{
 	const p = pnl();

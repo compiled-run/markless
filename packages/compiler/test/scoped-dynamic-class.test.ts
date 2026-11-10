@@ -17,7 +17,7 @@ export const boxState = shared(() => {
 	const box = state({ open: false });
 	const boxEl = element();
 	return { ...box, boxEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 export function Item({ children, ...rest }) @{
 	const box = boxState();
 	<div {...rest} el={box.boxEl} ui-open={box.open}>

@@ -219,6 +219,7 @@ export default function ResumeAnatomy() @{
 
 				<g
 					class="piece"
+					data-side="black"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="br"
 					data-gone={pos.br ? 'no' : 'yes'}
@@ -245,6 +246,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="black"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bk"
 					data-gone={pos.bk ? 'no' : 'yes'}
@@ -271,6 +273,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="black"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bn"
 					data-gone={pos.bn ? 'no' : 'yes'}
@@ -297,6 +300,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="black"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bb"
 					data-gone={pos.bb ? 'no' : 'yes'}
@@ -323,6 +327,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="black"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="bp"
 					data-gone={pos.bp ? 'no' : 'yes'}
@@ -349,6 +354,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="white"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wb"
 					data-gone={pos.wb ? 'no' : 'yes'}
@@ -375,6 +381,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="white"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wp"
 					data-gone={pos.wp ? 'no' : 'yes'}
@@ -401,6 +408,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="white"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wn"
 					data-gone={pos.wn ? 'no' : 'yes'}
@@ -427,6 +435,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="white"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wr"
 					data-gone={pos.wr ? 'no' : 'yes'}
@@ -453,6 +462,7 @@ export default function ResumeAnatomy() @{
 				</g>
 				<g
 					class="piece"
+					data-side="white"
 					onTouchmove={(event) => event.preventDefault()}
 					data-piece="wk"
 					data-gone={pos.wk ? 'no' : 'yes'}
@@ -528,9 +538,8 @@ export default function ResumeAnatomy() @{
 				--sheet-ink: var(--ink);
 
 				html.dark & {
-					--sheet-ink: var(--paper);
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--shade: rgb(0 0 0 / 0.5);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
 				}
 			}
 
@@ -580,8 +589,8 @@ export default function ResumeAnatomy() @{
 			}
 
 			.kraft {
-				fill: oklch(72% 0.07 65);
-				stroke: oklch(72% 0.07 65);
+				fill: var(--wood);
+				stroke: var(--wood);
 				opacity: 0.35;
 			}
 
@@ -592,14 +601,14 @@ export default function ResumeAnatomy() @{
 			}
 
 			.pool {
-				fill: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
+				fill: var(--marker);
 				stroke: none;
 				opacity: 0.5;
 			}
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.8;
 				stroke-linecap: round;
 				stroke-dasharray: 2 3;
@@ -631,7 +640,7 @@ export default function ResumeAnatomy() @{
 			.pencil-text {
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				font-size: 4.2px;
-				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				fill: var(--pencil);
 				opacity: 0.85;
 			}
 
@@ -716,7 +725,7 @@ export default function ResumeAnatomy() @{
 			}
 
 			.strike {
-				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				fill: var(--pencil);
 			}
 
 			.controls {
@@ -770,6 +779,44 @@ export default function ResumeAnatomy() @{
 
 			.newest[data-on='yes'] {
 				opacity: 1;
+			}
+
+			html.dark .scene {
+				.wash.yellow:not(.glow, .dot, .pick) {
+					opacity: 1;
+				}
+
+				.wash.pink {
+					fill: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					stroke: color-mix(in srgb, var(--pink) 60%, color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
+				}
+			}
+
+			html.dark .piece[data-side='white'] {
+				--sheet-ink: var(--on-accent);
+
+				.paper {
+					fill: color-mix(in oklch, var(--cream) 50%, white);
+				}
+			}
+
+			html.dark .piece[data-side='black'] {
+				.paper {
+					fill: var(--slab);
+				}
+
+				.tone {
+					stroke: color-mix(in oklch, var(--cream) 45%, var(--slab));
+				}
+			}
+
+			html.dark .newest[data-on='yes'] + .score {
+				fill: var(--on-accent);
+				stroke: var(--yellow);
+				stroke-width: 4px;
+				stroke-linejoin: round;
+				paint-order: stroke;
 			}
 		</style>
 	</figure>

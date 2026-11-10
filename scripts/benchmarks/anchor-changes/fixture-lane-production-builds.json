@@ -1,0 +1,74 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "runtime/graph"],
+			"delta": -544,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "serializer/protocol-locator-paths-format"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/fns/served-census-repair"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-foreign-dom"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-locators"],
+			"delta": -317,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "runtime/graph"],
+			"delta": -544,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "serializer/protocol-locator-paths-format"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/fns/served-census-repair"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-foreign-dom"],
+			"remove": true,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-locators"],
+			"delta": -317,
+			"reason": "fixture lane now builds in production mode, so it counts only shipped code (development-only checks fold away)",
+			"date": "2026-11-10"
+		}
+	]
+}

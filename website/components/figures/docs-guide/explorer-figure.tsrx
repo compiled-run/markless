@@ -158,6 +158,11 @@ export default function DocsExplorerFigure() @{
 				background: color-mix(in oklch, var(--yellow) 32%, transparent);
 				padding: 0 0.3rem;
 				border-radius: 4px;
+
+				html.dark & {
+					background: color-mix(in srgb, var(--yellow) 32%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.folder:hover,
@@ -208,7 +213,7 @@ export default function DocsExplorerFigure() @{
 			}
 
 			.none .path {
-				color: #cb2431;
+				color: var(--figure-error);
 				text-decoration: line-through;
 				animation: shake 360ms ease-in-out;
 			}

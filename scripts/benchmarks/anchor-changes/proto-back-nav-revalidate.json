@@ -1,0 +1,48 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"set": 897,
+			"reason": "Back, Forward and back-forward cache restores re-ask settled async values quietly (pageshow listener + rerun on wire)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 167,
+			"reason": "Back, Forward and back-forward cache restores re-ask settled async values quietly (pageshow listener + rerun on wire)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"set": 897,
+			"reason": "Back, Forward and back-forward cache restores re-ask settled async values quietly (pageshow listener + rerun on wire)",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 167,
+			"reason": "Back, Forward and back-forward cache restores re-ask settled async values quietly (pageshow listener + rerun on wire)",
+			"date": "2026-11-07"
+		}
+	]
+}

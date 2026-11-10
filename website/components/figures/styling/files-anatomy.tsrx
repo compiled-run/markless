@@ -366,13 +366,27 @@ export default function FilesAnatomy() @{
 
 			.shadow {
 				fill: color-mix(in oklch, var(--ink) 18%, transparent);
+
+				html.dark & {
+					fill: var(--figure-shade);
+				}
+			}
+
+			html.dark .card-out {
+				.hatch {
+					stroke: var(--figure-hatch);
+				}
+
+				.face + .ink + .ink {
+					fill: var(--on-accent);
+				}
 			}
 
 			.page {
 				fill: color-mix(in oklch, var(--paper) 55%, white);
 
 				html.dark & {
-					fill: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					fill: var(--figure-sheet);
 				}
 			}
 

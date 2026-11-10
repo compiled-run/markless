@@ -40,7 +40,7 @@ export const gateState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function GateRoot({ children }: { children?: Children }) @{

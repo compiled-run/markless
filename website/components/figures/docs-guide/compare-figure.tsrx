@@ -118,10 +118,9 @@ export default function CompareFigure() @{
 				--shade-ink: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -165,7 +164,7 @@ export default function CompareFigure() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;

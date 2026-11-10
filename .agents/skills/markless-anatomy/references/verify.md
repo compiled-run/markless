@@ -70,6 +70,20 @@ Ink
 - [ ] No card, border, figure number or legend; the drawing spans the prose column.
 - [ ] Light and dark both look intentional.
 
+Dark mode
+
+- [ ] Light and dark screenshotted side by side, at rest and after each interaction state; light
+      is pixel-identical to before the dark work.
+- [ ] Line work is cream `--ink`; sheets, cards and screens are `--figure-sheet` (`--raised`,
+      `--slab` for depth); no cream slab on the dark page.
+- [ ] Accent surfaces are their solid light pastel (mixed into `--cream`, blend normal, opacity
+      1) with `--on-accent` ink; nothing olive or murky from an accent mixed into the dark ground.
+- [ ] Shadows are `--figure-hatch` hatching over `--figure-shade`, not a dark blob.
+- [ ] No literal colours in the figure's `<style>`; status and code use `--figure-error`,
+      `--figure-ok`, `--syntax-*`.
+- [ ] Text on every fill passes contrast in both themes.
+- [ ] With blends or filters: Chromium, Firefox and WebKit agree.
+
 Motion and access
 
 - [ ] One press, cause then effect, once; nothing moves without a reason.

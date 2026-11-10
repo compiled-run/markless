@@ -7,6 +7,7 @@ import {
 } from './pending-timing.ts';
 import type { AsyncBoundarySettleTracker } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
+import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
 import type { ResumeAsyncBoundaryRecord } from './resume-types.ts';
 
@@ -27,10 +28,14 @@ export function createResettleHold(deps: {
 	readonly readStatus: (graphNodeId: string) => unknown;
 	readonly commitPendingArm: (boundary: ResumeAsyncBoundaryRecord) => Promise<void>;
 	readonly setBusy?: (boundary: ResumeAsyncBoundaryRecord, busy: boolean) => void;
+	// Disposal ends every stall, so a stall task that wakes after it finds no stall of its own.
+	readonly storeContainerSubscription?: (release: () => void) => void;
 	readonly clock?: { readonly wait?: PendingTimingClock['wait'] };
 }): ResettleHold {
 	const stalls = new Map<string, Stall>();
-	const setBusy = deps.setBusy ?? setBoundaryBusy;
+	deps.storeContainerSubscription?.(() => stalls.clear());
+	const setBusy =
+		deps.setBusy ?? ((boundary, busy) => (asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, busy));
 	const wait = deps.clock?.wait ?? waitMs;
 	return (boundary, snapshot) => {
 		const { status, version } =
@@ -58,6 +63,7 @@ export function createResettleHold(deps: {
 			stall.fallback = true;
 			// A commit failure rejects unhandled: a broken anchor census must fail loudly (D2).
 			await deps.commitPendingArm(boundary);
+			asyncPlanes.busy?.shown(boundary, ASYNC_BOUNDARY_ARM.pending);
 			if (stalls.get(boundary.id) === stall) setBusy(boundary, true);
 		})();
 	};
@@ -74,6 +80,7 @@ export function wireResettleHold(input: {
 		update: ArmCommitUpdate,
 	) => Promise<void>;
 	readonly hasHtmlRenderer: boolean;
+	readonly storeContainerSubscription: (release: () => void) => void;
 }): ResettleHold {
 	const pendingArmHtmlById = new Map<string, string>();
 	for (const boundary of input.hasHtmlRenderer ? input.boundaries : []) {
@@ -85,6 +92,7 @@ export function wireResettleHold(input: {
 		tracker: input.tracker,
 		hasPendingArm: (boundaryId) => pendingArmHtmlById.has(boundaryId),
 		readStatus: input.readStatus,
+		storeContainerSubscription: input.storeContainerSubscription,
 		commitPendingArm: (boundary) =>
 			input.commitArm(boundary, {
 				html: pendingArmHtmlById.get(boundary.id)!,

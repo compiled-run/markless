@@ -101,7 +101,7 @@ export const editableState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function EditableRoot({

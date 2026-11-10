@@ -276,7 +276,7 @@ export default function TentAnatomy() @{
 				--sheet: color-mix(in oklch, var(--paper) 55%, white);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 92%, var(--yellow));
+					--sheet: var(--figure-sheet);
 				}
 			}
 
@@ -422,10 +422,18 @@ export default function TentAnatomy() @{
 
 			.tick {
 				fill: var(--ink);
+
+				html.dark & {
+					fill: var(--on-accent);
+				}
 			}
 
 			.on {
 				opacity: 0.85;
+
+				html.dark & {
+					opacity: 1;
+				}
 			}
 
 			.tick.on {
@@ -436,10 +444,6 @@ export default function TentAnatomy() @{
 			.slot {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				fill: var(--ink);
-
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.name {

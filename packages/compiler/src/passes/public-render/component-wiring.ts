@@ -9,6 +9,7 @@ import {
 	isSpreadAttribute,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
+import { asyncComputedReadPath } from '../../artifact-helpers/graph-paths.ts';
 import { emitHtmlChildren } from './html.ts';
 import { componentEdgeInstanceSegment, objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
@@ -183,10 +184,19 @@ function ssrComponentPropsSource(
 	return props;
 }
 
-export function componentEdgeGraphRoutes(edge: ComponentEdge | undefined, hasProjection = false) {
+export function componentEdgeGraphRoutes(
+	edge: ComponentEdge | undefined,
+	hasProjection = false,
+	asyncGraphNodeIds?: ReadonlySet<string>,
+) {
 	const routes = (edge?.props ?? []).map((prop) =>
 		prop.kind === 'graph-reference'
-			? { name: prop.name, graphNodeId: prop.graphNodeId, path: prop.path }
+			? {
+					name: prop.name,
+					graphNodeId: prop.graphNodeId,
+					// The runtime reads an async value whole through its snapshot's value.
+					path: asyncGraphNodeIds?.has(prop.graphNodeId) ? asyncComputedReadPath(prop.path) : prop.path,
+				}
 			: {
 					name: prop.name,
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,

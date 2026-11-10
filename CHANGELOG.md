@@ -10,6 +10,101 @@ version of everything else.
 
 This file starts at 0.2.0. Earlier versions have no changelog entries.
 
+## 0.14.0
+
+### Breaking changes
+
+- **@markless/core:** Rename shared() scopes to app, container and subtree.
+  To upgrade, rename the `scope` option of each `shared()` call: `'page'` and `'request'` become `'app'` (the default, so you can also drop the option), and `'widget'` becomes `'subtree'`. `'container'` keeps its name. Behaviour does not change. An old name now fails the compile with `MARKLESS_SHARED_SCOPE_RENAMED`, which names the new spelling.
+
+[All 3 commits since v0.13.0](https://github.com/compiled-run/markless/compare/7dd60eb3df318577f58415eadecb40bd8fb02f31...v0.14.0)
+
+## 0.13.0
+
+No user-facing changes in the released packages.
+
+[All 2 commits since v0.12.0](https://github.com/compiled-run/markless/compare/44e2ecf53b88a7aad24541c3432fbe73e033c372...v0.13.0)
+
+## 0.12.0
+
+### General
+
+- **Fixed:** Imported stateful components render inside @if/@switch, and computeds only a hidden branch reads stay unrun.
+- **Fixed:** An @if holding a @try block renders it fresh each time it shows.
+- **Fixed:** An @if holding a @try block renders fresh inside nested and layer components.
+- **Fixed:** An @if around rows with an attribute binding, a nested @if, or held by a non-root component renders fresh.
+- **Fixed:** A keyed @for over a computed resumes with the served value instead of deriving it at startup.
+- **Fixed:** @for rows repaint when a computed or shared() value their attribute reads changes.
+- **Fixed:** @for rows repaint when an attribute reads widget-scoped shared() state.
+- **Fixed:** List rows holding sibling lists or server-only lists repaint, and row slots after a nested list patch their own element.
+- **Fixed:** StopPropagation in a nested handler keeps its ancestors' handlers from running.
+- **Fixed:** Draggable, contenteditable and spellcheck write "true" and "false", not an empty value.
+- **Fixed:** Every resume entry passes a nested handler's stopPropagation on to the walk.
+- **Fixed:** Page-scoped shared() binds on first change, and constant @for rows keep first use bounded.
+- **Fixed:** @for row values follow state read through body helpers.
+- **Faster:** Docs / and /ui/accordion load anchors back to their measurement.
+
+### @markless/bundler
+
+- **Fixed:** A page's payload ships its final compile whatever order its sibling requests finish in.
+- **Fixed:** An @if decided by props no longer moves a page's lazy code into its landing packs.
+- **Fixed:** A build settles its compile store writes before it resolves or rejects.
+- **Fixed:** A page loads no code for an arm its literal props rule out.
+
+### @markless/compiler
+
+- **Fixed:** A handler that passes state to a helper which changes it updates the page.
+- **Fixed:** The shadcn client build fits its 6656 MB heap again after #401.
+- **Fixed:** A branch-arm handler binds to the instance it renders in.
+- **Fixed:** A @for binding resolves only inside the loop that declares it.
+- **Fixed:** A synthetic computed belongs to the component that minted it.
+- **Fixed:** Each nested component instance binds its own handlers and computeds.
+- **Fixed:** A constant prop forwarded through imported components reaches the inner computed after resume.
+- **Fixed:** A spread-forwarded handler belongs to the edge that passed it.
+- **Fixed:** A row item forwarded into a computed, and a structured prop only a computed reads, reach it after resume.
+- **Fixed:** A module-constant @for goes on the graph when a row's child reads the row item in a handler.
+- **Fixed:** An @pending written after @catch fails with MARKLESS_ASYNC_ARM_ORDER.
+- **Fixed:** A parenthesized constant write takes the scalar path.
+- **Fixed:** A shared() method named add, delete, set, push or clear is a method call.
+- **Fixed:** An element() handle on rows of an @for over a constant array reads every row.
+- **Fixed:** A callback handed to an imported part runs for its own instance, at any depth and through a spread.
+- **Fixed:** A received callback handed straight to a native element runs as that instance's handler.
+- **Fixed:** A @for row value that can never repaint is a build error.
+- **Fixed:** The never-updates warning reads names from scope analysis, so a property named like a state is not a read of it.
+- **Fixed:** A callback handed on through props reaches the element or widget it lands on.
+- **Fixed:** A callback two components deep runs with its own instance's captures.
+- **Fixed:** State() written directly in a @for row is a build error naming the row-component fix.
+- **Fixed:** A destructured @for loop name renders its rows.
+- **Fixed:** An @else if chain and a condition-case @switch pick their arm by index.
+- **New:** State() written in an @if or @switch arm starts fresh each time the arm opens.
+- **Fixed:** A handler let copied from state and then reassigned is the handler's own variable.
+- **Fixed:** A @switch picked by index never reads its bare discriminant against arm indexes.
+- **Fixed:** State() in an arm nested inside another arm starts fresh when the outer arm reopens.
+
+### @markless/typescript-plugin
+
+- **Fixed:** Prefetch is a boolean on <a>, so a link or a part built on one typechecks.
+
+### @markless/web
+
+- **Fixed:** A navbar part outside every root no longer breaks the navbar.
+- **Fixed:** A header that differs between routes only in prop-set attributes stays in place across an in-place navigation.
+- **Fixed:** A shared() value survives in-place navigation and is shared between containers.
+- **Fixed:** A click on rows a @try just painted is never lost.
+- **Fixed:** A @try commits each settled value once, so a click on its fresh rows is never lost.
+- **Fixed:** An @if in a child imported from another file reads its routed props live.
+- **Fixed:** Row code that arrives late no longer puts back a row the browser deleted.
+- **Fixed:** Element() handles resolve per component.
+- **Fixed:** ARIA states write "false" instead of dropping the attribute.
+- **Fixed:** A row value reading state written before the row code arrived repaints.
+- **Fixed:** A callback in a component a constant @for renders runs with its row's captures.
+- **New:** A kept part with state keeps its state and handlers across in-place navigation.
+- **Fixed:** A component in nested keyed @for rows is one instance per row and reads its own rows.
+- **Fixed:** @for straight over a Set or Map renders its rows on first render.
+- **Fixed:** A @for row added after load appears when its component holds an @try.
+
+[All 113 commits since v0.11.0](https://github.com/compiled-run/markless/compare/aa239188704c8c5187edbc6a906e10c06a11dc7e...v0.12.0)
+
 ## 0.11.0
 
 ### @markless/bundler

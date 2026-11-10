@@ -8,7 +8,7 @@ import ServerSettled from './server-settled.tsrx';
 import Siblings from './siblings.tsrx';
 import Stall from './stall.tsrx';
 
-// Spec D8 re-settle, frame-sampled: a refresh keeps the settled content with its host aria-busy, and shows
+// Spec D8 re-settle, frame-sampled: a refresh keeps the settled content with the elements reading it aria-busy, and shows
 // @pending only once the newest run has been pending for the stall threshold (5 s, pending-timing.ts).
 afterEach(() => cleanup());
 
@@ -104,11 +104,11 @@ test('@pending replaces held content only after the newest run stalls, and a new
 	expect(container.querySelector('[data-boundary]')!.getAttribute('aria-busy')).toBeNull();
 }, 30_000);
 
-test('a @catch during a held refresh replaces the busy content and clears busy', async () => {
+test('a @catch during a held refresh keeps the busy content, clears busy, and shows after it', async () => {
 	const screen = await render(FailingRefresh);
 	const container = screen.container as HTMLElement;
 	await expect.poll(() => container.querySelector('[data-amount]')?.textContent, { timeout: 5_000 }).toBe('10');
-	const sampler = sampleFrames(container, (root) => root.querySelector('[data-amount]')?.textContent ?? root.querySelector('[data-failed]')?.textContent ?? null);
+	const sampler = sampleFrames(container, (root) => (root.querySelector('[data-failed]') ? 'failed' : (root.querySelector('[data-amount]')?.textContent ?? null)));
 	click(container, '[data-close]');
 	await expect.poll(() => container.querySelector('[data-failed]')?.textContent, { timeout: 5_000 }).toBe('Account closed');
 	await sleep(50);
@@ -118,6 +118,7 @@ test('a @catch during a held refresh replaces the busy content and clears busy',
 	const held = fromRefresh(frames).filter((frame) => frame.content === '10');
 	expect(held.length).toBeGreaterThan(0);
 	expect(held.every((frame) => frame.busy === 1)).toBe(true);
+	expect(container.querySelector('[data-amount]')?.textContent).toBe('10');
 	expect(container.querySelectorAll('[aria-busy]')).toHaveLength(0);
 });
 
@@ -152,15 +153,17 @@ test('sibling blocks in one element mark only the refreshing block busy', async 
 	await expect.poll(() => container.querySelectorAll('[aria-busy]').length, { timeout: 5_000 }).toBe(0);
 });
 
-test('a nested block keeps its own content while the outer block refreshes busy', async () => {
+test('a nested block keeps its own content unmarked while the outer block refreshes', async () => {
 	const screen = await render(Nested);
 	const container = screen.container as HTMLElement;
 	await expect.poll(() => container.querySelector('[data-count]')?.textContent, { timeout: 5_000 }).toBe('3');
 	await expect.poll(() => container.querySelector('[data-name]')?.textContent, { timeout: 5_000 }).toBe('User 1');
 	click(container, '[data-next]');
-	await expect.poll(() => container.querySelector('[data-outer]')?.getAttribute('aria-busy'), { timeout: 1_000, interval: 10 }).toBe('true');
+	await expect.poll(() => container.querySelector('[data-name]')?.getAttribute('aria-busy'), { timeout: 1_000, interval: 10 }).toBe('true');
 	expect(container.querySelector('[data-name]')?.textContent).toBe('User 1');
+	expect(container.querySelector('[data-outer]')?.hasAttribute('aria-busy')).toBe(false);
 	expect(container.querySelector('[data-inner]')?.hasAttribute('aria-busy')).toBe(false);
+	expect(container.querySelector('[data-count]')?.hasAttribute('aria-busy')).toBe(false);
 	expect(container.querySelector('[data-pending]')).toBeNull();
 	await expect.poll(() => container.querySelector('[data-name]')?.textContent, { timeout: 5_000 }).toBe('User 2');
 	await expect.poll(() => container.querySelector('[data-count]')?.textContent, { timeout: 5_000 }).toBe('3');

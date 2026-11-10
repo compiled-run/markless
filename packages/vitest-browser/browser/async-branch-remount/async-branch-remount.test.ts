@@ -76,10 +76,12 @@ async function drawerSettlesFreshEachTime() {
 	await expect.poll(summaryText).toBe('beta summary');
 	expect(drawer()).not.toBe(first);
 
-	// While shown, the @try block keeps settling, including into its @catch content.
+	// While shown, the @try block keeps settling; a failed refresh keeps the summary and adds its @catch content after it.
 	click('[data-next]');
-	await expect.poll(summaryText).toBe('No summary');
+	await expect.poll(() => document.querySelector('[data-trouble]')?.textContent).toBe('No summary');
+	expect(document.querySelector('[data-summary]')?.textContent).toBe('beta summary');
 	click('[data-next]');
+	await expect.poll(() => document.querySelector('[data-trouble]')).toBeNull();
 	await expect.poll(summaryText).toBe('alpha summary');
 	expect(document.querySelectorAll('[data-drawer]')).toHaveLength(1);
 }

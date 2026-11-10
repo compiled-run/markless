@@ -1,0 +1,1302 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/enclosing-catch"
+			],
+			"set": 991,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1656,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/owning-surface"
+			],
+			"set": 399,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 960,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 159,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-locals"
+			],
+			"delta": 637,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/payload-graph-construct"
+			],
+			"delta": -1368,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 2937,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render"
+			],
+			"delta": 90,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-anchor-census"
+			],
+			"delta": -71,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-records"
+			],
+			"delta": 389,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 2051,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 360,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 887,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1756,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 797,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": 181,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 669,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 44,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": -403,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 298,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/runtime-error-reporting"
+			],
+			"delta": -28,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 1592,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 370,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/enclosing-catch"
+			],
+			"set": 991,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1656,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/owning-surface"
+			],
+			"set": 399,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 960,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 159,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-locals"
+			],
+			"delta": 637,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/payload-graph-construct"
+			],
+			"delta": -1368,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 2937,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render"
+			],
+			"delta": 90,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-anchor-census"
+			],
+			"delta": -71,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-records"
+			],
+			"delta": 389,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 2051,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 422,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 360,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 887,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1756,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 797,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": 181,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 669,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 44,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": -403,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 298,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/runtime-error-reporting"
+			],
+			"delta": -28,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 1592,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 169,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 329,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"serializer/protocol-seeded-script"
+			],
+			"set": 284,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/enclosing-catch"
+			],
+			"set": 1003,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/served-row-ranges"
+			],
+			"set": 1668,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 125,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 960,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-async"
+			],
+			"remove": true,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-computed"
+			],
+			"delta": 97,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-reconcile"
+			],
+			"delta": 11,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-scheduler"
+			],
+			"delta": 117,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"serializer/protocol-page-markers"
+			],
+			"delta": 159,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 2092,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-locals"
+			],
+			"delta": 637,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-mint"
+			],
+			"delta": 754,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-placed-derive"
+			],
+			"delta": 266,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/row-slot-mint"
+			],
+			"delta": 116,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-graph-construct"
+			],
+			"delta": -1368,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 2937,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/owning-surface"
+			],
+			"delta": 200,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/reconcile-plane-slot"
+			],
+			"delta": 33,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render"
+			],
+			"delta": 90,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume"
+			],
+			"delta": 81,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-anchor-census"
+			],
+			"delta": -71,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 52,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-records"
+			],
+			"delta": 389,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 2051,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 428,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 360,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 887,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 1756,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-repeat-branch-arm"
+			],
+			"delta": 797,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-resettle-hold"
+			],
+			"delta": 181,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 669,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": 44,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-stream-patches"
+			],
+			"delta": 381,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-computed"
+			],
+			"delta": -403,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-demand"
+			],
+			"delta": 298,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/runtime-error-reporting"
+			],
+			"delta": -28,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/ssr-data/renderer"
+			],
+			"delta": 1592,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"constructGlue",
+				"async boundary"
+			],
+			"delta": 795,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"counter",
+				"executedChars"
+			],
+			"delta": 112,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"toggle",
+				"executedChars"
+			],
+			"delta": 66,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"toggle",
+				"functions"
+			],
+			"delta": 1,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"tab",
+				"executedChars"
+			],
+			"delta": 112,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"search",
+				"executedChars"
+			],
+			"delta": 1015,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"search",
+				"functions"
+			],
+			"delta": 11,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"executedChars"
+			],
+			"delta": 344,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"functions"
+			],
+			"delta": -5,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"settings",
+				"executedChars"
+			],
+			"delta": 478,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"settings",
+				"functions"
+			],
+			"delta": 3,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /",
+				"raw"
+			],
+			"delta": 746,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /",
+				"gzip"
+			],
+			"delta": 189,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /concepts/state",
+				"raw"
+			],
+			"delta": 1227,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /concepts/state",
+				"gzip"
+			],
+			"delta": 292,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /ui/accordion",
+				"raw"
+			],
+			"delta": 2076,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"resumeData",
+				"docs /ui/accordion",
+				"gzip"
+			],
+			"delta": 433,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 98,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 98,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 98,
+			"reason": "Async chain merged for review: async planes with a refresh half loaded on first refresh, busy marks, handler rejections to @catch, children in a component's @try, dev-only arm preload, build-time projection check",
+			"date": "2026-11-07"
+		}
+	]
+}

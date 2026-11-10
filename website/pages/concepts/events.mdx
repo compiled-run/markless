@@ -259,6 +259,27 @@ Pass an array, and they run in order. If one throws an error, the ones after it 
 <button onClick={[send, clearDraft]}>Send</button>
 ```
 
+## A handler that awaits can fail
+
+A handler can be `async`. If an `await` in it fails inside a `@try` that has a `@catch`, the error shows in the nearest `@catch` around the element, and the content stays. A handler that returns a promise works the same way. See [a failing handler](/concepts/async#a-failing-handler-shows-in-catch).
+
+Anywhere else, the handler stops at that `await`, state it changed before keeps its new value, and the browser reports an uncaught error. To show a message there, wrap the `await` in `try` and `catch`, and keep the message in state:
+
+```tsrx
+<button
+	onClick={async () => {
+		try {
+			await saveReport(days);
+			note = 'Saved';
+		} catch {
+			note = 'Could not save';
+		}
+	}}
+>
+	Save
+</button>
+```
+
 ## A handler's code waits for its event
 
 Your component runs once, to set up the page. A handler's code isn't part of that: it runs only when its event fires. Two event props run without a person: `onIdle` once the page is idle, and `onVisible` once the element scrolls into view.

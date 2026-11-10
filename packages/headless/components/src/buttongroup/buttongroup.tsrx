@@ -55,7 +55,7 @@ export const buttongroupState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 // Rooted by `buttongroup.item`: the field inside one item reads this instance,
@@ -67,7 +67,7 @@ export const buttongroupItemState = shared(
 
 		return { ...item, el };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function ButtonGroupRoot({

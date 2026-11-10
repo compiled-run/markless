@@ -10,7 +10,7 @@ const FAMILY = `import { shared, state } from '@markless/core';
 export const meterState = shared(() => {
 	const meter = state({ value: 0, ownLabel: '' });
 	return { ...meter };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function MeterRoot({ children }) @{
 	const meter = meterState();
@@ -39,7 +39,7 @@ const ALTERNATE_FAMILY = `import { shared, state } from '@markless/core';
 export const gaugeStore = shared(() => {
 	const gauge = state({ level: 0, caption: '' });
 	return { ...gauge };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function GaugeShell({ children }) @{
 	const gauge = gaugeStore();

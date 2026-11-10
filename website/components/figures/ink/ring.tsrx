@@ -16,15 +16,11 @@ export default function Ring({
 		<text x="13" y="17.5">{n}</text>
 		<style>
 			.ink-ring {
-				--ring: oklch(55% 0.17 30);
+				--ring: var(--figure-ring);
 				flex: none;
 				width: 1.6rem;
 				height: 1.6rem;
 				overflow: visible;
-
-				html.dark & {
-					--ring: oklch(72% 0.14 35);
-				}
 			}
 
 			.small {

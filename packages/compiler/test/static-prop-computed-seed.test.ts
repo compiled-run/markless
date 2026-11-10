@@ -21,7 +21,7 @@ export const panelState = shared(
 		const box = state({ value: '' });
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function PanelRoot({ value = '', children }) @{
 	const panel = panelState();
@@ -76,7 +76,7 @@ export const stepperState = shared(
 		const box = state({ slug: '' });
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 export function StepperRoot({ slug = '', children }) @{
 	const stepper = stepperState();

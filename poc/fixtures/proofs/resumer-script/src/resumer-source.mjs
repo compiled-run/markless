@@ -34,6 +34,10 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	detachedHostDrop: 17,
 	// Paired OXC builds measured 1,329 -> 1,384: the census counts only the page's elements between the start and end comments an author's element carries around them.
 	pageMarkers: 55,
+	// Paired OXC builds measured 1,384 -> 1,402: a handler failure the runtime already reported does not surface a second time as an unhandled rejection from the boot's listener.
+	reportedFailureContainment: 18,
+	// Paired OXC builds measured 1,402 -> 1,415: a failed resume import is dropped, so the next click or wake imports again.
+	failedImportRetry: 13,
 	gzipCrossTerm: 3,
 };
 

@@ -62,3 +62,31 @@ test('an explicit flush still runs while the graph is held', async () => {
 
 	expect(texts).toEqual([[1]]);
 });
+
+test('releasing a hold twice does not stop later writes from flushing', async () => {
+	const { graph, texts } = textGraph();
+
+	const release = graph.holdFlush!();
+	release();
+	release();
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await macrotask();
+
+	expect(texts).toEqual([[false]]);
+});
+
+test('a repeated release does not lift another holder', async () => {
+	const { graph, texts } = textGraph();
+
+	const first = graph.holdFlush!();
+	const second = graph.holdFlush!();
+	first();
+	first();
+	graph.write({ graphNodeId: 'state:open', value: false });
+	await macrotask();
+	expect(texts).toEqual([]);
+	second();
+	await macrotask();
+
+	expect(texts).toEqual([[false]]);
+});

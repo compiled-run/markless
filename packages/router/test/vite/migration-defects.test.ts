@@ -2,12 +2,10 @@ import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // Defects real app ports hit, pinned on a production build served by its own Nitro server in Chromium.
 
@@ -24,13 +22,9 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	const builder = await createBuilder({
+	await buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
 	});
-	await builder.buildApp();
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -511,6 +505,7 @@ test('xlink: and xml: attributes survive server rendering and client updates', a
 	expect(html).toMatch(/<use[^>]*\sxlink:href="#dot"/);
 	expect(html).toMatch(/<svg[^>]*\sxmlns:xlink="http:\/\/www\.w3\.org\/1999\/xlink"/);
 	expect(html).toMatch(/<text[^>]*\sxml:space="preserve"/);
+	expect(html).toMatch(/<use data-camel="" xlink:href="#dot" stroke-width="4"/);
 	const { page, errors } = await open('/xlink');
 	const xlinkHref = (selector: string) =>
 		page.evaluate(
@@ -521,6 +516,7 @@ test('xlink: and xml: attributes survive server rendering and client updates', a
 			selector,
 		);
 	expect(await xlinkHref('[data-use]')).toBe('#dot');
+	expect(await xlinkHref('[data-camel]')).toBe('#dot');
 	expect(await xlinkHref('[data-moving]')).toBe('#dot');
 	await page.click('[data-retarget]');
 	await expect.poll(() => xlinkHref('[data-moving]')).toBe('#ring');

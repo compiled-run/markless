@@ -24,6 +24,7 @@ import {
 	stepsAfterNestedRows,
 } from '../row-mint.ts';
 import { repeatRowsUnplaceable } from '../render-data/row-position.ts';
+import { rowRangeRefusal } from '../row-range.ts';
 import { staticTemplateReadDiagnostic } from '../state-lowering.ts';
 import {
 	joinDeciders,
@@ -121,12 +122,16 @@ export function collectKeyedRepeatRowMintDiagnostics(input: {
 			});
 			return;
 		}
-		const rowShape = shapeDecidedBy?.length === 0 ? null : rowShapeBesidesOneElement(rowNodes);
-		if (rowShape) {
+		const rangeRefusal =
+			shapeDecidedBy?.length === 0 || !repeat.rowRange
+				? null
+				: rowRangeRefusal(input.semanticGraph, repeat.id);
+		if (rangeRefusal) {
 			diagnostics.push({
 				...keyedRepeatRowNotOneElementDiagnostic({
 					itemName: rowItemLabel(repeat),
-					rowShape,
+					rowShape: rowShapeBesidesOneElement(rowNodes) ?? 'no single element at its top level',
+					reason: rangeRefusal,
 					node,
 					filename: input.filename,
 				}),
@@ -550,6 +555,7 @@ function rowMintRefusal(input: {
 				chunk.componentName,
 				slot,
 				input.rowNames,
+				(repeatId) => nestedRepeatMints(input, repeatId),
 			)
 		)
 			continue;

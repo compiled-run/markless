@@ -67,7 +67,7 @@ export const accordionState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 /** One section's instance, rooted by `accordion.item`. */
@@ -79,7 +79,7 @@ export const accordionItemState = shared(
 
 		return { ...item, labelEl, contentEl };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function AccordionRoot({

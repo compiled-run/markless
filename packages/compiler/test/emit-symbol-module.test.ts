@@ -375,7 +375,7 @@ import { shared, state } from '@markless/core';
 export const box = shared(() => {
 	const s = state({ open: false });
 	return { ...s };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Panel({ open }: { open?: boolean }) @{
 	const s = box();
@@ -803,6 +803,63 @@ export function App() @{
 	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
 });
 
+// Without its semicolon the carried const would run into the spliced `(async () => ...)` as a call.
+test('a semicolon-less module-scope arrow const an async computed calls is carried into the runner module', async () => {
+	const { modules, diagnostics } = await asyncRunnerModules(
+		'/workspace/app/src/AsyncRunnerArrowNoSemicolon.tsrx',
+		`
+import { computed, state } from '@markless/core';
+
+const fetcher = (url) => fetch(url).then((res) => res.json())
+
+export function App() @{
+	let reload = state(0);
+	const data = computed(async () => {
+		void reload;
+		return fetcher('/api/user');
+	});
+
+	<main>@try { <span>{data.name}</span> } @pending { <i>wait</i> }</main>
+}
+`,
+	);
+
+	expect(modules).toHaveLength(1);
+	expect(modules[0]!.source).toContain('const fetcher = (url) => fetch(url).then((res) => res.json());');
+	expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([]);
+});
+
+test('semicolon-less module-scope consts a derive and a handler read are carried into their modules', async () => {
+	const result = await compileTsrxModule({
+		filename: '/workspace/app/src/ArrowNoSemicolonCarry.tsrx',
+		source: `
+import { computed, state } from '@markless/core';
+
+let shout = (text) => text.toUpperCase()
+const step = 2
+
+export function App() @{
+	let word = state('hi');
+	let count = state(0);
+	const loud = computed(() => shout(word));
+
+	<main>
+		<button onClick={() => (count = count + step)}>{loud}</button>
+		<span>{count}</span>
+	</main>
+}
+`,
+		symbols: [],
+	});
+
+	expect(
+		result.symbolModules.diagnostics.filter((diagnostic) => diagnostic.severity === 'error'),
+	).toEqual([]);
+	const sources = result.symbolModules.modules.map((module) => module.source).join('\n');
+	expect(sources).toContain('let shout = (text) => text.toUpperCase();');
+	expect(sources).toContain('const step = 2;');
+});
+
 test('an async computed that names no module-scope declaration carries none', async () => {
 	const { modules } = await asyncRunnerModules(
 		'/workspace/app/src/AsyncRunnerNoConst.tsrx',
@@ -881,7 +938,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot() @{
 	const box = boxState();
@@ -919,7 +976,7 @@ export const boxState = shared(() => {
 	const box = state({ tag: '' });
 
 	return { ...box };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function BoxRoot({ tag }) @{
 	const box = boxState();

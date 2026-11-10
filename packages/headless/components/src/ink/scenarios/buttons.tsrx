@@ -19,7 +19,7 @@ export default function Buttons() @{
 	</main>
 }
 
-// The instance is widget-scoped, so the buttons sit inside the root: a `state()`
+// The instance is subtree-scoped, so the buttons sit inside the root: a `state()`
 // call outside it reaches a different drawing.
 function Toolbar() @{
 	const drawing = ink.state();

@@ -180,10 +180,20 @@ export default function TerminalFigure() @{
 
 			.row.added {
 				background: color-mix(in oklch, oklch(70% 0.14 150) 22%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, oklch(70% 0.14 150) 22%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.row.slip {
 				background: color-mix(in oklch, var(--yellow) 45%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--yellow) 45%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.stage[data-step='5'] .row.slip,
@@ -250,6 +260,11 @@ export default function TerminalFigure() @{
 
 			.pip:hover {
 				background: color-mix(in oklch, var(--pink) 40%, transparent);
+
+				html.dark & {
+					background: color-mix(in srgb, var(--pink) 40%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.caption {

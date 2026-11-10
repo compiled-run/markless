@@ -244,10 +244,8 @@ export default function StreamAnatomy() @{
 				--pencil: color-mix(in srgb, var(--ink) 45%, transparent);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: oklch(25% 0.01 60);
+					--sheet: var(--figure-sheet);
 					--drum: color-mix(in oklch, var(--sheet) 70%, oklch(70% 0.02 250));
-					--pencil: color-mix(in srgb, oklch(25% 0.01 60) 45%, transparent);
 				}
 			}
 
@@ -587,6 +585,31 @@ export default function StreamAnatomy() @{
 				overflow: hidden;
 				clip-path: inset(50%);
 				white-space: nowrap;
+			}
+
+			html.dark .scene {
+				--light-sheet: color-mix(in oklch, var(--cream) 50%, white);
+
+				.cake {
+					fill: color-mix(in oklch, var(--light-sheet) 55%, oklch(82% 0.1 85));
+				}
+
+				.lemon {
+					fill: color-mix(in oklch, var(--yellow) 80%, var(--light-sheet));
+				}
+
+				.bar-fill {
+					fill: color-mix(in oklch, var(--pink) 55%, var(--light-sheet));
+				}
+
+				.wash:not(.cake-wash) {
+					mix-blend-mode: normal;
+				}
+
+				.pink {
+					fill: color-mix(in srgb, var(--pink) 60%, var(--light-sheet));
+					opacity: 1;
+				}
 			}
 		</style>
 	</figure>

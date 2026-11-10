@@ -1,0 +1,88 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "executedChars"],
+			"delta": 71,
+			"reason": "link bridge recovers from a failed run-half load: fallback timer, pagehide listener and shown URL run at load (+71 chars on the four pages that measured steadily; bench / and /records moved -36 and +294 between runs of identical bridge code)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 46,
+			"reason": "link bridge recovers from a failed run-half load: one fallback timer, Back fallback, fresh press after failure",
+			"date": "2026-11-09"
+		}
+	]
+}

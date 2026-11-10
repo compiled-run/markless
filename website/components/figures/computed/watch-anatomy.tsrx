@@ -187,9 +187,9 @@ export default function WatchAnatomy() @{
 				--lcd: color-mix(in oklch, var(--paper) 80%, oklch(85% 0.06 120));
 
 				html.dark & {
-					--strap: color-mix(in oklch, var(--ink) 70%, oklch(45% 0.1 160));
-					--metal: color-mix(in oklch, var(--ink) 80%, oklch(55% 0.02 250));
-					--lcd: color-mix(in oklch, var(--ink) 88%, oklch(60% 0.06 120));
+					--strap: var(--slab);
+					--metal: var(--figure-sheet);
+					--lcd: var(--slab);
 				}
 			}
 
@@ -227,10 +227,6 @@ export default function WatchAnatomy() @{
 
 			.ink {
 				fill: var(--ink);
-
-				html.dark &:not(.desk) {
-					fill: var(--paper);
-				}
 			}
 
 			.readout {
@@ -346,12 +342,6 @@ export default function WatchAnatomy() @{
 				}
 			}
 
-			.name,
-			.value {
-				html.dark & {
-					fill: var(--paper);
-				}
-			}
 
 			@media (prefers-reduced-motion: reduce) {
 				.scene * {

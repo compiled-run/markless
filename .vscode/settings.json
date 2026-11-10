@@ -1,7 +1,7 @@
 {
 	"oxc.path.oxlint": "node_modules/@tsrx/oxc/bin/oxlint",
 	"emmet.includeLanguages": {
-		"ripple": "html"
+		"tsrx": "html"
 	},
 	"typescript.tsdk": "node_modules/typescript/lib",
 	"typescript.enablePromptUseWorkspaceTsdk": true

@@ -33,7 +33,7 @@ export default function EditorFigure() @{
 		if (!listed) return;
 		installed = !installed;
 		pin = 0;
-		said = installed ? 'TSRX for VS Code is installed. profile.tsrx is in colour, and hovers and red lines work.' : 'Uninstalled. profile.tsrx is plain text again: no colours, no hovers, no red lines.';
+		said = installed ? 'TSRX Syntax for VS Code is installed. profile.tsrx is in colour, and hovers and red lines work.' : 'Uninstalled. profile.tsrx is plain text again: no colours, no hovers, no red lines.';
 	};
 	const misspell = () => {
 		typo = !typo;
@@ -70,7 +70,7 @@ export default function EditorFigure() @{
 				event.preventDefault();
 				if (!listed) {
 					query = 'tsrx';
-					said = 'Searched tsrx: TSRX for VS Code is listed.';
+					said = 'Searched tsrx: TSRX Syntax for VS Code is listed.';
 				} else install();
 				return;
 			}
@@ -162,13 +162,13 @@ export default function EditorFigure() @{
 			value={query}
 			onInput={(event) => {
 				query = (event.target as HTMLInputElement).value;
-				said = query.trim() === '' ? '' : found ? 'TSRX for VS Code is listed.' : 'No extensions found.';
+				said = query.trim() === '' ? '' : found ? 'TSRX Syntax for VS Code is listed.' : 'No extensions found.';
 			}}
 		/>
 		</div>
 		<p class={lineClass} aria-live="off">{lineText}</p>
 		<figcaption class="sr">
-			A pen-and-ink drawing of a code editor. The Extensions sidebar lists TSRX for VS Code by ripple-ts with an Install button, and profile.tsrx is open: let name = state('Ada'), and a section with an h2 that shows name. Before the install the code is plain grey. After it, the code is in colour, hovering name shows let name: string, and misspelling name as nmae draws a red line with the message Cannot find name 'nmae'.
+			A pen-and-ink drawing of a code editor. The Extensions sidebar lists TSRX Syntax for VS Code by TSRX with an Install button, and profile.tsrx is open: let name = state('Ada'), and a section with an h2 that shows name. Before the install the code is plain grey. After it, the code is in colour, hovering name shows let name: string, and misspelling name as nmae draws a red line with the message Cannot find name 'nmae'.
 		</figcaption>
 		<p class="sr" aria-live="polite">{said}</p>
 		<style>
@@ -196,18 +196,17 @@ export default function EditorFigure() @{
 				--sheet-ink: var(--ink);
 				--shade: color-mix(in oklch, var(--ink) 24%, transparent);
 				--shade-ink: var(--ink);
-				--c-kw: #d73a49;
-				--c-fn: #6f42c1;
-				--c-str: #032f62;
-				--c-tag: #22863a;
-				--c-num: #005cc5;
-				--c-err: #cb2431;
+				--c-kw: var(--syntax-kw);
+				--c-fn: var(--syntax-fn);
+				--c-str: var(--syntax-str);
+				--c-tag: var(--syntax-tag);
+				--c-num: var(--syntax-num);
+				--c-err: var(--figure-error);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
 				}
 			}
 
@@ -277,12 +276,13 @@ export default function EditorFigure() @{
 				}
 			}
 
-			.logo-ink {
-				fill: var(--sheet-ink);
-			}
-
 			.frame {
 				position: relative;
+			}
+
+			html.dark :is(.btn-install, .btn-uninstall) {
+				--ink: var(--on-accent);
+				--sheet-ink: var(--on-accent);
 			}
 
 			.search {
@@ -294,10 +294,6 @@ export default function EditorFigure() @{
 				background: transparent;
 				font: 500 clamp(9px, 1.4vw, 0.8rem) / 1 var(--font-mono);
 				color: var(--ink);
-
-				html.dark & {
-					color: var(--paper);
-				}
 				outline: none;
 				-webkit-appearance: none;
 				appearance: none;
@@ -307,10 +303,6 @@ export default function EditorFigure() @{
 				font-family: 'Joy Elia', system-ui, sans-serif;
 				letter-spacing: 0.04em;
 				color: color-mix(in oklch, var(--ink) 45%, transparent);
-
-				html.dark & {
-					color: color-mix(in oklch, var(--paper) 55%, transparent);
-				}
 			}
 
 			.search:focus-visible {
@@ -340,6 +332,10 @@ export default function EditorFigure() @{
 			.tokens:has(.press:hover) .entry,
 			.use:hover {
 				fill: color-mix(in oklch, var(--yellow) 30%, transparent);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--ink) 10%, transparent);
+				}
 			}
 
 			.hover-line {

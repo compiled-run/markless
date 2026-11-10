@@ -1,5 +1,10 @@
 import { expect, test } from 'vitest';
-import { createRuntimeGraph } from '../src/index.ts';
+import { createRuntimeGraph as createGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
+
+const createRuntimeGraph: typeof createGraph = (input) =>
+	createGraph({ async: createAsyncComputedPlane, held: createHeldInputsPlane, ...input });
 
 // Spec D8 (12-arm-rendering): "the prior value is always addressable". When a
 // settled async computed re-runs (a mutation bumps its dependency), reads
@@ -116,4 +121,31 @@ test('debug-disabled graph omits the async snapshot member', () => {
 		expect('peekAsyncSnapshot' in graph).toBe(false);
 	}
 	delete (globalThis as any).__MARKLESS_DEBUG_ENABLED__;
+});
+
+test('an answer that arrives after a newer run started is dropped, even when it lands last', async () => {
+	const runs = deferredRuns();
+	const graph = graphWithAsyncComputed(runs.run);
+	const settle = async () => {
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		await graph.flush();
+	};
+
+	graph.read('computed:issueModel', ['status']);
+	runs.resolvers[0]!({ label: 'first' });
+	await settle();
+
+	graph.write({ graphNodeId: 'state:refreshTick', value: 1 });
+	await graph.flush();
+	graph.write({ graphNodeId: 'state:refreshTick', value: 2 });
+	await graph.flush();
+
+	runs.resolvers[2]!({ label: 'newest' });
+	await settle();
+	expect(graph.read('computed:issueModel', ['label'])).toBe('newest');
+
+	runs.resolvers[1]!({ label: 'older' });
+	await settle();
+	expect(graph.read('computed:issueModel', ['status'])).toBe('fulfilled');
+	expect(graph.read('computed:issueModel', ['label'])).toBe('newest');
 });

@@ -97,11 +97,21 @@ export default function SelectBasic() @{
 			}
 
 			.trigger:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger[ui-open] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.trigger:disabled {
@@ -136,7 +146,7 @@ export default function SelectBasic() @{
 				border: 1px solid var(--ink);
 				border-radius: 6px;
 				background: var(--raised);
-				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--paper));
+				box-shadow: 3px 3px 0 color-mix(in srgb, var(--purple) 45%, var(--cream));
 			}
 
 			.list[hidden] {
@@ -155,11 +165,21 @@ export default function SelectBasic() @{
 			}
 
 			.option:hover {
-				background: color-mix(in srgb, var(--purple) 16%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 16%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.option[ui-selected] {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.option:focus-visible {

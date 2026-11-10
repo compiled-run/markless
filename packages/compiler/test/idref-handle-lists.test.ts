@@ -239,7 +239,7 @@ export const field = shared(() => {
 	const errorEl = element<HTMLParagraphElement>();
 	const descriptionEl = element<HTMLParagraphElement>();
 	return { ...s, errorEl, descriptionEl };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ children }) @{
 	const f = field();

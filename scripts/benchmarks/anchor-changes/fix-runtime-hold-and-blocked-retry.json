@@ -1,0 +1,46 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 11,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 11,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 11,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 17,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 17,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 17,
+			"reason": "runtime graph: a flush-hold release counts once and a blocked async value re-enters pending while its failed input retries (+11 B gzip, +17 B where the async plane ships)",
+			"date": "2026-11-09"
+		}
+	]
+}

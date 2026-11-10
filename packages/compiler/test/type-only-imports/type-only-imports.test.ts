@@ -46,7 +46,7 @@ ${options.imports}
 export const gate = shared(() => {
 	const g = state({ minWidth: 1, maxWidth: 2, x: 3 });
 	return { ...g, grow() { g.x = g.x + 1; } };
-}, { scope: 'widget' });
+}, { scope: 'subtree' });
 
 export function Root({ ${options.defaults} }) @{
 	const g = gate();

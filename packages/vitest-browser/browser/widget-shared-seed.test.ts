@@ -3,7 +3,7 @@ import { cleanup, render, renderSSR, renderSSRPhased } from '../src/index.ts';
 import Page from './fixtures/chk-page.tsrx';
 import TallyPage from './fixtures/chk-session.tsrx';
 
-// A `shared(factory, { scope: 'widget' })` family whose factory returns two
+// A `shared(factory, { scope: 'subtree' })` family whose factory returns two
 // computeds — `isChecked` as a named const, `label` written inline in the
 // returned object literal — and whose root seeds the widget's shared state from
 // its own prop. Widget "a" renders with `disabled={true}`, widget "b" with the
@@ -90,7 +90,7 @@ test('SSR resume: two seeded widgets resume and stay independent', async () => {
 	await expectWidgetsIndependent(screen.container);
 });
 
-// D2's flip witness rides a PAGE-scoped family: a widget-scoped shared computed
+// D2's flip witness rides a APP-scoped family: a subtree-scoped shared computed
 // does not yet refresh a part after a write (see the receipt), so the flip of an
 // inline-declared factory computed is proven where nothing else is in the way.
 test('CSR: an inline factory computed renders and flips', async () => {

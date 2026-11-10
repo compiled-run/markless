@@ -372,7 +372,7 @@ export function childrenWidgetRootMarkerLine(
 }
 
 /**
- * The component that ROOTS each widget-scoped shared definition THIS MODULE
+ * The component that ROOTS each subtree-scoped shared definition THIS MODULE
  * DECLARES: the one whose payload owns the definition's cells, so every rendered
  * instance of it starts a widget instance of its own. The seeding component
  * roots it — its seed has to land in the payload it serves — and with no seed,
@@ -411,13 +411,13 @@ function declaredWidgetDefinitions(input: PublicRenderModuleInput) {
 	// The id carries the declaring module id, so it answers ownership.
 	return input.semanticGraph.sharedDefinitions.filter(
 		(definition) =>
-			definition.scope === 'widget' &&
+			definition.scope === 'subtree' &&
 			definition.id === sharedDefinitionId(input.semanticGraph.moduleId, definition.exportedName),
 	);
 }
 
 /**
- * The components that CARRY a widget-scoped definition's cells without rooting
+ * The components that CARRY a subtree-scoped definition's cells without rooting
  * it, keyed by definition id.
  *
  * Rooting follows the cells, and the cells can only be emitted once per compile
@@ -469,7 +469,7 @@ export function widgetFallbacksOutputField(
 	return carried.length > 0 ? `, widgetFallbacks: ${JSON.stringify(carried)}` : '';
 }
 
-/** The widget-scoped definitions one component carries without rooting. */
+/** The subtree-scoped definitions one component carries without rooting. */
 export function widgetFallbackDefinitionIds(
 	input: PublicRenderModuleInput,
 	componentName: string,
@@ -496,7 +496,7 @@ export function widgetCarriesMarkerLine(
 }
 
 /**
- * The widget-scoped definitions this module only ADOPTED from an import.
+ * The subtree-scoped definitions this module only ADOPTED from an import.
  *
  * A family's CELLS are its instance identity: the runtime reads "this component
  * roots that family" off the cells a composed child owns
@@ -515,7 +515,7 @@ export function adoptedWidgetDefinitionIds(
 ): ReadonlySet<string> {
 	return new Set(
 		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-			definition.scope === 'widget' &&
+			definition.scope === 'subtree' &&
 			definition.id !== sharedDefinitionId(input.semanticGraph.moduleId, definition.exportedName)
 				? [definition.id]
 				: [],
@@ -523,7 +523,7 @@ export function adoptedWidgetDefinitionIds(
 	);
 }
 
-/** The widget-scoped definitions one component roots, spelled as the payload spells them. */
+/** The subtree-scoped definitions one component roots, spelled as the payload spells them. */
 export function widgetRootDefinitionIds(
 	input: PublicRenderModuleInput,
 	componentName: string,
@@ -753,7 +753,51 @@ export function sharedSeedMarkerLine(
 		: null;
 }
 
-/** A component that reads a widget-scoped shared instance renders from the seeds its widget root wrote. */
+/** The render-context field carrying the request's seeded values of shared instances that are not subtree-scoped. */
+export const MARKLESS_SHARED_INSTANCE_VALUES_KEY = 'marklessSharedInstanceValues';
+
+/** The non-subtree shared state nodes a component's body resolves an instance of. */
+function sharedInstanceStateNodeIds(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): ReadonlyArray<string> {
+	const definitionIds = new Set(
+		(input.semanticGraph.sharedInstances ?? []).flatMap((instance) =>
+			instance.componentName === componentName ? [instance.definitionId] : [],
+		),
+	);
+	const nonSubtree = new Set(
+		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
+			definitionIds.has(definition.id) && definition.scope !== 'subtree' ? [definition.id] : [],
+		),
+	);
+	return [
+		...new Set(
+			input.semanticGraph.graphBindings.flatMap((binding) =>
+				binding.kind === 'state' &&
+				binding.sharedDefinitionId !== undefined &&
+				nonSubtree.has(binding.sharedDefinitionId)
+					? [binding.id]
+					: [],
+			),
+		),
+	];
+}
+
+/** A component reading a non-subtree shared instance renders from the values an enclosing body seeded this request. */
+export function sharedInstanceValuesConsumeLine(
+	input: PublicRenderModuleInput,
+	componentName: string,
+	valuesName: string,
+	payloadName: string,
+): string | null {
+	const nodeIds = sharedInstanceStateNodeIds(input, componentName);
+	if (nodeIds.length === 0) return null;
+	const seeded = `marklessSsrRenderContext?.${MARKLESS_SHARED_INSTANCE_VALUES_KEY}`;
+	return `	for (const marklessSeedId of ${JSON.stringify(nodeIds)}) if (${seeded}?.has(marklessSeedId)) marklessStateValue(${valuesName}, ${payloadName}, marklessSeedId, ${seeded}.get(marklessSeedId));`;
+}
+
+/** A component that reads a subtree-scoped shared instance renders from the seeds its widget root wrote. */
 export function sharedSeedConsumeLine(
 	input: PublicRenderModuleInput,
 	componentName: string,
@@ -761,7 +805,7 @@ export function sharedSeedConsumeLine(
 ): string | null {
 	const widgetScoped = new Set(
 		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
-			definition.scope === 'widget' ? [definition.id] : [],
+			definition.scope === 'subtree' ? [definition.id] : [],
 		),
 	);
 	const readsWidgetInstance = (input.semanticGraph.sharedInstances ?? []).some(

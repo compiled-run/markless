@@ -48,40 +48,46 @@ test('SSR: a sync-state @if inside @try opens AND closes without re-rendering th
 	);
 });
 
-test('SSR: the flip rewires after a real arm re-commit (no stale subscriptions, no leaks)', async () => {
+test('SSR: a refresh keeps the arm and its flip; the flip rewires after a real arm re-commit', async () => {
 	const screen = await renderSSR(ArmBranchFlip);
 	const container = screen.container as HTMLElement;
+	const renderCount = () => requireElement<HTMLSpanElement>(container, '[data-render-count]').textContent;
+	const toggle = () => requireElement<HTMLButtonElement>(container, 'button[data-drawer-toggle]');
+	const renderCountAfterLoad = renderCount();
 
-	const renderCountAfterLoad = requireElement<HTMLSpanElement>(
-		container,
-		'[data-render-count]',
-	).textContent;
-
-	// A write the async computed reads re-runs it: the whole arm re-commits
-	// (tier 4) — the probe MUST move here, proving it can detect arm renders.
+	// A write the async computed reads re-runs it: the arm updates in place, the probe stays put.
+	const toggleAtLoad = toggle();
 	requireElement<HTMLButtonElement>(container, 'button[data-region]').click();
+	await expect.poll(() => toggle().textContent?.trim()).toBe('east crews');
+	expect(toggle()).toBe(toggleAtLoad);
+	expect(renderCount()).toBe(renderCountAfterLoad);
+	toggle().click();
 	await expect
-		.poll(() => container.querySelector('button[data-drawer-toggle]')?.textContent?.trim())
-		.toBe('east crews');
-	const renderCountAfterCommit = requireElement<HTMLSpanElement>(
-		container,
-		'[data-render-count]',
-	).textContent;
+		.poll(() => Array.from(container.querySelectorAll('.drawer-item'), (item) => item.textContent))
+		.toEqual(['east-kestrel', 'east-osprey']);
+	toggle().click();
+	await expect.poll(() => container.querySelector('[data-drawer]')).toBeNull();
+
+	// A failed run shows @catch after the kept arm; the next good one re-commits the whole block (tier 4), so the probe moves.
+	requireElement<HTMLButtonElement>(container, 'button[data-lost]').click();
+	await expect.poll(() => container.querySelector('.broken')).not.toBeNull();
+	requireElement<HTMLButtonElement>(container, 'button[data-region]').click();
+	await expect.poll(() => container.querySelector('.broken')).toBeNull();
+	expect(container.querySelector('button[data-drawer-toggle]')?.textContent?.trim()).toBe('east crews');
+	const renderCountAfterCommit = renderCount();
 	expect(renderCountAfterCommit).not.toBe(renderCountAfterLoad);
 
 	// The re-committed arm's flip must be rewired against the fresh anchors.
-	requireElement<HTMLButtonElement>(container, 'button[data-drawer-toggle]').click();
+	toggle().click();
 	await expect.poll(() => container.querySelectorAll('.drawer-item').length).toBe(2);
 	expect(
 		Array.from(container.querySelectorAll('.drawer-item'), (item) => item.textContent),
 	).toEqual(['east-kestrel', 'east-osprey']);
 
 	// And the toggle still did not re-render the arm.
-	expect(requireElement<HTMLSpanElement>(container, '[data-render-count]').textContent).toBe(
-		renderCountAfterCommit,
-	);
+	expect(renderCount()).toBe(renderCountAfterCommit);
 
-	requireElement<HTMLButtonElement>(container, 'button[data-drawer-toggle]').click();
+	toggle().click();
 	await expect.poll(() => container.querySelector('[data-drawer]')).toBeNull();
 });
 

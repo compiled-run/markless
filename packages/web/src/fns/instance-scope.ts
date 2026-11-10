@@ -7,6 +7,7 @@ import { marklessCodedError } from '../coded-error.ts';
 import {
 	PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP,
 	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+	protocolBoundSymbolBase,
 } from '../../../serializer/src/protocol-constants.ts';
 import { marklessSettled, marklessThen, type Awaitable } from '../ssr-data/awaitable.ts';
 import type {
@@ -178,12 +179,12 @@ export function marklessRowScopedGraphNodeId(
 }
 
 /**
- * Refuse a widget-scoped read that reached no rendered widget.
+ * Refuse a subtree-scoped read that reached no rendered widget.
  *
  * Left alone the id stays in page space, the graph answers `undefined`, and the
  * handler runs to completion writing nothing - a dismiss that matches no message.
  * Only an id whose prefix names the edge a part was compiled at, for a definition
- * this page files as a widget, is that: page-scoped `shared()` and storage ids
+ * this page files as a widget, is that: app-scoped `shared()` and storage ids
  * are page space on purpose, and a bare widget id claims no instance.
  */
 function assertWidgetReadResolved(
@@ -193,8 +194,8 @@ function assertWidgetReadResolved(
 ): void {
 	const slash = sharedId.lastIndexOf('/');
 	const definitionId = slash > 0 ? sharedId.slice(0, slash) : sharedId;
-	// The registry files every widget-scoped definition the graph lists, rendered
-	// or not, so membership here is what says "widget-scoped" rather than a guess.
+	// The registry files every subtree-scoped definition the graph lists, rendered
+	// or not, so membership here is what says "subtree-scoped" rather than a guess.
 	if (!registry.rootPaths.has(definitionId) && !registry.rowRooted.has(definitionId)) return;
 	throw marklessCodedError(
 		'WidgetInstanceRuntimeError',
@@ -205,7 +206,7 @@ function assertWidgetReadResolved(
 }
 
 /**
- * A widget-scoped `shared:` id as a bound symbol spells it: `c1:p2:shared:…`.
+ * A subtree-scoped `shared:` id as a bound symbol spells it: `c1:p2:shared:…`.
  *
  * The prefix is the component EDGE the widget's part was compiled at, so it
  * names no row - while the widget-root registry holds one root per RENDERED
@@ -216,7 +217,7 @@ function assertWidgetReadResolved(
  * the edge path first is what makes the lookup reach this row's own root.
  *
  * `undefined` means "no rendered widget owns this id", and every such id - a
- * storage slot, a page-scoped `shared()` graph - falls through to the caller and
+ * storage slot, an app-scoped `shared()` graph - falls through to the caller and
  * resolves exactly as it does today. A widget rooted OUTSIDE every row is not
  * one of them: no row can answer it, so the projection site answers it below.
  */
@@ -480,15 +481,15 @@ function scopeSymbol(symbol: ResumeSymbol, instancePath: string): ResumeSymbol {
 }
 
 /**
- * A widget-scoped `element()` handle names one element PER RENDERED WIDGET, and
+ * A subtree-scoped `element()` handle names one element PER RENDERED WIDGET, and
  * its compiled id is one module-level string every instance of that widget
  * spells. Qualifying it exactly as the widget's graph nodes are qualified is
  * what turns it back into a key: the registration and the reading handler both
  * land on the rendered widget's own root path, so a page carrying two instances
  * answers each handler with its own element instead of the last registration.
  *
- * A handle that is not widget-scoped is returned untouched. A component-local
- * handle is already one element per key, and a page-scoped `shared()` graph is
+ * A handle that is not subtree-scoped is returned untouched. A component-local
+ * handle is already one element per key, and an app-scoped `shared()` graph is
  * page space by design.
  */
 export function marklessWidgetHandleId(
@@ -679,11 +680,11 @@ export function marklessPageSpaceId(graphNodeId: string): boolean {
 /**
  * One render's answer to "which rendered widget owns this id".
  *
- * Widget-scoped shared() definitions are the one page-space family that is NOT
+ * Subtree-scoped shared() definitions are the one page-space family that is NOT
  * page-wide: one graph per rendered widget. `rootPaths` answers, for an id a
  * part spells, WHICH rendered widget's instance path holds its nodes.
  * Composition fills it as it merges children; resume fills it from the payload.
- * A page with no widget-scoped definition never fills it and never pays for the
+ * A page with no subtree-scoped definition never fills it and never pays for the
  * lookup.
  *
  * `rowRooted` names the definitions at least one of whose rendered roots stands
@@ -758,7 +759,7 @@ function marklessRegistryHolder(graph: RuntimeGraph): object {
 
 /**
  * This graph's rendered widgets, minted on first ask and filled from the graph
- * itself: the payload's widget-scoped definitions carry their qualified root ids
+ * itself: the payload's subtree-scoped definitions carry their qualified root ids
  * and the projection sites composition registered them under, which is every
  * answer a lookup needs and the only place resume has ever read them from.
  */
@@ -787,7 +788,7 @@ function marklessShareWidgetRegistry(graph: object, registry: MarklessWidgetRegi
 
 function marklessNoteGraphWidgetRoots(registry: MarklessWidgetRegistry, graph: RuntimeGraph): void {
 	for (const definition of graph.listSharedDefinitions?.() ?? [])
-		if (definition.scope === 'widget') {
+		if (definition.scope === 'subtree') {
 			const rootPath = marklessInstancePath(definition.id);
 			marklessNoteWidgetRoot(registry, definition.id, rootPath);
 			for (const projectionId of definition.projectionIds ?? [])
@@ -966,7 +967,7 @@ function marklessWidgetRootPathThroughRows(
  * Two guards keep that from minting a phantom instance instead. The path must
  * carry no row of its own, because a path that already names its rows and STILL
  * found no root is not waiting on one. And the definition must be one some row
- * really did root: an id belonging to no widget at all - a page-scoped
+ * really did root: an id belonging to no widget at all - an app-scoped
  * `shared()` graph, a storage slot - is page space and stays exactly as spelled.
  */
 function marklessUnresolvedWidgetGraphNodeId(
@@ -1009,7 +1010,7 @@ function byDefinition<T>(id: string, lookup: (key: string) => T | undefined): T 
 	return lookup(id) ?? (slash > 0 ? lookup(id.slice(0, slash)) : undefined);
 }
 
-// Every id family a component owns is instance-local; a page-scoped shared()
+// Every id family a component owns is instance-local; an app-scoped shared()
 // graph and a persisted storage slot are page-space on purpose. The compiler
 // refuses at build time to emit an id belonging to neither, so this stays a
 // concatenation.
@@ -1045,6 +1046,31 @@ export function marklessComposedGraphNodeId(
 	return marklessUnresolvedWidgetGraphNodeId(graphNodeId, instancePath, registry);
 }
 
+// Host ids take the whole prefix; symbol ids the symbol prefix, which past one level of nesting differs; graph ids its instance-path part.
+function composedBoundaryPrefixes(
+	boundary: Parameters<ComposedArmRecordQualifier>[0],
+	symbolPrefix?: string,
+	renderedBoundaryId?: string,
+): { readonly prefix: string; readonly symbols: string } | undefined {
+	const local = /(?:boundary|branch-site):[^:]*$/.exec(boundary.id);
+	// A helper in the page's own module renders with the page, so its records already carry the path its rendered id holds.
+	const drawn =
+		renderedBoundaryId && boundary.id.endsWith(renderedBoundaryId)
+			? renderedBoundaryId.slice(0, renderedBoundaryId.lastIndexOf('boundary:'))
+			: '';
+	const prefix = local ? boundary.id.slice(0, local.index - drawn.length) : '';
+	if (!prefix) return undefined;
+	// A served boundary's update symbol was spelled through the composing edges' symbol prefixes.
+	const composedSymbols =
+		boundary.composedSymbolPrefix ?? (marklessInstancePath(boundary.updateSymbolId) || undefined);
+	const symbols =
+		symbolPrefix ??
+		(composedSymbols?.endsWith(drawn)
+			? composedSymbols.slice(0, composedSymbols.length - drawn.length)
+			: prefix);
+	return { prefix, symbols };
+}
+
 // Composed child-owned boundaries load their update symbol through the
 // instance prefix riding boundary.id (c0:boundary:1 -> prefix "c0:"). The
 // arm-render module mints records in the child module's own id space, so
@@ -1059,6 +1085,9 @@ function composedBoundaryArmRecords(
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
+	renderedBoundaryId?: string,
+	// Set for an escalated @if render rooted at its owner: bound ids stay spelled from the module root.
+	moduleRootPath?: string,
 ): ResumeArmRecordSet {
 	const exhaustive = {
 		locators: true,
@@ -1071,14 +1100,15 @@ function composedBoundaryArmRecords(
 		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
-	const local = /(?:boundary|branch-site):[^:]*$/.exec(boundary.id);
-	const prefix = local ? boundary.id.slice(0, local.index) : '';
-	if (!prefix) return set;
-	// Host ids take the whole prefix; symbol ids the symbol prefix, which past one level of nesting differs; graph ids its instance-path part.
-	const symbols = symbolPrefix ?? boundary.composedSymbolPrefix ?? prefix;
+	const prefixes = composedBoundaryPrefixes(boundary, symbolPrefix, renderedBoundaryId);
+	if (!prefixes) return set;
+	const { prefix, symbols } = prefixes;
 	const instancePath = marklessInstancePath(symbols);
 	const registry = marklessGraphWidgetRegistry(graph);
 	const routes = boundary.composedGraphProps ?? [];
+	const symbol = (symbolId: string) =>
+		(moduleRootPath !== undefined && protocolBoundSymbolBase(symbolId) ? moduleRootPath : symbols) +
+		symbolId;
 	const prefixHost = <T extends { readonly hostNodeId: string }>(record: T): T => ({
 		...record,
 		hostNodeId: prefix + record.hostNodeId,
@@ -1131,18 +1161,18 @@ function composedBoundaryArmRecords(
 		locators: set.locators.map(prefixHost),
 		events: set.events.map((event) => ({
 			...prefixHost(event),
-			symbolIds: event.symbolIds.map((symbolId) => symbols + symbolId),
+			symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
 		})),
 		domUpdates: set.domUpdates?.map((update) => ({
 			...prefixHost(qualifyRead(update)),
-			...(update.symbolId ? { symbolId: symbols + update.symbolId } : {}),
+			...(update.symbolId ? { symbolId: symbol(update.symbolId) } : {}),
 		})),
 		behaviors: set.behaviors.map((behavior) => ({
 			...prefixHost(behavior),
 			...(behavior.inputGraphReads
 				? { inputGraphReads: behavior.inputGraphReads.map(qualifyRead) }
 				: {}),
-			...(behavior.symbolId ? { symbolId: symbols + behavior.symbolId } : {}),
+			...(behavior.symbolId ? { symbolId: symbol(behavior.symbolId) } : {}),
 		})),
 		elementHandles: set.elementHandles.map((handle) => ({
 			...prefixHost(handle),
@@ -1164,7 +1194,7 @@ function composedBoundaryArmRecords(
 			...(repeat.rowTemplate && { rowTemplate: qualifyRowTemplate(repeat.rowTemplate) }),
 			rowEvents: repeat.rowEvents.map((event) => ({
 				...event,
-				symbolIds: event.symbolIds.map((symbolId) => symbols + symbolId),
+				symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
 			})),
 		})),
 		...(set.branches
@@ -1176,7 +1206,7 @@ function composedBoundaryArmRecords(
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
 							: {}),
-						...(branch.symbolId ? { symbolId: symbols + branch.symbolId } : {}),
+						...(branch.symbolId ? { symbolId: symbol(branch.symbolId) } : {}),
 						...(branch.armRecords
 							? {
 									armRecords: branch.armRecords.map((arm) => ({
@@ -1184,13 +1214,13 @@ function composedBoundaryArmRecords(
 										events: (arm.events ?? []).map((event) => ({
 											...event,
 											symbolIds: (event.symbolIds ?? []).map(
-												(symbolId) => symbols + symbolId,
+												(symbolId) => symbol(symbolId),
 											),
 										})),
 										domUpdates: (arm.domUpdates ?? []).map((update) => ({
 											...qualifyLooseRead(update),
 											...(update.symbolId
-												? { symbolId: symbols + update.symbolId }
+												? { symbolId: symbol(String(update.symbolId)) }
 												: {}),
 										})),
 									})),
@@ -1209,18 +1239,38 @@ function composedBoundaryArmRecords(
 					runnerGraphNodeId:
 						nested.runnerGraphNodeId &&
 						marklessComposedGraphNodeId(nested.runnerGraphNodeId, instancePath, registry),
-					...(nested.updateSymbolId && { updateSymbolId: symbols + nested.updateSymbolId }),
+					...(nested.updateSymbolId && { updateSymbolId: symbol(nested.updateSymbolId) }),
 					asyncReads: nested.asyncReads.map((read) => ({
 						...qualifyRead(read),
-						...(read.runnerSymbolId && { runnerSymbolId: symbols + read.runnerSymbolId }),
+						...(read.runnerSymbolId && { runnerSymbolId: symbol(read.runnerSymbolId) }),
 					})),
 					...(routes.length > 0 && {
 						composedInstancePath: instancePath,
 						composedGraphProps: routes,
 					}),
+					// The owner's render spelled the nested boundary's own routes in its space.
+					...(moduleRootPath !== undefined &&
+						nested.composedGraphProps && {
+							composedInstancePath: instancePath + (nested.composedInstancePath ?? ''),
+							composedGraphProps: nested.composedGraphProps.map((route) => ({
+								...route,
+								...qualifyRead({ graphNodeId: route.graphNodeId, path: route.path ?? [] }),
+							})),
+						}),
 					...(symbols !== prefix && { composedSymbolPrefix: symbols }),
+					...(moduleRootPath !== undefined &&
+						nested.updateSymbolId && {
+							composedSymbolPrefix: symbols + marklessInstancePath(nested.updateSymbolId),
+						}),
 					...(armRecords && {
-						armRecords: composedBoundaryArmRecords({ ...boundary, id }, armRecords, graph, symbols),
+						armRecords: composedBoundaryArmRecords(
+							{ ...boundary, id },
+							armRecords,
+							graph,
+							symbols,
+							undefined,
+							moduleRootPath,
+						),
 					}),
 				};
 			}),
@@ -1228,18 +1278,19 @@ function composedBoundaryArmRecords(
 	};
 }
 
+type ComposedUpdate = {
+	readonly armRecords: ResumeArmRecordSet;
+	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly moduleRootPath?: string;
+	readonly computed?: ReadonlyArray<{
+		readonly graphNodeId: string;
+		readonly deriveSymbolId?: string | null;
+		readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
+	}>;
+};
+
 // An escalated @if render of a composed child: its records, the cells of what it created, and its computeds, in page space.
-function composedBranchUpdate<
-	U extends {
-		readonly armRecords: ResumeArmRecordSet;
-		readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
-		readonly computed?: ReadonlyArray<{
-			readonly graphNodeId: string;
-			readonly deriveSymbolId?: string | null;
-			readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
-		}>;
-	},
->(
+function composedBranchUpdate<U extends ComposedUpdate>(
 	branch: Parameters<ComposedArmRecordQualifier>[0] & { readonly symbolId?: string },
 	update: U,
 	graph: RuntimeGraph | undefined,
@@ -1247,23 +1298,63 @@ function composedBranchUpdate<
 	// Past one level of nesting the symbol prefix differs from the host prefix the branch id carries.
 	const symbolPrefix = marklessInstancePath(branch.symbolId);
 	if (!symbolPrefix) return update;
+	return composedUpdateNodes(branch, update, graph, symbolPrefix, {
+		...update,
+		armRecords: composedBoundaryArmRecords(
+			branch,
+			update.armRecords,
+			graph,
+			symbolPrefix,
+			undefined,
+			update.moduleRootPath,
+		),
+	});
+}
+
+// A settled @try arm of a composed child: its cells and computeds take the prefix its records take.
+function composedBoundaryUpdate<U extends ComposedUpdate>(
+	boundary: Parameters<ComposedArmRecordQualifier>[0],
+	update: U,
+	graph: RuntimeGraph | undefined,
+	renderedBoundaryId?: string,
+): U {
+	const prefixes = composedBoundaryPrefixes(boundary, undefined, renderedBoundaryId);
+	if (!prefixes) return update;
+	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, {
+		...update,
+		armRecords: composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId),
+	});
+}
+
+function composedUpdateNodes<U extends ComposedUpdate>(
+	owner: Parameters<ComposedArmRecordQualifier>[0],
+	update: U,
+	graph: RuntimeGraph | undefined,
+	symbolPrefix: string,
+	qualified: U,
+): U {
+	const instancePath = marklessInstancePath(symbolPrefix);
 	const registry = marklessGraphWidgetRegistry(graph);
-	const node = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, symbolPrefix, registry);
+	const node = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	const read = <R extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(dependency: R): R => ({
 		...dependency,
-		...(marklessPropRoute(branch.composedGraphProps, dependency.graphNodeId, dependency.path) ?? {
+		...(marklessPropRoute(owner.composedGraphProps, dependency.graphNodeId, dependency.path) ?? {
 			graphNodeId: node(dependency.graphNodeId),
 		}),
 	});
 	return {
-		...update,
-		armRecords: composedBoundaryArmRecords(branch, update.armRecords, graph, symbolPrefix),
+		...qualified,
 		...(update.cells && { cells: update.cells.map((cell) => ({ ...cell, graphNodeId: node(cell.graphNodeId) })) }),
 		...(update.computed && {
 			computed: update.computed.map((computed) => ({
 				...computed,
 				graphNodeId: node(computed.graphNodeId),
-				...(computed.deriveSymbolId && { deriveSymbolId: symbolPrefix + computed.deriveSymbolId }),
+				...(computed.deriveSymbolId && {
+					deriveSymbolId:
+						(update.moduleRootPath !== undefined && protocolBoundSymbolBase(computed.deriveSymbolId)
+							? update.moduleRootPath
+							: symbolPrefix) + computed.deriveSymbolId,
+				}),
 				...(computed.dependencies && { dependencies: computed.dependencies.map(read) }),
 			})),
 		}),
@@ -1313,7 +1404,11 @@ function composedBoundaryGraph(
  */
 export function installMarklessComposedArmRecords(): void {
 	installComposedArmRecordQualifier(
-		Object.assign(composedBoundaryArmRecords, { graph: composedBoundaryGraph, branchUpdate: composedBranchUpdate }),
+		Object.assign(composedBoundaryArmRecords, {
+			graph: composedBoundaryGraph,
+			branchUpdate: composedBranchUpdate,
+			boundaryUpdate: composedBoundaryUpdate,
+		}),
 	);
 	// An `@if` arm's handles are filed at resume from the arm record, which the
 	// serializer never qualified: the record's owning id carries the instance.

@@ -137,7 +137,12 @@ export default function FeedSteps() @{
 
 			.board[data-step='1'] .one,
 			.board[data-step='2'] .two {
-				background: color-mix(in srgb, var(--purple) 26%, var(--paper));
+				background: color-mix(in srgb, var(--purple) 26%, var(--cream));
+
+				html.dark & {
+					--ink: var(--on-accent);
+					color: var(--on-accent);
+				}
 			}
 
 			.board[data-fast='no'][data-step='1'] .two {

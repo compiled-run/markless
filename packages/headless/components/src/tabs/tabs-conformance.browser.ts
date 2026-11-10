@@ -1,7 +1,7 @@
 import { renderSSRIslands } from '@markless/vitest-browser';
 import { runMultiEmbedConformance } from '../../test-support/multi-embed-conformance.ts';
 import MultiEmbed from './scenarios/multi-embed.tsrx';
-import MultiEmbedPageScope from './scenarios/multi-embed-page-scope.tsrx';
+import MultiEmbedPageScope from './scenarios/multi-embed-app-scope.tsrx';
 
 // The island mount is written out here rather than inside the shared battery:
 // the SSR island lever is a string-level transform that resolves each component

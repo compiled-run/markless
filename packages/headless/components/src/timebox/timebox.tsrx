@@ -154,7 +154,7 @@ export const timeboxState = shared(
 			},
 		};
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 export function TimeBoxRoot({

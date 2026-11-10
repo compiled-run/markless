@@ -13,11 +13,17 @@ import {
 } from './fns/instance-scope.ts';
 import { marklessCodedError } from './coded-error.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
-import { marklessEditableControl, marklessNoteControlEdits } from './control-edit-hold.ts';
+import {
+	marklessControlEditsRead,
+	marklessEditableControl,
+	marklessNoteArrivingControlEdits,
+	marklessNoteControlEdits,
+} from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
+	ResumeAsyncBoundaryRecord,
 	ResumeDispatchOptions,
 	ResumeDomElement,
 	ResumeDomEvent,
@@ -25,6 +31,7 @@ import type {
 	ResumeEventRecord,
 	ResumeKeyedRepeatRecord,
 	ResumeKeyedRepeatRowEvent,
+	ResumeRowRoot,
 	ResumeRuntimeErrorContext,
 	ResumeRuntimeInput,
 	ResumeSymbolContext,
@@ -40,7 +47,7 @@ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
 	readonly parent: ResumeDomElement;
-	readonly rowRoot: ResumeDomElement;
+	readonly rowRoot: ResumeRowRoot;
 	readonly rowKey: unknown;
 	readonly rowEvent: ResumeKeyedRepeatRowEvent;
 };
@@ -302,6 +309,8 @@ export function createEventWiring(input: {
 	readonly activateBehaviorsFromTrigger: (hostNodeId: string) => Promise<void> | undefined;
 	readonly behaviorHostIdsForAncestors: (element: ResumeDomElement | undefined) => string[];
 	readonly delegatedTriggers?: ResumeRuntimeInput['delegatedTriggers'];
+	readonly asyncBoundaries?: () => Iterable<ResumeAsyncBoundaryRecord>;
+	readonly failEnclosingCatch?: (element: ResumeDomElement, error: unknown) => Promise<boolean>;
 }) {
 	const readHandle = marklessHandleFocusReader(input.elementHandles.get);
 	const eventRecords = new WeakMap<ResumeDomElement, Map<string, ResumeEventRecord>>();
@@ -484,7 +493,12 @@ export function createEventWiring(input: {
 		runPolicy = (await import('./inline/sync-policy-core-lazy.ts'))
 			.runSyncPolicyActions as never;
 	}
-	async function dispatch(
+	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
+		// Another dispatch's flush may land while this one's handler still loads.
+		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
+		return dispatchArrived(event, dispatchOptions).finally(releaseArrivingEdits);
+	}
+	async function dispatchArrived(
 		event: ResumeDomEvent,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
@@ -560,6 +574,7 @@ export function createEventWiring(input: {
 			throw unmatchedDispatchError(event, selector);
 		}
 		if (!options.syncPolicyAlreadyApplied && runPolicy) {
+			marklessControlEditsRead(event);
 			applyPolicies(path, event);
 			options.syncPolicyAlreadyApplied = true;
 		}
@@ -700,8 +715,10 @@ export function createEventWiring(input: {
 			readonly locals?: Record<string, unknown>;
 		}>,
 	): Promise<void> {
-		if (record.syncPolicy && !options.syncPolicyAlreadyApplied)
+		if (record.syncPolicy && !options.syncPolicyAlreadyApplied) {
+			marklessControlEditsRead(event);
 			runPolicy?.(record.syncPolicy, input.graph, event);
+		}
 		let activeSymbolId: string | undefined;
 		const report = (error: unknown, symbolId: string | undefined) =>
 			input.reportRuntimeError(error, {
@@ -715,6 +732,8 @@ export function createEventWiring(input: {
 		// Opened before the try: beginning the window cannot throw, and the finally
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
+		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
+		const userActionToken = { open: true };
 		try {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
@@ -726,9 +745,16 @@ export function createEventWiring(input: {
 			) => {
 				// The caller's writes wait for this symbol's own, so loading its code splits no task.
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
+				const { graph } = context;
+				let loud: boolean | undefined;
 				try {
 					const symbol = await input.loadSymbol(symbolId);
-					return await marklessRunAtCurrentTarget(context.event, element, symbol, {
+					// A write this body makes is loud only inside a DOM dispatch; the same body a timer reaches later is quiet.
+					loud = context.userActionToken?.open === true;
+					if (loud) graph.markUserActionStart?.();
+					else graph.markQuietStart?.();
+					marklessControlEditsRead(event);
+					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && marklessIsBoundSymbolId(symbolId)
 							? marklessRowScopedSymbolContext(context, rowScope)
@@ -736,7 +762,13 @@ export function createEventWiring(input: {
 						invokeCallback,
 						invokeSymbol,
 					});
+					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
+					return await Promise.resolve(result).catch(async (error: unknown) => {
+						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
+					});
 				} finally {
+					if (loud) graph.markUserActionEnd?.();
+					else if (loud === false) graph.markQuietEnd?.();
 					releaseFlush?.();
 				}
 			};
@@ -744,6 +776,8 @@ export function createEventWiring(input: {
 			// body no caller awaits, so its failure is reported here rather than
 			// escaping the dispatch as an unhandled rejection.
 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
+				// Decided when called, not when the callee's code arrives: a timer calling back after the caller finished is quiet.
+				const calleeToken = context.userActionToken?.open ? { open: true } : undefined;
 				try {
 					// The callback channel belongs to this dispatch, so a context that
 					// arrived without one runs on the dispatch's own graph.
@@ -752,12 +786,15 @@ export function createEventWiring(input: {
 						{
 							...context,
 							graph: context.graph ?? input.graph,
+							userActionToken: calleeToken,
 						},
 						true,
 					);
 				} catch (error) {
 					await report(error, symbolId);
 					return undefined;
+				} finally {
+					if (calleeToken) calleeToken.open = false;
 				}
 			};
 			const baseContext = {
@@ -765,8 +802,12 @@ export function createEventWiring(input: {
 				event,
 				element,
 				getElementHandle: readHandle,
+				...(input.asyncBoundaries && {
+					catchScope: { graph: input.graph, boundaries: input.asyncBoundaries },
+				}),
 				...(locals ? { locals } : {}),
 				releaseQueue: options.releaseQueue,
+				userActionToken,
 			} as DispatchSymbolContext;
 			const invokeCallback = (symbolId: string, args: ReadonlyArray<unknown>) =>
 				invokeSymbol(symbolId, { ...baseContext, args, invokeCallback, invokeSymbol });
@@ -782,6 +823,7 @@ export function createEventWiring(input: {
 			await report(error, activeSymbolId);
 			throw error;
 		} finally {
+			userActionToken.open = false;
 			await input.flushRuntimeGraph();
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
@@ -1014,3 +1056,4 @@ function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefi
 		},
 	);
 }
+

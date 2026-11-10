@@ -279,6 +279,9 @@ export function collectVariableDeclaration(node: AnyNode, state: WalkState): voi
 				writable: true,
 				valueKind: initialValueKind(initial),
 				...(armScope ? { armScope } : {}),
+				...(armScope && state.currentBranchArms.length > 1
+					? { enclosingArms: state.currentBranchArms.slice(0, -1) }
+					: {}),
 				...(evaluatedInitial.ok
 					? { initialValue: evaluatedInitial.value, initialValueKnown: true }
 					: initial
@@ -523,7 +526,7 @@ export function collectModuleGraphInterface(input: {
 	};
 }
 
-// `export { default as root } from './x.tsrx'` and `export * as ns from './y.ts'`.
+// `export { default as root } from './x.tsrx'`, `export * as ns from './y.ts'` and `export * from './z.ts'`.
 // A linker follows these to reach the module that declares the component.
 function collectModuleReexports(
 	statements: ReadonlyArray<AnyNode>,
@@ -533,7 +536,8 @@ function collectModuleReexports(
 		const source = (statement.source as { readonly value?: unknown } | undefined)?.value;
 		if (typeof source !== 'string') continue;
 		if (statement.type === 'ExportAllDeclaration') {
-			const exportName = exportSpecifierName(statement.exported as AnyNode | undefined);
+			const exported = statement.exported as AnyNode | undefined | null;
+			const exportName = exported ? exportSpecifierName(exported) : '*';
 			if (exportName) reexports.push({ exportName, source, importedName: '*' });
 			continue;
 		}

@@ -22,7 +22,7 @@ export const theme = shared(() => {
 			data.mode = 'dark';
 		},
 	};
-}, { scope: 'page' });
+}, { scope: 'app' });
 
 export default function SharedTwoDefinitionsPage() @{
 	const currentSession = session();

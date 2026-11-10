@@ -519,11 +519,11 @@ export function IsoFigure({
 				html.dark & {
 					--anatomy-wash-steel: color-mix(in oklch, var(--ink) 9%, var(--paper));
 					--anatomy-wash-top-steel: color-mix(in oklch, var(--ink) 5%, var(--paper));
-					--anatomy-marker: color-mix(in oklch, var(--anatomy-accent) 70%, var(--paper));
-					--anatomy-marker-opacity: 0.5;
+					--anatomy-marker: var(--anatomy-accent);
+					--anatomy-marker-opacity: 0.85;
 					--anatomy-marker-blend: normal;
-					--anatomy-shadow: black;
-					--anatomy-pencil: color-mix(in oklch, var(--pink) 42%, var(--paper));
+					--anatomy-shadow: var(--slab);
+					--anatomy-pencil: var(--pencil);
 					--anatomy-lo: color-mix(in oklch, var(--ink) 82%, var(--paper));
 					--anatomy-faint: color-mix(in oklch, var(--ink) 55%, var(--paper));
 					--anatomy-lit: var(--anatomy-accent);

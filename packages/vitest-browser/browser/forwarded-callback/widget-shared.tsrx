@@ -6,14 +6,14 @@ export const total = shared(
 		const box = state({ sold: 0 });
 		return { ...box };
 	},
-	{ scope: 'page' },
+	{ scope: 'app' },
 );
 export const stall = shared(
 	() => {
 		const box = state({ sold: 0 });
 		return { ...box };
 	},
-	{ scope: 'widget' },
+	{ scope: 'subtree' },
 );
 
 function Stall({ name }: { readonly name: string }) @{

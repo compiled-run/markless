@@ -1,7 +1,8 @@
 import type { ResumeArmRange } from './resume-types.ts';
 
-type BusyNode = {
+export type BusyNode = {
 	readonly nodeType?: number;
+	readonly isConnected?: boolean;
 	readonly textContent?: string | null;
 	readonly parentNode?: BusyParent | null;
 	setAttribute?: (name: string, value: string) => void;
