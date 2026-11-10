@@ -131,9 +131,60 @@ export type FragmentEntryModule = {
 };
 
 type FragmentHost = Document & { __marklessFragmentNav?: FragmentNavigationState };
+
+// A navigation's phase, changed only by moveNavigation; a newer one cancels it up to FAILED. SHOWN streams its rest until ENDED.
+const FETCHING = 0,
+	HOLDING = 1,
+	MERGING = 2,
+	FAILED = 3,
+	SHOWN = 4,
+	SUPERSEDED = 5,
+	FALLBACK = 6,
+	ENDED = 7;
+// Each phase's allowed next phases, one bit per phase.
+const NAVIGATION_MOVES = [
+	(1 << HOLDING) | (1 << MERGING) | (1 << FAILED) | (1 << SUPERSEDED) | (1 << FALLBACK),
+	(1 << MERGING) | (1 << SUPERSEDED) | (1 << FALLBACK),
+	(1 << SHOWN) | (1 << SUPERSEDED),
+	(1 << SUPERSEDED) | (1 << FALLBACK),
+	1 << ENDED,
+	0,
+	0,
+	0,
+];
+
+const checkNavigationMove = import.meta.env?.DEV
+	? (from: number, to: number): void => {
+			(
+				globalThis as { __marklessNavigationMoves?: number[][] }
+			).__marklessNavigationMoves?.push([from, to]);
+			if (!((NAVIGATION_MOVES[from]! >> to) & 1))
+				throw new Error(`Markless router navigation: no move from phase ${from} to phase ${to}.`);
+		}
+	: undefined;
+
+// Development builds publish the phases and the check for the transition tests; production keeps neither.
+if (import.meta.env?.DEV)
+	(globalThis as { __marklessNavigationPhases?: unknown }).__marklessNavigationPhases = {
+		phases: { FETCHING, HOLDING, MERGING, FAILED, SHOWN, SUPERSEDED, FALLBACK, ENDED },
+		check: checkNavigationMove,
+	};
+
+type Navigation = { phase: number; stream?: AbortController };
+
+function moveNavigation(navigation: Navigation, to: number): void {
+	checkNavigationMove?.(navigation.phase, to);
+	navigation.phase = to;
+}
+
+const supersede = (navigation: Navigation | undefined) =>
+	navigation && navigation.phase <= FAILED && moveNavigation(navigation, SUPERSEDED);
+
 type Session = {
-	navigation: number;
-	streaming?: AbortController;
+	// The navigation asked for last, until the document is left.
+	latest?: Navigation;
+	// The navigation whose page is on screen, its stream open until the next one swaps in.
+	shown?: Navigation;
 	// The history entry on screen, and the last scroll offset seen for every entry this tab visited.
 	current?: string;
 	readonly positions: Map<string, { readonly x: number; readonly y: number }>;
@@ -145,7 +196,7 @@ const parsedVisits = new WeakMap<FragmentNavigationState, Map<string, FragmentFe
 function sessionFor(d: Document): Session {
 	let session = sessions.get(d);
 	if (session) return session;
-	const created: Session = { navigation: 0, positions: new Map() };
+	const created: Session = { positions: new Map() };
 	sessions.set(d, created);
 	const w = d.defaultView!;
 	w.addEventListener(
@@ -157,7 +208,8 @@ function sessionFor(d: Document): Session {
 		{ passive: true },
 	);
 	w.addEventListener('pagehide', () => {
-		created.navigation++;
+		supersede(created.latest);
+		created.latest = undefined;
 		if (created.current) saveScroll(w, created.current);
 		w.history.scrollRestoration = 'auto';
 	});
@@ -1118,9 +1170,13 @@ export async function navigate(
 	containerAttribute = state.config.containerAttributes[0];
 	keepAttributes = state.config.keepAttributes ?? ['', '', '', '', ''];
 	const session = sessionFor(d);
-	const id = ++session.navigation;
+	supersede(session.latest);
+	const navigation: Navigation = (session.latest = { phase: FETCHING });
 	// The address and history entry change only when the page swaps in, so Back before then goes back from the page still shown.
-	const stale = () => id !== session.navigation || (mode !== 'traverse' && stops !== state.stops);
+	const stale = (): boolean => {
+		if (mode !== 'traverse' && stops !== state.stops) supersede(navigation);
+		return navigation.phase === SUPERSEDED;
+	};
 	if (stale()) return;
 	const fallback = (href: string) => {
 		if (mode === 'traverse') w.location.reload();
@@ -1145,7 +1201,6 @@ export async function navigate(
 	sharedSwap?.catch(() => {});
 	// A kept part with state hands its live values to the next page's instance, which only the swap binder knows how to read.
 	const [keepAttribute, , , instanceAttribute] = state.config.keepAttributes;
-	keptSwap = undefined;
 	const keptSwapping =
 		instanceAttribute && d.querySelector(`[${instanceAttribute}]`)
 			? import('@markless/web/kept-swap')
@@ -1156,13 +1211,19 @@ export async function navigate(
 	try {
 		fetched = await taken.result;
 	} catch {
+		if (stale()) return;
+		moveNavigation(navigation, FAILED);
 		// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
-		w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
+		w.setTimeout(
+			() => stale() || (moveNavigation(navigation, FALLBACK), fallback(url.href)),
+			state.config.pendingDeadlineMs,
+		);
 		return;
 	}
 	if (stale()) return abandon();
 	let arrived = !fetched.rest;
 	if (fetched.rest) {
+		moveNavigation(navigation, HOLDING);
 		const held = await holdStream(
 			fetched.rest,
 			state.config.pendingDeadlineMs - (w.performance.now() - started),
@@ -1181,9 +1242,11 @@ export async function navigate(
 	const outgoing = documentLoads ? d.body : regionOf(state, d);
 	const scope = documentLoads && !isContainer(d.body) ? d.body : outgoing?.parentElement;
 	if (!incoming || !outgoing || !scope) {
+		moveNavigation(navigation, FALLBACK);
 		fallback(landed.href);
 		return;
 	}
+	moveNavigation(navigation, MERGING);
 	// The destination shows once its own code has arrived, so its first interaction never waits on a fetch.
 	const code = [...next.head.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')].map(
 		(link) => state.arriving.get(new URL(link.getAttribute('href') ?? '', d.baseURI).href),
@@ -1232,7 +1295,6 @@ export async function navigate(
 			reportAsync(error);
 		}
 		if (stale()) return abandon();
-		keptSwap = swapping;
 	}
 	let restore = scroll;
 	let region!: Element;
@@ -1256,7 +1318,10 @@ export async function navigate(
 			else w.history.replaceState(entry, '', landed.href);
 		}
 		// The leaving page keeps its stream until now: closed early, its unanswered @try runs the recipe in the browser.
-		session.streaming?.abort();
+		if (session.shown) {
+			moveNavigation(session.shown, ENDED);
+			session.shown.stream!.abort();
+		}
 		const settle = withoutTransitions(d);
 		const offsets: ScrolledBox[] = [];
 		for (const element of state.scrolled) {
@@ -1365,8 +1430,8 @@ export async function navigate(
 		for (const container of [region, ...region.querySelectorAll(`[${containerAttribute}]`)])
 			if (isContainer(container))
 				(container as unknown as Record<string, unknown>)[state.config.reaskProperty] = true;
-	const controller = new AbortController();
-	session.streaming = controller;
+	const controller = (navigation.stream = new AbortController());
+	moveNavigation((session.shown = navigation), SHOWN);
 	const host = d as unknown as Record<string, unknown>;
 	const openKey = state.config.streamOpenProperty;
 	const open = fetched.rest
@@ -1384,7 +1449,7 @@ export async function navigate(
 		d,
 		[...head.scripts, ...(scripts as HTMLScriptElement[])],
 		ranFiles,
-		() => id === session.navigation,
+		() => session.latest === navigation,
 	);
 	wakeShared?.();
 	const active = d.activeElement as HTMLElement | null;
