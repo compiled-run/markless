@@ -24,6 +24,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// Dispatched on the document once the page the user ends up on is in place.
+	readonly renderedEvent: string;
 	readonly requestPrefix: string;
 	readonly regionEndMarker: string;
 	readonly appendMarker: string;
@@ -1127,7 +1129,7 @@ export async function navigate(
 	};
 	const started = w.performance.now();
 	const restored = mode === 'traverse' && state.visited.has(pageKey(url));
-	const taken = take(state, url, mode === 'traverse', askedAt ?? started);
+	let taken = take(state, url, mode === 'traverse', askedAt ?? started);
 	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
 	// live values before it is shown. A document whose instances hold no values swaps in this task.
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
@@ -1151,14 +1153,20 @@ export async function navigate(
 	keptSwapping?.catch(() => {});
 	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
-	try {
-		fetched = await taken.result;
-	} catch {
-		// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
-		w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
-		return;
+	for (let again = false; ; again = true) {
+		try {
+			fetched = await taken.result;
+		} catch {
+			// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
+			w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
+			return;
+		}
+		if (stale()) return abandon();
+		// A write since the fetch began may change the page: fetch it once more, never in a loop.
+		if (again || taken.writes === state.writes) break;
+		abandon();
+		taken = state.request(url, false);
 	}
-	if (stale()) return abandon();
 	let arrived = !fetched.rest;
 	if (fetched.rest) {
 		const held = await holdStream(
@@ -1394,7 +1402,7 @@ export async function navigate(
 		else w.scrollTo({ top: 0, left: 0, behavior: 'instant' });
 	} else if (restore !== 'manual')
 		w.scrollTo({ top: restore.y, left: restore.x, behavior: 'instant' });
-	d.dispatchEvent(new CustomEvent('marklessrouterrendered'));
+	d.dispatchEvent(new CustomEvent(state.config.renderedEvent));
 	state.rescan();
 	const key = state.shown;
 	void streamAppends(d, state, fetched, end, controller.signal, arrived).then(

@@ -18,10 +18,60 @@ export type RuntimeAsyncInput = {
 
 export type RuntimeAsyncAnswer = { readonly value: unknown; readonly inputs: ReadonlyArray<RuntimeAsyncInput> };
 
+// Where an async value is in its life. Only `moveNode` changes it; the snapshot stays the value readers see.
+// Order matters: up to planned a demand starts a run; from running up a run started or settled on the snapshot's key.
+export const NODE_IDLE = 0;
+/** Starts a run on its next demand, even on the key it already has: a payload-planned pending value or a rerun. */
+export const NODE_PLANNED = 1;
+/** Waits on an async input, showing pending or its error; runs again once that input settles, even on the same key. */
+export const NODE_BLOCKED = 2;
+export const NODE_RUNNING = 3;
+/** A run on the inputs the screen shows while an async input refreshes; it lands into blocked. */
+export const NODE_RUNNING_ON_SHOWN = 4;
+export const NODE_SETTLED = 5;
+
+export type AsyncNodePhase =
+	| typeof NODE_IDLE
+	| typeof NODE_PLANNED
+	| typeof NODE_BLOCKED
+	| typeof NODE_RUNNING
+	| typeof NODE_RUNNING_ON_SHOWN
+	| typeof NODE_SETTLED;
+
+/** Throws when an async value could not move from `from` to `to`. */
+export function assertAsyncNodeMove(from: AsyncNodePhase, to: AsyncNodePhase): void {
+	let allowed: boolean;
+	switch (to) {
+		case NODE_PLANNED:
+			allowed = from === NODE_PLANNED || from === NODE_SETTLED || from === NODE_BLOCKED;
+			break;
+		case NODE_RUNNING:
+		case NODE_BLOCKED:
+			allowed = true;
+			break;
+		case NODE_RUNNING_ON_SHOWN:
+			allowed = from !== NODE_IDLE;
+			break;
+		case NODE_SETTLED:
+			allowed = from !== NODE_PLANNED && from !== NODE_BLOCKED;
+			break;
+		default:
+			allowed = false;
+	}
+	if (!allowed) throw new Error(`Illegal async node phase move ${from} -> ${to}`);
+}
+
+export function moveNode(node: RuntimeAsyncComputedNode, to: AsyncNodePhase): void {
+	if (import.meta.env?.DEV) assertAsyncNodeMove(node.phase, to);
+	node.phase = to;
+}
+
 export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
+	phase: AsyncNodePhase;
+	/** Aborts the latest run; a settled run's signal still aborts when the next one starts. */
 	controller?: AbortController;
-	gate: number;
 	snapshot: RuntimeGraphAsyncSnapshot;
+	/** The newest publish; a run whose number it no longer is lands nothing. */
 	version: number;
 	/** The inputs the shown value was fetched with; only a held-inputs plane captures them. */
 	valueInputs?: ReadonlyArray<RuntimeAsyncInput>;
@@ -47,6 +97,7 @@ export type RunCause = 'write' | 'revalidate';
 /** What the async plane shares with the held-inputs plane. */
 export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
 	readonly asyncComputedNodes: Map<string, RuntimeAsyncComputedNode>;
+	readonly move: typeof moveNode;
 	readonly start: (
 		node: RuntimeAsyncComputedNode,
 		key: unknown,
@@ -82,7 +133,7 @@ function createNode(asyncComputed: RuntimeGraphAsyncComputed): RuntimeAsyncCompu
 	};
 	return {
 		...asyncComputed,
-		gate: snapshot.status === 'pending' ? 1 : 0,
+		phase: snapshot.status === 'pending' ? NODE_PLANNED : snapshot.status === 'idle' ? NODE_IDLE : NODE_SETTLED,
 		snapshot,
 		version: snapshot.version,
 	};
@@ -111,6 +162,7 @@ export function createAsyncPlane(
 		(state ??= {
 			...internals,
 			asyncComputedNodes: nodes,
+			move: moveNode,
 			derivedCells: new Map(),
 			staleDerives: new Map(),
 			start: (...args) => bound!.start(...args),
@@ -158,12 +210,11 @@ export function createAsyncPlane(
 	return {
 		nodes,
 		read(node, path) {
-			// A payload-planned pending snapshot still needs its runner started on first demand; otherwise only idle computeds start.
-			if (node.gate === 1 || node.snapshot.status === 'idle') withRefresh((loaded) => loaded.advance(node));
+			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node));
 			return peek(node, path);
 		},
 		invalidate(node) {
-			if (node.snapshot.status !== 'idle') withRefresh((loaded) => loaded.advance(node, 'write'));
+			if (node.phase !== NODE_IDLE) withRefresh((loaded) => loaded.advance(node, 'write'));
 		},
 		markEntry(graphNodeId) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node));
@@ -183,7 +234,7 @@ export function createAsyncPlane(
 			const node = nodes.get(graphNodeId);
 			if (node?.snapshot.status !== (revalidate ? 'fulfilled' : 'rejected')) return false;
 			// A reset re-runs a rejected value, and a page shown again re-asks a fulfilled one, though the key has not changed.
-			node.gate = 1;
+			moveNode(node, NODE_PLANNED);
 			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
 			return true;
 		},

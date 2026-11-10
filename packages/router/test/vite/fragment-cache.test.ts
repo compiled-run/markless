@@ -72,9 +72,8 @@ function trackFetches(page: Page) {
 
 type Fetched = (path: string) => Promise<void>;
 
-async function open(browser: Browser, initScript?: () => void) {
+async function open(browser: Browser) {
 	const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
-	if (initScript) await page.addInitScript(initScript);
 	const { arrived, fetched } = trackFetches(page);
 	await page.goto(`${origin}/`);
 	await landedOn(page, 'home');
@@ -177,29 +176,33 @@ for (const [name, browserType] of [
 		});
 
 		test('a no-store page the press fetched is shown from that fetch when the navigation code arrives after it', async () => {
-			// The idle tier may fetch the page before the press; from the press on, the click's own fetch is the only one.
-			// Registered before the router's own capture listener, so the press is timed before that listener starts its fetch.
-			const { page } = await open(browser, () =>
-				addEventListener(
-					'pointerdown',
-					() => ((window as { pressedAt?: number }).pressedAt ??= performance.now()),
-					true,
-				),
-			);
-			const now = await bumpElsewhere();
+			const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+			// Every script is held until the page answered, so the press reaches only the inline bridge, never the run half.
+			let release = () => {};
+			const held = new Promise<void>((done) => (release = done));
 			await page.route(
 				(url) => url.pathname.endsWith('.js'),
 				async (route) => {
-					await new Promise((done) => setTimeout(done, 400));
+					await held;
 					await route.continue();
 				},
 			);
-			expect(await follow(page, '[data-live]', 'live')).toBe(now);
+			// The load event waits on the held scripts.
+			await page.goto(`${origin}/`, { waitUntil: 'commit' });
+			await landedOn(page, 'home');
+			const now = await bumpElsewhere();
+			const answered = page.waitForResponse(
+				(response) => fragmentPageUrl(new URL(response.url()))?.pathname === '/live',
+			);
+			await page.locator('[data-live]').click();
+			// The code lands after the page's no-store headers, as on a slow link.
+			await answered;
+			release();
+			await landedOn(page, 'live');
+			expect(Number(await page.locator('[data-count]').textContent())).toBe(now);
+			// A mouse resting on the link before the press may start the fetch instead; either way it is the only one.
 			const asked = await page.evaluate(() =>
-				performance
-					.getEntriesByType('resource')
-					.filter((entry) => entry.startTime >= (window as { pressedAt?: number }).pressedAt!)
-					.map((entry) => entry.name),
+				performance.getEntriesByType('resource').map((entry) => entry.name),
 			);
 			expect(
 				asked.filter((name) => fragmentPageUrl(new URL(name))?.pathname === '/live'),

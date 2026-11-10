@@ -136,7 +136,26 @@ export type InlineResumerSourceVariants = {
 	readonly graphSyncPolicyConsumer: string;
 	/** The deferred-trigger helper factory, minified; served in place of its authored text. */
 	readonly defer?: string;
+	/** The wake functions, minified; served in place of their authored text. */
+	readonly wakes?: InlineWakeSources;
 };
+
+/** Function expressions the wake scripts call, plus the module loader they pass. */
+export type InlineWakeSources = {
+	readonly selfWake: string;
+	readonly returnWake: string;
+	readonly storageWake: string;
+	readonly moduleLoader: string;
+};
+
+export function authoredInlineWakeSources(): InlineWakeSources {
+	return {
+		selfWake: runInlineResumerSelfWake.toString(),
+		returnWake: runInlineResumerReturnWake.toString(),
+		storageWake: runInlineResumerStorageWake.toString(),
+		moduleLoader: INLINE_MODULE_LOADER_SOURCE,
+	};
+}
 
 type InlineView = ProtocolViewPayload;
 type InlineEventRecord = InlineView['events'][number];
@@ -281,16 +300,23 @@ export function createInlineResumerDebugRegistrationSource(): string {
 	return `(${registerInlineResumerDebug.toString()})`;
 }
 
-export function createInlineResumerSelfWakeSource(resumeModuleUrl: string | undefined): string {
-	return `;(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()});`;
+const selfWakeCall = (resumeModuleUrl: string | undefined, wakes: InlineWakeSources) =>
+	`(${wakes.selfWake})(${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()})`;
+
+export function createInlineResumerSelfWakeSource(
+	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources = authoredInlineWakeSources(),
+): string {
+	return `;${selfWakeCall(resumeModuleUrl, wakes)};`;
 }
 
 // Appended to a page whose async values the browser can re-ask: shown again as it was left, it wakes at idle and re-asks them.
 export function createInlineResumerReturnWakeSource(
 	resumeModuleUrl: string | undefined,
 	reaskProperty: string,
+	wakes: InlineWakeSources = authoredInlineWakeSources(),
 ): string {
-	return `;(${runInlineResumerReturnWake.toString()})(${JSON.stringify(reaskProperty)},${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE});`;
+	return `;(${wakes.returnWake})(${JSON.stringify(reaskProperty)},${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader});`;
 }
 
 // Appended only to a page that renders storage() cells. The head seed script has
@@ -301,8 +327,9 @@ export function createInlineResumerStorageWakeSource(
 	resumeModuleUrl: string | undefined,
 	slotSymbolKey: string,
 	renderedJson: string,
+	wakes: InlineWakeSources = authoredInlineWakeSources(),
 ): string {
-	return `;(${runInlineResumerStorageWake.toString()})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()}));`;
+	return `;(${wakes.storageWake})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>${selfWakeCall(resumeModuleUrl, wakes)});`;
 }
 
 // Appended only to a page whose state declares an app-scoped shared() definition: the
@@ -805,7 +832,9 @@ function runInlineResumerSelfWake(
 	defer.idle(root, async () => {
 		if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
 		root.__marklessDelegatedDispatch = true;
-		const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
+		const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		}));
 		if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 	});
 }
@@ -830,7 +859,9 @@ function runInlineResumerReturnWake(
 			// A runtime that wired since re-asked as it did; the router leaves the started mark of the page it replaced.
 			if (typeof root[reaskProperty] === 'function' || root.__mL !== life) return;
 			root.__marklessDelegatedDispatch = true;
-			const module = await (root.__mResume ||= loadModule(resumeModuleUrl));
+			const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+				throw ((root.__mResume = undefined), error);
+			}));
 			if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 		});
 	if (root[reaskProperty] === true) wake();
@@ -961,9 +992,10 @@ function runInlineResumer(
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
 		pin();
-		return (root.__mResume ||= loadModule(resumeModuleUrl)).then(
-			(module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }),
-		);
+		// A failed import is not kept: the next forward or wake imports again.
+		return (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		})).then((module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }));
 	};
 	// The entry for this event name on one element: [ref, policy], either possibly undefined.
 	const entryOf = (element: Element, eventName: string) => {

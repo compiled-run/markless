@@ -1,9 +1,15 @@
 import type { RuntimeGraphAsyncSnapshot, RuntimeGraphRead } from './graph.ts';
-import type {
-	AsyncPlaneState,
-	AsyncRefresh,
-	RunCause,
-	RuntimeAsyncComputedNode,
+import {
+	NODE_BLOCKED,
+	NODE_IDLE,
+	NODE_PLANNED,
+	NODE_RUNNING,
+	NODE_RUNNING_ON_SHOWN,
+	NODE_SETTLED,
+	type AsyncPlaneState,
+	type AsyncRefresh,
+	type RunCause,
+	type RuntimeAsyncComputedNode,
 } from './graph-async-load.ts';
 
 // The most recent fulfilled value and the key it was fetched for, carried through re-runs and failures.
@@ -17,7 +23,7 @@ function lastGood(
 
 /** The refresh half of an async plane: loaded with its first run, failure, handler rejection or entry mark. */
 export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
-	const { asyncComputedNodes: nodes, computedNodes, readGraph, staleDerives } = state;
+	const { asyncComputedNodes: nodes, computedNodes, readGraph, staleDerives, move } = state;
 
 	const publish = (
 		node: RuntimeAsyncComputedNode,
@@ -57,7 +63,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		error: unknown,
 	): void => {
 		if (
-			node.gate === 2 &&
+			node.phase === NODE_BLOCKED &&
 			(status === 'pending'
 				? node.snapshot.status === 'pending'
 				: node.snapshot.status === 'rejected' && Object.is(node.snapshot.error, error))
@@ -66,7 +72,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 		node.controller?.abort();
 		node.controller = undefined;
-		node.gate = 2;
+		move(node, NODE_BLOCKED);
 		node.waitingFor = undefined;
 		const version = ++node.version;
 		const key = (node.snapshot as { readonly key?: unknown }).key;
@@ -86,7 +92,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		cause?: RunCause,
 	): void => {
 		node.controller?.abort();
-		node.gate = 0;
+		move(node, waiting ? NODE_RUNNING_ON_SHOWN : NODE_RUNNING);
 		node.waitingFor = undefined;
 		const inputs = state.held?.capture(node, read);
 
@@ -114,8 +120,9 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 					state.held?.keep(node, superseded);
 				}
 				node.servedKey = undefined;
-				if (waiting) node.gate = 2;
 			}
+			// Only a run on shown inputs lands pending.
+			move(node, snapshot.status === 'pending' ? NODE_BLOCKED : NODE_SETTLED);
 			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
 		};
 		const commitRejected = (error: unknown): void =>
@@ -124,7 +131,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			Promise.resolve(node.run({ key, signal: controller.signal, read })).then(
 				(value) =>
 					land(
-						waiting
+						node.phase === NODE_RUNNING_ON_SHOWN
 							? { status: 'pending', version, key, value, valueKey: key }
 							: { status: 'fulfilled', version, key, value },
 					),
@@ -182,8 +189,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 		const nextKey = node.key(readGraph);
 		if (
-			!node.gate &&
-			node.snapshot.status !== 'idle' &&
+			node.phase >= NODE_RUNNING &&
 			Object.is((node.snapshot as { readonly key?: unknown }).key, nextKey)
 		)
 			return;
@@ -192,12 +198,12 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	const demand = (node: RuntimeAsyncComputedNode, cause?: RunCause): void => {
-		if (node.gate === 1 || node.snapshot.status === 'idle') advance(node, cause);
+		if (node.phase <= NODE_PLANNED) advance(node, cause);
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
 	const markEntry = (node: RuntimeAsyncComputedNode): void => {
-		if (node.entryHold || node.snapshot.status === 'idle' || node.snapshot.status === 'pending')
+		if (node.entryHold || node.phase === NODE_IDLE || node.snapshot.status === 'pending')
 			return;
 		const previous = node.snapshot;
 		const version = ++node.version;
@@ -232,6 +238,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		fail(node, error) {
 			node.controller?.abort();
 			node.controller = undefined;
+			// A planned or blocked value keeps waiting for its demand or its input.
+			if (node.phase === NODE_IDLE || node.phase >= NODE_RUNNING) move(node, NODE_SETTLED);
 			const version = ++node.version;
 			const key = (node.snapshot as { readonly key?: unknown }).key;
 			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
