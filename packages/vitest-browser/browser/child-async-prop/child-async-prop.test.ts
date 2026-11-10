@@ -21,7 +21,11 @@ async function type(input: HTMLInputElement, text: string) {
 
 async function exercise(container: HTMLElement) {
 	const list = () => container.querySelector('ul');
-	const looks = () => [list()?.getAttribute('aria-busy') ?? null, list()?.style.opacity];
+	const looks = () => [
+		list()?.getAttribute('aria-busy') ?? null,
+		list()?.getAttribute('data-stale') ?? null,
+		list()?.style.opacity,
+	];
 	const busy = () => container.querySelectorAll('[aria-busy="true"]').length;
 	await expect.poll(() => container.querySelectorAll('li').length, { timeout: 5_000 }).toBe(7);
 	// The first keystroke wakes a served page; the second starts a refresh over a settled answer.
@@ -29,10 +33,10 @@ async function exercise(container: HTMLElement) {
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotbananagrapemango');
 	const release = holdSearches();
 	await type(container.querySelector('input')!, 'p');
-	await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', '0.5']);
+	await expect.poll(looks, { timeout: 5_000 }).toEqual(['true', 'true', '0.5']);
 	release();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('appleapricotgrape');
-	await expect.poll(looks).toEqual([null, '1']);
+	await expect.poll(looks).toEqual([null, null, '1']);
 
 	const input = container.querySelector('input')!;
 	input.value = '';
@@ -47,7 +51,9 @@ async function exercise(container: HTMLElement) {
 		.find((button) => button.textContent === 'Try again')!
 		.click();
 	await expect.poll(() => list()?.textContent, { timeout: 5_000 }).toBe('blueberry');
-	await expect.poll(() => [list()?.style.opacity, busy()]).toEqual(['1', 0]);
+	await expect
+		.poll(() => [list()?.getAttribute('data-stale') ?? null, list()?.style.opacity, busy()])
+		.toEqual([null, '1', 0]);
 }
 
 test('CSR: a child reading its query prop searches, fails, retries and recovers', async () => {
