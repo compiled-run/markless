@@ -146,7 +146,7 @@ export default function Term({ word }: { readonly word: string }) @{
 				margin-top: 0.35rem;
 				color: var(--ink);
 				font-size: 0.9em;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-decoration-thickness: 0.12em;
 				text-underline-offset: 0.16em;
 			}

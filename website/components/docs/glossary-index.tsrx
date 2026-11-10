@@ -148,7 +148,7 @@ export default function GlossaryIndex() @{
 			a.letter:hover,
 			a.letter:focus-visible {
 				text-decoration: underline;
-				text-decoration-color: var(--pink);
+				text-decoration-color: var(--link-underline);
 				text-decoration-thickness: 0.15em;
 			}
 
