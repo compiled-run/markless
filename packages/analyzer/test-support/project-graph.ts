@@ -6,7 +6,26 @@ import { dirname, join, matchesGlob, normalize, posix } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Analyzer, Module } from 'yuku/analyzer';
 
-export type WorkspacePackage = { dir: string; name: string; exports?: unknown; main?: string };
+export type WorkspacePackage = {
+	dir: string;
+	name: string;
+	exports?: unknown;
+	main?: string;
+	dependencies?: Record<string, string>;
+};
+
+/** What a module's fully dynamic imports load, so the selector can follow them as edges. */
+export type DynamicImportDeclaration = {
+	module: string;
+	/** The module's count of fully dynamic sites; any other count leaves the module undeclared. */
+	sites: number;
+	/** What the sites load, and the evidence for it. */
+	loads: string;
+	/** Vite roots whose build output the sites load: an edge to every tracked file under each. */
+	buildRoots: readonly string[];
+	/** Workspace packages the build bundles: an edge to each export target, then the same for their workspace dependencies. */
+	packages: readonly string[];
+};
 
 export type ProjectGraphInput = {
 	/** Repo-relative path to source, for every tracked file the analyzer parses. */
@@ -14,6 +33,8 @@ export type ProjectGraphInput = {
 	/** Every tracked repo-relative path, code or not. */
 	tracked: ReadonlySet<string>;
 	packages: readonly WorkspacePackage[];
+	/** Defaults to `DYNAMIC_IMPORT_DECLARATIONS`. */
+	declarations?: readonly DynamicImportDeclaration[];
 };
 
 export type Selection = { tests: string[]; runAll: string | null };
@@ -100,6 +121,42 @@ export const DISK_INPUT_READERS: readonly { glob: string; tests: readonly string
 	{ glob: 'website/**', tests: [] },
 ];
 
+/** Fully dynamic import sites whose loads are known; a test that reaches an undeclared one runs on any non-prose change. */
+export const DYNAMIC_IMPORT_DECLARATIONS: readonly DynamicImportDeclaration[] = [
+	{
+		module: 'packages/bundler/fixtures/vite-ssr/src/dev-server.ts',
+		sites: 1,
+		loads:
+			"fixtureSsrHost's preview server imports <config.root>/<build.outDir>/<builtRenderEntry ?? 'server/root.js'>: the server build of the Vite root that installs the host. Those roots are the folders of the Vite configs that import this module; tests that install it with a temp root bundle their own inline sources plus the workspace packages.",
+		buildRoots: [
+			'packages/bundler/fixtures/vite-ssr',
+			'packages/bundler/fixtures/vite-ssr-async',
+			'packages/bundler/fixtures/vite-ssr-branch',
+			'packages/bundler/fixtures/vite-ssr-dispose',
+			'packages/bundler/fixtures/vite-ssr-preloader',
+			'packages/bundler/fixtures/vite-ssr-rows',
+			'scripts/experiments/jev/advanced',
+			'scripts/experiments/jev/modal-app',
+		],
+		// The vite-ssr fixture manifest's workspace dependencies.
+		packages: ['@markless/bundler', '@markless/core'],
+	},
+	{
+		module: 'packages/bundler/test/render-data-capabilities.test.ts',
+		sites: 1,
+		loads:
+			"imports <mkdtemp root>/out/<chunk>: the output of a vite build() over sources the test writes itself, compiled by markless() with marklessSourceAliases, which maps @markless/core, web, runtime, serializer and the bundler's rolldown/preload/vite subpaths to their sources.",
+		buildRoots: [],
+		packages: [
+			'@markless/bundler',
+			'@markless/core',
+			'@markless/runtime',
+			'@markless/serializer',
+			'@markless/web',
+		],
+	},
+];
+
 // A file under one of these folders of a package can be a fixture that a test reads from disk.
 const TEST_AREAS = new Set(['test', 'tests', 'fixtures', 'test-support', '__snapshots__']);
 const SNAPSHOT = /^(.*)\/__snapshots__\/([^/]+)\.snap$/;
@@ -134,13 +191,14 @@ const packageNameOf = (specifier: string) => {
 };
 
 /** Every file target an `exports` entry can map a subpath to, across all conditions. */
+const leaves = (value: unknown): string[] => {
+	if (typeof value === 'string') return [value];
+	if (Array.isArray(value)) return value.flatMap(leaves);
+	if (value && typeof value === 'object') return Object.values(value).flatMap(leaves);
+	return [];
+};
+
 const exportTargets = (exports: unknown, subpath: string): string[] => {
-	const leaves = (value: unknown): string[] => {
-		if (typeof value === 'string') return [value];
-		if (Array.isArray(value)) return value.flatMap(leaves);
-		if (value && typeof value === 'object') return Object.values(value).flatMap(leaves);
-		return [];
-	};
 	if (exports === undefined || exports === null) return [];
 	const isSubpathMap =
 		typeof exports === 'object' &&
@@ -211,6 +269,8 @@ export class ProjectGraph {
 	readonly unresolved = new Map<string, string[]>();
 	/** Imports whose target the analyzer cannot know: a computed `import()`/`require()` or `import.meta.glob`. */
 	readonly opaque = new Map<string, string[]>();
+	/** Modules in `opaque` whose sites a `DynamicImportDeclaration` covers. */
+	readonly declared = new Set<string>();
 	/** Edges yuku does not model: non-code imports, extra export conditions and `new URL(..., import.meta.url)`. */
 	readonly extraDependents = new Map<string, Set<string>>();
 	private readonly tracked: ReadonlySet<string>;
@@ -247,11 +307,12 @@ export class ProjectGraph {
 	affectedTests(
 		changedPaths: readonly string[],
 		testFiles: readonly string[],
-		options: { ignoreComputedImports?: boolean } = {},
+		options: { ignoreUndeclaredImports?: boolean } = {},
 	): Selection {
 		const tests = new Set(testFiles);
 		const selected = new Set<string>();
 		const seeds: string[] = [];
+		let codeChanged = false;
 		const selectFolder = (folder: string) => {
 			for (const test of tests) if (test.startsWith(folder)) selected.add(test);
 		};
@@ -264,6 +325,7 @@ export class ProjectGraph {
 			const ruled = RUN_ALL_PATHS.find((rule) => matchesGlob(path, rule.glob));
 			if (ruled) return runAll(`${ruled.reason}: ${path}`);
 			if (matchesAny(path, NO_UNIT_TEST_PATHS)) continue;
+			if (!matchesAny(path, PROSE_PATHS)) codeChanged = true;
 
 			const snapshot = SNAPSHOT.exec(path);
 			if (snapshot) {
@@ -327,12 +389,26 @@ export class ProjectGraph {
 		for (const path of [...onPath].sort()) {
 			const missing = this.unresolved.get(path);
 			if (missing) return runAll(`unresolved import: ${path} imports '${missing[0]}'`);
-			const opaque = this.opaque.get(path);
-			if (opaque && !options.ignoreComputedImports)
-				return runAll(`computed import: ${path} has ${opaque[0]}`);
 		}
 		for (const test of reached) selected.add(test);
+		// An undeclared fully dynamic import can load any file, so its tests run on any non-prose change.
+		if (codeChanged && !options.ignoreUndeclaredImports)
+			for (const test of this.testsReachingUndeclaredImports(testFiles)) selected.add(test);
 		return { tests: [...selected].sort(), runAll: null };
+	}
+
+	/** Tests whose module closure holds a fully dynamic import site no declaration covers. */
+	testsReachingUndeclaredImports(testFiles: readonly string[]): string[] {
+		const tests = new Set(testFiles);
+		const closure = new Set<string>();
+		const queue = [...this.opaque.keys()].filter((path) => !this.declared.has(path));
+		while (queue.length) {
+			const path = queue.pop()!;
+			if (closure.has(path)) continue;
+			closure.add(path);
+			queue.push(...this.dependentsOf(path));
+		}
+		return [...closure].filter((path) => tests.has(path)).sort();
 	}
 
 	/** The repo paths a local specifier could name, for matching a deleted file to its importers. */
@@ -483,12 +559,62 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		return [...targets];
 	};
 
+	const exportedFiles = (pkg: WorkspacePackage): string[] => {
+		if (pkg.exports === undefined) {
+			const entry = probeCandidates(normalize(posix.join(pkg.dir, pkg.main ?? 'index'))).find(
+				(candidate) => input.tracked.has(candidate),
+			);
+			return entry ? [entry] : [];
+		}
+		const isSubpathMap =
+			typeof pkg.exports === 'object' &&
+			!Array.isArray(pkg.exports) &&
+			Object.keys(pkg.exports as object).some((key) => key.startsWith('.'));
+		const values = isSubpathMap
+			? Object.values(pkg.exports as Record<string, unknown>)
+			: [pkg.exports];
+		const files = new Set<string>();
+		for (const leaf of values.flatMap(leaves)) {
+			const target = normalize(posix.join(pkg.dir, leaf));
+			const star = target.indexOf('*');
+			if (star === -1) {
+				if (input.tracked.has(target)) files.add(target);
+				continue;
+			}
+			const [head, tail] = [target.slice(0, star), target.slice(star + 1)];
+			for (const path of trackedPaths)
+				if (path.startsWith(head) && path.endsWith(tail)) files.add(path);
+		}
+		return [...files];
+	};
+
+	const declare = (declaration: DynamicImportDeclaration) => {
+		if (graph.opaque.get(declaration.module)?.length !== declaration.sites) return;
+		const link = (target: string) => {
+			if (target !== declaration.module) graph.addExtraEdge(declaration.module, target);
+		};
+		for (const root of declaration.buildRoots)
+			for (const path of trackedPaths) if (path.startsWith(`${root}/`)) link(path);
+		const names = [...declaration.packages];
+		const seen = new Set<string>();
+		while (names.length) {
+			const name = names.pop()!;
+			const pkg = packagesByName.get(name);
+			if (!pkg || seen.has(name)) continue;
+			seen.add(name);
+			for (const path of exportedFiles(pkg)) link(path);
+			names.push(...Object.keys(pkg.dependencies ?? {}));
+		}
+		graph.declared.add(declaration.module);
+	};
+
 	const analyzer = new TsrxAnalyzer({ resolve });
 	graph = new ProjectGraph(analyzer, input.tracked);
 	for (const [path, source] of input.files) {
 		const module = analyzer.setFile(path, source);
 		scanImportSites(graph, module, { resolve, templateTargets, globTargets });
 	}
+	for (const declaration of input.declarations ?? DYNAMIC_IMPORT_DECLARATIONS) declare(declaration);
 	analyzer.link();
 	return graph;
 }
