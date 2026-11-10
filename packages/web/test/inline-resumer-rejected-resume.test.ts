@@ -8,7 +8,6 @@ import {
 	INLINE_RESUMER_PAGE_TOKEN,
 	renderInlineResumerPageSource,
 } from '../src/inline/resumer.ts';
-import { authoredLateWakeSources } from '../src/inline/wakes.ts';
 import { createSyncPolicyTable, inlineResumerPage, withEventHostMarks } from '../src/render-to-string.ts';
 
 const RESUME_URL = '/build/resume.js';
@@ -155,7 +154,7 @@ test('a back-forward restore after a rejected return-wake import imports again',
 	const f = page();
 	f.root[REASK] = true;
 	f.run(
-		createInlineResumerReturnWakeSource(RESUME_URL, REASK, { ...authoredLateWakeSources(), moduleLoader: INLINE_MODULE_LOADER_SOURCE })
+		createInlineResumerReturnWakeSource(RESUME_URL, REASK)
 			.replace(INLINE_MODULE_LOADER_SOURCE, 'load')
 			.slice(1),
 	);

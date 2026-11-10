@@ -6,18 +6,12 @@ import { ASYNC_PROTOCOL_VERSION } from '@markless/serializer/protocol';
 import { compileInlineResumerSources } from '../../bundler/src/inline-resumer.ts';
 import { renderToString } from '../src/index.ts';
 import {
+	authoredInlineWakeSources,
 	createInlineResumerReturnWakeSource,
 	createInlineResumerSelfWakeSource,
 	createInlineResumerStorageWakeSource,
-	authoredSelfWakeSources,
 	type InlineWakeSources,
 } from '../src/inline/resumer.ts';
-import { authoredLateWakeSources } from '../src/inline/wakes.ts';
-
-const authoredInlineWakeSources = (): InlineWakeSources => ({
-	...authoredSelfWakeSources(),
-	...authoredLateWakeSources(),
-});
 
 const RESUME_URL = '/build/resume.js';
 const REASK = '__mReaskTest';

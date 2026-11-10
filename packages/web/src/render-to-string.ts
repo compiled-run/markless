@@ -35,7 +35,6 @@ import {
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import type { MarklessExecutionLogMode } from './dev-log.ts';
 import {
-	authoredSelfWakeSources,
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerOverlayPrimerSource,
 	createPrerenderInlineResumerSource,
@@ -264,7 +263,6 @@ export async function assembleSsrContainer(
 					syncPolicy,
 				});
 	const overlayPrimer = hasOverlayMark(output.html);
-	const wakes = await pageWakeSources(artifactSources?.wakes, view, state);
 	const resumerScript =
 		hasPayload && browserTriggers
 			? renderInlineResumerScript(
@@ -299,11 +297,11 @@ export async function assembleSsrContainer(
 					deferredTriggerSource(view) +
 						(selfWake
 							? ''
-							: storageWakeSource(state, selectedResumeModuleUrl, wakes)) +
+							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
 						sharedWakeSource(state) +
-						returnWakeSource(view, selectedResumeModuleUrl, wakes),
+						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes),
 					artifactSources?.defer,
-					wakes,
+					artifactSources?.wakes,
 				)
 			: '';
 	const policyTable = createSyncPolicyTable();
@@ -370,7 +368,7 @@ export async function assemblePrerenderPageParts(
 	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
-	const wakes = await pageWakeSources(artifactInlineResumerSources(component)?.wakes, view, state);
+	const wakes = artifactInlineResumerSources(component)?.wakes;
 	// The settle path replaces the self-wake: it fills the arm from the plan and
 	// never imports the resume module, so a page only takes it when the build
 	// produced BOTH the plan this document ships and the settle module it needs.
@@ -593,42 +591,15 @@ function sharedWakeSource(state: ProtocolStatePayload): string {
 		: '';
 }
 
-// A build supplies the wakes minified; without one the authored text is loaded only for a page that ships a return or storage wake.
-async function pageWakeSources(
-	built: InlineWakeSources | undefined,
-	view: ProtocolViewPayload,
-	state: ProtocolStatePayload,
-): Promise<InlineWakeSources | undefined> {
-	if (built || (!hasReaskableAsync(view) && renderedStorageValues(state).length === 0)) return built;
-	return { ...authoredSelfWakeSources(), ...(await import('./inline/wakes.ts')).authoredLateWakeSources() };
-}
-
-function hasReaskableAsync(view: ProtocolViewPayload): boolean {
-	return (
-		Object.keys(view.asyncRunners ?? {}).length > 0 ||
-		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
-	);
-}
-
 function returnWakeSource(
 	view: ProtocolViewPayload,
 	resumeModuleUrl: string | undefined,
 	wakes: InlineWakeSources | undefined,
 ): string {
-	return wakes && hasReaskableAsync(view)
+	return Object.keys(view.asyncRunners ?? {}).length > 0 ||
+		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
 		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY, wakes)
 		: '';
-}
-
-function renderedStorageValues(state: ProtocolStatePayload) {
-	return (state.storage ?? []).flatMap((record) => {
-		const value = renderedCellValue(
-			state.cells.find((cell) => cell.graphNodeId === record.graphNodeId),
-		);
-		return value === undefined
-			? []
-			: [[storageSlotEntryKeyFromGraphNodeId(record.graphNodeId), value] as const];
-	});
 }
 
 // Each storage cell's slot key and the value this render gave it.
@@ -637,8 +608,15 @@ function storageWakeSource(
 	resumeModuleUrl: string | undefined,
 	wakes: InlineWakeSources | undefined,
 ): string {
-	const rendered = renderedStorageValues(state);
-	if (rendered.length === 0 || !wakes) return '';
+	const rendered = (state.storage ?? []).flatMap((record) => {
+		const value = renderedCellValue(
+			state.cells.find((cell) => cell.graphNodeId === record.graphNodeId),
+		);
+		return value === undefined
+			? []
+			: [[storageSlotEntryKeyFromGraphNodeId(record.graphNodeId), value] as const];
+	});
+	if (rendered.length === 0) return '';
 	return createInlineResumerStorageWakeSource(
 		resumeModuleUrl,
 		STORAGE_SLOT_SYMBOL_KEY,
