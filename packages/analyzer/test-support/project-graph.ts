@@ -72,9 +72,30 @@ export const NO_UNIT_TEST_PATHS: readonly string[] = [
 	'.mcp.json',
 ];
 
+/** Prose and editor settings: they select no test unless a graph edge or a disk reader below names them. */
+export const PROSE_PATHS: readonly string[] = [
+	'docs/**',
+	'specs/**',
+	'**/*.md',
+	'.agents/**',
+	'.vscode/**',
+];
+
 /** Folders that tests read from disk, and the test folders that read them, until tests declare their own disk inputs. */
 export const DISK_INPUT_READERS: readonly { glob: string; tests: readonly string[] }[] = [
 	{ glob: 'demos/**', tests: ['packages/bundler/', 'packages/web/', 'scripts/benchmarks/'] },
+	{ glob: 'packages/cli/templates/**', tests: ['packages/cli/'] },
+	{ glob: 'packages/cli/README.md', tests: ['packages/cli/'] },
+	{ glob: 'packages/core/agent/**', tests: ['packages/core/test/storage-types.test.ts'] },
+	{
+		glob: 'packages/bundler/README.md',
+		tests: ['packages/bundler/test/render-data-literals.test.ts'],
+	},
+	{
+		glob: 'packages/headless/components/**/*.md',
+		tests: ['packages/bundler/test/render-order-sweep.test.ts'],
+	},
+	{ glob: '**/*.tsrx', tests: ['packages/compiler/test/sync-policy/key-cancel-guard.test.ts'] },
 	// No node-project test reads the website from disk; its modules still reach tests through imports.
 	{ glob: 'website/**', tests: [] },
 ];
@@ -139,21 +160,37 @@ const exportTargets = (exports: unknown, subpath: string): string[] => {
 	return [];
 };
 
-const isStaticSource = (node: { type: string; expressions?: unknown[] }) =>
-	node.type === 'Literal' || (node.type === 'TemplateLiteral' && node.expressions?.length === 0);
-
-const literalValue = (node: {
-	type: string;
-	value?: unknown;
-	quasis?: { value: { cooked: string } }[];
-}) =>
-	node.type === 'Literal'
-		? typeof node.value === 'string'
-			? node.value
-			: null
-		: (node.quasis?.[0]?.value.cooked ?? null);
-
 type AstNode = { type: string; [key: string]: any };
+
+/**
+ * The static text of a specifier expression, split where runtime values go: `./pages/${name}.ts`
+ * gives `['./pages/', '.ts']`, a string literal gives one part, and anything else gives null.
+ */
+const specifierParts = (node: AstNode | undefined): string[] | null => {
+	if (!node) return null;
+	if (node.type === 'Literal') return typeof node.value === 'string' ? [node.value] : null;
+	if (node.type === 'TemplateLiteral')
+		return (node.quasis as AstNode[]).map((quasi) => quasi.value.cooked ?? quasi.value.raw);
+	if (node.type === 'BinaryExpression' && node.operator === '+') {
+		const left = specifierParts(node.left) ?? ['', ''];
+		const right = specifierParts(node.right) ?? ['', ''];
+		return [...left.slice(0, -1), left.at(-1)! + right[0], ...right.slice(1)];
+	}
+	return null;
+};
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// A static tail without an extension can still load `<tail>.ts` or `<tail>/index.ts`.
+const tailPattern = (tail: string) => {
+	if (!tail) return '$';
+	const extension = extensionOf(tail);
+	const swaps = TS_FOR_JS[extension];
+	if (swaps)
+		return `${escapeRegExp(tail.slice(0, -extension.length))}(?:${[extension, ...swaps].map(escapeRegExp).join('|')})$`;
+	if (extension) return `${escapeRegExp(tail)}$`;
+	return `${escapeRegExp(tail)}(?:(?:/index)?(?:${CODE_EXTENSIONS.map(escapeRegExp).join('|')}))?$`;
+};
 
 const isImportMeta = (node: AstNode | undefined) =>
 	node?.type === 'MetaProperty' && node.meta?.name === 'import' && node.property?.name === 'meta';
@@ -237,7 +274,7 @@ export class ProjectGraph {
 				}
 			}
 
-			let classified = false;
+			let classified = matchesAny(path, PROSE_PATHS);
 			if (this.analyzer.module(path)) {
 				seeds.push(path);
 				classified = true;
@@ -384,39 +421,137 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 		return primary ?? false;
 	};
 
+	const trackedPaths = [...input.tracked].filter((path) => !isInstalledPackagePath(path));
+	const matching = (pattern: RegExp) => trackedPaths.filter((path) => pattern.test(path));
+
+	const templateTargets = (
+		importer: string,
+		parts: string[],
+		bareIsRelative = false,
+	): string[] | null => {
+		// A query or hash ends the file path: `${file}?t=${now}` names whatever `${file}` names.
+		const cut = parts.findIndex((part) => /[?#]/.test(part));
+		const path =
+			cut === -1 ? parts : [...parts.slice(0, cut), parts[cut].replace(/[?#][^]*$/, '')];
+		let prefix = path[0];
+		if (/^(node|bun|virtual|data|https?):/.test(prefix) || prefix.startsWith('\0')) return [];
+		if (
+			bareIsRelative &&
+			prefix &&
+			!/^[./]/.test(prefix) &&
+			!/^[a-z][a-z\d+.-]*:/i.test(prefix)
+		)
+			prefix = `./${prefix}`;
+		const middle = path
+			.slice(1, -1)
+			.map((part) => `.*${escapeRegExp(part)}`)
+			.join('');
+		const tail = path.length > 1 ? `.*${tailPattern(path.at(-1)!)}` : '';
+		const head = (base: string) => (path.length > 1 ? escapeRegExp(base) : tailPattern(base));
+		if (prefix.startsWith('./') || prefix.startsWith('../')) {
+			const joined = normalize(posix.join(posix.dirname(importer), prefix));
+			const base = joined === '.' || joined === './' ? '' : joined;
+			const directory = prefix.endsWith('/') && !base.endsWith('/') ? `${base}/` : base;
+			return matching(new RegExp(`^${head(directory)}${middle}${tail}`));
+		}
+		// The Vite root is not known here, so a root-absolute path may sit under any folder.
+		if (prefix.startsWith('/'))
+			return matching(new RegExp(`(?:^|/)${head(prefix.slice(1))}${middle}${tail}`));
+		if (!prefix) return null;
+		const name = packageNameOf(prefix);
+		if (prefix.length <= name.length)
+			return input.packages.some((pkg) => pkg.name.startsWith(prefix)) ? null : [];
+		const pkg = packagesByName.get(name);
+		// `exports` can map a subpath anywhere in the package, so any file in it with the right ending counts.
+		return pkg
+			? matching(new RegExp(`^${escapeRegExp(`${pkg.dir}/`)}.*${tailPattern(path.at(-1)!)}`))
+			: [];
+	};
+
+	const globTargets = (importer: string, patterns: string[]): string[] | null => {
+		const targets = new Set<string>();
+		for (const pattern of patterns) {
+			// Dropping a negative pattern only adds edges.
+			if (pattern.startsWith('!')) continue;
+			let glob: string;
+			if (pattern.startsWith('./') || pattern.startsWith('../'))
+				glob = normalize(posix.join(posix.dirname(importer), pattern));
+			else if (pattern.startsWith('/')) glob = `**/${pattern.slice(1)}`;
+			else return null;
+			for (const path of trackedPaths) if (matchesGlob(path, glob)) targets.add(path);
+		}
+		return [...targets];
+	};
+
 	const analyzer = new TsrxAnalyzer({ resolve });
 	graph = new ProjectGraph(analyzer, input.tracked);
 	for (const [path, source] of input.files) {
 		const module = analyzer.setFile(path, source);
-		scanImportSites(graph, module, resolve);
+		scanImportSites(graph, module, { resolve, templateTargets, globTargets });
 	}
 	analyzer.link();
 	return graph;
 }
 
-// Reads AST facts the import records lack: computed import targets and `new URL(literal, import.meta.url)` files.
-const scanImportSites = (
-	graph: ProjectGraph,
-	module: Module,
-	resolve: (specifier: string, importer: string) => string | false | null,
-) => {
+type ImportSites = {
+	resolve: (specifier: string, importer: string) => string | false | null;
+	/** Tracked files a specifier with runtime parts can name; null when its static text pins no location. */
+	templateTargets: (
+		importer: string,
+		parts: string[],
+		bareIsRelative?: boolean,
+	) => string[] | null;
+	/** Tracked files an `import.meta.glob` pattern list matches; null for a pattern with no known root. */
+	globTargets: (importer: string, patterns: string[]) => string[] | null;
+};
+
+const isPlainLiteral = (node: AstNode | undefined) =>
+	node?.type === 'Literal' ||
+	(node?.type === 'TemplateLiteral' && node.expressions?.length === 0);
+
+// Reads AST facts the import records lack: computed import targets, globs and `new URL(..., import.meta.url)` files.
+const scanImportSites = (graph: ProjectGraph, module: Module, sites: ImportSites) => {
 	const opaque: string[] = [];
+	const link = (targets: string[] | null, label: string) => {
+		if (targets === null) opaque.push(label);
+		else
+			for (const target of targets)
+				if (target !== module.path) graph.addExtraEdge(module.path, target);
+	};
+	const computedTargets = (node: AstNode, bareIsRelative = false) => {
+		const parts = specifierParts(node);
+		return parts && sites.templateTargets(module.path, parts, bareIsRelative);
+	};
 	for (const node of module.findAll('ImportExpression') as AstNode[])
-		if (!isStaticSource(node.source)) opaque.push('a computed import()');
+		if (!isPlainLiteral(node.source)) link(computedTargets(node.source), 'a computed import()');
 	for (const node of module.findAll('CallExpression') as AstNode[]) {
 		const callee = node.callee as AstNode;
-		if (isImportMetaMember(callee, 'glob')) opaque.push('import.meta.glob()');
-		else if (
+		const [first] = node.arguments as AstNode[];
+		if (isImportMetaMember(callee, 'glob')) {
+			const patterns = (first?.type === 'ArrayExpression' ? first.elements : [first]).map(
+				(element: AstNode | undefined) => specifierParts(element),
+			);
+			link(
+				patterns.every((parts: string[] | null) => parts?.length === 1)
+					? sites.globTargets(
+							module.path,
+							patterns.map((parts: string[]) => parts[0]),
+						)
+					: null,
+				'import.meta.glob()',
+			);
+		} else if (
 			callee.type === 'Identifier' &&
 			callee.name === 'require' &&
 			!module.referenceOf(callee as never)?.binding &&
-			node.arguments[0] &&
-			!isStaticSource(node.arguments[0])
+			first &&
+			!isPlainLiteral(first)
 		)
-			opaque.push('a computed require()');
-		else if (isImportMetaMember(callee, 'resolve') && node.arguments[0]) {
-			const target = literalValue(node.arguments[0]);
-			if (target !== null) addReference(graph, module.path, target, resolve);
+			link(computedTargets(first), 'a computed require()');
+		else if (isImportMetaMember(callee, 'resolve') && first) {
+			const parts = specifierParts(first);
+			if (parts?.length === 1) addReference(graph, module.path, parts[0], sites.resolve);
+			else if (parts) link(computedTargets(first) ?? [], 'import.meta.resolve()');
 		}
 	}
 	for (const node of module.findAll('NewExpression') as AstNode[]) {
@@ -425,11 +560,11 @@ const scanImportSites = (
 			node.callee.type === 'Identifier' &&
 			node.callee.name === 'URL' &&
 			first &&
-			isStaticSource(first) &&
 			isImportMetaMember(second, 'url')
 		) {
-			const target = literalValue(first);
-			if (target !== null) addReference(graph, module.path, target, resolve);
+			const parts = specifierParts(first);
+			if (parts?.length === 1) addReference(graph, module.path, parts[0], sites.resolve);
+			else if (parts) link(computedTargets(first, true) ?? [], 'new URL()');
 		}
 	}
 	if (opaque.length) graph.opaque.set(module.path, opaque);
