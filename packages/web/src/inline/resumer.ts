@@ -148,15 +148,6 @@ export type InlineWakeSources = {
 	readonly moduleLoader: string;
 };
 
-export function authoredInlineWakeSources(): InlineWakeSources {
-	return {
-		selfWake: runInlineResumerSelfWake.toString(),
-		returnWake: runInlineResumerReturnWake.toString(),
-		storageWake: runInlineResumerStorageWake.toString(),
-		moduleLoader: INLINE_MODULE_LOADER_SOURCE,
-	};
-}
-
 type InlineView = ProtocolViewPayload;
 type InlineEventRecord = InlineView['events'][number];
 /**
@@ -170,7 +161,7 @@ export type MarklessSettledArmHandoff = {
 	readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown;
 };
 
-type InlineRoot = HTMLElement &
+export type InlineRoot = HTMLElement &
 	EarlyEventRoot &
 	OverlayInstalledRoot &
 	OverlayPrimedDismissalHost & {
@@ -204,7 +195,7 @@ type InlineDispatchInput = {
 	readonly propagationStopped?: boolean;
 	readonly logOnly?: boolean;
 };
-type InlineResumeModule = {
+export type InlineResumeModule = {
 	resumeContainerEvent(input: InlineDispatchInput): Promise<void> | void;
 };
 type InlineSyncPolicyRuntime = {
@@ -300,21 +291,23 @@ export function createInlineResumerDebugRegistrationSource(): string {
 	return `(${registerInlineResumerDebug.toString()})`;
 }
 
-const selfWakeCall = (resumeModuleUrl: string | undefined, wakes: InlineWakeSources) =>
-	`(${wakes.selfWake})(${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()})`;
+export const authoredSelfWakeSources = (): Pick<InlineWakeSources, 'selfWake' | 'moduleLoader'> => ({
+	selfWake: runInlineResumerSelfWake.toString(),
+	moduleLoader: INLINE_MODULE_LOADER_SOURCE,
+});
 
 export function createInlineResumerSelfWakeSource(
 	resumeModuleUrl: string | undefined,
-	wakes: InlineWakeSources = authoredInlineWakeSources(),
+	wakes?: InlineWakeSources,
 ): string {
-	return `;${selfWakeCall(resumeModuleUrl, wakes)};`;
+	return `;(${wakes?.selfWake ?? runInlineResumerSelfWake.toString()})(${JSON.stringify(resumeModuleUrl)},${wakes?.moduleLoader ?? INLINE_MODULE_LOADER_SOURCE},${inlineDeferSource()});`;
 }
 
 // Appended to a page whose async values the browser can re-ask: shown again as it was left, it wakes at idle and re-asks them.
 export function createInlineResumerReturnWakeSource(
 	resumeModuleUrl: string | undefined,
 	reaskProperty: string,
-	wakes: InlineWakeSources = authoredInlineWakeSources(),
+	wakes: Pick<InlineWakeSources, 'returnWake' | 'moduleLoader'>,
 ): string {
 	return `;(${wakes.returnWake})(${JSON.stringify(reaskProperty)},${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader});`;
 }
@@ -327,9 +320,9 @@ export function createInlineResumerStorageWakeSource(
 	resumeModuleUrl: string | undefined,
 	slotSymbolKey: string,
 	renderedJson: string,
-	wakes: InlineWakeSources = authoredInlineWakeSources(),
+	wakes: InlineWakeSources,
 ): string {
-	return `;(${wakes.storageWake})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>${selfWakeCall(resumeModuleUrl, wakes)});`;
+	return `;(${wakes.storageWake})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>(${wakes.selfWake})(${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()}));`;
 }
 
 // Appended only to a page whose state declares an app-scoped shared() definition: the
@@ -342,17 +335,6 @@ export function createInlineResumerSharedWakeSource(
 	return `;((document[${JSON.stringify(instancesProperty)}]||={version:${instancesVersion},instances:{}}).dormant||=[]).push(document.currentScript.closest(${JSON.stringify(`[${containerAttribute}]`)}));`;
 }
 
-function runInlineResumerStorageWake(
-	slotSymbolKey: string,
-	rendered: ReadonlyArray<readonly [slotKey: string, value: string]>,
-	wake: () => void,
-): void {
-	const slot = (globalThis as Record<symbol, Record<string, unknown> | undefined>)[
-		Symbol.for(slotSymbolKey)
-	];
-	if (slot && rendered.some(([key, value]) => Object.hasOwn(slot, key) && slot[key] !== value))
-		wake();
-}
 
 /**
  * The Escape primer, appended only to a page whose served HTML carries an
@@ -818,7 +800,7 @@ function runPrerenderInlineResumer(
 // Serialized only into documents whose payload has an unsettled async runner.
 // Keeping this outside runInlineResumer leaves event-only documents on the
 // smaller interaction-triggered bootstrap.
-function runInlineResumerSelfWake(
+export function runInlineResumerSelfWake(
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule>,
 	defer: MarklessDefer,
@@ -839,47 +821,6 @@ function runInlineResumerSelfWake(
 	});
 }
 
-// Shown again as it was left: the router marks the page before this runs; a back-forward cache restore or an HTTP cache replay arrives as `pageshow`.
-function runInlineResumerReturnWake(
-	reaskProperty: string,
-	resumeModuleUrl: string | undefined,
-	loadModule: (url: string) => Promise<InlineResumeModule>,
-): void {
-	const root = (document.currentScript as HTMLScriptElement | null)?.closest<
-		InlineRoot & Record<string, unknown>
-	>('[data-async-container]');
-	if (!root || !resumeModuleUrl) return;
-	const life = (root.__mL ||= {});
-	// A streamed page installed the deferred-trigger helper, which also waits for its arms to land.
-	const idle =
-		(globalThis as { __mDefer?: MarklessDefer }).__mDefer?.idle ??
-		((_: Element, run: () => void) => (globalThis.requestIdleCallback ?? setTimeout)(run));
-	const wake = () =>
-		idle(root, async () => {
-			// A runtime that wired since re-asked as it did; the router leaves the started mark of the page it replaced.
-			if (typeof root[reaskProperty] === 'function' || root.__mL !== life) return;
-			root.__marklessDelegatedDispatch = true;
-			const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
-				throw ((root.__mResume = undefined), error);
-			}));
-			if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
-		});
-	if (root[reaskProperty] === true) wake();
-	const shown = (event: PageTransitionEvent) => {
-		if (root.__mL !== life || !root.isConnected) return removeEventListener('pageshow', shown);
-		const entry = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
-		const replayed = !event.persisted && entry?.type === 'back_forward' && entry.transferSize === 0;
-		const reask = root[reaskProperty];
-		// A wired runtime re-asks a restore on its own listener.
-		if (typeof reask === 'function') {
-			if (replayed) reask();
-		} else if (event.persisted || replayed) {
-			root[reaskProperty] = true;
-			wake();
-		}
-	};
-	addEventListener('pageshow', shown);
-}
 
 // Retain Escape until installation; defer the wake so authored dispatch (`true`, never a visible forward) can claim it.
 function runInlineResumerOverlayPrimer(

@@ -1,6 +1,6 @@
 import {
 	INLINE_RESUMER_PAGE_TOKEN,
-	authoredInlineWakeSources,
+	authoredSelfWakeSources,
 	PRERENDER_INLINE_EVENT_NAMES_TOKEN,
 	createInlineResumerDebugRegistrationSource,
 	createInlineResumerSelfWakeSource,
@@ -64,7 +64,7 @@ async function compileInlineResumerSourceVariants(options: {
 		}),
 	]);
 	const defer = await compileDeferFactorySource();
-	const wakes = compileInlineWakeSources();
+	const wakes = await compileInlineWakeSources();
 	return {
 		...shared,
 		event,
@@ -80,14 +80,15 @@ export async function compileDeferFactorySource(): Promise<string> {
 	return compileExpressionSource('markless-defer.js', createMarklessDefer.toString());
 }
 
-export function compileInlineWakeSources(): InlineWakeSources {
-	const authored = authoredInlineWakeSources();
-	return {
-		selfWake: compileExpressionSource('markless-self-wake.js', authored.selfWake),
-		returnWake: compileExpressionSource('markless-return-wake.js', authored.returnWake),
-		storageWake: compileExpressionSource('markless-storage-wake.js', authored.storageWake),
-		moduleLoader: compileExpressionSource('markless-module-loader.js', authored.moduleLoader),
-	};
+// Loaded on demand so a bundler that never compiles a server module, such as the docs playground's, does not ship the wakes.
+export async function compileInlineWakeSources(): Promise<InlineWakeSources> {
+	const { authoredLateWakeSources } = await import('../../web/src/inline/wakes.ts');
+	return Object.fromEntries(
+		Object.entries({ ...authoredSelfWakeSources(), ...authoredLateWakeSources() }).map(([name, source]) => [
+			name,
+			compileExpressionSource(`${name}.js`, source),
+		]),
+	) as InlineWakeSources;
 }
 
 // An expression is minified as a named binding the mangler must keep and then unwrapped.
