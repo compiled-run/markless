@@ -118,9 +118,36 @@ Full recipes in `references/ink.md`. In words:
   ink. Faint pink-orange pencil construction lines stay visible under the ink.
 - **Placement:** directly on the page, the width of the prose column. No card, no border, no
   figure number, no legend, no title inside the drawing.
-- **Themes:** light and dark come from the site tokens (`--ink`, `--paper`, `--yellow`,
-  `--pink`) with an `html.dark &` override block in the figure's `<style>`. A material tint such
-  as bean brown may mix a literal with a token, but must carry its own dark value.
+- **Themes:** light and dark come from the site tokens in `website/styles/global.css`, with an
+  `html.dark &` override block in the figure's `<style>`. Dark follows the chalk rule below.
+
+### Dark mode: chalk on a dark ground
+
+Dark is the swap of light: the page ground is light's ink and `--ink` is light's cream paper.
+Accents (`--yellow`, `--pink`, `--purple`, `--green-soft`) are the same colours in both themes.
+Design in light first; light is the reference and must not change when you add dark.
+
+- **Line work** is `--ink` everywhere, so it reads as cream chalk in dark.
+- **Paper-like objects go dark.** A sheet, card, screen, window or plain paper is
+  `--figure-sheet` in dark, with `--raised` or `--slab` for depth. No cream slabs on the dark
+  page.
+- **Accent surfaces keep their light pastel,** solid: mix the accent into `--cream` (never
+  `--paper`, which is dark in dark mode), `mix-blend-mode: normal`, opacity 1. Everything drawn
+  on that fill uses `--on-accent`. Never mix an accent or material colour into the dark ground;
+  it turns olive or a murky jewel tone. Washes that `multiply` in light switch to `normal` in
+  dark.
+- **Shadows are hatching** in `--figure-hatch` over a faint `--figure-shade`, never a filled dark
+  blob.
+- **Status and code colours are shared tokens:** `--figure-error`, `--figure-ok`, `--syntax-*`
+  (also `--pencil`, `--marker`, `--highlight`, `--figure-kraft`). No literal hex or oklch in a
+  figure's `<style>`. A new role gets a new token in `global.css` whose light value equals the
+  old literal, plus a dark value.
+- **CSS gotcha:** never nest `html.dark &` inside a rule whose selector ends in a pseudo-element
+  (`::before`, `::marker`); write `html.dark .x::before { ... }` as its own rule.
+
+Check: screenshot light and dark side by side, at rest and after each interaction; light is
+unchanged, text on every fill passes contrast, and if blends or filters are involved, Chromium,
+Firefox and WebKit agree. Checklist in `references/verify.md`.
 
 ## 4. Motion and play
 
