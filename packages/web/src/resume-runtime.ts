@@ -38,7 +38,8 @@ export function createResumeRuntime(
 	const { elementsByHostId, elementHandles } = prepared;
 	let storagePlane: import('./storage-plane.ts').StoragePlane | undefined;
 	const hasStorageCells = (input.state?.storage?.length ?? 0) > 0;
-	let disposed = false,
+	// Lifetime: 0 starting, 1 capture listeners live, 2 disposed; nothing leaves 2.
+	let phase = 0,
 		debugModule: typeof import('./debug-channel.ts') | undefined;
 	const debugRoot =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
@@ -49,7 +50,7 @@ export function createResumeRuntime(
 				.then((debug) => {
 					debugModule = debug;
 					const root = debugRoot.deref();
-					if (!disposed && root)
+					if (phase !== 2 && root)
 						debug.__marklessDebugStartContainer(root, 'ssr-resume', false);
 				})
 				.catch(() => {})
@@ -61,7 +62,6 @@ export function createResumeRuntime(
 	Object.defineProperty(eventTypes, 'add', {
 		value: (type: string) => (input.root.__marklessListen?.(type), addEventType(type)),
 	});
-	let captureListenersStarted = false;
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
 		containerSubscriptionReleases: Array<() => void> = [];
@@ -99,7 +99,7 @@ export function createResumeRuntime(
 	};
 	const storeContainerSubscription = (release: () => void) => {
 		if (typeof release !== 'function') return;
-		if (disposed) release();
+		if (phase === 2) release();
 		else containerSubscriptionReleases.push(release);
 	};
 	const registerComputedRefreshes = async (
@@ -263,12 +263,12 @@ export function createResumeRuntime(
 				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
 		);
+		const listener = input.root.__marklessDelegatedDispatch ? events!.applySyncPolicy : dispatchCaptured;
 		for (const eventType of eventTypes) {
 			if (eventTypesBefore.has(eventType)) continue;
-			input.root.addEventListener?.(
-				eventType,
-				input.root.__marklessDelegatedDispatch ? events!.applySyncPolicy : dispatchCaptured,
-				{ capture: true },
+			input.root.addEventListener?.(eventType, listener, { capture: true });
+			storeContainerSubscription(() =>
+				input.root.removeEventListener?.(eventType, listener, { capture: true }),
 			);
 		}
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds)
@@ -296,7 +296,7 @@ export function createResumeRuntime(
 			{ ...registration, renderHtml: input.renderBranchHtml },
 			installArmEventType,
 		);
-		return () => commit(boundary, update);
+		return () => (phase === 2 ? Promise.resolve() : commit(boundary, update));
 	}
 	async function armRegistrationDeps(
 		records: ArmCommitUpdate['armRecords'],
@@ -364,7 +364,7 @@ export function createResumeRuntime(
 		eventTypes.add(eventType);
 		// Arm rows paint before they register, so the delegated container listens for them first.
 		if (input.root.__marklessDelegatedDispatch) input.delegatedTriggers?.registerRowEventName(eventType);
-		else if (captureListenersStarted)
+		else if (phase === 1)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
 	async function registerServedBoundaryArms(): Promise<void> {
@@ -406,13 +406,10 @@ export function createResumeRuntime(
 		hostSubscriptionReleases.delete(hostNodeId);
 	}
 	function dispose(): void {
-		if (disposed) return;
-		disposed = true;
+		if (phase === 2) return;
+		phase = 2;
 		for (const eventType of eventTypes)
 			input.root.removeEventListener?.(eventType, dispatchCaptured, { capture: true });
-		input.root.removeEventListener?.(SHARED_PATCH_EVENT_TYPE, receiveSharedPatch, {
-			capture: true,
-		});
 		behaviorRuntime?.disconnect();
 		for (const hostNodeId of Array.from(elementsByHostId.keys()))
 			disposeHost(hostNodeId, { ignoreFutureEvents: true });
@@ -483,12 +480,12 @@ export function createResumeRuntime(
 			)?.reconcileSharedCells(input.graph))
 		)
 			await input.graph.flush();
-		captureListenersStarted = true;
+		if (phase === 2) return;
+		phase = 1;
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__) {
-			if (disposed) return;
 			await debugReady;
 			await events?.whenDebugRegistered?.();
-			if (disposed) return;
+			if (phase === 2) return;
 			const root = debugRoot?.deref();
 			if (!root || !debugModule) return;
 			debugModule.__marklessDebugActivateContainer(root);
@@ -563,9 +560,9 @@ export function createResumeRuntime(
 	const runtime: ResumeRuntime = {
 		start,
 		dispatch: async (event: ResumeDomEvent, options?: ResumeDispatchOptions) => {
-			if (disposed || behaviorRuntime?.observesVisible(event)) return;
+			if (phase === 2 || behaviorRuntime?.observesVisible(event)) return;
 			const wiring = await getEvents();
-			if (!disposed) await wiring.dispatch(event, options);
+			if (phase !== 2) await wiring.dispatch(event, options);
 		},
 		activateBehaviors: async (hostNodeId: string) =>
 			(await loadBehaviorRuntime()).activateBehaviors(hostNodeId),

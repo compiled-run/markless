@@ -10,9 +10,20 @@ if [ $status -ne 0 ]; then
 	exit $status
 fi
 
+# Shadow mode: compute the yuku-selected unit tests beside the full run and log them; the full run still decides.
+shadow_dir="$(mktemp -d "${TMPDIR:-/tmp}/markless-affected.XXXXXX")"
+node scripts/ci/affected.mjs --staged --json >"$shadow_dir/selection.json" 2>/dev/null &
+shadow_pid=$!
+export MARKLESS_CI_JSON_REPORT_DIR="$shadow_dir"
+
 # Run CI's fast jobs (agent files, typecheck, unit) with the exact commands from ci.yml.
 node scripts/ci/local.mjs --fast --bail
 status=$?
+
+unset MARKLESS_CI_JSON_REPORT_DIR
+wait "$shadow_pid" 2>/dev/null
+node scripts/ci/affected.mjs --shadow-log "$shadow_dir/selection.json" --unit-report "$shadow_dir/unit.json" >/dev/null 2>&1
+rm -rf "$shadow_dir"
 if [ $status -ne 0 ]; then
 	echo ""
 	echo "pre-commit: CI fast jobs failed (see above)."

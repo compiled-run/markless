@@ -1,0 +1,277 @@
+import { describe, expect, test } from 'vitest';
+import { createProjectGraph, type WorkspacePackage } from '../test-support/project-graph.ts';
+
+type Project = {
+	files: Record<string, string>;
+	assets?: string[];
+	packages?: WorkspacePackage[];
+};
+
+const graphOf = async ({ files, assets = [], packages = [] }: Project) =>
+	createProjectGraph({
+		files: new Map(Object.entries(files)),
+		tracked: new Set([...Object.keys(files), ...assets]),
+		packages,
+	});
+
+const testsIn = (files: Record<string, string>) =>
+	Object.keys(files).filter((path) => path.endsWith('.test.ts'));
+
+const select = async (project: Project, changed: string[]) =>
+	(await graphOf(project)).affectedTests(changed, testsIn(project.files));
+
+describe('module edges', () => {
+	test('selects tests that reach a change through a chain of imports, and only those', async () => {
+		const files = {
+			'pkg/src/leaf.ts': 'export const leaf = 1;',
+			'pkg/src/middle.ts': "import { leaf } from './leaf.ts'; export const middle = leaf;",
+			'pkg/test/middle.test.ts': "import { middle } from '../src/middle.ts'; middle;",
+			'pkg/test/other.test.ts': "import { other } from '../src/other.ts'; other;",
+			'pkg/src/other.ts': 'export const other = 2;',
+		};
+		expect(await select({ files }, ['pkg/src/leaf.ts'])).toEqual({
+			tests: ['pkg/test/middle.test.ts'],
+			runAll: null,
+		});
+	});
+
+	test('counts type-only imports as edges', async () => {
+		const files = {
+			'pkg/src/types.ts': 'export type Shape = { size: number };',
+			'pkg/src/use.ts':
+				"import type { Shape } from './types.ts'; export const s = (x: Shape) => x;",
+			'pkg/test/use.test.ts': "import { s } from '../src/use.ts'; s;",
+		};
+		expect((await select({ files }, ['pkg/src/types.ts'])).tests).toEqual([
+			'pkg/test/use.test.ts',
+		]);
+	});
+
+	test('follows export * barrels', async () => {
+		const files = {
+			'pkg/src/impl.ts': 'export const impl = 1;',
+			'pkg/src/index.ts': "export * from './impl.ts';",
+			'pkg/test/index.test.ts': "import { impl } from '../src/index.ts'; impl;",
+		};
+		expect((await select({ files }, ['pkg/src/impl.ts'])).tests).toEqual([
+			'pkg/test/index.test.ts',
+		]);
+	});
+
+	test('follows dynamic imports with a static specifier', async () => {
+		const files = {
+			'pkg/src/lazy.ts': 'export const lazy = 1;',
+			'pkg/test/lazy.test.ts': "const { lazy } = await import('../src/lazy.ts'); lazy;",
+		};
+		expect((await select({ files }, ['pkg/src/lazy.ts'])).tests).toEqual([
+			'pkg/test/lazy.test.ts',
+		]);
+	});
+
+	test('analyzes .tsrx modules in the same graph', async () => {
+		const files = {
+			'pkg/src/count.ts': 'export const start = 0;',
+			'pkg/src/Counter.tsrx':
+				"import { start } from './count.ts';\nexport function Counter() @{\n\t<button>{start}</button>\n}\n",
+			'pkg/test/counter.test.ts': "import { Counter } from '../src/Counter.tsrx'; Counter;",
+		};
+		const graph = await graphOf({ files });
+		expect(graph.analyzer.module('pkg/src/Counter.tsrx')?.diagnostics).toEqual([]);
+		expect(graph.affectedTests(['pkg/src/count.ts'], testsIn(files)).tests).toEqual([
+			'pkg/test/counter.test.ts',
+		]);
+	});
+
+	test('maps workspace specifiers through package.json exports, every condition and wildcard', async () => {
+		const files = {
+			'packages/web/src/index.ts': 'export const node = 1;',
+			'packages/web/src/index.browser.ts': 'export const browser = 1;',
+			'packages/web/src/fns/format.ts': 'export const format = 1;',
+			'packages/app/test/root.test.ts':
+				"import '@markless/web'; import 'vitest'; import '../../web/node_modules/playwright/index.mjs';",
+			'packages/app/test/fns.test.ts':
+				"import { format } from '@markless/web/fns/format'; format;",
+		};
+		const packages = [
+			{
+				dir: 'packages/web',
+				name: '@markless/web',
+				exports: {
+					'.': { browser: './src/index.browser.ts', default: './src/index.ts' },
+					'./fns/*': './src/fns/*.ts',
+				},
+			},
+		];
+		const graph = await graphOf({ files, packages });
+		const tests = testsIn(files);
+		expect(graph.affectedTests(['packages/web/src/index.browser.ts'], tests)).toEqual({
+			tests: ['packages/app/test/root.test.ts'],
+			runAll: null,
+		});
+		expect(graph.affectedTests(['packages/web/src/index.ts'], tests).tests).toEqual([
+			'packages/app/test/root.test.ts',
+		]);
+		expect(graph.affectedTests(['packages/web/src/fns/format.ts'], tests).tests).toEqual([
+			'packages/app/test/fns.test.ts',
+		]);
+	});
+
+	test('follows non-code imports and files named by new URL(..., import.meta.url)', async () => {
+		const files = {
+			'pkg/src/worker.ts': 'export {};',
+			'pkg/src/spawn.ts':
+				"export const url = new URL('./worker.ts', import.meta.url); import data from './data.json'; data;",
+			'pkg/test/spawn.test.ts': "import { url } from '../src/spawn.ts'; url;",
+		};
+		const project = { files, assets: ['pkg/src/data.json'] };
+		expect((await select(project, ['pkg/src/worker.ts'])).tests).toEqual([
+			'pkg/test/spawn.test.ts',
+		]);
+		expect((await select(project, ['pkg/src/data.json'])).tests).toEqual([
+			'pkg/test/spawn.test.ts',
+		]);
+	});
+});
+
+describe('fails closed', () => {
+	test('an unresolved local import inside the affected set runs everything', async () => {
+		const files = {
+			'pkg/src/a.ts':
+				"import { gone } from './gone.ts'; import { b } from './b.ts'; export const a = gone + b;",
+			'pkg/src/b.ts': 'export const b = 1;',
+			'pkg/test/a.test.ts': "import { a } from '../src/a.ts'; a;",
+			'pkg/test/c.test.ts': "import { c } from '../src/c.ts'; c;",
+			'pkg/src/c.ts': 'export const c = 1;',
+		};
+		expect((await select({ files }, ['pkg/src/b.ts'])).runAll).toBe(
+			"unresolved import: pkg/src/a.ts imports './gone.ts'",
+		);
+		expect(await select({ files }, ['pkg/src/c.ts'])).toEqual({
+			tests: ['pkg/test/c.test.ts'],
+			runAll: null,
+		});
+	});
+
+	test('a computed import() inside the affected set runs everything', async () => {
+		const files = {
+			'pkg/src/loader.ts':
+				"import { name } from './name.ts'; export const load = () => import(`./plugins/${name}.ts`);",
+			'pkg/src/name.ts': "export const name = 'x';",
+			'pkg/test/loader.test.ts': "import { load } from '../src/loader.ts'; load;",
+		};
+		const selection = await select({ files }, ['pkg/src/name.ts']);
+		expect(selection.runAll).toBe('computed import: pkg/src/loader.ts has a computed import()');
+		expect(selection.tests).toEqual(['pkg/test/loader.test.ts']);
+	});
+
+	test('a computed import() off every path to a test does not force a full run', async () => {
+		const files = {
+			'pkg/src/name.ts': "export const name = 'x';",
+			'pkg/test/name.test.ts': "import { name } from '../src/name.ts'; name;",
+			'site/page.ts': "import { name } from '../pkg/src/name.ts'; import(`./${name}.ts`);",
+		};
+		expect(await select({ files }, ['pkg/src/name.ts'])).toEqual({
+			tests: ['pkg/test/name.test.ts'],
+			runAll: null,
+		});
+	});
+
+	test('a computed require() and import.meta.glob() count as unknown targets', async () => {
+		const graph = await graphOf({
+			files: {
+				'a.cjs': 'const name = "x"; module.exports = require(name);',
+				'b.ts': "export const all = import.meta.glob('./*.ts');",
+				'c.ts': "const fs = require('node:fs'); export { fs };",
+			},
+		});
+		expect(graph.opaque.get('a.cjs')).toEqual(['a computed require()']);
+		expect(graph.opaque.get('b.ts')).toEqual(['import.meta.glob()']);
+		expect(graph.opaque.has('c.ts')).toBe(false);
+	});
+
+	test('a deleted module that is still imported runs everything', async () => {
+		const files = {
+			'pkg/src/a.ts': "import { gone } from './gone.ts'; export const a = gone;",
+			'pkg/test/a.test.ts': "import { a } from '../src/a.ts'; a;",
+		};
+		expect((await select({ files }, ['pkg/src/gone.ts'])).runAll).toBe(
+			"unresolved import: pkg/src/a.ts imports './gone.ts'",
+		);
+		expect(await select({ files }, ['pkg/src/never-imported.ts'])).toEqual({
+			tests: [],
+			runAll: null,
+		});
+	});
+});
+
+describe('path rules', () => {
+	const files = {
+		'packages/web/src/a.ts': 'export const a = 1;',
+		'packages/web/test/a.test.ts': "import { a } from '../src/a.ts'; a;",
+		'packages/web/test/b.test.ts': "import { readFileSync } from 'node:fs'; readFileSync;",
+		'packages/bundler/test/build.test.ts': 'export {};',
+		'packages/headless/components/test/menu.test.ts': 'export {};',
+	};
+
+	test('config, manifests, hooks, CI scripts and shared test helpers run everything', async () => {
+		for (const path of [
+			'pnpm-lock.yaml',
+			'packages/web/package.json',
+			'tsconfig.json',
+			'vite.config.ts',
+			'packages/web/vitest.config.ts',
+			'.githooks/pre-commit',
+			'scripts/ci/local.mjs',
+			'scripts/test-utils/browser.ts',
+			'packages/typescript-plugin/src/index.ts',
+		]) {
+			const selection = await select({ files }, [path]);
+			expect(selection.runAll, path).toContain(path);
+			expect(selection.tests).toHaveLength(4);
+		}
+	});
+
+	test('a path no rule classifies runs everything', async () => {
+		expect((await select({ files }, ['docs/ci-process.md'])).runAll).toBe(
+			'no rule classifies the path: docs/ci-process.md',
+		);
+	});
+
+	test('agent rule sources select no unit test', async () => {
+		expect(await select({ files }, ['.ruler/AGENTS.md', 'CLAUDE.md'])).toEqual({
+			tests: [],
+			runAll: null,
+		});
+	});
+
+	test('a fixture under a package test folder runs that package, a test file runs itself', async () => {
+		expect(await select({ files }, ['packages/web/test/fixtures/page.html'])).toEqual({
+			tests: ['packages/web/test/a.test.ts', 'packages/web/test/b.test.ts'],
+			runAll: null,
+		});
+		expect(
+			(await select({ files }, ['packages/headless/components/test/fixtures/x.tsrx'])).tests,
+		).toEqual(['packages/headless/components/test/menu.test.ts']);
+		expect((await select({ files }, ['packages/web/test/b.test.ts'])).tests).toEqual([
+			'packages/web/test/b.test.ts',
+		]);
+	});
+
+	test('a snapshot runs the test it belongs to', async () => {
+		expect(
+			(await select({ files }, ['packages/web/test/__snapshots__/a.test.ts.snap'])).tests,
+		).toEqual(['packages/web/test/a.test.ts']);
+	});
+
+	test('demos changes run the test folders that read them from disk; website changes only follow imports', async () => {
+		expect((await select({ files }, ['demos/todomvc/src/App.tsrx'])).tests).toEqual([
+			'packages/bundler/test/build.test.ts',
+			'packages/web/test/a.test.ts',
+			'packages/web/test/b.test.ts',
+		]);
+		expect(await select({ files }, ['website/pages/index.mdx'])).toEqual({
+			tests: [],
+			runAll: null,
+		});
+	});
+});
