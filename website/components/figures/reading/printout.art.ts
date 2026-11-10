@@ -28,37 +28,43 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "export",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.796 -0.048 0.016 2.759 58.265 157.343)"
 				},
 				{
 					"key": 1,
 					"text": " default",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.796 -0.048 0.024 2.759 122.688 156.233)"
 				},
 				{
 					"key": 2,
 					"text": " function",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.796 -0.048 0.035 2.758 208.574 154.754)"
 				},
 				{
 					"key": 4,
 					"text": "GuestList",
-					"tint": "--c:#6f42c1",
+					"tint": "--c:#6f42c1;--cd:#b392f0",
+					"washed": false,
 					"matrix": "matrix(2.795 -0.048 0.048 2.758 315.917 152.906)"
 				},
 				{
 					"key": 5,
 					"text": "() ",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.795 -0.048 0.06 2.758 412.51 151.242)"
 				},
 				{
 					"key": 6,
 					"text": "@{",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.795 -0.048 0.064 2.757 444.704 150.688)"
 				}
 			]
@@ -69,55 +75,64 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "let",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.799 -0.048 0.019 2.765 79.915 182.935)"
 				},
 				{
 					"key": 2,
 					"text": "guests",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.799 -0.048 0.024 2.765 122.913 182.193)"
 				},
 				{
 					"key": 4,
 					"text": "=",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.799 -0.048 0.033 2.765 198.152 180.896)"
 				},
 				{
 					"key": 6,
 					"text": "state",
-					"tint": "--c:#6f42c1",
+					"tint": "--c:#6f42c1;--cd:#b392f0",
+					"washed": false,
 					"matrix": "matrix(2.799 -0.048 0.036 2.765 219.647 180.526)"
 				},
 				{
 					"key": 7,
 					"text": "([",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.799 -0.048 0.043 2.765 273.382 179.599)"
 				},
 				{
 					"key": 8,
 					"text": "'Ada'",
-					"tint": "--c:#032f62",
+					"tint": "--c:#032f62;--cd:#9ecbff",
+					"washed": false,
 					"matrix": "matrix(2.798 -0.048 0.045 2.765 294.874 179.229)"
 				},
 				{
 					"key": 9,
 					"text": ", ",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.798 -0.048 0.052 2.764 348.603 178.302)"
 				},
 				{
 					"key": 10,
 					"text": "'Grace'",
-					"tint": "--c:#032f62",
+					"tint": "--c:#032f62;--cd:#9ecbff",
+					"washed": false,
 					"matrix": "matrix(2.798 -0.048 0.055 2.764 370.093 177.932)"
 				},
 				{
 					"key": 11,
 					"text": "]);",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.798 -0.048 0.064 2.764 445.303 176.635)"
 				}
 			]
@@ -128,49 +143,57 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "const",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.803 -0.048 0.019 2.772 80.091 208.957)"
 				},
 				{
 					"key": 2,
 					"text": "clear",
-					"tint": "--c:#6f42c1",
+					"tint": "--c:#6f42c1;--cd:#b392f0",
+					"washed": false,
 					"matrix": "matrix(2.802 -0.048 0.027 2.772 144.661 207.842)"
 				},
 				{
 					"key": 3,
 					"text": " =",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.802 -0.048 0.033 2.771 198.465 206.914)"
 				},
 				{
 					"key": 4,
 					"text": " () ",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.802 -0.048 0.036 2.771 219.985 206.542)"
 				},
 				{
 					"key": 5,
 					"text": "=>",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.802 -0.048 0.041 2.771 263.023 205.799)"
 				},
 				{
 					"key": 6,
 					"text": " (guests ",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.802 -0.048 0.044 2.771 284.541 205.428)"
 				},
 				{
 					"key": 7,
 					"text": "=",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.801 -0.048 0.056 2.771 381.363 203.757)"
 				},
 				{
 					"key": 8,
 					"text": " []);",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.801 -0.048 0.057 2.771 392.121 203.571)"
 				}
 			]
@@ -182,18 +205,21 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "<",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.806 -0.048 0.019 2.778 80.267 235.04)"
 				},
 				{
 					"key": 1,
 					"text": "section",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.806 -0.048 0.02 2.778 91.042 234.854)"
 				},
 				{
 					"key": 2,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.806 -0.048 0.029 2.778 166.459 233.55)"
 				}
 			]
@@ -204,49 +230,57 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "@for",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.809 -0.049 0.021 2.785 102.018 260.81)"
 				},
 				{
 					"key": 1,
 					"text": " (",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.809 -0.049 0.027 2.785 145.164 260.064)"
 				},
 				{
 					"key": 2,
 					"text": "const",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.809 -0.049 0.029 2.784 166.736 259.69)"
 				},
 				{
 					"key": 4,
 					"text": "name",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.809 -0.049 0.038 2.784 231.448 258.571)"
 				},
 				{
 					"key": 6,
 					"text": "of",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.808 -0.049 0.044 2.784 285.37 257.638)"
 				},
 				{
 					"key": 7,
 					"text": " guests; ",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.808 -0.049 0.047 2.784 306.938 257.265)"
 				},
 				{
 					"key": 8,
 					"text": "key",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.808 -0.049 0.059 2.783 403.982 255.586)"
 				},
 				{
 					"key": 9,
 					"text": " name) {",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.808 -0.049 0.063 2.783 436.327 255.026)"
 				}
 			]
@@ -258,78 +292,91 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "<",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.812 -0.049 0.024 2.791 123.818 286.64)"
 				},
 				{
 					"key": 1,
 					"text": "p",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.812 -0.049 0.026 2.791 134.617 286.453)"
 				},
 				{
 					"key": 3,
 					"text": "class",
-					"tint": "--c:#6f42c1",
+					"tint": "--c:#6f42c1;--cd:#b392f0",
+					"washed": false,
 					"matrix": "matrix(2.812 -0.049 0.028 2.791 156.215 286.079)"
 				},
 				{
 					"key": 4,
 					"text": "=",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.812 -0.049 0.035 2.791 210.206 285.143)"
 				},
 				{
 					"key": 5,
 					"text": "{name ",
 					"tint": "",
+					"washed": true,
 					"matrix": "matrix(2.812 -0.049 0.036 2.791 221.004 284.956)"
 				},
 				{
 					"key": 6,
 					"text": "===",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": true,
 					"matrix": "matrix(2.812 -0.049 0.044 2.79 285.786 283.834)"
 				},
 				{
 					"key": 7,
 					"text": " 'Ada'",
-					"tint": "--c:#032f62",
+					"tint": "--c:#032f62;--cd:#9ecbff",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.048 2.79 318.175 283.273)"
 				},
 				{
 					"key": 8,
 					"text": " ?",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.056 2.79 382.947 282.151)"
 				},
 				{
 					"key": 9,
 					"text": " 'host'",
-					"tint": "--c:#032f62",
+					"tint": "--c:#032f62;--cd:#9ecbff",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.059 2.79 404.537 281.777)"
 				},
 				{
 					"key": 10,
 					"text": " :",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.068 2.79 480.094 280.468)"
 				},
 				{
 					"key": 11,
 					"text": " ''",
-					"tint": "--c:#032f62",
+					"tint": "--c:#032f62;--cd:#9ecbff",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.071 2.79 501.68 280.095)"
 				},
 				{
 					"key": 12,
 					"text": "}",
 					"tint": "",
+					"washed": true,
 					"matrix": "matrix(2.811 -0.049 0.075 2.789 534.058 279.534)"
 				},
 				{
 					"key": 13,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.81 -0.049 0.076 2.789 544.85 279.347)"
 				}
 			]
@@ -341,6 +388,7 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "{name}",
 					"tint": "",
+					"washed": true,
 					"matrix": "matrix(2.815 -0.049 0.027 2.798 145.669 312.529)"
 				}
 			]
@@ -352,18 +400,21 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "</",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.819 -0.049 0.024 2.804 124.274 339.23)"
 				},
 				{
 					"key": 1,
 					"text": "p",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.819 -0.049 0.027 2.804 145.923 338.854)"
 				},
 				{
 					"key": 2,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.819 -0.049 0.028 2.804 156.747 338.666)"
 				}
 			]
@@ -375,6 +426,7 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "}",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.822 -0.049 0.022 2.811 102.828 365.994)"
 				}
 			]
@@ -385,37 +437,43 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "@if",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.826 -0.049 0.022 2.817 103.032 392.444)"
 				},
 				{
 					"key": 1,
 					"text": " (guests.",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.825 -0.049 0.026 2.817 135.582 391.877)"
 				},
 				{
 					"key": 2,
 					"text": "length",
-					"tint": "--c:#005cc5",
+					"tint": "--c:#005cc5;--cd:#79b8ff",
+					"washed": false,
 					"matrix": "matrix(2.825 -0.049 0.038 2.817 233.222 390.178)"
 				},
 				{
 					"key": 3,
 					"text": " ===",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.825 -0.049 0.046 2.817 298.307 389.045)"
 				},
 				{
 					"key": 4,
 					"text": " 0",
-					"tint": "--c:#005cc5",
+					"tint": "--c:#005cc5;--cd:#79b8ff",
+					"washed": false,
 					"matrix": "matrix(2.825 -0.049 0.051 2.816 341.693 388.29)"
 				},
 				{
 					"key": 5,
 					"text": ") {",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.824 -0.049 0.054 2.816 363.385 387.913)"
 				}
 			]
@@ -427,30 +485,35 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "<",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.829 -0.049 0.024 2.824 124.962 418.577)"
 				},
 				{
 					"key": 1,
 					"text": "p",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.829 -0.049 0.026 2.824 135.825 418.388)"
 				},
 				{
 					"key": 2,
 					"text": ">No one yet</",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.829 -0.049 0.027 2.824 146.687 418.199)"
 				},
 				{
 					"key": 3,
 					"text": "p",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.828 -0.049 0.045 2.823 287.881 415.739)"
 				},
 				{
 					"key": 4,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.828 -0.049 0.046 2.823 298.74 415.55)"
 				}
 			]
@@ -462,6 +525,7 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "}",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.832 -0.049 0.022 2.831 103.441 445.531)"
 				}
 			]
@@ -473,48 +537,56 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "<",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.836 -0.05 0.022 2.837 103.647 472.168)"
 				},
 				{
 					"key": 1,
 					"text": "button",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.836 -0.05 0.023 2.837 114.535 471.978)"
 				},
 				{
 					"key": 3,
 					"text": "onClick",
-					"tint": "--c:#6f42c1",
+					"tint": "--c:#6f42c1;--cd:#b392f0",
+					"washed": false,
 					"matrix": "matrix(2.835 -0.05 0.033 2.837 190.749 470.647)"
 				},
 				{
 					"key": 4,
 					"text": "=",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.835 -0.05 0.042 2.837 266.954 469.316)"
 				},
 				{
 					"key": 5,
 					"text": "{clear}",
 					"tint": "",
+					"washed": true,
 					"matrix": "matrix(2.835 -0.05 0.044 2.837 277.84 469.126)"
 				},
 				{
 					"key": 6,
 					"text": ">Clear</",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.834 -0.05 0.053 2.836 354.035 467.795)"
 				},
 				{
 					"key": 7,
 					"text": "button",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.834 -0.049 0.064 2.836 441.103 466.274)"
 				},
 				{
 					"key": 8,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.834 -0.049 0.072 2.836 506.397 465.134)"
 				}
 			]
@@ -526,18 +598,21 @@ export const art: ReturnType<typeof drawing> = {
 					"key": 0,
 					"text": "</",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.839 -0.05 0.019 2.844 82.049 499.249)"
 				},
 				{
 					"key": 1,
 					"text": "section",
-					"tint": "--c:#22863a",
+					"tint": "--c:#22863a;--cd:#85e89d",
+					"washed": false,
 					"matrix": "matrix(2.839 -0.05 0.022 2.844 103.852 498.868)"
 				},
 				{
 					"key": 2,
 					"text": ">",
 					"tint": "",
+					"washed": false,
 					"matrix": "matrix(2.839 -0.05 0.031 2.844 180.157 497.533)"
 				}
 			]
@@ -548,7 +623,8 @@ export const art: ReturnType<typeof drawing> = {
 				{
 					"key": 0,
 					"text": "}",
-					"tint": "--c:#d73a49",
+					"tint": "--c:#d73a49;--cd:#f97583",
+					"washed": false,
 					"matrix": "matrix(2.842 -0.05 0.016 2.851 60.4 526.395)"
 				}
 			]

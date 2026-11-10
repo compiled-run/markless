@@ -527,23 +527,23 @@ function Book() @{
 				--shade-ink: var(--ink);
 				--cloth: color-mix(in oklch, var(--paper) 40%, oklch(62% 0.07 55));
 				--red: oklch(52% 0.19 27);
-				--c-kw: #d73a49;
-				--c-fn: #6f42c1;
-				--c-str: #032f62;
-				--c-tag: #22863a;
+				--c-kw: var(--syntax-kw);
+				--c-fn: var(--syntax-fn);
+				--c-str: var(--syntax-str);
+				--c-tag: var(--syntax-tag);
 				--c-plain: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--paper) 84%, var(--ink));
-					--shade: rgb(0 0 0 / 0.45);
-					--shade-ink: rgb(0 0 0 / 0.85);
-					--cloth: oklch(38% 0.05 55);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
+					--cloth: var(--slab);
 					--red: oklch(70% 0.17 27);
-					--c-kw: #f97583;
-					--c-fn: #b392f0;
-					--c-str: #9ecbff;
-					--c-tag: #85e89d;
 				}
+			}
+
+			html.dark :is(.btn .said, .overlay .said.now) {
+				fill: var(--on-accent);
 			}
 
 			.scene.tall {
@@ -625,7 +625,7 @@ function Book() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.6;
 				stroke-linecap: round;
 				opacity: 0.3;
@@ -792,6 +792,10 @@ function Book() @{
 			.wash {
 				stroke-width: 1.2;
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					mix-blend-mode: normal;
+				}
 			}
 
 			.pink {
@@ -800,7 +804,9 @@ function Book() @{
 				opacity: 0.7;
 
 				html.dark & {
-					opacity: 0.4;
+					fill: color-mix(in srgb, var(--pink) 70%, var(--cream));
+					stroke: color-mix(in srgb, var(--pink) 70%, var(--cream));
+					opacity: 1;
 				}
 			}
 
@@ -810,13 +816,13 @@ function Book() @{
 				opacity: 0.85;
 
 				html.dark & {
-					opacity: 0.3;
+					opacity: 1;
 				}
 			}
 
 			.wash-edge {
 				fill: none;
-				stroke: oklch(72% 0.15 75);
+				stroke: var(--highlight);
 				stroke-width: 1;
 				opacity: 0.55;
 				mix-blend-mode: multiply;
@@ -1239,7 +1245,7 @@ function Book() @{
 				height: 64px;
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--paper) 84%, var(--ink));
+					--sheet: var(--figure-sheet);
 				}
 			}
 

@@ -14,7 +14,7 @@ export function drawing() {
 	k.put('paper', k.pathOf(go, true));
 	k.put('wash pink', k.wash(go, 9003, 1, 2));
 	k.put('ink', k.outline(go, { w: 1.3, heavy: 1, seed: 9004 }));
-	k.say('label button-label', 46, 248, 'Get Started');
+	k.say('label button-label go-label', 46, 248, 'Get Started');
 	const browse = roundRect(168, 226, 290, 260, 10, 5);
 	k.put('paper', k.pathOf(browse, true));
 	k.put('ink', k.outline(browse, { w: 1.2, seed: 9005 }));

@@ -246,8 +246,7 @@ export default function RoutesAnatomy() @{
 				--sheet-ink: var(--ink);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
+					--sheet: var(--figure-sheet);
 				}
 			}
 

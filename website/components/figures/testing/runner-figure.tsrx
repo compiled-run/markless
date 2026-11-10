@@ -385,6 +385,34 @@ export default function RunnerFigure() @{
 				}
 			}
 
+			html.dark .runner-toy {
+				button.line:hover,
+				button.line:focus-visible {
+					background: color-mix(in srgb, var(--yellow) 30%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				.broken .hot,
+				.row.fail .mark,
+				.failure {
+					color: var(--figure-error);
+					text-decoration-color: var(--figure-error);
+				}
+
+				.expect.failing {
+					background: color-mix(in oklch, var(--figure-error) 16%, transparent);
+					box-shadow: inset 3px 0 0 var(--figure-error);
+				}
+
+				.row.pass {
+					background: color-mix(in oklch, var(--figure-ok) 22%, transparent);
+				}
+
+				.row.fail {
+					background: color-mix(in oklch, var(--figure-error) 22%, transparent);
+				}
+			}
+
 			.sr {
 				position: absolute;
 				width: 1px;

@@ -162,6 +162,11 @@ export default function SourceAnatomy() @{
 				border-radius: 0.3rem;
 				background: color-mix(in oklch, var(--booked) 60%, transparent);
 				font-family: 'Shantell Sans', system-ui, sans-serif;
+
+				html.dark & {
+					background: color-mix(in srgb, var(--booked) 60%, var(--cream));
+					color: var(--on-accent);
+				}
 			}
 
 			.days {
@@ -180,6 +185,15 @@ export default function SourceAnatomy() @{
 				font-weight: 700;
 				box-shadow: 2px 2px 0 var(--ink);
 				cursor: pointer;
+			}
+
+			html.dark .day {
+				background: color-mix(in oklch, var(--day) 40%, var(--cream));
+				color: var(--on-accent);
+			}
+
+			html.dark .day[aria-pressed='true'] {
+				background: var(--day);
 			}
 
 			.day:active {
@@ -328,8 +342,29 @@ export default function SourceAnatomy() @{
 					color: #79b8ff;
 				}
 
-				html.dark & .t[data-w] {
-					color: var(--ink);
+				html.dark & .t[data-w='booked'] {
+					background: color-mix(in srgb, var(--booked) 60%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				html.dark & .t[data-w='day'] {
+					background: color-mix(in srgb, var(--day) 45%, var(--cream));
+					color: var(--on-accent);
+				}
+
+				html.dark &[data-active='booked'] .t[data-w='booked'] {
+					background: var(--booked);
+				}
+
+				html.dark &[data-active='day'] .t[data-w='day'] {
+					background: var(--day);
+				}
+
+				html.dark &[data-active='booked'] .t[data-w='day'],
+				html.dark &[data-active='day'] .t[data-w='booked'],
+				html.dark &[data-active='heading'] .t[data-w] {
+					background: none;
+					color: inherit;
 				}
 			}
 

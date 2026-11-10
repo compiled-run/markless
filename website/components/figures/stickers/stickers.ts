@@ -111,7 +111,8 @@ function stickerArt(seed: number) {
 	return {
 		shadow: hatch(at(shape(), [5, 7]), -0.7, 1.9, seed, { cluster: 3, skip: 0.2, trim: 0.3 }),
 		paper: pathOf(s, true),
-		ink: outline(s, { w: 1.6, heavy: 1.2, seed: seed + 1 }) + outline(ring, { w: 1, seed: seed + 2 }) + outline(head, { w: 1.1, seed: seed + 3 }) + line(shoulders, { w: 1.1, seed: seed + 9, over: 0 }),
+		ink: outline(s, { w: 1.6, heavy: 1.2, seed: seed + 1 }),
+		faceInk: outline(ring, { w: 1, seed: seed + 2 }) + outline(head, { w: 1.1, seed: seed + 3 }) + line(shoulders, { w: 1.1, seed: seed + 9, over: 0 }),
 		face: pathOf(ring, true),
 		faceShade: hatch(ring.filter(([x]) => x > -22), 1.1, 2, seed + 11, { cluster: 3, skip: 0.3, trim: 0.4 }),
 		die: pathOf(at(shape(), [0, 0]), true),

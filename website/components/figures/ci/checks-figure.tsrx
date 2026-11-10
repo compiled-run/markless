@@ -349,10 +349,31 @@ export default function ChecksFigure() @{
 				--wait: oklch(68% 0.14 75);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--sheet-ink: var(--paper);
-					--shade: rgb(0 0 0 / 0.55);
-					--shade-ink: rgb(0 0 0 / 0.85);
+					--sheet: var(--figure-sheet);
+					--shade: var(--figure-shade);
+					--shade-ink: var(--figure-hatch);
+					--ok: var(--figure-ok);
+					--bad: var(--figure-error);
+				}
+			}
+
+			html.dark .press {
+				.wash {
+					--o: calc(0.25 + 0.75 * max(0, 1 - max(var(--ph) - 1, 1 - var(--ph))) + 0.75 * var(--merged));
+					opacity: 1;
+				}
+
+				&:hover .wash {
+					--o: 1;
+				}
+
+				.go-wash {
+					fill: color-mix(in srgb, oklch(52% 0.13 150) calc(50% * min(var(--o), 1)), color-mix(in oklch, var(--cream) 50%, white));
+					opacity: 1;
+				}
+
+				.label text {
+					fill: var(--on-accent);
 				}
 			}
 
@@ -398,7 +419,7 @@ export default function ChecksFigure() @{
 
 			.pencil {
 				fill: none;
-				stroke: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				stroke: var(--pencil);
 				stroke-width: 0.7;
 				stroke-linecap: round;
 				opacity: 0.5;
@@ -572,6 +593,10 @@ export default function ChecksFigure() @{
 			.run-hit:hover,
 			.run-hit.active {
 				fill: color-mix(in oklch, var(--yellow) 40%, transparent);
+
+				html.dark & {
+					fill: color-mix(in oklch, var(--ink) 15%, transparent);
+				}
 			}
 
 			.home,

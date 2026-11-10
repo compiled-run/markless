@@ -348,13 +348,12 @@ export default function VendingAnatomy() @{
 				--m-shade: color-mix(in oklch, var(--ink) 22%, transparent);
 
 				html.dark & {
-					--m-body: color-mix(in oklch, var(--ink) 80%, oklch(78% 0.05 210));
-					--m-paper: color-mix(in oklch, var(--ink) 94%, var(--yellow));
-					--m-metal: color-mix(in oklch, var(--ink) 78%, oklch(72% 0.01 250));
-					--m-ink: var(--paper);
-					--m-slit: color-mix(in oklch, var(--paper) 85%, transparent);
-					--m-brass: color-mix(in oklch, var(--ink) 60%, oklch(76% 0.11 85));
-					--m-shade: rgb(0 0 0 / 0.5);
+					--m-body: var(--figure-sheet);
+					--m-paper: var(--raised);
+					--m-metal: var(--slab);
+					--m-slit: oklch(15% 0.012 90);
+					--m-brass: color-mix(in oklch, var(--cream) 45%, oklch(76% 0.11 85));
+					--m-shade: var(--figure-shade);
 				}
 			}
 

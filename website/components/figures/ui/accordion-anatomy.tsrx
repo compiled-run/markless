@@ -164,7 +164,7 @@ export default function AccordionAnatomy() @{
 				--sheet: color-mix(in oklch, var(--paper) 45%, white);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--paper) 88%, white);
+					--sheet: var(--figure-sheet);
 				}
 			}
 
@@ -258,6 +258,18 @@ export default function AccordionAnatomy() @{
 				fill: var(--tone);
 			}
 
+			html.dark .accordion-anatomy:not([data-mode='together']) {
+				.layer {
+					--ink: var(--on-accent);
+					--sheet: color-mix(in oklch, var(--cream) 45%, white);
+				}
+
+				.tint {
+					fill: color-mix(in srgb, var(--tone) 38%, color-mix(in oklch, var(--cream) 45%, white));
+					opacity: 1;
+				}
+			}
+
 			.tag {
 				fill: color-mix(in oklch, var(--tone) 55%, var(--ink));
 			}
@@ -349,8 +361,9 @@ export default function AccordionAnatomy() @{
 				transition: opacity 200ms ease;
 
 				html.dark & {
+					fill: color-mix(in srgb, var(--yellow) 60%, color-mix(in oklch, var(--cream) 45%, white));
 					mix-blend-mode: normal;
-					opacity: 0.4;
+					opacity: 1;
 				}
 			}
 
@@ -377,7 +390,7 @@ export default function AccordionAnatomy() @{
 				font-family: 'Recursive', ui-monospace, monospace;
 				font-size: 15px;
 				font-weight: 600;
-				fill: color-mix(in srgb, var(--pink) 70%, #e0603c);
+				fill: var(--pencil);
 				opacity: 0;
 				transition: opacity 150ms ease;
 			}

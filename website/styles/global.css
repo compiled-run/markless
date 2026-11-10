@@ -46,6 +46,15 @@
 	--marker: color-mix(in oklch, var(--yellow) 70%, oklch(70% 0.16 70));
 	--highlight: oklch(72% 0.15 75);
 	--figure-ring: oklch(55% 0.17 30);
+	--figure-error: #cb2431;
+	--figure-ok: oklch(48% 0.13 150);
+	--wood: oklch(72% 0.07 65);
+	--figure-kraft: color-mix(in oklch, oklch(78% 0.06 70) 70%, var(--cream));
+	--syntax-kw: #d73a49;
+	--syntax-fn: #6f42c1;
+	--syntax-str: #032f62;
+	--syntax-tag: #22863a;
+	--syntax-num: #005cc5;
 	--shadow-h1: var(--pink);
 	--shadow-h2: var(--purple);
 	--shadow-h3: var(--green-soft);
@@ -79,11 +88,20 @@
 		--sprite-light: none;
 		--sprite-dark: inline-block;
 		--figure-sheet: var(--code-surface);
-		--figure-shade: oklch(12% 0.012 90 / 0.6);
+		--figure-shade: oklch(12% 0.012 90 / 0.3);
 		--figure-hatch: oklch(10% 0.012 90 / 0.85);
 		--pencil: color-mix(in srgb, var(--pink) 85%, #e0603c);
 		--highlight: oklch(80% 0.15 85);
 		--figure-ring: oklch(72% 0.14 35);
+		--figure-error: oklch(74% 0.15 22);
+		--figure-ok: oklch(80% 0.13 150);
+		--wood: var(--slab);
+		--figure-kraft: var(--slab);
+		--syntax-kw: #f97583;
+		--syntax-fn: #b392f0;
+		--syntax-str: #9ecbff;
+		--syntax-tag: #85e89d;
+		--syntax-num: #79b8ff;
 		/* Cream letters need a darker-than-page layer beyond the pastel to stay apart from it. */
 	}
 }

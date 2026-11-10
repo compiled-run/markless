@@ -258,10 +258,10 @@ export default function PostcardsAnatomy() @{
 				--bin: var(--sheet);
 
 				html.dark & {
-					--sheet: color-mix(in oklch, var(--ink) 90%, var(--yellow));
-					--cork: color-mix(in oklch, var(--paper) 55%, var(--yellow));
-					--frame: color-mix(in oklch, var(--paper) 55%, var(--ink));
-					--bin: color-mix(in oklch, var(--paper) 78%, var(--ink));
+					--sheet: var(--figure-sheet);
+					--cork: color-mix(in oklch, var(--yellow) 40%, var(--cream));
+					--frame: var(--slab);
+					--bin: var(--figure-sheet);
 				}
 			}
 
@@ -292,6 +292,10 @@ export default function PostcardsAnatomy() @{
 
 			.hatch.grain {
 				opacity: 0.22;
+
+				html.dark & {
+					stroke: var(--on-accent);
+				}
 			}
 
 			.ink {
@@ -325,24 +329,16 @@ export default function PostcardsAnatomy() @{
 
 			.slit {
 				fill: color-mix(in oklch, var(--ink) 85%, var(--paper));
+
+				html.dark & {
+					fill: oklch(15% 0.012 90);
+				}
 			}
 
 			.slot-label {
 				font: 600 11px 'Shantell Sans', system-ui, sans-serif;
 				fill: var(--ink);
 				opacity: 0.8;
-			}
-
-			.card .ink {
-				html.dark & {
-					fill: var(--paper);
-				}
-			}
-
-			.card .hatch {
-				html.dark & {
-					stroke: var(--paper);
-				}
 			}
 
 			.pin-head {
@@ -407,13 +403,6 @@ export default function PostcardsAnatomy() @{
 			.void-text {
 				font-family: 'Shantell Sans', system-ui, sans-serif;
 				fill: var(--ink);
-			}
-
-			.name,
-			.temp {
-				html.dark & {
-					fill: var(--paper);
-				}
 			}
 
 			.name {
