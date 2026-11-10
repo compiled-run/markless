@@ -84,7 +84,7 @@ function treeRssBytes(rootPid, pageSize) {
 
 // A fixed JavaScript workload; the shard's CPU-seconds divided by its CPU-seconds is the work done,
 // whatever the speed of the runner's CPU model.
-function calibrationRound() {
+export function calibrationRound() {
 	const started = process.cpuUsage();
 	let seed = 1;
 	const rows = [];
@@ -103,7 +103,28 @@ function calibrationRound() {
 	return (spent.user + spent.system) / 1e6;
 }
 
-const calibrate = () => Math.min(...Array.from({ length: 5 }, calibrationRound));
+const scriptPath = fileURLToPath(import.meta.url);
+
+// The fastest of three rounds in each of `copies` processes at once, so shared cores slow it as they slow the tests.
+async function calibrate(copies) {
+	const rounds = await Promise.all(
+		Array.from(
+			{ length: copies },
+			() =>
+				new Promise((done, fail) => {
+					const child = spawn(process.execPath, [scriptPath, 'calibrate'], {
+						stdio: ['ignore', 'pipe', 'inherit'],
+					});
+					let text = '';
+					child.stdout.on('data', (chunk) => (text += chunk));
+					child.on('close', (code) =>
+						code === 0 ? done(JSON.parse(text)) : fail(new Error('calibration failed')),
+					);
+				}),
+		),
+	);
+	return Math.round(median(rounds.map((list) => Math.min(...list))) * 1000) / 1000;
+}
 
 async function measure(command) {
 	if (!command.length) throw new Error(USAGE);
@@ -112,7 +133,13 @@ async function measure(command) {
 		throw new Error(
 			'measure records Linux anchors only; unset MARKLESS_UNIT_BUDGET_OUT to run the command plainly',
 		);
-	const calibrationS = out ? calibrate() : null;
+	let calibration = null;
+	let before = null;
+	if (out) {
+		const cpus = Number(execFileSync('nproc', { encoding: 'utf8' }));
+		calibration = { singleS: await calibrate(1), parallelS: await calibrate(cpus), cpus };
+		before = procStat('self');
+	}
 	const child = spawn(command[0], command.slice(1), { stdio: 'inherit' });
 	for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 	if (!out)
@@ -132,9 +159,10 @@ async function measure(command) {
 	);
 	clearInterval(timer);
 	// cutime/cstime: CPU of every descendant this process waited for, through their own waited children.
+	// Minus what the calibration processes spent before the tests started.
 	const fields = procStat('self');
-	const userS = Number(fields[13]) / ticks;
-	const sysS = Number(fields[14]) / ticks;
+	const userS = (Number(fields[13]) - Number(before[13])) / ticks;
+	const sysS = (Number(fields[14]) - Number(before[14])) / ticks;
 	const own = process.cpuUsage();
 	const cpuModel =
 		/model name\s*:\s*(.*)/.exec(readFileSync('/proc/cpuinfo', 'utf8'))?.[1] ?? 'unknown';
@@ -143,7 +171,7 @@ async function measure(command) {
 		shard: process.env.MARKLESS_UNIT_BUDGET_SHARD ?? 'all',
 		platform: PLATFORM,
 		cpuModel,
-		cpus: Number(execFileSync('nproc', { encoding: 'utf8' })),
+		cpus: calibration.cpus,
 		sha: process.env.GITHUB_SHA ?? null,
 		run: process.env.GITHUB_RUN_ID ?? null,
 		attempt: Number(process.env.GITHUB_RUN_ATTEMPT ?? 1),
@@ -154,7 +182,8 @@ async function measure(command) {
 		userS: round(userS),
 		sysS: round(sysS),
 		peakRssMb: Math.round(peak / 2 ** 20),
-		calibrationS: Math.round(calibrationS * 1000) / 1000,
+		calibrationS: calibration.parallelS,
+		singleCalibrationS: calibration.singleS,
 		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
 	};
 	mkdirSync(dirname(out), { recursive: true });
@@ -429,6 +458,10 @@ async function main(argv) {
 	const args = separator === -1 ? argv : argv.slice(0, separator);
 	const command = args[0];
 	if (command === 'measure') return measure(separator === -1 ? [] : argv.slice(separator + 1));
+	if (command === 'calibrate') {
+		console.log(JSON.stringify(Array.from({ length: 3 }, calibrationRound)));
+		return 0;
+	}
 	const budgetPath = resolve(flags(args, '--budget')[0] ?? DEFAULT_BUDGET);
 	const budget = readBudget(budgetPath);
 	if (command === 'check') {
