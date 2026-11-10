@@ -271,6 +271,7 @@ export function emitSourceModule(input: {
 		readonly location: 'head' | 'body';
 	}>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
+	readonly storageSeedImports?: ReadonlyArray<string>;
 	readonly executionLog?: MarklessExecutionLogMode;
 	readonly inlineResumerSources?: InlineResumerSourceVariants;
 	readonly prerenderBoot?: PrerenderBootArtifact;
@@ -497,6 +498,7 @@ export function emitSourceModule(input: {
 					executionLog: input.executionLog,
 					headInjections: input.headInjections,
 					storageSeeds: input.storageSeeds,
+					storageSeedImports: input.storageSeedImports,
 					inlineResumerSources: input.inlineResumerSources,
 					prerenderBoot: input.prerenderBoot,
 					sharedInlineSources: sharedInlineSources(input),
@@ -1245,6 +1247,7 @@ function emitCompiledAppDefault(input: {
 		readonly location: 'head' | 'body';
 	}>;
 	readonly storageSeeds?: ReadonlyArray<StorageSeedMetadata>;
+	readonly storageSeedImports?: ReadonlyArray<string>;
 	readonly resumeModuleUrl?: string;
 	readonly prerenderWakeModuleUrl?: string;
 	readonly rootExportName: string | null;
@@ -1328,10 +1331,17 @@ function emitCompiledAppDefault(input: {
 		input.headInjections?.length && input.environment !== 'client'
 			? [`	headInjections: ${JSON.stringify(input.headInjections)},`]
 			: [];
-	const storageSeedEntry =
-		input.storageSeeds?.length && input.environment !== 'client'
-			? [`\tstorageSeeds: ${JSON.stringify(input.storageSeeds)},`]
-			: [];
+	const storageSeedImports = input.storageSeedImports ?? [];
+	const servesStorageSeeds =
+		(!!input.storageSeeds?.length || storageSeedImports.length > 0) && input.environment !== 'client';
+	const storageSeedImportLines = servesStorageSeeds
+		? storageSeedImports.map(
+				(source, index) => `import marklessStorageSeedChild${index} from ${JSON.stringify(source)};`,
+			)
+		: [];
+	const storageSeedEntry = servesStorageSeeds
+		? [`\tstorageSeeds: ${storageSeedsSource(input.storageSeeds ?? [], storageSeedImports.length)},`]
+		: [];
 	const modulePreloadEntry =
 		input.resumeModuleUrl && input.environment === 'server'
 			? [
@@ -1356,6 +1366,7 @@ function emitCompiledAppDefault(input: {
 				];
 
 	return [
+		...storageSeedImportLines,
 		'const marklessCompiledApp = {',
 		...renderCsrEntry,
 		...renderDataEntry,
@@ -1397,6 +1408,19 @@ const RESERVED_MODULE_BINDINGS: ReadonlySet<string> = new Set([
 	'readMarklessBehaviorSourceSymbol',
 	'resumeContainerEvent',
 ]);
+
+// A composing page lists its children's seeds after its own, once per slot.
+function storageSeedsSource(own: ReadonlyArray<StorageSeedMetadata>, childCount: number): string {
+	if (childCount === 0) return JSON.stringify(own);
+	const entries = [
+		...own.map((seed) => JSON.stringify(seed)),
+		...Array.from(
+			{ length: childCount },
+			(_, index) => `...(marklessStorageSeedChild${index}.storageSeeds ?? [])`,
+		),
+	];
+	return `[...new Map([${entries.join(', ')}].map((seed) => [seed.slotKey, seed])).values()]`;
+}
 
 /**
  * One real ES named export per component the module serves, so plain ESM reaches

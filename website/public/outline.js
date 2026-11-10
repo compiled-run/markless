@@ -66,6 +66,8 @@ class MarklessOutline extends HTMLElement {
 			else if (linkBounds.top < bounds.top) rail.scrollTop -= bounds.top - linkBounds.top + 8;
 		};
 		const schedule = () => {
+			// While the sidebar slides, the column only moves; read the headings once it has settled.
+			if (document.documentElement.hasAttribute('data-sidebar-sliding')) return void setTimeout(schedule, 120);
 			if (!frame) frame = requestAnimationFrame(update);
 		};
 		for (const { link } of entries) link.title = link.textContent.trim();

@@ -1,0 +1,203 @@
+{
+	"version": 1,
+	"platform": "linux-x64",
+	"margin": {
+		"cpu": 0.204,
+		"rss": 0.079,
+		"samples": {
+			"1/3": [
+				{
+					"run": "42842994876",
+					"attempt": 1,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 780.1,
+					"calibrationS": 1.233,
+					"work": 632.7,
+					"peakRssMb": 4118,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 6,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 1011.5,
+					"calibrationS": 1.341,
+					"work": 754.3,
+					"peakRssMb": 3881,
+					"cpuModel": "AMD EPYC 7763 64-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 7,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 681.9,
+					"calibrationS": 1.143,
+					"work": 596.6,
+					"peakRssMb": 4129,
+					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 8,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 806.9,
+					"calibrationS": 1.3,
+					"work": 620.7,
+					"peakRssMb": 4448,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				}
+			],
+			"2/3": [
+				{
+					"run": "42842994876",
+					"attempt": 1,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 648.7,
+					"calibrationS": 1.283,
+					"work": 505.6,
+					"peakRssMb": 4457,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 10,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 545.8,
+					"calibrationS": 1.064,
+					"work": 513,
+					"peakRssMb": 4465,
+					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 9,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 637.2,
+					"calibrationS": 1.213,
+					"work": 525.3,
+					"peakRssMb": 4324,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				}
+			],
+			"3/3": [
+				{
+					"run": "42842994876",
+					"attempt": 1,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 1078.2,
+					"calibrationS": 1.356,
+					"work": 795.1,
+					"peakRssMb": 4272,
+					"cpuModel": "AMD EPYC 7763 64-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 2,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 703.3,
+					"calibrationS": 1.003,
+					"work": 701.2,
+					"peakRssMb": 3963,
+					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 3,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 848.1,
+					"calibrationS": 1.271,
+					"work": 667.3,
+					"peakRssMb": 4378,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 4,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 857.7,
+					"calibrationS": 1.404,
+					"work": 610.9,
+					"peakRssMb": 4228,
+					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
+				},
+				{
+					"run": "42842994876",
+					"attempt": 5,
+					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
+					"cpuS": 859.7,
+					"calibrationS": 1.038,
+					"work": 828.2,
+					"peakRssMb": 4354,
+					"cpuModel": "INTEL(R) XEON(R) PLATINUM 8573C"
+				}
+			]
+		}
+	},
+	"anchors": {
+		"calibrationS": 1.371,
+		"cpuS": 2659.9,
+		"peakRssMb": 4367,
+		"shards": {
+			"1/3": {
+				"cpuS": 884,
+				"peakRssMb": 4078
+			},
+			"2/3": {
+				"cpuS": 782.1,
+				"peakRssMb": 4367
+			},
+			"3/3": {
+				"cpuS": 993.8,
+				"peakRssMb": 4338
+			}
+		},
+		"runs": [
+			"42802493087"
+		],
+		"sha": "0ae70e4224dacc75ebad7ad6d0971858b231e2bc"
+	},
+	"history": [
+		{
+			"date": "2026-11-10",
+			"change": "margin",
+			"from": null,
+			"to": {
+				"cpu": 0.138,
+				"rss": 0.032
+			},
+			"runs": [
+				"42802493087"
+			],
+			"reason": "12 green CI measurements of one test set (4 per shard, run 42802493087 attempts 1-10) on AMD EPYC 7763, 9V45, 9V74 and Intel Xeon 8573C runners"
+		},
+		{
+			"date": "2026-11-10",
+			"change": "anchors",
+			"from": null,
+			"to": {
+				"cpuS": 2659.9,
+				"peakRssMb": 4367
+			},
+			"runs": [
+				"42802493087"
+			],
+			"reason": "first anchors: the median of 4 green CI measurements per shard on 7fc7475fa, the tree this guardrail landed on"
+		},
+		{
+			"date": "2026-11-10",
+			"change": "margin",
+			"from": {
+				"cpu": 0.138,
+				"rss": 0.032
+			},
+			"to": {
+				"cpu": 0.204,
+				"rss": 0.079
+			},
+			"runs": [
+				"42842994876"
+			],
+			"reason": "12 green CI measurements of one test set (main eb049036d, run 42842994876 attempts 1-10: 4 samples of shard 1, 3 of shard 2, 5 of shard 3) on AMD EPYC 7763, 9V45, 9V74 and Intel Xeon 8573C runners; the first margin came from 4 samples a shard and same-tree peak RSS ranged 3881-4448 MB on shard 1"
+		}
+	]
+}

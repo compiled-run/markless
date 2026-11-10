@@ -20,6 +20,7 @@ Agents: before writing any check, scan, probe or rewrite over code or build outp
 ## CI discipline
 
 CI exists to catch real defects. Never make a check pass by weakening it: no skipping, deleting, loosening assertions, adding retries, or raising a budget without a measured, stated reason. When a check fails, classify it before touching it (environment or config drift, a regression you introduced, a failure that was already there, or nondeterminism) and fix the root cause; a flaky test gets its nondeterminism fixed (random ports, awaited readiness, no wall-clock races), or is quarantined in `docs/ci-process.md` with an owner and an expiry date.
+A unit test that builds an app or launches a browser is declared in scripts/ci/heavy-tests.json; the placement check and the CI unit CPU budget fail otherwise, and raising a budget needs a measured reason.
 Never commit with `--no-verify` or bypass `.githooks`. Never push onto a red `main` except the change that makes it green. Before reporting work done, the pull request's CI run on your tree must be green; a local pass of an ad hoc subset is not a receipt. See `docs/ci-process.md`.
 
 Protocol and config facts are imported from their owning package, never restated as literals.

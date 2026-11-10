@@ -115,7 +115,7 @@ const POSTURE_CONDITIONAL_ALLOWLIST: Readonly<Record<string, string>> = {
 		'Compiled app metadata exposes the prerender settle boot only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.headInjections?.length && input.environment !== 'client'":
 		'Compiled app metadata exposes document head injections only from non-client output.',
-	"packages/bundler/src/source-module.ts :: input.storageSeeds?.length && input.environment !== 'client'":
+	"packages/bundler/src/source-module.ts :: (!!input.storageSeeds?.length || storageSeedImports.length > 0) && input.environment !== 'client';":
 		'Compiled app metadata exposes storage seeds only from non-client output.',
 	"packages/bundler/src/source-module.ts :: input.resumeModuleUrl && input.environment === 'server'":
 		'Compiled app metadata emits module preloads from server output.',
