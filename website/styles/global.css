@@ -71,6 +71,9 @@
 		--grain-fiber-opacity: 0.08;
 		--grain-speck-blend: normal;
 		--grain-speck-opacity: 0.25;
+		--shadow-x: -0.06em;
+		--shadow-y: 0.06em;
+		--shadow-under: oklch(17% 0.012 90);
 		--sprite-light: none;
 		--sprite-dark: inline-block;
 		--figure-sheet: var(--code-surface);
@@ -80,11 +83,6 @@
 		--highlight: oklch(80% 0.15 85);
 		--figure-ring: oklch(72% 0.14 35);
 		/* Cream letters need a darker-than-page layer beyond the pastel to stay apart from it. */
-		--shadow-h1: oklch(17% 0.012 90);
-		--shadow-h2: oklch(17% 0.012 90);
-		--shadow-h3: oklch(17% 0.012 90);
-		--shadow-x: -0.07em;
-		--shadow-y: 0.07em;
 	}
 }
 
@@ -291,10 +289,6 @@ h1:where(:not(.code-stage *)) {
 	font-size: var(--step-5);
 	--shadow-color: var(--shadow-h1);
 	line-height: 115%;
-
-	html.dark & {
-		color: var(--pink);
-	}
 }
 
 /* Paper grain over the whole page. Absolute, not fixed: a fixed layer with a
@@ -548,10 +542,6 @@ markless-outline { display: contents; }
 	--shadow-color: var(--shadow-h2);
 	margin-top: calc(var(--space-2xl) * 1.5);
 	margin-bottom: var(--space-s);
-
-	html.dark & {
-		color: var(--purple);
-	}
 }
 
 .prose h2:has(+ .keyboard-study) {
@@ -565,10 +555,6 @@ markless-outline { display: contents; }
 	--shadow-color: var(--shadow-h3);
 	margin-top: var(--space-m);
 	margin-bottom: var(--space-xs);
-
-	html.dark & {
-		color: var(--green-soft);
-	}
 }
 
 .prose a:where(:not(.code-stage *)) {
