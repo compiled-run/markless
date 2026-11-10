@@ -58,8 +58,9 @@
 	--syntax-var: #e36209;
 	--syntax-comment: #6a737d;
 	--shadow-h1: var(--pink);
-	--shadow-h2: var(--purple);
-	--shadow-h3: var(--green-soft);
+	--shadow-h2: var(--pink);
+	--shadow-h3: var(--pink);
+	--link-underline: var(--pink);
 	color-scheme: light;
 
 	/* Dark: ink and paper swap; the accents stay exactly as in light. */
@@ -83,8 +84,9 @@
 		--grain-speck-blend: normal;
 		--grain-speck-opacity: 0.25;
 		--shadow-h1: oklch(62% 0.07 315);
-		--shadow-h2: oklch(62% 0.07 240);
-		--shadow-h3: oklch(62% 0.07 135);
+		--shadow-h2: oklch(62% 0.07 315);
+		--shadow-h3: oklch(62% 0.07 315);
+		--link-underline: color-mix(in srgb, var(--ink) 55%, transparent);
 		--shadow-x: -0.06em;
 		--shadow-y: 0.06em;
 		--sprite-light: none;
@@ -99,12 +101,12 @@
 		--figure-ok: oklch(80% 0.13 150);
 		--wood: var(--slab);
 		--figure-kraft: var(--slab);
-		--syntax-kw: var(--pink);
-		--syntax-fn: var(--purple);
-		--syntax-str: var(--yellow);
-		--syntax-tag: var(--green-soft);
-		--syntax-num: color-mix(in oklch, var(--yellow) 50%, var(--cream));
-		--syntax-var: color-mix(in oklch, var(--pink) 45%, var(--cream));
+		--syntax-kw: oklch(78% 0.07 350);
+		--syntax-fn: oklch(78% 0.07 315);
+		--syntax-str: oklch(84% 0.07 95);
+		--syntax-tag: oklch(80% 0.07 135);
+		--syntax-num: oklch(84% 0.05 65);
+		--syntax-var: oklch(84% 0.05 30);
 		--syntax-comment: color-mix(in oklch, var(--ink) 66%, var(--paper));
 		/* Cream letters need a darker-than-page layer beyond the pastel to stay apart from it. */
 	}
@@ -583,7 +585,7 @@ markless-outline { display: contents; }
 
 .prose a:where(:not(.code-stage *)) {
 	color: var(--ink);
-	text-decoration-color: var(--pink);
+	text-decoration-color: var(--link-underline);
 	text-decoration-thickness: 0.12em;
 	text-underline-offset: 0.16em;
 }
