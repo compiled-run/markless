@@ -140,6 +140,29 @@ describe('module edges', () => {
 			'pkg/test/spawn.test.ts',
 		]);
 	});
+
+	test('a test that runs a script by path from import.meta.dirname is selected when the script or its imports change', async () => {
+		const files = {
+			'pkg/src/util.ts': 'export const util = 1;',
+			'pkg/scripts/build.ts': "import { util } from '../src/util.ts'; util;",
+			'pkg/scripts/other.ts': 'export {};',
+			'pkg/test/resolve.test.ts':
+				"import { resolve } from 'node:path'; spawn(resolve(import.meta.dirname, '../scripts/build.ts'));",
+			'pkg/test/join.test.ts':
+				"import { join as at } from 'pathe'; spawn(at(import.meta.dirname, '..', `scripts/build.ts`));",
+			'pkg/test/local.test.ts':
+				"const resolve = (...parts: string[]) => parts.join('/'); resolve(import.meta.dirname, '../scripts/other.ts');",
+			'pkg/test/computed.test.ts':
+				"import { resolve } from 'node:path'; const name = 'other'; resolve(import.meta.dirname, `../scripts/${name}.ts`);",
+		};
+		const spawners = ['pkg/test/join.test.ts', 'pkg/test/resolve.test.ts'];
+		expect(await select({ files }, ['pkg/scripts/build.ts'])).toEqual({
+			tests: spawners,
+			runAll: null,
+		});
+		expect((await select({ files }, ['pkg/src/util.ts'])).tests).toEqual(spawners);
+		expect((await select({ files }, ['pkg/scripts/other.ts'])).tests).toEqual([]);
+	});
 });
 
 describe('computed specifiers with static parts', () => {

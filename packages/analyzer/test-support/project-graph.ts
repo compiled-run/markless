@@ -729,7 +729,12 @@ export async function createProjectGraph(input: ProjectGraphInput): Promise<Proj
 	graph = new ProjectGraph(analyzer, input.tracked);
 	for (const [path, source] of input.files) {
 		const module = analyzer.setFile(path, source);
-		scanImportSites(graph, module, { resolve, templateTargets, globTargets });
+		scanImportSites(graph, module, {
+			resolve,
+			templateTargets,
+			globTargets,
+			tracked: input.tracked,
+		});
 	}
 	for (const declaration of input.declarations ?? DYNAMIC_IMPORT_DECLARATIONS)
 		declare(declaration);
@@ -747,13 +752,41 @@ type ImportSites = {
 	) => string[] | null;
 	/** Tracked files an `import.meta.glob` pattern list matches; null for a pattern with no known root. */
 	globTargets: (importer: string, patterns: string[]) => string[] | null;
+	tracked: ReadonlySet<string>;
 };
 
 const isPlainLiteral = (node: AstNode | undefined) =>
 	node?.type === 'Literal' ||
 	(node?.type === 'TemplateLiteral' && node.expressions?.length === 0);
 
-// Reads AST facts the import records lack: computed import targets, globs and `new URL(..., import.meta.url)` files.
+const PATH_MODULES = new Set(['node:path', 'path', 'pathe']);
+
+/** `resolve(import.meta.dirname, 'helpers/build.ts')` with `resolve` or `join` from a path module: a file the module runs by path, such as a spawned script. */
+const spawnedScriptTarget = (
+	module: Module,
+	node: AstNode,
+	tracked: ReadonlySet<string>,
+): string | null => {
+	const callee = node.callee as AstNode;
+	if (callee.type !== 'Identifier') return null;
+	const binding = module.referenceOf(callee as never)?.binding;
+	if (!binding) return null;
+	const imported = module.imports.find((record) => record.local?.id === binding.id);
+	if (
+		!imported ||
+		!PATH_MODULES.has(imported.specifier) ||
+		!['resolve', 'join'].includes(imported.name ?? '')
+	)
+		return null;
+	const [first, ...rest] = node.arguments as AstNode[];
+	if (!isImportMetaMember(first, 'dirname') || first.computed || rest.length === 0) return null;
+	const parts = rest.map((part) => (isPlainLiteral(part) ? specifierParts(part)![0] : null));
+	if (parts.some((part) => part === null)) return null;
+	const target = posix.normalize(posix.join(posix.dirname(module.path), ...(parts as string[])));
+	return isCodePath(target) && tracked.has(target) ? target : null;
+};
+
+// Reads AST facts the import records lack: computed import targets, globs, `new URL(..., import.meta.url)` files and scripts run by path.
 const scanImportSites = (graph: ProjectGraph, module: Module, sites: ImportSites) => {
 	const opaque: string[] = [];
 	const link = (targets: string[] | null, label: string) => {
@@ -771,6 +804,8 @@ const scanImportSites = (graph: ProjectGraph, module: Module, sites: ImportSites
 	for (const node of module.findAll('CallExpression') as AstNode[]) {
 		const callee = node.callee as AstNode;
 		const [first] = node.arguments as AstNode[];
+		const script = spawnedScriptTarget(module, node, sites.tracked);
+		if (script && script !== module.path) graph.addExtraEdge(module.path, script);
 		if (isImportMetaMember(callee, 'glob')) {
 			const patterns = (first?.type === 'ArrayExpression' ? first.elements : [first]).map(
 				(element: AstNode | undefined) => specifierParts(element),

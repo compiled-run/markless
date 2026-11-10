@@ -2,8 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join, matchesGlob, posix } from 'node:path';
-import type { Module } from 'yuku/analyzer';
+import { dirname, join, matchesGlob } from 'node:path';
 import {
 	createProjectGraph,
 	isCodePath,
@@ -33,47 +32,6 @@ export type ClosureGraph = {
 	packageImports: ReadonlyMap<string, readonly { from: string; name: string | null }[]>;
 	tracked: ReadonlySet<string>;
 	rounds: number;
-};
-
-type AstNode = { type: string; [key: string]: any };
-
-const PATH_MODULES = new Set(['node:path', 'path', 'pathe']);
-
-const isImportMetaDirname = (node: AstNode | undefined) =>
-	node?.type === 'MemberExpression' &&
-	node.object?.type === 'MetaProperty' &&
-	node.object.meta?.name === 'import' &&
-	node.object.property?.name === 'meta' &&
-	!node.computed &&
-	node.property?.name === 'dirname';
-
-const stringValue = (node: AstNode | undefined): string | null => {
-	if (node?.type === 'Literal' && typeof node.value === 'string') return node.value;
-	if (node?.type === 'TemplateLiteral' && node.expressions?.length === 0)
-		return node.quasis[0].value.cooked;
-	return null;
-};
-
-/** `resolve(import.meta.dirname, 'helpers/build.ts')` with `resolve` or `join` from a path module: the file a test spawns. */
-const pathLiteralTargets = (module: Module, tracked: ReadonlySet<string>): string[] => {
-	const targets: string[] = [];
-	for (const node of module.findAll('CallExpression') as AstNode[]) {
-		const callee = node.callee as AstNode;
-		if (callee.type !== 'Identifier' || !['resolve', 'join'].includes(callee.name)) continue;
-		const binding = module.referenceOf(callee as never)?.binding;
-		if (!binding) continue;
-		const imported = module.imports.find((record) => record.local?.id === binding.id);
-		if (!imported || !PATH_MODULES.has(imported.specifier)) continue;
-		const [first, ...rest] = node.arguments as AstNode[];
-		if (!isImportMetaDirname(first) || rest.length === 0) continue;
-		const parts = rest.map(stringValue);
-		if (parts.some((part) => part === null)) continue;
-		const target = posix.normalize(
-			posix.join(posix.dirname(module.path), ...(parts as string[])),
-		);
-		if (isCodePath(target) && tracked.has(target)) targets.push(target);
-	}
-	return targets;
 };
 
 const git = (root: string, args: string[]) =>
@@ -122,9 +80,7 @@ export async function closureOf(
 		const next = new Set<string>();
 		for (const path of files.keys()) {
 			const module = graph.analyzer.module(path)!;
-			const targets = [
-				...new Set([...graph.dependenciesOf(path), ...pathLiteralTargets(module, tracked)]),
-			];
+			const targets = [...new Set(graph.dependenciesOf(path))];
 			edges.set(path, targets);
 			packageImports.set(
 				path,
