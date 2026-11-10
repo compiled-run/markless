@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'pathe';
@@ -214,4 +215,50 @@ test('retiring returns once the compile processes have exited, their store write
 		readdirSync(directory, { recursive: true }).some((name) => String(name).endsWith('.bin')),
 	).toBe(true);
 	await pool.close();
+});
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+test('a build that never queues more compiles than its online workers take starts one process', async () => {
+	await retireCompileWorkers();
+	const pool = await onlinePool({ size: 4 });
+	for (const name of ['One', 'Two', 'Three', 'Four', 'Five', 'Six'])
+		expect(await pool.run(input(name), name)).toBeDefined();
+	await sleep(300);
+	expect(compileWorkerPids()).toHaveLength(1);
+	await pool.close();
+	await retireCompileWorkers();
+});
+
+test('a module graph that keeps compiles waiting grows the pool to its full size, and no further', async () => {
+	await retireCompileWorkers();
+	// A process's compile pool is as large as the largest size any build in it asked for.
+	const size = 4;
+	const pool = await onlinePool({ size });
+	let most = 0;
+	const watch = setInterval(() => (most = Math.max(most, compileWorkerPids().length)), 5);
+	const names = Array.from({ length: 400 }, (_, index) => `Graph${index}`);
+	await Promise.all(names.map((name) => pool.run(input(name), name)));
+	clearInterval(watch);
+	most = Math.max(most, compileWorkerPids().length);
+	expect(most).toBe(size);
+	await pool.close();
+	await retireCompileWorkers();
+});
+
+test('a compile process starts no build workers of its own', async () => {
+	await retireCompileWorkers();
+	const pool = await onlinePool({ size: 4 });
+	const names = Array.from({ length: 200 }, (_, index) => `Nested${index}`);
+	await Promise.all(names.map((name) => pool.run(input(name), name)));
+	const workers = new Set(compileWorkerPids());
+	expect(workers.size).toBeGreaterThan(0);
+	const children = execFileSync('ps', ['-axo', 'pid=,ppid='], { encoding: 'utf8' })
+		.trim()
+		.split('\n')
+		.map((line) => line.trim().split(/\s+/).map(Number))
+		.filter(([, parent]) => workers.has(parent!));
+	expect(children).toEqual([]);
+	await pool.close();
+	await retireCompileWorkers();
 });
