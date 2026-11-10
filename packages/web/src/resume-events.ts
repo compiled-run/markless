@@ -13,7 +13,11 @@ import {
 } from './fns/instance-scope.ts';
 import { marklessCodedError } from './coded-error.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
-import { marklessEditableControl, marklessNoteControlEdits } from './control-edit-hold.ts';
+import {
+	marklessControlEditsRead,
+	marklessEditableControl,
+	marklessNoteControlEdits,
+} from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
@@ -564,6 +568,7 @@ export function createEventWiring(input: {
 			throw unmatchedDispatchError(event, selector);
 		}
 		if (!options.syncPolicyAlreadyApplied && runPolicy) {
+			marklessControlEditsRead(event);
 			applyPolicies(path, event);
 			options.syncPolicyAlreadyApplied = true;
 		}
@@ -704,8 +709,10 @@ export function createEventWiring(input: {
 			readonly locals?: Record<string, unknown>;
 		}>,
 	): Promise<void> {
-		if (record.syncPolicy && !options.syncPolicyAlreadyApplied)
+		if (record.syncPolicy && !options.syncPolicyAlreadyApplied) {
+			marklessControlEditsRead(event);
 			runPolicy?.(record.syncPolicy, input.graph, event);
+		}
 		let activeSymbolId: string | undefined;
 		const report = (error: unknown, symbolId: string | undefined) =>
 			input.reportRuntimeError(error, {
@@ -740,6 +747,7 @@ export function createEventWiring(input: {
 					loud = context.userActionToken?.open === true;
 					if (loud) graph.markUserActionStart?.();
 					else graph.markQuietStart?.();
+					marklessControlEditsRead(event);
 					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && marklessIsBoundSymbolId(symbolId)
