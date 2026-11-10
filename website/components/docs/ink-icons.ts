@@ -241,7 +241,8 @@ export const ICONS = {
 	bell: path(blob(12, 12, (x, y) => (inCircle(x, y, 12, 10.2, 6.6) && y <= 10.2) || (y > 10.2 && y <= 16.6 && Math.abs(x - 12) <= 6.6 + (y - 10.2) * 0.3) || (y > 16.6 && y <= 18.4 && Math.abs(x - 12) <= 9.6)), circle(12, 2.2, 1.2), arc(12, 19.6, 2.4, 0, 180)),
 	copy: path(bar([[5.8, 16.6], [4, 16.6], [2.6, 15.2], [2.6, 3.4], [4, 2], [13.4, 2], [14.8, 3.4], [14.8, 5]], 1.7), frame(8, 7, 14, 15.6, 1.7, 1.6), rect(11, 11.4, 8, 1.7, 0.85), rect(11, 15.4, 5.6, 1.7, 0.85)),
 	copied: path(bar([[2.6, 12.6], [5.6, 15.2], [8.8, 18.8], [12, 13.6], [16.2, 8.4], [21.4, 4.4]], 3.2)),
+	'sidebar-panel': path(frame(1.5, 3, 21, 18, 1.5, 1.4), rect(3.8, 5.3, 5.4, 13.4, 0.6)),
 };
 
 /** Marks a control shows rather than a page, so no `nav.ts` entry names them. */
-export const BUTTON_MARKS = ['copy', 'copied'] as const satisfies readonly (keyof typeof ICONS)[];
+export const BUTTON_MARKS = ['copy', 'copied', 'sidebar-panel'] as const satisfies readonly (keyof typeof ICONS)[];
