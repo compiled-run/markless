@@ -398,8 +398,18 @@ export async function settleAsyncBoundaryRange(
 		boundary.runnerGraphNodeId === null
 			? status
 			: input.graph.read(boundary.runnerGraphNodeId, ['status']);
+	// The runner can be a sync computed with no status, so the async values the boundary reads (those with a runner symbol) are checked too.
+	const newerRunPending = () =>
+		runnerStatus() === 'pending' ||
+		boundary.asyncReads.some(
+			(read) => !!read.runnerSymbolId && input.graph.read(read.graphNodeId, ['status']) === 'pending',
+		);
 	// A newer run that started while this settle waited or rendered owns the boundary: its own settle commits, and the hold keeps what is shown.
-	if ((await input.settleTracker?.waitOutCommitHold()) === true && runnerStatus() !== status) return;
+	if (
+		(await input.settleTracker?.waitOutCommitHold()) === true &&
+		(runnerStatus() !== status || newerRunPending())
+	)
+		return;
 	// A refresh over the shown @try arm updates it in place: its bindings, branches, rows and nested blocks follow the graph.
 	if (
 		status === 'fulfilled' &&
@@ -436,7 +446,7 @@ export async function settleAsyncBoundaryRange(
 	// bundler gave component edges (fns/composed-arm-records).
 	if (source === 'renderAsyncBoundary') {
 		const rendered = await input.renderAsyncBoundary!(boundary.id, status, input.graph);
-		if (runnerStatus() === 'pending' || claim?.() === false) return;
+		if (newerRunPending() || claim?.() === false) return;
 		const armRecords = boundaryArmRecordSet(rendered.armRecords);
 		if (!armRecords) throw emptySettleRenderError(boundary.id);
 		await commit({
@@ -455,7 +465,7 @@ export async function settleAsyncBoundaryRange(
 		asyncBoundary: boundary,
 	});
 	if (!isResumeBranchUpdate(update)) throw emptySettleRenderError(boundary.id);
-	if (runnerStatus() === 'pending') return;
+	if (newerRunPending()) return;
 	if (input.commitArm) {
 		const rawArmRecords = (update as { readonly armRecords?: unknown }).armRecords;
 		const plannedArmRecords = Array.isArray(boundary.armRecords)
