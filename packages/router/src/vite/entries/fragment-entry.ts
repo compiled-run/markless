@@ -1129,7 +1129,7 @@ export async function navigate(
 	};
 	const started = w.performance.now();
 	const restored = mode === 'traverse' && state.visited.has(pageKey(url));
-	const taken = take(state, url, mode === 'traverse', askedAt ?? started);
+	let taken = take(state, url, mode === 'traverse', askedAt ?? started);
 	// The next page is served with shared() defaults; once a runtime has bound an instance it takes the
 	// live values before it is shown. A document whose instances hold no values swaps in this task.
 	const [sharedProperty, resumeAttribute] = state.config.sharedInstances;
@@ -1153,14 +1153,20 @@ export async function navigate(
 	keptSwapping?.catch(() => {});
 	const abandon = () => taken.abort();
 	let fetched: FragmentFetched;
-	try {
-		fetched = await taken.result;
-	} catch {
-		// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
-		w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
-		return;
+	for (let again = false; ; again = true) {
+		try {
+			fetched = await taken.result;
+		} catch {
+			// Leaving the document aborts the fetch a few ms before pagehide, which makes this navigation stale.
+			w.setTimeout(() => stale() || fallback(url.href), state.config.pendingDeadlineMs);
+			return;
+		}
+		if (stale()) return abandon();
+		// A write since the fetch began may change the page: fetch it once more, never in a loop.
+		if (again || taken.writes === state.writes) break;
+		abandon();
+		taken = state.request(url, false);
 	}
-	if (stale()) return abandon();
 	let arrived = !fetched.rest;
 	if (fetched.rest) {
 		const held = await holdStream(
