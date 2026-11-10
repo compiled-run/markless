@@ -49,6 +49,7 @@ import {
 	INLINE_PAGE_SCOPED,
 	type InlineResumerPage,
 	type InlineResumerSourceVariants,
+	type InlineWakeSources,
 	type PrerenderBootArtifact,
 } from './inline/resumer.ts';
 import { createInlineDeferTriggerSource, inlineDeferSource } from './inline/defer.ts';
@@ -294,10 +295,13 @@ export async function assembleSsrContainer(
 					true,
 					overlayPrimer,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, selectedResumeModuleUrl)) +
+						(selfWake
+							? ''
+							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
 						sharedWakeSource(state) +
-						returnWakeSource(view, selectedResumeModuleUrl),
+						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes),
 					artifactSources?.defer,
+					artifactSources?.wakes,
 				)
 			: '';
 	const policyTable = createSyncPolicyTable();
@@ -364,6 +368,7 @@ export async function assemblePrerenderPageParts(
 	const eventNames = browserEventNames(view);
 	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
 	const boot = artifactPrerenderBoot(component);
+	const wakes = artifactInlineResumerSources(component)?.wakes;
 	// The settle path replaces the self-wake: it fills the arm from the plan and
 	// never imports the resume module, so a page only takes it when the build
 	// produced BOTH the plan this document ships and the settle module it needs.
@@ -388,10 +393,11 @@ export async function assemblePrerenderPageParts(
 					!boot,
 					false,
 					deferredTriggerSource(view) +
-						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl)) +
+						(selfWake ? '' : storageWakeSource(state, resumeModuleUrl, wakes)) +
 						sharedWakeSource(state) +
-						returnWakeSource(view, resumeModuleUrl),
+						returnWakeSource(view, resumeModuleUrl, wakes),
 					artifactInlineResumerSources(component)?.defer,
+					wakes,
 				)
 			: '';
 
@@ -585,10 +591,14 @@ function sharedWakeSource(state: ProtocolStatePayload): string {
 		: '';
 }
 
-function returnWakeSource(view: ProtocolViewPayload, resumeModuleUrl: string | undefined): string {
+function returnWakeSource(
+	view: ProtocolViewPayload,
+	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
+): string {
 	return Object.keys(view.asyncRunners ?? {}).length > 0 ||
 		view.asyncBoundaries.some((boundary) => boundary.asyncReads.some((read) => !!read.runnerSymbolId))
-		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY)
+		? createInlineResumerReturnWakeSource(resumeModuleUrl, CONTAINER_REASK_PROPERTY, wakes)
 		: '';
 }
 
@@ -596,6 +606,7 @@ function returnWakeSource(view: ProtocolViewPayload, resumeModuleUrl: string | u
 function storageWakeSource(
 	state: ProtocolStatePayload,
 	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
 ): string {
 	const rendered = (state.storage ?? []).flatMap((record) => {
 		const value = renderedCellValue(
@@ -610,6 +621,7 @@ function storageWakeSource(
 		resumeModuleUrl,
 		STORAGE_SLOT_SYMBOL_KEY,
 		escapeScriptJson(JSON.stringify(rendered)),
+		wakes,
 	);
 }
 
@@ -1178,6 +1190,7 @@ function renderInlineResumerScript(
 	overlayPrimer = false,
 	appendedSource = '',
 	deferFactory?: string,
+	wakes?: InlineWakeSources,
 ): string {
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	const resumeModuleAttribute = resumeModuleUrl
@@ -1188,7 +1201,7 @@ function renderInlineResumerScript(
 		: '';
 	const selfWakeAttribute = selfWake ? ' data-markless-self-wake' : '';
 	const selfWakeSource =
-		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl) : '';
+		selfWake && appendSelfWakeSource ? createInlineResumerSelfWakeSource(resumeModuleUrl, wakes) : '';
 	const overlayPrimerSource = overlayPrimer
 		? createInlineResumerOverlayPrimerSource(resumeModuleUrl)
 		: '';
