@@ -1,8 +1,15 @@
 # 12. Arm Rendering: Update Escalation Ladder, Arm-Relative Coordinates, Out-of-Order Streaming
 
-Status: DRAFT (ratified design, implementation in progress — goals/arm-rendering)
-Ratified with owner: 2026-07-07. Source discussion: dashboard-migration goal,
-15-need ledger. Working research notes: goals/arm-rendering/notes/.
+Status: Ratified and implemented. Checked against main on 2026-11-10 (b79a5bab0).
+Ratified with owner: 2026-07-07; D8 ratified 2026-07-08 and revised 2026-10-25,
+2026-11-04 and 2026-11-06. The ladder, arm-relative records, streaming and
+client navigation landed through goals/arm-rendering; the async error and
+refresh model in D8 landed in #540 (2026-11-09), with #257 (refreshes keep
+content), #397 (reads after an await join the key), #510 (an `@try` in a row
+added after load) and #586 (a `@try` whose code loads after a click). Source
+discussion: dashboard-migration goal, 15-need ledger. Research notes:
+goals/arm-rendering/notes/ and goals/async-dx/notes/. Unresolved work is listed
+under "Open items" at the end.
 
 ## Motivation
 
@@ -59,7 +66,9 @@ the chosen arm from compiled markup and never escalates for the chain itself.
 ## D2. Escalation is never silent
 
 If tier 3 cannot handle a flip (e.g. the @if contains a component), the
-compiler escalates AND emits a diagnostic with a restructure suggestion. The
+compiler escalates AND emits a diagnostic with a restructure suggestion
+(`MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER`, a warning naming the component it
+runs); the flip still replaces only the `@if`'s own range. The
 sharp edge (a toggle wiping sibling DOM state) may only exist where a
 diagnostic already said so. Silent failure is a defect class.
 
@@ -89,8 +98,12 @@ The server flushes the document with each still-pending boundary showing its
 open. When a boundary settles, the server appends to the same stream:
 
     <template m:arm="boundary:N">settled arm html</template>
-    <script type="markless/arm">arm records (arm-relative)</script>
-    <script>__mArm("boundary:N")</script>
+    <script type="markless/arm" data-boundary="boundary:N">arm records (arm-relative)</script>
+    <script type="markless/state-patch" data-graph-node="...">incremental state patch</script>
+    <script>__mArm("boundary:N", [boundaries it depends on])</script>
+
+The dependency list is present only when the boundary reads another
+boundary's async values; the executor uses it to order reveals (D8).
 
 The template parses inert (the browser builds its DOM without rendering it);
 the once-installed executor moves that content into the boundary's anchor
@@ -112,7 +125,8 @@ registration above.
 ## D6. Sequencing and defaults (amended 2026-07-07, owner ruling)
 
 Client-side primitive first (tiers 3-4, commitArm); streaming after it proves
-out. Streaming additionally requires incremental snapshot serialization.
+out. Streaming additionally requires incremental snapshot serialization. Both
+shipped in that order; the state patch is the incremental serialization.
 Ordering groups (parallel/sequential/reverse) are a deferred nicety.
 
 STREAMING IS THE DEFAULT SSR POSTURE. Blocking the whole page on every async
@@ -134,12 +148,15 @@ decide):
 
 ## D7. Navigation
 
-The router routes CLIENT-SIDE: dispatchRouteUpdate -> renderCsr -> boundaries
-settle via commitArm. The document.write/server-HTML-swap navigation
-(2026-07-07, superseded) and its machinery — swap-pending flag, rendered-route
-meta, before-document-swap teardown — are deleted when tier 4 lands. The Link
-component owns SPA navigation; plain-anchor hash special-casing is removed
-once component-in-row lands and apps can use Link everywhere.
+The router routes CLIENT-SIDE: dispatchRouteUpdate -> the route renderer
+renders the destination in the browser -> boundaries settle via commitArm,
+under the navigation hold in D8. The document.write/server-HTML-swap
+navigation (2026-07-07, superseded) and its machinery (swap-pending flag,
+rendered-route meta, before-document-swap teardown) are deleted. The Link
+component owns SPA navigation; Back and Forward are client navigations too.
+A plain anchor to a path is a document load. The one plain-anchor case the
+router takes is a hash change toward a `#/...` route path in a hash-routed
+app; any other hash change is an in-page jump and stays with the browser.
 
 ## D8. Deadline-gated pending (ratified 2026-07-08, owner)
 
@@ -179,10 +196,10 @@ across all three cases:
   host: its parent element when the block is that element's only content,
   otherwise each top-level element of the shown arm. That fallback is decided
   at runtime because a component whose root is the boundary cannot see its
-  parent at build time. Server-rendered and
-  resumed boundaries get the busy marking but no stall fallback: their
-  `@pending` arm is not shipped to the browser, and 13-resume-cache step 3
-  requires seeded content to stay visible. Live regions inside a busy
+  parent at build time. The stall fallback applies only to a block that
+  already shows settled content and whose `@pending` arm the browser holds:
+  server-rendered and resumed boundaries get the busy marking but no stall
+  fallback, because their `@pending` arm is not shipped to the browser. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
 - Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
@@ -242,14 +259,53 @@ across all three cases:
   async input is, that input re-runs instead. It is
   not a closure over the body, so it survives server render and resume.
   While the retry runs the shown content is held busy under the same rule as
-  any refresh. Handlers outside a DOM event (callback props) still refuse it
-  as a body local.
+  any refresh. `reset` may also be handed to a child component as a prop
+  (`onRetry={reset}` or an inline arrow, through any number of components);
+  each lowers to the same retry call. A handler in `@catch` still refuses any
+  other body local the browser cannot recompute, including `error`.
+- Handler rejection (2026-11-09, #540): an async event handler inside a
+  `@try` whose returned promise rejects fails that block the way a failed
+  refresh does: the content stays and the `@catch` arm renders after it. The
+  failure reaches only the nearest `@try` around the handler's element, also
+  when the handler is a callback prop a child or grandchild calls. Nothing
+  rejected among the block's async values, so `reset` clears the `@catch`
+  without fetching again. A promise the handler starts but neither returns
+  nor awaits is not watched.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
-pending UI shows, it stays a minimum duration (no blink). Deadline,
-stall-threshold and min-duration constants live in one documented module; the timing state machine
-is pure and property-tested under a fake clock. Reveal choreography is
+pending UI shows, it stays a minimum duration (no blink). The client
+deadline, stall-threshold, min-duration and reveal-cadence constants live in
+one documented module (`packages/web/src/pending-timing.ts`: deadline 250 ms,
+stall 5000 ms, minimum pending visibility 200 ms, reveal-train cadence
+300 ms); the server's first-flush deadline (10 ms) lives with the stream
+renderer. The timing state machine is pure and tested under a fake clock
+across sweeps of settle times. Reveal choreography is
 tier-aware: value-slot commits are layout-safe and commit immediately; range
 commits join dependency-ordered reveal trains. All timing behavior is
 structural or latency-decided — never per-block configuration. TSRX syntax is
 unchanged.
+
+## Open items
+
+Known gaps on main as of 2026-11-10. Each is either being fixed or deferred;
+none changes a ruling above.
+
+- Independent blocks settle one after another (being fixed). Two `@try`
+  blocks on one page that read unrelated values should reveal together, but
+  a fragment render settles them in turn: two 1 s values take about 2 s.
+- Reveal ordering groups (deferred, D6). Authors cannot ask for
+  parallel/sequential/reverse reveal; streamed reveals follow the
+  compiler-known dependency order only.
+- Loud vs quiet across awaits in plain code (open, D8 "Quiet re-settle").
+  Plain (non-symbol) code, such as a timer callback that writes directly, is
+  counted loud while any handler is still waiting on its own `await`.
+  Closing it needs the compiler to rewrap each `await`, or a platform async
+  context.
+- Async reads inside `@pending` and `@catch` (deferred). The rules above
+  cover the `@try` arm's async reads; reading an async value directly in a
+  `@pending` or `@catch` arm is not specified.
+- Optimistic edits of existing rows (open). Adding a row optimistically is
+  quiet, but an optimistic edit of a row already shown (a like, a toggle)
+  still marks that row busy while its save runs.
+- Mutations (design under research). How a save declares what it refreshes,
+  and form-submit pending, are not specified here.
