@@ -41,11 +41,6 @@ export default function PreviewCard({
 				--pg-wash: color-mix(in srgb, var(--purple) 26%, var(--paper));
 				--pg-edge: color-mix(in oklch, var(--ink) 80%, transparent);
 				--pg-font: 'Shantell Sans', system-ui, sans-serif;
-
-				html.dark & {
-					--pg-accent: color-mix(in srgb, var(--purple) 42%, var(--paper));
-					--pg-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
-				}
 			}
 
 			@media (max-width: 600px) {
@@ -162,7 +157,7 @@ export function Watch({ children }: { readonly children?: Children }) @{
 				padding: 0.8em 1.35em;
 				border-block-start: 1px dashed var(--code-edge);
 				background: var(--tinted);
-				color: var(--ink);
+				color: var(--on-accent);
 				font-family: var(--pg-font);
 				font-size: var(--step--1);
 				line-height: 1.5;

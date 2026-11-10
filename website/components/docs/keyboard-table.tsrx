@@ -137,7 +137,6 @@ export default function KeyboardTable({family,rows}: {readonly family?: string;r
    .platform-picker { --picker-edge: color-mix(in oklch, var(--ink) 80%, transparent); --picker-wash: color-mix(in srgb, var(--purple) 26%, var(--paper)); position: relative; display: grid; grid-template-columns: auto max-content; align-items: center; gap: .8em; font: var(--step-0)/1.3 'Shantell Sans', system-ui, sans-serif; }
    .platform-picker[ui-open] { z-index: 30; --keyboard-control-shadow: 4px 4px 0 var(--purple); }
    .platform-picker { margin-inline-start: auto; }
-   html.dark .platform-picker { --picker-wash: color-mix(in srgb, var(--purple) 20%, var(--paper)); }
    .platform-trigger { box-sizing: border-box; box-shadow: 2px 3px 0 var(--ink); display: flex; align-items: center; justify-content: space-between; gap: .7em; cursor: pointer; min-width: 10rem; border: 1.5px solid var(--ink); border-radius: 10px 6px 12px 8px; background: var(--paper); color: var(--ink); padding: .45em .8em; font: inherit; text-align: start; }
    .platform-trigger > svg { width: 1em; height: 1em; opacity: .65; transition: transform 140ms ease; }
    .platform-trigger[ui-open] > svg { transform: rotate(180deg); }

@@ -147,9 +147,8 @@ export default function StartWithAgent() @{
 				rotate: -0.8deg;
 
 				html.dark & {
-					--slip: color-mix(in oklch, var(--ink) 92%, var(--yellow));
-					--slip-ink: var(--paper);
-					--slip-shade: rgb(0 0 0 / 0.55);
+					--slip: var(--figure-sheet);
+					--slip-shade: var(--figure-shade);
 				}
 			}
 
@@ -196,8 +195,8 @@ export default function StartWithAgent() @{
 				opacity: 0.45;
 
 				html.dark & {
-					stroke: rgb(0 0 0 / 0.9);
-					opacity: 0.8;
+					stroke: var(--figure-hatch);
+					opacity: 1;
 				}
 			}
 
@@ -211,6 +210,11 @@ export default function StartWithAgent() @{
 				stroke-width: 1.2;
 				opacity: 0.4;
 				mix-blend-mode: multiply;
+
+				html.dark & {
+					opacity: 1;
+					mix-blend-mode: normal;
+				}
 			}
 
 			.head,
@@ -271,7 +275,7 @@ export default function StartWithAgent() @{
 				justify-content: center;
 				gap: calc(var(--u) * 9);
 				border-radius: calc(var(--u) * 10);
-				color: var(--slip-ink);
+				color: var(--on-accent);
 				text-decoration: none;
 				opacity: 0.88;
 				rotate: var(--turn);
@@ -302,6 +306,10 @@ export default function StartWithAgent() @{
 			.stamp:hover .wash,
 			.stamp:focus-visible .wash {
 				opacity: 0.6;
+
+				html.dark & {
+					opacity: 1;
+				}
 			}
 
 			.stamp:focus-visible,

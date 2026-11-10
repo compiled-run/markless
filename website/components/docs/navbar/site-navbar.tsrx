@@ -126,10 +126,10 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 				background: color-mix(in oklch, var(--ink) 52%, transparent);
 				opacity: 0;
 				transition: opacity 325ms ease-in-out;
+			}
 
-				html.dark & {
-					background: color-mix(in oklch, black 58%, transparent);
-				}
+			html.dark .nav-shade::before {
+				background: color-mix(in oklch, var(--slab) 70%, transparent);
 			}
 
 			.nav-shade:has([ui-open])::before {
@@ -408,12 +408,12 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 				background: var(--paper);
 				color: var(--ink);
 				text-decoration: none;
-				/* QDS sets white type on a gradient to its darkest tone; here the darkest tone is the ink in light and near-black in dark. */
+				/* QDS sets white type on a gradient to its darkest tone; here that is the ink in light and the slab in dark. */
 				--card-scrim: var(--ink);
 				--card-text: color-mix(in oklch, var(--paper) 35%, white);
 
 				html.dark & {
-					--card-scrim: oklch(12% 0.006 70);
+					--card-scrim: var(--slab);
 					--card-text: var(--ink);
 				}
 			}
@@ -575,7 +575,7 @@ function CardArt({ card, class: className }: { readonly card: NavCard; readonly 
 				--decor-wash-blend: multiply;
 
 				html.dark & {
-					--decor-wash-opacity: 0.4;
+					--decor-wash-opacity: 0.9;
 					--decor-wash-blend: normal;
 				}
 			}
@@ -1104,7 +1104,7 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 				}
 
 				html.dark & {
-					opacity: 0.45;
+					opacity: 0.9;
 					mix-blend-mode: normal;
 				}
 			}

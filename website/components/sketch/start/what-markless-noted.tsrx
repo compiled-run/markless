@@ -136,6 +136,7 @@ export default function WhatMarklessNoted() @{
 
 			.board[data-used='yes'] .text {
 				background: var(--mark);
+				color: var(--on-mark);
 			}
 
 			.board[data-used='yes'] .click {
@@ -184,6 +185,7 @@ export default function WhatMarklessNoted() @{
 
 			.board[data-used='yes'] .num {
 				background: var(--mark);
+				color: var(--on-mark);
 			}
 
 			b {

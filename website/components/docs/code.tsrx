@@ -208,7 +208,6 @@ export default function Code({
 				line-height: 1.5;
 
 				html.dark & {
-					--code-wash: color-mix(in srgb, var(--purple) 20%, var(--paper));
 					--code-tab-back: color-mix(in oklch, var(--ink) 12%, var(--paper));
 					--code-selection: color-mix(in oklch, var(--yellow) 28%, transparent);
 					--code-problem: oklch(76% 0.14 15);
@@ -253,6 +252,7 @@ export default function Code({
 				border-radius: 999px;
 				background: var(--tinted);
 				box-shadow: inset 0 0 0 1.5px color-mix(in oklch, var(--yellow) 60%, transparent);
+				color: var(--on-accent);
 				font-size: var(--step--1);
 				line-height: 1.3;
 				white-space: nowrap;
@@ -442,7 +442,7 @@ export default function Code({
 				top: -0.12em;
 				width: 0.28em;
 				height: 0.62em;
-				border: solid var(--ink);
+				border: solid var(--on-mark);
 				border-width: 0 2.5px 2.5px 0;
 				transform: rotate(40deg);
 				content: '';

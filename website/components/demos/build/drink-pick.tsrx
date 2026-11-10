@@ -105,7 +105,7 @@ export default function DrinkPick() @{
 				padding: 0 0.15em;
 				border-radius: 3px;
 				background: var(--mark);
-				color: inherit;
+				color: var(--on-mark);
 				font-weight: 700;
 			}
 
