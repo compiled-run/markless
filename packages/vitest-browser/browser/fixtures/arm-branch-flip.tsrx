@@ -2,10 +2,7 @@ import { computed, state } from '@markless/core';
 import { PanelFrame } from './panel-frame.tsrx';
 import { bumpPanelRenders } from './panel-render-probe.ts';
 
-// T104 tier-3 proof, dashboard branch-menu shape: a sync-state @if (with a
-// keyed @for inside it) inside a component's children inside @try. Toggling
-// the drawer must flip ONLY the branch range — the render-count probe must
-// not move. A refresh (region write) keeps the arm; a @catch -> @try re-commit must rewire the flip.
+// A sync-state @if with a keyed @for inside it, in a component's children inside @try: toggling flips only the branch range, so the render-count probe stays put through toggles, refreshes and the recovery from a failed refresh.
 export function App() @{
 	let drawerOpen = state(false);
 	let region = state('west');

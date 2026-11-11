@@ -29,9 +29,9 @@ function armListeners(): number {
 	return count;
 }
 
-// Every subscription on the nodes a row list follows, old and new.
-function collectionSubscriptions(graph: Graph): () => number {
-	const nodes = new Set<string>();
+// Every subscription on the nodes a row list follows, old and new; `held` names nodes the list already follows at render.
+function collectionSubscriptions(graph: Graph, held: ReadonlyArray<string> = []): () => number {
+	const nodes = new Set<string>(held);
 	const subscribe = graph.subscribe;
 	graph.subscribe = (subscription) => {
 		if (subscription.id.startsWith('keyed-repeat:')) nodes.add(subscription.graphNodeId);
@@ -94,11 +94,11 @@ const TOOLS = {
 	a: ['Awl', 'Axe', 'Clamp'],
 };
 
-test('CSR: a @try that rewires its row list at every settle releases the list it replaced', async () => {
+test('CSR: a @try whose row list settles over and over keeps its wiring bounded', async () => {
 	const { runtime } = await render(Aviary);
 	open();
 	await expect.poll(names).toEqual(BIRDS['']);
-	await staysBounded(BIRDS, collectionSubscriptions(runtime.graph as never));
+	await staysBounded(BIRDS, collectionSubscriptions(runtime.graph as never, ['computed:birds']));
 });
 
 test('SSR: a @try that rewires its row list at every settle keeps its rows and wiring steady', async () => {

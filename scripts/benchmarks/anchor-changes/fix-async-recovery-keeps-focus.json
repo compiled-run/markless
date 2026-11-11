@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 674,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content; settle-time code, not executed at load (docs executed chars unchanged, downloads -45 to -53 B gzip); measured 14045 vs anchor 13371 rendered on PR #605 linux CI run 42968686830",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 554,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": -66,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 554,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": -66,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content (settle-time code)",
+			"date": "2026-11-11"
+		}
+	]
+}
