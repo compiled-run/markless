@@ -72,13 +72,61 @@ test('a value that ran again since the writes settled is not re-asked', async ()
 	expect(people.settles).toHaveLength(2);
 });
 
-test('a value still running is left to its own run', async () => {
+test('a read still in flight from before the writes settled starts over, and its old answer never lands', async () => {
 	const people = scriptedRuns();
 	const count = scriptedRuns();
 	const graph = chainGraph(people, count);
 	graph.read('computed:people', ['status']);
 	graph.asyncPlane!()!.refreshAfterWrite(versions(graph, 'computed:people'));
-	expect(people.settles).toHaveLength(1);
+	expect(people.settles).toHaveLength(2);
+	people.settles[0]!.resolve(['Ada']);
+	await tick();
+	expect(graph.read('computed:people', ['status'])).toBe('pending');
+	people.settles[1]!.resolve(['Ada', 'Grace']);
+	await tick();
+	expect(graph.read('computed:people', ['value'])).toEqual(['Ada', 'Grace']);
+});
+
+test('a read that started after the writes settled is left to its own run', async () => {
+	const { graph, people } = await settledChain();
+	const settledAt = versions(graph, 'computed:people');
+	graph.write({ graphNodeId: 'state:team', path: [], value: 'red' });
+	await graph.flush();
+	await tick();
+	expect(people.settles).toHaveLength(2);
+	graph.asyncPlane!()!.refreshAfterWrite(settledAt);
+	expect(people.settles).toHaveLength(2);
+});
+
+test('withInputs lists the async values a value reads through sync computeds, inputs first', () => {
+	const graph = createRuntimeGraph({
+		cells: [{ graphNodeId: 'state:team', value: 'blue' }],
+		computed: [
+			{
+				graphNodeId: 'computed:label',
+				dependencies: [{ graphNodeId: 'computed:user', path: [] }],
+				compute: (read: (id: string) => unknown) => String(read('computed:user')),
+			},
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:user',
+				dependencies: [{ graphNodeId: 'state:team', path: [] }],
+				key: (read) => read('state:team'),
+				run: async () => 'Ada',
+			},
+			{
+				graphNodeId: 'computed:orders',
+				dependencies: [{ graphNodeId: 'computed:label', path: [] }],
+				key: (read) => read('computed:label'),
+				run: async () => [],
+			},
+		],
+	} as never);
+	expect(graph.asyncPlane!()!.withInputs(['computed:orders']).map((node) => node.graphNodeId)).toEqual([
+		'computed:user',
+		'computed:orders',
+	]);
 });
 
 test('a reader listed before its async input waits for the input and runs once, on the new key', async () => {

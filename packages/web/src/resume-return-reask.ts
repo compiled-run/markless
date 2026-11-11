@@ -1,9 +1,8 @@
 import type { AsyncComputedPlane } from '@markless/runtime';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
+import { dispatchSpans, type DispatchSpan } from './event-current-target.ts';
 
-// Re-asks the async values a wired container shows: when the page is shown again from the back-forward cache, and
-// after an event handler's same-origin write succeeds, once every overlapping write and every handler open when one
-// was sent have finished. Nothing aborts a write.
+// Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
 // On a container shown again as it was left: true until its runtime wires, then the call that re-asks its async values.
 export const CONTAINER_REASK_PROPERTY = '__mReask';
@@ -38,92 +37,102 @@ export function reaskOnReturn(root: object, graph: Graph, boundaries: Boundaries
 	};
 }
 
-/** A DOM dispatch in flight: resume-events adds one to `__mOpen` per dispatch and calls `closed` when it ends. */
-type DispatchSpan = { closed?: () => void };
-
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
-const IDLE = 0;
-const WRITING = 1;
-const WRITING_SUCCEEDED = 2;
-// Every write settled and one succeeded; the refresh waits for the handlers that sent them.
-const OWED = 3;
-type Phase = typeof IDLE | typeof WRITING | typeof WRITING_SUCCEEDED | typeof OWED;
+export const WRITE_IDLE = 0;
+export const WRITE_WRITING = 1;
+export const WRITE_WRITING_SUCCEEDED = 2;
+// Every write settled and one succeeded; the refresh waits for the dispatches that sent them.
+export const WRITE_OWED = 3;
+export type WritePhase = typeof WRITE_IDLE | typeof WRITE_WRITING | typeof WRITE_WRITING_SUCCEEDED | typeof WRITE_OWED;
 
-// Shared through the window so the dispatch path loads nothing for it.
-const spans = globalThis as { __mOpen?: Set<DispatchSpan> };
-const READS = new Set(['GET', 'HEAD', 'OPTIONS']);
-const containers = new Set<Container>();
-const owed = new Map<Container, ReadonlyMap<string, number>>();
-const writers = new Set<DispatchSpan>();
-// Values whose latest run sent a write itself: a refresh would send it again.
-const writerRuns = new WeakSet<RuntimeAsyncComputedNode>();
-let phase: Phase = IDLE;
-let inFlight = 0;
-let recipe: RuntimeAsyncComputedNode | undefined;
-let refreshing: RuntimeAsyncComputedNode[] = [];
+type Versions = ReadonlyMap<string, number>;
+// Each phase holds only what it means: writes in flight while writing, the versions owed once they settle.
+type WriteState =
+	| { readonly phase: typeof WRITE_IDLE }
+	| {
+			readonly phase: typeof WRITE_WRITING | typeof WRITE_WRITING_SUCCEEDED;
+			readonly inFlight: number;
+			readonly writers: Set<DispatchSpan>;
+	  }
+	| { readonly phase: typeof WRITE_OWED; readonly writers: Set<DispatchSpan>; readonly due: Map<Container, Versions> };
 
-function move(to: Phase): void {
-	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) {
-		let allowed: boolean;
-		switch (to) {
-			case IDLE:
-				allowed = phase === WRITING || phase === OWED;
-				break;
-			case WRITING:
-				allowed = phase === IDLE;
-				break;
-			case WRITING_SUCCEEDED:
-				allowed = phase === WRITING || phase === OWED;
-				break;
-			default:
-				allowed = phase === WRITING_SUCCEEDED;
-		}
-		if (!allowed) throw new Error(`Markless write refresh: no move from ${phase} to ${to}`);
+/** Throws when the write watch could not move from `from` to `to`; a phase may stay put only while writes are in flight. */
+export function assertWriteMove(from: WritePhase, to: WritePhase): void {
+	let allowed: boolean;
+	switch (to) {
+		case WRITE_IDLE:
+			allowed = from === WRITE_WRITING || from === WRITE_OWED;
+			break;
+		case WRITE_WRITING:
+			allowed = from === WRITE_IDLE || from === WRITE_WRITING;
+			break;
+		case WRITE_WRITING_SUCCEEDED:
+			allowed = from !== WRITE_IDLE;
+			break;
+		default:
+			allowed = from === WRITE_WRITING || from === WRITE_WRITING_SUCCEEDED;
 	}
-	phase = to;
+	if (!allowed) throw new Error(`Markless write refresh: no move from ${from} to ${to}`);
 }
 
+const READS = new Set(['GET', 'HEAD', 'OPTIONS']);
+const containers = new Set<Container>();
+// Values whose latest run sent a write itself: a refresh would send it again.
+const writerRuns = new WeakSet<RuntimeAsyncComputedNode>();
+// Development only: per container, the runs the last refresh started and their versions.
+const refreshed = new Map<Container, Map<RuntimeAsyncComputedNode, number>>();
+let state: WriteState = { phase: WRITE_IDLE };
+let recipe: RuntimeAsyncComputedNode | undefined;
+
+function move(next: WriteState): void {
+	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) {
+		assertWriteMove(state.phase, next.phase);
+		if ('inFlight' in next && next.inFlight < 1) throw new Error('Markless write refresh: writing with no write in flight');
+	}
+	state = next;
+}
+
+// Shown values and every async value they read, inputs first, so a value never re-runs on an input's old answer.
 function shown([graph, boundaries]: Container): RuntimeAsyncComputedNode[] {
-	const nodes = graph.asyncPlane?.()?.nodes;
-	return [...shownIds(boundaries)].flatMap((id) => nodes?.get(id) ?? []);
+	return graph.asyncPlane?.()?.withInputs(shownIds(boundaries)) ?? [];
 }
 
 function refreshIfOwed(): void {
-	if (phase !== OWED) return;
-	for (const writer of writers) if (spans.__mOpen?.has(writer)) return;
-	writers.clear();
-	move(IDLE);
-	const due = [...owed];
-	owed.clear();
-	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
-		refreshing = due.flatMap(([container, versions]) =>
-			shown(container).filter((node) => versions.has(node.graphNodeId)),
-		);
+	if (state.phase !== WRITE_OWED) return;
+	for (const writer of state.writers) if (dispatchSpans().has(writer)) return;
+	const { due } = state;
+	move({ phase: WRITE_IDLE });
 	for (const [[graph], versions] of due) graph.asyncPlane?.()?.refreshAfterWrite(versions);
+	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
+		for (const [container, versions] of due)
+			refreshed.set(
+				container,
+				new Map(shown(container).flatMap((node) => (versions.has(node.graphNodeId) ? [[node, node.version]] : []))),
+			);
 }
 
-function begin(): void {
-	inFlight++;
-	if (phase === IDLE) move(WRITING);
-	else if (phase === OWED) move(WRITING_SUCCEEDED);
+function begin(open: ReadonlySet<DispatchSpan>): void {
+	for (const span of open) span.closed = refreshIfOwed;
+	if (state.phase === WRITE_IDLE) return move({ phase: WRITE_WRITING, inFlight: 1, writers: new Set(open) });
+	const writers = new Set([...state.writers, ...open]);
+	if (state.phase === WRITE_OWED) return move({ phase: WRITE_WRITING_SUCCEEDED, inFlight: 1, writers });
+	move({ phase: state.phase, inFlight: state.inFlight + 1, writers });
 }
 
 function end(ok: boolean): void {
-	inFlight--;
-	if (ok && phase === WRITING) move(WRITING_SUCCEEDED);
-	if (inFlight > 0) return;
-	if (phase === WRITING) {
-		writers.clear();
-		return move(IDLE);
-	}
+	if (state.phase !== WRITE_WRITING && state.phase !== WRITE_WRITING_SUCCEEDED) return;
+	const phase = ok ? WRITE_WRITING_SUCCEEDED : state.phase;
+	const inFlight = state.inFlight - 1;
+	if (inFlight > 0) return move({ phase, inFlight, writers: state.writers });
+	if (phase === WRITE_WRITING) return move({ phase: WRITE_IDLE });
+	const due = new Map<Container, Versions>();
 	for (const container of containers) {
 		const versions = new Map<string, number>();
-		for (const node of shown(container))
-			if (!writerRuns.has(node)) versions.set(node.graphNodeId, node.version);
-		owed.set(container, versions);
+		for (const node of shown(container)) if (!writerRuns.has(node)) versions.set(node.graphNodeId, node.version);
+		due.set(container, versions);
 	}
-	move(OWED);
+	move({ phase: WRITE_OWED, writers: state.writers, due });
 	refreshIfOwed();
 }
 
@@ -135,12 +144,20 @@ function sameOrigin(url: string): boolean {
 	}
 }
 
+// Blames only a run a refresh started that is still in flight, so an unrelated reload or a later timer is not named.
 function warnIfResent(method: string, url: string): void {
-	if (!refreshing.some((node) => node.snapshot.status === 'pending')) return;
-	console.warn(
-		`Markless: a ${method} to ${url} was sent outside any event handler while async values loaded again after a save. ` +
-			'If an async value sends it after an await, that reload sent it again. Send writes from event handlers.',
-	);
+	for (const runs of refreshed.values())
+		for (const [node, version] of runs) {
+			if (node.version !== version || node.snapshot.status !== 'pending') {
+				runs.delete(node);
+				continue;
+			}
+			console.warn(
+				`Markless: a ${method} to ${url} was sent outside any event handler while async values loaded again after a save. ` +
+					'If an async value sends it after an await, that reload sent it again. Send writes from event handlers.',
+			);
+			return;
+		}
 }
 
 let patched = false;
@@ -155,17 +172,13 @@ function patchFetch(): void {
 		const url = request?.url ?? String(input);
 		if (READS.has(method) || !sameOrigin(url)) return response;
 		if (recipe) writerRuns.add(recipe);
-		const open = spans.__mOpen;
-		if (!open || open.size === 0) {
+		const open = dispatchSpans();
+		if (open.size === 0) {
 			if (!recipe && (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__))
 				warnIfResent(method, url);
 			return response;
 		}
-		for (const span of open) {
-			writers.add(span);
-			span.closed = refreshIfOwed;
-		}
-		begin();
+		begin(open);
 		response.then(
 			(answer) => end(answer.ok),
 			() => end(false),
@@ -193,6 +206,7 @@ export function registerWriteRefresh(graph: Container[0], boundaries: Container[
 	containers.add(container);
 	return () => {
 		containers.delete(container);
-		owed.delete(container);
+		refreshed.delete(container);
+		if (state.phase === WRITE_OWED) state.due.delete(container);
 	};
 }

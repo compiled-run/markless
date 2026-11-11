@@ -262,17 +262,37 @@ export function createAsyncPlane(
 			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
 			return true;
 		},
+		withInputs(graphNodeIds) {
+			const ordered: RuntimeAsyncComputedNode[] = [];
+			const seen = new Set<string>();
+			const visit = (graphNodeId: string): void => {
+				if (seen.has(graphNodeId)) return;
+				seen.add(graphNodeId);
+				const node = nodes.get(graphNodeId);
+				for (const dependency of node?.dependencies ?? internals.computedNodes.get(graphNodeId)?.dependencies ?? [])
+					visit(dependency.graphNodeId);
+				for (const hop of node?.syncHops ?? []) for (const input of hop.asyncFrom) visit(input);
+				if (node) ordered.push(node);
+			};
+			for (const graphNodeId of graphNodeIds) visit(graphNodeId);
+			return ordered;
+		},
 		refreshAfterWrite(versions) {
 			const due: RuntimeAsyncComputedNode[] = [];
 			for (const [graphNodeId, version] of versions) {
 				const node = nodes.get(graphNodeId);
 				// A value that ran again since the writes settled already has their answer.
-				if (node?.version === version && node.phase === NODE_SETTLED) due.push(node);
+				if (node?.version !== version) continue;
+				if (node.phase === NODE_SETTLED) moveNode(node, NODE_PLANNED);
+				// A read still in flight from before the writes settled may carry the old answer, so it starts over.
+				if (node.phase === NODE_PLANNED || node.phase === NODE_RUNNING) due.push(node);
 			}
-			for (const node of due) moveNode(node, NODE_PLANNED);
 			if (due.length > 0)
 				withRefresh((loaded) => {
-					for (const node of due) if (node.phase === NODE_PLANNED) loaded.advance(node);
+					for (const node of due)
+						if (node.phase === NODE_PLANNED) loaded.advance(node);
+						else if (node.phase === NODE_RUNNING && node.version === versions.get(node.graphNodeId))
+							loaded.start(node, (node.snapshot as { readonly key?: unknown }).key);
 				});
 		},
 		holdInputs(factory) {

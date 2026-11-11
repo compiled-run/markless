@@ -4,246 +4,6 @@
 			"surface": "perf-guards",
 			"path": [
 				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 37,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 37,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 37,
-			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-async-wiring"
-			],
-			"delta": 137,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-return-reask"
-			],
-			"delta": 2789,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 38,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 137,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-return-reask"
-			],
-			"delta": 2789,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 38,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 38,
-			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the values on screen after a save (shipped only with async values, no extra module); resume-events gains a dispatch span; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-return-reask"
-			],
-			"delta": 2789,
-			"reason": "refresh after a save: also watches same-origin writes and re-asks the async values on screen once the save answers; loaded only with async values, so no extra module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-async-wiring"
-			],
-			"delta": 137,
-			"reason": "refresh after a save: each container with async values registers with the write watch",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "refresh after a save: each DOM dispatch opens a span so a reload waits for the handler that sent the write; runs per dispatch, never at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 717,
-			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 3532,
-			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 717,
-			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
 				"linux-x64",
 				"bench /",
 				"jsGzipBytes"
@@ -310,6 +70,336 @@
 			],
 			"delta": 774,
 			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 216,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/direct"
+			],
+			"delta": 33,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 137,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 178,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 3152,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 67,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 216,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/direct"
+			],
+			"delta": 33,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 137,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 178,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 3152,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 43,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 93,
+			"reason": "refresh after a save: resume-return-reask also watches same-origin writes and re-asks the async values on screen and their inputs after a save; resume-events puts each dispatch's user-action token in a shared set; graph-async-load lists a value's async inputs",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 3152,
+			"reason": "refresh after a save: watches same-origin writes and re-asks the async values on screen and the async values they read once the save answers",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 137,
+			"reason": "refresh after a save: each container with async values registers with the write watch",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 178,
+			"reason": "refresh after a save: each dispatch's user-action token joins the set of dispatches in flight until its writes have flushed",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 216,
+			"reason": "refresh after a save: holds the window key and accessor for the dispatches in flight, shared by resume-events and the write watch",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 94,
+			"reason": "refresh after a save: the dispatch set in event-current-target and resume-events is downloaded with the click path",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 94,
+			"reason": "refresh after a save: the dispatch set in event-current-target and resume-events is downloaded with the click path",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 94,
+			"reason": "refresh after a save: the dispatch set in event-current-target and resume-events is downloaded with the click path",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1077,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 4436,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1066,
+			"reason": "refresh after a save: the Async page's resume module, which these pages download, carries the new sections and their syntax-highlighted code (+41,265 B rendered), plus the dispatch set",
 			"date": "2026-11-11"
 		}
 	]

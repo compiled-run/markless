@@ -3,6 +3,9 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { deferred, poll, shows, text, watchPending } from '../back-revalidate/support.ts';
 import { BumpsItself } from './bumps.tsrx';
 import { Chain } from './chain.tsrx';
+import { HiddenInput } from './hidden-input.tsrx';
+import { InFlight } from './in-flight.tsrx';
+import { PostRead } from './post-read.tsrx';
 import { LateWriter } from './late-writer.tsrx';
 import { addItem, installServer, resetServer, server } from './server.ts';
 import { Shelf } from './shelf.tsrx';
@@ -132,6 +135,7 @@ test('a write sent outside any handler does not refresh', async () => {
 test('a value keyed by another async value re-asks once, after its input answers', async () => {
 	const container = (await render(Chain)).container as HTMLElement;
 	await shows(container, '[data-count]', '1');
+	const seen = watchPending();
 	click(container, '[data-add]');
 	await shows(container, '[data-names]', 'Ada, Grace');
 	await shows(container, '[data-count]', '2');
@@ -141,6 +145,7 @@ test('a value keyed by another async value re-asks once, after its input answers
 		'/mut/items?count=2',
 	]);
 	expect(reads('/mut/items?v=people')).toBe(2);
+	expect(seen()).toEqual([]);
 });
 
 test('a write that never settles holds the refresh, until the page gives up on it', async () => {
@@ -227,6 +232,136 @@ test('a write an async value sends after an await is sent again by a refresh, an
 		await expect
 			.poll(() => warn.mock.calls.map(([message]) => String(message)), poll)
 			.toEqual([expect.stringContaining('POST to /mut/visits was sent outside any event handler')]);
+	} finally {
+		warn.mockRestore();
+	}
+});
+
+test('an async value read by no @try is asked again before the shown value that reads it', async () => {
+	const container = (await render(HiddenInput)).container as HTMLElement;
+	await shows(container, '[data-count]', '1');
+	click(container, '[data-add]');
+	await shows(container, '[data-count]', '2');
+	await settle(150);
+	expect(reads('/mut/items?v=people')).toBe(2);
+	expect(server.gets.filter((get) => get.startsWith('/mut/items?count='))).toEqual([
+		'/mut/items?count=1',
+		'/mut/items?count=2',
+	]);
+});
+
+test('a read still out when the save answers is asked again, and its old answer never shows', async () => {
+	const container = (await render(InFlight)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	const held = deferred<void>();
+	server.holdReads = held.promise;
+	click(container, '[data-add]');
+	await expect.poll(() => reads('/mut/items?page=1'), poll).toBe(2);
+	server.holdReads = undefined;
+	held.resolve();
+	await shows(container, '[data-names]', 'Ada, Grace');
+	await settle(150);
+	expect(reads('/mut/items?page=1')).toBe(2);
+	expect(text(container, '[data-names]')).toBe('Ada, Grace');
+});
+
+test('a POST read inside an async value counts as a save, and that value is never asked again after one', async () => {
+	const container = (await render(PostRead)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	expect(server.searches).toBe(1);
+	// Changing the query sends the read while the click's handler runs, so the other values on the page load again.
+	click(container, '[data-query]');
+	await expect.poll(() => reads(), poll).toBe(2);
+	expect(server.searches).toBe(2);
+	// A real save reloads the other values, but not the POST read: running it again could send a save twice.
+	click(container, '[data-add]');
+	await shows(container, '[data-names]', 'Ada, Grace');
+	await settle(150);
+	expect(reads()).toBe(3);
+	expect(server.searches).toBe(2);
+});
+
+test('a write to another origin does not refresh', async () => {
+	const container = (await render(Shelf)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	click(container, '[data-add-remote]');
+	await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Remote']);
+	await settle(150);
+	expect(reads()).toBe(1);
+});
+
+test('a write sent as a Request object refreshes', async () => {
+	const container = (await render(Shelf)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	click(container, '[data-add-request]');
+	await shows(container, '[data-names]', 'Ada, Ivy');
+	expect(server.posts).toEqual(['POST /mut/items Ivy']);
+	expect(reads()).toBe(2);
+});
+
+test('a save in one container refreshes every container on the page', async () => {
+	const first = (await render(Shelf)).container as HTMLElement;
+	const second = (await render(Shelf)).container as HTMLElement;
+	await shows(first, '[data-names]', 'Ada');
+	await shows(second, '[data-names]', 'Ada');
+	click(first, '[data-add]');
+	await shows(first, '[data-names]', 'Ada, Grace');
+	await shows(second, '[data-names]', 'Ada, Grace');
+	await settle(150);
+	expect(reads()).toBe(4);
+});
+
+test('today: a page shown while a save is out is asked again, loudly, once the save answers', async () => {
+	const leaving = (await render(Shelf)).container as HTMLElement;
+	await shows(leaving, '[data-names]', 'Ada');
+	const slow = deferred<void>();
+	server.nextPost = [{ wait: slow.promise }];
+	click(leaving, '[data-add]');
+	await expect.poll(() => server.posts.length, poll).toBe(1);
+	await cleanup();
+	const arriving = (await render(Shelf)).container as HTMLElement;
+	await shows(arriving, '[data-names]', 'Ada');
+	expect(reads()).toBe(2);
+	const held = deferred<void>();
+	server.holdReads = held.promise;
+	slow.resolve();
+	await expect.poll(() => reads(), poll).toBe(3);
+	await expect.poll(() => arriving.querySelector('[data-names]')?.getAttribute('aria-busy'), poll).toBe('true');
+	server.holdReads = undefined;
+	held.resolve();
+	await shows(arriving, '[data-names]', 'Ada, Grace');
+});
+
+test('today: an analytics POST a handler sends counts as a save and reloads the page', async () => {
+	const container = (await render(Shelf)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	click(container, '[data-track]');
+	await expect.poll(() => reads(), poll).toBe(2);
+	expect(server.posts).toEqual(['POST /mut/track click']);
+});
+
+test('today: a write an async value sends after an await while a handler runs counts as a new save', async () => {
+	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+	try {
+		const container = (await render(LateWriter)).container as HTMLElement;
+		await shows(container, '[data-stamp]', 'stamped');
+		const gate = deferred<void>();
+		server.lateGate = gate.promise;
+		const handler = deferred<void>();
+		server.handlerWait = handler.promise;
+		click(container, '[data-add]');
+		await shows(container, '[data-names]', 'Ada, Grace');
+		// The reload re-ran the stamp, which now waits; a slow handler is running when it sends its write.
+		click(container, '[data-slow]');
+		await expect.poll(() => server.handlersStarted, poll).toBe(1);
+		gate.resolve();
+		await expect.poll(() => server.posts.length, poll).toBe(3);
+		await settle(150);
+		expect(reads()).toBe(2);
+		handler.resolve();
+		await expect.poll(() => reads(), poll).toBe(3);
+		await expect.poll(() => server.posts.length, poll).toBe(4);
+		expect(server.posts.filter((post) => post.includes('/mut/visits'))).toHaveLength(3);
 	} finally {
 		warn.mockRestore();
 	}

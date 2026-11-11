@@ -1,8 +1,9 @@
 import { computed } from '@markless/core';
-import { addItem, loadItems } from './server.ts';
+import { addItem, loadItems, server, waitInHandler } from './server.ts';
 
 async function stampVisit(): Promise<string> {
 	await Promise.resolve();
+	await server.lateGate;
 	await fetch('/mut/visits', { method: 'POST', body: 'visit' });
 	return 'stamped';
 }
@@ -14,6 +15,7 @@ export function LateWriter() @{
 
 	<main>
 		<button type="button" data-add onClick={async () => await addItem('Grace')}>Add Grace</button>
+		<button type="button" data-slow onClick={async () => await waitInHandler()}>Wait</button>
 		@try {
 			<section>
 				<p data-names>{shelf.items.join(', ')}</p>

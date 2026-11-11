@@ -8,6 +8,9 @@ type Server = {
 	reads: Map<string, number>;
 	holdReads?: Promise<unknown>;
 	handlerWait?: Promise<unknown>;
+	lateGate?: Promise<unknown>;
+	searches: number;
+	handlersStarted: number;
 	nextPost: Array<Answer>;
 };
 
@@ -18,6 +21,8 @@ export const server: Server = (shared.__mutServer ??= {
 	posts: [],
 	reads: new Map(),
 	nextPost: [],
+	searches: 0,
+	handlersStarted: 0,
 });
 
 export function resetServer() {
@@ -27,6 +32,9 @@ export function resetServer() {
 	server.reads = new Map();
 	server.holdReads = undefined;
 	server.handlerWait = undefined;
+	server.lateGate = undefined;
+	server.searches = 0;
+	server.handlersStarted = 0;
 	server.nextPost = [];
 }
 
@@ -41,11 +49,14 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 		server.gets.push(url.pathname + url.search);
 		const count = (server.reads.get(url.pathname + url.search) ?? 0) + 1;
 		server.reads.set(url.pathname + url.search, count);
+		// The answer is what the server held when it was asked, however long it is held back.
+		const items = [...server.items];
 		if (server.holdReads) await server.holdReads;
 		await new Promise((resolve) => setTimeout(resolve, 5));
-		return json({ items: [...server.items], run: count });
+		return json({ items, run: count });
 	}
 	server.posts.push(`${method} ${url.pathname} ${String(body ?? '')}`);
+	if (url.pathname === '/mut/search') return json({ run: ++server.searches });
 	const planned = server.nextPost.shift() ?? {};
 	if (planned.wait) await planned.wait;
 	else await new Promise((resolve) => setTimeout(resolve, 5));
@@ -59,9 +70,12 @@ export function installServer() {
 	const real = globalThis.fetch;
 	if ((real as { __mutStub?: true }).__mutStub) return;
 	const stub = async (input: RequestInfo | URL, init?: RequestInit) => {
-		const url = new URL(input instanceof Request ? input.url : String(input), location.href);
+		const request = input instanceof Request ? input : undefined;
+		const url = new URL(request?.url ?? String(input), location.href);
 		if (!url.pathname.startsWith('/mut/')) return real(input, init);
-		return answer(url, (init?.method ?? 'GET').toUpperCase(), init?.body);
+		const method = (init?.method ?? request?.method ?? 'GET').toUpperCase();
+		const body = init?.body ?? (request && method !== 'GET' ? await request.text() : undefined);
+		return answer(url, method, body);
 	};
 	(stub as { __mutStub?: true }).__mutStub = true;
 	globalThis.fetch = stub as typeof fetch;
@@ -80,5 +94,6 @@ export async function addItem(name: string): Promise<void> {
 
 // A handler that sends no write and runs until the test lets it finish.
 export async function waitInHandler(): Promise<void> {
+	server.handlersStarted++;
 	await server.handlerWait;
 }

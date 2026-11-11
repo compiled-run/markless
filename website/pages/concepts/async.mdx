@@ -241,18 +241,20 @@ export async function saveMug(name: string) {
 
 Press **Add a tall mug**: the save goes out, and when it answers, the list asks for the mugs again and shows the new one. Here is what Markless does, and why:
 
-- **What counts as a save.** A `fetch` to your own site (the same origin as the page) with any method other than `GET`, `HEAD` or `OPTIONS`, sent while an event handler is running. `saveMug` can live in any file, as deep in other helpers as you like.
+- **What counts as a save.** A `fetch` to your own site (the same origin as the page) with any method other than `GET`, `HEAD` or `OPTIONS`, sent while a handler you wrote in markup (`onClick`, `onSubmit`, and the rest) is running. `saveMug` can live in any file, as deep in other helpers as you like. A listener added with `addEventListener`, or a widget from another library that handles its own clicks, is not one of these handlers, so its requests are not seen as saves.
 - **Only a save that worked.** A save that answers with an error status, or never reaches the server, loads nothing again. If the handler throws, as `saveMug` does, the error shows in the `@catch` around its button, as for [any failing handler](#a-failing-handler-shows-in-catch).
 - **Saves are never cancelled.** Two saves at once are both sent in full, and the page loads again once, after both have answered.
-- **Everything shown loads again.** Every async value inside a `@try` on the page asks again, not only the ones the save changed, and they ask side by side. With three values on the page, one save costs four requests: the save and three loads.
+- **Everything shown loads again.** Every async value inside a `@try` on the page asks again, not only the ones the save changed, and so does every async value they read. An input loads first, so a value that reads another one runs once, on the new answer. Values that do not depend on each other ask side by side: with three of them on the page, one save costs four requests, the save and three loads.
+- **A load already out starts over.** If a value was still loading when the save answered, that request may have left before the save landed, so it is asked again and its old answer never shows.
 - **The old answer stays.** While the new answers load, the page keeps the old ones and marks each element that shows them with `aria-busy="true"`, the same as any [refresh a click starts](#a-background-refresh-stays-quiet).
 - **Still one load if you also change what it reads.** A handler written the older way, which changes a value the recipe reads after its save, loads that value once, not twice.
 
-Three limits are worth knowing:
+Four limits are worth knowing:
 
 - **A save that never answers holds the reload**, and so does any other save sent before it answers. Give a save that might hang a time limit: `fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) })`. When the time runs out, the save counts as failed and the other saves' reload goes ahead.
-- **The reload waits for every handler that was running when the save went out**, even one that has nothing to do with it, because the browser cannot say which handler sent a request.
-- **Some requests are not seen as saves:** ones sent from a timer or other code outside an event handler, ones to another site, and ones sent with `XMLHttpRequest`, `navigator.sendBeacon`, a WebSocket, or a library that keeps its own copy of `fetch`. For those, use a counter, as a Reload button does.
+- **The reload waits for every handler that was running when the save went out**, even one that has nothing to do with it, because the browser cannot say which handler sent a request. A handler that never finishes, such as one waiting for the person to close a dialog, holds the reload until it does. A request such a handler sends while it runs counts as a save too, even a small one like an analytics ping.
+- **Some requests are not seen as saves:** ones sent from a timer or other code outside your handlers, ones to another site, and ones sent with `XMLHttpRequest`, `navigator.sendBeacon`, a WebSocket, or a library that keeps its own copy of `fetch`. For those, use a counter, as a Reload button does.
+- **A read sent as a `POST` from inside an async value counts as a save.** GraphQL and many RPC clients read this way. Two things follow. When a handler changes what such a value reads, its new request is sent while the handler runs, so every other value on the page loads again too. And after a real save, that value is not asked again, because Markless cannot tell it apart from an async value that saves (see [Show a new row before it's saved](#show-a-new-row-before-its-saved)), and asking that one again would send its save twice. To reload it after a save, give it a counter to read.
 
 ### A Reload button
 
