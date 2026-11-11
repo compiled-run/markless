@@ -1,13 +1,14 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
 import {
 	createAsyncBoundarySettleTracker,
 	settleAsyncBoundaryRange,
+	startAsyncBoundaries,
 } from '../src/resume-async-wiring.ts';
+import { MARKLESS_PENDING_MIN_VISIBLE_MS, MARKLESS_PENDING_REFRESH_STALL_MS } from '../src/pending-timing.ts';
 import type { ArmCommitUpdate } from '../src/resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
-import * as busyMarks from '../src/fns/async-plane.ts';
 
 installMarklessAsyncPlane();
 
@@ -51,28 +52,93 @@ function harness(servedArm: number) {
 	return { boundary, commits, settle };
 }
 
-test('a rejection over shown @try content commits @catch after it, again and again, until a fulfil replaces the range', async () => {
+test('a rejection over shown @try content commits @catch after it, again and again, until a fulfil clears that @catch and keeps the content', async () => {
 	const { commits, settle } = harness(ASYNC_BOUNDARY_ARM.try);
 	await settle('rejected');
 	await settle('rejected');
 	await settle('fulfilled');
+	await settle('fulfilled');
 	await settle('rejected');
-	expect(commits.map((update) => [update.arm, update.after === true])).toEqual([
-		[ASYNC_BOUNDARY_ARM.catch, true],
-		[ASYNC_BOUNDARY_ARM.catch, true],
-		[ASYNC_BOUNDARY_ARM.try, false],
-		[ASYNC_BOUNDARY_ARM.catch, true],
+	expect(commits.map((update) => [update.arm, update.after === true, update.nodes?.length])).toEqual([
+		[ASYNC_BOUNDARY_ARM.catch, true, undefined],
+		[ASYNC_BOUNDARY_ARM.catch, true, undefined],
+		[undefined, true, 0],
+		[ASYNC_BOUNDARY_ARM.catch, true, undefined],
 	]);
 });
 
-test('a rejection over @catch, @pending, or a stalled refresh replaces the range', async () => {
+test('a rejection over @catch or @pending replaces the range', async () => {
 	for (const servedArm of [ASYNC_BOUNDARY_ARM.catch, ASYNC_BOUNDARY_ARM.pending]) {
 		const { commits, settle } = harness(servedArm);
 		await settle('rejected');
 		expect(commits.map((update) => update.after === true)).toEqual([false]);
 	}
-	const stalled = harness(ASYNC_BOUNDARY_ARM.try);
-	busyMarks.shown(stalled.boundary, ASYNC_BOUNDARY_ARM.pending);
-	await stalled.settle('rejected');
-	expect(stalled.commits.map((update) => update.after === true)).toEqual([false]);
+});
+
+test('a rejection after a stalled refresh committed @pending replaces the range', async () => {
+	vi.useFakeTimers();
+	try {
+		const parent: { childNodes: unknown[] } = { childNodes: [] };
+		const startAnchor = { nodeType: 8, parentNode: parent };
+		const endAnchor = {
+			nodeType: 8,
+			parentNode: parent,
+			ownerDocument: { createComment: () => ({ parentNode: parent }) },
+			before() {},
+		};
+		parent.childNodes.push(startAnchor, { nodeType: 1, outerHTML: '<p>Loading</p>', parentNode: parent }, endAnchor);
+		const boundary = {
+			id: 'invoice',
+			startAnchor,
+			endAnchor,
+			runnerGraphNodeId: 'computed:invoice',
+			initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+			updateSymbolId: 'symbol:update',
+			asyncReads: [{ graphNodeId: 'computed:invoice', path: [] }],
+		} as unknown as ResumeAsyncBoundaryRecord;
+		let status = 'pending';
+		let version = 0;
+		const subscribers: Array<{ run(snapshot: unknown): unknown }> = [];
+		const commits: ArmCommitUpdate[] = [];
+		await startAsyncBoundaries({
+			asyncBoundariesById: new Map([[boundary.id, boundary]]),
+			graph: {
+				read: (_: string, path: readonly string[]) => (path.length ? status : { status, version }),
+				subscribe: (subscriber: { run(snapshot: unknown): unknown }) => {
+					subscribers.push(subscriber);
+					return () => {};
+				},
+				flush: async () => {},
+			} as never,
+			root: {} as never,
+			loadSymbol: async () =>
+				(async () => ({
+					arm: status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
+					html: '<b></b>',
+					armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+				})) as never,
+			renderBranchHtml: (html: string) => html as never,
+			elementHandles: { get: () => undefined } as never,
+			storeContainerSubscription: () => {},
+			commitArm: async (_, update) => void commits.push(update),
+		});
+		const publish = async (next: string) => {
+			status = next;
+			version++;
+			for (const subscriber of subscribers) await subscriber.run({ status, version });
+		};
+		await publish('fulfilled');
+		await publish('pending');
+		await vi.advanceTimersByTimeAsync(MARKLESS_PENDING_REFRESH_STALL_MS);
+		const failed = publish('rejected');
+		await vi.advanceTimersByTimeAsync(MARKLESS_PENDING_MIN_VISIBLE_MS);
+		await failed;
+		expect(commits.map((update) => [update.arm, update.after === true])).toEqual([
+			[ASYNC_BOUNDARY_ARM.try, false],
+			[ASYNC_BOUNDARY_ARM.pending, false],
+			[ASYNC_BOUNDARY_ARM.catch, false],
+		]);
+	} finally {
+		vi.useRealTimers();
+	}
 });

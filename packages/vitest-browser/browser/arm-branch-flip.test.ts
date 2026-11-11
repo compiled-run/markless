@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
 import ArmBranchEscalate from './fixtures/arm-branch-escalate.tsrx';
 import ArmBranchFlip from './fixtures/arm-branch-flip.tsrx';
+import ArmBranchFlipFirstFail from './fixtures/arm-branch-flip-first-fail.tsrx';
 import { resetPanelRenders } from './fixtures/panel-render-probe.ts';
 
 // T104: @if/@switch INSIDE async boundary arms get real flip machinery (D1
@@ -48,7 +49,7 @@ test('SSR: a sync-state @if inside @try opens AND closes without re-rendering th
 	);
 });
 
-test('SSR: a refresh keeps the arm and its flip; the flip rewires after a real arm re-commit', async () => {
+test('SSR: a refresh and the recovery from a failed refresh keep the arm and its flip', async () => {
 	const screen = await renderSSR(ArmBranchFlip);
 	const container = screen.container as HTMLElement;
 	const renderCount = () => requireElement<HTMLSpanElement>(container, '[data-render-count]').textContent;
@@ -68,25 +69,43 @@ test('SSR: a refresh keeps the arm and its flip; the flip rewires after a real a
 	toggle().click();
 	await expect.poll(() => container.querySelector('[data-drawer]')).toBeNull();
 
-	// A failed run shows @catch after the kept arm; the next good one re-commits the whole block (tier 4), so the probe moves.
+	// A failed run shows @catch after the kept arm; the next good one updates that arm in place, so the probe stays put.
 	requireElement<HTMLButtonElement>(container, 'button[data-lost]').click();
 	await expect.poll(() => container.querySelector('.broken')).not.toBeNull();
+	expect(toggle()).toBe(toggleAtLoad);
 	requireElement<HTMLButtonElement>(container, 'button[data-region]').click();
 	await expect.poll(() => container.querySelector('.broken')).toBeNull();
-	expect(container.querySelector('button[data-drawer-toggle]')?.textContent?.trim()).toBe('east crews');
-	const renderCountAfterCommit = renderCount();
-	expect(renderCountAfterCommit).not.toBe(renderCountAfterLoad);
+	expect(toggle().textContent?.trim()).toBe('east crews');
+	expect(toggle()).toBe(toggleAtLoad);
+	expect(renderCount()).toBe(renderCountAfterLoad);
 
-	// The re-committed arm's flip must be rewired against the fresh anchors.
+	// The kept arm's flip still answers.
+	toggle().click();
+	await expect.poll(() => container.querySelectorAll('.drawer-item').length).toBe(2);
+	expect(renderCount()).toBe(renderCountAfterLoad);
+	toggle().click();
+	await expect.poll(() => container.querySelector('[data-drawer]')).toBeNull();
+});
+
+test('SSR: a first load that fails then succeeds commits the arm and rewires its flip against the fresh anchors', async () => {
+	const screen = await renderSSR(ArmBranchFlipFirstFail);
+	const container = screen.container as HTMLElement;
+	const toggle = () => requireElement<HTMLButtonElement>(container, 'button[data-drawer-toggle]');
+	await expect.poll(() => container.querySelector('.broken')).not.toBeNull();
+	expect(container.querySelector('[data-render-count]')).toBeNull();
+
+	requireElement<HTMLButtonElement>(container, 'button[data-region]').click();
+	await expect.poll(() => container.querySelector('[data-drawer-toggle]')?.textContent?.trim()).toBe('east crews');
+	expect(container.querySelector('.broken')).toBeNull();
+	const renderCountAfterCommit = requireElement<HTMLSpanElement>(container, '[data-render-count]').textContent;
+
+	// The committed arm's flip must be wired against the fresh anchors, and toggling it must not re-render the arm.
 	toggle().click();
 	await expect.poll(() => container.querySelectorAll('.drawer-item').length).toBe(2);
 	expect(
 		Array.from(container.querySelectorAll('.drawer-item'), (item) => item.textContent),
 	).toEqual(['east-kestrel', 'east-osprey']);
-
-	// And the toggle still did not re-render the arm.
-	expect(renderCount()).toBe(renderCountAfterCommit);
-
+	expect(requireElement<HTMLSpanElement>(container, '[data-render-count]').textContent).toBe(renderCountAfterCommit);
 	toggle().click();
 	await expect.poll(() => container.querySelector('[data-drawer]')).toBeNull();
 });

@@ -11,7 +11,6 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { ResumePayloadGraphInput } from '../payload-graph-construct.ts';
 import { asyncPlanes } from '../reconcile-plane-slot.ts';
-import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import type {
 	ResumeArmRange,
 	ResumeAsyncBoundaryRecord,
@@ -84,11 +83,8 @@ const parts = {
 		apply(...args: Parameters<typeof apply>) {
 			apply(...args);
 		},
-		settleRange(...args: Parameters<typeof settleRange>) {
-			return settleRange(...args);
-		},
-		shown(...args: Parameters<typeof shown>) {
-			shown(...args);
+		afterRange(...args: Parameters<typeof afterRange>) {
+			return afterRange(...args);
 		},
 	},
 } satisfies AsyncPlaneSlot;
@@ -251,8 +247,7 @@ export type AsyncPlaneSlot = {
 		readonly note: typeof note;
 		readonly set: typeof set;
 		readonly apply: typeof apply;
-		readonly settleRange: typeof settleRange;
-		readonly shown: typeof shown;
+		readonly afterRange: typeof afterRange;
 	};
 };
 
@@ -296,22 +291,12 @@ export function apply(boundary: BusyBoundary): void {
 	withMarks(false, (loaded) => loaded.apply(boundary));
 }
 
-type ShownArm = { __marklessShownArm?: number };
-export function shown(boundary: ResumeAsyncBoundaryRecord, arm: number): void {
-	(boundary.endAnchor as ShownArm).__marklessShownArm = arm;
-}
-
-// A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
-export function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): ResumeArmRange | undefined {
-	const after =
-		arm === ASYNC_BOUNDARY_ARM.catch &&
-		((boundary.endAnchor as ShownArm).__marklessShownArm ?? boundary.initiallyServedArm) ===
-			ASYNC_BOUNDARY_ARM.try;
-	shown(boundary, after ? ASYNC_BOUNDARY_ARM.try : arm);
-	if (!after) return;
+// The range after a boundary's kept @try content where a failed refresh draws its @catch; `open` creates it when missing.
+export function afterRange(boundary: ResumeAsyncBoundaryRecord, open: boolean): ResumeArmRange | undefined {
 	const end = boundary.endAnchor as unknown as ChildNode & AfterAnchor;
 	let start = end.__marklessAfter as unknown as ChildNode | undefined;
 	if (start?.parentNode !== end.parentNode) {
+		if (!open) return;
 		// The arm-branch prefix keeps page-level comment walks from counting it.
 		start = end.ownerDocument!.createComment('markless:arm-branch:after');
 		end.before(start);
@@ -319,7 +304,6 @@ export function settleRange(boundary: ResumeAsyncBoundaryRecord, arm: number): R
 	}
 	return { id: `${boundary.id}:after`, startAnchor: end.__marklessAfter!, endAnchor: boundary.endAnchor };
 }
-
 
 // Entry marks, called by compiled handlers that write a key input of an async value.
 type EntryMarkContext = {
