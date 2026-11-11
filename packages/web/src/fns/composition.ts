@@ -108,6 +108,8 @@ export type ComposeChild = {
 	readonly hostPrefix: string;
 	readonly symbolPrefix?: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	/** Where the module whose edge owns `boundSymbols` is rooted; absent when `symbolPrefix` is relative to that module. */
+	readonly boundSymbolPrefix?: string;
 	readonly graphProps?: ComposeGraphProps;
 	readonly output?: ComposeChildOutput;
 	/** Build-time: the child-relative path of the composed widget root its children land in. */

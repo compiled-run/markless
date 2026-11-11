@@ -184,6 +184,7 @@ type SsrPrefixChild = {
 	readonly hostPrefix: string;
 	readonly symbolPrefix?: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly boundSymbolPrefix?: string;
 	readonly graphProps?: ComposeGraphProps;
 	readonly externalSymbolIds?: ReadonlySet<string>;
 };
