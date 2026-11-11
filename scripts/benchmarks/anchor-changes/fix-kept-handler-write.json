@@ -159,6 +159,42 @@
 			"delta": 815,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
 		}
 	]
 }
