@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 256,
+			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page (resume runtime, loaded on first wake: +256 B rendered, +30-34 B emitted gzip vs merge-base)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 34,
+			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page (resume runtime, loaded on first wake: +256 B rendered, +30-34 B emitted gzip vs merge-base)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 256,
+			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page (resume runtime, loaded on first wake: +256 B rendered, +30-34 B emitted gzip vs merge-base)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 30,
+			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page (resume runtime, loaded on first wake: +256 B rendered, +30-34 B emitted gzip vs merge-base)",
+			"date": "2026-11-11"
+		}
+	]
+}
