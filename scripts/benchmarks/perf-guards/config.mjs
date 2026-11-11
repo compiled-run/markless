@@ -29,6 +29,8 @@ export const LOAD_WEIGHT_RUNS = 3;
 export const BUDGETS = {
 	// The lowest of three loads moved by at most 107 chars across three measurements of one build (bench /settings); 2.4x that.
 	loadExecutionSwingChars: 256,
+	// Gzip is not additive: a PR's download growth measured up to 48 B more in the merge queue than on its own run (42 queue runs, 2026-10-30 to 11-11).
+	loadDownloadCompositionBytes: 48,
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
 	resumeRowGrowthBytes: 16,
