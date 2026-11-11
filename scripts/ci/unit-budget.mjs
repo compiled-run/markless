@@ -53,7 +53,8 @@ const procStat = (pid) => {
 	return text.slice(text.lastIndexOf(')') + 2).split(' ');
 };
 
-function treeRssBytes(rootPid, pageSize) {
+/** Every descendant of rootPid with its parent and resident bytes. */
+function descendants(rootPid, pageSize) {
 	const parentOf = new Map();
 	const rssOf = new Map();
 	for (const entry of readdirSync('/proc')) {
@@ -72,14 +73,88 @@ function treeRssBytes(rootPid, pageSize) {
 		if (list) list.push(pid);
 		else children.set(parent, [pid]);
 	}
-	let total = 0;
+	const procs = [];
 	const stack = [...(children.get(rootPid) ?? [])];
 	while (stack.length) {
 		const pid = stack.pop();
-		total += rssOf.get(pid) ?? 0;
+		procs.push({ pid, ppid: parentOf.get(pid), rss: rssOf.get(pid) ?? 0 });
 		stack.push(...(children.get(pid) ?? []));
 	}
-	return total;
+	return procs;
+}
+
+const MB = 2 ** 20;
+const UNATTRIBUTED = '(no test file: vitest main process, pnpm, the wrapper)';
+
+/**
+ * Splits one sample of the process tree by test file: each process counts toward the nearest
+ * ancestor (itself included) that a test file was recorded for, so a file owns its Chromium and
+ * child builds. `label` names a process's kind within its file.
+ */
+export function attribute(procs, fileOf, label = () => 'process') {
+	const byPid = new Map(procs.map((proc) => [proc.pid, proc]));
+	const owner = (pid) => {
+		for (let at = pid; byPid.has(at); at = byPid.get(at).ppid)
+			if (fileOf.has(at)) return fileOf.get(at);
+		return UNATTRIBUTED;
+	};
+	const groups = new Map();
+	for (const proc of procs) {
+		const file = owner(proc.pid);
+		const group = groups.get(file) ?? { file, bytes: 0, parts: new Map() };
+		group.bytes += proc.rss;
+		const kind = label(proc);
+		group.parts.set(kind, (group.parts.get(kind) ?? 0) + proc.rss);
+		groups.set(file, group);
+	}
+	return [...groups.values()]
+		.sort((a, b) => b.bytes - a.bytes)
+		.map((group) => ({
+			file: group.file,
+			mb: Math.round(group.bytes / MB),
+			parts: Object.fromEntries(
+				[...group.parts]
+					.sort(([, a], [, b]) => b - a)
+					.map(([kind, bytes]) => [kind, Math.round(bytes / MB)]),
+			),
+		}));
+}
+
+// The program's name, or for node the script it runs; Chromium rewrites its argv into one space-joined string.
+export function processLabel(args) {
+	const name = (path) => path.slice(path.lastIndexOf('/') + 1);
+	const words = args.length === 1 ? args[0].split(' ') : args;
+	const program = name(words[0] ?? '?');
+	if (program !== 'node') return program;
+	const valued = new Set(['-r', '--require', '--import', '--loader', '-C', '--conditions']);
+	for (let index = 1; index < words.length; index += 1) {
+		if (valued.has(words[index])) index += 1;
+		else if (!words[index].startsWith('-')) return `node ${name(words[index])}`;
+	}
+	return 'node';
+}
+
+const labelOf = ({ pid }) => {
+	try {
+		return processLabel(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean));
+	} catch {
+		return 'exited';
+	}
+};
+
+// Test files by the pid of the vitest worker that ran them, as unit-budget-attribution.ts records them.
+function readFileOwners(dir, known) {
+	for (const entry of readdirSync(dir)) {
+		const pid = Number(entry);
+		if (known.has(pid)) continue;
+		try {
+			const file = readFileSync(join(dir, entry), 'utf8').trim();
+			if (file) known.set(pid, file);
+		} catch {
+			continue;
+		}
+	}
+	return known;
 }
 
 // A fixed JavaScript workload; the shard's CPU-seconds divided by its CPU-seconds is the work done,
@@ -126,6 +201,23 @@ async function calibrate(copies) {
 	return Math.round(median(rounds.map((list) => Math.min(...list))) * 1000) / 1000;
 }
 
+/** What was alive at a measurement's peak, largest test file first. */
+export function describePeak(measurement, limit = 8) {
+	const at = measurement.atPeak;
+	if (!at) return `  shard ${measurement.shard}: no per-file attribution at its peak`;
+	return [
+		`  shard ${measurement.shard} at its peak (${measurement.peakRssMb} MB, ${at.atS} s in):`,
+		...at.groups
+			.slice(0, limit)
+			.map(
+				(group) =>
+					`    ${group.mb} MB  ${group.file}  (${Object.entries(group.parts)
+						.map(([kind, mb]) => `${kind} ${mb}`)
+						.join(', ')})`,
+			),
+	].join('\n');
+}
+
 async function measure(command) {
 	if (!command.length) throw new Error(USAGE);
 	const out = process.env.MARKLESS_UNIT_BUDGET_OUT;
@@ -140,7 +232,11 @@ async function measure(command) {
 		calibration = { singleS: await calibrate(1), parallelS: await calibrate(cpus), cpus };
 		before = procStat('self');
 	}
-	const child = spawn(command[0], command.slice(1), { stdio: 'inherit' });
+	const filesDir = out ? mkdtempSync(join(tmpdir(), 'unit-budget-files-')) : null;
+	const child = spawn(command[0], command.slice(1), {
+		stdio: 'inherit',
+		env: filesDir ? { ...process.env, MARKLESS_UNIT_BUDGET_FILES: filesDir } : process.env,
+	});
 	for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal));
 	if (!out)
 		return new Promise((done) =>
@@ -150,8 +246,21 @@ async function measure(command) {
 	const pageSize = Number(execFileSync('getconf', ['PAGESIZE'], { encoding: 'utf8' }));
 	const started = performance.now();
 	let peak = 0;
+	let peakAt = null;
+	const fileOf = new Map();
+	const filePeaks = new Map();
 	const sample = () => {
-		peak = Math.max(peak, treeRssBytes(process.pid, pageSize));
+		const procs = descendants(process.pid, pageSize);
+		const total = procs.reduce((sum, proc) => sum + proc.rss, 0);
+		readFileOwners(filesDir, fileOf);
+		const isNewPeak = total > peak;
+		const groups = attribute(procs, fileOf, isNewPeak ? labelOf : undefined);
+		for (const group of groups)
+			filePeaks.set(group.file, Math.max(filePeaks.get(group.file) ?? 0, group.mb));
+		if (isNewPeak) {
+			peak = total;
+			peakAt = { atS: round((performance.now() - started) / 1000), groups };
+		}
 	};
 	const timer = setInterval(sample, 1000);
 	const exitCode = await new Promise((done) =>
@@ -185,12 +294,20 @@ async function measure(command) {
 		calibrationS: calibration.parallelS,
 		singleCalibrationS: calibration.singleS,
 		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
+		atPeak: peakAt,
+		filePeaksMb: Object.fromEntries(
+			[...filePeaks]
+				.sort(([, a], [, b]) => b - a)
+				.slice(0, 25),
+		),
 	};
+	rmSync(filesDir, { recursive: true, force: true });
 	mkdirSync(dirname(out), { recursive: true });
 	writeFileSync(out, `${JSON.stringify(measurement, null, '\t')}\n`);
 	console.log(
 		`unit budget: shard ${measurement.shard} used ${measurement.cpuS} CPU-s, peak RSS ${measurement.peakRssMb} MB, in ${measurement.wallS} s (${cpuModel}, calibration ${measurement.calibrationS} CPU-s)`,
 	);
+	console.log(describePeak(measurement));
 	return exitCode;
 }
 
@@ -468,8 +585,11 @@ async function main(argv) {
 	if (command === 'check') {
 		const dir = flags(args, '--measurements')[0];
 		if (!dir) throw new Error(USAGE);
-		const result = evaluate(budget, readMeasurements(dir));
+		const measurements = readMeasurements(dir);
+		const result = evaluate(budget, measurements);
 		console.log(result.report);
+		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) => a.localeCompare(b)))
+			console.log(describePeak(m));
 		if (!result.failures.length) {
 			console.log('unit budget: within the noise band of its anchors');
 			return 0;

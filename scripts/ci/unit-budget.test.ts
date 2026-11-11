@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
+import { attribute, describePeak, processLabel } from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -258,4 +259,79 @@ test('measure without an output file runs the command and keeps its exit code', 
 		},
 	);
 	expect(result.status).toBe(3);
+});
+
+describe('peak attribution', () => {
+	const MB = 2 ** 20;
+	// 1: vitest main; 10 and 20: workers; 11: a Chromium under worker 10, 12 its renderer; 21: a build child of worker 20.
+	const procs = [
+		{ pid: 1, ppid: 0, rss: 300 * MB },
+		{ pid: 10, ppid: 1, rss: 400 * MB },
+		{ pid: 11, ppid: 10, rss: 500 * MB },
+		{ pid: 12, ppid: 11, rss: 250 * MB },
+		{ pid: 20, ppid: 1, rss: 200 * MB },
+		{ pid: 21, ppid: 20, rss: 600 * MB },
+	];
+	const fileOf = new Map([
+		[10, 'packages/a/test/browser.test.ts'],
+		[20, 'packages/b/test/build.test.ts'],
+	]);
+	const kinds = new Map([
+		[1, 'node vitest.mjs'],
+		[10, 'node forks.js'],
+		[11, 'chrome'],
+		[12, 'chrome'],
+		[20, 'node forks.js'],
+		[21, 'node fixture-build-child.ts'],
+	]);
+
+	test('a test file owns every process under its worker, largest file first', () => {
+		const groups = attribute(procs, fileOf, ({ pid }) => kinds.get(pid) ?? '?');
+		expect(groups).toEqual([
+			{
+				file: 'packages/a/test/browser.test.ts',
+				mb: 1150,
+				parts: { chrome: 750, 'node forks.js': 400 },
+			},
+			{
+				file: 'packages/b/test/build.test.ts',
+				mb: 800,
+				parts: { 'node fixture-build-child.ts': 600, 'node forks.js': 200 },
+			},
+			{ file: expect.stringContaining('no test file'), mb: 300, parts: { 'node vitest.mjs': 300 } },
+		]);
+	});
+
+	test('the report lists the files alive at the peak', () => {
+		const groups = attribute(procs, fileOf);
+		const text = describePeak({ shard: '1/3', peakRssMb: 2250, atPeak: { atS: 12.5, groups } });
+		expect(text.split('\n')).toEqual([
+			'  shard 1/3 at its peak (2250 MB, 12.5 s in):',
+			'    1150 MB  packages/a/test/browser.test.ts  (process 1150)',
+			'    800 MB  packages/b/test/build.test.ts  (process 800)',
+			expect.stringMatching(/^ {4}300 MB {2}\(no test file/),
+		]);
+		expect(describePeak({ shard: '2/3', peakRssMb: 1 })).toContain('no per-file attribution');
+	});
+
+	test('a process is named by its program, or for node by the script it runs', () => {
+		expect(
+			processLabel([
+				'/opt/ms-playwright/chromium_headless_shell-1/chrome-headless-shell --type=renderer --no-sandbox',
+			]),
+		).toBe('chrome-headless-shell');
+		expect(
+			processLabel([
+				'/usr/bin/node',
+				'--require',
+				'/repo/node_modules/vitest/suppress-warnings.cjs',
+				'--conditions',
+				'node',
+				'/repo/node_modules/vitest/dist/workers/forks.js',
+			]),
+		).toBe('node forks.js');
+		expect(processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}'])).toBe(
+			'node fixture-build-child.ts',
+		);
+	});
 });
