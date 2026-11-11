@@ -277,6 +277,11 @@ const item = computed(() => items[picked.id]);
   - An event handler reads the inputs it pairs with an async-backed value the
     same way, except an input the handler writes: that stays live, so two
     clicks count as two.
+  - The clicked control's own text (2026-11-10, owner, UC23): text inside a
+    control element (`button`, `select`, `option`, `textarea`, `label`, the
+    nearest one enclosing the text) reads the state that control's own
+    handlers write as written, while the async parts of the same text stay
+    as shown. See 12-arm-rendering D8.
   - Mixing on purpose: read an input the fetch does not read. A search box
     that writes both `query` and `searched`, with the fetch reading
     `searched`, can compare `results.q !== query` to dim stale results.

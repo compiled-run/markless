@@ -319,6 +319,8 @@ const posts = computed(async () => {
 
 A picker or button that sets `sort` is fine as it is: it shows the choice the person just made.
 
+That holds even when the control's own text also shows loaded data. A pager button labelled `Next: page {page} of {rows.count}` shows the new page number as soon as it's clicked, next to the count it already had. Everything else on the page, including a `Page {page} of {rows.count}` line beside the button, keeps the old page until the new rows arrive. Only text inside the button (or select, option, label, textarea) whose own handler sets the state gets this. A button that a child component draws, or one inside a list row, keeps the old page like the rest.
+
 To compare the shown answer with what was just typed, keep two states, one the load reads and one it doesn't. The one it doesn't read always shows the latest value:
 
 ```tsrx
