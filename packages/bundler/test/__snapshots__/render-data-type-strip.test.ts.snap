@@ -231,6 +231,7 @@ async function marklessFullResumeHandoff(handoff) {
 	await runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });
 }
 async function marklessResumeContainerEvent(input) {
+	if (input.logOnly && !input.root.__asyncResumeRuntimeStarted) return;
 	await marklessFullResumeHandoff({ ...input, document: input.root });
 }
 export function resumeContainerEvent(input) {

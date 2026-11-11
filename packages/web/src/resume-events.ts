@@ -290,8 +290,7 @@ function queueDeferredHost(root: unknown, host: unknown, eventName: string): voi
 		);
 }
 
-// By event: a promise and what settles it, settled once the handlers ran, one awaits its own work, or one returns a promise. Only a started runtime opens entries.
-// The events a container has received and not yet handled: an in-place navigation retires the page only once they are.
+// Events a started runtime received and has not handled: an in-place navigation retires the page only once they are.
 export const CONTAINER_HANDLING_PROPERTY = '__mH';
 
 type ContainerHandling = Map<object, readonly [handled: Promise<unknown>, settle: () => void]>;
@@ -518,7 +517,6 @@ export function createEventWiring(input: {
 	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
 		// Another dispatch's flush may land while this one's handler still loads.
 		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
-		// Settles the event for a navigation waiting on the page's events.
 		const handled = marklessEventReceived(input.root, event);
 		return dispatchArrived(event, handled, dispatchOptions).finally(() => {
 			handled();

@@ -26,6 +26,8 @@ export interface FragmentNavigationConfig {
 	readonly streamOpenProperty: string;
 	// The leaving page stays up this long after the click while the next one still streams its @pending arms.
 	readonly pendingDeadlineMs: number;
+	// The swap waits at most this long for the destination's code and stylesheets and the leaving page's handlers.
+	readonly swapDeadlineMs: number;
 	// Dispatched on the document once the page the user ends up on is in place.
 	readonly renderedEvent: string;
 	readonly requestPrefix: string;
@@ -417,7 +419,7 @@ async function runScripts(
 	}
 }
 
-function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> {
+function loaded(w: Window, links: readonly HTMLLinkElement[], deadlineMs: number): Promise<unknown> {
 	if (links.length === 0) return Promise.resolve();
 	return Promise.race([
 		Promise.all(
@@ -429,7 +431,7 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 					}),
 			),
 		),
-		new Promise((resolve) => w.setTimeout(resolve, 3000)),
+		new Promise((resolve) => w.setTimeout(resolve, deadlineMs)),
 	]);
 }
 
@@ -437,7 +439,12 @@ function loaded(w: Window, links: readonly HTMLLinkElement[]): Promise<unknown> 
 const servedMedia = new WeakMap<Element, string | null>();
 
 // Existing head nodes stay where they are (moving a stylesheet re-applies it); new ones go in the destination's order.
-export async function mergeHead(d: Document, next: Document, stylesheetKey: string) {
+export async function mergeHead(
+	d: Document,
+	next: Document,
+	stylesheetKey: string,
+	deadlineMs: number,
+) {
 	// A stylesheet's name is a URL and outerHTML starts with "<", so the two never collide.
 	const key = (element: Element) => element.getAttribute(stylesheetKey) ?? element.outerHTML;
 	const current = new Map<string, Element[]>();
@@ -485,7 +492,7 @@ export async function mergeHead(d: Document, next: Document, stylesheetKey: stri
 		if (rel === 'stylesheet' || element.localName === 'style') stale.push(element);
 		else if ((element as HTMLScriptElement).type !== 'importmap') leaving.push(element);
 	}
-	await loaded(d.defaultView!, stylesheets);
+	await loaded(d.defaultView!, stylesheets, deadlineMs);
 	const show = () => {
 		for (const element of leaving) element.remove();
 		for (const [node, after] of later) {
@@ -1219,11 +1226,16 @@ export async function navigate(
 			),
 		);
 	const ranFiles = filesRan(d);
-	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
-	// The leaving page is retired once it has handled the events it received, so a late handler writes before the carry reads; its wait shares the destination code's deadline.
+	const head = await mergeHead(
+		d,
+		next,
+		state.config.stylesheetKeyAttribute,
+		state.config.swapDeadlineMs,
+	);
+	// The leaving page retires once it has handled the events it received, so a late handler writes before the carry reads.
 	await Promise.race([
 		Promise.all([...code, handled(state, outgoing)]),
-		new Promise((resolve) => w.setTimeout(resolve, 3000)),
+		new Promise((resolve) => w.setTimeout(resolve, state.config.swapDeadlineMs)),
 	]);
 	if (stale()) return abandon();
 	let wakeShared: (() => void) | undefined;

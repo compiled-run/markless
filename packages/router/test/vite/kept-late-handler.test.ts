@@ -19,6 +19,8 @@ let server: FixtureDevServer | undefined;
 let origin = '';
 let browser: Browser | undefined;
 let handlerModules: ReadonlySet<string> = new Set();
+// Longer than any test run, so only the cases that test the deadline meet it.
+const LONG_DEADLINE_MS = 10 * 60_000;
 
 beforeAll(async () => {
 	root = await realpath(await mkdtemp(join(tmpdir(), 'markless-kept-late-handler-app-')));
@@ -120,25 +122,55 @@ async function firstRunModules(): Promise<Set<string>> {
 	return handlers;
 }
 
-async function heldPage(): Promise<{
+// The router's swap deadline, set on its config as the page creates it, so a test decides the deadline instead of the clock.
+async function swapDeadline(page: Page, ms: number): Promise<void> {
+	await page.addInitScript((deadline) => {
+		let state: { config: { swapDeadlineMs: number } } | undefined;
+		Object.defineProperty(document, '__marklessFragmentNav', {
+			configurable: true,
+			get: () => state,
+			set: (next: typeof state) => {
+				if (next) next.config.swapDeadlineMs = deadline;
+				state = next;
+			},
+		});
+	}, ms);
+}
+
+async function heldPage(deadlineMs?: number): Promise<{
 	page: Page;
 	errors: string[];
 	rest: () => Promise<void>;
 	release: () => void;
+	landed: () => Promise<void>;
 }> {
 	const page = await browser!.newPage({ viewport: { width: 1000, height: 700 } });
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
+	if (deadlineMs !== undefined) await swapDeadline(page, deadlineMs);
 	let release!: () => void;
 	const released = new Promise<void>((done) => (release = done));
 	const held = (url: string) => handlerModules.has(url);
+	const routed = new Set<string>();
+	const finished = new Set<string>();
+	let changed: () => void = () => {};
+	page.on('requestfinished', (request) => {
+		if (held(request.url())) finished.add(request.url());
+		changed();
+	});
 	await page.route(
 		(url) => held(url.href),
 		async (route) => {
+			routed.add(route.request().url());
 			await released;
 			await route.continue();
 		},
 	);
+	// Every held module the page asked for has arrived.
+	const landed = async () => {
+		while ([...routed].some((url) => !finished.has(url)))
+			await new Promise<void>((resolve) => (changed = resolve));
+	};
 	const rest = quiet(page, held);
 	await page.goto(`${origin}/guide`);
 	// As the docs navbar does: the page's own capture listener tells the parts before the router takes the click.
@@ -153,7 +185,7 @@ async function heldPage(): Promise<{
 			true,
 		);
 	}, PARTS);
-	return { page, errors, rest, release };
+	return { page, errors, rest, release, landed };
 }
 
 test('each handler loads its own code on its first run, so the test can hold it back', () => {
@@ -161,7 +193,7 @@ test('each handler loads its own code on its first run, so the test can hold it 
 });
 
 test('a kept part whose handler code arrives after the link click writes onto the next page', async () => {
-	const { page, errors, rest, release } = await heldPage();
+	const { page, errors, rest, release } = await heldPage(LONG_DEADLINE_MS);
 	await press(page);
 	await page.click('[data-nav="reference"]');
 	await rest();
@@ -178,7 +210,7 @@ test('a kept part whose handler code arrives after the link click writes onto th
 
 // Known gap: the inline boot forwards an event before any runtime exists and tells no navigation about it, so the swap retires the page first and the event is dropped.
 test.fails('an event the page sends before its runtime has started is handled, and its write reaches the next page', async () => {
-	const { page, errors, rest, release } = await heldPage();
+	const { page, errors, rest, release } = await heldPage(LONG_DEADLINE_MS);
 	// No pointer crosses the page first, so nothing has woken its runtime.
 	await page.evaluate(() => document.querySelector<HTMLAnchorElement>('[data-nav="reference"]')!.click());
 	await rest();
@@ -216,6 +248,65 @@ test('a second link clicked while a navigation waits on handler code that never 
 	expect(await shown(page)).toEqual({ title: 'Changelog page', left: 'none', saved: null });
 	expect(errors).toEqual([]);
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.close();
+});
+
+test('a handler whose code arrives after the deadline writes into neither the page it left nor the next one', async () => {
+	const { page, errors, rest, release, landed } = await heldPage(0);
+	await press(page);
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	release();
+	await landed();
+	await rest();
+	expect(errors).toEqual([]);
+	expect(await shown(page)).toEqual({ title: 'Reference page', left: 'none', saved: null });
+	await storedShows(page, 'none');
+	expect(await page.textContent('main')).toBe(
+		'Reference pageThe reference page has its own content, which a navigation replaces.',
+	);
+	await page.click('[data-note-press]');
+	await page.waitForFunction(() => document.querySelector('[data-note-press]')?.textContent === 'presses 2');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a save a handler sent before the reader navigates answers after the swap without touching either page', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	let answer!: () => void;
+	const answered = new Promise<void>((done) => (answer = done));
+	const saves: string[] = [];
+	await page.route(
+		(url) => url.pathname === '/save',
+		async (route) => {
+			saves.push(`${route.request().method()} ${route.request().postData()}`);
+			await answered;
+			await route.fulfill({ status: 204 });
+		},
+	);
+	const rest = quiet(page, (url) => new URL(url).pathname === '/save');
+	await page.goto(`${origin}/guide`);
+	await page.waitForFunction(() => document.querySelector('[data-names]')?.textContent === 'Ada');
+	await page.click('[data-save]');
+	await page.waitForFunction(() => document.querySelector('[data-save-status]')?.textContent === 'saving');
+	const status = await page.$('[data-save-status]');
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	const saved = page.waitForEvent('requestfinished', (request) => new URL(request.url()).pathname === '/save');
+	answer();
+	await saved;
+	await rest();
+	expect(saves).toEqual(['POST Grace']);
+	expect(errors).toEqual([]);
+	expect(new URL(page.url()).pathname).toBe('/reference');
+	expect(await page.$('[data-save-shelf]')).toBeNull();
+	expect(await status!.evaluate((element) => [element.isConnected, element.textContent])).toEqual([false, 'saving']);
+	expect(await shown(page)).toEqual({ title: 'Reference page', left: 'none', saved: null });
+	await page.click('[data-note-press]');
+	await page.waitForFunction(() => document.querySelector('[data-note-press]')?.textContent === 'presses 1');
+	expect(errors).toEqual([]);
 	await page.close();
 });
 
