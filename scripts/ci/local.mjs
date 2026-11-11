@@ -40,6 +40,10 @@ const JOB_POLICY = {
 		'typecheck-ts7': { mode: 'fast' },
 		// MARKLESS_CI_JSON_REPORT_DIR adds a JSON reporter beside the default one; the tests that run are unchanged.
 		unit: { mode: 'fast', vitestJsonReport: true, testSelection: true },
+		'unit-budget': {
+			mode: 'ci-only',
+			reason: 'checks the Linux CPU and memory the unit shards measured in this CI run; a Mac run has no comparable numbers',
+		},
 		browser: { mode: 'full', needsBrowser: true },
 		'completion-matrix': { mode: 'full' },
 		'boxes-bundler': { mode: 'full', needsBrowser: true },
