@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 101,
+			"reason": "docs pages load the in-browser compiler; lowering @catch reset inside attach adds about 100 B gzip to it",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 101,
+			"reason": "docs pages load the in-browser compiler; lowering @catch reset inside attach adds about 100 B gzip to it",
+			"date": "2026-11-11"
+		}
+	]
+}

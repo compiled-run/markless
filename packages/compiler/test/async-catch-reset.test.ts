@@ -147,3 +147,31 @@ export function Team() @{
 		'[["computed:members"],["computed:roster","computed:members"]]',
 	);
 });
+
+test('an attach function in @catch lowers reset the way a handler does, also passed as a value', async () => {
+	for (const attach of [
+		'() => { const timer = setTimeout(reset, 1000); return () => clearTimeout(timer); }',
+		'() => { const timer = setTimeout(() => reset(), 1000); return () => clearTimeout(timer); }',
+	]) {
+		const page = balancePage(`@catch (error, again) { <p attach={${attach.replaceAll('reset', 'again')}} onIdle={() => {}}>{error.message}</p> }`);
+		const result = await compileTsrxModule({ filename: 'src/Page.tsrx', source: page, symbols: [] });
+		expect(result.semanticGraph.diagnostics.map((diagnostic) => diagnostic.code), attach).toEqual([]);
+		expect(result.semanticGraph.behaviors.map((behavior) => behavior.catchResets), attach).toEqual([
+			[{ name: 'again', boundaryId: 'boundary:0' }],
+		]);
+		const behavior = result.symbolModules.modules.find((module) => module.kind === 'behavior');
+		expect(behavior?.source, attach).toContain(RESET_IMPORT);
+		expect(behavior?.source, attach).toContain('"computed:balance"');
+		expect(behavior?.source, attach).not.toMatch(/(?<![-\w])again(?![-\w])/);
+	}
+});
+
+test('an attach function that does not name reset keeps its plain behavior module', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: balancePage('@catch (error, reset) { <p attach={() => console.info("down")} onIdle={() => {}}>Down</p> }'),
+		symbols: [],
+	});
+	expect(result.semanticGraph.behaviors.map((behavior) => behavior.catchResets)).toEqual([undefined]);
+	expect(result.symbolModules.modules.find((module) => module.kind === 'behavior')?.source).not.toContain(RESET_IMPORT);
+});

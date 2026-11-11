@@ -8504,6 +8504,7 @@ export function buildSymbolModuleEmission(
 						asyncComputedGraphNodeIds(input.semanticGraph),
 					),
 					writes: symbol.graphAccess.writes,
+					...(symbol.graphAccess.catchResets ? { catchResets: symbol.graphAccess.catchResets } : {}),
 				},
 				localNames: input.localNames ?? emptyLocalNames,
 				captureSlots: [],

@@ -1292,6 +1292,8 @@ export type SemanticBehavior = {
 	/** Set when the behavior is a function written inline, whose graph reads and writes lower like a handler's. */
 	readonly functionSpan?: SourceSpan;
 	readonly functionParameters?: ReadonlyArray<string>;
+	/** `@catch (error, reset)` reset names the function calls, with the boundary each resets. */
+	readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 };
 
 /**
@@ -2042,6 +2044,10 @@ export type PlannedSymbol =
 				readonly moduleImports?: ReadonlyArray<SemanticModuleImport>;
 				readonly reads: ReadonlyArray<LoweredStateRead>;
 				readonly writes: ReadonlyArray<LoweredStateWrite>;
+				readonly catchResets?: ReadonlyArray<{
+					readonly name: string;
+					readonly resets: ReadonlyArray<ReadonlyArray<string>>;
+				}>;
 			};
 	  }
 	| {
