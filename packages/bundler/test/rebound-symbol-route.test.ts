@@ -9,6 +9,8 @@ import { markless } from '../src/vite/index.ts';
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
 // Page places Board, Board places Editor, all in one module; Editor's bound row is spelled from the module root.
 const nestedFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-nested', import.meta.url));
+// Page places Panel three times, Panel places Picker: each copy's Picker callback has its own bound row.
+const copiesFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-copies', import.meta.url));
 
 const ROUTE_FUNCTION =
 	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;
@@ -97,4 +99,17 @@ test('a same-module child two levels down is rebound under every prefix the tabl
 	const routed = (await route('c0:c1:symbol:1')) as { loaded: unknown; prefix: string };
 	expect(routed.prefix).toBe('c0:c1:');
 	expect(routed.loaded).toMatch(/^local bound:symbol%3A1:0\/1\[/);
+});
+
+test('each copy of a same-module owner reaches the bound row of its own instance path', async () => {
+	const code = await pageCode(copiesFixtureRoot);
+	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
+	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
+	const { route } = runRoute(routeSource);
+
+	for (const copy of [0, 1, 2]) {
+		const routed = (await route(`c${copy}:c3:symbol:1`)) as { loaded: unknown; prefix: string };
+		expect(routed.prefix).toBe(`c${copy}:c3:`);
+		expect(routed.loaded).toMatch(new RegExp(`^local bound:symbol%3A1:${copy}/3\\[`));
+	}
 });

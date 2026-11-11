@@ -180,18 +180,43 @@ export function componentEdgeSymbolRoutes(
 		]),
 	);
 	const boundByEdge = edgeBoundSymbols(compiled.captureAnalysis);
+	const boundByInstance = instanceBoundSymbols(compiled.captureAnalysis, boundByEdge);
 	return compiled.semanticGraph.componentEdges
 		.flatMap((edge, index): ComponentEdgeSymbolRoute[] => {
 			if (artifactChildMaterializations?.[edge.id]) return [];
 			const prefix = instancePaths.get(edge.id) ?? protocolInstanceSegment(index);
 			const boundSymbols = boundByEdge.get(edge.id);
 			const bound = boundSymbols ? { boundSymbols } : {};
+			// Another placement of this edge's parent binds its own rows, so its full instance path gets a route of its own.
+			const instanceRoutes = (boundByInstance.get(edge.id) ?? []).flatMap(
+				({ path, boundSymbols: instanceSymbols }): ComponentEdgeSymbolRoute[] => {
+					const segments = path.map((edgeId) => instancePaths.get(edgeId));
+					if (segments.some((segment) => segment === undefined)) return [];
+					const instancePrefix = segments.join('');
+					return [
+						edge.importSource
+							? {
+									prefix: instancePrefix,
+									importSource: edge.importSource,
+									componentEdgeId: edge.id,
+									boundSymbols: instanceSymbols,
+								}
+							: {
+									prefix: instancePrefix,
+									self: true,
+									componentEdgeId: edge.id,
+									boundSymbols: instanceSymbols,
+								},
+					];
+				},
+			);
 			// A same-module child's symbols were emitted by THIS module, so its
 			// route strips the instance path and answers from the page's own
 			// resolver. It never names an import, so it never reaches the
 			// manifest's import resolution.
 			if (edge.importSource)
 				return [
+					...instanceRoutes,
 					{ prefix, importSource: edge.importSource, componentEdgeId: edge.id, ...bound },
 				];
 			// A cyclic same-module edge is entered once per rendered level, so what
@@ -210,6 +235,7 @@ export function componentEdgeSymbolRoutes(
 							componentEdgeId: edge.id,
 						}
 					: { prefix, self: true, componentEdgeId: edge.id, ...bound },
+				...(selfSource ? [] : instanceRoutes),
 			];
 		})
 		.sort((left, right) => right.prefix.length - left.prefix.length);
@@ -235,6 +261,48 @@ function edgeBoundSymbols(
 		if (entry.via !== 'own' || entry.forwarded) continue;
 		byEdge.set(entry.edgeId, { ...byEdge.get(entry.edgeId), [entry.key]: entry.rowId });
 	}
+	return byEdge;
+}
+
+// The rows each full edge path binds, kept only where they differ from the row its last edge binds for every instance.
+function instanceBoundSymbols(
+	captureAnalysis:
+		| Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'>
+		| undefined,
+	boundByEdge: ReadonlyMap<string, Readonly<Record<string, string>>>,
+): ReadonlyMap<
+	string,
+	ReadonlyArray<{
+		readonly path: ReadonlyArray<string>;
+		readonly boundSymbols: Record<string, string>;
+	}>
+> {
+	const byPath = new Map<
+		string,
+		{
+			edgeId: string;
+			path: ReadonlyArray<string>;
+			boundSymbols: Record<string, string>;
+			differs: boolean;
+		}
+	>();
+	for (const row of captureAnalysis?.boundResolverRows ?? []) {
+		const path = row.componentEdgePath;
+		const child = boundRowChildSymbolId(row, captureAnalysis!.extractedSymbols);
+		if (!child || child.forwarded || path.length < 2) continue;
+		const edgeId = path[path.length - 1]!;
+		const key = JSON.stringify(path);
+		const entry = byPath.get(key) ?? { edgeId, path, boundSymbols: {}, differs: false };
+		entry.boundSymbols[child.symbolId] = row.id;
+		if (boundByEdge.get(edgeId)?.[child.symbolId] !== row.id) entry.differs = true;
+		byPath.set(key, entry);
+	}
+	const byEdge = new Map<
+		string,
+		Array<{ path: ReadonlyArray<string>; boundSymbols: Record<string, string> }>
+	>();
+	for (const { edgeId, path, boundSymbols, differs } of byPath.values())
+		if (differs) byEdge.set(edgeId, [...(byEdge.get(edgeId) ?? []), { path, boundSymbols }]);
 	return byEdge;
 }
 
@@ -322,8 +390,20 @@ export function importedSymbolRoutes(
 	readonly importSource: string;
 	readonly componentEdgeId?: string;
 }> {
+	// An edge reached under several instance paths names its child module once, by its own shortest route.
+	const shortest = new Map<string, number>();
+	for (const route of routes)
+		if (route.componentEdgeId !== undefined)
+			shortest.set(
+				route.componentEdgeId,
+				Math.min(shortest.get(route.componentEdgeId) ?? Infinity, route.prefix.length),
+			);
 	return routes.flatMap((route) =>
-		'importSource' in route && route.importSource !== undefined && !route.selfRecursive
+		'importSource' in route &&
+		route.importSource !== undefined &&
+		!route.selfRecursive &&
+		(route.componentEdgeId === undefined ||
+			shortest.get(route.componentEdgeId) === route.prefix.length)
 			? [{ ...route, importSource: route.importSource }]
 			: [],
 	);
