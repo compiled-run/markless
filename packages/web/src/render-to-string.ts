@@ -153,15 +153,20 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): Promise<string> {
-	// Each pass starts every value it reaches before waiting on any, so separate blocks load side by side.
+	// Start every value the page reaches before waiting on any, so separate blocks load side by side.
 	const runs = new Map<string, { readonly promise?: Promise<unknown> }>();
-	const renderContext = { ...storageRenderContext(options.cookie), streaming: { runs, prestart: true } };
-	let output = await renderSsrOutput(component, options.props, renderContext);
-	for (let started = 0; runs.size > started; ) {
-		started = runs.size;
-		await Promise.all([...runs.values()].map((run) => run.promise));
-		output = await renderSsrOutput(component, options.props, renderContext);
-	}
+	const storage = storageRenderContext(options.cookie);
+	const discovered = await renderSsrOutput(component, options.props, {
+		...storage,
+		streaming: { runs, prestart: true },
+	});
+	if (runs.size === 0) return assembleSsrContainer(component, discovered, options);
+	await Promise.all([...runs.values()].map((run) => run.promise));
+	// A whole-page render has no first flush, so a value the discovery pass did not reach is waited for in place.
+	const output = await renderSsrOutput(component, options.props, {
+		...storage,
+		streaming: { runs, deadline: new Promise<never>(() => {}) },
+	});
 	return assembleSsrContainer(component, output, options);
 }
 
