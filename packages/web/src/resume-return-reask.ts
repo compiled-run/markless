@@ -1,6 +1,6 @@
 import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
-import { NODE_IDLE, type RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
-import { dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
+import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
+import { dispatchSpans, holdBusy, writeWatch, type DispatchSpan } from './event-current-target.ts';
 
 // Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
@@ -192,7 +192,7 @@ function begin(open: ReadonlySet<DispatchSpan>): void {
 			if (
 				!writerRuns.has(node) &&
 				!held.has(node) &&
-				(node.entryHold || (node.phase !== NODE_IDLE && node.snapshot.status !== 'pending'))
+				(node.entryHold || node.snapshot.status === 'fulfilled' || node.snapshot.status === 'rejected')
 			) {
 				held.set(node, container[0]);
 				container[0].asyncPlane?.()?.markEntry(node.graphNodeId);
@@ -212,6 +212,7 @@ function end(ok: boolean): void {
 	const { writers, held } = state;
 	if (inFlight > 0) return move({ phase, inFlight, writers, held });
 	if (phase === WRITE_WRITING) {
+		writeWatch.takeFailure = takeWriteFailure;
 		move({ phase: held.size > 0 ? WRITE_FAILED : WRITE_IDLE });
 		endHolds(held);
 		return roundDone(writers);

@@ -1,6 +1,5 @@
 import type { ArmRowsAnchor } from '../resume-repeat-branch-arm.ts';
-import { holdBusy } from '../event-current-target.ts';
-import { takeWriteFailure } from '../resume-return-reask.ts';
+import { holdBusy, writeWatch } from '../event-current-target.ts';
 import { boundaryBusyHosts, type BusyNode } from '../resume-refresh-busy.ts';
 import type {
 	ResumeArmRecordSet,
@@ -121,7 +120,7 @@ function loadAnnouncer(): Promise<typeof import('./refresh-announcer.ts')> {
 
 function announce(busy: BoundaryBusy, hosts: Set<BusyNode>): void {
 	const nowBusy = busy.marked.size === 0;
-	const failed = !nowBusy && (takeWriteFailure() || busy.failed === true);
+	const failed = !nowBusy && (writeWatch.takeFailure?.() === true || busy.failed === true);
 	busy.failed = false;
 	const key = busy.pending;
 	void loadAnnouncer().then((module) => module.refreshChanged(key, nowBusy, failed, hosts));
