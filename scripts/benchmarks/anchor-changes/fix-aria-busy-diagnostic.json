@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 425,
+			"reason": "the docs playground's compile worker carries the compiler, which gains the MARKLESS_ASYNC_ARIA_BUSY_MANAGED check and its message text; nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 522,
+			"reason": "the docs playground's compile worker carries the compiler, which gains the MARKLESS_ASYNC_ARIA_BUSY_MANAGED check and its message text, and one page chunk changes with it; nothing more runs at load",
+			"date": "2026-11-10"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "the links manifest file name changes with the rebuilt compile worker; nothing more runs at load",
+			"date": "2026-11-10"
+		}
+	]
+}

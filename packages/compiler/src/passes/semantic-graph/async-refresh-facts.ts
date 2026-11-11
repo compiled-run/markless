@@ -13,7 +13,8 @@ import {
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { asyncKeyInputs, asyncReach } from '../paired-async-values.ts';
-import { asyncInputBesideValueDiagnostic } from './diagnostics.ts';
+import { asyncInputBesideValueDiagnostic, managedAriaBusyDiagnostic } from './diagnostics.ts';
+import type { AuthoredAriaBusy } from './types.ts';
 
 type RefreshGraph = Pick<
 	SemanticGraphArtifact,
@@ -125,6 +126,24 @@ export function collectAsyncInputBesideValueDiagnostics(
 			);
 		}
 	}
+}
+
+// The runtime owns aria-busy on every element a refresh marks, so an authored one there is overwritten.
+export function collectManagedAriaBusyDiagnostics(
+	graph: RefreshGraph & { diagnostics: SemanticGraphDiagnostic[] },
+	authored: ReadonlyArray<AuthoredAriaBusy>,
+): void {
+	if (authored.length === 0) return;
+	const { readNodes, readAsyncValues } = refreshContext(graph);
+	const marked = new Set(
+		graph.asyncBoundaries.flatMap((boundary) =>
+			boundaryReads(graph, boundary.id, readNodes, readAsyncValues).flatMap((read) =>
+				read.asyncValues.length > 0 ? [read.hostNodeId] : [],
+			),
+		),
+	);
+	for (const { hostNodeId, sourceSpan } of authored)
+		if (marked.has(hostNodeId)) graph.diagnostics.push(managedAriaBusyDiagnostic(sourceSpan));
 }
 
 // Text in these elements names the control's own choice, which the user just made.

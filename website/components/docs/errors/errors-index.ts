@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 312,
-	guided: 49,
+	total: 313,
+	guided: 50,
 	groups: [
 		{
 			area: 'state',
@@ -874,6 +874,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: true,
 					words: 'an async value looks something up after an await markless_async_post_await_read an async computed() looks a value up with a key that comes from an await.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+					title: 'aria-busy is set where Markless already sets it',
+					chip: 'error',
+					kind: 'compile error',
+					guided: true,
+					words: 'aria-busy is set where markless already sets it markless_async_aria_busy_managed an element inside a @try sets `aria-busy`, but markless already sets it there.',
 				},
 				{
 					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',
