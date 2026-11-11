@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
-import { asked, hold, release, reset } from '../matched-values/gates.ts';
+import { asked, fail, hold, release, reset } from '../matched-values/gates.ts';
 import { ChainMarks } from './chain-marks.tsrx';
 import { RangeChart } from './range-chart.tsrx';
 import { KeyedByData } from './seeded-editor-by-data.tsrx';
@@ -14,7 +14,6 @@ afterEach(() => {
 	cleanup();
 });
 
-// Gap: only the value the click changed is marked; the values downstream are never marked, not even during their own requests.
 each('a chain of dependent values marks each value until its own answer lands', { csr: () => render(ChainMarks), ssr: () => renderSSR(ChainMarks) }, async (container) => {
 	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
 	hold('depot:south', 'route:south-depot', 'eta:south-depot-route');
@@ -41,7 +40,77 @@ each('a chain of dependent values marks each value until its own answer lands', 
 	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('south-depot-route-eta');
 	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
 	expect(container.querySelector('[data-pending]')).toBeNull();
+});
+
+const chainMounts = { csr: () => render(ChainMarks), ssr: () => renderSSR(ChainMarks) };
+const chainBusy = (container: HTMLElement) =>
+	['depot', 'route', 'eta'].filter((name) => busy(container, `[data-${name}]`)).join(' ');
+
+each('a background refresh down a chain marks no value', chainMounts, async (container) => {
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
+	hold('depot:south', 'route:south-depot', 'eta:south-depot-route');
+	const stop = watch(container, { busy: () => chainBusy(container) });
+	click(container, '[data-later]');
+	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
+	release('depot:south');
+	await expect.poll(() => asked.includes('route:south-depot'), poll).toBe(true);
+	release('route:south-depot');
+	await expect.poll(() => asked.includes('eta:south-depot-route'), poll).toBe(true);
+	release('eta:south-depot-route');
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('south-depot-route-eta');
+	expect(stop().busy).toEqual(['']);
+});
+
+const chainShows = (container: HTMLElement) =>
+	[text(container, '[data-depot]'), text(container, '[data-route]'), text(container, '[data-eta]')];
+
+each('a failed link in a chain keeps the content and the values below it stop being busy', chainMounts, async (container) => {
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
+	hold('depot:south', 'route:south-depot');
+	const before = asked.length;
+	click(container, '[data-south]');
+	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	release('depot:south');
+	await expect.poll(() => asked.includes('route:south-depot'), poll).toBe(true);
+	expect(chainBusy(container)).toBe('route eta');
+	fail('route:south-depot', 'no route');
+	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
+	expect(chainShows(container)).toEqual(['south-depot', 'north-depot-route', 'north-depot-route-eta']);
+	expect(asked.slice(before)).toEqual(['depot:south', 'route:south-depot']);
+});
+
+each('a failed first link keeps the content and stops every value below it being busy', chainMounts, async (container) => {
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
+	hold('depot:south');
+	const before = asked.length;
+	click(container, '[data-south]');
+	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	fail('depot:south', 'no depot');
+	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
+	expect(chainShows(container)).toEqual(['north-depot', 'north-depot-route', 'north-depot-route-eta']);
+	expect(asked.slice(before).filter((name) => name.includes('south'))).toEqual(['depot:south']);
+});
+
+// Gap: a failed refresh of a value other than the one the block's update renders from draws @pending or the kept @try content, never @catch.
+each('a failed link in a chain shows its @catch after the kept content', chainMounts, async (container) => {
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
+	hold('depot:south');
+	click(container, '[data-south]');
+	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
+	fail('depot:south', 'no depot');
+	await expect.poll(() => text(container, '[data-failed]'), poll).toBe('no depot');
+	expect(text(container, '[data-eta]')).toBe('north-depot-route-eta');
 }, test.fails);
+
+each('values below a link that answers the same id stop being busy when it lands', chainMounts, async (container) => {
+	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
+	hold('depot:north');
+	click(container, '[data-again]');
+	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	release('depot:north');
+	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
+	expect(text(container, '[data-eta]')).toBe('north-depot-route-eta');
+});
 
 const editors = (container: HTMLElement) =>
 	[...container.querySelectorAll<HTMLElement>('[data-editor]')].map(
