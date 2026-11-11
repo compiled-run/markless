@@ -216,9 +216,9 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		],
 	},
 	MARKLESS_ASYNC_ARIA_BUSY_MANAGED: {
-		summary: 'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
-		what: 'This element shows an async value. While that value loads again, Markless sets `aria-busy="true"` on it, and removes it when the load ends, whether it worked or failed. Your `aria-busy` would be overwritten, so screen readers would never hear what you wrote.',
-		how: 'Remove `aria-busy` and leave it to Markless. To dim old results while new ones load, use a class or a `data-` attribute and style that.',
+		summary: 'Your markup sets `aria-busy` on an element where Markless already sets it.',
+		what: 'Markless sets `aria-busy` itself in two places. An element inside a @try that shows an async value gets `aria-busy="true"` while that value loads again. A form whose submit handler returns a promise gets `aria-busy="true"` while it is sending. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
+		how: 'Remove `aria-busy` and leave it to Markless. To style the busy state, select on it, for example `form[aria-busy="true"]`. For a state of your own, such as old results while new ones load or a form busy for another reason, use a class or a `data-` attribute and style that.',
 		example: [
 			'<ul data-stale={results.query !== query}>',
 			'\t@for (const item of results.items; key item.id) {',

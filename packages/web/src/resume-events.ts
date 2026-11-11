@@ -19,7 +19,7 @@ import {
 	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
-import { dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget } from './event-current-target.ts';
+import { dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget, submitRecord } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -43,6 +43,10 @@ import type {
 type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 	readonly graph: RuntimeGraph;
 };
+
+// Kept once loaded, so a later submission is held without waiting on another import.
+type SubmitHoldModule = typeof import('./submit-hold.ts');
+let submitHold: SubmitHoldModule | undefined;
 
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
@@ -734,6 +738,13 @@ export function createEventWiring(input: {
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
 		const userActionToken: DispatchSpan = { open: true };
+		const form =
+			event.type === 'submit' && event.target?.tagName === 'FORM'
+				? (event.target as unknown as HTMLFormElement)
+				: undefined;
+		// What the submit carries, read before its handler can change the form; the hold, loaded only for a handler that returns a promise.
+		let sent: string | undefined;
+		let hold: Promise<(() => void) | undefined> | undefined;
 		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
 		dispatchSpans().add(userActionToken);
 		try {
@@ -756,6 +767,7 @@ export function createEventWiring(input: {
 					if (loud) graph.markUserActionStart?.();
 					else graph.markQuietStart?.();
 					marklessControlEditsRead(event);
+					if (form && !held) sent ??= submitRecord(form);
 					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
 						...context,
 						...(rowScope && marklessIsBoundSymbolId(symbolId)
@@ -765,6 +777,19 @@ export function createEventWiring(input: {
 						invokeSymbol,
 					});
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
+					if (form && !held && !hold) {
+						const start = (module: SubmitHoldModule) =>
+							module.holdSubmit(
+								form,
+								(event as unknown as SubmitEvent).submitter,
+								sent!,
+								record.authoredSubmitAriaDisabled,
+							);
+						// A hold that fails to load or start leaves the submission unmarked, never failing it.
+						hold = (submitHold ? Promise.resolve(submitHold) : import('./submit-hold.ts'))
+							.then((module) => start((submitHold = module)))
+							.catch(() => undefined);
+					}
 					return await Promise.resolve(result).catch(async (error: unknown) => {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});
@@ -831,6 +856,8 @@ export function createEventWiring(input: {
 			} finally {
 				dispatchSpans().delete(userActionToken);
 				userActionToken.closed?.();
+				// A submission stays held until the reload its save caused has landed.
+				if (hold) void Promise.all([hold, userActionToken.refreshed]).then(([end]) => end?.());
 			}
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({

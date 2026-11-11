@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolRowTemplateSlotValue,
+	type ProtocolSubmitEventFacts,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
@@ -108,6 +109,7 @@ export function createProtocolViewPayload(
 					eventName: event.eventName,
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+					...submitEventFacts(input, event),
 				})),
 			forwarded.events,
 		),
@@ -518,6 +520,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			// host's, so dropping the policy here left every row past the
 			// first with no synchronous preventDefault.
 			...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
+			...submitEventFacts(input, event),
 		});
 		const events = oneRecordPerEvent(input.payloadArena.view.events);
 		const indexName = input.semanticGraph?.keyedRepeats.find(
@@ -1513,6 +1516,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 					eventName: event.eventName,
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+					...submitEventFacts(input, event),
 				})),
 			domUpdates: input.payloadArena.view.domUpdates
 				.filter((domUpdate) => hostIds.has(domUpdate.hostNodeId))
@@ -1697,4 +1701,19 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 			...behaviorSymbolFields(input, symbolsByHost.get(behavior.hostNodeId)?.[rank]),
 		};
 	});
+}
+
+// The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+function submitEventFacts(
+	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
+	event: { readonly hostNodeId: string; readonly eventName: string },
+): ProtocolSubmitEventFacts {
+	return input.semanticGraph?.events.some(
+		(candidate) =>
+			candidate.authoredSubmitAriaDisabled &&
+			candidate.hostNodeId === event.hostNodeId &&
+			candidate.eventName === event.eventName,
+	)
+		? { authoredSubmitAriaDisabled: true }
+		: {};
 }
