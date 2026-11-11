@@ -45,6 +45,52 @@
 			"delta": 1,
 			"reason": "@catch text joining the error with state: when a block with an error cell fails, the arm render hands the shown error to the commit's cell list; no new client module, nothing runs for blocks without that shape (smallest correct placement tried: lazy modules broke the client module count, lazy enclosing-catch grew a load-time chunk)",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 479,
+			"reason": "when a block whose @catch text joins the error with state fails, the arm render hands the shown error to the commit cell list (measured on PR #618 run 43080662668, linux-x64); blocks without that shape run nothing new",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 511,
+			"reason": "the docs live code blocks load the compiler in the browser, and the compiler now resolves the @catch error binding into a joined text cell (measured on PR #618 run 43080662668, linux-x64); bench pages without @catch are unchanged at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 742,
+			"reason": "the docs live code blocks load the compiler in the browser, and the compiler now resolves the @catch error binding into a joined text cell (measured on PR #618 run 43080662668, linux-x64); bench pages without @catch are unchanged at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 63,
+			"reason": "the docs live code blocks load the compiler in the browser, and the compiler now resolves the @catch error binding into a joined text cell (measured on PR #618 run 43080662668, linux-x64); bench pages without @catch are unchanged at load",
+			"date": "2026-11-11"
 		}
 	]
 }
