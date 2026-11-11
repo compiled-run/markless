@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/write-refresh"
+			],
+			"set": 3029,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 161,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 21,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/write-refresh"
+			],
+			"set": 3029,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 161,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 39,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 40,
+			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
+			"date": "2026-11-11"
+		}
+	]
+}

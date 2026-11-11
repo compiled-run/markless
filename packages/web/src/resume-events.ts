@@ -734,6 +734,9 @@ export function createEventWiring(input: {
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
 		const userActionToken = { open: true };
+		const span: { closed?: () => void } = {};
+		const spans = ((globalThis as { __mOpen?: Set<object> }).__mOpen ??= new Set());
+		spans.add(span);
 		try {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
@@ -824,7 +827,12 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			userActionToken.open = false;
-			await input.flushRuntimeGraph();
+			try {
+				await input.flushRuntimeGraph();
+			} finally {
+				spans.delete(span);
+				span.closed?.();
+			}
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,

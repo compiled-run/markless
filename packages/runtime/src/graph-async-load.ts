@@ -238,6 +238,19 @@ export function createAsyncPlane(
 			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
 			return true;
 		},
+		refreshAfterWrite(versions) {
+			const due: RuntimeAsyncComputedNode[] = [];
+			for (const [graphNodeId, version] of versions) {
+				const node = nodes.get(graphNodeId);
+				// A value that ran again since the writes settled already has their answer.
+				if (node?.version === version && node.phase === NODE_SETTLED) due.push(node);
+			}
+			for (const node of due) moveNode(node, NODE_PLANNED);
+			if (due.length > 0)
+				withRefresh((loaded) => {
+					for (const node of due) if (node.phase === NODE_PLANNED) loaded.advance(node);
+				});
+		},
 		holdInputs(factory) {
 			const shared = context();
 			if (shared.held) return;

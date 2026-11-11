@@ -229,6 +229,39 @@ across all three cases:
   a timer callback that writes directly, firing while some handler is still
   waiting on its own `await`, is counted loud too. Closing it needs the
   compiler to rewrap each `await`, or a platform async context.
+- Refresh after a save (2026-11-11, owner, design A of the async-dx
+  mutation proofs): when an event handler's write succeeds, every async
+  value the page shows inside a `@try` re-asks with its current key, with
+  no author code: no refresh or invalidate call, no action API, no status
+  read. A write is a `fetch` the page sends to its own origin with a method
+  other than `GET`, `HEAD` or `OPTIONS`, while at least one DOM dispatch is
+  in flight; it succeeds when its response is `ok`. Writes are never
+  aborted, and latest-wins never applies to them. The refresh runs once,
+  after every write in flight has settled and every dispatch that was in
+  flight when one of them was sent has ended (the browser cannot attribute
+  a request to one handler, so all of them count). It is loud: a save the
+  person started is the person's change, so readers are marked busy and the
+  refresh is announced as in the re-settle rule above. A value that ran
+  again after the writes settled (the handler changed its key) is not asked
+  again. A value whose recipe sent a write in the synchronous start of its
+  latest run is never re-asked by this rule, because that would send the
+  write again. Values re-ask inputs first, so a value keyed by another
+  async value waits for that input's answer and runs once. A write that
+  fails, rejects, is sent outside any dispatch (a timer, a socket message)
+  or to another origin refreshes nothing; neither does a write made through
+  `XMLHttpRequest`, `sendBeacon`, a WebSocket or a `fetch` reference taken
+  before the page wired its async values. A write that never settles holds
+  every later refresh on the page until it does; an author bounds it with
+  the request's own `signal` (`AbortSignal.timeout`). A recipe that sends a
+  write after an `await` is not attributed, and a refresh re-runs it and
+  sends the write again: authoring rule, writes start before a recipe's
+  first `await` or live in handlers; in development the runtime warns when
+  a write is sent outside any dispatch while a refresh it started is
+  loading. No compile-time check exists, because the analyzer has no fact
+  for a fetch call site's method or for what a recipe reaches across
+  functions. Validated by
+  `packages/vitest-browser/browser/mutations-refresh` and the docs recipe
+  `async-recipes/mugs.tsrx`.
 - Matched values during a re-settle (2026-11-04, async-error-states): the
   held content keeps showing pairs that belong together. A binding in the
   arm that reads the refreshing value beside an input of its key shows that
@@ -310,7 +343,7 @@ unchanged.
 
 ## Open items
 
-Known gaps on main as of 2026-11-10. Each is either being fixed or deferred;
+Known gaps on main as of 2026-11-11. Each is either being fixed or deferred;
 none changes a ruling above.
 
 - Independent blocks settle one after another (being fixed). Two `@try`
@@ -330,5 +363,10 @@ none changes a ruling above.
 - Optimistic edits of existing rows (open). Adding a row optimistically is
   quiet, but an optimistic edit of a row already shown (a like, a toggle)
   still marks that row busy while its save runs.
-- Mutations (design under research). How a save declares what it refreshes,
-  and form-submit pending, are not specified here.
+- Mutations (partly specified). Refresh after a save is ruled above.
+  Narrowing which values a save refreshes is not approved; form-submit
+  pending and the native form upgrade are not specified here.
+- Writes after an `await` in a recipe (open, D8 "Refresh after a save").
+  Covered by an authoring rule and a development warning only; a compile
+  error needs an analyzer fact for fetch call sites and what a recipe
+  reaches.

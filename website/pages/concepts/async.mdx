@@ -192,38 +192,83 @@ export function loadForecast(
 
 ## Load it again after a save
 
-The same trick reloads data after a save, or from a Reload button. Give the recipe a counter to read, and add one to it:
+When an event handler saves something, the async values on the page load again on their own once the save has answered. You write the save, and nothing else:
+
+```tsrx title="mugs.tsrx"
+import { computed } from '@markless/core';
+import { loadMugs, saveMug } from './mugs.ts';
+
+export default function Mugs() @{
+	const mugs = computed(async () => await loadMugs());
+
+	<section>
+		@try {
+			<div>
+				<ul>
+					@for (const mug of mugs; key mug.id) {
+						<li>{mug.name}</li>
+					}
+				</ul>
+				<button onClick={async () => await saveMug('Tall mug')}>
+					Add a tall mug
+				</button>
+			</div>
+		} @pending {
+			<p>Counting mugs</p>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</section>
+}
+```
+
+```ts title="mugs.ts"
+export type Mug = { readonly id: number; readonly name: string };
+
+export async function loadMugs(): Promise<Mug[]> {
+	const response = await fetch('/api/mugs');
+	return response.json();
+}
+
+export async function saveMug(name: string) {
+	const response = await fetch('/api/mugs', {
+		method: 'POST',
+		body: JSON.stringify({ name }),
+	});
+	if (!response.ok) throw new Error(`Saving failed (${response.status})`);
+}
+```
+
+Press **Add a tall mug**: the save goes out, and when it answers, the list asks for the mugs again and shows the new one. Here is what Markless does, and why:
+
+- **What counts as a save.** A `fetch` to your own site (the same origin as the page) with any method other than `GET`, `HEAD` or `OPTIONS`, sent while an event handler is running. `saveMug` can live in any file, as deep in other helpers as you like.
+- **Only a save that worked.** A save that answers with an error status, or never reaches the server, loads nothing again. If the handler throws, as `saveMug` does, the error shows in the `@catch` around its button, as for [any failing handler](#a-failing-handler-shows-in-catch).
+- **Saves are never cancelled.** Two saves at once are both sent in full, and the page loads again once, after both have answered.
+- **Everything shown loads again.** Every async value inside a `@try` on the page asks again, not only the ones the save changed, and they ask side by side. With three values on the page, one save costs four requests: the save and three loads.
+- **The old answer stays.** While the new answers load, the page keeps the old ones and marks each element that shows them with `aria-busy="true"`, the same as any [refresh a click starts](#a-background-refresh-stays-quiet).
+- **Still one load if you also change what it reads.** A handler written the older way, which changes a value the recipe reads after its save, loads that value once, not twice.
+
+Three limits are worth knowing:
+
+- **A save that never answers holds the reload**, and so does any other save sent before it answers. Give a save that might hang a time limit: `fetch(url, { method: 'POST', signal: AbortSignal.timeout(10_000) })`. When the time runs out, the save counts as failed and the other saves' reload goes ahead.
+- **The reload waits for every handler that was running when the save went out**, even one that has nothing to do with it, because the browser cannot say which handler sent a request.
+- **Some requests are not seen as saves:** ones sent from a timer or other code outside an event handler, ones to another site, and ones sent with `XMLHttpRequest`, `navigator.sendBeacon`, a WebSocket, or a library that keeps its own copy of `fetch`. For those, use a counter, as a Reload button does.
+
+### A Reload button
+
+To load again when the person asks, give the recipe a counter to read, and add one to it:
 
 ```tsrx
 let reload = state(0);
 const mugs = computed(async () => {
 	reload;
-	return loadMugs();
+	return await loadMugs();
 });
 
 <button onClick={() => reload++}>Reload</button>
-<button
-	onClick={async () => {
-		await saveMug('tall');
-		reload++;
-	}}
->
-	Add a tall mug
-</button>
-@try {
-	<ul>
-		@for (const mug of mugs; key mug.id) {
-			<li>{mug.name}</li>
-		}
-	</ul>
-} @pending {
-	<p>Counting mugs</p>
-}
 ```
 
-The bare `reload;` line is the read. It is what makes a change to `reload` run the recipe again.
-
-The list is marked busy from the moment you press **Add a tall mug**, while the save is still running, not only once `reload++` runs. Markless sees before the page runs that this handler changes `reload`. If the handler ends without changing it, for example because the save failed, the mark goes away and nothing loads again.
+The bare `reload;` line is the read. It is what makes a change to `reload` run the recipe again. The list is marked busy from the moment you press **Reload**.
 
 ## The old answer stays until the new one is ready
 
@@ -377,7 +422,7 @@ const orders = computed(async () => {
 <button onClick={() => poll++}>Check now</button>
 ```
 
-- **A change made in an event handler** marks the block busy and says "Updating…". That includes a change made after an `await` in the handler, and a change made by a function the handler calls.
+- **A change made in an event handler** marks the block busy and says "Updating…". That includes a change made after an `await` in the handler, a change made by a function the handler calls, and the [reload after a save](#load-it-again-after-a-save) the handler sent.
 - **A change made anywhere else** refreshes quietly: no busy mark, no message. That means a timer, a socket or `EventSource` message, or a promise no handler started. The new answer still swaps in when it lands.
 
 A quiet refresh that fails still says "Update failed", because a check that stopped working without a word is worse than one that speaks up. The page follows the [failed-refresh rule](#a-failed-refresh-keeps-the-last-answer) either way.
@@ -668,8 +713,9 @@ A form handler adds `{ id: crypto.randomUUID(), title }` to `drafts`, and the li
 
 - Each save runs once, in the browser. It never runs while the server renders the page.
 - A failed save shows `@catch` in that row only, and `reset` retries only that save.
-- Give each draft an id you make in the browser. When you load the whole list again, leave out the saved items that are still in `drafts`, so no item shows twice.
+- Give each draft an id you make in the browser. When the whole list [loads again after the save](#load-it-again-after-a-save), leave out the saved items that are still in `drafts`, so no item shows twice.
 - A draft row is a first load, not a refresh, so it gets no busy mark.
+- Start the save before the first `await` in the recipe, as `saveTodo(draft)` does. Markless then knows the row's value sends a save, and never runs it again when the page loads again after some other save. A save sent after an `await` cannot be told apart from any other request, so a later reload would send it a second time. In development, the browser console warns when that happens. If the save needs an answer first, get it in the event handler that adds the draft.
 
 Changing a row that is already saved is a refresh, not a first load: the row keeps its old content, marked busy, until the save answers.
 
