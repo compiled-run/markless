@@ -232,7 +232,6 @@ export async function registerArmRecordSet(
 		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
 		await deps.registerComputedRefreshes(update.computed!);
 	}
-	registerArmDomUpdates(deps, materialized.domUpdates);
 	if (materialized.keyedRepeats.length)
 		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved);
 	if (deps.addBehaviors && materialized.behaviors.length) {
@@ -255,6 +254,8 @@ export async function registerArmRecordSet(
 			update.computed,
 			!update.comments,
 		);
+	// Last: text this arm writes outside a nested @try reads the async values that registration defined.
+	registerArmDomUpdates(deps, materialized.domUpdates);
 	return materialized;
 }
 
