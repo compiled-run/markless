@@ -1,0 +1,16 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 77,
+			"reason": "async refresh module: busy marks follow a chain of async values until each answer lands (UC9); measured 511805 vs anchor 511728 on PR #597's linux run, executed chars unchanged",
+			"date": "2026-11-10"
+		}
+	]
+}
