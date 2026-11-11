@@ -57,6 +57,108 @@
 			"delta": 118,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 198,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 198,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 193,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 360,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": 149,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 815,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
 		}
 	]
 }
