@@ -239,6 +239,78 @@
 			"delta": 717,
 			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); no async values here, so the write watch is not downloaded and nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582; executed chars not recorded, their swing between the two runs was +108/+1/-223)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); no async values here, so the write watch is not downloaded and nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582; executed chars not recorded, their swing between the two runs was +108/+1/-223)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); no async values here, so the write watch is not downloaded and nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582; executed chars not recorded, their swing between the two runs was +108/+1/-223)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 774,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 3655,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 774,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load (CI run 42986846752 vs merge-group run 42981779582)",
+			"date": "2026-11-11"
 		}
 	]
 }
