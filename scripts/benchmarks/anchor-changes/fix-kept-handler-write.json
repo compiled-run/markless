@@ -5,20 +5,9 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/payload-resume-registry"
-			],
-			"set": 735,
-			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 264,
+			"delta": 783,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
@@ -30,18 +19,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 122,
-			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/payload-resume-registry"
-			],
-			"set": 735,
+			"delta": 119,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
@@ -52,7 +30,7 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 264,
+			"delta": 783,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
@@ -64,7 +42,7 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 128,
+			"delta": 117,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
@@ -76,7 +54,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 123,
+			"delta": 118,
 			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		}

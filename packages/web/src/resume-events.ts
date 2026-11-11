@@ -20,7 +20,6 @@ import {
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
-import { marklessEventHandled, marklessEventReceived } from './payload-resume-registry.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -289,6 +288,28 @@ function queueDeferredHost(root: unknown, host: unknown, eventName: string): voi
 		void import('./fns/visible-trigger.ts').then((trigger) =>
 			trigger.queueMarklessVisibleHost(root as object, host as object),
 		);
+}
+
+// By event: a promise and what settles it, settled once the handlers ran, one awaits its own work, or one returns a promise. Only a started runtime opens entries.
+// The events a container has received and not yet handled: an in-place navigation retires the page only once they are.
+export const CONTAINER_HANDLING_PROPERTY = '__mH';
+
+type ContainerHandling = Map<object, readonly [handled: Promise<unknown>, settle: () => void]>;
+export type HandlingRoot = { [CONTAINER_HANDLING_PROPERTY]?: ContainerHandling };
+
+function marklessEventReceived(root: object, event: object): () => void {
+	const handling = ((root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY] ??= new Map());
+	const entry = handling.get(event);
+	if (entry) return entry[1];
+	let resolve!: () => void;
+	const handled = new Promise<void>((done) => (resolve = done));
+	const settle = () => (resolve(), handling.delete(event));
+	handling.set(event, [handled, settle]);
+	return settle;
+}
+
+function marklessEventHandled(root: object, event: object): void {
+	(root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY]?.get(event)?.[1]();
 }
 
 export function createEventWiring(input: {
