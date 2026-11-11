@@ -105,26 +105,30 @@ test('diagnoses invalid request files', () => {
 });
 
 test('wraps API and middleware files for Nitro with Markless HTTP context', () => {
-	expect(
-		transformRequestFileSource(
-			'api/users/[id].get.ts',
-			'export default async function (http) { return http.params.id; }',
-		)?.code,
-	).toContain(
-		'import { __marklessCreateHttpContext as __markless_create_http_context__ } from "@markless/router";',
+	const endpoint = transformRequestFileSource(
+		'api/users/[id].get.ts',
+		'export default async function (http) { return http.params.id; }',
+	)?.code;
+	expect(endpoint).toContain(
+		'import { __marklessCreateHttpContext as __markless_create_http_context__, __marklessRefuseCrossSiteWrite as __markless_refuse_cross_site_write__ } from "@markless/router";',
 	);
-	expect(
-		transformRequestFileSource(
-			'api/posts.get.ts',
-			'export const cache = { maxAge: 60 }; export default function () {}',
-		)?.code,
-	).toContain(
-		'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";',
+	expect(endpoint).toContain(
+		'__markless_refuse_cross_site_write__(event) ?? __markless_request_handler__(__markless_create_http_context__(event))',
 	);
-	expect(
-		transformRequestFileSource(
-			'middleware/01.auth.ts',
-			'const auth = (http) => { http.locals.user = {}; }; export default auth;',
-		)?.code,
-	).toContain('auth(__markless_create_http_context__(event))');
+	const cached = transformRequestFileSource(
+		'api/posts.get.ts',
+		'export const cache = { maxAge: 60 }; export default function () {}',
+	)?.code;
+	expect(cached).toContain(
+		'import { defineCachedHandler as __markless_define_cached_handler__ } from "nitro/cache";',
+	);
+	expect(cached).toContain(
+		'__markless_refuse_cross_site_write__(event) ?? __markless_cached_handler__(event)',
+	);
+	const middleware = transformRequestFileSource(
+		'middleware/01.auth.ts',
+		'const auth = (http) => { http.locals.user = {}; }; export default auth;',
+	)?.code;
+	expect(middleware).toContain('auth(__markless_create_http_context__(event))');
+	expect(middleware).not.toContain('__markless_refuse_cross_site_write__');
 });

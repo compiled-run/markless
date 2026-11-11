@@ -169,6 +169,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_SERVER_ONLY_PROP_BROWSER_READ: 'Browser code reads the page’s http prop',
 	MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED: 'prefetch={false} sits on something that is not a link',
 	MARKLESS_ROUTER_RESPONSE_COMMITTED: 'A page changed its status after streaming began',
+	MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: 'An API route refused a write sent from another site',
 	MARKLESS_NODE_IN_BROWSER: 'Node-only code reaches the browser',
 	// Codes whose diagnostic title is written for the compiler, not for you.
 	MARKLESS_ARTIFACT_CHILD_PROP_NOT_BUILD_KNOWN: 'A child prop is not known at build time',

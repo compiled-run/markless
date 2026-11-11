@@ -45,6 +45,19 @@ with a `Route conflict:` error naming both files; an endpoint for another
 method, such as `api/contact.post.ts` beside `pages/api/contact.tsrx`, leaves
 the page its GET.
 
+Every endpoint in `api/` refuses a write that a browser sent from another site,
+before its function runs and before any endpoint cache is read. A write is any
+method other than GET, HEAD and OPTIONS. When the request carries
+`Sec-Fetch-Site`, only `same-origin` and `none` pass; `same-site` and
+`cross-site` are refused. Without `Sec-Fetch-Site`, a request whose `Origin`
+differs from the origin of the request's own URL is refused (`Origin: null`
+included). A request with neither header passes, so curl and server-to-server
+calls are unaffected. The refusal is status 403 with a plain-text body that
+starts with `MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED`. Middleware still runs
+first. The check runs only on the server and adds nothing to the browser.
+There is no option to trust another origin: such a site writes through its own
+server.
+
 ## Page placement
 
 The page's markup lands where the document's `{children}` sits, with no element
