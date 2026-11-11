@@ -51,6 +51,7 @@ import {
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
 	freeReadSources,
+	type GraphReadScope,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
@@ -60,6 +61,7 @@ import {
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import { collectRowLocalReads } from './row-local-reads.ts';
+import { catchErrorScope } from './catch-error-cell.ts';
 import { takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import {
 	extractSyncPolicy,
@@ -412,24 +414,38 @@ function joinTextParts(
 		AnyNode,
 		{ readonly source: string; readonly definitions: AnyNode[] }
 	>();
+	const catchErrors = new Map<string, string>();
 	for (const value of values as AnyNode[]) {
 		const entry = shared
 			? {
 					kind: 'inlined' as const,
 					source: expressionSource(value, state.source),
 					definitions: [],
+					catchErrors: new Map<string, string>(),
 				}
-			: inlineRenderLocals(value, state);
+			: inlineRenderLocals(value, state, { catchErrors: true });
 		if (entry.kind !== 'inlined') return null;
+		for (const [name, boundaryId] of entry.catchErrors) {
+			if ((catchErrors.get(name) ?? boundaryId) !== boundaryId) return null;
+			catchErrors.set(name, boundaryId);
+		}
 		inlined.set(value, { source: entry.source ?? '', definitions: [...entry.definitions] });
 	}
+	const baseScope = {
+		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+		aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
+	};
+	const caught = catchErrors.size > 0 ? catchErrorScope(catchErrors, baseScope, state) : null;
+	if (catchErrors.size > 0 && !caught) return null;
+	const scope = caught?.scope ?? baseScope;
 	const definitions = [...inlined.values()].flatMap((entry) => entry.definitions);
 	const readSources = joinReadSources([
 		...values.map((value) => {
 			const sources = pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS);
 			return shared
 				? sources
-				: (sources?.filter((source) => !readsRenderDefinition(source, state)) ?? null);
+				: (sources?.filter((source) => !readsRenderDefinition(source, state, caught?.scope)) ??
+						null);
 		}),
 		...definitions.map((definition) =>
 			collectGraphDependencies(definition, state).map((dependency) => dependency.source),
@@ -449,12 +465,13 @@ function joinTextParts(
 		`() => ${source}`,
 		readSources,
 		state,
-		undefined,
+		caught ? scope : undefined,
 		false,
 		undefined,
 		true,
 	);
 	if (!composite) return null;
+	caught?.keep();
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
@@ -463,9 +480,10 @@ function joinTextParts(
 }
 
 // A read rooted in a body const the join spliced in by its definition, not a graph read.
-function readsRenderDefinition(source: string, state: WalkState): boolean {
+function readsRenderDefinition(source: string, state: WalkState, caught?: GraphReadScope): boolean {
 	const root = /^[^.?[(\s]+/.exec(source)?.[0];
 	if (!root || repeatRowBindsName(root, state)) return false;
+	if (caught && resolveGraphPath(root, caught.bindings, caught.aliases)) return false;
 	return (
 		!resolveGraphPath(
 			root,

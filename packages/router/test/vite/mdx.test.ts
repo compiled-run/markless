@@ -9,6 +9,7 @@ import {
 	transformMdxRoute,
 } from '../../src/vite/mdx.ts';
 import { createMdxRenderDataSurface } from '../../src/vite/runtime/mdx-route.ts';
+import { marklessOwningSurface } from '../../../web/src/prerender/owning-surface.ts';
 import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), 'markless-mdx-config-'));
@@ -218,11 +219,9 @@ This page is static markdown.
 				'createMdxRenderDataSurface',
 				'marklessImport',
 				`const marklessMdxParts = ${declared('marklessMdxParts') ?? '[]'};\nreturn ${loader!.replaceAll('import(', 'marklessImport(')};`,
-			)(createMdxRenderDataSurface, async () => island) as () => Promise<{
-				readonly imports: Record<string, unknown>;
-			}>;
+			)(createMdxRenderDataSurface, async () => island) as () => Promise<unknown>;
 			const composed = await load();
-			expect(composed.imports, id).toEqual({ Steps: surface });
+			expect(marklessOwningSurface(composed as never, 'Steps')?.surface, id).toEqual(surface);
 		}
 	});
 

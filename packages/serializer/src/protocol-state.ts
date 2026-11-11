@@ -203,17 +203,15 @@ function serializeComputedSnapshot(
 			error: serializeProtocolStateField(
 				computed,
 				'error',
-				durableSnapshotError(computed.snapshot.error),
+				durableError(computed.snapshot.error),
 			),
 		},
 	};
 }
 
-// Rejected async snapshots routinely hold live Error instances (a failed fetch
-// rejects with TypeError). Refusing to serialize them would fail the WHOLE page
-// render over an error the page's @catch arm already handled — keep the durable
-// facts (name/message) and drop the live object.
-function durableSnapshotError(error: unknown): unknown {
+
+// A live Error is not durable graph state; its name and message are, so a handled failure never fails the render.
+export function durableError(error: unknown): unknown {
 	if (error instanceof Error) {
 		return { $type: 'error', name: error.name, message: error.message };
 	}

@@ -591,6 +591,9 @@ function branchesInside(
 	) as unknown as NonNullable<ResumeArmRecordSet['branches']>;
 }
 
+// The error each shown @catch renders, for the commit to write into its cell; it never passes through serialization.
+const caughtErrors = new WeakMap<ReadonlySet<string>, Map<string, unknown>>();
+
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
 function freshArmCells(
 	output: SsrRenderOutput,
@@ -601,7 +604,9 @@ function freshArmCells(
 			? [
 					{
 						graphNodeId: cell.graphNodeId,
-						value: (cell as { readonly directValue?: unknown }).directValue,
+						value:
+							caughtErrors.get(freshCellIds)?.get(cell.graphNodeId) ??
+							(cell as { readonly directValue?: unknown }).directValue,
 					},
 				]
 			: [],
@@ -916,9 +921,7 @@ function instanceCellIds(
 	if (visiting.has(definition)) return ids;
 	visiting.add(definition);
 	for (const edge of definition.edges ?? []) {
-		const childSurface = surface.components[edge.childComponentName]
-			? surface
-			: surface.imports[edge.childComponentName];
+		const childSurface = childEdgeSurface(surface, edge);
 		const child = childSurface?.components[edge.childComponentName];
 		if (child)
 			ids.push(...instanceCellIds(childSurface, child, instancePrefix + edge.symbolPrefix, visiting));
@@ -1260,7 +1263,7 @@ export function evaluatePrerenderDataComponent(input: {
 							...(computed.deriveSymbolId
 								? {
 										deriveSymbolId: marklessBoundSymbolId(
-											input,
+											{ ...input, boundSymbolPrefix: input.composer?.module?.rootPrefix },
 											computed.deriveSymbolId,
 										),
 									}
@@ -1448,14 +1451,16 @@ export function evaluatePrerenderDataComponent(input: {
 							const status = boundary?.runnerGraphNodeId
 								? runnerStatus(boundary.runnerGraphNodeId, state.computed)
 								: undefined;
-							if (status === 'rejected')
-								return {
-									arm: 2,
-									error: runnerError(
-										boundary!.runnerGraphNodeId!,
-										state.computed,
-									),
-								};
+							if (status === 'rejected') {
+								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
+								const shown = boundary!.errorGraphNodeId;
+								const fresh = input.freshCellIds;
+								if (shown && fresh) {
+									fresh.add(input.symbolPrefix + shown);
+									caughtErrors.set(fresh, (caughtErrors.get(fresh) ?? new Map()).set(input.symbolPrefix + shown, error));
+								}
+								return { arm: 2, error };
+							}
 							return status === 'fulfilled' ? 0 : 1;
 						},
 						seedChild: (slot, context) =>

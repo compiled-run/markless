@@ -756,15 +756,14 @@ export default function Backoff() @{
 		} @pending {
 			<p>Checking the sky</p>
 		} @catch (error) {
-			<div
+			<p
 				attach={() => {
 					if (attempt < 4) attempt++;
 				}}
 				onIdle={() => {}}
 			>
-				<p>{error.message}</p>
-				<p>Attempt {attempt} of 4</p>
-			</div>
+				{error.message} Attempt {attempt} of 4
+			</p>
 		}
 		<button
 			onClick={() => {
@@ -1035,6 +1034,7 @@ export function loadOrders(signal: AbortSignal) {
 
 Each page is a row of a keyed `@for`, and each row has its own `@try`. **Load more** adds a page number to the list, and `loadPosts` stands in for a fetch of one page.
 
+<Code steps={[{ label: 'Press Load more. Page 2 shows Loading page 2, then its own posts.', shows: 'Post 1 of page 2' }]}>
 ```tsrx title="feed.tsrx"
 import { computed, state } from '@markless/core';
 import { loadPosts } from './posts.ts';
@@ -1081,6 +1081,30 @@ export default function Feed() @{
 	</section>
 }
 ```
+
+```ts title="posts.ts"
+export function loadPosts(
+	page: number,
+	signal: AbortSignal,
+) {
+	const posts = [1, 2, 3].map((n) => ({
+		id: `${page}-${n}`,
+		title: `Post ${n} of page ${page}`,
+	}));
+	return new Promise<typeof posts>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				resolve(posts);
+			}, 500);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+</Code>
 
 - A page on the screen is never loaded again when a new page is added.
 - A failed page shows its own `@catch`, and **Try again** loads only that page.
