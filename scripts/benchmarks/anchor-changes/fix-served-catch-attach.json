@@ -45,6 +45,16 @@
 			"delta": 30,
 			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page (resume runtime, loaded on first wake: +256 B rendered, +30-34 B emitted gzip vs merge-base)",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 256,
+			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page; module loads on first wake, not at page load (CI run 43116536172 measured +246 B rendered; +256 B against the merge-base on a Mac)",
+			"date": "2026-11-11"
 		}
 	]
 }
