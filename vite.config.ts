@@ -286,6 +286,10 @@ export default defineConfig({
 					// One id per run: the typescript-plugin test files build the same
 					// dist/ from separate workers and lock on it to build it once.
 					env: { MARKLESS_TSPLUGIN_CJS_BUILD_RUN: randomUUID() },
+					// CI's unit budget splits its memory peak by test file.
+					setupFiles: process.env.MARKLESS_UNIT_BUDGET_FILES
+						? ['scripts/ci/unit-budget-attribution.ts']
+						: [],
 				},
 			},
 			'packages/vitest-browser/vitest.config.ts',

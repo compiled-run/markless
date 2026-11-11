@@ -155,7 +155,9 @@ A flake is a test that fails and passes on the same code. Rules:
 
 An entry is a table row naming the test, its expiry date, its owner and why it is skipped. A website box is skipped through `website/boxes/quarantined.ts`, which holds the same entries; past its expiry date the box fails instead of skipping.
 
-None right now.
+| Test | Expires | Owner | Why it is skipped |
+| --- | --- | --- | --- |
+| `website/boxes/sidebar-open-sections.box.ts` | 2026-11-18 | markless PM (async-dx session) | A kept part's handler write is lost when the handler's code is cold, as it always is on CI's fresh dev server per box: the section the reader left closes. Fix task T030. CI runs 42932389029, 42941478976, 42941545926 |
 
 ### Quarantine list
 

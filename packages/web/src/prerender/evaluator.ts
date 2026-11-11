@@ -819,9 +819,10 @@ function marklessSurfaceDeclaresGraphNode(
 		if (definition.stateGraphNodeIds?.includes(graphNodeId)) return true;
 		if (definition.initialValues?.some((initial) => initial.graphNodeId === graphNodeId))
 			return true;
-		if (definition.state.cells.some((cell) => cell.graphNodeId === graphNodeId)) return true;
-		if (definition.state.computed.some((computed) => computed.graphNodeId === graphNodeId))
-			return true;
+		// A served page strips `state` from a component it only walks through; an evaluated sibling carries the module's.
+		const state = definition.state as ProtocolStatePayload | undefined;
+		if (state?.cells.some((cell) => cell.graphNodeId === graphNodeId)) return true;
+		if (state?.computed.some((computed) => computed.graphNodeId === graphNodeId)) return true;
 	}
 	return false;
 }
