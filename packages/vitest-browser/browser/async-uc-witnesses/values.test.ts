@@ -22,6 +22,7 @@ each('a chain of dependent values marks each value until its own answer lands', 
 	expect(busy(container, '[data-route]'), 'the route waits on the depot from the click').toBe(true);
 	expect(busy(container, '[data-eta]'), 'the eta waits on the depot from the click').toBe(true);
 
+	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
 	release('depot:south');
 	await expect.poll(() => text(container, '[data-depot]'), poll).toBe('south-depot');
 	await expect.poll(() => busy(container, '[data-depot]'), poll).toBe(false);
@@ -70,6 +71,7 @@ each('a failed link in a chain keeps the content and the values below it stop be
 	const before = asked.length;
 	click(container, '[data-south]');
 	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
 	release('depot:south');
 	await expect.poll(() => asked.includes('route:south-depot'), poll).toBe(true);
 	expect(chainBusy(container)).toBe('route eta');
@@ -85,6 +87,8 @@ each('a failed first link keeps the content and stops every value below it being
 	const before = asked.length;
 	click(container, '[data-south]');
 	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	// The busy mark lands at the click, before the request is asked; a gate failed earlier answers nothing.
+	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
 	fail('depot:south', 'no depot');
 	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
 	expect(chainShows(container)).toEqual(['north-depot', 'north-depot-route', 'north-depot-route-eta']);
@@ -105,8 +109,10 @@ each('a failed link in a chain shows its @catch after the kept content', chainMo
 each('values below a link that answers the same id stop being busy when it lands', chainMounts, async (container) => {
 	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
 	hold('depot:north');
+	const before = asked.length;
 	click(container, '[data-again]');
 	await expect.poll(() => chainBusy(container), poll).toBe('depot route eta');
+	await expect.poll(() => asked.slice(before).includes('depot:north'), poll).toBe(true);
 	release('depot:north');
 	await expect.poll(() => container.querySelectorAll('[aria-busy="true"]').length, poll).toBe(0);
 	expect(text(container, '[data-eta]')).toBe('north-depot-route-eta');
