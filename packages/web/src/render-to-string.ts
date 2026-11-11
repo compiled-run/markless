@@ -72,7 +72,6 @@ import { servedElementTree, servedLocatorPaths, withElementAttributes } from './
 
 export { prepareSsrResumeRecords } from './prerender/records.ts';
 export { CONTAINER_RETIRE_PROPERTY } from './payload-resume-registry.ts';
-export { CONTAINER_HANDLING_PROPERTY } from './resume-events.ts';
 export { CONTAINER_REASK_PROPERTY } from './resume-return-reask.ts';
 
 type RosterResumeHost = {
