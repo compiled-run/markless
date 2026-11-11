@@ -8,7 +8,7 @@
 				"web/pending-timing"
 			],
 			"remove": true,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -19,7 +19,7 @@
 				"web/resume-async-wiring"
 			],
 			"delta": -714,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -30,7 +30,7 @@
 				"web/resume-resettle-hold"
 			],
 			"remove": true,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -41,7 +41,7 @@
 				"web/resume-runtime-start"
 			],
 			"delta": -6,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -53,7 +53,7 @@
 				"measured"
 			],
 			"delta": 2,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -64,7 +64,7 @@
 				"web/pending-timing"
 			],
 			"remove": true,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -75,7 +75,7 @@
 				"web/resume-async-wiring"
 			],
 			"delta": -714,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -86,7 +86,7 @@
 				"web/resume-resettle-hold"
 			],
 			"remove": true,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -97,7 +97,7 @@
 				"web/resume-runtime-start"
 			],
 			"delta": -6,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -109,7 +109,7 @@
 				"measured"
 			],
 			"delta": 1,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
 			"date": "2026-11-11"
 		},
 		{
@@ -121,7 +121,119 @@
 				"measured"
 			],
 			"delta": -9,
-			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -110,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -110,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -110,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -877,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -546,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -853,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/pending-timing"
+			],
+			"delta": -78,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": -714,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-resettle-hold"
+			],
+			"remove": true,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": -6,
+			"reason": "the 5 s refresh stall is removed (PR #621): resume-resettle-hold, its dynamic import and its wiring no longer load on pages with an async block; measured on CI run 43088671213 against queue run 43071906016",
 			"date": "2026-11-11"
 		}
 	]
