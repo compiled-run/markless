@@ -1490,18 +1490,40 @@ jobs:
                   key: ${{ needs.lanes.outputs.key_receipts }}
                   path: receipts-completed.txt
 
+    # The unit shards' CPU-seconds and peak memory against the Linux anchors in
+    # scripts/ci/unit-budget.json. A job of its own so it reports when another lane
+    # fails, and the unit marker waits for it so a re-run after a red budget measures again.
+    unit-budget:
+        needs: [lanes, unit]
+        if: needs.unit.result == 'success'
+        runs-on: ubuntu-26.04
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+
+            - name: Download the unit budget measurements
+              uses: actions/download-artifact@v4
+              with:
+                  pattern: unit-budget-*
+                  path: ${{ runner.temp }}/unit-budget
+
+            - name: Check the unit shards against their CPU and memory budget
+              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
+
     save-lane-markers:
-        needs: [lanes, unit, browser]
+        needs: [lanes, unit, unit-budget, browser]
         if: always()
         runs-on: ubuntu-26.04
         timeout-minutes: 5
         steps:
             - name: Mark the unit lane complete
-              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success'
+              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
               run: echo ok > unit-completed.txt
 
             - name: Save the unit lane marker
-              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success'
+              if: needs.lanes.outputs.run_unit == 'true' && needs.unit.result == 'success' && needs.unit-budget.result == 'success'
               uses: actions/cache/save@v4
               with:
                   key: ${{ needs.lanes.outputs.key_unit }}
@@ -1529,6 +1551,7 @@ jobs:
                 typecheck-ts7,
                 lanes,
                 unit,
+                unit-budget,
                 browser,
                 completion-matrix,
                 boxes-bundler,
@@ -1556,7 +1579,8 @@ jobs:
             # `skipped` means the lane's content hash already had a green marker.
             # It cannot mean "an upstream job failed": typecheck and lanes are the
             # only jobs that can skip a lane, and both are in `needs`, so their
-            # failure lands here as `failure`.
+            # failure lands here as `failure`. `unit-budget` skips only with `unit`,
+            # whose own failure lands here.
             - name: Fail unless every test lane succeeded or hit its content hash
               id: gate
               run: |
@@ -1577,7 +1601,7 @@ jobs:
             # for a runner again after the box lanes (9 minutes on 2026-10-27). A skipped box lane's receipts come
             # back out of the cache entry its last green run saved under the key whose hit skipped it.
             - uses: actions/checkout@v4
-              if: env.RUN_RECEIPTS == 'true' || needs.unit.result == 'success'
+              if: env.RUN_RECEIPTS == 'true'
               with:
                   persist-credentials: false
 
@@ -1714,19 +1738,6 @@ jobs:
               with:
                   key: ${{ needs.lanes.outputs.key_receipts }}
                   path: receipts-completed.txt
-
-            # The unit shards' CPU-seconds and peak memory against the Linux anchors in
-            # scripts/ci/unit-budget.json; it runs only when the unit lane ran in this run.
-            - name: Download the unit budget measurements
-              if: needs.unit.result == 'success'
-              uses: actions/download-artifact@v4
-              with:
-                  pattern: unit-budget-*
-                  path: ${{ runner.temp }}/unit-budget
-
-            - name: Check the unit shards against their CPU and memory budget
-              if: needs.unit.result == 'success'
-              run: node scripts/ci/unit-budget.mjs check --measurements "$RUNNER_TEMP/unit-budget"
 
     # Separate from `test` on purpose. The CLI workspace matrix needs npm, pnpm,
     # yarn (via corepack) and bun all on PATH and runs real installs, so it
