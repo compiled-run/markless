@@ -1,7 +1,5 @@
 import type { ResumeAsyncBoundaryRecord, ResumeDomElement } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
-import type { ProtocolStatePayload } from '@markless/serializer';
-import { durableError } from '../../../serializer/src/value-constants.ts';
 
 type Range = Pick<ResumeAsyncBoundaryRecord, 'startAnchor' | 'endAnchor'>;
 const holds = (range: Range, node: unknown) =>
@@ -57,18 +55,4 @@ export function marklessFailEnclosingCatch(
 	if (!target || !plane) return false;
 	plane.failHandler(target.runnerGraphNodeId!, error);
 	return true;
-}
-
-// The shown @catch error goes into its cell, which the arm commit writes before the arm's text updates subscribe.
-export function marklessShowCaughtError(
-	cells: ProtocolStatePayload['cells'],
-	render: { readonly symbolPrefix: string; readonly freshCellIds?: Set<string> },
-	boundary: { readonly errorGraphNodeId?: string },
-	error: unknown,
-): { readonly arm: 2; readonly error: unknown } {
-	const graphNodeId = boundary.errorGraphNodeId!;
-	const cell = cells.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (cell) Object.assign(cell, { value: undefined, directValue: durableError(error) });
-	render.freshCellIds?.add(render.symbolPrefix + graphNodeId);
-	return { arm: 2, error };
 }

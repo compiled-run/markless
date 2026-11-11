@@ -591,6 +591,9 @@ function branchesInside(
 	) as unknown as NonNullable<ResumeArmRecordSet['branches']>;
 }
 
+// The error each shown @catch renders, for the commit to write into its cell; it never passes through serialization.
+const caughtErrors = new WeakMap<ReadonlySet<string>, Map<string, unknown>>();
+
 // Taken before serialization: nothing in the live graph answers for a component this render is creating.
 function freshArmCells(
 	output: SsrRenderOutput,
@@ -601,7 +604,9 @@ function freshArmCells(
 			? [
 					{
 						graphNodeId: cell.graphNodeId,
-						value: (cell as { readonly directValue?: unknown }).directValue,
+						value:
+							caughtErrors.get(freshCellIds)?.get(cell.graphNodeId) ??
+							(cell as { readonly directValue?: unknown }).directValue,
 					},
 				]
 			: [],
@@ -1450,9 +1455,13 @@ export function evaluatePrerenderDataComponent(input: {
 								: undefined;
 							if (status === 'rejected') {
 								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
-								return boundary!.errorGraphNodeId
-									? import('../fns/enclosing-catch.ts').then((m) => m.marklessShowCaughtError(state.cells, input, boundary!, error))
-									: { arm: 2, error };
+								const shown = boundary!.errorGraphNodeId;
+								const fresh = input.freshCellIds;
+								if (shown && fresh) {
+									fresh.add(input.symbolPrefix + shown);
+									caughtErrors.set(fresh, (caughtErrors.get(fresh) ?? new Map()).set(input.symbolPrefix + shown, error));
+								}
+								return { arm: 2, error };
 							}
 							return status === 'fulfilled' ? 0 : 1;
 						},

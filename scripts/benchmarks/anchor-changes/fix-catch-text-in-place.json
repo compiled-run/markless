@@ -5,32 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"serializer/value-constants"
-			],
-			"delta": 153,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/enclosing-catch"
-			],
-			"delta": 407,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 235,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
+			"delta": 387,
+			"reason": "@catch text joining the error with state: when a block with an error cell fails, the arm render hands the shown error to the commit's cell list; no new client module, nothing runs for blocks without that shape (smallest correct placement tried: lazy modules broke the client module count, lazy enclosing-catch grew a load-time chunk)",
 			"date": "2026-11-11"
 		},
 		{
@@ -41,30 +19,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 7,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"serializer/value-constants"
-			],
-			"delta": 153,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/enclosing-catch"
-			],
-			"delta": 407,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
+			"delta": 1,
+			"reason": "@catch text joining the error with state: when a block with an error cell fails, the arm render hands the shown error to the commit's cell list; no new client module, nothing runs for blocks without that shape (smallest correct placement tried: lazy modules broke the client module count, lazy enclosing-catch grew a load-time chunk)",
 			"date": "2026-11-11"
 		},
 		{
@@ -74,20 +30,8 @@
 				"@fixtures/vite-plus",
 				"web/prerender/evaluator"
 			],
-			"delta": 235,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": -3,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
+			"delta": 387,
+			"reason": "@catch text joining the error with state: when a block with an error cell fails, the arm render hands the shown error to the commit's cell list; no new client module, nothing runs for blocks without that shape (smallest correct placement tried: lazy modules broke the client module count, lazy enclosing-catch grew a load-time chunk)",
 			"date": "2026-11-11"
 		},
 		{
@@ -98,8 +42,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -7,
-			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
+			"delta": 1,
+			"reason": "@catch text joining the error with state: when a block with an error cell fails, the arm render hands the shown error to the commit's cell list; no new client module, nothing runs for blocks without that shape (smallest correct placement tried: lazy modules broke the client module count, lazy enclosing-catch grew a load-time chunk)",
 			"date": "2026-11-11"
 		}
 	]
