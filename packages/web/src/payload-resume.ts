@@ -253,6 +253,8 @@ async function startDecodedResume(
 		(input.root as typeof input.root & RetirableContainer)[CONTAINER_RETIRE_PROPERTY] = () => {
 			deleteResumedPayload(input.root);
 			retiring.dispose();
+			// A container the navigation keeps in place wakes the next page's runtime only once nothing claims this one.
+			delete (input.root as { __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted;
 		};
 		try {
 			await runtime.start();

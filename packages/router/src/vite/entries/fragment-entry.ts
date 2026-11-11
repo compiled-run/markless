@@ -14,6 +14,8 @@ export interface FragmentNavigationConfig {
 	// Names the stylesheet a head <style> or <link> carries: a document keeps the one it has, inline or linked.
 	readonly stylesheetKeyAttribute: string;
 	readonly retireProperty: string;
+	// Where a container holds the events it received and has not yet handled, each entry's promise settling once it has.
+	readonly handlingProperty: string;
 	// Set on a container Back or Forward shows again as it was left, so its async values re-ask once its runtime wires.
 	readonly reaskProperty: string;
 	// Where the document (or a container element) holds its live shared() instances, which the swap keeps,
@@ -235,6 +237,17 @@ function retire(state: FragmentNavigationState, root: Element): void {
 			reportAsync(error);
 		}
 	}
+}
+
+function unhandled(state: FragmentNavigationState, root: Element): Promise<unknown>[] {
+	return [root, ...root.querySelectorAll(`[${state.config.containerAttributes[0]}]`)].flatMap(
+		(container) => {
+			const handling = (container as unknown as Record<string, unknown>)[
+				state.config.handlingProperty
+			] as ReadonlyMap<object, readonly [Promise<unknown>, unknown]> | undefined;
+			return handling ? [...handling.values()].map(([handled]) => handled) : [];
+		},
+	);
 }
 
 function reportAsync(error: unknown): void {
@@ -1204,6 +1217,11 @@ export async function navigate(
 	const head = await mergeHead(d, next, state.config.stylesheetKeyAttribute);
 	await Promise.race([Promise.all(code), new Promise((resolve) => w.setTimeout(resolve, 3000))]);
 	if (stale()) return abandon();
+	// The leaving page is retired only once it has handled the events it received, so a handler whose code arrives late writes before the carry reads.
+	for (let pending = unhandled(state, outgoing); pending.length > 0; pending = unhandled(state, outgoing)) {
+		await Promise.all(pending);
+		if (stale()) return abandon();
+	}
 	let wakeShared: (() => void) | undefined;
 	if (sharedSwap) {
 		try {
