@@ -753,6 +753,8 @@ export type SemanticGraphDependency = {
 	readonly source: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Text only: the control showing it writes this state from its own handler. */
+	readonly writtenByControl?: true;
 };
 
 export type SemanticHostNode = {
