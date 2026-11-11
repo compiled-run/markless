@@ -7,15 +7,17 @@ import { markless } from '../src/vite/index.ts';
 // RelayRow's own `onPicked` prop. Row invokes that arrow by instance path, so the
 // page's route must answer it with the bound row carrying that edge's captures.
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
+// Page places Board, Board places Editor, all in one module; Editor's bound row is spelled from the module root.
+const nestedFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-nested', import.meta.url));
 
 const ROUTE_FUNCTION =
-	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId\) \{[\s\S]*?\n\}/;
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
 
-async function pageCode(): Promise<string> {
+async function pageCode(root = fixtureRoot): Promise<string> {
 	const server = await createServer({
-		root: fixtureRoot,
+		root,
 		configFile: false,
 		logLevel: 'error',
 		appType: 'custom',
@@ -84,4 +86,15 @@ test('a child symbol its edge binds is answered by that edge bound row, under th
 	expect(calls.at(-1)).toBe(
 		'import /relay-row.tsrx?import&markless-symbols -> bound:symbol%3A0:0',
 	);
+});
+
+test('a same-module child two levels down is rebound under every prefix the table consumed', async () => {
+	const code = await pageCode(nestedFixtureRoot);
+	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
+	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
+	const { route } = runRoute(routeSource);
+
+	const routed = (await route('c0:c1:symbol:1')) as { loaded: unknown; prefix: string };
+	expect(routed.prefix).toBe('c0:c1:');
+	expect(routed.loaded).toMatch(/^local bound:symbol%3A1:0\/1\[/);
 });
