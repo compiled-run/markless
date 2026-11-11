@@ -207,6 +207,150 @@
 			"delta": 1271,
 			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -32,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1127,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1813,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 445,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
 		}
 	]
 }
