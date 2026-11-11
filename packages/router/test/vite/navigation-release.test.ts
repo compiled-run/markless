@@ -64,37 +64,17 @@ test('in-place navigations leave no window or document listeners behind and reta
 		await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'leak' });
 		return types.sort();
 	};
-	// Every DOM node the page's heap still holds, live or detached, in every document it parsed.
+	// Every DOM node and document the renderer still holds, live or detached, with or without a JavaScript wrapper.
 	const retainedNodes = async () => {
 		await cdp.send('HeapProfiler.collectGarbage');
 		await cdp.send('HeapProfiler.collectGarbage');
-		const { result: prototype } = await cdp.send('Runtime.evaluate', {
-			expression: 'Node.prototype',
-			objectGroup: 'leak',
-		});
-		const { objects } = await cdp.send('Runtime.queryObjects', {
-			prototypeObjectId: prototype.objectId!,
-			objectGroup: 'leak',
-		});
-		const { result } = await cdp.send('Runtime.callFunctionOn', {
-			objectId: objects.objectId!,
-			functionDeclaration: `function () {
-				const nodes = this.filter((node) => { try { return typeof node.nodeType === 'number'; } catch { return false; } });
-				return { nodes: nodes.length, documents: nodes.filter((node) => node.nodeType === 9).length };
-			}`,
-			returnByValue: true,
-		});
-		await cdp.send('Runtime.releaseObjectGroup', { objectGroup: 'leak' });
-		await cdp.send('HeapProfiler.collectGarbage');
+		const { nodes, documents } = await cdp.send('Memory.getDOMCounters');
 		// JavaScript objects and the DOM nodes behind them.
 		const heap = (await cdp.send('Runtime.getHeapUsage')) as {
 			usedSize: number;
 			embedderHeapUsedSize?: number;
 		};
-		return {
-			...(result.value as { nodes: number; documents: number }),
-			heapKB: (heap.usedSize + (heap.embedderHeapUsedSize ?? 0)) / 1024,
-		};
+		return { nodes, documents, heapKB: (heap.usedSize + (heap.embedderHeapUsedSize ?? 0)) / 1024 };
 	};
 	let n = 0;
 	const navigate = async (times: number) => {
@@ -131,7 +111,7 @@ test('in-place navigations leave no window or document listeners behind and reta
 	const after = await retainedNodes();
 	expect(listenersAfter).toEqual(listeners);
 	expect(after.documents).toBeLessThanOrEqual(settled.documents);
-	// A held page adds about 130 nodes per visit; the count moves by a node or so with timing alone.
+	// A held page adds about 630 nodes; without one the count does not move.
 	expect(after.nodes).toBeLessThanOrEqual(settled.nodes + 16);
 	// Measured over these ten visits: about 1.5 MB of growth with the leak, about 30 kB without.
 	expect(after.heapKB - settled.heapKB).toBeLessThan(300);
