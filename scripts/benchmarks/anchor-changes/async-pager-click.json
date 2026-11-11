@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 17,
+			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion and the protocol key table one key; executed chars unchanged; measured on CI run 42930068482 against the anchor main carries (1689686)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 57,
+			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion, the protocol key table one key, and the preloaded Async page one paragraph; executed chars unchanged; measured on CI run 42930068482 against the anchor main carries (2203310)",
+			"date": "2026-11-11"
+		}
+	]
+}
