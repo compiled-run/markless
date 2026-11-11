@@ -130,3 +130,110 @@ test('an imported child whose own module forwards its callback prop binds the pr
 		expect.objectContaining({ kind: 'callback-route', callbackSymbolId: 'symbol:0' }),
 	]);
 });
+
+test('a derive an imported child reads through its own list binds to each placed row instance props', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/List.tsrx',
+		source: `import { state } from '@markless/core';
+	export function List() @{
+		let ids = state(['a', 'b']);
+		<ul>
+			@for (const id of ids; key id) {
+				<Row label={id} />
+			}
+		</ul>
+	}
+	export function Row({ label }) @{
+		let tries = state(1);
+		<li>{label} try {tries}</li>
+	}`,
+		symbols: [],
+	});
+	const derive = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'sync-computed-derive' && symbol.captureSlots.length > 0,
+	)!;
+	expect(derive.captureSlots.map((slot) => slot.propName)).toEqual(['label']);
+	const parentFor = async (prop: string) =>
+		compileTsrxModule({
+			filename: 'src/Page.tsrx',
+			source: `import { state } from '@markless/core';
+	import { Row } from './List.tsrx';
+	export function Page() @{
+		let ids = state(['north', 'south']);
+		<ul>
+			@for (const id of ids; key id) {
+				<Row label={${prop}} />
+			}
+		</ul>
+	}`,
+			symbols: [
+				{
+					id: 'imported:List:derive',
+					chunk: 'virtual:markless:symbol:List:derive',
+					exportName: 'rowText',
+					componentEdgeId: 'component-edge:0',
+					ownerComponentName: 'Row',
+					captureSymbol: derive,
+				},
+			],
+		});
+
+	for (const prop of ['id', 'id.trim()']) {
+		const parent = await parentFor(prop);
+		const rows = parent.boundSymbolResolver.rows.filter(
+			(row) => row.loaderSymbolId === 'imported:List:derive',
+		);
+		expect(rows.map((row) => row.captureSlots.map((slot) => slot.route))).toEqual([
+			[
+				expect.objectContaining({
+					kind: 'graph-reference',
+					graphNodeId: 'c0:prop:props',
+					path: ['label'],
+				}),
+			],
+		]);
+	}
+});
+
+test('a derive an imported child reads straight from its props gets no bound row from a row placement', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Row.tsrx',
+		source: `import { state } from '@markless/core';
+	export function Row({ label }) @{
+		let tries = state(1);
+		<li>{label} try {tries}</li>
+	}`,
+		symbols: [],
+	});
+	const derive = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'sync-computed-derive' && symbol.captureSlots.length > 0,
+	)!;
+	const parent = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+	import { Row } from './Row.tsrx';
+	export function Page() @{
+		let ids = state(['north', 'south']);
+		<ul>
+			@for (const id of ids; key id) {
+				<Row label={id} />
+			}
+		</ul>
+	}`,
+		symbols: [
+			{
+				id: 'imported:Row:derive',
+				chunk: 'virtual:markless:symbol:Row:derive',
+				exportName: 'rowText',
+				componentEdgeId: 'component-edge:0',
+				ownerComponentName: 'Row',
+				captureSymbol: derive,
+			},
+		],
+	});
+	expect(
+		parent.boundSymbolResolver.rows.filter(
+			(row) => row.loaderSymbolId === 'imported:Row:derive',
+		),
+	).toEqual([]);
+});
