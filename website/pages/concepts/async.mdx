@@ -11,7 +11,7 @@ import PostcardsAnatomy from '../../components/figures/async/postcards-anatomy.t
 
 # Async values
 
-<PageMeta time="14 min" assumes="state, computed, conditionals" />
+<PageMeta time="27 min" assumes="state, computed, conditionals" />
 
 <Subtitle text="An async computed is a value that arrives later, and @try shows it once it's there." terms="computed" />
 
@@ -674,6 +674,449 @@ Changing a row that is already saved is a refresh, not a first load: the row kee
 ## A reload starts over
 
 A reload starts every block over, so the page shows `@pending` again. Keeping the last answer across a reload is parked for now.
+
+## Recipes for everyday loading
+
+Each recipe is plain code: state, `computed`, `attach` and the browser's own APIs. Copy one and rename what you need.
+
+Three of them start a timer or a listener with [`attach`](/build/elements#attach-runs-setup-code-on-the-element). The empty `onIdle={() => {}}` beside it is what starts `attach` on a server-rendered page, once the page is idle.
+
+### Try again, waiting longer each time
+
+Keep the attempt number in state. The `@catch` content adds one to it when it appears, and the computed waits longer before each new try.
+
+<Code steps={[{ label: 'Press Boston. The first two tries fail, and the third shows the forecast.', shows: 'Boston: clear' }, { label: 'Change `1000` to `300`, then press Boston. The tries come faster.', source: '300 * 2' }]}>
+```tsrx title="backoff.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+import { pause } from './pause.ts';
+
+export default function Backoff() @{
+	let city = state('Austin');
+	let attempt = state(1);
+	const weather = computed(async ({ signal }) => {
+		const wait = 1000 * 2 ** (attempt - 2);
+		if (attempt > 1) await pause(wait, signal);
+		return loadForecast(city, signal);
+	});
+
+	<section>
+		@try {
+			<p>{weather.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		} @catch (error) {
+			<div
+				attach={() => {
+					if (attempt < 4) attempt++;
+				}}
+				onIdle={() => {}}
+			>
+				<p>{error.message}</p>
+				<p>Attempt {attempt} of 4</p>
+			</div>
+		}
+		<button
+			onClick={() => {
+				city = 'Boston';
+				attempt = 1;
+			}}
+		>
+			Boston
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+let calls = 0;
+
+export function loadForecast(
+	city: string,
+	signal: AbortSignal,
+) {
+	if (city === 'Boston') calls++;
+	const down = city === 'Boston' && calls < 3;
+	return new Promise<{ summary: string }>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				if (down) {
+					reject(new Error('Service down.'));
+				} else {
+					resolve({ summary: `${city}: clear` });
+				}
+			}, 600);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+
+```ts title="pause.ts"
+export function pause(
+	ms: number,
+	signal: AbortSignal,
+) {
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener('abort', () => {
+			clearTimeout(timer);
+			reject(signal.reason);
+		});
+	});
+}
+```
+</Code>
+
+- Each failed try puts new `@catch` content on the page, so `attach` runs once per failure.
+- The waits are 1, 2 and 4 seconds. `pause` gets the `signal`, so picking another city cancels a wait that hasn't finished.
+- The Boston button sets `attempt` back to 1, so a new city starts without a wait.
+
+### Load again when the person comes back
+
+`onReturn` adds one to `returned` when the tab is shown again or the network comes back. The computed reads `returned`, so it loads again.
+
+<Code note="Switch to another tab and come back. The count goes up, and nothing is marked busy.">
+```tsrx title="inbox.tsrx"
+import { computed, state } from '@markless/core';
+import { loadInbox } from './inbox.ts';
+import { onReturn } from './returning.ts';
+
+export default function Inbox() @{
+	let returned = state(0);
+	const inbox = computed(async ({ signal }) => {
+		returned;
+		return loadInbox(signal);
+	});
+
+	<section
+		attach={() => onReturn(() => returned++)}
+		onIdle={() => {}}
+	>
+		@try {
+			<p>{inbox.unread} unread</p>
+		} @pending {
+			<p>Opening the inbox</p>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</section>
+}
+```
+
+```ts title="inbox.ts"
+let checks = 0;
+
+export function loadInbox(signal: AbortSignal) {
+	checks++;
+	const unread = checks;
+	return new Promise<{ unread: number }>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				resolve({ unread });
+			}, 500);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+
+```ts title="returning.ts"
+export function onReturn(wake: () => void) {
+	const stop = new AbortController();
+	const options = { signal: stop.signal };
+	const visible = () => {
+		if (!document.hidden) wake();
+	};
+	document.addEventListener(
+		'visibilitychange',
+		visible,
+		options,
+	);
+	addEventListener('online', wake, options);
+	return () => stop.abort();
+}
+```
+</Code>
+
+- The reload is [quiet](#a-background-refresh-stays-quiet): a browser event is not a handler, so the old count stays on the page with no busy mark.
+- Coming back while a load is still out cancels it. Only the newest answer shows.
+- Reconnecting after a failed load replaces the `@catch` content with the answer.
+
+### Give up on a slow request
+
+`AbortSignal.any` aborts when either signal does: `signal`, when a newer run replaces this one, or `AbortSignal.timeout(3000)`, after three seconds. A timeout reaches `@catch` as an error named `TimeoutError`.
+
+<Code steps={[{ label: 'Press Boston. After three seconds, the request is given up.', shows: 'The forecast took too long.' }, { label: 'Change `3000` to `8000`, then press Boston. It answers in time.', shows: 'Boston: clear' }]}>
+```tsrx title="timeout.tsrx"
+import { computed, state } from '@markless/core';
+import { loadForecast } from './forecast.ts';
+
+export default function Timeout() @{
+	let city = state('Austin');
+	const weather = computed(async ({ signal }) => {
+		const either = AbortSignal.any([
+			signal,
+			AbortSignal.timeout(3000),
+		]);
+		return loadForecast(city, either);
+	});
+
+	<section>
+		@try {
+			<p>{weather.summary}</p>
+		} @pending {
+			<p>Checking the sky</p>
+		} @catch (error) {
+			<p>
+				{error.name === 'TimeoutError'
+					? 'The forecast took too long.'
+					: error.message}
+			</p>
+		}
+		<button onClick={() => (city = 'Boston')}>
+			Boston
+		</button>
+	</section>
+}
+```
+
+```ts title="forecast.ts"
+const waits: Record<string, number> = {
+	Austin: 500,
+	Boston: 6000,
+};
+
+export function loadForecast(
+	city: string,
+	signal: AbortSignal,
+) {
+	return new Promise<{ summary: string }>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				resolve({ summary: `${city}: clear` });
+			}, waits[city]);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+</Code>
+
+- A newer run cancels the older one, timeout and all, so an old timeout never reaches `@catch`.
+- When a refresh times out, the last forecast stays, and the message shows after it.
+
+### Check for new data on a timer
+
+`setInterval` in `attach` adds one to `tick` every five seconds. The function `attach` returns stops the timer when the section leaves the page.
+
+<Code steps={[{ label: 'Wait five seconds. A new order joins the list.', shows: 'Teapot' }]}>
+```tsrx title="orders.tsrx"
+import { computed, state } from '@markless/core';
+import { loadOrders } from './orders.ts';
+
+export default function Orders() @{
+	let tick = state(0);
+	const list = computed(async ({ signal }) => {
+		tick;
+		return loadOrders(signal);
+	});
+
+	<section
+		attach={() => {
+			const timer = setInterval(() => {
+				if (!document.hidden) tick++;
+			}, 5000);
+			return () => clearInterval(timer);
+		}}
+		onIdle={() => {}}
+	>
+		@try {
+			<ul>
+				@for (const order of list; key order.id) {
+					<li>{order.item}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading orders</p>
+		}
+	</section>
+}
+```
+
+```ts title="orders.ts"
+const items = ['Tall mug', 'Teapot', 'Saucer'];
+let checks = 0;
+
+export function loadOrders(signal: AbortSignal) {
+	checks++;
+	const orders = items
+		.slice(0, checks)
+		.map((item, id) => ({ id, item }));
+	return new Promise<typeof orders>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				resolve(orders);
+			}, 400);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+</Code>
+
+- `document.hidden` is true while the tab is in the background, so no request goes out then.
+- A timer's change is quiet: no busy mark and no "Updating…" message.
+- A tick while the last request is still out cancels that request.
+
+### Load a long list one page at a time
+
+Each page is a row of a keyed `@for`, and each row has its own `@try`. **Load more** adds a page number to the list, and `loadPosts` stands in for a fetch of one page.
+
+```tsrx title="feed.tsrx"
+import { computed, state } from '@markless/core';
+import { loadPosts } from './posts.ts';
+
+function FeedPage({ page }: { page: number }) @{
+	const posts = computed(async ({ signal }) =>
+		loadPosts(page, signal),
+	);
+
+	<li>
+		@try {
+			<ul>
+				@for (const post of posts; key post.id) {
+					<li>{post.title}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading page {page}</p>
+		} @catch (error, reset) {
+			<p>
+				<span>Page {page} didn't load.</span>
+				<button onClick={reset}>Try again</button>
+			</p>
+		}
+	</li>
+}
+
+export default function Feed() @{
+	let pages = state([1]);
+
+	<section>
+		<ol>
+			@for (const page of pages; key page) {
+				<FeedPage page={page} />
+			}
+		</ol>
+		<button
+			onClick={() => {
+				pages = [...pages, pages.length + 1];
+			}}
+		>
+			Load more
+		</button>
+	</section>
+}
+```
+
+- A page on the screen is never loaded again when a new page is added.
+- A failed page shows its own `@catch`, and **Try again** loads only that page.
+
+### Search as the person types
+
+The computed waits 300 ms before it asks. Each key starts a new run, and the new run cancels the last one's wait, so a request goes out only once typing stops.
+
+<Code steps={[{ label: 'Type `bo` quickly. One request goes out, after you stop.', shows: 'Boston' }]}>
+```tsrx title="city-search.tsrx"
+import { computed, state } from '@markless/core';
+import { findCities } from './cities.ts';
+import { pause } from './pause.ts';
+
+export default function CitySearch() @{
+	let query = state('');
+	const matches = computed(async ({ signal }) => {
+		const text = query;
+		if (!text) return [];
+		await pause(300, signal);
+		return findCities(text, signal);
+	});
+
+	<section>
+		<input
+			value={query}
+			onInput={(event) => {
+				query = event.currentTarget.value;
+			}}
+		/>
+		@try {
+			<ul>
+				@for (const city of matches; key city) {
+					<li>{city}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Searching</p>
+		}
+	</section>
+}
+```
+
+```ts title="cities.ts"
+const names = ['Austin', 'Boston', 'Bogotá'];
+
+export function findCities(
+	text: string,
+	signal: AbortSignal,
+) {
+	const start = text.toLowerCase();
+	const found = names.filter((name) =>
+		name.toLowerCase().startsWith(start),
+	);
+	return new Promise<string[]>(
+		(resolve, reject) => {
+			const timer = setTimeout(() => {
+				resolve(found);
+			}, 500);
+			signal.addEventListener('abort', () => {
+				clearTimeout(timer);
+				reject(signal.reason);
+			});
+		},
+	);
+}
+```
+
+```ts title="pause.ts"
+export function pause(
+	ms: number,
+	signal: AbortSignal,
+) {
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener('abort', () => {
+			clearTimeout(timer);
+			reject(signal.reason);
+		});
+	});
+}
+```
+</Code>
+
+- An answer from an older run never replaces a newer one, even when it lands last.
+- An empty box shows no matches and asks nothing.
 
 ## Build errors inside `@try`
 

@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "app code, not framework: the Async page's recipes (PR #596) add about 17 KB gzip to the Async page's own chunks, which /concepts/state downloads only through the router's idle-tier prefetch of its on-screen sidebar link to /concepts/async (fetched at low priority, never run: executed chars unchanged); with the idle tier off the state page moves -254 B. Linux numbers from PR #596 run 42934098346 against merge-base b79a5bab0's merge-queue run 42917586925",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 17076,
+			"reason": "app code, not framework: the Async page's recipes (PR #596) add about 17 KB gzip to the Async page's own chunks, which /concepts/state downloads only through the router's idle-tier prefetch of its on-screen sidebar link to /concepts/async (fetched at low priority, never run: executed chars unchanged); with the idle tier off the state page moves -254 B. Linux numbers from PR #596 run 42934098346 against merge-base b79a5bab0's merge-queue run 42917586925",
+			"date": "2026-11-11"
+		}
+	]
+}
