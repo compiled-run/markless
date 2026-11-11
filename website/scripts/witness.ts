@@ -3041,12 +3041,8 @@ try {
 
 		// --- the stickers are on the pages that ask for them --------------------
 		await page.goto(`${origin}/`, { waitUntil: 'load' });
-		const heroSticker = page.locator('.sticker.is-hero');
-		check((await heroSticker.count()) === 1, 'the landing hero carries one sticker');
-		const heroLoaded = await heroSticker.evaluate(
-			(node) => (node as HTMLImageElement).naturalWidth > 0,
-		);
-		check(heroLoaded, 'the hero sticker is a cut asset the server really serves');
+		const titleSparkles = page.locator('.sparkles:has(h1) .sparkle');
+		check((await titleSparkles.count()) > 0, 'the landing title twinkles with sparkles');
 		check(
 			(await page.locator('.pager-doodles .sticker').count()) === 2,
 			'the footer strip mixes two stickers in with the doodles',

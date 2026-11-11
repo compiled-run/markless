@@ -601,14 +601,14 @@ export default function MugArt({
 
 		<style>
 .mug { --spring: linear(0, 0.027 1.1%, 0.103 2.3%, 0.583 7.5%, 0.792 10.4%, 0.932 13.6%, 0.977 15.4%, 1.006 17.4%, 1.02 19.4%, 1.024 21.7%, 1 38.4%, 1); --snap: linear(0, 0.029 0.8%, 0.13 1.8%, 0.908 7.2%, 1.051 9.1%, 1.112 11.2%, 1.116 12.2%, 1.106 13.4%, 1.007 19.5%, 0.987 23.1%, 1.001 35%, 1); display:block; width:var(--mug-width, min(100%,275px)); height:var(--mug-height,320px); overflow:visible; }
- .halo { fill: none; stroke: #fffdf7; stroke-width: 14; stroke-linejoin: round; stroke-linecap: round; }
+ .halo { fill: none; stroke: var(--halo); stroke-width: 14; stroke-linejoin: round; stroke-linecap: round; }
  .handle-motion { transform-origin: 172px 129px; }
- .handle-halo { fill: none; stroke: #fffdf6; stroke-width: 27; stroke-linecap: round; }
- .handle-ink { fill: none; stroke: #2d2b2a; stroke-width: 19; stroke-linecap: round; }
+ .handle-halo { fill: none; stroke: var(--halo); stroke-width: 27; stroke-linecap: round; }
+ .handle-ink { fill: none; stroke: var(--line); stroke-width: 19; stroke-linecap: round; }
  .handle-glaze { fill: none; stroke: var(--glaze); stroke-width: 11; stroke-linecap: round; }
- .body-shape, .rim { fill: var(--glaze); stroke: #2d2b2a; stroke-width: 3; }
+ .body-shape, .rim { fill: var(--glaze); stroke: var(--line); stroke-width: 3; }
  .shine { fill: none; stroke: #fffdf6; stroke-width: 4; stroke-linecap: round; opacity: .5; }
- .coffee { fill: #74492f; stroke: #2d2b2a; stroke-width: 2; }
+ .coffee { fill: #74492f; stroke: var(--line); stroke-width: 2; }
  .latte-art { fill: #f7e7bd; transform-origin: 0px 0px; }
  .pour-art { display: none; }
 .mug [data-art='rosetta'] { html[data-mascot-pour='rosetta'] & {  display: inline; } }
@@ -745,7 +745,9 @@ export default function MugArt({
 .mug [data-companion-art='eucalyptus']  { html[data-mascot-companion='eucalyptus'] & {  display:inline; } }
 .mug [data-companion-art='notes']  { html[data-mascot-companion='notes'] & {  display:inline; } }
 .mug [data-companion-art='moka']  { html[data-mascot-companion='moka'] & {  display:inline; } }
-.mug { --glaze:#f7e7bd; --eye:#2d2b2a; }
+.mug { --glaze:#f7e7bd; --eye:#2d2b2a; --line:#2d2b2a; --halo:#fffdf7; }
+.mug { html.dark:is(:not([data-mascot-glaze]),[data-mascot-glaze='cream']) & { --glaze: #343432; --eye: #faf7ed; } }
+.mug .shine { html.dark & { opacity: .22; } }
 .mug [data-art='rosetta'] { display:inline; html:is([data-mascot-pour='heart'],[data-mascot-pour='tulip'],[data-mascot-pour='markless']) & { display:none; } }
 .mug .eye-l { transform:translate(100px,149px) rotate(-12deg) scale(0.85,0.85); }
 .mug[data-state='idle'] .eye-l { html[data-mascot-expression='neutral'] & { transform:translate(100px,149px) rotate(-12deg) scale(0.85,0.85); } }

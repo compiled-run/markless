@@ -1377,9 +1377,7 @@ html.dark .prose .torn-strip {
 /* ---------------------------------------------------------------------------
    Stickers. The owner's die-cut sheet, cut by tooling/cut-sprites.ts. Each one
    carries its own white border and printed shadow, so unlike a crayon sprite it
-   needs no dark twin. They are the accents with depth: one at the corner of the
-   landing hero, two in the footer strip, and the
-   heart under the rail.
+   needs no dark twin.
    --------------------------------------------------------------------------- */
 
 .sticker {
@@ -1388,15 +1386,6 @@ html.dark .prose .torn-strip {
 	height: auto;
 	flex: none;
 	vertical-align: -0.25em;
-}
-
-/* Taped on above the landing title, tilted the way a sticker lands. It sits in
-   the flow rather than over a corner: the header is directly above the top of
-   the prose column and the mascot already floats into its right. */
-.sticker.is-hero {
-	display: block;
-	margin: 0 0 -0.9rem -0.5rem;
-	rotate: -9deg;
 }
 
 /* The props table. `display: block` is what lets a table scroll inside its own

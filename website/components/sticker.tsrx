@@ -4,8 +4,7 @@ import { asset } from '../site-base.ts';
 // `tooling/cut-sprites.ts`. A sticker carries its own white border and printed
 // shadow, so one file reads on both the paper and the dark ground and there is
 // no dark twin the way a crayon sprite has one. `spot` names a placement:
-// `hero` floats one past the corner of the landing title, `callout` sits one on
-// the corner of a callout.
+// `callout` sits one on the corner of a callout.
 export default function Sticker({
 	name,
 	size,
