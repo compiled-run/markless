@@ -459,6 +459,11 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 		what: 'The router sends the status and headers with the first bytes of the page. A page that waits on data keeps streaming after that. This write came later and tried to change what was already sent.',
 		how: 'Set `http.response.status` and `http.response.headers` in the page body, before anything the page waits on. Writing the same value again is fine.',
 	},
+	MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: {
+		summary: 'An API route refused a write that a browser sent from another site.',
+		what: 'A browser sends your cookies with every request to your app, even one that a page on another site starts. So a page elsewhere could send a form to your `POST` route as if a signed-in visitor sent it. To stop that, every route in `api/` answers 403 to a request that changes data (any method except `GET`, `HEAD` and `OPTIONS`) when the browser says it came from another site. The browser says so in the `Sec-Fetch-Site` header, or in older browsers only through the `Origin` header.',
+		how: 'Send the write from a page on the same origin as the route: same scheme, host and port, so `admin.example.com` cannot write to `example.com`. If another site really needs to write, let its server call the route: a request with neither header passes. If your own pages are refused in an older browser, check whether a proxy in front of the app changes the host or the scheme the server sees. See [API routes](/router/api-routes).',
+	},
 	MARKLESS_NODE_IN_BROWSER: {
 		summary: 'Code that only runs in Node is reachable from code the browser loads.',
 		what: 'A module the browser loads imports a Node built-in like `node:fs` or `os`, directly or through other modules, or uses a global only Node has, like `__dirname` or `Buffer`. A browser has none of these. The build stops and lists every module from the page to the Node import.',

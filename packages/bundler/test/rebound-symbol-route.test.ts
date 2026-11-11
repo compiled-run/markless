@@ -8,13 +8,9 @@ import { markless } from '../src/vite/index.ts';
 // page's route must answer it with the bound row carrying that edge's captures.
 const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.meta.url));
 // Page places Board, Board places Editor, all in one module; Editor's bound row is spelled from the module root.
-const nestedFixtureRoot = fileURLToPath(
-	new URL('./fixtures/rebound-route-nested', import.meta.url),
-);
+const nestedFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-nested', import.meta.url));
 // Page places Panel three times, Panel places Picker: each copy's Picker callback has its own bound row.
-const copiesFixtureRoot = fileURLToPath(
-	new URL('./fixtures/rebound-route-copies', import.meta.url),
-);
+const copiesFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-copies', import.meta.url));
 
 const ROUTE_FUNCTION =
 	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;

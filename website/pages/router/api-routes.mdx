@@ -51,6 +51,16 @@ export const cache = { maxAge: 60 };
 
 That line lets the answer be cached for 60 seconds.
 
+## Writes from other sites are refused
+
+A browser sends your app's cookies with every request to it, even one that a page on another site starts. Without a check, a page elsewhere could submit a form to your `POST` route as if your signed-in visitor had sent it. This attack is called *cross-site request forgery*.
+
+So every endpoint answers `403` to a write that a browser sent from another site, before your function runs. A write is any method except `GET`, `HEAD` and `OPTIONS`. The browser tells the server where a request came from in the `Sec-Fetch-Site` header. Only requests from the same *origin* (same scheme, host and port) pass, so `admin.example.com` cannot write to `example.com`. Older browsers that do not send `Sec-Fetch-Site` are judged by their `Origin` header, which must match the address the request was sent to. A request with neither header, such as one from `curl` or from another server, always passes.
+
+If a proxy in front of your app changes the host or the scheme (`https` to `http`) that the server sees, that `Origin` check can refuse your own pages in those older browsers. Current browsers send `Sec-Fetch-Site` and are not affected.
+
+There is no switch to trust another site's pages. If another site needs to write, have its server call your endpoint, with whatever credentials you choose to check.
+
 ## Middleware runs on every request
 
 A file in `middleware/` runs before every page and endpoint. The full-stack starter ships this one:

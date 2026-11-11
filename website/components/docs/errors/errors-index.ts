@@ -2,8 +2,8 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 313,
-	guided: 50,
+	total: 314,
+	guided: 51,
 	groups: [
 		{
 			area: 'state',
@@ -1210,6 +1210,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: true,
 					words: 'a page changed its status after streaming began markless_router_response_committed a page changed its status or headers after the response started streaming.',
+				},
+				{
+					code: 'MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED',
+					title: 'An API route refused a write sent from another site',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: true,
+					words: 'an api route refused a write sent from another site markless_router_cross_site_write_refused an api route refused a write that a browser sent from another site.',
 				},
 				{
 					code: 'MARKLESS_SERVER_ONLY_PROP_BROWSER_READ',

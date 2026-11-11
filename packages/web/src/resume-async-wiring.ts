@@ -323,8 +323,14 @@ export async function startAsyncBoundaries(
 	};
 }
 
-// The arm a boundary's range shows, as this runtime last committed it.
+// What a boundary's range shows, as this runtime last committed it: one of its arms, or its @try content kept with the @catch drawn after it.
+const SHOWN_TRY_KEPT = ASYNC_BOUNDARY_ARM.catch + 1;
 const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
+const showsTry = (boundary: ResumeAsyncBoundaryRecord): boolean => {
+	const shown = shownArms.get(boundary) ?? boundary.initiallyServedArm;
+	return shown === ASYNC_BOUNDARY_ARM.try || shown === SHOWN_TRY_KEPT;
+};
+const noRecords = (): ResumeArmRecordSet => ({ locators: [], events: [], behaviors: [], elementHandles: [] });
 
 function commitShownArm(
 	commitArm: NonNullable<WiringInput['commitArm']>,
@@ -411,14 +417,20 @@ export async function settleAsyncBoundaryRange(
 	)
 		return;
 	// A refresh over the shown @try arm updates it in place: its bindings, branches, rows and nested blocks follow the graph.
+	const kept = shownArms.get(boundary) === SHOWN_TRY_KEPT;
 	if (
 		status === 'fulfilled' &&
 		!rerender &&
 		!boundary.rerendersOnRefresh &&
 		input.commitArm &&
-		(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try
+		showsTry(boundary) &&
+		// Rows written straight into the arm insert inside the @catch drawn after kept content, so only a full commit recovers them.
+		!(kept && input.root.__marklessBranchArms?.get(boundary.id)?.listeners.size)
 	) {
 		if (claim?.() === false) return;
+		shownArms.set(boundary, ASYNC_BOUNDARY_ARM.try);
+		const after = kept && asyncPlanes.busy?.afterRange(boundary, false);
+		if (after) await input.commitArm(after as ResumeAsyncBoundaryRecord, { nodes: [], armRecords: noRecords(), after: true });
 		input.settleTracker?.markSettled(boundary.id);
 		return;
 	}
@@ -430,8 +442,13 @@ export async function settleAsyncBoundaryRange(
 		const moved = rows?.length
 			? (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows)
 			: undefined;
-		const after = asyncPlanes.busy?.settleRange(boundary, arm);
-		if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
+		// A failed refresh over shown @try content keeps it and draws the @catch in a range opened after it.
+		const after =
+			arm === ASYNC_BOUNDARY_ARM.catch && showsTry(boundary)
+				? asyncPlanes.busy?.afterRange(boundary, true)
+				: undefined;
+		if (after) shownArms.set(boundary, SHOWN_TRY_KEPT);
+		else if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
 		else shownArms.delete(boundary);
 		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
@@ -489,28 +506,18 @@ export async function settleAsyncBoundaryRange(
 			);
 			return;
 		}
-		// A failure over shown @try content keeps it, which only a commit can draw: the journal swap replaces the range.
-		const keepsShown =
-			arm === ASYNC_BOUNDARY_ARM.catch &&
-			(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try;
-		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
-		else shownArms.set(boundary, arm);
+		// A failure commits, so shown @try content can stay with the @catch drawn after it; a journal swap replaces the range.
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
-		if (keepsShown || input.root.__marklessBranchArms?.has(boundary.id)) {
+		if (arm === ASYNC_BOUNDARY_ARM.catch || input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;
-			await commit(
-				{
-					html: update.html,
-					armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
-				},
-				false,
-			);
+			await commit({ html: update.html, armRecords: noRecords() }, false);
 			return;
 		}
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-	asyncPlanes.busy?.shown(boundary, arm);
+	if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
+	else shownArms.set(boundary, arm);
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
 }

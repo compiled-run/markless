@@ -43,17 +43,17 @@ async function deepPick() {
 	await expect.poll(() => document.querySelector('[data-chosen]')?.textContent).toBe('picked');
 }
 
-test('client render: Back inside an @if arm closes the form when the page owns the state', async () => {
+test("client render: Back inside an @if arm closes the form when the page owns the state", async () => {
 	await render(EditorRoot);
 	await backCloses();
 });
 
-test('client render: a callback with no argument closes the form', async () => {
+test("client render: a callback with no argument closes the form", async () => {
 	await render(EditorRootNoArg);
 	await backCloses();
 });
 
-test('client render: Back closes the form when its owner is one component below the page', async () => {
+test("client render: Back closes the form when its owner is one component below the page", async () => {
 	await render(EditorNested);
 	await backCloses();
 });
@@ -68,17 +68,17 @@ test("client render: a callback three same-module components below the page writ
 	await deepPick();
 });
 
-test('server render: Back inside an @if arm closes the form when the page owns the state', async () => {
+test("server render: Back inside an @if arm closes the form when the page owns the state", async () => {
 	await renderSSR(EditorRoot);
 	await backCloses();
 });
 
-test('server render: a callback with no argument closes the form', async () => {
+test("server render: a callback with no argument closes the form", async () => {
 	await renderSSR(EditorRootNoArg);
 	await backCloses();
 });
 
-test('server render: Back closes the form when its owner is one component below the page', async () => {
+test("server render: Back closes the form when its owner is one component below the page", async () => {
 	await renderSSR(EditorNested);
 	await backCloses();
 });
@@ -93,12 +93,12 @@ test("server render: a callback three same-module components below the page writ
 	await deepPick();
 });
 
-test('client render: Back closes the first of two forms the page places from one component', async () => {
+test("client render: Back closes the first of two forms the page places from one component", async () => {
 	await render(TwinBoards);
 	await leftBoardCloses();
 });
 
-test('server render: Back closes the first of two forms the page places from one component', async () => {
+test("server render: Back closes the first of two forms the page places from one component", async () => {
 	await renderSSR(TwinBoards);
 	await leftBoardCloses();
 });
