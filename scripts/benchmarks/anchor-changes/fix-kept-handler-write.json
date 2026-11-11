@@ -5,10 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/event-handling"
+				"web/payload-resume-registry"
 			],
-			"set": 606,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"set": 735,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -18,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 240,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"delta": 264,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -30,8 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 110,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"delta": 122,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -39,10 +39,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-plus",
-				"web/event-handling"
+				"web/payload-resume-registry"
 			],
-			"set": 606,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"set": 735,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -52,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 240,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"delta": 264,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -64,8 +64,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 115,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"delta": 128,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		},
 		{
@@ -76,8 +76,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 107,
-			"reason": "an in-place navigation waits for the events the leaving page received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"delta": 123,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
 			"date": "2026-11-11"
 		}
 	]

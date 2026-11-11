@@ -20,7 +20,7 @@ import {
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
 import { marklessRunAtCurrentTarget } from './event-current-target.ts';
-import { marklessEventReceived } from './event-handling.ts';
+import { marklessEventHandled, marklessEventReceived } from './payload-resume-registry.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -775,8 +775,8 @@ export function createEventWiring(input: {
 						invokeSymbol,
 					});
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
-					// A body that returns a promise awaits its own work, as an authored await does: it holds neither the next event nor a navigation.
-					options.releaseQueue?.();
+					// A body that returns a promise owns what follows, which may be the navigation it started.
+					marklessEventHandled(input.root, event);
 					return await Promise.resolve(result).catch(async (error: unknown) => {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});
