@@ -120,19 +120,27 @@ export function attribute(procs, fileOf, label = () => 'process') {
 		}));
 }
 
-// The process's executable name, or for node the script it runs, so a build child reads as fixture-build-child.ts.
-function processLabel({ pid }) {
+// The program's name, or for node the script it runs; Chromium rewrites its argv into one space-joined string.
+export function processLabel(args) {
+	const name = (path) => path.slice(path.lastIndexOf('/') + 1);
+	const words = args.length === 1 ? args[0].split(' ') : args;
+	const program = name(words[0] ?? '?');
+	if (program !== 'node') return program;
+	const valued = new Set(['-r', '--require', '--import', '--loader', '-C', '--conditions']);
+	for (let index = 1; index < words.length; index += 1) {
+		if (valued.has(words[index])) index += 1;
+		else if (!words[index].startsWith('-')) return `node ${name(words[index])}`;
+	}
+	return 'node';
+}
+
+const labelOf = ({ pid }) => {
 	try {
-		const args = readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean);
-		const name = (path) => path.slice(path.lastIndexOf('/') + 1);
-		const program = name(args[0] ?? '?');
-		if (program !== 'node') return program;
-		const script = args.slice(1).find((arg) => !arg.startsWith('-'));
-		return script ? `node ${name(script)}` : 'node';
+		return processLabel(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean));
 	} catch {
 		return 'exited';
 	}
-}
+};
 
 // Test files by the pid of the vitest worker that ran them, as unit-budget-attribution.ts records them.
 function readFileOwners(dir, known) {
@@ -246,7 +254,7 @@ async function measure(command) {
 		const total = procs.reduce((sum, proc) => sum + proc.rss, 0);
 		readFileOwners(filesDir, fileOf);
 		const isNewPeak = total > peak;
-		const groups = attribute(procs, fileOf, isNewPeak ? processLabel : undefined);
+		const groups = attribute(procs, fileOf, isNewPeak ? labelOf : undefined);
 		for (const group of groups)
 			filePeaks.set(group.file, Math.max(filePeaks.get(group.file) ?? 0, group.mb));
 		if (isNewPeak) {

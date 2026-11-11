@@ -16,3 +16,4 @@ export declare function describePeak(
 	},
 	limit?: number,
 ): string;
+export declare function processLabel(args: readonly string[]): string;

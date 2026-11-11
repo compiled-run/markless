@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'vitest';
-import { attribute, describePeak } from './unit-budget.mjs';
+import { attribute, describePeak, processLabel } from './unit-budget.mjs';
 
 const script = resolve(import.meta.dirname, 'unit-budget.mjs');
 const scratch: string[] = [];
@@ -312,5 +312,26 @@ describe('peak attribution', () => {
 			expect.stringMatching(/^ {4}300 MB {2}\(no test file/),
 		]);
 		expect(describePeak({ shard: '2/3', peakRssMb: 1 })).toContain('no per-file attribution');
+	});
+
+	test('a process is named by its program, or for node by the script it runs', () => {
+		expect(
+			processLabel([
+				'/opt/ms-playwright/chromium_headless_shell-1/chrome-headless-shell --type=renderer --no-sandbox',
+			]),
+		).toBe('chrome-headless-shell');
+		expect(
+			processLabel([
+				'/usr/bin/node',
+				'--require',
+				'/repo/node_modules/vitest/suppress-warnings.cjs',
+				'--conditions',
+				'node',
+				'/repo/node_modules/vitest/dist/workers/forks.js',
+			]),
+		).toBe('node forks.js');
+		expect(processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}'])).toBe(
+			'node fixture-build-child.ts',
+		);
 	});
 });
