@@ -1,4 +1,4 @@
-export * from './durable-error.ts';
+export { durableError } from './value-constants.ts';
 export * from './payload-scripts.ts';
 export * from './protocol.ts';
 export * from './protocol-state.ts';

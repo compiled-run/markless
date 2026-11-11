@@ -1451,7 +1451,7 @@ export function evaluatePrerenderDataComponent(input: {
 							if (status === 'rejected') {
 								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
 								return boundary!.errorGraphNodeId
-									? import('./caught-error.ts').then((m) => m.showCaughtError(state.cells, input, boundary!, error))
+									? import('../fns/enclosing-catch.ts').then((m) => m.marklessShowCaughtError(state.cells, input, boundary!, error))
 									: { arm: 2, error };
 							}
 							return status === 'fulfilled' ? 0 : 1;

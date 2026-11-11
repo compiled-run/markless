@@ -5,10 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"serializer/durable-error"
+				"serializer/value-constants"
 			],
-			"set": 306,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 153,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -16,10 +16,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/prerender/caught-error"
+				"web/fns/enclosing-catch"
 			],
-			"set": 526,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 407,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -29,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 227,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 235,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -41,8 +41,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 4,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 7,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -50,10 +50,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-plus",
-				"serializer/durable-error"
+				"serializer/value-constants"
 			],
-			"set": 306,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 153,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -61,10 +61,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-plus",
-				"web/prerender/caught-error"
+				"web/fns/enclosing-catch"
 			],
-			"set": 526,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 407,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -74,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"web/prerender/evaluator"
 			],
-			"delta": 227,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": 235,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -86,8 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -1,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": -3,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		},
 		{
@@ -98,8 +98,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -3,
-			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"delta": -7,
+			"reason": "@catch text joining the error with state: evaluator call site (one conditional import, smallest tried) lazy-loads the cell write in enclosing-catch only when a block with an error cell fails; durableError moved into value-constants so the browser and server share one durable error form without a new module",
 			"date": "2026-11-11"
 		}
 	]

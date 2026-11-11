@@ -1,4 +1,4 @@
-import { durableError } from './durable-error.ts';
+import { durableError } from './value-constants.ts';
 import { protocolStateVersion } from './protocol-constants.ts';
 import type { ProtocolStatePayload } from './protocol.ts';
 import {
