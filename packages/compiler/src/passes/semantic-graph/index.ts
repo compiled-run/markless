@@ -93,6 +93,7 @@ import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './re
 import {
 	collectAsyncInputBesideValueDiagnostics,
 	markControlWrittenInputs,
+	collectManagedAriaBusyDiagnostics,
 } from './async-refresh-facts.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
 
@@ -216,6 +217,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectAsyncBoundaryDiagnostics(graph);
 	collectAsyncInputBesideValueDiagnostics(graph);
 	markControlWrittenInputs(graph, state.hostParents);
+	collectManagedAriaBusyDiagnostics(graph, state.authoredAriaBusy);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,

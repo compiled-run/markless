@@ -172,6 +172,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
+	if (isHostElement && hostNodeId) collectAuthoredAriaBusy(node, hostNodeId, state);
 	const moduleScopeClass = state.currentStyleScopeClass;
 	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
@@ -1642,6 +1643,15 @@ function collectDuplicateAttributeDiagnostics(
 		}
 		seen.set(name, attribute);
 	}
+}
+
+function collectAuthoredAriaBusy(node: AnyNode, hostNodeId: string, state: WalkState): void {
+	for (const attribute of getElementAttributes(node))
+		if (
+			!isSpreadAttribute(attribute) &&
+			getIdentifierName(attribute.name as AnyNode | undefined) === 'aria-busy'
+		)
+			state.authoredAriaBusy.push({ hostNodeId, sourceSpan: sourceSpan(attribute, state.filename) });
 }
 
 function authoredAttributeName(attribute: AnyNode, source: string): string {

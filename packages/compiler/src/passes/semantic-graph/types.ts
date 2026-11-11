@@ -113,6 +113,9 @@ export type PendingElementHandleIdref = Omit<
 	readonly declaringScope?: string;
 };
 
+/** An `aria-busy` the author wrote on a host element, static or bound. */
+export type AuthoredAriaBusy = { readonly hostNodeId: string; readonly sourceSpan?: SourceSpan };
+
 export type WalkState = {
 	readonly filename: string;
 	readonly moduleId: string;
@@ -183,6 +186,7 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	authoredAriaBusy: AuthoredAriaBusy[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -334,6 +338,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		authoredAriaBusy: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),

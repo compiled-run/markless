@@ -302,6 +302,244 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+		title: 'aria-busy is set where Markless already sets it',
+		area: 'async',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
+		printed: [
+			'MARKLESS_ASYNC_ARIA_BUSY_MANAGED: aria-busy on this element is managed by the async boundary; dim stale content with a class or a data- attribute instead.',
+			'This element reads an async value inside @try, so a refresh sets aria-busy="true" on it while the fetch runs and removes it when the fetch settles. That replaces whatever the binding wrote, so the authored value never reaches assistive tech.',
+			'Remove aria-busy and dim the stale content with a class or a data- attribute, for example data-stale={results.query !== query}.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+		],
+		structured: true,
+		why: 'This element reads an async value inside @try, so a refresh sets aria-busy="true" on it while the fetch runs and removes it when the fetch settles. That replaces whatever the binding wrote, so the authored value never reaches assistive tech.',
+		suggestion:
+			'Remove aria-busy and dim the stale content with a class or a data- attribute, for example data-stale={results.query !== query}.',
+		guide: {
+			summary:
+				'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
+			what: [
+				{
+					id: 's0',
+					text: 'This element shows an async value. While that value loads again, Markless sets ',
+				},
+				{
+					id: 's1',
+					text: 'aria-busy="true"',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' on it, and removes it when the load ends, whether it worked or failed. Your ',
+				},
+				{
+					id: 's3',
+					text: 'aria-busy',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' would be overwritten, so screen readers would never hear what you wrote.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Remove ',
+				},
+				{
+					id: 's1',
+					text: 'aria-busy',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' and leave it to Markless. To dim old results while new ones load, use a class or a ',
+				},
+				{
+					id: 's3',
+					text: 'data-',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' attribute and style that.',
+				},
+			],
+			example: [
+				{
+					id: 'l0',
+					runs: [
+						{
+							id: 'r0',
+							text: '<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: ' ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'data-stale',
+							style: 'color:#6f42c1;--shiki-dark:var(--syntax-fn)',
+						},
+						{
+							id: 'r4',
+							text: '=',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r5',
+							text: '{results.query ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r6',
+							text: '!==',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r7',
+							text: ' query}>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l1',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: '@for',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r2',
+							text: ' (',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'const',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r4',
+							text: ' item ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r5',
+							text: 'of',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r6',
+							text: ' results.items; ',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r7',
+							text: 'key',
+							style: 'color:#d73a49;--shiki-dark:var(--syntax-kw)',
+						},
+						{
+							id: 'r8',
+							text: ' item.id) {',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l2',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t\t<',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>{item.name}</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r3',
+							text: 'li',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r4',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l3',
+					runs: [
+						{
+							id: 'r0',
+							text: '\t}',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+				{
+					id: 'l4',
+					runs: [
+						{
+							id: 'r0',
+							text: '</',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+						{
+							id: 'r1',
+							text: 'ul',
+							style: 'color:#22863a;--shiki-dark:var(--syntax-tag)',
+						},
+						{
+							id: 'r2',
+							text: '>',
+							style: 'color:var(--ink);--shiki-dark:var(--ink)',
+						},
+					],
+				},
+			],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_ARM_ORDER',
 		title: 'An `@pending` arm is written after `@catch`',
 		area: 'async',
