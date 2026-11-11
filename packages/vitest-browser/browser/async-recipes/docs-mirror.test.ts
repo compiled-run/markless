@@ -7,6 +7,7 @@ import mugs from './mugs.tsrx?raw';
 import mugsHelpers from './mugs.ts?raw';
 import orders from './orders.tsrx?raw';
 import pause from './pause.ts?raw';
+import retry from './retry.ts?raw';
 import backoff from './backoff.tsrx?raw';
 import returning from './returning.ts?raw';
 import timeout from './timeout.tsrx?raw';
@@ -16,13 +17,14 @@ const shown: ReadonlyArray<readonly [name: string, language: string, source: str
 	['mugs.tsrx', 'tsrx', mugs, 1],
 	['mugs.ts', 'ts', mugsHelpers, 1],
 	['backoff.tsrx', 'tsrx', backoff, 1],
+	['retry.ts', 'ts', retry, 1],
 	['inbox.tsrx', 'tsrx', inbox, 1],
 	['returning.ts', 'ts', returning, 1],
 	['timeout.tsrx', 'tsrx', timeout, 1],
 	['orders.tsrx', 'tsrx', orders, 1],
 	['feed.tsrx', 'tsrx', feed, 1],
 	['city-search.tsrx', 'tsrx', citySearch, 1],
-	['pause.ts', 'ts', pause, 2],
+	['pause.ts', 'ts', pause, 1],
 ];
 
 for (const [name, language, source, times] of shown) {
