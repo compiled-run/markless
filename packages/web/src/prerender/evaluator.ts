@@ -916,9 +916,7 @@ function instanceCellIds(
 	if (visiting.has(definition)) return ids;
 	visiting.add(definition);
 	for (const edge of definition.edges ?? []) {
-		const childSurface = surface.components[edge.childComponentName]
-			? surface
-			: surface.imports[edge.childComponentName];
+		const childSurface = childEdgeSurface(surface, edge);
 		const child = childSurface?.components[edge.childComponentName];
 		if (child)
 			ids.push(...instanceCellIds(childSurface, child, instancePrefix + edge.symbolPrefix, visiting));
@@ -1260,7 +1258,7 @@ export function evaluatePrerenderDataComponent(input: {
 							...(computed.deriveSymbolId
 								? {
 										deriveSymbolId: marklessBoundSymbolId(
-											input,
+											{ ...input, boundSymbolPrefix: input.composer?.module?.rootPrefix },
 											computed.deriveSymbolId,
 										),
 									}
