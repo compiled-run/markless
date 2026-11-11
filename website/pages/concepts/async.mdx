@@ -740,51 +740,77 @@ A reload starts every block over, so the page shows `@pending` again. Keeping th
 
 Each recipe is plain code: state, `computed`, `attach` and the browser's own APIs. Copy one and rename what you need.
 
-Three of them start a timer or a listener with [`attach`](/build/elements#attach-runs-setup-code-on-the-element). The empty `onIdle={() => {}}` beside it is what starts `attach` on a server-rendered page, once the page is idle.
+Two of them start a timer or a listener with [`attach`](/build/elements#attach-runs-setup-code-on-the-element). The empty `onIdle={() => {}}` beside it is what starts `attach` on a server-rendered page, once the page is idle.
 
-### Try again, waiting longer each time
+### Try again before showing an error
 
-Keep the attempt number in state. The `@catch` content adds one to it when it appears, and the computed waits longer before each new try.
+Many failed requests work when they are sent again a moment later. Put the retries inside the computed, around the request, so a failure that a later try fixes never reaches `@catch`. While the loop waits, the page shows `@pending`, or keeps the last answer marked busy. The person sees one error, only when every try has failed, and the Try again button from [`reset`](#try-again-with-reset) starts a new loop.
 
-<Code steps={[{ label: 'Press Boston. The first two tries fail, and the third shows the forecast.', shows: 'Boston: clear' }, { label: 'Change `1000` to `300`, then press Boston. The tries come faster.', source: '300 * 2' }]}>
+Markless has no retry option. `retry` below is ordinary TypeScript in your own file: copy it and change the waits or the number of tries.
+
+<Code steps={[{ label: 'Press Boston. The first two tries fail without a message, and the third shows the forecast.', shows: 'Boston: clear' }, { label: 'Change `tries: 3` to `tries: 1`. Now the first failure shows at once, with a Try again button.', source: 'tries: 1' }]}>
 ```tsrx title="backoff.tsrx"
 import { computed, state } from '@markless/core';
 import { loadForecast } from './forecast.ts';
-import { pause } from './pause.ts';
+import { retry } from './retry.ts';
 
 export default function Backoff() @{
 	let city = state('Austin');
-	let attempt = state(1);
-	const weather = computed(async ({ signal }) => {
-		const wait = 1000 * 2 ** (attempt - 2);
-		if (attempt > 1) await pause(wait, signal);
-		return loadForecast(city, signal);
-	});
+	const weather = computed(async ({ signal }) =>
+		retry(() => loadForecast(city, signal), {
+			tries: 3,
+			signal,
+		}),
+	);
 
 	<section>
 		@try {
 			<p>{weather.summary}</p>
 		} @pending {
 			<p>Checking the sky</p>
-		} @catch (error) {
-			<p
-				attach={() => {
-					if (attempt < 4) attempt++;
-				}}
-				onIdle={() => {}}
-			>
-				{error.message} Attempt {attempt} of 4
-			</p>
+		} @catch (error, reset) {
+			<div>
+				<p>{error.message}</p>
+				<button onClick={reset}>Try again</button>
+			</div>
 		}
-		<button
-			onClick={() => {
-				city = 'Boston';
-				attempt = 1;
-			}}
-		>
+		<button onClick={() => (city = 'Boston')}>
 			Boston
 		</button>
 	</section>
+}
+```
+
+```ts title="retry.ts"
+type Options = {
+	tries: number;
+	signal: AbortSignal;
+};
+
+export async function retry<T>(
+	load: () => Promise<T>,
+	{ tries, signal }: Options,
+): Promise<T> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await load();
+		} catch (error) {
+			if (signal.aborted || attempt === tries) {
+				throw error;
+			}
+		}
+		await wait(1000 * 2 ** (attempt - 1), signal);
+	}
+}
+
+function wait(ms: number, signal: AbortSignal) {
+	return new Promise<void>((resolve, reject) => {
+		const timer = setTimeout(resolve, ms);
+		signal.addEventListener('abort', () => {
+			clearTimeout(timer);
+			reject(signal.reason);
+		});
+	});
 }
 ```
 
@@ -815,25 +841,12 @@ export function loadForecast(
 }
 ```
 
-```ts title="pause.ts"
-export function pause(
-	ms: number,
-	signal: AbortSignal,
-) {
-	return new Promise<void>((resolve, reject) => {
-		const timer = setTimeout(resolve, ms);
-		signal.addEventListener('abort', () => {
-			clearTimeout(timer);
-			reject(signal.reason);
-		});
-	});
-}
-```
 </Code>
 
-- Each failed try puts new `@catch` content on the page, so `attach` runs once per failure.
-- The waits are 1, 2 and 4 seconds. `pause` gets the `signal`, so picking another city cancels a wait that hasn't finished.
-- The Boston button sets `attempt` back to 1, so a new city starts without a wait.
+- `retry` waits 1 second after the first failure and 2 seconds after the second. After the last try, it throws that try's error, and `@catch` shows it.
+- Picking another city aborts the `signal`. The request and `wait` both listen to it, so the old loop stops at once, and the new city starts its own loop.
+- `reset` runs the computed again, which starts a fresh loop of three tries.
+- There is no try count to read. A page that wants to show one, such as "Attempt 2 of 3", keeps it in its own `state`.
 
 ### Load again when the person comes back
 
