@@ -428,23 +428,34 @@ function requestFileWrapperSource(
 	sourceText: string,
 	handlerName: string,
 ): string {
-	const defineImport =
-		requestFile.kind === 'api' && requestFile.cache
-			? 'import { defineCachedHandler as __markless_define_handler__ } from "nitro/cache";'
-			: 'import { defineHandler as __markless_define_handler__ } from "nitro";';
-	const wrappedHandler = `(event) =>
+	const handler = `(event) =>
 	${handlerName}(__markless_create_http_context__(event))`;
-	const wrappedDefault =
-		requestFile.kind === 'api' && requestFile.cache
-			? `__markless_define_handler__(${wrappedHandler}, cache)`
-			: `__markless_define_handler__(${wrappedHandler})`;
+	const routerNames = ['__marklessCreateHttpContext as __markless_create_http_context__'];
+	const imports = ['import { defineHandler as __markless_define_handler__ } from "nitro";'];
+	let declarations = '';
+	let wrappedDefault = `__markless_define_handler__(${handler})`;
+	if (requestFile.kind === 'api') {
+		routerNames.push('__marklessRefuseCrossSiteWrite as __markless_refuse_cross_site_write__');
+		let answer = `${handlerName}(__markless_create_http_context__(event))`;
+		// The cross-site check wraps the cache, so a cached answer never skips it.
+		if (requestFile.cache) {
+			imports.push(
+				'import { defineCachedHandler as __markless_define_cached_handler__ } from "nitro/cache";',
+			);
+			declarations = `const __markless_cached_handler__ = __markless_define_cached_handler__(${handler}, cache);\n\n`;
+			answer = '__markless_cached_handler__(event)';
+		}
+		wrappedDefault = `__markless_define_handler__((event) =>
+	__markless_refuse_cross_site_write__(event) ?? ${answer})`;
+	}
 
-	return `${defineImport}
-import { __marklessCreateHttpContext as __markless_create_http_context__ } from "@markless/router";
+	imports.push(`import { ${routerNames.join(', ')} } from "@markless/router";`);
+
+	return `${imports.join('\n')}
 
 ${sourceText.trimEnd()}
 
-export default ${wrappedDefault};
+${declarations}export default ${wrappedDefault};
 `;
 }
 

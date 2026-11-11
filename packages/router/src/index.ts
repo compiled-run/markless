@@ -177,6 +177,27 @@ export function __marklessCreateHttpContext<
 	};
 }
 
+const CROSS_SITE_WRITE_REFUSED =
+	'MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: this api/ route refused a write that a browser sent from another site. Writes are accepted from pages on this origin and from callers that are not browsers, such as curl or another server.';
+
+/** The 403 an api/ route answers when a browser sends it a write from another site, so a page elsewhere cannot act for a signed-in visitor. */
+export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Response | undefined {
+	const request = event.req;
+	if (!request || request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS')
+		return undefined;
+	const site = request.headers.get('sec-fetch-site');
+	const origin = request.headers.get('origin');
+	const crossSite = site
+		? site !== 'same-origin' && site !== 'none'
+		: origin !== null && origin !== (event.url ?? new URL(request.url)).origin;
+	return crossSite
+		? new Response(CROSS_SITE_WRITE_REFUSED, {
+				status: 403,
+				headers: { 'content-type': 'text/plain; charset=utf-8' },
+			})
+		: undefined;
+}
+
 export const Html = Object.assign(
 	function Html(props: HtmlAttributes & { readonly children?: JsxChild }): unknown {
 		return props.children;
