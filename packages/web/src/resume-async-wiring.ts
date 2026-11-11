@@ -323,8 +323,8 @@ export async function startAsyncBoundaries(
 	};
 }
 
-// The arm a boundary's range shows, as this runtime last committed it, or SHOWN_TRY_KEPT: its @try content kept with the @catch drawn after it, numbered below the @try arm so `<= try` reads "shows @try content".
-const SHOWN_TRY_KEPT = ASYNC_BOUNDARY_ARM.try - 1;
+// The arm a boundary's range shows, as this runtime last committed it; TRY_KEPT: @try kept, @catch after it.
+const TRY_KEPT = ASYNC_BOUNDARY_ARM.try - 1;
 const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
 
 function commitShownArm(
@@ -432,8 +432,7 @@ export async function settleAsyncBoundaryRange(
 			? (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows)
 			: undefined;
 		const after = asyncPlanes.busy?.settleRange(boundary, arm);
-		if (after) shownArms.set(boundary, SHOWN_TRY_KEPT);
-		else if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
+		if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, after ? TRY_KEPT : arm);
 		else shownArms.delete(boundary);
 		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
