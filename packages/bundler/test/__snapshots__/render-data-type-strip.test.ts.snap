@@ -150,7 +150,6 @@ export const runtimeDemandMap = {
 		"web/resume-locators",
 		"web/resume-refresh-busy",
 		"web/resume-repeat-branch-arm",
-		"web/resume-resettle-hold",
 		"web/resume-runtime",
 		"web/resume-runtime-shared",
 		"web/resume-runtime-start",

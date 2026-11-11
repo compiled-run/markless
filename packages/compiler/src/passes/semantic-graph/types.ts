@@ -188,6 +188,8 @@ export type WalkState = {
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
 	authoredAriaBusy: AuthoredAriaBusy[];
+	// aria-disabled written on a control that submits its form.
+	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -342,6 +344,7 @@ export function createWalkState(input: {
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
 		authoredAriaBusy: [],
+		authoredSubmitAriaDisabled: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),

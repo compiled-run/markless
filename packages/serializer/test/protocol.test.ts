@@ -859,3 +859,40 @@ test('a row slot may carry an authored expression, with its component and reads'
 		}),
 	).toThrow(/keyedRepeat\[0\]\.rowTemplate\.textSlots\[0\]\.reads\[0\]/);
 });
+
+test('a submit event record carries authoredSubmitAriaDisabled through payload scripts, templated or not', () => {
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const form = (hostNodeId: string) => ({
+		hostNodeId,
+		eventName: 'submit',
+		symbolIds: [`symbol:${hostNodeId}`],
+		authoredSubmitAriaDisabled: true as const,
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [form('h1'), form('h2'), { hostNodeId: 'h3', eventName: 'submit', symbolIds: ['symbol:h3'] }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.events.map((event) => event.authoredSubmitAriaDisabled)).toEqual([true, true, undefined]);
+});
+
+test('authoredSubmitAriaDisabled other than true is refused', () => {
+	const state = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+	const view = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [{ hostNodeId: 'h1', eventName: 'submit', symbolIds: [], authoredSubmitAriaDisabled: false }],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	expect(() => decodePayloadScripts(renderPayloadScripts({ state, view } as never))).toThrow(
+		/authoredSubmitAriaDisabled/,
+	);
+});

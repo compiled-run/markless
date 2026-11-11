@@ -188,18 +188,22 @@ across all three cases:
   even inside the block. Two async values in one block mark their own
   elements; a value that settles while another is still running clears its
   own marks, and the last one clears with the commit that shows it. `@pending`
-  replaces the held content only when the NEWEST run has been pending longer
-  than the stall threshold (5000 ms); the stall clock restarts on every newer
-  run, so a typing burst never reaches it. A refreshing value no arm record
+  never replaces the held content, however long the refresh takes (revised
+  2026-11-11, owner, on the async-dx research check: swapping shown content
+  for `@pending` loses scroll position, focus, the caret and typed input, so
+  keeping it wins; the 5000 ms stall threshold is removed). A refresh that
+  fails keeps the content and opens `@catch` after it, as below. An author who
+  wants a cue for a long refresh styles it from `aria-busy`, for example a
+  CSS transition delay on the busy style. A refreshing value no arm record
   binds (bare text at the block's top level, an arm that registered no
   records, a `@catch` arm reading only the error) falls back to the block's
   host: its parent element when the block is that element's only content,
   otherwise each top-level element of the shown arm. That fallback is decided
   at runtime because a component whose root is the boundary cannot see its
-  parent at build time. The stall fallback applies only to a block that
-  already shows settled content and whose `@pending` arm the browser holds:
-  server-rendered and resumed boundaries get the busy marking but no stall
-  fallback, because their `@pending` arm is not shipped to the browser. Live regions inside a busy
+  parent at build time. Client-rendered, server-rendered and resumed
+  boundaries follow the same rule. Starting over from `@pending` on a new
+  subject is the author's choice, made by keying a one-row list by that
+  subject, which mounts a new block whose first load shows `@pending`. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
 - Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
@@ -355,13 +359,65 @@ across all three cases:
   rejected among the block's async values, so `reset` clears the `@catch`
   without fetching again. A promise the handler starts but neither returns
   nor awaits is not watched.
+- Form submit pending (2026-11-11, owner; extent per the async-dx
+  research): while a `submit` handler's returned promise runs, the
+  submitted form carries `aria-busy="true"` and the control that submitted
+  it (`event.submitter`) carries `aria-disabled="true"`. When the handler's
+  dispatch sent a same-origin write that succeeded, the marks and the
+  repeat hold below stay until the refresh after a save that write caused
+  has landed: they clear in the flush that commits the refreshed content,
+  or that commits its failure. When no refresh follows (no write, or every
+  write in the round failed) they clear once the promise settles and the
+  dispatch ends. Writes that overlap join one refresh round, so the marks
+  of every dispatch in that round clear together; a dispatch still running
+  when another sends its write is part of that round, so one that never
+  ends keeps the round, and its marks, open. A rejection still follows the
+  handler-rejection rule above. No author code and no status read: authors
+  style `form[aria-busy="true"]`. `disabled` is not used because it drops
+  keyboard focus from the pressed control and does not give it back; focus
+  stays on the control throughout. `aria-disabled` does not itself block
+  activation. A handler that returns no promise marks nothing. Other submit
+  controls of the form are not marked.
+  - Repeat hold: what a submission carries is read when its dispatch
+    reaches the handler, before the handler runs: the value and checked
+    state of every control in `form.elements`, all selected options of a
+    select, each file's name, size and last-modified time, and the
+    submitter element (an image button included; no submitter is its own
+    case). A second submit of the form whose record and submitter equal
+    those of a submission still held is cancelled before any handler hears
+    it, with no message. Any other submit starts at once, because holding
+    it back would lose it and replaying it later would read the form after
+    the first run may have cleared it. Disabled and unnamed controls take
+    part, which errs toward sending. A form-associated custom element's
+    value set only through `ElementInternals` is not seen, so a change to it
+    alone can be held as a repeat.
+  - The hold lives in a module that loads on the first submit whose handler
+    returns a promise, never at page load, and starts as soon as it is
+    loaded; every later submission is held as its handler returns. A repeat
+    pressed before the first hold has started is sent. Closing that needs
+    the submit event record to say the handler can return a promise, so the
+    hold starts at dispatch, at a download cost on every page; not done.
+  - `aria-busy` on an element is true while any owner holds it: a refresh
+    showing that element's value, or a submission of that form. Each owner
+    clears only its own hold.
+  - A submit event record carries `authoredSubmitAriaDisabled` when a
+    control that submits its form has an author-written `aria-disabled`
+    (static or bound; the analyzer's fact, not a DOM read). Such a form
+    then writes `aria-disabled` on none of its controls, so an unbound
+    second submit control of that form is not marked either; the form's
+    `aria-busy` and the repeat hold still apply.
+  - `MARKLESS_ASYNC_ARIA_BUSY_MANAGED` refuses an authored `aria-busy` on a
+    form whose own or enclosing `submit` handler can return a promise. A
+    form busy for another reason marks it with a class or a `data-`
+    attribute.
+  - A form inside a shadow root is not marked: the submit event does not
+    leave the shadow tree, so it reaches no dispatcher outside it.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client
-deadline, stall-threshold, min-duration and reveal-cadence constants live in
-one documented module (`packages/web/src/pending-timing.ts`: deadline 250 ms,
-stall 5000 ms, minimum pending visibility 200 ms, reveal-train cadence
-300 ms); the server's first-flush deadline (10 ms) lives with the stream
+deadline, min-duration and reveal-cadence constants live in one documented
+module (`packages/web/src/pending-timing.ts`: deadline 250 ms, minimum pending
+visibility 200 ms, reveal-train cadence 300 ms); the server's first-flush deadline (10 ms) lives with the stream
 renderer. The timing state machine is pure and tested under a fake clock
 across sweeps of settle times. Reveal choreography is
 tier-aware: value-slot commits are layout-safe and commit immediately; range
@@ -391,9 +447,9 @@ none changes a ruling above.
 - Optimistic edits of existing rows (open). Adding a row optimistically is
   quiet, but an optimistic edit of a row already shown (a like, a toggle)
   still marks that row busy while its save runs.
-- Mutations (partly specified). Refresh after a save is ruled above.
-  Narrowing which values a save refreshes is not approved; form-submit
-  pending and the native form upgrade are not specified here.
+- Mutations (partly specified). Refresh after a save and form submit
+  pending are ruled above. Narrowing which values a save refreshes is not
+  approved; the native form upgrade is not specified here.
 - Requests from inside an async value (open, owner, D8 "Refresh after a
   save"). Today a non-`GET` request a recipe sends counts as a write, which
   keeps a recipe that saves (a draft row) from being sent twice, but treats

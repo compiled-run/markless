@@ -130,7 +130,10 @@ export type ProtocolEventRecord = {
 	readonly action?: ProtocolEventAction;
 	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
 	readonly forwarded?: true;
-};
+} & ProtocolSubmitEventFacts;
+
+/** On a submit event record: a control that submits this form has an author-written aria-disabled, so a submitting form marks no control. */
+export type ProtocolSubmitEventFacts = { readonly authoredSubmitAriaDisabled?: true };
 
 export function protocolEventActionKind(
 	record: Pick<ProtocolEventRecord, 'action'>,
@@ -732,7 +735,7 @@ export type ProtocolViewPayload = {
 			readonly name: string;
 			readonly plural?: boolean;
 		}>;
-		readonly rowEvents: ReadonlyArray<{
+		readonly rowEvents: ReadonlyArray<ProtocolSubmitEventFacts & {
 			readonly hostPath: ProtocolElementAddress;
 			readonly eventName: string;
 			readonly symbolIds: ReadonlyArray<string>;
@@ -753,7 +756,7 @@ export type ProtocolViewPayload = {
 		readonly armTests?: ReadonlyArray<unknown>;
 		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 		readonly armRecords?: ReadonlyArray<{
-			readonly events: ReadonlyArray<{
+			readonly events: ReadonlyArray<ProtocolSubmitEventFacts & {
 				readonly hostPath: ProtocolElementAddress;
 				readonly eventName: string;
 				readonly symbolIds: ReadonlyArray<string>;

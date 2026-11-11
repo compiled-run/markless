@@ -881,7 +881,7 @@ export const errorIndex: ErrorIndex = {
 					chip: 'error',
 					kind: 'compile error',
 					guided: true,
-					words: 'aria-busy is set where markless already sets it markless_async_aria_busy_managed an element inside a @try sets `aria-busy`, but markless already sets it there.',
+					words: 'aria-busy is set where markless already sets it markless_async_aria_busy_managed your markup sets `aria-busy` on an element where markless already sets it.',
 				},
 				{
 					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',

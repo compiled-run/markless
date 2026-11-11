@@ -39,6 +39,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			state.markDirtyPath(node.graphNodeId, []);
 		});
 		state.scheduleFlush();
+		if (snapshot.status !== 'pending') for (const heard of state.settled) heard(node);
 		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
 			void (state.flush?.() ?? Promise.resolve()).then(() => {
 				for (const held of heldOnInputs) endEntry(held);
