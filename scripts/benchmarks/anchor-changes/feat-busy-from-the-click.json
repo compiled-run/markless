@@ -1,52 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-return-reask"
-			],
-			"delta": 1637,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the button that sent it when it is sent (resume-return-reask, loaded with async wiring, runs only when a save is sent; code run at load unchanged)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 360,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the button that sent it when it is sent (resume-return-reask, loaded with async wiring, runs only when a save is sent; code run at load unchanged)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 517,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the button that sent it when it is sent (resume-return-reask, loaded with async wiring, runs only when a save is sent; code run at load unchanged)",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 361,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the button that sent it when it is sent (resume-return-reask, loaded with async wiring, runs only when a save is sent; code run at load unchanged)",
-			"date": "2026-11-11"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -64,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 1637,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"delta": 773,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -76,8 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 24,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"delta": 11,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -98,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 1637,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"delta": 773,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -122,8 +76,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 2,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"delta": 29,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
 			"date": "2026-11-11"
 		}
 	]
