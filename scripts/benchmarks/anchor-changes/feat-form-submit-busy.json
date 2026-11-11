@@ -1,0 +1,212 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/submit-hold"
+			],
+			"set": 1683,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 376,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 100,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/submit-hold"
+			],
+			"set": 1683,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 376,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 94,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 93,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 376,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/submit-hold"
+			],
+			"set": 1695,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the module loads on that first submit, never at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 439,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 967,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 2656,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1271,
+			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
+			"date": "2026-11-11"
+		}
+	]
+}

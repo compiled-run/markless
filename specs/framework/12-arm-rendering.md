@@ -339,6 +339,37 @@ across all three cases:
   rejected among the block's async values, so `reset` clears the `@catch`
   without fetching again. A promise the handler starts but neither returns
   nor awaits is not watched.
+- Form submit pending (2026-11-11, owner): while a `submit` handler's
+  returned promise runs, the submitted form carries `aria-busy="true"` and
+  the control that submitted it (`event.submitter`) carries
+  `aria-disabled="true"`; both clear when that promise settles, fulfilled or
+  rejected (a rejection still follows the handler-rejection rule above). No
+  author code and no status read: authors style `form[aria-busy="true"]`.
+  `disabled` is not used because it drops keyboard focus from the pressed
+  control and does not give it back; focus stays on the control throughout.
+  A handler that returns no promise marks nothing. Other submit controls of
+  the form are not marked. A second submit of the same form while a run is
+  in flight is cancelled before any handler hears it only when it would send
+  the same thing as a run still in flight: the same value and checked state
+  for every control in `form.elements`, and the same submitter. A submit
+  whose values or submitter differ starts at once, because it is new input:
+  holding it back would lose it, and replaying it after the first run would
+  read the form after that run may have cleared it. The form stays busy, and
+  each submitter marked, until every run that marked it has settled; an
+  `aria-disabled` the page set itself is left alone. The marks and the
+  repeat guard live in a module that loads on the first submit whose handler
+  returns a promise, never at page load, so a repeat in the moment before
+  that module arrives is not yet cancelled. A handler on an element around
+  the form holds the form too (the form is the event's target).
+  `MARKLESS_ASYNC_ARIA_BUSY_MANAGED` refuses an authored `aria-busy` on a
+  form whose own or enclosing `submit` handler can return a promise, and an
+  authored `aria-disabled` on a control whose written attributes make it
+  submit that form (`<button>` with no type or `type="submit"`, `<input
+  type="submit">` or `type="image"`, no `form=` and no spread). A form that
+  is busy for another reason marks it with a class or a `data-` attribute.
+  Not handled: a form element that itself shows an async value gets
+  `aria-busy` from both the refresh marks and this rule, each clearing its
+  own.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client
@@ -375,9 +406,9 @@ none changes a ruling above.
 - Optimistic edits of existing rows (open). Adding a row optimistically is
   quiet, but an optimistic edit of a row already shown (a like, a toggle)
   still marks that row busy while its save runs.
-- Mutations (partly specified). Refresh after a save is ruled above.
-  Narrowing which values a save refreshes is not approved; form-submit
-  pending and the native form upgrade are not specified here.
+- Mutations (partly specified). Refresh after a save and form submit
+  pending are ruled above. Narrowing which values a save refreshes is not
+  approved; the native form upgrade is not specified here.
 - Requests from inside an async value (open, owner, D8 "Refresh after a
   save"). Today a non-`GET` request a recipe sends counts as a write, which
   keeps a recipe that saves (a draft row) from being sent twice, but treats

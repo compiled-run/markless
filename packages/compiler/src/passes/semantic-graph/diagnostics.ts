@@ -755,6 +755,39 @@ export function managedAriaBusyDiagnostic(span: SourceSpan | undefined): Semanti
 	};
 }
 
+/** An authored aria-busy on a form, or aria-disabled on its submit control, that a running submit handler overwrites. */
+export function submitHoldAriaDiagnostic(
+	span: SourceSpan | undefined,
+	on: 'form' | 'submitter',
+): SemanticGraphDiagnostic {
+	const form = on === 'form';
+	return {
+		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: form
+			? 'aria-busy is written on a form Markless marks busy while it submits'
+			: 'aria-disabled is written on a submit control Markless marks while its form submits',
+		message: form
+			? 'aria-busy on this form is managed while its submit handler runs; style the busy form with form[aria-busy="true"] instead.'
+			: 'aria-disabled on this submit control is managed while its form submits; style it with [aria-disabled="true"] or mark your own state with a class or a data- attribute instead.',
+		why: form
+			? 'This form has a submit handler that can return a promise, so each submit sets aria-busy="true" on the form until that promise settles and then removes it. That replaces whatever the attribute said, so the authored value never reaches assistive tech.'
+			: 'The form around this control has a submit handler that can return a promise, so pressing the control sets aria-disabled="true" on it until that promise settles and then removes it. A value the binding writes in between is removed with it.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: form
+					? 'Remove aria-busy. Style the sending form with form[aria-busy="true"], or mark another reason for being busy with a class or a data- attribute.'
+					: 'Remove aria-disabled from the submit control, and mark your own state with a class or a data- attribute.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+	};
+}
+
 export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,

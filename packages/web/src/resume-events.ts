@@ -749,6 +749,7 @@ export function createEventWiring(input: {
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
 				const { graph } = context;
 				let loud: boolean | undefined;
+				let release: Promise<() => void> | undefined;
 				try {
 					const symbol = await input.loadSymbol(symbolId);
 					// A write this body makes is loud only inside a DOM dispatch; the same body a timer reaches later is quiet.
@@ -765,10 +766,16 @@ export function createEventWiring(input: {
 						invokeSymbol,
 					});
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
+					const form = event.target as unknown as HTMLFormElement | null;
+					if (!held && event.type === 'submit' && form?.tagName === 'FORM')
+						release = import('./submit-hold.ts').then(({ holdSubmit }) =>
+							holdSubmit(form, (event as unknown as SubmitEvent).submitter as HTMLElement | null),
+						);
 					return await Promise.resolve(result).catch(async (error: unknown) => {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});
 				} finally {
+					void release?.then((end) => end());
 					if (loud) graph.markUserActionEnd?.();
 					else if (loud === false) graph.markQuietEnd?.();
 					releaseFlush?.();

@@ -138,7 +138,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_REPEAT_KEY_DUPLICATE: 'Two rows of a list have the same key',
 	MARKLESS_ASYNC_BOUNDARY_REQUIRED: 'An async value is read outside @try',
 	MARKLESS_ASYNC_POST_AWAIT_READ: 'An async value looks something up after an await',
-	MARKLESS_ASYNC_ARIA_BUSY_MANAGED: 'aria-busy is set where Markless already sets it',
+	MARKLESS_ASYNC_ARIA_BUSY_MANAGED: 'aria-busy or aria-disabled is set where Markless already sets it',
 	MARKLESS_ASYNC_PLANE_MISSING: 'A page reads an async value no compiled code set up',
 	MARKLESS_CATCH_RESET_GRAPH_MISSING: 'A @catch reset has no graph to re-run values in',
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: 'A handler reads something the browser does not have',
