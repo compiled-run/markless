@@ -2,37 +2,45 @@ import type { SemanticGraphArtifact, SemanticGraphDiagnostic } from '../../artif
 import { submitHoldAriaDiagnostic } from './diagnostics.ts';
 import type { AuthoredAriaBusy } from './types.ts';
 
-type SubmitGraph = Pick<SemanticGraphArtifact, 'hostNodes' | 'events'> & {
+type SubmitGraph = Pick<SemanticGraphArtifact, 'hostNodes'> & {
+	events: SemanticGraphArtifact['events'][number][];
 	diagnostics: SemanticGraphDiagnostic[];
 };
 
-// While a submit handler's promise runs, the runtime owns aria-busy on the form and aria-disabled on the control that submitted it.
-export function collectSubmitHoldAriaDiagnostics(
+// While a submit handler runs, the runtime owns aria-busy on the form, and aria-disabled on its submitter unless the author writes one there.
+export function collectSubmitHoldFacts(
 	graph: SubmitGraph,
 	hostParents: ReadonlyMap<string, string>,
-	authored: { readonly ariaBusy: ReadonlyArray<AuthoredAriaBusy>; readonly submitAriaDisabled: ReadonlyArray<AuthoredAriaBusy> },
+	authored: {
+		readonly ariaBusy: ReadonlyArray<AuthoredAriaBusy>;
+		readonly submitAriaDisabled: ReadonlyArray<AuthoredAriaBusy>;
+	},
 ): void {
 	if (authored.ariaBusy.length === 0 && authored.submitAriaDisabled.length === 0) return;
 	const tags = new Map(graph.hostNodes.map((host) => [host.id, host.tagName]));
-	const asyncSubmit = new Set(
-		graph.events.flatMap((event) =>
-			event.eventName === 'submit' && (event.handlerReturnsPromise || event.handlerMayReject)
-				? [event.hostNodeId]
-				: [],
-		),
-	);
-	const ancestors = function* (hostNodeId: string) {
-		for (let host = hostParents.get(hostNodeId); host; host = hostParents.get(host)) yield host;
+	const ancestors = (hostNodeId: string) => {
+		const hosts: string[] = [];
+		for (let host = hostParents.get(hostNodeId); host; host = hostParents.get(host)) hosts.push(host);
+		return hosts;
 	};
 	// A submit event bubbles, so a handler on the form or on any element around it holds the form.
-	const heldForm = (formId: string) =>
-		asyncSubmit.has(formId) || [...ancestors(formId)].some((host) => asyncSubmit.has(host));
+	const submitEvents = (formId: string) => {
+		const hosts = new Set([formId, ...ancestors(formId)]);
+		return graph.events.filter((event) => event.eventName === 'submit' && hosts.has(event.hostNodeId));
+	};
 	for (const { hostNodeId, sourceSpan } of authored.ariaBusy)
-		if (tags.get(hostNodeId) === 'form' && heldForm(hostNodeId))
-			graph.diagnostics.push(submitHoldAriaDiagnostic(sourceSpan, 'form'));
-	for (const { hostNodeId, sourceSpan } of authored.submitAriaDisabled) {
-		const form = [...ancestors(hostNodeId)].find((host) => tags.get(host) === 'form');
-		if (form && heldForm(form))
-			graph.diagnostics.push(submitHoldAriaDiagnostic(sourceSpan, 'submitter'));
+		if (
+			tags.get(hostNodeId) === 'form' &&
+			submitEvents(hostNodeId).some((event) => event.handlerReturnsPromise || event.handlerMayReject)
+		)
+			graph.diagnostics.push(submitHoldAriaDiagnostic(sourceSpan));
+	const leaveAlone = new Set<SemanticGraphArtifact['events'][number]>();
+	for (const { hostNodeId } of authored.submitAriaDisabled) {
+		const form = ancestors(hostNodeId).find((host) => tags.get(host) === 'form');
+		if (form) for (const event of submitEvents(form)) leaveAlone.add(event);
 	}
+	if (leaveAlone.size > 0)
+		graph.events = graph.events.map((event) =>
+			leaveAlone.has(event) ? { ...event, authoredSubmitAriaDisabled: true as const } : event,
+		);
 }

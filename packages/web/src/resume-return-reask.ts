@@ -83,6 +83,14 @@ const writerRuns = new WeakSet<RuntimeAsyncComputedNode>();
 // Development only: per container, the runs the last refresh started and their versions.
 const refreshed = new Map<Container, Map<RuntimeAsyncComputedNode, number>>();
 let state: WriteState = { phase: WRITE_IDLE };
+// Each writing dispatch's `refreshed`, settled when its round ends: after the reload it caused lands, or at once when none follows.
+const rounds = new WeakMap<DispatchSpan, () => void>();
+function roundDone(writers: Iterable<DispatchSpan>): void {
+	for (const writer of writers) {
+		rounds.get(writer)?.();
+		rounds.delete(writer);
+	}
+}
 let recipe: RuntimeAsyncComputedNode | undefined;
 
 function move(next: WriteState): void {
@@ -101,9 +109,10 @@ function shown([graph, boundaries]: Container): RuntimeAsyncComputedNode[] {
 function refreshIfOwed(): void {
 	if (state.phase !== WRITE_OWED) return;
 	for (const writer of state.writers) if (dispatchSpans().has(writer)) return;
-	const { due } = state;
+	const { due, writers } = state;
 	move({ phase: WRITE_IDLE });
-	for (const [[graph], versions] of due) graph.asyncPlane?.()?.refreshAfterWrite(versions);
+	const landed = [...due].map(([[graph], versions]) => graph.asyncPlane?.()?.refreshAfterWrite(versions));
+	void Promise.all(landed).then(() => roundDone(writers));
 	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
 		for (const [container, versions] of due)
 			refreshed.set(
@@ -113,7 +122,10 @@ function refreshIfOwed(): void {
 }
 
 function begin(open: ReadonlySet<DispatchSpan>): void {
-	for (const span of open) span.closed = refreshIfOwed;
+	for (const span of open) {
+		span.closed = refreshIfOwed;
+		span.refreshed ??= new Promise((done) => rounds.set(span, done));
+	}
 	if (state.phase === WRITE_IDLE) return move({ phase: WRITE_WRITING, inFlight: 1, writers: new Set(open) });
 	const writers = new Set([...state.writers, ...open]);
 	if (state.phase === WRITE_OWED) return move({ phase: WRITE_WRITING_SUCCEEDED, inFlight: 1, writers });
@@ -125,7 +137,11 @@ function end(ok: boolean): void {
 	const phase = ok ? WRITE_WRITING_SUCCEEDED : state.phase;
 	const inFlight = state.inFlight - 1;
 	if (inFlight > 0) return move({ phase, inFlight, writers: state.writers });
-	if (phase === WRITE_WRITING) return move({ phase: WRITE_IDLE });
+	if (phase === WRITE_WRITING) {
+		const { writers } = state;
+		move({ phase: WRITE_IDLE });
+		return roundDone(writers);
+	}
 	const due = new Map<Container, Versions>();
 	for (const container of containers) {
 		const versions = new Map<string, number>();

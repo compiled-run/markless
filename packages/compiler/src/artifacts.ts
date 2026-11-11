@@ -907,6 +907,8 @@ export type SemanticEvent = {
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
+	/** A submit event whose form has a submit control with an author-written aria-disabled, which a submitting form then leaves alone. */
+	readonly authoredSubmitAriaDisabled?: true;
 };
 
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {

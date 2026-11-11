@@ -303,13 +303,12 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
-		title: 'aria-busy or aria-disabled is set where Markless already sets it',
+		title: 'aria-busy is set where Markless already sets it',
 		area: 'async',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description:
-			'Your markup sets `aria-busy` or `aria-disabled` on an element where Markless already sets it.',
+		description: 'Your markup sets `aria-busy` on an element where Markless already sets it.',
 		printed: [
 			'MARKLESS_ASYNC_ARIA_BUSY_MANAGED: aria-busy on this element is managed by the async boundary; dim stale content with a class or a data- attribute instead.',
 			'This element reads an async value inside @try, so a refresh sets aria-busy="true" on it while the fetch runs and removes it when the fetch settles. That replaces whatever the binding wrote, so the authored value never reaches assistive tech.',
@@ -321,21 +320,20 @@ export const errorEntries: readonly ErrorEntry[] = [
 		suggestion:
 			'Remove aria-busy and dim the stale content with a class or a data- attribute, for example data-stale={results.query !== query}.',
 		guide: {
-			summary:
-				'Your markup sets `aria-busy` or `aria-disabled` on an element where Markless already sets it.',
+			summary: 'Your markup sets `aria-busy` on an element where Markless already sets it.',
 			what: [
 				{
 					id: 's0',
-					text: 'Markless sets these attributes itself in two places. An element inside a @try that shows an async value gets ',
+					text: 'Markless sets ',
 				},
 				{
 					id: 's1',
-					text: 'aria-busy="true"',
+					text: 'aria-busy',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: ' while that value loads again. A form whose submit handler returns a promise gets ',
+					text: ' itself in two places. An element inside a @try that shows an async value gets ',
 				},
 				{
 					id: 's3',
@@ -344,39 +342,48 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: ' while the handler runs, and the button that sent it gets ',
+					text: ' while that value loads again. A form whose submit handler returns a promise gets ',
 				},
 				{
 					id: 's5',
-					text: 'aria-disabled="true"',
+					text: 'aria-busy="true"',
 					code: true,
 				},
 				{
 					id: 's6',
-					text: '. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
+					text: ' while it is sending. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
 				},
 			],
 			how: [
 				{
 					id: 's0',
-					text: 'Remove the attribute and leave it to Markless. To style the busy state, select on it, for example ',
+					text: 'Remove ',
 				},
 				{
 					id: 's1',
-					text: 'form[aria-busy="true"]',
+					text: 'aria-busy',
 					code: true,
 				},
 				{
 					id: 's2',
-					text: '. For a state of your own, such as old results while new ones load or a form that is not ready to send, use a class or a ',
+					text: ' and leave it to Markless. To style the busy state, select on it, for example ',
 				},
 				{
 					id: 's3',
-					text: 'data-',
+					text: 'form[aria-busy="true"]',
 					code: true,
 				},
 				{
 					id: 's4',
+					text: '. For a state of your own, such as old results while new ones load or a form busy for another reason, use a class or a ',
+				},
+				{
+					id: 's5',
+					text: 'data-',
+					code: true,
+				},
+				{
+					id: 's6',
 					text: ' attribute and style that.',
 				},
 			],

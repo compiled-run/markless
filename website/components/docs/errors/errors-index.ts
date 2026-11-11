@@ -877,11 +877,11 @@ export const errorIndex: ErrorIndex = {
 				},
 				{
 					code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
-					title: 'aria-busy or aria-disabled is set where Markless already sets it',
+					title: 'aria-busy is set where Markless already sets it',
 					chip: 'error',
 					kind: 'compile error',
 					guided: true,
-					words: 'aria-busy or aria-disabled is set where markless already sets it markless_async_aria_busy_managed your markup sets `aria-busy` or `aria-disabled` on an element where markless already sets it.',
+					words: 'aria-busy is set where markless already sets it markless_async_aria_busy_managed your markup sets `aria-busy` on an element where markless already sets it.',
 				},
 				{
 					code: 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE',

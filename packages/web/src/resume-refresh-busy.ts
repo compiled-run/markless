@@ -1,3 +1,4 @@
+import { holdBusy } from './event-current-target.ts';
 import type { ResumeArmRange } from './resume-types.ts';
 
 export type BusyNode = {
@@ -30,8 +31,5 @@ export function setBoundaryBusy(
 	boundary: Pick<ResumeArmRange, 'startAnchor' | 'endAnchor'>,
 	busy: boolean,
 ): void {
-	for (const host of boundaryBusyHosts(boundary)) {
-		if (busy) host.setAttribute?.('aria-busy', 'true');
-		else host.removeAttribute?.('aria-busy');
-	}
+	for (const host of boundaryBusyHosts(boundary)) holdBusy(host, boundary.startAnchor as object, busy);
 }

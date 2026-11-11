@@ -1,4 +1,5 @@
 import type { ArmRowsAnchor } from '../resume-repeat-branch-arm.ts';
+import { holdBusy } from '../event-current-target.ts';
 import { boundaryBusyHosts, type BusyNode } from '../resume-refresh-busy.ts';
 import type {
 	ResumeArmRecordSet,
@@ -105,8 +106,9 @@ function apply(boundary: BusyBoundary): void {
 		};
 		for (const host of boundaryBusyHosts(range)) hosts.add(host);
 	}
-	for (const host of busy.marked) if (!hosts.has(host)) host.removeAttribute?.('aria-busy');
-	for (const host of hosts) host.setAttribute?.('aria-busy', 'true');
+	const owner = (boundary.startAnchor as object | undefined) ?? boundary;
+	for (const host of busy.marked) if (!hosts.has(host)) holdBusy(host, owner, false);
+	for (const host of hosts) holdBusy(host, owner, true);
 	if (hosts.size > 0 !== busy.marked.size > 0) announce(busy, hosts.size > 0 ? hosts : busy.marked);
 	busy.marked = hosts;
 }

@@ -339,37 +339,59 @@ across all three cases:
   rejected among the block's async values, so `reset` clears the `@catch`
   without fetching again. A promise the handler starts but neither returns
   nor awaits is not watched.
-- Form submit pending (2026-11-11, owner): while a `submit` handler's
-  returned promise runs, the submitted form carries `aria-busy="true"` and
-  the control that submitted it (`event.submitter`) carries
-  `aria-disabled="true"`; both clear when that promise settles, fulfilled or
-  rejected (a rejection still follows the handler-rejection rule above). No
-  author code and no status read: authors style `form[aria-busy="true"]`.
-  `disabled` is not used because it drops keyboard focus from the pressed
-  control and does not give it back; focus stays on the control throughout.
-  A handler that returns no promise marks nothing. Other submit controls of
-  the form are not marked. A second submit of the same form while a run is
-  in flight is cancelled before any handler hears it only when it would send
-  the same thing as a run still in flight: the same value and checked state
-  for every control in `form.elements`, and the same submitter. A submit
-  whose values or submitter differ starts at once, because it is new input:
-  holding it back would lose it, and replaying it after the first run would
-  read the form after that run may have cleared it. The form stays busy, and
-  each submitter marked, until every run that marked it has settled; an
-  `aria-disabled` the page set itself is left alone. The marks and the
-  repeat guard live in a module that loads on the first submit whose handler
-  returns a promise, never at page load, so a repeat in the moment before
-  that module arrives is not yet cancelled. A handler on an element around
-  the form holds the form too (the form is the event's target).
-  `MARKLESS_ASYNC_ARIA_BUSY_MANAGED` refuses an authored `aria-busy` on a
-  form whose own or enclosing `submit` handler can return a promise, and an
-  authored `aria-disabled` on a control whose written attributes make it
-  submit that form (`<button>` with no type or `type="submit"`, `<input
-  type="submit">` or `type="image"`, no `form=` and no spread). A form that
-  is busy for another reason marks it with a class or a `data-` attribute.
-  Not handled: a form element that itself shows an async value gets
-  `aria-busy` from both the refresh marks and this rule, each clearing its
-  own.
+- Form submit pending (2026-11-11, owner; extent per the async-dx
+  research): while a `submit` handler's returned promise runs, the
+  submitted form carries `aria-busy="true"` and the control that submitted
+  it (`event.submitter`) carries `aria-disabled="true"`. When the handler's
+  dispatch sent a same-origin write that succeeded, the marks and the
+  repeat hold below stay until the refresh after a save that write caused
+  has landed: they clear in the flush that commits the refreshed content,
+  or that commits its failure. When no refresh follows (no write, or every
+  write in the round failed) they clear once the promise settles and the
+  dispatch ends. Writes that overlap join one refresh round, so the marks
+  of every dispatch in that round clear together; a dispatch still running
+  when another sends its write is part of that round, so one that never
+  ends keeps the round, and its marks, open. A rejection still follows the
+  handler-rejection rule above. No author code and no status read: authors
+  style `form[aria-busy="true"]`. `disabled` is not used because it drops
+  keyboard focus from the pressed control and does not give it back; focus
+  stays on the control throughout. `aria-disabled` does not itself block
+  activation. A handler that returns no promise marks nothing. Other submit
+  controls of the form are not marked.
+  - Repeat hold: what a submission carries is read when its dispatch
+    reaches the handler, before the handler runs: the value and checked
+    state of every control in `form.elements`, all selected options of a
+    select, each file's name, size and last-modified time, and the
+    submitter element (an image button included; no submitter is its own
+    case). A second submit of the form whose record and submitter equal
+    those of a submission still held is cancelled before any handler hears
+    it, with no message. Any other submit starts at once, because holding
+    it back would lose it and replaying it later would read the form after
+    the first run may have cleared it. Disabled and unnamed controls take
+    part, which errs toward sending. A form-associated custom element's
+    value set only through `ElementInternals` is not seen, so a change to it
+    alone can be held as a repeat.
+  - The hold lives in a module that loads on the first submit whose handler
+    returns a promise, never at page load, and starts as soon as it is
+    loaded; every later submission is held as its handler returns. A repeat
+    pressed before the first hold has started is sent. Closing that needs
+    the submit event record to say the handler can return a promise, so the
+    hold starts at dispatch, at a download cost on every page; not done.
+  - `aria-busy` on an element is true while any owner holds it: a refresh
+    showing that element's value, or a submission of that form. Each owner
+    clears only its own hold.
+  - A submit event record carries `authoredSubmitAriaDisabled` when a
+    control that submits its form has an author-written `aria-disabled`
+    (static or bound; the analyzer's fact, not a DOM read). Such a form
+    then writes `aria-disabled` on none of its controls, so an unbound
+    second submit control of that form is not marked either; the form's
+    `aria-busy` and the repeat hold still apply.
+  - `MARKLESS_ASYNC_ARIA_BUSY_MANAGED` refuses an authored `aria-busy` on a
+    form whose own or enclosing `submit` handler can return a promise. A
+    form busy for another reason marks it with a class or a `data-`
+    attribute.
+  - A form inside a shadow root is not marked: the submit event does not
+    leave the shadow tree, so it reaches no dispatcher outside it.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client

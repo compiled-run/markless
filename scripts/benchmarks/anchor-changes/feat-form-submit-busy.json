@@ -1,214 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/submit-hold"
-			],
-			"set": 1683,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 376,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 100,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/submit-hold"
-			],
-			"set": 1683,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 376,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 94,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 93,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; nothing more runs at load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-events"
-			],
-			"delta": 376,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/submit-hold"
-			],
-			"set": 1695,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the module loads on that first submit, never at page load",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 439,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 439,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 439,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 967,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 2656,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"darwin-arm64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 1271,
-			"reason": "a form marks itself busy while its async submit handler runs: resume-events loads web/submit-hold only for a submit whose handler returns a promise; the load cost is resume-events' few added lines and its lazy-import entry, submit-hold itself is not loaded",
-			"date": "2026-11-11"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"loadWeight",
@@ -350,6 +142,344 @@
 			],
 			"delta": 445,
 			"reason": "a form marks itself busy while its async submit handler runs: packed builds carry web/submit-hold in the runtime chunk downloaded at load (not run at load), resume-events gains its lazy-import site; docs also carry the compiler's new diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/submit-hold"
+			],
+			"set": 1227,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 712,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": -16,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 630,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-refresh-busy"
+			],
+			"delta": -18,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"delta": -16,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 379,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 134,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/submit-hold"
+			],
+			"set": 1227,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 712,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": -16,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 630,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-refresh-busy"
+			],
+			"delta": -18,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"delta": -16,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 379,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 161,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 129,
+			"reason": "form submit hold, review round: the submission record (read before the handler) and per-element aria-busy owners move into event-current-target, which ships with dispatch; resume-return-reask settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 712,
+			"reason": "form submit hold, review round: the submission record read before the handler and per-element aria-busy owners ship with dispatch; the write watch settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 630,
+			"reason": "form submit hold, review round: the submission record read before the handler and per-element aria-busy owners ship with dispatch; the write watch settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 379,
+			"reason": "form submit hold, review round: the submission record read before the handler and per-element aria-busy owners ship with dispatch; the write watch settles each writing dispatch's round so a form stays busy until the reload its save caused lands",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 572,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 572,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 572,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1214,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 3240,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1604,
+			"reason": "a form marks itself busy while its async submit handler runs: packed builds download web/submit-hold inside the runtime chunk at load but do not run it; dispatch also downloads the submission record and aria-busy owners; docs pages also download the compiler's diagnostic text in the playground worker",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/submit-hold"
+			],
+			"set": 1239,
+			"reason": "a form marks itself busy while its async submit handler runs: loaded on the first submit whose handler returns a promise; the comparison helpers moved to event-current-target",
 			"date": "2026-11-11"
 		}
 	]

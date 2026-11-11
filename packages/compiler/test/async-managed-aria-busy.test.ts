@@ -1,4 +1,12 @@
 import { expect, test } from 'vitest';
+import {
+	buildSemanticGraph,
+	createProtocolViewPayload,
+	createRenderData,
+	lowerStateAccess,
+	planPayloadArena,
+	planSymbolResolver,
+} from '../src/index.ts';
 import { buildSemanticGraphSync } from '../src/passes/semantic-graph/index.ts';
 
 const CODE = 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED';
@@ -7,6 +15,27 @@ function errors(source: string) {
 	return buildSemanticGraphSync({ filename: 'page.tsrx', source }).diagnostics.filter(
 		(diagnostic) => diagnostic.code === CODE,
 	);
+}
+
+function submitFacts(source: string) {
+	return buildSemanticGraphSync({ filename: 'page.tsrx', source })
+		.events.filter((event) => event.eventName === 'submit')
+		.map((event) => event.authoredSubmitAriaDisabled);
+}
+
+async function submitRecords(source: string) {
+	const semanticGraph = await buildSemanticGraph({ filename: 'page.tsrx', source });
+	const stateLowering = lowerStateAccess({ semanticGraph });
+	const payloadArena = planPayloadArena({ semanticGraph, stateLowering });
+	const symbolResolver = planSymbolResolver({ semanticGraph, payloadArena });
+	const view = createProtocolViewPayload({
+		payloadArena,
+		symbolResolver,
+		semanticGraph,
+		renderData: createRenderData({ semanticGraph, symbolResolver }),
+		publicRenderPlan: { asyncBoundaryGates: [], branchReactivityGates: [], keyedRepeats: [] } as never,
+	} as never);
+	return view.events.filter((event) => event.eventName === 'submit');
 }
 
 function spanText(source: string, span: { start: number; end: number } | undefined) {
@@ -107,27 +136,25 @@ test('a static aria-busy on such a form, or a submit handler on an element aroun
 	expect(errors(form('aria-busy={saving}', '<button>Save</button>', asyncSubmit))).toHaveLength(1);
 });
 
-test('aria-disabled on the control that submits such a form is an error', () => {
+test('aria-disabled the author writes on a control that submits such a form is allowed, and the form says so', async () => {
 	for (const control of [
 		'<button aria-disabled={saving}>Save</button>',
-		'<button type="submit" aria-disabled="false">Save</button>',
+		'<button type="submit" aria-disabled="true">Save</button>',
 		'<input type="submit" aria-disabled={saving} />',
 		'<input type="image" alt="Save" aria-disabled={saving} />',
 	]) {
 		const source = form(asyncSubmit, control);
-		const [error, ...rest] = errors(source);
-		expect(rest).toEqual([]);
-		expect(spanText(source, error?.primarySpan)).toMatch(/^aria-disabled=/);
-		expect(error?.message).toBe(
-			'aria-disabled on this submit control is managed while its form submits; style it with [aria-disabled="true"] or mark your own state with a class or a data- attribute instead.',
-		);
+		expect(errors(source)).toEqual([]);
+		expect(submitFacts(source)).toEqual([true]);
+		expect((await submitRecords(source)).map((record) => record.authoredSubmitAriaDisabled)).toEqual([true]);
 	}
+	expect(submitFacts(form('', '<button aria-disabled={saving}>Save</button>', asyncSubmit))).toEqual([true]);
 });
 
-test('forms and controls the submit hold never marks stay quiet', () => {
+test('forms and controls the submit hold never marks stay quiet and carry no fact', async () => {
 	const sync = 'onSubmit={(event) => { event.preventDefault(); sent++; }}';
 	for (const source of [
-		form(`aria-busy={saving} ${sync}`, '<button aria-disabled={saving}>Save</button>'),
+		form(`aria-busy={saving} ${sync}`, '<button>Save</button>'),
 		form('aria-busy={saving}', '<button aria-disabled={saving}>Save</button>'),
 		form(asyncSubmit, '<button type="button" aria-disabled={saving}>Preview</button>'),
 		form(asyncSubmit, '<button type="reset" aria-disabled={saving}>Clear</button>'),
@@ -135,4 +162,7 @@ test('forms and controls the submit hold never marks stay quiet', () => {
 		form(asyncSubmit, '<input aria-disabled={saving} /><fieldset aria-busy={saving}></fieldset>'),
 	])
 		expect(errors(source)).toEqual([]);
+	const plain = form(asyncSubmit, '<button>Save</button>');
+	expect(submitFacts(plain)).toEqual([undefined]);
+	expect(JSON.stringify(await submitRecords(plain))).not.toContain('authoredSubmitAriaDisabled');
 });

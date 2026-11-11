@@ -282,19 +282,24 @@ Anywhere else, the handler stops at that `await`, state it changed before keeps 
 
 ## A form shows that it is sending
 
-While an `onSubmit` handler that returns a promise is still running, Markless marks the form for you. The form gets `aria-busy="true"`, and the button that sent it gets `aria-disabled="true"`. Both go away when the promise finishes, whether it worked or failed. You write no extra state for this, only CSS:
+While an `onSubmit` handler that returns a promise is still running, Markless marks the form for you. The form gets `aria-busy="true"`, and the button that sent it gets `aria-disabled="true"`. If the handler saved something and the page loads its data again because of it, the marks stay until that new data is on screen. Otherwise they go away when the promise finishes, whether it worked or failed. You write no extra state for this, only CSS:
 
 ```css
 form[aria-busy='true'] {
 	opacity: 0.6;
 }
+form[aria-busy='true'] button {
+	cursor: progress;
+}
 ```
 
-Screen readers announce the form as busy and the button as unavailable. Unlike `disabled`, `aria-disabled` keeps keyboard focus on the button, so a keyboard user is not sent back to the top of the page.
+`aria-busy` on a form tells assistive tech that its contents are being updated, so many screen readers hold back announcing changes inside it until it clears; most don't announce the busy state itself. `aria-disabled` makes the button report as unavailable. Unlike `disabled`, it keeps keyboard focus on the button, so a keyboard user is not sent back to the top of the page.
 
-Pressing the button again while the form is sending does nothing, so the same thing is never sent twice. If the person changed a field first, or pressed a different submit button, that is a new submission, and it is sent at once. A handler that returns no promise marks nothing.
+`aria-disabled` doesn't stop the button working on its own. Markless stops a press that would send exactly what is already being sent: the same values in every field, from the same button. That press does nothing, with no message. If the person changed a field first, or pressed a different submit button, that is a new submission, and it is sent at once. A press made before Markless has loaded the code that does this, on the very first submit of a page, can still be sent twice. A handler that returns no promise marks nothing.
 
-Because Markless sets these two attributes, the build refuses an `aria-busy` you write on such a form, or an `aria-disabled` you write on its submit button. To mark a form that is busy for another reason, use a class or a `data-` attribute. See [`MARKLESS_ASYNC_ARIA_BUSY_MANAGED`](/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED).
+If you write `aria-disabled` on a submit button yourself, for example `aria-disabled={!ready}` to show the form isn't ready, Markless leaves `aria-disabled` alone on every button of that form and still marks the form busy. Style the sending state from the form's `aria-busy`, as above.
+
+Markless sets the form's `aria-busy`, so the build refuses an `aria-busy` you write on such a form. To mark a form that is busy for another reason, use a class or a `data-` attribute. See [`MARKLESS_ASYNC_ARIA_BUSY_MANAGED`](/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED).
 
 ## A handler's code waits for its event
 
