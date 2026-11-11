@@ -323,7 +323,8 @@ export async function startAsyncBoundaries(
 	};
 }
 
-// The arm a boundary's range shows, as this runtime last committed it.
+// The arm a boundary's range shows, as this runtime last committed it, or its @try content kept with the @catch drawn after it.
+const SHOWN_TRY_KEPT = 3;
 const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
 
 function commitShownArm(
@@ -431,7 +432,8 @@ export async function settleAsyncBoundaryRange(
 			? (await import('./resume-keyed-repeats-lazy.ts')).movedSincePaint(input.graph, rows)
 			: undefined;
 		const after = asyncPlanes.busy?.settleRange(boundary, arm);
-		if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
+		if (after) shownArms.set(boundary, SHOWN_TRY_KEPT);
+		else if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
 		else shownArms.delete(boundary);
 		await input.commitArm!((after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
@@ -490,9 +492,10 @@ export async function settleAsyncBoundaryRange(
 			return;
 		}
 		// A failure over shown @try content keeps it, which only a commit can draw: the journal swap replaces the range.
+		const shown = shownArms.get(boundary) ?? boundary.initiallyServedArm;
 		const keepsShown =
 			arm === ASYNC_BOUNDARY_ARM.catch &&
-			(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try;
+			(shown === ASYNC_BOUNDARY_ARM.try || shown === SHOWN_TRY_KEPT);
 		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
 		else shownArms.set(boundary, arm);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
