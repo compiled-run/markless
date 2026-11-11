@@ -102,8 +102,10 @@ function checkLoadWeight(subject, load, platform, anchor, fail, note) {
 					`runs +${ran} chars more than its anchor ${anchor.executedChars} (allowed swing ${BUDGETS.loadExecutionSwingChars})`,
 				]
 			: []),
-		...(grew > 0
-			? [`downloads +${grew} B gzip more than its anchor ${anchor.jsGzipBytes}`]
+		...(grew > BUDGETS.loadDownloadCompositionBytes
+			? [
+					`downloads +${grew} B gzip more than its anchor ${anchor.jsGzipBytes} (allowed ${BUDGETS.loadDownloadCompositionBytes} B for gzip composing accepted changes)`,
+				]
 			: []),
 	];
 	if (problems.length) {

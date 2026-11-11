@@ -10295,6 +10295,134 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED',
+		title: 'An API route refused a write sent from another site',
+		area: 'router',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'An API route refused a write that a browser sent from another site.',
+		printed: [
+			'MARKLESS_ROUTER_CROSS_SITE_WRITE_REFUSED: this api/ route refused a write that a browser sent from another site. Writes are accepted from pages on this origin and from callers that are not browsers, such as curl or another server.',
+		],
+		structured: false,
+		guide: {
+			summary: 'An API route refused a write that a browser sent from another site.',
+			what: [
+				{
+					id: 's0',
+					text: 'A browser sends your cookies with every request to your app, even one that a page on another site starts. So a page elsewhere could send a form to your ',
+				},
+				{
+					id: 's1',
+					text: 'POST',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' route as if a signed-in visitor sent it. To stop that, every route in ',
+				},
+				{
+					id: 's3',
+					text: 'api/',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: ' answers 403 to a request that changes data (any method except ',
+				},
+				{
+					id: 's5',
+					text: 'GET',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ', ',
+				},
+				{
+					id: 's7',
+					text: 'HEAD',
+					code: true,
+				},
+				{
+					id: 's8',
+					text: ' and ',
+				},
+				{
+					id: 's9',
+					text: 'OPTIONS',
+					code: true,
+				},
+				{
+					id: 's10',
+					text: ') when the browser says it came from another site. The browser says so in the ',
+				},
+				{
+					id: 's11',
+					text: 'Sec-Fetch-Site',
+					code: true,
+				},
+				{
+					id: 's12',
+					text: ' header, or in older browsers only through the ',
+				},
+				{
+					id: 's13',
+					text: 'Origin',
+					code: true,
+				},
+				{
+					id: 's14',
+					text: ' header.',
+				},
+			],
+			how: [
+				{
+					id: 's0',
+					text: 'Send the write from a page on the same origin as the route: same scheme, host and port, so ',
+				},
+				{
+					id: 's1',
+					text: 'admin.example.com',
+					code: true,
+				},
+				{
+					id: 's2',
+					text: ' cannot write to ',
+				},
+				{
+					id: 's3',
+					text: 'example.com',
+					code: true,
+				},
+				{
+					id: 's4',
+					text: '. If another site really needs to write, let its server call the route: a request with neither header passes. If your own pages are refused in an older browser, check whether a proxy in front of the app changes the host or the scheme the server sees. See ',
+				},
+				{
+					id: 's5',
+					text: 'API routes',
+					href: '/router/api-routes',
+				},
+				{
+					id: 's6',
+					text: '.',
+				},
+			],
+			example: [],
+			before: [],
+		},
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/index.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/index.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED',
 		title: 'document.tsrx has an event handler',
 		area: 'router',

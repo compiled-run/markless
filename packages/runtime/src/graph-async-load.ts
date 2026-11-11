@@ -202,6 +202,22 @@ export function createAsyncPlane(
 		}
 	};
 	for (const each of asyncComputed ?? []) add(createNode(each));
+	// Inputs written in one synchronous turn start one run per value, on the final inputs; a read in between starts them first.
+	let written: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
+	const startWritten = (): void => {
+		const batch = written;
+		written = undefined;
+		batch?.forEach((byAction, node) =>
+			withRefresh((loaded) => {
+				replaying = byAction;
+				try {
+					loaded.advance(node, 'write');
+				} finally {
+					replaying = undefined;
+				}
+			}),
+		);
+	};
 	const forward = (graphNodeId: string, call: (bound: AsyncRefresh, node: RuntimeAsyncComputedNode) => void): void => {
 		const node = nodes.get(graphNodeId);
 		if (node) withRefresh((loaded) => call(loaded, node));
@@ -210,12 +226,20 @@ export function createAsyncPlane(
 	return {
 		nodes,
 		read(node, path) {
+			if (written?.has(node)) startWritten();
 			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node));
 			return peek(node, path);
 		},
 		invalidate(node) {
-			if (node.phase !== NODE_IDLE) withRefresh((loaded) => loaded.advance(node, 'write'));
+			if (node.phase === NODE_IDLE) return;
+			if (!written) {
+				written = new Map();
+				queueMicrotask(startWritten);
+			}
+			const byAction = context().isUserAction?.();
+			written.set(node, written.get(node) || byAction);
 		},
+		startWritten,
 		markEntry(graphNodeId) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node));
 		},
