@@ -168,6 +168,23 @@ test('a synchronous submit handler marks nothing', async () => {
 	expect(marks).toEqual([]);
 });
 
+// Known gap: the hold starts only once the handler has returned its promise, after the handler's code and the hold's module load, so a second press before then is sent too.
+test.fails('a repeat pressed before the hold exists is not sent (known gap: the hold arrives after the first press has loaded its code)', async () => {
+	const container = (await render(NoteForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	const { submitter } = parts(container);
+	const answer = deferred<void>();
+	server.nextPost = [{ wait: answer.promise }, { wait: answer.promise }];
+	submitter.click();
+	submitter.click();
+	await settle();
+	try {
+		expect(server.posts).toEqual(['POST /mut/items Grace']);
+	} finally {
+		answer.resolve();
+	}
+});
+
 // Measured, not Markless behaviour: which way of blocking a button keeps keyboard focus on it.
 test('disabling a focused button drops its focus; aria-disabled keeps it', async () => {
 	const form = document.createElement('form');
