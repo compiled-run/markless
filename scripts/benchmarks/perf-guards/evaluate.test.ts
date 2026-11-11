@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, test } from 'vitest';
 import { accept } from './cli.mjs';
+import { BUDGETS } from './config.mjs';
 import { evaluate } from './evaluate.mjs';
 import { criticalPathRounds, routeHtml } from './measure.mjs';
 import { compareCells } from './timing-guard.mjs';
@@ -590,12 +591,48 @@ describe('G16 load weight', () => {
 		expect(g16(withLoad({ executedChars: 9_000, jsGzipBytes: 70_000 }), anchors())).toEqual([]);
 	});
 
-	test('running more than the swing at load, or downloading one byte more, fails', () => {
+	test('running more than the swing at load fails, even with no more bytes downloaded', () => {
 		expect(
 			g16(withLoad({ executedChars: 10_400, jsGzipBytes: 80_000 }), anchors()),
 		).toHaveLength(1);
+		const swing = BUDGETS.loadExecutionSwingChars;
 		expect(
-			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_001 }), anchors()),
+			g16(withLoad({ executedChars: 10_000 + swing, jsGzipBytes: 80_000 }), anchors()),
+		).toEqual([]);
+		expect(
+			g16(withLoad({ executedChars: 10_000 + swing + 1, jsGzipBytes: 80_000 }), anchors()),
+		).toHaveLength(1);
+	});
+
+	test('two accepted changes whose gzip does not add up pass within the composition allowance, and one byte past it fails', () => {
+		const composed = anchors({});
+		composed.loadWeight[platform]['bench /records'].jsGzipBytes += 43 + 88;
+		const tree = (extra: number) =>
+			withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + 43 + 88 + extra });
+		expect(g16(tree(7), composed)).toEqual([]);
+		expect(g16(tree(BUDGETS.loadDownloadCompositionBytes), composed)).toEqual([]);
+		const over = g16(tree(BUDGETS.loadDownloadCompositionBytes + 1), composed);
+		expect(over).toHaveLength(1);
+		expect(over[0].message).toContain(`+${BUDGETS.loadDownloadCompositionBytes + 1} B gzip`);
+	});
+
+	test('the allowance is measured against the anchor, so unaccepted growth across pull requests adds up and fails', () => {
+		const step = Math.ceil(BUDGETS.loadDownloadCompositionBytes / 2) + 1;
+		expect(
+			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + step }), anchors()),
+		).toEqual([]);
+		expect(
+			g16(withLoad({ executedChars: 10_000, jsGzipBytes: 80_000 + 2 * step }), anchors()),
+		).toHaveLength(1);
+	});
+
+	test('the composition allowance does not cover code run at load', () => {
+		const swing = BUDGETS.loadExecutionSwingChars;
+		expect(
+			g16(
+				withLoad({ executedChars: 10_000 + swing + 1, jsGzipBytes: 80_000 + 1 }),
+				anchors(),
+			),
 		).toHaveLength(1);
 	});
 
