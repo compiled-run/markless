@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'pathe';
 import { chromium } from '@playwright/test';
-import { createBuilder, createServer } from 'vite';
+import { createServer } from 'vite';
 import { afterAll, beforeAll, expect, test } from 'vitest';
 import { markless } from '@markless/bundler/vite';
 import { router } from '../../src/vite/index.ts';
@@ -10,6 +10,7 @@ import { SERVED_HTML_ATTRIBUTES_PROPERTY } from '../../src/route-dom.ts';
 import { fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // A document.tsrx that writes <html> itself, with a scoped <style>, the way the website's does.
 
@@ -76,14 +77,7 @@ beforeAll(async () => {
 		await mkdir(dirname(join(root, file)), { recursive: true });
 		await writeFile(join(root, file), source);
 	}
-	const builder = await createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		nitro: { routeRules: { '/': { prerender: true } } },
-		plugins: [markless(), router()],
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
+	await buildFixture({ root, nitro: { routeRules: { '/': { prerender: true } } } });
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
