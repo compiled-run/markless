@@ -753,6 +753,8 @@ export type SemanticGraphDependency = {
 	readonly source: string;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
+	/** Text only: the control showing it writes this state from its own handler. */
+	readonly writtenByControl?: true;
 };
 
 export type SemanticHostNode = {
@@ -927,6 +929,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_HANDLER_WRITES_RENDER_LOCAL'
 		| 'MARKLESS_ASYNC_POST_AWAIT_READ'
 		| 'MARKLESS_ASYNC_INPUT_BESIDE_VALUE'
+		| 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED'
 		| 'MARKLESS_ASYNC_BOUNDARY_REQUIRED'
 		| 'MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED'
 		| 'MARKLESS_PROJECTED_REPEAT_HOLE_REPEATED'

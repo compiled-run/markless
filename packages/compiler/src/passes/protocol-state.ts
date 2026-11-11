@@ -41,6 +41,7 @@ export function createProtocolStatePayloadFromArena(
 					dependencies: computed.dependencies.map((dependency) => ({
 						graphNodeId: dependency.graphNodeId,
 						path: dependency.path,
+						...(dependency.writtenByControl ? { writtenByControl: true as const } : {}),
 					})),
 				}
 			: {}),

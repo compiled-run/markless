@@ -113,6 +113,9 @@ export type PendingElementHandleIdref = Omit<
 	readonly declaringScope?: string;
 };
 
+/** An `aria-busy` the author wrote on a host element, static or bound. */
+export type AuthoredAriaBusy = { readonly hostNodeId: string; readonly sourceSpan?: SourceSpan };
+
 export type WalkState = {
 	readonly filename: string;
 	readonly moduleId: string;
@@ -139,6 +142,8 @@ export type WalkState = {
 		readonly propName: string;
 	}>;
 	readonly hostIds: WeakMap<object, string>;
+	/** The host element each host sits directly inside, in its component's own markup. */
+	readonly hostParents: Map<string, string>;
 	/** Template values already refused at their use site; the walk must not treat them as markup again. */
 	readonly handledTemplateValues: WeakSet<object>;
 	currentComponentName: string | null;
@@ -181,6 +186,7 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	authoredAriaBusy: AuthoredAriaBusy[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -307,6 +313,7 @@ export function createWalkState(input: {
 		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		hostIds: new WeakMap<object, string>(),
+		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),
 		currentComponentName: null,
 		currentComponentId: null,
@@ -331,6 +338,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		authoredAriaBusy: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),

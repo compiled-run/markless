@@ -733,6 +733,28 @@ export function asyncInputBesideValueDiagnostic(input: {
 	};
 }
 
+export function managedAriaBusyDiagnostic(span: SourceSpan | undefined): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'aria-busy is written on an element the async boundary marks busy',
+		message:
+			'aria-busy on this element is managed by the async boundary; dim stale content with a class or a data- attribute instead.',
+		why: 'This element reads an async value inside @try, so a refresh sets aria-busy="true" on it while the fetch runs and removes it when the fetch settles. That replaces whatever the binding wrote, so the authored value never reaches assistive tech.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Remove aria-busy and dim the stale content with a class or a data- attribute, for example data-stale={results.query !== query}.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+	};
+}
+
 export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,

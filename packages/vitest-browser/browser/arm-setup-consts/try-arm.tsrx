@@ -20,7 +20,7 @@ export function Search() @{
 		}} />
 		@try {
 			const stale = results.q !== query;
-			<ul aria-busy={stale} style={stale ? 'opacity: 0.5' : 'opacity: 1'}>
+			<ul data-stale={stale} style={stale ? 'opacity: 0.5' : 'opacity: 1'}>
 				@for (const item of results.items; key item.id) {
 					<li>{item.name}</li>
 				}
