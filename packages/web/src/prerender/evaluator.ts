@@ -1448,14 +1448,12 @@ export function evaluatePrerenderDataComponent(input: {
 							const status = boundary?.runnerGraphNodeId
 								? runnerStatus(boundary.runnerGraphNodeId, state.computed)
 								: undefined;
-							if (status === 'rejected')
-								return {
-									arm: 2,
-									error: runnerError(
-										boundary!.runnerGraphNodeId!,
-										state.computed,
-									),
-								};
+							if (status === 'rejected') {
+								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
+								return boundary!.errorGraphNodeId
+									? import('./caught-error.ts').then((m) => m.showCaughtError(state.cells, input, boundary!, error))
+									: { arm: 2, error };
+							}
 							return status === 'fulfilled' ? 0 : 1;
 						},
 						seedChild: (slot, context) =>

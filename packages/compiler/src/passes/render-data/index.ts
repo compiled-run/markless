@@ -72,6 +72,7 @@ export function createRenderData(input: {
 				armChunkIds: slot?.armTemplateIds ?? {
 					try: `async:${boundary.id}:arm:try`,
 				},
+				...(boundary.errorGraphNodeId ? { errorGraphNodeId: boundary.errorGraphNodeId } : {}),
 			};
 		}),
 		interactions: interactionEvents.map((event) => ({

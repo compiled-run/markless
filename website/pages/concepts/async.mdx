@@ -708,15 +708,14 @@ export default function Backoff() @{
 		} @pending {
 			<p>Checking the sky</p>
 		} @catch (error) {
-			<div
+			<p
 				attach={() => {
 					if (attempt < 4) attempt++;
 				}}
 				onIdle={() => {}}
 			>
-				<p>{error.message}</p>
-				<p>Attempt {attempt} of 4</p>
-			</div>
+				{error.message} Attempt {attempt} of 4
+			</p>
 		}
 		<button
 			onClick={() => {

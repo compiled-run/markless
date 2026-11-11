@@ -72,6 +72,8 @@ export function collectAsyncBoundary(
 	const resetParam = handler?.resetParam as AnyNode | null | undefined;
 	if (resetParam?.type === 'Identifier' && typeof resetParam.start === 'number')
 		state.catchResetBoundaries.set(resetParam.start, boundaryId);
+	if (errorParam?.type === 'Identifier' && typeof errorParam.start === 'number')
+		state.catchErrorBoundaries.set(errorParam.start, boundaryId);
 
 	for (const child of asNodes([node.block, node.handler, node.pending])) {
 		state.currentAsyncBoundaryArm = armByNode.get(child) ?? previousArm;

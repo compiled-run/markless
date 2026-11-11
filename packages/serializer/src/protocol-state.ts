@@ -1,3 +1,4 @@
+import { durableError } from './durable-error.ts';
 import { protocolStateVersion } from './protocol-constants.ts';
 import type { ProtocolStatePayload } from './protocol.ts';
 import {
@@ -203,22 +204,12 @@ function serializeComputedSnapshot(
 			error: serializeProtocolStateField(
 				computed,
 				'error',
-				durableSnapshotError(computed.snapshot.error),
+				durableError(computed.snapshot.error),
 			),
 		},
 	};
 }
 
-// Rejected async snapshots routinely hold live Error instances (a failed fetch
-// rejects with TypeError). Refusing to serialize them would fail the WHOLE page
-// render over an error the page's @catch arm already handled — keep the durable
-// facts (name/message) and drop the live object.
-function durableSnapshotError(error: unknown): unknown {
-	if (error instanceof Error) {
-		return { $type: 'error', name: error.name, message: error.message };
-	}
-	return error;
-}
 
 function serializeProtocolStateField(
 	computed: NonNullable<ProtocolStatePayloadInput['computed']>[number],

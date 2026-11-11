@@ -286,6 +286,22 @@ across all three cases:
   (`onRetry={reset}` or an inline arrow, through any number of components);
   each lowers to the same retry call. A handler in `@catch` still refuses any
   other body local the browser cannot recompute, including `error`.
+- Text beside the error (2026-11-11, async-dx): text in a `@catch` arm that
+  joins the error with page state in one run of text, such as
+  `<p>{error.message} (attempt {attempt})</p>`, updates in place when the
+  state changes, like any other joined text: the element stays and its text
+  is rewritten whole. The compiler resolves the error binding by its
+  declaration, not its name, and gives that boundary a cell holding the error
+  the shown `@catch` renders. The server writes the cell when it renders the
+  arm, inline or streamed, as the error's name and message (the same durable
+  form a rejected snapshot carries), and every browser commit of the arm
+  writes it before the arm's updates subscribe. While a retry runs the
+  `@catch` content stays and nothing rewrites the cell, so the text keeps the
+  error it shows; the next `@catch` commit writes the new one. A boundary
+  whose `@catch` text never joins the error with a graph read gets no cell.
+  Unchanged: a handler in `@catch` refuses `error` (rule above), and one
+  `{...}` template literal mixing the error with state is still refused at
+  build time.
 - Handler rejection (2026-11-09, #540): an async event handler inside a
   `@try` whose returned promise rejects fails that block the way a failed
   refresh does: the content stays and the `@catch` arm renders after it. The

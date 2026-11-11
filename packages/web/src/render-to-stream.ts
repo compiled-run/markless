@@ -86,6 +86,8 @@ type StreamRenderContext = ReturnType<typeof storageRenderContext> & {
 		readonly signal: AbortSignal;
 		readonly deadline?: Promise<void>;
 		readonly prestart?: boolean;
+		// The cell each @catch this render showed writes its error to, by page boundary id.
+		readonly caughtErrors?: Map<string, string>;
 	};
 };
 
@@ -127,7 +129,7 @@ export async function renderToStream(
 	} satisfies StreamRenderContext);
 	const renderContext: StreamRenderContext = {
 		...storage,
-		streaming: { runs, signal: settleController.signal, deadline },
+		streaming: { runs, signal: settleController.signal, deadline, caughtErrors: new Map() },
 	};
 	let output = discoveryOutput;
 	if (runs.size > 0) {
@@ -280,7 +282,15 @@ async function* streamArmAppends(input: {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
 				}
-				parts.push(renderArmAppend(output, arm, input.options.nonce, input.shellState));
+				parts.push(
+					renderArmAppend(
+						output,
+						arm,
+						input.options.nonce,
+						input.shellState,
+						input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
+					),
+				);
 			}
 			for (const arm of settledBeforeWave) {
 				if (!remaining.has(arm.boundaryId)) continue;
@@ -360,6 +370,7 @@ function renderArmAppend(
 	arm: PendingArm,
 	nonce: string | undefined,
 	shellState: ProtocolStatePayload | undefined,
+	caughtError: string | undefined,
 ): string {
 	const renderedAnchor = output.structure?.anchors.find(
 		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
@@ -383,8 +394,11 @@ function renderArmAppend(
 		...(shellState?.cells ?? []).map((cell) => cell.graphNodeId),
 		...(shellState?.computed ?? []).map((definition) => definition.graphNodeId),
 	]);
+	// The shell served the @catch error cell empty; this arm's own error rides its patch.
 	const cells = serializeRuntimeStateCells(
-		(output.state?.cells ?? []).filter((cell) => !shellGraphNodeIds.has(cell.graphNodeId)),
+		(output.state?.cells ?? []).filter(
+			(cell) => !shellGraphNodeIds.has(cell.graphNodeId) || cell.graphNodeId === caughtError,
+		),
 	);
 	const armGraphNodeIds = armDependencyClosure(output, arm.graphNodeId);
 	const computedById = new Map(

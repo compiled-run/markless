@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/durable-error"
+			],
+			"set": 306,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/caught-error"
+			],
+			"set": 526,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 227,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/durable-error"
+			],
+			"set": 306,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/caught-error"
+			],
+			"set": 526,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 227,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "@catch text joining the error with state: the evaluator lazy-loads the cell write only when a boundary with an error cell fails (+267 B rendered call site, smallest tried; +110 B minified); caught-error and durable-error ship as a lazy chunk never loaded on pages without that shape",
+			"date": "2026-11-11"
+		}
+	]
+}
