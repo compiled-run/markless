@@ -323,8 +323,8 @@ export async function startAsyncBoundaries(
 	};
 }
 
-// The arm a boundary's range shows, as this runtime last committed it, or its @try content kept with the @catch drawn after it.
-const SHOWN_TRY_KEPT = 3;
+// The arm a boundary's range shows, as this runtime last committed it, or SHOWN_TRY_KEPT: its @try content kept with the @catch drawn after it, numbered below the @try arm so `<= try` reads "shows @try content".
+const SHOWN_TRY_KEPT = ASYNC_BOUNDARY_ARM.try - 1;
 const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
 
 function commitShownArm(
@@ -492,10 +492,9 @@ export async function settleAsyncBoundaryRange(
 			return;
 		}
 		// A failure over shown @try content keeps it, which only a commit can draw: the journal swap replaces the range.
-		const shown = shownArms.get(boundary) ?? boundary.initiallyServedArm;
 		const keepsShown =
 			arm === ASYNC_BOUNDARY_ARM.catch &&
-			(shown === ASYNC_BOUNDARY_ARM.try || shown === SHOWN_TRY_KEPT);
+			(shownArms.get(boundary) ?? boundary.initiallyServedArm) <= ASYNC_BOUNDARY_ARM.try;
 		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
 		else shownArms.set(boundary, arm);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
