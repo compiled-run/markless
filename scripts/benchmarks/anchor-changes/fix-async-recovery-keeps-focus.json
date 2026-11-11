@@ -1,6 +1,16 @@
 {
 	"changes": [
 		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 674,
+			"reason": "failed-refresh recovery keeps content in place: the one shown-arm state moves from the busy plane into the wiring, and recovery clears the @catch drawn after kept content; settle-time code, not executed at load (docs executed chars unchanged, downloads -45 to -53 B gzip); measured 14045 vs anchor 13371 rendered on PR #605 linux CI run 42968686830",
+			"date": "2026-11-11"
+		},
+		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
