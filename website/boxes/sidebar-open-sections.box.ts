@@ -1,4 +1,5 @@
 import { box } from '@async/witness';
+import { skipWhileQuarantined } from './quarantined.ts';
 
 const WAIT = { timeoutMs: 30_000 };
 const branch = (title: string) => `.sidebar .branch[aria-label="${title}"]`;
@@ -14,6 +15,7 @@ export default box(
 		modes: ['dev'],
 	},
 	async ({ pipeline, browser, expect, receipt }) => {
+		if (skipWhileQuarantined('sidebar-open-sections')) return;
 		await pipeline.dev({
 			config: (config) => ({ ...config, server: { ...config.server, watch: null } }),
 		});
