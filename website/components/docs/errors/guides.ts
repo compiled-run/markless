@@ -215,6 +215,18 @@ export const guides: Readonly<Record<string, GuideSource>> = {
 			'<p>Sorted by {posts.sort}</p>',
 		],
 	},
+	MARKLESS_ASYNC_ARIA_BUSY_MANAGED: {
+		summary: 'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
+		what: 'This element shows an async value. While that value loads again, Markless sets `aria-busy="true"` on it, and removes it when the load ends, whether it worked or failed. Your `aria-busy` would be overwritten, so screen readers would never hear what you wrote.',
+		how: 'Remove `aria-busy` and leave it to Markless. To dim old results while new ones load, use a class or a `data-` attribute and style that.',
+		example: [
+			'<ul data-stale={results.query !== query}>',
+			'\t@for (const item of results.items; key item.id) {',
+			'\t\t<li>{item.name}</li>',
+			'\t}',
+			'</ul>',
+		],
+	},
 	MARKLESS_EVENT_HANDLER_EMIT_UNSUPPORTED: {
 		summary: 'An event handler reads a local variable that does not exist in the browser.',
 		what: 'The handler reads a local from the component body that Markless cannot carry to the browser. It holds a class instance, a DOM node, a function declared with `let`, or another value that is not plain data.',

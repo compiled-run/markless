@@ -105,6 +105,8 @@ export type RuntimeGraphRead = (graphNodeId: string, path?: ReadonlyArray<string
 export type RuntimeGraphComputedDependency = {
 	readonly graphNodeId: string;
 	readonly path?: ReadonlyArray<string>;
+	/** The control showing this text writes this state from its own handler: it reads as written, never as the shown value was fetched. */
+	readonly writtenByControl?: true;
 };
 
 export type RuntimeGraphComputed = {

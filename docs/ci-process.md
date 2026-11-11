@@ -152,7 +152,11 @@ A flake is a test that fails and passes on the same code. Rules:
 
 ### Quarantined tests
 
-None right now. An entry is a table row naming the test, its expiry date, its owner and why it is skipped.
+An entry is a table row naming the test, its expiry date, its owner and why it is skipped. A website box is skipped through `website/boxes/quarantined.ts`, which holds the same entries; past its expiry date the box fails instead of skipping.
+
+| Test | Expires | Owner | Why it is skipped |
+| --- | --- | --- | --- |
+| `website/boxes/sidebar-open-sections.box.ts` | 2026-11-18 | markless PM (async-dx session) | A kept part's handler write is lost when the handler's code is cold, as it always is on CI's fresh dev server per box: the section the reader left closes. Fix task T030. CI runs 42932389029, 42941478976, 42941545926 |
 
 ### Quarantine list
 
@@ -164,7 +168,6 @@ A test listed here failed and then passed on a rerun of the same commit at least
 | `packages/router/test/vite/fragment-cache.test.ts` (chromium) | "the move that woke the navigation code over a link still counts as resting on it" (30 s timeout), "a page that answers Cache-Control: no-store is fetched again at the click" | CI runs 40193557743, 40075780850 | thejackshelton | 2026-11-09 |
 | `packages/bundler/test/ssr-browser-hmr.test.ts` | "reports an invalid real edit without reload and clears it before the corrected reload", "a new .tsrx file nothing loaded imports sends no reload and no error" (watcher events, see the mechanisms above) | CI runs 39978464580, 39404383274 | thejackshelton | 2026-11-09 |
 | `benchmark-guard` | "The benchmark shards disagree on whether the app changed": two shards built different apps from one commit | CI runs 40195481656, 40017342977 | thejackshelton | 2026-11-09 |
-| `packages/router/test/vite/navigation-release.test.ts` | "in-place navigations leave no window or document listeners behind and retain no page beyond the visit cache": retained nodes past the allowance (1267 vs 343, about seven held pages), on a fixture with no child components | CI run 42042489083 (passed on rerun); also seen in 40401426019, 42096673239, 42100423455, 42416048773, 42501156310, 42542921106 and 42574774623 (twice) | thejackshelton | 2026-11-19 |
 | `packages/vitest-browser/browser/async-failed-switch/site.test.ts` | "CSR: the site demo follows its switch after a failed refresh": the next page is never requested after Next or Previous. A runtime defect, not the test: a state write while a `@try` still shows `@pending` keeps it there (#581, with a throttled repro) | CI runs 42722925879, 42736994523, 42766905263 and 42768342801 (one queue entry, merged green later), 42842997789, and #576's bundler-only pull request run 42852082441 | thejackshelton | 2026-11-24 |
 | `packages/cli/test/workspace-matrix.test.ts` (`package-manager-matrix`) | npm installs time out at 90 s ("a non-member app installs on its own", "an app that already matches a member declaration") | CI run 39741280055; the 0.9.0 release pull request run | thejackshelton | 2026-11-09 |
 

@@ -1099,19 +1099,13 @@ function fixedRows(
 	if (!template || template.componentName || template.branchSlots) return false;
 	const slots = [...(template.textSlots ?? []), ...(template.attributeSlots ?? [])];
 	if (slots.some((slot) => !('itemPath' in slot))) return false;
-	return invariantInBrowser(
-		graph,
-		root,
-		repeat.collectionGraphNodeId,
-		semantic.asyncBoundaryId !== undefined,
-	);
+	return invariantInBrowser(graph, root, repeat.collectionGraphNodeId);
 }
 
 function invariantInBrowser(
 	graph: NonNullable<ProtocolViewPayloadInput['semanticGraph']>,
 	root: string,
 	graphNodeId: string,
-	asyncOwned: boolean,
 	seen = new Set<string>(),
 ): boolean {
 	if (seen.has(graphNodeId)) return true;
@@ -1122,10 +1116,10 @@ function invariantInBrowser(
 	if (!binding || binding.sharedDefinitionId !== undefined) return false;
 	if (binding.kind === 'prop') return true;
 	if (binding.kind !== 'computed' || binding.storage) return false;
-	// A value that settles in the browser re-renders its own arm, so only rows inside that arm may read it.
-	if ((binding.async || binding.asyncCapable) && !asyncOwned) return false;
+	// An async value is asked again in the browser (a return re-ask, a reset), so its rows can change.
+	if (binding.async || binding.asyncCapable) return false;
 	return (binding.dependencies ?? []).every((dependency) =>
-		invariantInBrowser(graph, root, dependency.graphNodeId, asyncOwned, seen),
+		invariantInBrowser(graph, root, dependency.graphNodeId, seen),
 	);
 }
 

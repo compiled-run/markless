@@ -22,7 +22,7 @@ export function Search() @{
 		@try {
 			const stale = results.q !== query;
 			<ul
-				aria-busy={stale}
+				data-stale={stale}
 				style={{ opacity: stale ? 0.5 : 1, background: 'transparent', transition: 'opacity 150ms' }}
 			>
 				@for (const item of results.items; key item.id) {

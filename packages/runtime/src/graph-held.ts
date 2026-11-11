@@ -158,7 +158,15 @@ export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {
 		if (!resolution) return false;
 		const { pins, chosen, rejectedOnly } = resolution;
 
-		const moved = [...pins.values()].filter((pin) => !Object.is(pin.value, readGraph(pin.graphNodeId, pin.path)));
+		const written = dependencies.filter((dependency) => dependency.writtenByControl);
+		const readsAsWritten = (pin: RuntimeAsyncInput) =>
+			written.some(
+				({ graphNodeId, path = [] }) =>
+					graphNodeId === pin.graphNodeId && (startsWith(pin.path, path) || startsWith(path, pin.path)),
+			);
+		const moved = [...pins.values()].filter(
+			(pin) => !readsAsWritten(pin) && !Object.is(pin.value, readGraph(pin.graphNodeId, pin.path)),
+		);
 		if (moved.length === 0 && chosen.size === 0) return undefined;
 		for (const ancestor of ancestors)
 			if (ancestor.valueInputs?.some((input) => moved.includes(input)) || chosen.has(ancestor)) ancestor.pinned = true;

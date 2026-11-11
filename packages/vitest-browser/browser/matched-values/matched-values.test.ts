@@ -5,6 +5,8 @@ import { Convert } from './convert.tsrx';
 import { Freeze } from './freeze.tsrx';
 import { Groups } from './groups.tsrx';
 import { Narrow } from './narrow.tsrx';
+import { Pager } from './pager.tsrx';
+import { PagerShapes } from './pager-shapes.tsrx';
 import { Prices } from './prices.tsrx';
 import { Rates } from './rates.tsrx';
 import { RefreshCatch } from './refreshcatch.tsrx';
@@ -256,4 +258,60 @@ each('mixing on purpose: a value over an input its fetch did not read narrows th
 	release('found:ap');
 	await settle();
 	expect(text(container, '[data-visible]')).toBe('apple,apricot,grape');
+});
+
+each('the clicked pager shows its new page at once, the rest stays matched until the page lands', { csr: () => render(Pager), ssr: () => renderSSR(Pager) }, async (container) => {
+	await expect.poll(() => text(container, '[data-items]'), { timeout: 5_000 }).toBe('a,b');
+	expect(text(container, '[data-next]')).toBe('Next: page 1 of 3');
+	hold('rows:2', 'rows:3');
+	const stop = watch(container, {
+		where: () => text(container, '[data-where]'),
+		items: () => text(container, '[data-items]'),
+	});
+	click(container, '[data-next]');
+	await expect.poll(() => text(container, '[data-next]'), 'the clicked control moves on the click').toBe('Next: page 2 of 3');
+	await expect.poll(() => busy(container, '[data-items]'), 'the list paints dimmed while page 2 loads').toBe(true);
+	expect(text(container, '[data-where]'), 'a sibling label stays matched to the shown page').toBe('Page 1 of 3');
+	expect(text(container, '[data-items]')).toBe('a,b');
+	click(container, '[data-next]');
+	await expect.poll(() => text(container, '[data-next]'), 'two fast clicks count as two').toBe('Next: page 3 of 3');
+	await settle();
+	expect(text(container, '[data-where]')).toBe('Page 1 of 3');
+	expect(text(container, '[data-items]')).toBe('a,b');
+	release('rows:3');
+	await expect.poll(() => text(container, '[data-items]'), { timeout: 5_000 }).toBe('e');
+	expect(text(container, '[data-where]')).toBe('Page 3 of 3');
+	expect(text(container, '[data-next]')).toBe('Next: page 3 of 3');
+	expect(busy(container, '[data-items]'), 'settled content is never left dimmed').toBe(false);
+	expect(stop(), 'the list and the label never pair a page with another page\'s rows').toEqual({ where: ['Page 1 of 3', 'Page 3 of 3'], items: ['a,b', 'e'] });
+});
+
+each('only text inside the control that writes the state moves early: not a row, a child component or a sibling', { csr: () => render(PagerShapes), ssr: () => renderSSR(PagerShapes) }, async (container) => {
+	const shapes = () => ({
+		nested: text(container, '[data-nested-label]'),
+		jumps: texts(container, '[data-jump]'),
+		child: text(container, '[data-child]'),
+		shown: text(container, '[data-shown]'),
+	});
+	await expect.poll(() => text(container, '[data-shown]'), { timeout: 5_000 }).toBe('5');
+	hold('sheets:2', 'sheets:3');
+	click(container, '[data-nested]');
+	await expect.poll(() => text(container, '[data-nested-label]'), 'text in an element inside the control moves').toBe('Sheet 2 of 4');
+	await settle();
+	expect(shapes()).toEqual({ nested: 'Sheet 2 of 4', jumps: 'Go 1, at 1 of 4|Go 2, at 1 of 4|Go 3, at 1 of 4', child: 'Step 1 / 4', shown: '5' });
+	container.querySelectorAll<HTMLElement>('[data-jump]')[2]!.click();
+	await expect.poll(() => text(container, '[data-nested-label]')).toBe('Sheet 3 of 4');
+	await settle();
+	expect(texts(container, '[data-jump]'), 'a control inside a keyed row stays matched').toBe('Go 1, at 1 of 4|Go 2, at 1 of 4|Go 3, at 1 of 4');
+	release('sheets:3');
+	await expect.poll(() => text(container, '[data-shown]'), { timeout: 5_000 }).toBe('7');
+	expect(shapes()).toEqual({ nested: 'Sheet 3 of 4', jumps: 'Go 1, at 3 of 4|Go 2, at 3 of 4|Go 3, at 3 of 4', child: 'Step 3 / 4', shown: '7' });
+	hold('sheets:4');
+	click(container, '[data-child]');
+	await expect.poll(() => text(container, '[data-nested-label]')).toBe('Sheet 4 of 4');
+	await settle();
+	expect(text(container, '[data-child]'), 'a control a child component renders stays matched').toBe('Step 3 / 4');
+	expect(text(container, '[data-shown]')).toBe('7');
+	release('sheets:4');
+	await expect.poll(() => text(container, '[data-child]'), { timeout: 5_000 }).toBe('Step 4 / 4');
 });
