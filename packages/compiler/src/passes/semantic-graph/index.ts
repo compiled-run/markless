@@ -95,6 +95,7 @@ import {
 	markControlWrittenInputs,
 	collectManagedAriaBusyDiagnostics,
 } from './async-refresh-facts.ts';
+import { collectSubmitHoldFacts } from './submit-hold-marks.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
 
 export async function buildSemanticGraph(
@@ -218,6 +219,10 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectAsyncInputBesideValueDiagnostics(graph);
 	markControlWrittenInputs(graph, state.hostParents);
 	collectManagedAriaBusyDiagnostics(graph, state.authoredAriaBusy);
+	collectSubmitHoldFacts(graph, state.hostParents, {
+		ariaBusy: state.authoredAriaBusy,
+		submitAriaDisabled: state.authoredSubmitAriaDisabled,
+	});
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,

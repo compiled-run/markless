@@ -225,6 +225,7 @@ export function assertProtocolViewPayload(
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${context}.syncPolicy`);
 		}
+		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', context);
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
@@ -395,6 +396,11 @@ function assertBooleanField(record: Record<string, unknown>, key: string, contex
 			`Invalid ${context}: expected ${key} boolean.`,
 		);
 	}
+}
+
+function assertOptionalTrueField(record: Record<string, unknown>, key: string, context: string): void {
+	if (record[key] !== undefined && record[key] !== true)
+		throw invalidPayloadShapeError(contextPayloadType(context), `Invalid ${context}: expected ${key} true when present.`);
 }
 
 function assertLiteralField(
@@ -871,6 +877,7 @@ function assertRowEvents(value: unknown, context: string): void {
 		if (event.syncPolicy !== undefined) {
 			assertSyncPolicy(event.syncPolicy, `${eventContext}.syncPolicy`);
 		}
+		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', eventContext);
 		if (event.arm !== undefined) {
 			assertRecordShape(event.arm, `${eventContext}.arm`);
 			assertNonNegativeIntegerField(event.arm, 'slot', `${eventContext}.arm`);

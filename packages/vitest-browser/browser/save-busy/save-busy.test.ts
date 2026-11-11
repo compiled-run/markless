@@ -85,6 +85,33 @@ function sentAndMarked(names: Element, control: Element): () => Promise<void> {
 	};
 }
 
+// The frame in which each element gained and lost aria-busy, counted by requestAnimationFrame.
+function frames(elements: ReadonlyArray<Element>): () => Array<{ readonly on: number[]; readonly off: number[] }> {
+	let frame = 0;
+	let running = true;
+	const tick = () => {
+		if (!running) return;
+		frame++;
+		requestAnimationFrame(tick);
+	};
+	requestAnimationFrame(tick);
+	const seen = elements.map(() => ({ on: [] as number[], off: [] as number[] }));
+	const observer = new MutationObserver((records) => {
+		for (const record of records) {
+			const at = seen[elements.indexOf(record.target as Element)]!;
+			const now = marked(record.target as Element);
+			if (now !== (record.oldValue === 'true')) (now ? at.on : at.off).push(frame);
+		}
+	});
+	for (const element of elements)
+		observer.observe(element, { attributes: true, attributeFilter: ['aria-busy'], attributeOldValue: true });
+	return () => {
+		running = false;
+		observer.disconnect();
+		return seen;
+	};
+}
+
 async function savesAndRefreshes(
 	container: HTMLElement,
 	selector: string,
@@ -206,18 +233,19 @@ for (const [mode, mount, readsBefore] of modes) {
 		]);
 		expect(reads()).toBe(readsBefore);
 		expect(text(container, '[data-names]')).toBe('Ada');
-		await expect.poll(said, poll).toHaveLength(1);
-		expect(['Updated', 'Update failed']).toContain(said()[0]);
+		await expect.poll(said, poll).toEqual(['Update failed']);
 	});
 
 	test(`${mode}: a save refused in the same task still reaches @catch with nothing marked`, async () => {
 		const container = await mounted(await mount());
+		const said = listen();
 		server.nextPost = [{ status: 422, body: 'A name is required', now: true }];
 		at(container, '[data-fail]').click();
 		await shows(container, '[data-failed]', 'A name is required');
 		await allClear(container);
 		expect(reads()).toBe(readsBefore);
 		expect(text(container, '[data-names]')).toBe('Ada');
+		await expect.poll(said, poll).toEqual(['Update failed']);
 	});
 
 	test(`${mode}: a 4xx answer the handler ignores clears the marks and reloads nothing`, async () => {
@@ -235,7 +263,11 @@ for (const [mode, mount, readsBefore] of modes) {
 		expect(container.querySelector('[data-failed]')).toBe(null);
 		expect(reads()).toBe(readsBefore);
 		expect(text(container, '[data-names]')).toBe('Ada');
-		await expect.poll(said, poll).toEqual(['Updated']);
+		await expect.poll(said, poll).toEqual(['Update failed']);
+		// One failure line, and the failure does not leak into the next save's announcement.
+		at(container, '[data-like]').click();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await expect.poll(said, poll).toEqual(['Update failed', 'Updated']);
 	});
 
 	test(`${mode}: two overlapping saves keep every mark until the one reload after both`, async () => {
@@ -285,5 +317,123 @@ for (const [mode, mount, readsBefore] of modes) {
 		await shows(container, '[data-names]', 'Ada, Grace');
 		await expect.poll(region, poll).toBe('Updated');
 		expect(said()).toEqual(['Updating…', 'Updated']);
+	});
+
+	for (const order of ['form first', 'button first'] as const)
+		test(`${mode}: a form submit and a button save overlapping (${order} answered) clear every mark in one frame`, async () => {
+			const container = await mounted(await mount());
+			const names = at(container, '[data-names]');
+			const like = at(container, '[data-like]');
+			const form = at(container, '[data-form]');
+			const history = [track(names), track(like), track(form)];
+			const formSave = deferred<void>();
+			const likeSave = deferred<void>();
+			const held = deferred<void>();
+			server.nextPost = [{ wait: likeSave.promise }, { wait: formSave.promise }];
+			server.holdReads = held.promise;
+			like.click();
+			at(container, '[data-form-submit]').click();
+			await expect.poll(() => server.posts.length, poll).toBe(2);
+			await expect.poll(() => [names, like, form].map(marked), poll).toEqual([true, true, true]);
+			const seen = frames([names, like, form]);
+			const [first, second] = order === 'form first' ? [formSave, likeSave] : [likeSave, formSave];
+			first.resolve();
+			await nextFrame();
+			await nextFrame();
+			expect([names, like, form].map(marked)).toEqual([true, true, true]);
+			second.resolve();
+			await expect.poll(reads, poll).toBe(readsBefore + 1);
+			expect([names, like, form].map(marked)).toEqual([true, true, true]);
+			server.holdReads = undefined;
+			held.resolve();
+			await allClear(container);
+			const cleared = seen().map((each) => each.off);
+			expect(cleared[0]).toHaveLength(1);
+			expect(cleared).toEqual([cleared[0], cleared[0], cleared[0]]);
+			expect(history.map((each) => each())).toEqual([
+				[false, true, false],
+				[false, true, false],
+				[false, true, false],
+			]);
+			expect(reads()).toBe(readsBefore + 1);
+		});
+
+	test(`${mode}: a form inside the @try whose content reloads is marked with it and cleared in the same frame`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const form = at(container, '[data-form]');
+		const seen = frames([names, form]);
+		const answered = deferred<void>();
+		const held = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		at(container, '[data-form-submit]').click();
+		await expect.poll(() => [names, form].map(marked), poll).toEqual([true, true]);
+		server.holdReads = held.promise;
+		answered.resolve();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		expect([names, form].map(marked)).toEqual([true, true]);
+		server.holdReads = undefined;
+		held.resolve();
+		await shows(container, '[data-names]', 'Ada, Form');
+		await allClear(container);
+		const [content, own] = seen();
+		expect(content!.on).toHaveLength(1);
+		expect(own!.on).toEqual(content!.on);
+		expect(content!.off).toHaveLength(1);
+		expect(own!.off).toEqual(content!.off);
+	});
+
+	test(`${mode}: a save that fails while another save's reload loads keeps that save's control marked`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const like = at(container, '[data-like]');
+		const other = at(container, '[data-ignore-status]');
+		const history = [track(names), track(like), track(other)];
+		const held = deferred<void>();
+		server.holdReads = held.promise;
+		server.nextPost = [{}, { status: 409, body: 'Taken' }];
+		like.click();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		other.click();
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		await expect.poll(() => marked(other), poll).toBe(false);
+		await nextFrame();
+		expect([names, like].map(marked)).toEqual([true, true]);
+		server.holdReads = undefined;
+		held.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([
+			[false, true, false],
+			[false, true, false],
+			[false, true, false],
+		]);
+	});
+
+	test(`${mode}: a handler that writes a key input to the value it has, then saves, stays marked with no gap`, async () => {
+		const container = await mounted(await mount());
+		await savesAndRefreshes(container, '[data-same-key-save]', readsBefore, 'Ada, Grace');
+	});
+
+	test(`${mode}: a handler that never finishes holds the marks, and the reload, until it does`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const control = at(container, '[data-save-then-wait]');
+		const history = [track(names), track(control)];
+		const waiting = deferred<void>();
+		server.handlerWait = waiting.promise;
+		control.click();
+		await expect.poll(() => server.handlersStarted, poll).toBe(1);
+		await nextFrame();
+		await nextFrame();
+		expect([marked(names), marked(control)]).toEqual([true, true]);
+		expect(reads()).toBe(readsBefore);
+		waiting.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([
+			[false, true, false],
+			[false, true, false],
+		]);
 	});
 }

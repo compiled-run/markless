@@ -76,8 +76,8 @@ export type AsyncComputedPlane = {
 	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
 	/** The listed async values and every async value they read through sync computeds, each input before its readers. */
 	readonly withInputs: (graphNodeIds: Iterable<string>) => RuntimeAsyncComputedNode[];
-	/** After a write, loudly re-asks each value still at the version it had when the writes settled, in the order given; a read still in flight starts over. */
-	readonly refreshAfterWrite: (versions: ReadonlyMap<string, number>) => void;
+	/** After a write, loudly re-asks each value still at the version it had when the writes settled, in the order given; a read still in flight starts over. Resolves once every re-asked value has settled and that commit has flushed. */
+	readonly refreshAfterWrite: (versions: ReadonlyMap<string, number>) => Promise<void>;
 	/** Publishes a `rejected` snapshot for a handler's own rejection, standing in for the async value's own run; a no-op when the node does not exist. */
 	readonly failHandler: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */

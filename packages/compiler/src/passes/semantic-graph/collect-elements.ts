@@ -174,7 +174,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 	}
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
-	if (isHostElement && hostNodeId) collectAuthoredAriaBusy(node, hostNodeId, state);
+	if (isHostElement && hostNodeId) collectAuthoredAriaMarks(node, tagName, hostNodeId, state);
 	const moduleScopeClass = state.currentStyleScopeClass;
 	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
@@ -1663,13 +1663,41 @@ function collectDuplicateAttributeDiagnostics(
 	}
 }
 
-function collectAuthoredAriaBusy(node: AnyNode, hostNodeId: string, state: WalkState): void {
-	for (const attribute of getElementAttributes(node))
-		if (
-			!isSpreadAttribute(attribute) &&
-			getIdentifierName(attribute.name as AnyNode | undefined) === 'aria-busy'
-		)
+function collectAuthoredAriaMarks(
+	node: AnyNode,
+	tagName: string | null | undefined,
+	hostNodeId: string,
+	state: WalkState,
+): void {
+	const submits = submitsItsForm(node, tagName);
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) continue;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (name === 'aria-busy')
 			state.authoredAriaBusy.push({ hostNodeId, sourceSpan: sourceSpan(attribute, state.filename) });
+		else if (name === 'aria-disabled' && submits)
+			state.authoredSubmitAriaDisabled.push({
+				hostNodeId,
+				sourceSpan: sourceSpan(attribute, state.filename),
+			});
+	}
+}
+
+// Only a control whose written attributes make it submit its enclosing form: a static submit type, no form= and no spread.
+function submitsItsForm(node: AnyNode, tagName: string | null | undefined): boolean {
+	if (tagName !== 'button' && tagName !== 'input') return false;
+	let type: unknown = tagName === 'button' ? 'submit' : 'text';
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) return false;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (name === 'form') return false;
+		if (name !== 'type') continue;
+		const value = attribute.value as AnyNode | undefined;
+		const literal = value?.type === 'Literal' ? value : unwrapExpressionContainer(value);
+		if (literal?.type !== 'Literal') return false;
+		type = typeof literal.value === 'string' ? literal.value.toLowerCase() : literal.value;
+	}
+	return type === 'submit' || (tagName === 'input' && type === 'image');
 }
 
 function authoredAttributeName(attribute: AnyNode, source: string): string {

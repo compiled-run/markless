@@ -42,10 +42,39 @@ export function Saves() @{
 			Poll
 		</button>
 		<SaveButton onSave={async () => await addItem('Linus')}>Save from a child</SaveButton>
+		<button
+			type="button"
+			data-same-key-save
+			onClick={async () => {
+				poll = poll;
+				await addItem('Grace');
+			}}
+		>
+			Write the same key, then save
+		</button>
+		<button
+			type="button"
+			data-save-then-wait
+			onClick={async () => {
+				await addItem('Grace');
+				await waitInHandler();
+			}}
+		>
+			Save, then wait
+		</button>
 		@try {
 			<section>
 				<p data-names>{shelf.items.join(', ')}</p>
 				<button type="button" data-fail onClick={async () => await addItem('Bad')}>Save, refused</button>
+				<form
+					data-form
+					onSubmit={async (event) => {
+						event.preventDefault();
+						await addItem('Form');
+					}}
+				>
+					<button type="submit" data-form-submit>Save the form</button>
+				</form>
 			</section>
 		} @pending {
 			<p data-pending>Loading</p>

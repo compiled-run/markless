@@ -308,8 +308,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description:
-			'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
+		description: 'Your markup sets `aria-busy` on an element where Markless already sets it.',
 		printed: [
 			'MARKLESS_ASYNC_ARIA_BUSY_MANAGED: aria-busy on this element is managed by the async boundary; dim stale content with a class or a data- attribute instead.',
 			'This element reads an async value inside @try, so a refresh sets aria-busy="true" on it while the fetch runs and removes it when the fetch settles. That replaces whatever the binding wrote, so the authored value never reaches assistive tech.',
@@ -321,30 +320,38 @@ export const errorEntries: readonly ErrorEntry[] = [
 		suggestion:
 			'Remove aria-busy and dim the stale content with a class or a data- attribute, for example data-stale={results.query !== query}.',
 		guide: {
-			summary:
-				'An element inside a @try sets `aria-busy`, but Markless already sets it there.',
+			summary: 'Your markup sets `aria-busy` on an element where Markless already sets it.',
 			what: [
 				{
 					id: 's0',
-					text: 'This element shows an async value. While that value loads again, Markless sets ',
+					text: 'Markless sets ',
 				},
 				{
 					id: 's1',
-					text: 'aria-busy="true"',
-					code: true,
-				},
-				{
-					id: 's2',
-					text: ' on it, and removes it when the load ends, whether it worked or failed. Your ',
-				},
-				{
-					id: 's3',
 					text: 'aria-busy',
 					code: true,
 				},
 				{
+					id: 's2',
+					text: ' itself in two places. An element inside a @try that shows an async value gets ',
+				},
+				{
+					id: 's3',
+					text: 'aria-busy="true"',
+					code: true,
+				},
+				{
 					id: 's4',
-					text: ' would be overwritten, so screen readers would never hear what you wrote.',
+					text: ' while that value loads again. A form whose submit handler returns a promise gets ',
+				},
+				{
+					id: 's5',
+					text: 'aria-busy="true"',
+					code: true,
+				},
+				{
+					id: 's6',
+					text: ' while it is sending. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
 				},
 			],
 			how: [
@@ -359,15 +366,24 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's2',
-					text: ' and leave it to Markless. To dim old results while new ones load, use a class or a ',
+					text: ' and leave it to Markless. To style the busy state, select on it, for example ',
 				},
 				{
 					id: 's3',
-					text: 'data-',
+					text: 'form[aria-busy="true"]',
 					code: true,
 				},
 				{
 					id: 's4',
+					text: '. For a state of your own, such as old results while new ones load or a form busy for another reason, use a class or a ',
+				},
+				{
+					id: 's5',
+					text: 'data-',
+					code: true,
+				},
+				{
+					id: 's6',
 					text: ' attribute and style that.',
 				},
 			],

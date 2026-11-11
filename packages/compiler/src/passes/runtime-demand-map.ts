@@ -83,11 +83,10 @@ const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 // Arm range commits and served-arm registration load only for records that own an arm.
 const ARM_COMMIT = ['web/resume-commit-arm'];
 const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
-// Settle tracking, the re-settle hold and streamed-arm adoption load only for async boundaries.
+// Settle tracking and streamed-arm adoption load only for async boundaries.
 const ASYNC_BOUNDARY = [
 	'web/resume-async-boundaries',
 	'web/resume-async-wiring',
-	'web/resume-resettle-hold',
 	'web/resume-stream-patches',
 	'web/resume-refresh-busy',
 	'web/fns/async-plane',

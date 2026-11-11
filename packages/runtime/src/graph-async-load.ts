@@ -86,7 +86,7 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	/** The key of the run on held inputs, in flight or landed, while its async inputs still refresh. */
 	waitingFor?: { readonly key: unknown };
 	/** A handler that writes one of this node's key inputs marked it busy before running; cleared on `endEntry`, or left for the real run to clear once it lands. */
-	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot };
+	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot; holders: number };
 	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
 	quiet?: boolean;
 };
@@ -111,6 +111,8 @@ export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
 
 /** What the refresh half reads: the context, plus the derived cells sync hops write, by source, and those written since their derive. */
 export type AsyncPlaneState = AsyncPlaneContext & {
+	/** Called for each settled snapshot a value publishes, as it publishes. */
+	readonly settled: Set<(node: RuntimeAsyncComputedNode) => void>;
 	readonly derivedCells: Map<string, Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>>;
 	readonly staleDerives: Map<string, number>;
 };
@@ -163,6 +165,7 @@ export function createAsyncPlane(
 			...internals,
 			asyncComputedNodes: nodes,
 			move: moveNode,
+			settled: new Set(),
 			derivedCells: new Map(),
 			staleDerives: new Map(),
 			start: (...args) => bound!.start(...args),
@@ -287,13 +290,23 @@ export function createAsyncPlane(
 				// A read still in flight from before the writes settled may carry the old answer, so it starts over.
 				if (node.phase === NODE_PLANNED || node.phase === NODE_RUNNING) due.push(node);
 			}
-			if (due.length > 0)
+			if (due.length === 0) return Promise.resolve();
+			const { settled, flush } = context();
+			return new Promise<void>((resolve) => {
+				const waiting = new Set(due);
+				const heard = (node: RuntimeAsyncComputedNode) => {
+					if (!waiting.delete(node) || waiting.size > 0) return;
+					settled.delete(heard);
+					void (flush?.() ?? Promise.resolve()).then(() => resolve());
+				};
+				settled.add(heard);
 				withRefresh((loaded) => {
 					for (const node of due)
 						if (node.phase === NODE_PLANNED) loaded.advance(node);
 						else if (node.phase === NODE_RUNNING && node.version === versions.get(node.graphNodeId))
 							loaded.start(node, (node.snapshot as { readonly key?: unknown }).key);
 				});
+			});
 		},
 		holdInputs(factory) {
 			const shared = context();

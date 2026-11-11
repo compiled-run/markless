@@ -39,9 +39,10 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			state.markDirtyPath(node.graphNodeId, []);
 		});
 		state.scheduleFlush();
+		if (snapshot.status !== 'pending') for (const heard of state.settled) heard(node);
 		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
 			void (state.flush?.() ?? Promise.resolve()).then(() => {
-				for (const held of heldOnInputs) endEntry(held);
+				for (const held of heldOnInputs) release(held);
 			});
 	};
 
@@ -235,12 +236,13 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
+	// A handler's key write and a save it sends may both hold one value; the mark ends with the last of them.
 	const markEntry = (node: RuntimeAsyncComputedNode): void => {
-		if (node.entryHold || node.phase === NODE_IDLE || node.snapshot.status === 'pending')
-			return;
+		if (node.entryHold) return void node.entryHold.holders++;
+		if (node.phase === NODE_IDLE || node.snapshot.status === 'pending') return;
 		const previous = node.snapshot;
 		const version = ++node.version;
-		node.entryHold = { version, previous };
+		node.entryHold = { version, previous, holders: 1 };
 		node.quiet = false;
 		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
 		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
@@ -249,11 +251,16 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 	const endEntry = (node: RuntimeAsyncComputedNode, unwritten?: boolean): void => {
 		const hold = node.entryHold;
+		if (hold && (node.version !== hold.version || --hold.holders === 0)) release(node, unwritten);
+	};
+
+	const release = (node: RuntimeAsyncComputedNode, unwritten?: boolean): void => {
+		const hold = node.entryHold;
 		if (!hold) return;
 		// A cell-backed computed between the write and this key only recomputes in the next flush.
 		if (!unwritten && node.version === hold.version && state.hasPendingFlush?.()) {
 			void state.flush?.().then(() => {
-				if (node.entryHold === hold) endEntry(node);
+				if (node.entryHold === hold) release(node);
 			});
 			return;
 		}

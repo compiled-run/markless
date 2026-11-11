@@ -453,7 +453,7 @@ test('a handler rejection on a blocked value keeps it blocked: the input landing
 	expect(orders.runs.map((run) => run.key)).toEqual(['ada']);
 });
 
-test('an entry mark shows a settled value busy and its end restores it when no run started', async () => {
+test('an entry mark shows a settled value busy and the last of its holders to end restores it when no run started', async () => {
 	const { graph, runner, plane } = single();
 	graph.read('computed:user', ['status']);
 	runner.runs[0]!.resolve('a');
@@ -469,6 +469,10 @@ test('an entry mark shows a settled value busy and its end restores it when no r
 	});
 	plane.markEntry('computed:user');
 	expect(snapshot(graph, 'computed:user')).toMatchObject({ version: 2 });
+	// A second holder (a save sent by the same handler) keeps the mark until it ends too.
+	plane.endEntry('computed:user');
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending', version: 2 });
 	plane.endEntry('computed:user');
 	await graph.flush();
 	expect(snapshot(graph, 'computed:user')).toBe(settled);

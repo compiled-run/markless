@@ -203,9 +203,7 @@ export async function startResumeRuntime(input: {
 	let wiring: Promise<AsyncBoundaryWiring> | undefined;
 	const wire = () =>
 		(wiring ??= (async () => {
-			const started = await (
-				await import('./resume-async-wiring.ts')
-			).startAsyncBoundaries({
+			const started = (await import('./resume-async-wiring.ts')).startAsyncBoundaries({
 				asyncBoundariesById: prepared.asyncBoundariesById,
 				graph: runtimeInput.graph,
 				root: runtimeInput.root,

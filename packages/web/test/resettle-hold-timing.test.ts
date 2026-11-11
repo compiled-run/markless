@@ -1,264 +1,161 @@
-import { expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { ASYNC_BOUNDARY_ARM } from '@markless/serializer';
-import { createFakeClock } from '../../../scripts/test-utils/fake-clock.ts';
+import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
 import {
-	createAsyncBoundarySettleTracker,
-	settleAsyncBoundaryRange,
+	startAsyncBoundaries,
 	wireAsyncBoundariesWithoutLoadingCapability,
 } from '../src/resume-async-wiring.ts';
-import { createResettleHold } from '../src/resume-resettle-hold.ts';
+import type { ArmCommitUpdate } from '../src/resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 
-import {
-	MARKLESS_PENDING_MIN_VISIBLE_MS as PENDING_MIN,
-	MARKLESS_PENDING_REFRESH_STALL_MS as STALL,
-} from '../src/pending-timing.ts';
+installMarklessAsyncPlane();
+beforeEach(() => void vi.useFakeTimers());
+afterEach(() => void vi.useRealTimers());
 
-// Spec D8 re-settle under the fake clock: a refresh over settled content keeps
-// it busy; only a newest run still pending STALL ms after it started commits
-// @pending, which then stays at least PENDING_MIN before the settle commits.
-// Drives the real hold and the real settle path (settleAsyncBoundaryRange).
-
-function boundaryRecord(id: string): ResumeAsyncBoundaryRecord {
-	return {
-		id,
-		runnerGraphNodeId: `computed:${id}`,
-		initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
+// Spec D8 re-settle through the real wiring under fake timers: a refresh over shown content keeps it, marked busy,
+// however long it waits, and @pending never replaces it. The block mounts showing @pending, as a client render
+// mounts it, so the arm a refresh must not bring back is on hand.
+async function mountedBlock() {
+	const parent = {
+		nodeType: 1,
+		childNodes: [] as unknown[],
+		busy: false,
+		setAttribute() {
+			parent.busy = true;
+		},
+		removeAttribute() {
+			parent.busy = false;
+		},
+	};
+	const startAnchor = { nodeType: 8, parentNode: parent };
+	const endAnchor = {
+		nodeType: 8,
+		parentNode: parent,
+		ownerDocument: { createComment: () => ({ parentNode: parent }) },
+		before() {},
+	};
+	parent.childNodes.push(startAnchor, { nodeType: 1, outerHTML: '<p>Loading</p>', parentNode: parent }, endAnchor);
+	const boundary = {
+		id: 'report',
+		startAnchor,
+		endAnchor,
+		runnerGraphNodeId: 'computed:report',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
 		updateSymbolId: 'symbol:update',
-		asyncReads: [{ graphNodeId: `computed:${id}`, path: [] }],
+		asyncReads: [{ graphNodeId: 'computed:report', path: [] }],
 	} as unknown as ResumeAsyncBoundaryRecord;
-}
-
-type ResettleCase = {
-	/** Virtual time the newest run's settled snapshot arrives. */
-	readonly settleAt: number;
-	/** A newer run starting while the first is still pending. */
-	readonly newerRunAt?: number;
-	/** Whether the boundary has a client-known @pending arm to commit. */
-	readonly available: boolean;
-};
-
-type ResettleRun = {
-	readonly pendingShownAt: readonly number[];
-	readonly busy: readonly { readonly at: number; readonly busy: boolean }[];
-	readonly committedAt: number;
-};
-
-function createHarness(available: boolean, commitWaitMs = 0, settledAtStart = true) {
-	const clock = createFakeClock();
+	let snapshot: { status: string; version: number; quiet?: true } = { status: 'pending', version: 0 };
+	const subscribers: Array<{ run(snapshot: unknown): unknown }> = [];
+	const commits: Array<readonly [ArmCommitUpdate['arm'], boolean]> = [];
 	const releases: Array<() => void> = [];
-	const boundary = boundaryRecord('report');
-	if (!settledAtStart)
-		Object.assign(boundary, { initiallyServedArm: ASYNC_BOUNDARY_ARM.pending });
-	let status: string = settledAtStart ? 'fulfilled' : 'pending';
-	const pendingShownAt: number[] = [];
-	const pendingCommittedAt: number[] = [];
-	const busy: { at: number; busy: boolean }[] = [];
-	const tracker = createAsyncBoundarySettleTracker({
-		boundaries: [boundary],
-		clock,
-	});
-	const hold = createResettleHold({
-		tracker,
-		hasPendingArm: () => available,
-		readStatus: () => status,
-		commitPendingArm: async () => {
-			pendingShownAt.push(clock.now());
-			if (commitWaitMs > 0) await clock.wait(commitWaitMs);
-			pendingCommittedAt.push(clock.now());
-		},
-		setBusy: (_, next) => void busy.push({ at: clock.now(), busy: next }),
-		storeContainerSubscription: (release) => void releases.push(release),
-		clock,
-	});
-	const settle = (snapshot: unknown) =>
-		settleAsyncBoundaryRange(
-			{
-				graph: { read: () => status, flush: async () => {} } as never,
-				root: {} as never,
-				loadSymbol: async () =>
-					(async () => ({ arm: 0, html: '<p data-arm>done</p>' })) as never,
-				renderBranchHtml: undefined,
-				elementHandles: { get: () => undefined } as never,
-				settleTracker: tracker,
+	startAsyncBoundaries({
+		asyncBoundariesById: new Map([[boundary.id, boundary]]),
+		graph: {
+			read: (_: string, path: readonly string[]) => (path.length ? snapshot.status : snapshot),
+			subscribe: (subscriber: { run(snapshot: unknown): unknown }) => {
+				subscribers.push(subscriber);
+				return () => {};
 			},
-			boundary,
-			snapshot,
-		);
-	let version = 1;
-	const startRun = () => {
-		status = 'pending';
-		version += 1;
-		hold(boundary, { status: 'pending', version });
-	};
-	const finishRun = () => {
-		status = 'fulfilled';
-		hold(boundary, { status: 'fulfilled', version });
-		return settle({ status: 'fulfilled', version });
-	};
-	return {
-		clock,
-		boundary,
-		hold,
-		startRun,
-		finishRun,
-		setStatus: (next: string) => {
-			status = next;
-		},
-		currentVersion: () => version,
-		dispose: () => {
-			for (const release of releases.splice(0)) release();
-		},
-		pendingShownAt,
-		pendingCommittedAt,
-		busy,
-	};
-}
-
-async function runResettle(resettleCase: ResettleCase): Promise<ResettleRun> {
-	const harness = createHarness(resettleCase.available);
-	const { clock } = harness;
-	harness.startRun();
-	if (resettleCase.newerRunAt !== undefined && resettleCase.newerRunAt < resettleCase.settleAt) {
-		await clock.advanceTo(resettleCase.newerRunAt);
-		harness.startRun();
-	}
-	await clock.advanceTo(resettleCase.settleAt);
-	let committedAt = -1;
-	const settled = harness.finishRun().then((entries) => {
-		expect(entries).toHaveLength(2);
-		committedAt = clock.now();
+			flush: async () => {},
+		} as never,
+		root: {} as never,
+		loadSymbol: async () =>
+			(async () => ({
+				arm: snapshot.status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try,
+				html: '<b></b>',
+				armRecords: { locators: [], events: [], behaviors: [], elementHandles: [] },
+			})) as never,
+		renderBranchHtml: (html: string) => html as never,
+		elementHandles: { get: () => undefined } as never,
+		storeContainerSubscription: (release) => void releases.push(release),
+		commitArm: async (_, update) => void commits.push([update.arm, update.after === true]),
 	});
-	await clock.advanceTo(40_000);
-	await settled;
-	expect(clock.pendingWaits(), 'leaked timing waits').toBe(0);
-	return { pendingShownAt: harness.pendingShownAt, busy: harness.busy, committedAt };
+	const publish = async (status: string, quiet?: true) => {
+		snapshot = { status, version: snapshot.version + 1, ...(quiet && { quiet }) };
+		for (const subscriber of subscribers) await subscriber.run(snapshot);
+		await vi.advanceTimersByTimeAsync(0);
+	};
+	const dispose = () => {
+		for (const release of releases.splice(0)) release();
+	};
+	return { parent, commits, publish, dispose };
 }
 
-test('re-settle grid: busy from the first run, stall clock restarts on a newer run, fallback keeps its minimum', async () => {
-	const settleTimes = [0, 100, 300, 2_000, 4_900, 5_000, 5_100, 6_000, 7_900, 8_000, 8_100, 9_000];
-	for (const available of [true, false]) {
-		for (const newerRunAt of [undefined, 40, 3_000]) {
-			for (const settleAt of settleTimes) {
-				if (newerRunAt !== undefined && newerRunAt >= settleAt) continue;
-				const label = `settleAt=${settleAt} newer=${String(newerRunAt)} available=${String(available)}`;
-				const run = await runResettle({ settleAt, newerRunAt, available });
-				const stallAt = (newerRunAt ?? 0) + STALL;
-				const fallback = available && settleAt >= stallAt;
-				expect(run.busy[0], label).toEqual({ at: 0, busy: true });
-				expect(run.busy.every((entry) => entry.busy), label).toBe(true);
-				if (!fallback) {
-					expect(run.pendingShownAt, label).toEqual([]);
-					expect(run.committedAt, label).toBe(settleAt);
-				} else {
-					expect(run.pendingShownAt, label).toEqual([stallAt]);
-					expect(run.committedAt, label).toBe(Math.max(settleAt, stallAt + PENDING_MIN));
-				}
-			}
+test('a refresh over shown content keeps it busy for as long as it waits, then updates it in place', async () => {
+	for (const waitMs of [100, 300, 4_900, 5_000, 5_200, 6_000, 60_000, 600_000]) {
+		const block = await mountedBlock();
+		await block.publish('fulfilled');
+		expect(block.commits, `waitMs=${waitMs}`).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
+		await block.publish('pending');
+		// The busy marks load with the first refresh over shown content.
+		await vi.waitFor(() => expect(block.parent.busy).toBe(true));
+		for (let waited = 0; waited < waitMs; waited += 100) {
+			await vi.advanceTimersByTimeAsync(Math.min(100, waitMs - waited));
+			expect(block.parent.busy, `busy at ${waited} of ${waitMs}`).toBe(true);
 		}
+		await block.publish('fulfilled');
+		expect(block.commits, `waitMs=${waitMs}`).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
+		expect(block.parent.busy, `waitMs=${waitMs}`).toBe(false);
+		block.dispose();
 	}
 });
 
-test('a settle racing the stall exactly: the pending arm is skipped once the graph settled', async () => {
-	const harness = createHarness(true);
-	const { clock } = harness;
-	harness.startRun();
-	// The graph already reads fulfilled when the stall fires; the raised floor only holds the prior content a little longer.
-	harness.setStatus('fulfilled');
-	await clock.advanceTo(STALL);
-	let committedAt = -1;
-	const settled = harness.finishRun().then(() => {
-		committedAt = clock.now();
-	});
-	await clock.advanceTo(40_000);
-	await settled;
-	expect(harness.pendingShownAt).toEqual([]);
-	expect(committedAt).toBe(STALL + PENDING_MIN);
+test('newer refreshes during a long wait keep the content and its busy mark', async () => {
+	const block = await mountedBlock();
+	await block.publish('fulfilled');
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(4_000);
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(4_000);
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(30_000);
+	expect(block.parent.busy).toBe(true);
+	expect(block.commits).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
+	await block.publish('fulfilled');
+	expect(block.parent.busy).toBe(false);
 });
 
-test('two sequential refreshes each get their own stall clock', async () => {
-	const harness = createHarness(true);
-	const { clock } = harness;
-	harness.startRun();
-	await clock.advanceTo(100);
-	await harness.finishRun();
-	expect(harness.pendingShownAt).toEqual([]);
-
-	await clock.advanceTo(150);
-	harness.startRun();
-	await clock.advanceTo(6_000);
-	let committedAt = -1;
-	const settled = harness.finishRun().then(() => {
-		committedAt = clock.now();
-	});
-	await clock.advanceTo(40_000);
-	await settled;
-	expect(harness.pendingShownAt).toEqual([150 + STALL]);
-	expect(committedAt).toBe(6_000);
-	expect(harness.busy.map((entry) => entry.at)).toEqual([0, 150, 150 + STALL]);
-	expect(clock.pendingWaits()).toBe(0);
+test('a quiet refresh stays unmarked and keeps the content however long it waits', async () => {
+	const block = await mountedBlock();
+	await block.publish('fulfilled');
+	await block.publish('pending', true);
+	await vi.advanceTimersByTimeAsync(60_000);
+	expect(block.parent.busy).toBe(false);
+	expect(block.commits).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
 });
 
-test('re-notifies of the same run never restart the clock, and newer runs never re-commit a shown fallback', async () => {
-	const harness = createHarness(true);
-	const { clock, boundary, hold } = harness;
-	harness.startRun();
-	await clock.advanceTo(1_000);
-	hold(boundary, { status: 'pending', version: harness.currentVersion() });
-	await clock.advanceTo(STALL + 100);
-	expect(harness.pendingShownAt).toEqual([STALL]);
-	harness.startRun();
-	await clock.advanceTo(STALL + 300);
-	harness.startRun();
-	await clock.advanceTo(3 * STALL);
-	const settled = harness.finishRun();
-	await clock.advanceTo(40_000);
-	await settled;
-	expect(harness.pendingShownAt).toEqual([STALL]);
+test('a refresh during the first load keeps @pending, marks nothing busy, and the newest run lands', async () => {
+	const block = await mountedBlock();
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(20_000);
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(20_000);
+	expect(block.parent.busy).toBe(false);
+	expect(block.commits).toEqual([]);
+	await block.publish('fulfilled');
+	expect(block.commits).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
 });
 
-test('floor-first ordering: a settle racing an in-flight pending commit lands strictly after it', async () => {
-	const harness = createHarness(true, 30);
-	const { clock } = harness;
-	harness.startRun();
-	await clock.advanceTo(STALL);
-	let committedAt = -1;
-	const settled = harness.finishRun().then(() => {
-		committedAt = clock.now();
-	});
-	await clock.advanceTo(40_000);
-	await settled;
-	expect(harness.pendingShownAt).toEqual([STALL]);
-	expect(harness.pendingCommittedAt).toEqual([STALL + 30]);
-	expect(committedAt).toBe(STALL + PENDING_MIN);
-	expect(clock.pendingWaits()).toBe(0);
-});
-
-test('a run during the first load is neither held nor marked busy', async () => {
-	const harness = createHarness(true, 0, false);
-	const { clock } = harness;
-	harness.startRun();
-	await clock.advanceTo(2 * STALL);
-	harness.startRun();
-	await clock.advanceTo(4 * STALL);
-	expect(harness.busy).toEqual([]);
-	expect(harness.pendingShownAt).toEqual([]);
-});
-
-test('a runtime disposed during a refresh never commits the stall fallback', async () => {
-	const harness = createHarness(true);
-	const { clock } = harness;
-	harness.startRun();
-	await clock.advanceTo(1_000);
-	harness.dispose();
-	await clock.advanceTo(3 * STALL);
-	expect(harness.pendingShownAt).toEqual([]);
-	expect(harness.busy).toEqual([{ at: 0, busy: true }]);
-	expect(clock.pendingWaits()).toBe(0);
+test('a runtime disposed during a long refresh commits nothing', async () => {
+	const block = await mountedBlock();
+	await block.publish('fulfilled');
+	await block.publish('pending');
+	await vi.advanceTimersByTimeAsync(1_000);
+	block.dispose();
+	await vi.advanceTimersByTimeAsync(60_000);
+	expect(block.commits).toEqual([[ASYNC_BOUNDARY_ARM.try, false]]);
 });
 
 test('a settle in flight when the runtime is disposed commits nothing and flushes nothing', async () => {
-	const boundary = Object.assign(boundaryRecord('report'), { rerendersOnRefresh: true });
+	vi.useRealTimers();
+	const boundary = {
+		id: 'report',
+		runnerGraphNodeId: 'computed:report',
+		initiallyServedArm: ASYNC_BOUNDARY_ARM.try,
+		updateSymbolId: 'symbol:update',
+		asyncReads: [{ graphNodeId: 'computed:report', path: [] }],
+		rerendersOnRefresh: true,
+	} as unknown as ResumeAsyncBoundaryRecord;
 	const runs: Array<(snapshot: unknown) => unknown> = [];
 	const releases: Array<() => void> = [];
 	let flushes = 0;

@@ -755,6 +755,29 @@ export function managedAriaBusyDiagnostic(span: SourceSpan | undefined): Semanti
 	};
 }
 
+/** An authored aria-busy on a form that a running submit handler marks busy. */
+export function submitHoldAriaDiagnostic(span: SourceSpan | undefined): SemanticGraphDiagnostic {
+	return {
+		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+		severity: 'error',
+		phase: 'semantic-graph',
+		title: 'aria-busy is written on a form Markless marks busy while it submits',
+		message:
+			'aria-busy on this form is managed while its submit handler runs; style the busy form with form[aria-busy="true"] instead.',
+		why: 'This form has a submit handler that can return a promise, so each submit sets aria-busy="true" on the form until the submission and the reload it caused are done, and then removes it. That replaces whatever the attribute said, so the authored value never reaches assistive tech.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message:
+					'Remove aria-busy. Style the sending form with form[aria-busy="true"], or mark another reason for being busy with a class or a data- attribute.',
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
+	};
+}
+
 export function asyncPostAwaitDependentReadDiagnostic(
 	computedName: string,
 	read: SemanticStateRead,
