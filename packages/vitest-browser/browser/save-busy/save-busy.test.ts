@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
+import { commands } from 'vitest/browser';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { deferred, poll, shows, text } from '../back-revalidate/support.ts';
 import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
@@ -8,6 +9,8 @@ import { Saves } from './saves.tsrx';
 installServer();
 beforeEach(() => resetServer());
 afterEach(() => cleanup());
+// The one-frame lag between a round's end and the content clearing shows only on a slow CPU, so the frame tests run throttled.
+afterEach(() => commands.throttleCpu(1));
 
 type Screen = { readonly container: unknown; readonly runtime?: { readonly runtime?: unknown } };
 const modes = [
@@ -322,6 +325,7 @@ for (const [mode, mount, readsBefore] of modes) {
 	for (const order of ['form first', 'button first'] as const)
 		test(`${mode}: a form submit and a button save overlapping (${order} answered) clear every mark in one frame`, async () => {
 			const container = await mounted(await mount());
+			await commands.throttleCpu(6);
 			const names = at(container, '[data-names]');
 			const like = at(container, '[data-like]');
 			const form = at(container, '[data-form]');
@@ -360,6 +364,7 @@ for (const [mode, mount, readsBefore] of modes) {
 
 	test(`${mode}: a form inside the @try whose content reloads is marked with it and cleared in the same frame`, async () => {
 		const container = await mounted(await mount());
+		await commands.throttleCpu(6);
 		const names = at(container, '[data-names]');
 		const form = at(container, '[data-form]');
 		const seen = frames([names, form]);

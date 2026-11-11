@@ -267,8 +267,10 @@ across all three cases:
   send; a `submit` dispatch marks no control here, because its form holds
   itself (Form submit pending below). Control, form and content marks share
   `aria-busy` through its owners and end at one settle: the end of the
-  dispatch's refresh round, which is when the refresh its write caused has
-  landed and flushed, or at once when every write in the round failed. Each
+  dispatch's refresh round, heard in the flush pass that publishes the last
+  re-asked answer, after the subscriptions that clear the content's marks in
+  that pass (so all three clear in one frame), or at once when every write
+  in the round failed. Each
   dispatch owns its own mark, so a write that fails while another
   dispatch's refresh still loads clears only its own. An `aria-busy` the
   author wrote on such a control is cleared with it. The browser cannot tell

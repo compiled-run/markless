@@ -18,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 773,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
+			"delta": 1426,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -30,8 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 11,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
+			"delta": 16,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -52,8 +52,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 773,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
+			"delta": 1426,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -64,8 +64,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 14,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"delta": 11,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
 			"date": "2026-11-11"
 		},
 		{
@@ -76,8 +76,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 29,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends; a failed round is announced as failed",
+			"delta": 13,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
 			"date": "2026-11-11"
 		}
 	]

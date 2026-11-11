@@ -1,4 +1,4 @@
-import type { AsyncComputedPlane } from '@markless/runtime';
+import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
 import { NODE_IDLE, type RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
 
@@ -7,7 +7,10 @@ import { dispatchSpans, holdBusy, type DispatchSpan } from './event-current-targ
 // On a container shown again as it was left: true until its runtime wires, then the call that re-asks its async values.
 export const CONTAINER_REASK_PROPERTY = '__mReask';
 
-type Graph = { readonly asyncPlane?: () => AsyncComputedPlane | undefined };
+type Graph = {
+	readonly asyncPlane?: () => AsyncComputedPlane | undefined;
+	readonly subscribe?: RuntimeGraph['subscribe'];
+};
 type Boundary = { readonly asyncReads: ReadonlyArray<{ readonly graphNodeId: string }> };
 type Boundaries = ReadonlyMap<string, Boundary>;
 /** A wired container: its graph, and the @try blocks whose async values it shows. */
@@ -107,11 +110,14 @@ const rounds = new WeakMap<DispatchSpan, () => void>();
 // A round's end releases each dispatch's own control, so another round still loading keeps its marks.
 function roundDone(writers: Iterable<DispatchSpan>): void {
 	for (const writer of writers) {
-		rounds.get(writer)?.();
+		const done = rounds.get(writer);
+		if (!done) continue;
 		rounds.delete(writer);
+		done();
 		if (writer.control) holdBusy(writer.control, writer, false);
 	}
 }
+let roundCount = 0;
 let recipe: RuntimeAsyncComputedNode | undefined;
 
 function move(next: WriteState): void {
@@ -146,7 +152,23 @@ function refreshIfOwed(): void {
 	const landed = [...due].map(([[graph], versions]) => graph.asyncPlane?.()?.refreshAfterWrite(versions));
 	// The re-asked runs took over the marks the writes placed; one that did not start gives its mark back.
 	endHolds(held);
-	void Promise.all(landed).then(() => roundDone(writers));
+	const asked = [...due].flatMap(([[graph], versions]) =>
+		[...versions.keys()].flatMap((graphNodeId) => {
+			const node = graph.asyncPlane?.()?.nodes.get(graphNodeId);
+			return node ? [[graph, node] as const] : [];
+		}),
+	);
+	const stops: Array<(() => void) | undefined> = [];
+	// Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks.
+	const settle = () => {
+		for (const [, node] of asked) if (node.snapshot.status === 'pending') return;
+		for (const stop of stops.splice(0)) stop?.();
+		roundDone(writers);
+	};
+	const id = `markless:round:${++roundCount}`;
+	for (const [graph, node] of asked)
+		stops.push(graph.subscribe?.({ id, graphNodeId: node.graphNodeId, path: ['status'], run: settle }));
+	void Promise.all(landed).then(settle);
 	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__)
 		for (const [container, versions] of due)
 			refreshed.set(
