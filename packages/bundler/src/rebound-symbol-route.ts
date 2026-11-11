@@ -32,7 +32,6 @@ export function emitSymbolRouteTable(input: {
 	];
 	const keyLists: string[] = [];
 	const rebinds = hasAnyBound(routes);
-	const within = `${functionName}Within`;
 	const table = routes.map(
 		(route) =>
 			`[${JSON.stringify(route.prefix)}, ${route.importSource ? sources.indexOf(route.importSource) : -1}, ${hasBoundSymbols(route) ? boundEntry(route.boundSymbols!, keyLists) : 0}]`,
@@ -42,17 +41,12 @@ export function emitSymbolRouteTable(input: {
 		`const ${functionName}Imports = [${sources.map((source) => `() => import(${JSON.stringify(source)})`).join(', ')}];`,
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
-		rebinds
-			? `${input.exported ? 'export ' : ''}function ${functionName}(symbolId) {\n\treturn ${within}(symbolId, '');\n}`
-			: '',
-		rebinds
-			? `function ${within}(symbolId, consumed) {`
-			: `${input.exported ? 'export ' : ''}function ${functionName}(symbolId) {`,
+		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId${rebinds ? ", consumed = ''" : ''}) {`,
 		`\tfor (const [prefix, at, bound] of ${functionName}Routes) {`,
 		'\t\tif (!symbolId.startsWith(prefix)) continue;',
 		'\t\tconst rest = symbolId.slice(prefix.length);',
 		// A same-module child re-enters the table: what is left can carry another child's path.
-		`\t\tconst unbound = () => at < 0 ? (prefix ? ${rebinds ? `${within}(rest, consumed + prefix)` : `${functionName}(rest)`} : ${fallbackName}(rest)) : ${functionName}Imports[at]().then((mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest${rebinds ? ', consumed + prefix' : ''}) : ${fallbackName}(rest)) : ${functionName}Imports[at]().then((mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
 		// A child symbol its edge binds goes through the edge's bound row, or a callback the
 		// child's own child invokes by instance path never sees the captures this edge supplies.
 		rebinds

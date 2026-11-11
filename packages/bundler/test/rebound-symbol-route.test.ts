@@ -11,7 +11,7 @@ const fixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route', import.met
 const nestedFixtureRoot = fileURLToPath(new URL('./fixtures/rebound-route-nested', import.meta.url));
 
 const ROUTE_FUNCTION =
-	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRouteWithin\(symbolId, consumed\) \{[\s\S]*?\n\}/;
+	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
 
