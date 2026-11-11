@@ -3,9 +3,10 @@ import { answer } from '../matched-values/gates.ts';
 
 export function ChainMarks() @{
 	let region = state('north');
+	let round = state(0);
 	const depot = computed(async () => {
 		const at = region;
-		return answer(`depot:${at}`, { id: `${at}-depot` });
+		return answer(`depot:${at}`, { id: `${at}-depot`, round });
 	});
 	const route = computed(async () => {
 		const from = depot.id;
@@ -18,6 +19,8 @@ export function ChainMarks() @{
 
 	<section>
 		<button type="button" data-south onClick={() => (region = 'south')}>South</button>
+		<button type="button" data-again onClick={() => (round = round + 1)}>Again</button>
+		<button type="button" data-later onClick={() => setTimeout(() => (region = 'south'), 0)}>Later</button>
 		@try {
 			<div data-board>
 				<p data-depot>{depot.id}</p>
@@ -26,6 +29,8 @@ export function ChainMarks() @{
 			</div>
 		} @pending {
 			<p data-pending>Loading</p>
+		} @catch (error) {
+			<p data-failed>{error.message}</p>
 		}
 	</section>
 }
