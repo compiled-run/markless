@@ -14,7 +14,11 @@ import { isUncountedComment } from '../resume-anchor-census.ts';
 import { spliceCensus } from '../resume-census.ts';
 import { marklessOwningSurface } from '../prerender/owning-surface.ts';
 import { marklessSsrRowQualifiedView } from './row-qualified-view.ts';
-import { marklessBoundSymbolId, marklessDomUpdateSymbolId } from './bound-symbol.ts';
+import {
+	marklessBoundSymbolId,
+	marklessDomUpdateSymbolId,
+	marklessReboundSymbolId,
+} from './bound-symbol.ts';
 import { readKeyedRepeatCollection } from '../resume-keyed-repeats.ts';
 import {
 	focusPath,
@@ -32,7 +36,10 @@ import {
 } from './row-mint.ts';
 import { rowRangeNodes, wrapRowRange } from './served-row-ranges.ts';
 import { marklessRowSlotReader, type RowSlotReader } from './row-slot-mint.ts';
-import { PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS } from '../../../serializer/src/protocol-constants.ts';
+import {
+	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+	protocolBoundSymbolBase,
+} from '../../../serializer/src/protocol-constants.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP } from '../../../serializer/src/protocol-prop-prefix.ts';
 import type {
 	ResumeArmBranchRecord,
@@ -538,7 +545,7 @@ function renderComponentRow(input: ComponentRowInput): Awaitable<RenderedCompone
 				(rendered) => ({
 					// Page space, like the widget ids the row files: an island prefix belongs in front.
 					rowSegment: owner.symbolPrefix + rowSegment,
-					rendered: ownerRecordsInPageSpace(rendered, owner, hostPrefix, instanceScopeModule, input.graph),
+					rendered: ownerRecordsInPageSpace(rendered, owner, found.symbolPrefix, hostPrefix, instanceScopeModule, input.graph),
 				}),
 			);
 		},
@@ -808,6 +815,7 @@ function ownerProjectionView(
 function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayload; readonly view: ProtocolViewPayload }>(
 	rendered: R,
 	owner: { readonly symbolPrefix: string; readonly edge?: OwningSurfaceEdge; readonly edgePrefix?: string },
+	modulePrefix: string,
 	ownerHostPrefix: string,
 	instanceScope: InstanceScopeModule | undefined,
 	graph: RuntimeGraph,
@@ -821,8 +829,17 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 	const own = (id: string) => !instanceScope.marklessInstancePath(id);
 	// A symbol the owner's own edge binds is the composer's, exactly as composition spells it for a served row.
 	const edge = { symbolPrefix: ownerSymbolPrefix, boundSymbols: owner.edge?.boundSymbols };
-	const symbol = (symbolId: string) => (own(symbolId) ? marklessBoundSymbolId(edge, symbolId) : symbolId);
-	const updateSymbol = (symbolId: string) => (own(symbolId) ? marklessDomUpdateSymbolId(edge, symbolId) : symbolId);
+	// A bound id is spelled from its module's root, so it takes that module's place, not the owner's instance inside it.
+	const moduleBound = (symbolId: string) =>
+		!!protocolBoundSymbolBase(symbolId) && !marklessReboundSymbolId(edge.boundSymbols, symbolId);
+	const symbol = (symbolId: string) =>
+		!own(symbolId) ? symbolId : moduleBound(symbolId) ? modulePrefix + symbolId : marklessBoundSymbolId(edge, symbolId);
+	const updateSymbol = (symbolId: string) =>
+		!own(symbolId)
+			? symbolId
+			: moduleBound(symbolId)
+				? modulePrefix + symbolId
+				: marklessDomUpdateSymbolId(edge, symbolId);
 	const graphNode = (graphNodeId: string): string => {
 		if (graphNodeId.startsWith(PROP))
 			throw new Error(
