@@ -31,7 +31,7 @@ async function failsAndBacksOff(city: string, attempt: number, ms: number) {
 	const asked = requested(city);
 	const paused = pausesOf(ms);
 	answer(city, down);
-	await until(shown, `Service down. | Attempt ${attempt} of 4`);
+	await until(shown, `Service down. Attempt ${attempt} of 4`);
 	await until(paused, 1);
 	await vi.advanceTimersByTimeAsync(ms - 200);
 	expect(requested(city)).toBe(asked);
@@ -52,7 +52,7 @@ test('CSR: a failed load is tried again after 1 s, 2 s and 4 s, showing the atte
 	await failsAndBacksOff('Austin', 3, 2_000);
 	await failsAndBacksOff('Austin', 4, 4_000);
 	answer('Austin', down);
-	await until(shown, 'Service down. | Attempt 4 of 4');
+	await until(shown, 'Service down. Attempt 4 of 4');
 	await vi.advanceTimersByTimeAsync(20_000);
 	expect(requested('Austin')).toBe(4);
 });
@@ -66,15 +66,14 @@ test('CSR: a retry that succeeds shows the answer and stops retrying', async () 
 	expect(requested('Austin')).toBe(2);
 });
 
-// Picking Boston writes both `city` and `attempt`, which today sends Boston twice (pinned in known-defects.test.ts).
 async function newPickCancelsTheWaitingRetry(paused: () => number) {
-	await until(shown, 'Service down. | Attempt 2 of 4');
+	await until(shown, 'Service down. Attempt 2 of 4');
 	await until(paused, 1);
 	await vi.advanceTimersByTimeAsync(500);
 	const austin = requested('Austin');
 	press('Boston');
 	await until(() => requested('Boston') > 0, true);
-	await until(shown, 'Service down. | Attempt 1 of 4');
+	await until(shown, 'Service down. Attempt 1 of 4');
 	await vi.advanceTimersByTimeAsync(20_000);
 	expect(requested('Austin')).toBe(austin);
 	answerEvery('Boston');
@@ -113,7 +112,7 @@ test('SSR: a refresh that fails after resume backs off and retries, keeping the 
 	await until(() => requested('Boston'), 1);
 	const paused = pausesOf(1_000);
 	answer('Boston', down);
-	await until(shown, 'Austin sky | Service down. | Attempt 2 of 4');
+	await until(shown, 'Austin sky | Service down. Attempt 2 of 4');
 	await until(paused, 1);
 	await vi.advanceTimersByTimeAsync(800);
 	expect(requested('Boston')).toBe(1);

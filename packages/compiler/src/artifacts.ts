@@ -1543,6 +1543,8 @@ export type SemanticGraphArtifact = {
 		readonly componentName?: string;
 		/** The name `@catch (name)` binds the rejection to. */
 		readonly errorName?: string;
+		/** The cell holding the error the shown `@catch` renders, minted when its text joins the error with graph reads. */
+		readonly errorGraphNodeId?: string;
 		/** The minted sync computed a boundary reading several async values settles on. */
 		readonly gateGraphNodeId?: string;
 		/** Where the `@try` keyword is written. */
@@ -1632,6 +1634,8 @@ export type RenderDataBoundary = {
 		readonly pending?: string;
 		readonly catch?: string;
 	}>;
+	/** The cell the shown `@catch` arm writes its error to. */
+	readonly errorGraphNodeId?: string;
 };
 
 export type RenderDataInteraction = {

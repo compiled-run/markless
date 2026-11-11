@@ -162,6 +162,7 @@ export type SsrRenderData = {
 			readonly pending?: string;
 			readonly catch?: string;
 		}>;
+		readonly errorGraphNodeId?: string;
 	}>;
 	readonly branches?: ReadonlyArray<{
 		readonly branchSiteId: string;

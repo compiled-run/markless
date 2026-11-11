@@ -933,8 +933,11 @@ function emitSsrDataLines(
 						`{const marklessSsrInput=marklessSsrAsyncRuns.get((marklessSsrRenderContext?.streaming?.runs?marklessSsrIdPrefix:'')+${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
 				)
 				.join('')}`;
+			const showsError = boundary.errorGraphNodeId
+				? `if(marklessSsrSnapshot.status==='rejected')marklessSsrCatchError(marklessSsrRenderStateValues,marklessSsrPayloadState,${JSON.stringify(boundary.errorGraphNodeId)},marklessSsrSnapshot.error,marklessSsrRenderContext,${JSON.stringify(boundary.boundaryId)});`
+				: '';
 			return [
-				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
+				`case ${JSON.stringify(boundary.boundaryId)}:{const marklessSsrSnapshot=await marklessSsrRunAsyncComputed(marklessSsrAsyncSnapshots,${JSON.stringify(runner.graphNodeId)},${runner.source},marklessSsrRenderContext,${String(!!boundary.armChunkIds.pending)}${extra});if(marklessSsrSnapshot.status==='fulfilled')${derived ? `{${settled}${derived}}` : settled}${showsError}return {arm:marklessSsrAsyncArm(marklessSsrSnapshot),error:marklessSsrSnapshot.error};}`,
 			];
 		});
 	const edges = componentEdgesFor(input, componentName);
