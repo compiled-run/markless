@@ -99,6 +99,7 @@ import {
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
+	catchResetUses,
 	collectDefinitionReads,
 	factoryHandlerSource,
 	inlineHandlerRenderLocals,
@@ -1321,9 +1322,12 @@ function collectAttribute(
 	if (attributeName === 'attach') {
 		if (expressionValue) {
 			for (const behavior of behaviorExpressions(expressionValue)) {
+				const parts = behaviorSourceParts(behavior, state);
+				const catchResets = parts.functionSpan ? catchResetUses(behavior, state) : [];
 				state.graph.behaviors.push({
 					hostNodeId,
-					...behaviorSourceParts(behavior, state),
+					...parts,
+					...(catchResets.length > 0 ? { catchResets } : {}),
 					...(state.currentKeyedRepeatScopeIds.length > 0
 						? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
 						: {}),

@@ -266,7 +266,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 				behavior.functionSource,
 			),
 			order,
-			...behaviorGraphAccess(authored, input, semanticsReader),
+			...behaviorGraphAccess(authored, input, semanticsReader, boundaryResets),
 		});
 	});
 
@@ -1078,13 +1078,18 @@ function behaviorGraphAccess(
 	authored: SymbolResolverInput['semanticGraph']['behaviors'][number] | undefined,
 	input: SymbolResolverInput,
 	semanticsReader: SymbolSourceSemanticsReader,
+	boundaryResets: (boundaryId: string) => ReadonlyArray<ReadonlyArray<string>>,
 ): Pick<Extract<PlannedSymbol, { readonly kind: 'behavior' }>, 'graphAccess'> {
 	const sourceSpan = authored?.functionSpan;
 	if (!authored || !sourceSpan) return {};
 	const source = authored.functionSource;
 	const reads = eventReads(input.stateLowering?.reads, [sourceSpan], source, semanticsReader);
 	const writes = eventWrites(source, input.stateLowering?.writes, [sourceSpan]);
-	if (reads.length === 0 && writes.length === 0) return {};
+	const catchResets = (authored.catchResets ?? []).map((reset) => ({
+		name: reset.name,
+		resets: boundaryResets(reset.boundaryId),
+	}));
+	if (reads.length === 0 && writes.length === 0 && catchResets.length === 0) return {};
 	const moduleImports = referencedModuleImports(input.semanticGraph.moduleImports, source);
 	return {
 		graphAccess: {
@@ -1093,6 +1098,7 @@ function behaviorGraphAccess(
 			...(moduleImports.length > 0 ? { moduleImports } : {}),
 			reads,
 			writes,
+			...(catchResets.length > 0 ? { catchResets } : {}),
 		},
 	};
 }
