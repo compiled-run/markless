@@ -249,12 +249,14 @@ across all three cases:
   is sent, not when it answers. At that moment every value the refresh will
   re-ask (the same set, writers excluded) takes the entry mark a handler
   writing its key input takes, so each element reading it carries
-  `aria-busy="true"` from the frame after the send; the refresh's own runs
+  `aria-busy="true"` from the first graph flush after the send (the next
+  frame, unless that flush waits for code still loading, such as the
+  busy-marking module on a page's first loud refresh); the refresh's own runs
   take that mark over, so it never drops between the write answering and
   the re-ask starting. The element whose dispatch sent the write (the
   clicked control, also when a child component calls the handler it was
-  given) carries `aria-busy="true"` for the same stretch, from the send
-  until every value the refresh re-asked has settled or failed; a `submit`
+  given) carries `aria-busy="true"` from the send itself (set in the same
+  task) until every value the refresh re-asked has settled or failed; a `submit`
   dispatch marks no control here (its form has its own rule), and an
   `aria-busy` the element already has when the write is sent is left
   alone. A write sent while an earlier refresh still loads keeps the marks

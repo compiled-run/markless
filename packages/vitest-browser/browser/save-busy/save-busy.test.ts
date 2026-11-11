@@ -72,14 +72,17 @@ function listen(): () => string[] {
 const listening: MutationObserver[] = [];
 afterEach(() => listening.splice(0).forEach((observer) => observer.disconnect()));
 
-// What each element shows in the first frame after the page sends its next write.
-function atSendFrame(elements: ReadonlyArray<Element>): () => boolean[] | undefined {
-	let seen: boolean[] | undefined;
+// The control's mark in the first frame after the page sends its next write; the content's mark lands with the flush after the send.
+function sentAndMarked(names: Element, control: Element): () => Promise<void> {
+	let controlAtFirstFrame: boolean | undefined;
 	server.sent = () => {
 		server.sent = undefined;
-		requestAnimationFrame(() => (seen = elements.map(marked)));
+		requestAnimationFrame(() => (controlAtFirstFrame = marked(control)));
 	};
-	return () => seen;
+	return async () => {
+		await expect.poll(() => controlAtFirstFrame, poll).toBe(true);
+		await expect.poll(() => marked(names), poll).toBe(true);
+	};
 }
 
 async function savesAndRefreshes(
@@ -96,10 +99,10 @@ async function savesAndRefreshes(
 	const held = deferred<void>();
 	server.nextPost = [{ wait: answered.promise }];
 	server.holdReads = held.promise;
-	const firstFrame = atSendFrame([names, control]);
+	const markedOnSend = sentAndMarked(names, control);
 
 	send();
-	await expect.poll(firstFrame, poll).toEqual([true, true]);
+	await markedOnSend();
 	expect(names.textContent).toBe('Ada');
 
 	answered.resolve();
@@ -191,9 +194,9 @@ for (const [mode, mount, readsBefore] of modes) {
 		const said = listen();
 		const answered = deferred<void>();
 		server.nextPost = [{ status: 422, body: 'A name is required', wait: answered.promise }];
-		const firstFrame = atSendFrame([names, control]);
+		const markedOnSend = sentAndMarked(names, control);
 		control.click();
-		await expect.poll(firstFrame, poll).toEqual([true, true]);
+		await markedOnSend();
 		answered.resolve();
 		await shows(container, '[data-failed]', 'A name is required');
 		await allClear(container);
@@ -224,9 +227,9 @@ for (const [mode, mount, readsBefore] of modes) {
 		const said = listen();
 		const answered = deferred<void>();
 		server.nextPost = [{ status: 409, body: 'Taken', wait: answered.promise }];
-		const firstFrame = atSendFrame([names, control]);
+		const markedOnSend = sentAndMarked(names, control);
 		control.click();
-		await expect.poll(firstFrame, poll).toEqual([true, true]);
+		await markedOnSend();
 		answered.resolve();
 		await allClear(container);
 		expect(container.querySelector('[data-failed]')).toBe(null);
@@ -249,8 +252,7 @@ for (const [mode, mount, readsBefore] of modes) {
 		like.click();
 		child.click();
 		await expect.poll(() => server.posts.length, poll).toBe(2);
-		await nextFrame();
-		expect([names, like, child].map(marked)).toEqual([true, true, true]);
+		await expect.poll(() => [names, like, child].map(marked), poll).toEqual([true, true, true]);
 		second.resolve();
 		await nextFrame();
 		await nextFrame();
