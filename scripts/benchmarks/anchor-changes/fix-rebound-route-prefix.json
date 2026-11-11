@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 247,
+			"reason": "symbol route tables with bound rows carry the prefix they consumed, so a callback a same-module child calls writes its owner's state (download only; executed code unchanged)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 275,
+			"reason": "symbol route tables with bound rows carry the prefix they consumed, so a callback a same-module child calls writes its owner's state (download only; executed code unchanged)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 189,
+			"reason": "symbol route tables with bound rows carry the prefix they consumed, so a callback a same-module child calls writes its owner's state (download only; executed code unchanged)",
+			"date": "2026-11-11"
+		}
+	]
+}
