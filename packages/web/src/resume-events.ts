@@ -733,7 +733,11 @@ export function createEventWiring(input: {
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
-		const userActionToken: DispatchSpan = { open: true };
+		// A form's submit is marked by its own hold, not as the control that saved.
+		const userActionToken: DispatchSpan = {
+			open: true,
+			control: event.type === 'submit' ? undefined : (element as unknown as Element),
+		};
 		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
 		dispatchSpans().add(userActionToken);
 		try {

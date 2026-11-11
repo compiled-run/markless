@@ -3,12 +3,19 @@ import {
 	assertWriteMove,
 	WRITE_IDLE,
 	WRITE_OWED,
+	WRITE_RELOADING,
 	WRITE_WRITING,
 	WRITE_WRITING_SUCCEEDED,
 	type WritePhase,
 } from '../src/resume-return-reask.ts';
 
-const phases = [WRITE_IDLE, WRITE_WRITING, WRITE_WRITING_SUCCEEDED, WRITE_OWED] as const;
+const phases = [
+	WRITE_IDLE,
+	WRITE_WRITING,
+	WRITE_WRITING_SUCCEEDED,
+	WRITE_OWED,
+	WRITE_RELOADING,
+] as const;
 const allowed: ReadonlyArray<readonly [WritePhase, WritePhase]> = [
 	[WRITE_IDLE, WRITE_WRITING], // the first write is sent
 	[WRITE_WRITING, WRITE_WRITING], // another write is sent, or one fails while others are in flight
@@ -18,7 +25,9 @@ const allowed: ReadonlyArray<readonly [WritePhase, WritePhase]> = [
 	[WRITE_WRITING_SUCCEEDED, WRITE_WRITING_SUCCEEDED], // more writes are sent or settle
 	[WRITE_WRITING_SUCCEEDED, WRITE_OWED], // the last write settles after one succeeded
 	[WRITE_OWED, WRITE_WRITING_SUCCEEDED], // a new write is sent while the refresh waits for its handlers
-	[WRITE_OWED, WRITE_IDLE], // the handlers ended, so the refresh runs
+	[WRITE_OWED, WRITE_RELOADING], // the handlers ended, so the refresh runs
+	[WRITE_RELOADING, WRITE_IDLE], // every value the refresh re-asked settled
+	[WRITE_RELOADING, WRITE_WRITING], // a new write is sent while the refresh still loads
 ];
 
 for (const from of phases)

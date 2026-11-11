@@ -247,11 +247,11 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		void state.flush?.();
 	};
 
-	const endEntry = (node: RuntimeAsyncComputedNode): void => {
+	const endEntry = (node: RuntimeAsyncComputedNode, unwritten?: boolean): void => {
 		const hold = node.entryHold;
 		if (!hold) return;
 		// A cell-backed computed between the write and this key only recomputes in the next flush.
-		if (node.version === hold.version && state.hasPendingFlush?.()) {
+		if (!unwritten && node.version === hold.version && state.hasPendingFlush?.()) {
 			void state.flush?.().then(() => {
 				if (node.entryHold === hold) endEntry(node);
 			});

@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 61,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 1637,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 24,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 61,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 1637,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 14,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
+			"date": "2026-11-11"
+		}
+	]
+}

@@ -483,6 +483,22 @@ test('an entry mark shows a settled value busy and its end restores it when no r
 	});
 });
 
+test('a mark with no write behind it ends at once, even while its own flush is still pending', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	runner.runs[0]!.resolve('a');
+	await tick();
+	await graph.flush();
+	const settled = snapshot(graph, 'computed:user');
+	plane.markEntry('computed:user');
+	expect(graph.hasPendingFlush?.()).toBe(true);
+	plane.endEntry('computed:user', true);
+	expect(snapshot(graph, 'computed:user')).toBe(settled);
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toBe(settled);
+	expect(runner.runs).toHaveLength(1);
+});
+
 test('an entry mark whose handler wrote the key is replaced by the real run, loud, and its end changes nothing', async () => {
 	const { graph, runner, plane } = single();
 	graph.read('computed:user', ['status']);

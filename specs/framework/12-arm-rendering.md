@@ -244,7 +244,41 @@ across all three cases:
   (the browser cannot attribute a request to one handler, so all of them
   count); a dispatch that never ends holds it. It is loud: a save the
   person started is the person's change, so readers are marked busy and the
-  refresh is announced as in the re-settle rule above. Inputs re-ask before
+  refresh is announced as in the re-settle rule above. Busy from the send
+  (2026-11-11, owner, research UC3 and UC4): the marks start when the write
+  is sent, not when it answers. At that moment every value the refresh will
+  re-ask (the same set, writers excluded) takes the entry mark a handler
+  writing its key input takes, so each element reading it carries
+  `aria-busy="true"` from the frame after the send; the refresh's own runs
+  take that mark over, so it never drops between the write answering and
+  the re-ask starting. The element whose dispatch sent the write (the
+  clicked control, also when a child component calls the handler it was
+  given) carries `aria-busy="true"` for the same stretch, from the send
+  until every value the refresh re-asked has settled or failed; a `submit`
+  dispatch marks no control here (its form has its own rule), and an
+  `aria-busy` the element already has when the write is sent is left
+  alone. A write sent while an earlier refresh still loads keeps the marks
+  through to the refresh after it. The browser cannot tell a write is
+  coming before it is sent (the analyzer has no fact for a `fetch` call
+  site), so a handler that awaits something else first is marked from its
+  write, and a handler that never writes marks nothing. When every write
+  fails or answers with a non-`ok` status, the marks clear as the last one
+  settles, before the handler's own continuation runs, so a handler that
+  throws on the failure reaches `@catch` with nothing marked. A quiet
+  refresh (a timer, a poll) sends no write from a dispatch and marks
+  nothing. One announcement pair per save, riding the value marks:
+  "Updating…" once they have held for the settle deadline (250 ms), then
+  "Updated" one reveal cadence (300 ms) after the last clears; a save that
+  answers sooner says only the second line. A failed save ends the marks
+  at once (the hold has no write behind it, so it does not wait for a
+  pending flush) and says one closing line: "Updated" for a save whose
+  handler ignores the status; for one whose handler throws into `@catch`,
+  "Update failed" when that rejection lands in the same flush as the marks
+  clearing, otherwise "Updated" (open: the marks do not know the save
+  failed). Known gap: a value a handler's key write already entry-marked is
+  not re-marked by the send, so if that write left its key unchanged the
+  handler's own end clears the mark before the refresh marks it again.
+  Inputs re-ask before
   their readers, so a value keyed by another async value waits for that
   input's answer and runs once. A value that started a run after the writes
   settled (the handler changed its key) is not asked again. A value whose
@@ -273,7 +307,8 @@ across all three cases:
   check exists, because the analyzer has no fact for a fetch call site's
   method or for what a recipe reaches across functions. Validated by
   `packages/vitest-browser/browser/mutations-refresh` and the docs recipe
-  `async-recipes/mugs.tsrx`.
+  `async-recipes/mugs.tsrx`; the marks from the send by
+  `packages/vitest-browser/browser/save-busy`.
 - Matched values during a re-settle (2026-11-04, async-error-states): the
   held content keeps showing pairs that belong together. A binding in the
   arm that reads the refreshing value beside an input of its key shows that

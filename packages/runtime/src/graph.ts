@@ -82,8 +82,8 @@ export type AsyncComputedPlane = {
 	readonly failHandler: (graphNodeId: string, error: unknown) => void;
 	/** Marks a settled value busy ahead of the write that will really refresh it. */
 	readonly markEntry: (graphNodeId: string) => void;
-	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. */
-	readonly endEntry: (graphNodeId: string) => void;
+	/** Undoes `markEntry` when the handler that called it never reached the write; a no-op once the real run has started. `unwritten`: no write stands behind the mark (a save's), so it ends now, without waiting for a pending flush. */
+	readonly endEntry: (graphNodeId: string, unwritten?: boolean) => void;
 	/** Installs matched values, from `@markless/runtime/graph-held`. */
 	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
 	readonly shownRead: (

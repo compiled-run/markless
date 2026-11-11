@@ -1,5 +1,5 @@
 // An in-page stand-in for the app's API routes: same-origin URLs under /mut/, answered without a network.
-export type Answer = { readonly status?: number; readonly body?: unknown; readonly wait?: Promise<unknown> };
+export type Answer = { readonly status?: number; readonly body?: unknown; readonly wait?: Promise<unknown>; readonly now?: true };
 
 type Server = {
 	items: string[];
@@ -9,6 +9,9 @@ type Server = {
 	holdReads?: Promise<unknown>;
 	handlerWait?: Promise<unknown>;
 	lateGate?: Promise<unknown>;
+	pollGate?: Promise<unknown>;
+	/** Called as each write arrives, before it is answered. */
+	sent?: () => void;
 	searches: number;
 	handlersStarted: number;
 	nextPost: Array<Answer>;
@@ -33,6 +36,8 @@ export function resetServer() {
 	server.holdReads = undefined;
 	server.handlerWait = undefined;
 	server.lateGate = undefined;
+	server.pollGate = undefined;
+	server.sent = undefined;
 	server.searches = 0;
 	server.handlersStarted = 0;
 	server.nextPost = [];
@@ -56,10 +61,11 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 		return json({ items, run: count });
 	}
 	server.posts.push(`${method} ${url.pathname} ${String(body ?? '')}`);
+	server.sent?.();
 	if (url.pathname === '/mut/search') return json({ run: ++server.searches });
 	const planned = server.nextPost.shift() ?? {};
 	if (planned.wait) await planned.wait;
-	else await new Promise((resolve) => setTimeout(resolve, 5));
+	else if (!planned.now) await new Promise((resolve) => setTimeout(resolve, 5));
 	const status = planned.status ?? 200;
 	if (status < 400 && url.pathname === '/mut/items' && typeof body === 'string' && body) server.items = [...server.items, body];
 	return json(planned.body ?? { ok: status < 400 }, status);

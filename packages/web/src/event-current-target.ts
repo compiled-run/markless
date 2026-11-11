@@ -17,8 +17,8 @@ export function marklessRunAtCurrentTarget<A, T>(
 // The DOM dispatches in flight, kept on the window so the click path loads none of the write watch.
 export const MARKLESS_DISPATCHES_GLOBAL = '__marklessDispatches';
 
-/** A dispatch's user-action token: `open` until its handlers return; the write watch sets `closed` to hear when its flush ends. */
-export type DispatchSpan = { open: boolean; closed?: () => void };
+/** A dispatch's user-action token: `open` until its handlers return; the write watch sets `closed` to hear when its flush ends, and marks `control` while a save it sent reloads. */
+export type DispatchSpan = { open: boolean; closed?: () => void; readonly control?: Element };
 
 export function dispatchSpans(): Set<DispatchSpan> {
 	const host = globalThis as { [MARKLESS_DISPATCHES_GLOBAL]?: Set<DispatchSpan> };

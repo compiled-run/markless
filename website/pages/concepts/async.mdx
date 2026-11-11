@@ -246,7 +246,8 @@ Press **Add a tall mug**: the save goes out, and when it answers, the list asks 
 - **Saves are never cancelled.** Two saves at once are both sent in full, and the page loads again once, after both have answered.
 - **Everything shown loads again.** Every async value inside a `@try` on the page asks again, not only the ones the save changed, and so does every async value they read. An input loads first, so a value that reads another one runs once, on the new answer. Values that do not depend on each other ask side by side: with three of them on the page, one save costs four requests, the save and three loads.
 - **A load already out starts over.** If a value was still loading when the save answered, that request may have left before the save landed, so it is asked again and its old answer never shows.
-- **The old answer stays.** While the new answers load, the page keeps the old ones and marks each element that shows them with `aria-busy="true"`, the same as any [refresh a click starts](#a-background-refresh-stays-quiet).
+- **Marked busy from the moment the save is sent.** Each element that shows a value the save will load again gets `aria-busy="true"` as soon as the request leaves, and keeps it, with no gap, until the new answer is on the page. The button (or other element) whose handler sent the save is marked the same way for the same stretch, so you can style it with `[aria-busy='true']`. If the handler awaits something else before saving, the marks start at the save, not at the click. A save that fails clears the marks straight away.
+- **The old answer stays.** While the new answers load, the page keeps the old ones on screen, the same as any [refresh a click starts](#a-background-refresh-stays-quiet).
 - **Still one load if you also change what it reads.** A handler written the older way, which changes a value the recipe reads after its save, loads that value once, not twice.
 
 Four limits are worth knowing:

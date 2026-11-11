@@ -120,7 +120,7 @@ export type AsyncRefresh = {
 	readonly advance: (node: RuntimeAsyncComputedNode, cause?: RunCause) => void;
 	readonly start: AsyncPlaneContext['start'];
 	readonly markEntry: (node: RuntimeAsyncComputedNode) => void;
-	readonly endEntry: (node: RuntimeAsyncComputedNode) => void;
+	readonly endEntry: (node: RuntimeAsyncComputedNode, unwritten?: boolean) => void;
 	readonly fail: (node: RuntimeAsyncComputedNode, error: unknown) => void;
 };
 
@@ -243,8 +243,8 @@ export function createAsyncPlane(
 		markEntry(graphNodeId) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node));
 		},
-		endEntry(graphNodeId) {
-			forward(graphNodeId, (loaded, node) => loaded.endEntry(node));
+		endEntry(graphNodeId, unwritten) {
+			forward(graphNodeId, (loaded, node) => loaded.endEntry(node, unwritten));
 		},
 		failHandler(graphNodeId, error) {
 			forward(graphNodeId, (loaded, node) => loaded.fail(node, error));
