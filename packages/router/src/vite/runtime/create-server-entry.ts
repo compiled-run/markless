@@ -29,11 +29,7 @@ import {
 	STREAM_ARM_EXECUTOR_GLOBAL,
 	STREAMED_ARM_SELECTOR,
 } from '@markless/web/render-to-stream';
-import {
-	CONTAINER_HANDLING_PROPERTY,
-	CONTAINER_REASK_PROPERTY,
-	CONTAINER_RETIRE_PROPERTY,
-} from '@markless/web/render-to-string';
+import { CONTAINER_REASK_PROPERTY, CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
 import {
 	CONTAINER_ATTRIBUTE,
 	PROTOCOL_CONTAINER_END_COMMENT,
@@ -1319,7 +1315,6 @@ function fragmentConfig(
 		servedBodyAttributesProperty: SERVED_BODY_ATTRIBUTES_PROPERTY,
 		stylesheetKeyAttribute: STYLESHEET_KEY_ATTRIBUTE,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
-		handlingProperty: CONTAINER_HANDLING_PROPERTY,
 		reaskProperty: CONTAINER_REASK_PROPERTY,
 		sharedInstances: [PROTOCOL_SHARED_INSTANCES_PROPERTY, RESUME_MODULE_ATTRIBUTE],
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,

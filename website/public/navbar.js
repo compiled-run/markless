@@ -25,7 +25,7 @@
 	const kept = () => (root.getAttribute('data-sidebar-sections') ?? '').split(' ').filter(Boolean);
 	const leaving = () => {
 		const token = sidebar()?.querySelector('.branch[aria-expanded="true"]:has([aria-current="page"])')?.getAttribute('data-section');
-		if (token && !kept().includes(token)) sidebar().dispatchEvent(new CustomEvent('sidebarleave', { detail: token }));
+		if (token && !kept().includes(token)) sidebar().dispatchEvent(new CustomEvent('sidebarleave'));
 	};
 	const arriving = () => {
 		const closed = kept().some((token) => sidebar()?.querySelector(`.branch[data-section="${token}"][aria-expanded="false"]`));

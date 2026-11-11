@@ -5,10 +5,6 @@
 			"why": "builds a router fixture app in a child process (fixture-build-child.ts)"
 		},
 		{
-			"module": "packages/router/test/support/fixture-dev.ts",
-			"why": "starts a router fixture app's Vite dev server in a child process (fixture-dev-child.ts)"
-		},
-		{
 			"module": "scripts/test-utils/browser.ts",
 			"why": "launchBrowser starts a Playwright browser"
 		},
@@ -123,7 +119,6 @@
 		"packages/router/test/vite/idle-wake-refresh.test.ts",
 		"packages/router/test/vite/inline-css.test.ts",
 		"packages/router/test/vite/intent-preloads.test.ts",
-		"packages/router/test/vite/kept-late-handler.test.ts",
 		"packages/router/test/vite/kept-part-state.test.ts",
 		"packages/router/test/vite/landing-resume-size.test.ts",
 		"packages/router/test/vite/link-bridge-static.test.ts",

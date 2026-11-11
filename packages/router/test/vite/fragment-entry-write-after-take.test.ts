@@ -92,7 +92,6 @@ async function install(page: Page): Promise<void> {
 			servedBodyAttributesProperty: '__servedBody',
 			stylesheetKeyAttribute: 'data-css',
 			retireProperty: '__retire',
-			handlingProperty: '__handling',
 			reaskProperty: '__reask',
 			sharedInstances: ['__shared', 'data-shared-resume'],
 			streamExecutorGlobal: '__exec',
