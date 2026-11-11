@@ -310,6 +310,61 @@ test('a save a handler sent before the reader navigates answers after the swap w
 	await page.close();
 });
 
+test('a form whose save is still out when the reader navigates releases its hold without touching either page', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	let answer!: () => void;
+	const answered = new Promise<void>((done) => (answer = done));
+	const saves: string[] = [];
+	await page.route(
+		(url) => url.pathname === '/save',
+		async (route) => {
+			saves.push(`${route.request().method()} ${route.request().postData()}`);
+			await answered;
+			await route.fulfill({ status: 204 });
+		},
+	);
+	const rest = quiet(page, (url) => new URL(url).pathname === '/save');
+	await page.goto(`${origin}/guide`);
+	await page.waitForFunction(() => document.querySelector('[data-names]')?.textContent === 'Ada');
+	await page.click('[data-submit]');
+	await page.waitForFunction(() => document.querySelector('[data-save-form]')?.getAttribute('aria-busy') === 'true');
+	const form = await page.$('[data-save-form]');
+	const submitter = await page.$('[data-submit]');
+	const status = await page.$('[data-save-status]');
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	const saved = page.waitForEvent('requestfinished', (request) => new URL(request.url()).pathname === '/save');
+	answer();
+	await saved;
+	await form!.evaluate(
+		(element) =>
+			new Promise<void>((done) => {
+				if (!element.hasAttribute('aria-busy')) return done();
+				new MutationObserver((_records, observer) => {
+					if (element.hasAttribute('aria-busy')) return;
+					observer.disconnect();
+					done();
+				}).observe(element, { attributes: true, attributeFilter: ['aria-busy'] });
+			}),
+	);
+	await rest();
+	expect(saves).toEqual(['POST name=Grace']);
+	expect(errors).toEqual([]);
+	expect(new URL(page.url()).pathname).toBe('/reference');
+	expect(await form!.evaluate((element) => element.isConnected)).toBe(false);
+	expect(await submitter!.evaluate((element) => element.hasAttribute('aria-disabled'))).toBe(false);
+	expect(await status!.evaluate((element) => [element.isConnected, element.textContent])).toEqual([false, 'submitting']);
+	expect(await page.evaluate(() => document.querySelectorAll('[aria-busy], [aria-disabled]').length)).toBe(0);
+	expect(await shown(page)).toEqual({ title: 'Reference page', left: 'none', saved: null });
+	await page.click('[data-note-press]');
+	await page.waitForFunction(() => document.querySelector('[data-note-press]')?.textContent === 'presses 1');
+	expect(saves).toHaveLength(1);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('a handler that returns the navigation it starts does not hold that navigation back', async () => {
 	const page = await browser!.newPage();
 	const errors: string[] = [];

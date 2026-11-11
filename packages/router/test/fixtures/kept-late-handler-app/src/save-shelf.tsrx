@@ -20,6 +20,19 @@ export default function SaveShelf() @{
 			await fetch('/save', { method: 'POST', body: 'Grace' });
 			status = 'saved';
 		}}>{'Save'}</button>
+		<form
+			data-save-form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				const body = new FormData(event.currentTarget as HTMLFormElement);
+				status = 'submitting';
+				await fetch('/save', { method: 'POST', body: new URLSearchParams(body as unknown as Record<string, string>) });
+				status = 'submitted';
+			}}
+		>
+			<input name="name" value="Grace" />
+			<button type="submit" data-submit>{'Submit'}</button>
+		</form>
 		<span data-save-status>{status}</span>
 	</section>
 }
