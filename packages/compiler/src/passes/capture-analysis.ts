@@ -292,7 +292,9 @@ function importedCaptureSymbols(
 						: slot.propName && !republished
 							? keepConstantFields(
 									edgePaths.map((path) => {
-										const ownRead = ownPropRead(captureSymbol.kind, slot);
+										const ownRead = captureSlotReadInContext(slot)
+											? ownPropRead(captureSymbol.kind, slot)
+											: undefined;
 										const route = propCaptureRoute(
 											path,
 											slot.propName as string,
@@ -362,6 +364,18 @@ function importedCaptureSymbols(
 			},
 		];
 	});
+}
+
+/** Whether a symbol's emitted body reads this slot through its capture context rather than straight from the graph. */
+export function captureSlotReadInContext(slot: CaptureSlot): boolean {
+	return slot.routes.some(
+		(route) =>
+			route.componentEdgeId !== undefined ||
+			// A composing module supplies this slot's edge.
+			route.kind === 'widget-callback-route' ||
+			// This module already resolved the slot itself.
+			route.kind === 'callback-slot-route',
+	);
 }
 
 // A derive or runner the edge places in a row reads that row's item from its own instance's props, as a local symbol's does.

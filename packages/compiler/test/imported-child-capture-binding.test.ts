@@ -194,3 +194,46 @@ test('a derive an imported child reads through its own list binds to each placed
 		]);
 	}
 });
+
+test('a derive an imported child reads straight from its props gets no bound row from a row placement', async () => {
+	const child = await compileTsrxModule({
+		filename: 'src/Row.tsrx',
+		source: `import { state } from '@markless/core';
+	export function Row({ label }) @{
+		let tries = state(1);
+		<li>{label} try {tries}</li>
+	}`,
+		symbols: [],
+	});
+	const derive = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'sync-computed-derive' && symbol.captureSlots.length > 0,
+	)!;
+	const parent = await compileTsrxModule({
+		filename: 'src/Page.tsrx',
+		source: `import { state } from '@markless/core';
+	import { Row } from './Row.tsrx';
+	export function Page() @{
+		let ids = state(['north', 'south']);
+		<ul>
+			@for (const id of ids; key id) {
+				<Row label={id} />
+			}
+		</ul>
+	}`,
+		symbols: [
+			{
+				id: 'imported:Row:derive',
+				chunk: 'virtual:markless:symbol:Row:derive',
+				exportName: 'rowText',
+				componentEdgeId: 'component-edge:0',
+				ownerComponentName: 'Row',
+				captureSymbol: derive,
+			},
+		],
+	});
+	expect(
+		parent.boundSymbolResolver.rows.filter(
+			(row) => row.loaderSymbolId === 'imported:Row:derive',
+		),
+	).toEqual([]);
+});
