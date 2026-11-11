@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderServerHTML, renderStream } from '../src/index.ts';
+import { resetService } from './async-catch-text/service.ts';
+import { CatchRows } from './imported-row-capture/catch-rows.tsrx';
 import { ImportedPage } from './imported-row-capture/imported-page.tsrx';
 import { List } from './imported-row-capture/list.tsrx';
 import { SoloPage } from './imported-row-capture/solo-page.tsrx';
@@ -122,3 +124,18 @@ for (const { shape, stream, csr } of pages) {
 		await rowCounts('east');
 	});
 }
+
+test("SSR, an imported row's @catch text streamed after the first flush, from a module that also lists it", async () => {
+	resetService([['slow', 'Slow down.']]);
+	const { shell, appends } = await renderStream(CatchRows);
+	expect(appends).toHaveLength(1);
+	const { container } = renderServerHTML(shell);
+	for (const chunk of appends) appendStreamed(container, chunk);
+	const slow = '[data-region="slow"] [data-error]';
+	await expect.poll(() => textOf(slow), WAIT).toBe('Slow down. (try 1 for slow)');
+	for (const tries of [2, 3]) {
+		click('[data-region="slow"] [data-next]');
+		await expect.poll(() => textOf(slow), WAIT).toBe(`Slow down. (try ${tries} for slow)`);
+	}
+	expect(uncaught).toEqual([]);
+});
