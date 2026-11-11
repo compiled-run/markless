@@ -3,6 +3,8 @@ import page from '../../../../website/pages/concepts/async.mdx?raw';
 import citySearch from './city-search.tsrx?raw';
 import feed from './feed.tsrx?raw';
 import inbox from './inbox.tsrx?raw';
+import mugs from './mugs.tsrx?raw';
+import mugsHelpers from './mugs.ts?raw';
 import orders from './orders.tsrx?raw';
 import pause from './pause.ts?raw';
 import backoff from './backoff.tsrx?raw';
@@ -11,6 +13,8 @@ import timeout from './timeout.tsrx?raw';
 
 // The Async page's recipes are these tested files, shown whole; only the fetch stand-ins beside them differ.
 const shown: ReadonlyArray<readonly [name: string, language: string, source: string, times: number]> = [
+	['mugs.tsrx', 'tsrx', mugs, 1],
+	['mugs.ts', 'ts', mugsHelpers, 1],
 	['backoff.tsrx', 'tsrx', backoff, 1],
 	['inbox.tsrx', 'tsrx', inbox, 1],
 	['returning.ts', 'ts', returning, 1],

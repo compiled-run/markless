@@ -19,7 +19,7 @@ import {
 	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
-import { marklessRunAtCurrentTarget } from './event-current-target.ts';
+import { dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -766,7 +766,9 @@ export function createEventWiring(input: {
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
-		const userActionToken = { open: true };
+		const userActionToken: DispatchSpan = { open: true };
+		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
+		dispatchSpans().add(userActionToken);
 		try {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
@@ -859,7 +861,12 @@ export function createEventWiring(input: {
 			throw error;
 		} finally {
 			userActionToken.open = false;
-			await input.flushRuntimeGraph();
+			try {
+				await input.flushRuntimeGraph();
+			} finally {
+				dispatchSpans().delete(userActionToken);
+				userActionToken.closed?.();
+			}
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
 				eventName: event.type,
