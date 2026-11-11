@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 17,
-			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion and the protocol key table one key; executed chars unchanged; measured on CI run 42930068482 against the anchor main carries (1689686)",
+			"delta": 131,
+			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion, the protocol key table one key, and the docs playground's compile worker the markControlWrittenInputs pass; executed chars unchanged; measured on CI run 42955063071 (this PR merged with main b698874ff) against the anchor main carries (1690111); before #583 merged the same change measured +17 on run 42930068482",
 			"date": "2026-11-11"
 		},
 		{
@@ -20,8 +20,20 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 57,
-			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion, the protocol key table one key, and the preloaded Async page one paragraph; executed chars unchanged; measured on CI run 42930068482 against the anchor main carries (2203310)",
+			"delta": 160,
+			"reason": "Clicked control's own text reads its written state (PR #594): the held-inputs plane's shownRead gains the writtenByControl exclusion, the protocol key table one key, the docs playground's compile worker the markControlWrittenInputs pass, and the preloaded Async page one paragraph; executed chars unchanged; measured on CI run 42955063071 (this PR merged with main b698874ff) against the anchor main carries (2220908); before #583 merged the same change measured +57 on run 42930068482",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 15,
+			"reason": "Clicked control's own text reads its written state (PR #594): two runtime chunks carrying the held-inputs plane and protocol key table change, and the links manifest name changes with the rebuilt compile worker; executed chars unchanged; measured on CI run 42955063071 (this PR merged with main b698874ff) against the anchor main carries (511806)",
 			"date": "2026-11-11"
 		}
 	]
