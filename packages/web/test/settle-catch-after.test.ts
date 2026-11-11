@@ -5,7 +5,6 @@ import {
 	settleAsyncBoundaryRange,
 	startAsyncBoundaries,
 } from '../src/resume-async-wiring.ts';
-import { MARKLESS_PENDING_MIN_VISIBLE_MS, MARKLESS_PENDING_REFRESH_STALL_MS } from '../src/pending-timing.ts';
 import type { ArmCommitUpdate } from '../src/resume-commit-arm.ts';
 import type { ResumeAsyncBoundaryRecord } from '../src/resume-types.ts';
 import { installMarklessAsyncPlane } from '../src/fns/async-plane.ts';
@@ -75,7 +74,7 @@ test('a rejection over @catch or @pending replaces the range', async () => {
 	}
 });
 
-test('a rejection after a stalled refresh committed @pending replaces the range', async () => {
+test('a rejection after a refresh held for a minute keeps the content and commits @catch after it', async () => {
 	vi.useFakeTimers();
 	try {
 		const parent: { childNodes: unknown[] } = { childNodes: [] };
@@ -100,7 +99,7 @@ test('a rejection after a stalled refresh committed @pending replaces the range'
 		let version = 0;
 		const subscribers: Array<{ run(snapshot: unknown): unknown }> = [];
 		const commits: ArmCommitUpdate[] = [];
-		await startAsyncBoundaries({
+		startAsyncBoundaries({
 			asyncBoundariesById: new Map([[boundary.id, boundary]]),
 			graph: {
 				read: (_: string, path: readonly string[]) => (path.length ? status : { status, version }),
@@ -129,14 +128,11 @@ test('a rejection after a stalled refresh committed @pending replaces the range'
 		};
 		await publish('fulfilled');
 		await publish('pending');
-		await vi.advanceTimersByTimeAsync(MARKLESS_PENDING_REFRESH_STALL_MS);
-		const failed = publish('rejected');
-		await vi.advanceTimersByTimeAsync(MARKLESS_PENDING_MIN_VISIBLE_MS);
-		await failed;
+		await vi.advanceTimersByTimeAsync(60_000);
+		await publish('rejected');
 		expect(commits.map((update) => [update.arm, update.after === true])).toEqual([
 			[ASYNC_BOUNDARY_ARM.try, false],
-			[ASYNC_BOUNDARY_ARM.pending, false],
-			[ASYNC_BOUNDARY_ARM.catch, false],
+			[ASYNC_BOUNDARY_ARM.catch, true],
 		]);
 	} finally {
 		vi.useRealTimers();

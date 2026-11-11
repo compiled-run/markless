@@ -274,7 +274,18 @@ The bare `reload;` line is the read. It is what makes a change to `reload` run t
 
 ## The old answer stays until the new one is ready
 
-Once a forecast is on the page, picking another city keeps it there while the new one loads. Meanwhile each element that shows the value gets `aria-busy="true"`, so you can style the wait. `@pending` only comes back if the newest request has waited more than five seconds. Each new pick starts that wait over, so fast typing never brings it back.
+Once a forecast is on the page, picking another city keeps it there while the new one loads, however long that takes. `@pending` does not come back. Swapping the forecast out would lose what the person was doing in it: where they had scrolled, which field had focus, and what they had typed. Meanwhile each element that shows the value gets `aria-busy="true"`, so you can style the wait.
+
+To show that a refresh is taking a while, delay the busy style. This rule fades the old forecast only after a refresh has run for a full second, so a quick one shows no change at all:
+
+```css
+[aria-busy='true'] {
+	opacity: 0.4;
+	transition: opacity 0.2s 1s;
+}
+```
+
+The second time in `transition` is the delay. When the new answer lands, the mark goes away and the forecast is back to full strength at once. To start over from `@pending` when a choice changes, give each choice its own block, as in [One block per row](#one-block-per-row).
 
 - Busy marks go on text, attributes, a list built from the value, a value passed to a child component, and values computed from it.
 - An element in the same block that shows only plain state, such as a picker, is never marked.

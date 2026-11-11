@@ -188,18 +188,22 @@ across all three cases:
   even inside the block. Two async values in one block mark their own
   elements; a value that settles while another is still running clears its
   own marks, and the last one clears with the commit that shows it. `@pending`
-  replaces the held content only when the NEWEST run has been pending longer
-  than the stall threshold (5000 ms); the stall clock restarts on every newer
-  run, so a typing burst never reaches it. A refreshing value no arm record
+  never replaces the held content, however long the refresh takes (revised
+  2026-11-11, owner, on the async-dx research check: swapping shown content
+  for `@pending` loses scroll position, focus, the caret and typed input, so
+  keeping it wins; the 5000 ms stall threshold is removed). A refresh that
+  fails keeps the content and opens `@catch` after it, as below. An author who
+  wants a cue for a long refresh styles it from `aria-busy`, for example a
+  CSS transition delay on the busy style. A refreshing value no arm record
   binds (bare text at the block's top level, an arm that registered no
   records, a `@catch` arm reading only the error) falls back to the block's
   host: its parent element when the block is that element's only content,
   otherwise each top-level element of the shown arm. That fallback is decided
   at runtime because a component whose root is the boundary cannot see its
-  parent at build time. The stall fallback applies only to a block that
-  already shows settled content and whose `@pending` arm the browser holds:
-  server-rendered and resumed boundaries get the busy marking but no stall
-  fallback, because their `@pending` arm is not shipped to the browser. Live regions inside a busy
+  parent at build time. Client-rendered, server-rendered and resumed
+  boundaries follow the same rule. Starting over from `@pending` on a new
+  subject is the author's choice, made by keying a one-row list by that
+  subject, which mounts a new block whose first load shows `@pending`. Live regions inside a busy
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
 - Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
@@ -358,10 +362,9 @@ across all three cases:
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client
-deadline, stall-threshold, min-duration and reveal-cadence constants live in
-one documented module (`packages/web/src/pending-timing.ts`: deadline 250 ms,
-stall 5000 ms, minimum pending visibility 200 ms, reveal-train cadence
-300 ms); the server's first-flush deadline (10 ms) lives with the stream
+deadline, min-duration and reveal-cadence constants live in one documented
+module (`packages/web/src/pending-timing.ts`: deadline 250 ms, minimum pending
+visibility 200 ms, reveal-train cadence 300 ms); the server's first-flush deadline (10 ms) lives with the stream
 renderer. The timing state machine is pure and tested under a fake clock
 across sweeps of settle times. Reveal choreography is
 tier-aware: value-slot commits are layout-safe and commit immediately; range
