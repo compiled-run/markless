@@ -828,7 +828,11 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 	const registry = instanceScope.marklessGraphWidgetRegistry(graph);
 	const own = (id: string) => !instanceScope.marklessInstancePath(id);
 	// A symbol the owner's own edge binds is the composer's, exactly as composition spells it for a served row.
-	const edge = { symbolPrefix: ownerSymbolPrefix, boundSymbols: owner.edge?.boundSymbols };
+	const edge = {
+		symbolPrefix: ownerSymbolPrefix,
+		boundSymbols: owner.edge?.boundSymbols,
+		boundSymbolPrefix: owner.edgePrefix ?? '',
+	};
 	// A bound id is spelled from its module's root, so it takes that module's place, not the owner's instance inside it.
 	const moduleBound = (symbolId: string) =>
 		!!protocolBoundSymbolBase(symbolId) && !marklessReboundSymbolId(edge.boundSymbols, symbolId);

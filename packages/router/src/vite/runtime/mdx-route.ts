@@ -81,6 +81,11 @@ type MdxRenderDataChild = {
 	readonly surface: MdxRenderDataSurface;
 };
 
+// Every live block's root has the same name, so a child's surface is filed by its slot.
+function mdxChildImportKey(componentIndex: number): string {
+	return `mdx:${componentIndex}`;
+}
+
 // MDX contributes only static markup records. Imported TSRX children keep their
 // compiler-emitted render-data surfaces and compose through ordinary child edges.
 export function createMdxRenderDataSurface(
@@ -136,6 +141,7 @@ export function createMdxRenderDataSurface(
 		edges.push({
 			id: edgeId,
 			childComponentName,
+			importSource: mdxChildImportKey(part.componentIndex),
 			hostPrefix: child.hostPrefix,
 			symbolPrefix: child.symbolPrefix,
 			props: Object.entries(child.props).map(([name, value]) => ({
@@ -195,7 +201,7 @@ export function createMdxRenderDataSurface(
 		imports: Object.fromEntries(
 			children.flatMap((child) =>
 				child.surface.rootComponentName
-					? [[child.surface.rootComponentName, child.surface] as const]
+					? [[mdxChildImportKey(child.componentIndex), child.surface] as const]
 					: [],
 			),
 		),
