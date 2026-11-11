@@ -39,6 +39,37 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			state.markDirtyPath(node.graphNodeId, []);
 		});
 		state.scheduleFlush();
+		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
+			void (state.flush?.() ?? Promise.resolve()).then(() => {
+				for (const held of heldOnInputs) endEntry(held);
+			});
+	};
+
+	// Entry marks that outlived their handler: the write reaches them only through an async input still refreshing loudly.
+	const heldOnInputs = new Set<RuntimeAsyncComputedNode>();
+
+	const asyncInputWhere = (
+		node: RuntimeAsyncComputedNode,
+		test: (input: RuntimeAsyncComputedNode) => boolean,
+	): RuntimeAsyncComputedNode | undefined => {
+		const visited = new Set<string>([node.graphNodeId]);
+		const visit = (graphNodeId: string): RuntimeAsyncComputedNode | undefined => {
+			if (visited.has(graphNodeId)) return;
+			visited.add(graphNodeId);
+			const input = nodes.get(graphNodeId);
+			if (input) return test(input) ? input : undefined;
+			for (const dependency of computedNodes.get(graphNodeId)?.dependencies ?? []) {
+				const found = visit(dependency.graphNodeId);
+				if (found) return found;
+			}
+		};
+		for (const graphNodeId of [
+			...node.dependencies.map((dependency) => dependency.graphNodeId),
+			...(node.syncHops ?? []).flatMap((hop) => hop.asyncFrom),
+		]) {
+			const found = visit(graphNodeId);
+			if (found) return found;
+		}
 	};
 
 	const pendingSnapshot = (
@@ -224,9 +255,21 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			});
 			return;
 		}
+		if (
+			node.version === hold.version &&
+			asyncInputWhere(node, (input) => input.snapshot.status === 'pending' && input.snapshot.quiet !== true)
+		) {
+			heldOnInputs.add(node);
+			return;
+		}
+		const outlived = heldOnInputs.delete(node);
 		node.entryHold = undefined;
 		if (node.version !== hold.version) return;
-		publish(node, hold.previous);
+		// Below a failed link the value goes where any reader of a failed input goes.
+		if (outlived && asyncInputWhere(node, (input) => input.snapshot.status === 'rejected')) advance(node);
+		if (node.version !== hold.version) return;
+		// A new version, so the block settles on it: its input's failure was held back while this value was busy.
+		publish(node, outlived ? ({ ...hold.previous, version: ++node.version } as RuntimeGraphAsyncSnapshot) : hold.previous);
 		void state.flush?.();
 	};
 

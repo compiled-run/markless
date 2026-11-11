@@ -66,3 +66,28 @@ test('rows over page state, or rows that show page state, can change', async () 
 	);
 	expect((await compile(showsState, true)).repeat).not.toHaveProperty('fixed');
 });
+
+test("rows over an async value inside its own @try are not fixed, so a re-ask updates the block in place", async () => {
+	const fromAsync = `import { computed } from '@markless/core';
+import { loadItems } from './items.ts';
+
+export default function Page() @{
+	const items = computed(async () => await loadItems());
+	<main>
+		@try {
+			<ul>
+				@for (const item of items; key item.id) {
+					<li>{item.label}</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}
+`;
+	const result = await compileTsrxModule({ filename: 'pages/index.tsrx', source: fromAsync, symbols: [], routeRoot: true });
+	expect(result.protocolView.keyedRepeats?.[0]).not.toHaveProperty('fixed');
+	expect(result.protocolView.keyedRepeats?.[0]).toHaveProperty('rowTemplate');
+	expect(result.protocolView.asyncBoundaries[0]).not.toHaveProperty('rerendersOnRefresh');
+});
