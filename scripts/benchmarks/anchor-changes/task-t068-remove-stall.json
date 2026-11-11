@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/pending-timing"
+			],
+			"remove": true,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": -714,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-resettle-hold"
+			],
+			"remove": true,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": -6,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/pending-timing"
+			],
+			"remove": true,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": -714,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-resettle-hold"
+			],
+			"remove": true,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": -6,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -9,
+			"reason": "the 5 s refresh stall is removed (T068): resume-resettle-hold no longer exists, and resume-async-wiring and resume-runtime-start lose its wiring; a refresh keeps shown content busy however long it takes",
+			"date": "2026-11-11"
+		}
+	]
+}

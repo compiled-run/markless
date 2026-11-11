@@ -64,7 +64,6 @@ async function browserSourceWaits(mount: () => Promise<{ readonly container: unk
 	const container = (await mount()).container as HTMLElement;
 	await expect.poll(() => asked.includes('position'), poll).toBe(true);
 	const stop = watch(container, { waiting: () => waiting(container) });
-	// Under the 5 s refresh stall, so a late @pending cannot pass for a reported wait.
 	await expect.poll(() => waiting(container), { ...poll, timeout: 1_000 }).toBe(true);
 	release('position');
 	await expect.poll(() => text(container, '[data-place]'), poll).toBe('Oslo');
