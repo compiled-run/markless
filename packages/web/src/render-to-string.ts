@@ -153,11 +153,15 @@ export async function renderToString(
 	component: SsrRenderable,
 	options: RenderToStringOptions = {},
 ): Promise<string> {
-	const output = await renderSsrOutput(
-		component,
-		options.props,
-		storageRenderContext(options.cookie),
-	);
+	// Each pass starts every value it reaches before waiting on any, so separate blocks load side by side.
+	const runs = new Map<string, { readonly promise?: Promise<unknown> }>();
+	const renderContext = { ...storageRenderContext(options.cookie), streaming: { runs, prestart: true } };
+	let output = await renderSsrOutput(component, options.props, renderContext);
+	for (let started = 0; runs.size > started; ) {
+		started = runs.size;
+		await Promise.all([...runs.values()].map((run) => run.promise));
+		output = await renderSsrOutput(component, options.props, renderContext);
+	}
 	return assembleSsrContainer(component, output, options);
 }
 
