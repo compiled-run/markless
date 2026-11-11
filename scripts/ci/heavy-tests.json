@@ -116,6 +116,7 @@
 		"packages/router/test/vite/fragment-redirect.test.ts",
 		"packages/router/test/vite/fragment-scripts.test.ts",
 		"packages/router/test/vite/hash-route-settle.test.ts",
+		"packages/router/test/vite/idle-wake-refresh.test.ts",
 		"packages/router/test/vite/inline-css.test.ts",
 		"packages/router/test/vite/intent-preloads.test.ts",
 		"packages/router/test/vite/kept-part-state.test.ts",
