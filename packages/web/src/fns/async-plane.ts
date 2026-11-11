@@ -18,7 +18,7 @@ import type {
 	ResumeDomComment,
 } from '../resume-types.ts';
 import type { BusyBoundary, busyElements } from './busy-elements.ts';
-import { runRecipe } from '../write-refresh.ts';
+import { runRecipe } from '../resume-return-reask.ts';
 
 // A page whose async values all arrived settled loads the refresh half with its first refresh, failure, handler rejection or entry mark.
 let refresh: AsyncRefreshModule | Promise<AsyncRefreshModule> | undefined;

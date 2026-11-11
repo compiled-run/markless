@@ -4,8 +4,7 @@ import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-r
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
-import { reaskOnReturn } from './resume-return-reask.ts';
-import { registerWriteRefresh } from './write-refresh.ts';
+import { reaskOnReturn, registerWriteRefresh } from './resume-return-reask.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
