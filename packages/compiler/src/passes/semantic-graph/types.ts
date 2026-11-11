@@ -88,6 +88,7 @@ export type MutableSemanticGraphArtifact = {
 		readonly componentName?: string;
 		/** The name `@catch (name)` binds the rejection to. */
 		readonly errorName?: string;
+		errorGraphNodeId?: string;
 		readonly gateGraphNodeId?: string;
 		/** Where the `@try` keyword is written. */
 		readonly keywordSpan?: SourceSpan;
@@ -217,6 +218,8 @@ export type WalkState = {
 	nextBoundaryId: number;
 	/** The boundary each `@catch (error, reset)` reset binding resets, by the binding's declaration offset. */
 	catchResetBoundaries: Map<number, string>;
+	/** The boundary each `@catch (error)` error binding names, by the binding's declaration offset. */
+	catchErrorBoundaries: Map<number, string>;
 	nextBranchSiteId: number;
 	nextAnchorOrder: number;
 };
@@ -353,6 +356,7 @@ export function createWalkState(input: {
 		nextEventId: 0,
 		nextBoundaryId: 0,
 		catchResetBoundaries: new Map(),
+		catchErrorBoundaries: new Map(),
 		nextBranchSiteId: 0,
 		nextAnchorOrder: 0,
 	};

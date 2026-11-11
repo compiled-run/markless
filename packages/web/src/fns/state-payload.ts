@@ -1,4 +1,4 @@
-import { serializeGraphValue } from '@markless/serializer';
+import { durableError, serializeGraphValue } from '@markless/serializer';
 import { marklessSerializeGraphValue } from './state-serialize.ts';
 
 // The served state payload while it is still being built: cells carry the
@@ -52,4 +52,23 @@ export function marklessSsrServeComputed(
 		}
 		computed[index] = { ...record, value: marklessSerializeGraphValue(value, record) };
 	}
+}
+
+// A served @catch keeps the error it shows in its cell, so text joining it with graph reads still spells it after resume.
+export function marklessSsrCatchError(
+	values: Map<string, unknown>,
+	state: MarklessStatePayloadDraft,
+	graphNodeId: string,
+	error: unknown,
+	context: {
+		readonly idPrefix?: string;
+		readonly streaming?: { readonly caughtErrors?: Map<string, string> };
+	} | undefined,
+	boundaryId: string,
+) {
+	const durable = durableError(error);
+	values.set(graphNodeId, durable);
+	marklessSetStatePayloadValue(state, graphNodeId, durable);
+	const prefix = context?.idPrefix ?? '';
+	context?.streaming?.caughtErrors?.set(prefix + boundaryId, prefix + graphNodeId);
 }

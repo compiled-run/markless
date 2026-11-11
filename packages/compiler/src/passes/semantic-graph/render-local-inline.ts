@@ -51,6 +51,8 @@ export type RenderLocalInline =
 			readonly names: ReadonlySet<string>;
 			// `@catch (error, reset)` reset bindings left free, with the boundary each resets.
 			readonly catchResets: ReadonlyMap<string, string>;
+			// `@catch (error)` error bindings left free, with the boundary whose error each names.
+			readonly catchErrors: ReadonlyMap<string, string>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
@@ -80,19 +82,23 @@ export function inlineRenderLocals(
 		readonly inlineFunctions?: boolean;
 		// Only locals declared where this answers true are spliced; any other is left as written.
 		readonly inlineOnly?: (declarationStart: number) => boolean;
+		// A `@catch (error)` binding is left free, for the caller to read from the boundary's error cell.
+		readonly catchErrors?: boolean;
 	} = {},
 ): RenderLocalInline {
 	const definitions: AnyNode[] = [];
 	const names = new Set<string>();
 	const catchResets = new Map<string, string>();
-	const result = inlineWithin(node, state, definitions, names, catchResets, new Set(), {
+	const catchErrors = new Map<string, string>();
+	const result = inlineWithin(node, state, definitions, names, { catchResets, catchErrors }, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineFunctions: options.inlineFunctions === true,
 		inlineOnly: options.inlineOnly,
+		catchErrors: options.catchErrors === true,
 	});
 	return 'source' in result
-		? { kind: 'inlined', source: result.source, definitions, names, catchResets }
+		? { kind: 'inlined', source: result.source, definitions, names, catchResets, catchErrors }
 		: result;
 }
 
@@ -101,13 +107,17 @@ function inlineWithin(
 	state: WalkState,
 	definitions: AnyNode[],
 	names: Set<string>,
-	catchResets: Map<string, string>,
+	catches: {
+		readonly catchResets: Map<string, string>;
+		readonly catchErrors: Map<string, string>;
+	},
 	inlining: Set<number>,
 	options: {
 		readonly leaveCaptureOwned: boolean;
 		readonly leaveRowItems: boolean;
 		readonly inlineFunctions: boolean;
 		readonly inlineOnly: ((declarationStart: number) => boolean) | undefined;
+		readonly catchErrors: boolean;
 	},
 ):
 	| { readonly source: string; readonly freeNames: ReadonlySet<string> }
@@ -142,10 +152,21 @@ function inlineWithin(
 					state.catchResetBoundaries.has(declarationStartOf(semantic, symbolId))
 				) {
 					const boundaryId = state.catchResetBoundaries.get(declarationStartOf(semantic, symbolId))!;
-					const known = catchResets.get(name);
+					const known = catches.catchResets.get(name);
 					if (known !== undefined && known !== boundaryId) refusal = { kind: 'render-local', name };
 					else {
-						catchResets.set(name, boundaryId);
+						catches.catchResets.set(name, boundaryId);
+						freeNames.add(name);
+					}
+				} else if (
+					options.catchErrors &&
+					state.catchErrorBoundaries.has(declarationStartOf(semantic, symbolId))
+				) {
+					const boundaryId = state.catchErrorBoundaries.get(declarationStartOf(semantic, symbolId))!;
+					const known = catches.catchErrors.get(name);
+					if (known !== undefined && known !== boundaryId) refusal = { kind: 'render-local', name };
+					else {
+						catches.catchErrors.set(name, boundaryId);
 						freeNames.add(name);
 					}
 				} else if (repeatRowBindsName(name, state)) {
@@ -205,7 +226,7 @@ function inlineWithin(
 							state,
 							definitions,
 							names,
-							catchResets,
+							catches,
 							new Set([...inlining, symbolId]),
 							options,
 						);
