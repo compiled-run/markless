@@ -69,6 +69,8 @@ export type AsyncComputedPlane = {
 	readonly nodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
+	/** Starts the runs that writes since the last call asked for; a flush calls it before its subscriptions read. */
+	readonly startWritten?: () => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
 	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set; false otherwise. */
 	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
@@ -671,6 +673,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		try {
 			try {
 				while (dirtyPaths.length > 0) {
+					asyncPlane?.startWritten?.();
 					plane?.recomputeSubscribed();
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();

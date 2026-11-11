@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 35,
+			"reason": "the flush starts the async runs a turn's writes asked for before its subscriptions read, so one handler that writes several inputs starts one run per async value",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "the flush starts the async runs a turn's writes asked for before its subscriptions read, so one handler that writes several inputs starts one run per async value",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 35,
+			"reason": "the flush starts the async runs a turn's writes asked for before its subscriptions read, so one handler that writes several inputs starts one run per async value",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "the flush starts the async runs a turn's writes asked for before its subscriptions read, so one handler that writes several inputs starts one run per async value",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "the flush starts the async runs a turn's writes asked for before its subscriptions read, so one handler that writes several inputs starts one run per async value",
+			"date": "2026-11-11"
+		}
+	]
+}
