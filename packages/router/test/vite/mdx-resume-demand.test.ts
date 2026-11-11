@@ -2,7 +2,7 @@ import { parseSync } from 'rolldown/experimental';
 import { expect, test, vi } from 'vitest';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 
-type Input = { root: Record<string, unknown>; event: object; scalar?: boolean };
+type Input = { root: Record<string, unknown>; event: object; scalar?: boolean; logOnly?: boolean };
 type RuntimeModule = { resumeFromPayloadDocument(input: unknown): unknown };
 
 async function entry(source: string, load: (specifier: string) => Promise<RuntimeModule>) {
@@ -106,4 +106,19 @@ test('MDX dispatches with the policy and the stop the boot actually applied', as
 	).toEqual(
 		expect.objectContaining({ syncPolicyAlreadyApplied: true, propagationStopped: true }),
 	);
+});
+
+// The execution log forwards a click that leaves the page only to record it; booting the runtime then fetches its code for a page about to go.
+test('MDX records a log-only event without loading the runtime until the runtime has started', async () => {
+	const dispatch = vi.fn();
+	const load = vi.fn().mockResolvedValue({ resumeFromPayloadDocument: () => ({ runtime: { dispatch } }) });
+	const resume = await entry("import Control from './Control.tsrx';\n\n<Control />", load);
+	const root: Record<string, unknown> = {};
+	await resume({ root, event: {}, logOnly: true });
+	expect(load).not.toHaveBeenCalled();
+	expect(root.__asyncResumeRuntimeStarted).toBeUndefined();
+	root.__asyncResumeRuntimeStarted = true;
+	await resume({ root, event: {}, logOnly: true });
+	expect(load).toHaveBeenCalledTimes(1);
+	expect(dispatch).toHaveBeenCalledTimes(1);
 });
