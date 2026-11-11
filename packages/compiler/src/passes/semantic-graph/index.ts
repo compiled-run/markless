@@ -90,7 +90,10 @@ import { inlineNestedTemplateLocals } from './render-local-inline.ts';
 import { collectDirectEvalDiagnostics } from './direct-eval.ts';
 import { mintAsyncBoundaryGates } from '../public-render/boundary-runner.ts';
 import { componentsWithRejectingHandlers, keepRejectingChildCatches } from './rejecting-handlers.ts';
-import { collectAsyncInputBesideValueDiagnostics } from './async-refresh-facts.ts';
+import {
+	collectAsyncInputBesideValueDiagnostics,
+	markControlWrittenInputs,
+} from './async-refresh-facts.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
 
 export async function buildSemanticGraph(
@@ -212,6 +215,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
 	collectAsyncBoundaryDiagnostics(graph);
 	collectAsyncInputBesideValueDiagnostics(graph);
+	markControlWrittenInputs(graph, state.hostParents);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,

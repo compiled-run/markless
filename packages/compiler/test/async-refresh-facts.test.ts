@@ -187,3 +187,40 @@ export function Profile() @{
 		'`user` reads no state or prop, so it runs once and never refreshes. To refresh it, read a counter in its recipe (`let reload = state(0)`) and bump it.',
 	);
 });
+
+const pager = (markup: string) => `import { computed, state } from '@markless/core';
+
+export function Pager() @{
+	let page = state(1);
+	const rows = computed(async () => (await fetch('/rows?page=' + page)).json() as Promise<{ count: number; pages: number[] }>);
+
+	<main>
+		@try {
+			<section>${markup}</section>
+		} @pending {
+			<p>Loading</p>
+		}
+	</main>
+}
+`;
+
+function writtenByControl(source: string) {
+	const graph = buildSemanticGraphSync({ filename: 'pager.tsrx', source });
+	return graph.templateReads.flatMap((read) => {
+		const binding = graph.graphBindings.find((candidate) => candidate.id === read.computedGraphNodeId);
+		const written = (binding?.dependencies ?? []).filter((dependency) => dependency.writtenByControl);
+		return written.length > 0 ? [written.map((dependency) => dependency.source).join(',')] : [];
+	});
+}
+
+test('text in a control joining the state its own handler writes with fetched data reads that state as written', () => {
+	expect(writtenByControl(pager('<button onClick={() => (page = page + 1)}>Page {page} of {rows.count}</button>'))).toEqual(['page']);
+	expect(writtenByControl(pager('<button onClick={() => (page = page + 1)}><span>Page {page} of {rows.count}</span></button>'))).toEqual(['page']);
+});
+
+test('text outside the writing control, in a container with a handler, or in a control that writes nothing it shows stays matched', () => {
+	expect(writtenByControl(pager('<button onClick={() => (page = page + 1)}>Next</button><p>Page {page} of {rows.count}</p>'))).toEqual([]);
+	expect(writtenByControl(pager('<div onClick={() => (page = page + 1)}><p>Page {page} of {rows.count}</p></div>'))).toEqual([]);
+	expect(writtenByControl(pager('<button onClick={() => console.log(page)}>Page {page} of {rows.count}</button>'))).toEqual([]);
+	expect(writtenByControl(pager('<ul>@for (const n of rows.pages; key n) {<li><button onClick={() => (page = n)}>{n}: {page} of {rows.count}</button></li>}</ul>'))).toEqual([]);
+});

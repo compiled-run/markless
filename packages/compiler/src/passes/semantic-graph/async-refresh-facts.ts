@@ -13,7 +13,9 @@ import {
 	splitStaticGraphPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { asyncKeyInputs, asyncReach } from '../paired-async-values.ts';
+import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from '../public-render/boundary-runner.ts';
 import { asyncInputBesideValueDiagnostic } from './diagnostics.ts';
+import type { MutableSemanticGraphArtifact } from './types.ts';
 
 type RefreshGraph = Pick<
 	SemanticGraphArtifact,
@@ -125,6 +127,52 @@ export function collectAsyncInputBesideValueDiagnostics(
 			);
 		}
 	}
+}
+
+/**
+ * Text that joins state with an async value, inside a control (the nearest enclosing
+ * control element), reads the state that control's own handlers write as written.
+ * The rest of the text stays matched to what the async value was fetched with.
+ */
+export function markControlWrittenInputs(
+	graph: Omit<RefreshGraph, 'graphBindings'> &
+		Pick<MutableSemanticGraphArtifact, 'graphBindings'>,
+	hostParents: ReadonlyMap<string, string>,
+): void {
+	const { reach, hostsById } = refreshContext(graph);
+	const control = (hostNodeId: string) => {
+		let host: string | undefined = hostNodeId;
+		while (host && !CONTROL_TAGS.has(hostsById.get(host)?.tagName ?? ''))
+			host = hostParents.get(host);
+		return host;
+	};
+	const marked = new Map<string, ReadonlySet<string>>();
+	for (const read of graph.templateReads) {
+		const id = read.computedGraphNodeId;
+		if (read.target.kind !== 'text' || !id?.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX))
+			continue;
+		const host = control(read.hostNodeId);
+		if (!host || reach([id]).asyncValues.size === 0) continue;
+		const written = hostWrites(graph, host);
+		if (written.size > 0) marked.set(id, written);
+	}
+	if (marked.size === 0) return;
+	graph.graphBindings = graph.graphBindings.map((binding) => {
+		const written = marked.get(binding.id);
+		if (
+			!written ||
+			!binding.dependencies?.some((dependency) => written.has(dependency.graphNodeId))
+		)
+			return binding;
+		return {
+			...binding,
+			dependencies: binding.dependencies.map((dependency) =>
+				written.has(dependency.graphNodeId)
+					? { ...dependency, writtenByControl: true as const }
+					: dependency,
+			),
+		};
+	});
 }
 
 // Text in these elements names the control's own choice, which the user just made.

@@ -221,6 +221,29 @@ across all three cases:
   records for any binding whose value can change between settles: a sync
   computed or template expression that reads a live input, and an async
   value that reads one beside an async input.
+- The clicked control's own text (2026-11-10, owner, UC23): the one place
+  values shown together may mix. A pager button labelled
+  `Next: page {page} of {rows.count}` shows the new page on the click, next
+  to the count it already shows; every other reader of `page` beside `rows`,
+  such as a `Page {page} of {rows.count}` line next to the button, stays
+  matched until the new rows land. The rule, from compiler facts only: a
+  text read whose value is one per-site template expression reaching an
+  async value, whose nearest enclosing element in the same component's
+  markup (itself included) is a control element (`button`, `select`,
+  `option`, `textarea`, `label`, the same set the
+  `MARKLESS_ASYNC_INPUT_BESIDE_VALUE` warning treats as showing the user's
+  own choice), reads each state that control's own event handlers write as
+  written; its other inputs and its async parts read as shown. The compiler
+  marks those dependencies `writtenByControl` on the computed record. Not
+  covered, so still matched: text a child component renders inside its own
+  control (the child cannot see that its callback prop writes the parent's
+  state), text in a keyed `@for` row (a row rebuilds from one shown read
+  for the whole row), a sync computed read in the text (only the written
+  state read directly counts), attributes such as `disabled`, and a
+  container with a handler that is not a control element (a `form` or
+  `div`). The rule is static, so every control that writes the state shows
+  it as written, not only the one clicked. The control stays marked busy
+  while its async part refreshes.
 - Failed refresh (2026-11-04, async-error-states): a refresh that rejects
   keeps the last good value. The rejected snapshot carries the previous
   settled `value` and the `valueKey` it was fetched for; a first-load failure

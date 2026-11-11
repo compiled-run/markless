@@ -172,6 +172,8 @@ export type ProtocolStatePayload = {
 		readonly dependencies?: ReadonlyArray<{
 			readonly graphNodeId: string;
 			readonly path: ReadonlyArray<string>;
+			// Text only: the element showing it writes this state from its own handler, so it reads as written while the rest stays matched.
+			readonly writtenByControl?: true;
 		}>;
 		readonly snapshot?:
 			| {

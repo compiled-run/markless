@@ -167,6 +167,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 					}
 				: {}),
 		});
+		if (previousHost) state.hostParents.set(hostNodeId, previousHost);
 		state.currentHostNodeId = hostNodeId;
 	}
 
