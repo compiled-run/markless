@@ -489,14 +489,12 @@ export async function settleAsyncBoundaryRange(
 			);
 			return;
 		}
-		// A failure over shown @try content keeps it, which only a commit can draw: the journal swap replaces the range.
-		const keepsShown =
-			arm === ASYNC_BOUNDARY_ARM.catch &&
-			(shownArms.get(boundary) ?? boundary.initiallyServedArm) === ASYNC_BOUNDARY_ARM.try;
+		// A failure commits, so the busy plane decides whether shown @try content stays with the @catch drawn after it; a journal swap replaces the range.
+		const failed = arm === ASYNC_BOUNDARY_ARM.catch;
 		if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
 		else shownArms.set(boundary, arm);
 		// Rows written straight into this arm follow its commits; a journal swap would leave them holding the old nodes.
-		if (keepsShown || input.root.__marklessBranchArms?.has(boundary.id)) {
+		if (failed || input.root.__marklessBranchArms?.has(boundary.id)) {
 			if (claim?.() === false) return;
 			await commit(
 				{
