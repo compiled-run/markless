@@ -17,6 +17,7 @@ import type {
 	ResumeDomComment,
 } from '../resume-types.ts';
 import type { BusyBoundary, busyElements } from './busy-elements.ts';
+import { runRecipe } from '../resume-return-reask.ts';
 
 // A page whose async values all arrived settled loads the refresh half with its first refresh, failure, handler rejection or entry mark.
 let refresh: AsyncRefreshModule | Promise<AsyncRefreshModule> | undefined;
@@ -185,15 +186,17 @@ async function asyncComputedFromRecord(
 					graphNodeId: computed.graphNodeId,
 					deriveSymbolId: runnerSymbolId,
 				});
-			return runner({
-				// Inputs held at what the screen shows reach the runner, which reads through the graph.
-				graph: read === graph.read ? graph : { ...graph, read },
-				read,
-				key,
-				signal,
-				element: input.root,
-				getElementHandle: () => undefined,
-			});
+			return runRecipe(graph.asyncPlane?.()?.nodes.get(computed.graphNodeId), () =>
+				runner({
+					// Inputs held at what the screen shows reach the runner, which reads through the graph.
+					graph: read === graph.read ? graph : { ...graph, read },
+					read,
+					key,
+					signal,
+					element: input.root,
+					getElementHandle: () => undefined,
+				}),
+			);
 		},
 	};
 }

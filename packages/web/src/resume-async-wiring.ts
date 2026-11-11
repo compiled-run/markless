@@ -4,7 +4,7 @@ import { boundaryArmRecordSet, composedArmRecordQualifier } from './resume-arm-r
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import { asyncPlanes } from './reconcile-plane-slot.ts';
 import { setBoundaryBusy } from './resume-refresh-busy.ts';
-import { reaskOnReturn } from './resume-return-reask.ts';
+import { reaskOnReturn, registerWriteRefresh } from './resume-return-reask.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
@@ -146,9 +146,11 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 	};
 	let disposed = false;
 	let stopReasking: (() => void) | undefined;
+	let stopWriteRefresh: (() => void) | undefined;
 	input.storeContainerSubscription(() => {
 		disposed = true;
 		stopReasking?.();
+		stopWriteRefresh?.();
 		for (const boundaryId of releasesById.keys()) release(boundaryId);
 	});
 	const wire = (
@@ -255,7 +257,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				input.demandOnStart === true,
 			input.demandOnStart === true,
 		);
-	if (!disposed) stopReasking = reaskOnReturn(input.root, input.graph, input.asyncBoundariesById);
+	if (!disposed) {
+		stopReasking = reaskOnReturn(input.root, input.graph, input.asyncBoundariesById);
+		stopWriteRefresh = registerWriteRefresh(input.graph, input.asyncBoundariesById);
+	}
 	return {
 		add(boundary, shown) {
 			release(boundary.id);

@@ -185,6 +185,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			if (staleDerives.has(graphNodeId)) staleDerive = true;
 			const dependency = nodes.get(graphNodeId);
 			if (dependency) {
+				// A planned input starts first, so this reader waits for its answer instead of running on the old one.
+				if (dependency.phase === NODE_PLANNED) demand(dependency, cause);
 				if (dependency.snapshot.status === 'idle' || dependency.snapshot.status === 'pending') {
 					blocked = dependency;
 					if (!dependency.valueInputs) shown = false;
