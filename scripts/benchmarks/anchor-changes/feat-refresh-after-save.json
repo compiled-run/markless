@@ -101,6 +101,180 @@
 			"delta": 40,
 			"reason": "refresh after a save: new write-refresh module, shipped only with async values, and a dispatch span in resume-events; at load a server-rendered page runs nothing new and a client-rendered page with async values runs 40 chars more (live-feed)",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/write-refresh"
+			],
+			"set": 3041,
+			"reason": "refresh after a save: watches same-origin writes and re-asks the async values on screen; shipped only on pages with async values",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 161,
+			"reason": "refresh after a save: each container with async values registers with the write watch",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "refresh after a save: each DOM dispatch opens a span so a reload waits for the handler that sent the write; runs per dispatch, never at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 846,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 3661,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 833,
+			"reason": "refresh after a save: the Async page's new save and Reload sections are prose the docs packs carry to other pages, plus the dispatch span; nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "refresh after a save: the dispatch span in resume-events (+37 B gzip); the page has no async values, so the write watch is not downloaded, and nothing new runs at load",
+			"date": "2026-11-11"
 		}
 	]
 }
