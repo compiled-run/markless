@@ -93,6 +93,41 @@ test('a full-resume wake whose page an in-place navigation swapped while its cod
 	expect(await wake('@markless/web/fns/streamed-arms')).toEqual({ resumed: 0, adopted: 0 });
 });
 
+// The execution log forwards a click that leaves the page only to record it; booting the runtime then fetches its code for a page about to go.
+test.each([
+	['a page that needs full resume', { needsFullResume: true }],
+	['a row page', { runtimeDemandMap: { recordKinds: [{ kind: 'keyed-repeat', replaced: true }, { kind: 'dom-update', replaced: true }] } }],
+	['a mixed scalar and row page', { runtimeDemandMap: { recordKinds: [{ kind: 'event', replaced: true }, { kind: 'keyed-repeat', replaced: true }, { kind: 'dom-update', replaced: true }] } }],
+	['a plain full page', {}],
+])('%s records a log-only event without loading the runtime', async (_name, mode) => {
+	const run = async (executionLog: 'auto' | 'never', input: Record<string, unknown>) => {
+		const source = emitResumeModule({ ...baseInput, ...mode, executionLog })
+			.replace(/^import .*;$/gm, '')
+			.replace(/export /g, '')
+			.replace(/\bimport\(/g, 'loadModule(')
+			.replace(/\bimport\.meta\b/g, '({ env: {} })');
+		const loaded: string[] = [];
+		const loadModule = async (id: string) => {
+			loaded.push(id);
+			const resumeExport = async () => ({ runtime: { dispatch: async () => undefined } });
+			return new Proxy({}, { get: (_target, name) => (name === 'then' ? undefined : resumeExport) });
+		};
+		const resume = new Function(
+			'loadModule',
+			'globalThis',
+			'payloadRuntimeDemandMap',
+			`${source}\nreturn resumeContainerEvent;`,
+		)(loadModule, {}, {}) as (input: unknown) => Promise<void>;
+		await resume({ root: { __mL: {}, querySelector: () => null }, event: { type: 'click' }, ...input });
+		return loaded;
+	};
+	expect(await run('auto', { logOnly: true, eventRecord: null })).toEqual([]);
+	expect(await run('auto', { eventRecord: null })).not.toEqual([]);
+	expect(emitResumeModule({ ...baseInput, ...mode, executionLog: 'never' })).not.toContain(
+		'input.logOnly && !input.root.__asyncResumeRuntimeStarted',
+	);
+});
+
 test('server source module carries the prerender wake URL beside the regular resume URL', () => {
 	const code = emitSourceModule({
 		...baseInput,
