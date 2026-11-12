@@ -7,7 +7,7 @@
 				"web/resume-return-reask"
 			],
 			"delta": 1071,
-			"reason": "hold after save in the write watch (held paints per round, reload started early when the handler goes on past its save): 7620 -> 8691 B rendered, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 7620 B",
+			"reason": "hold after save in the write watch (held paints per round, reload started early when the handler goes on past its save): 7620 -> 8691 B rendered, measured on PR #642 CI run 43276665369, unchanged on run 43285542404 (head 1ab2e956a, linux-x64) against the main anchor 7620 B",
 			"date": "2026-11-12"
 		},
 		{
@@ -18,8 +18,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 248,
-			"reason": "hold after save (graph paint hook and write-watch hold): 1699641 -> 1699889 B gzip downloaded at load, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 1699641 B; executed chars unchanged at 25873",
+			"delta": 245,
+			"reason": "hold after save: 1699641 -> 1699886 B gzip downloaded at load, measured on PR #642 CI run 43285542404 (head c5a4ff385, linux-x64) against the main anchor 1699641 B. Breakdown: this PR's runtime, per file (local builds of main a989c3896 runtime/web source against head, same machine, gzip -9): write watch chunk 8338 -> 8523 B gzip (+185; 23497 -> 24047 raw), runtime graph chunk 61041 -> 61091 B gzip (+50; 203092 -> 203170 raw), two _markless/links files +1/-1; measured with the guard's own loadWeight: +227 B gzip on both docs pages, executed +1 char; the async.mdx text change adds +1 B here; the rest is within the run-to-run spread of which files load",
 			"date": "2026-11-12"
 		},
 		{
@@ -30,8 +30,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 852,
-			"reason": "hold after save (graph paint hook and write-watch hold): 2247820 -> 2248672 B gzip downloaded at load, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 2247820 B; executed chars unchanged at 25907; the gzip growth beyond the module growth is unattributed (the measurement lists files without sizes)",
+			"delta": 946,
+			"reason": "hold after save: 2247820 -> 2248766 B gzip downloaded at load, measured on PR #642 CI run 43285542404 (head c5a4ff385, linux-x64) against the main anchor 2247820 B. Breakdown: this PR's runtime, per file (local builds of main a989c3896 runtime/web source against head, same machine, gzip -9): write watch chunk 8338 -> 8523 B gzip (+185; 23497 -> 24047 raw), runtime graph chunk 61041 -> 61091 B gzip (+50; 203092 -> 203170 raw), two _markless/links files +1/-1; measured with the guard's own loadWeight: +227 B gzip on both docs pages, executed +1 char; plus the async.mdx text this PR adds (about +700 B gzip): the page loads the docs search chunk (chunk-BGFD9wsN), which statically imports the async page's compiled content (chunk-b7B1DcD-, 450352 -> 452065 raw and 41396 -> 42001 B gzip for the first-round text, +94 B more for the second), so the state page downloads the whole async page's text at load (a site bundling issue, reported separately); executed chars unchanged at 25907",
 			"date": "2026-11-12"
 		},
 		{
