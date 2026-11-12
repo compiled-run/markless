@@ -316,7 +316,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const prerenderWakeId = prerenderWakeVirtualModuleId(input.filename);
 	const settleId = settleVirtualModuleId(input.filename);
 	const { compiled: compiledForAllClasses, blockingDiagnostics } =
-		await compileWithBlockingDiagnostics(input, resolverId);
+		await compileWithBlockingDiagnostics(input);
 	const linkPendingDiagnostics = linkPendingRefusals(
 		input,
 		compiledForAllClasses,
@@ -1318,14 +1318,11 @@ async function prerenderDataModuleSource(
 export async function preflightTsrxModuleDiagnostics(
 	input: Pick<TransformTsrxModuleInput, 'filename' | 'source' | 'buildId'>,
 ): Promise<void> {
-	const resolverId = `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`;
-	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input, resolverId);
+	const { blockingDiagnostics } = await compileWithBlockingDiagnostics(input);
 	throwIfBlocked(input, blockingDiagnostics);
 }
 
-// The naming closures that decide what this bundler links. Naming a branch
-// export is what fulfils an escalation candidate, so the same call answers both
-// "what do we emit" and "which refusal still stands".
+// The naming closures that decide what this bundler links.
 function linkedSymbolInput(
 	compiled: CompileTsrxModuleResult,
 	input: Pick<
@@ -1348,26 +1345,6 @@ function linkedSymbolInput(
 		branchExportName: (index: number) =>
 			scopedSymbolExportName(input.moduleId ?? input.filename, `marklessLinkedBranchUpdate${index}`),
 	} satisfies Parameters<typeof linkedRenderDataBoundarySymbols>[0];
-}
-
-// The client link ships the escalation symbol, so it decides the refusal for
-// every environment: a server build must not refuse the shape its own client
-// build knows how to flip.
-function fulfilledEscalationSymbolIds(
-	compiled: CompileTsrxModuleResult,
-	input: Pick<
-		TransformTsrxModuleInput,
-		'filename' | 'moduleId' | 'importedModuleInterfaces' | 'artifactChildMaterializations'
-	>,
-	resolverId: string,
-): ReadonlySet<string> {
-	if ((compiled.symbolModules.armEscalationCandidates ?? []).length === 0) return new Set();
-	const renderDataId = `${MARKLESS_VIRTUAL_PREFIX}render-data:${encodeURIComponent(input.moduleId ?? input.filename)}`;
-	return new Set(
-		linkedRenderDataBoundarySymbols(
-			linkedSymbolInput(compiled, input, renderDataId, resolverId, true),
-		).flatMap((symbol) => (symbol.manifest.kind === 'branch-update' ? [symbol.row.id] : [])),
-	);
 }
 
 type CompiledTransformInput = Pick<
@@ -1411,19 +1388,12 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 	};
 }
 
-async function compileWithBlockingDiagnostics(input: CompiledTransformInput, resolverId: string) {
+async function compileWithBlockingDiagnostics(input: CompiledTransformInput) {
 	const compiled = await compileTsrxModule(transformCompileInput(input));
-	const fulfilled = fulfilledEscalationSymbolIds(compiled, input, resolverId);
 	return {
 		compiled,
 		blockingDiagnostics: moduleDiagnostics(compiled).filter(
-			(diagnostic) =>
-				diagnostic.severity === 'error' &&
-				!(
-					diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
-					typeof diagnostic.symbolId === 'string' &&
-					fulfilled.has(diagnostic.symbolId)
-				),
+			(diagnostic) => diagnostic.severity === 'error',
 		),
 	};
 }

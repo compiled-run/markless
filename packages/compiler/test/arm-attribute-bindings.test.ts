@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const noteSource = (onOpen: string, afterField: string) => `
 import { state } from '@markless/core';
@@ -139,8 +140,8 @@ export function Rows() @{
 	expect(branchModule(result) ?? '').toMatch(/"attribute": \{ "name": "title", "itemPath": \["label"\] \}/);
 });
 
-test('a repeated row holding an @if inside an @if still refuses, in author words', async () => {
-	const result = await compile(
+test('a repeated row holding an @if inside an @if runs in the browser, and refuses in author words where the page cannot re-render', async () => {
+	const rows = (unlinked: string) => compile(
 		'src/Rows.tsrx',
 		`
 import { state } from '@markless/core';
@@ -158,8 +159,14 @@ export function Rows() @{
 			</ul>
 		}
 	</div>
-}`,
+}${unlinked}`,
 	);
+	expect(
+		(await rows('')).symbolModules.diagnostics.some(
+			(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toBe(false);
+	const result = await rows(UNLINKED_RENDER);
 	const diagnostic = result.symbolModules.diagnostics.find(
 		(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);

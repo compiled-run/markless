@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const source = `
 import { computed, state } from '@markless/core';
@@ -21,7 +22,11 @@ function Ledger({ account }: { account: number }) @{
 `;
 
 test('the arm refusal suggests only restructures that build, never moving the @if into the child', async () => {
-	const result = await compileTsrxModule({ filename: 'src/accounts.tsrx', source, symbols: [] });
+	const result = await compileTsrxModule({
+		filename: 'src/accounts.tsrx',
+		source: source + UNLINKED_RENDER,
+		symbols: [],
+	});
 	const refusal = collectTsrxModuleDiagnostics(result).find(
 		(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);
@@ -30,4 +35,10 @@ test('the arm refusal suggests only restructures that build, never moving the @i
 	expect(suggestion).toContain('declare what it keeps in the component that owns the @if');
 	expect(suggestion).toContain('Moving the @if into the component does not help');
 	expect(JSON.stringify(collectTsrxModuleDiagnostics(result))).not.toContain('marklessProps');
+	const shipped = await compileTsrxModule({ filename: 'src/accounts.tsrx', source, symbols: [] });
+	expect(
+		collectTsrxModuleDiagnostics(shipped).some(
+			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toBe(false);
 });
