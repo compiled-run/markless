@@ -6,8 +6,8 @@
 				"runtimeModules",
 				"web/resume-return-reask"
 			],
-			"delta": 730,
-			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save); measured on PR #642 CI, linux-x64",
+			"delta": 1071,
+			"reason": "hold after save in the write watch (held paints per round, reload started early when the handler goes on past its save): 7620 -> 8691 B rendered, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 7620 B",
 			"date": "2026-11-12"
 		},
 		{
@@ -18,8 +18,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 197,
-			"reason": "graph paint hook and write-watch hold (no blink after a save); docs pages also ship the playground compiler's own runtime copy; measured on PR #642 CI, linux-x64",
+			"delta": 248,
+			"reason": "hold after save (graph paint hook and write-watch hold): 1699641 -> 1699889 B gzip downloaded at load, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 1699641 B; executed chars unchanged at 25873",
 			"date": "2026-11-12"
 		},
 		{
@@ -30,8 +30,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 515,
-			"reason": "graph paint hook and write-watch hold (no blink after a save); docs pages also ship the playground compiler's own runtime copy; measured on PR #642 CI, linux-x64",
+			"delta": 852,
+			"reason": "hold after save (graph paint hook and write-watch hold): 2247820 -> 2248672 B gzip downloaded at load, measured on PR #642 CI run 43276665369 (head 1ab2e956a, linux-x64) against the main anchor 2247820 B; executed chars unchanged at 25907; the gzip growth beyond the module growth is unattributed (the measurement lists files without sizes)",
 			"date": "2026-11-12"
 		},
 		{
