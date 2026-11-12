@@ -14,6 +14,7 @@ import oneSave from './one-save.tsrx?raw';
 import orders from './orders.tsrx?raw';
 import pause from './pause.ts?raw';
 import retry from './retry.ts?raw';
+import retryCounted from './retry-counted.ts?raw';
 import backoff from './backoff.tsrx?raw';
 import returning from './returning.ts?raw';
 import timeout from './timeout.tsrx?raw';
@@ -24,6 +25,7 @@ const shown: ReadonlyArray<readonly [name: string, language: string, source: str
 	['mugs.ts', 'ts', mugsHelpers, 1],
 	['backoff.tsrx', 'tsrx', backoff, 1],
 	['retry.ts', 'ts', retry, 1],
+	['retry-counted.ts', 'ts', retryCounted, 1],
 	['inbox.tsrx', 'tsrx', inbox, 1],
 	['returning.ts', 'ts', returning, 1],
 	['timeout.tsrx', 'tsrx', timeout, 1],

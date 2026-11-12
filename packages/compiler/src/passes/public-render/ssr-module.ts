@@ -1155,6 +1155,10 @@ function emitSsrDataLines(
 				),
 			),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
+			// A child inside an @try arm files its @if records with that arm, so a streamed arm carries them.
+			...(edge.asyncBoundaryId
+				? { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm }
+				: {}),
 		};
 		const declaredName = edgeDeclaredComponentName(edge);
 		const childSurface = declaredName

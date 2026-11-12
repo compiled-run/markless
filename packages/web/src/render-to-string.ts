@@ -90,6 +90,8 @@ export type SsrRenderOutput = {
 			readonly kind: 'branch' | 'async' | 'arm-branch';
 			readonly id: string;
 			readonly html: string;
+			/** How many page elements precede the anchor. */
+			readonly elementStart: number;
 		}>;
 	};
 };
@@ -319,7 +321,7 @@ export async function assembleSsrContainer(
 			: '';
 	const policyTable = createSyncPolicyTable();
 	const pageHtml = resumerScript
-		? withEventHostMarks(view, output.html, policyTable)
+		? withEventHostMarks(view, output.html, policyTable, output.structure?.anchors)
 		: output.html;
 	const storageSeedScript = renderStorageSeedScript(
 		artifactStorageSeeds(component),
@@ -425,7 +427,9 @@ export async function assemblePrerenderPageParts(
 	const container = renderContainer(
 		options.containerId,
 		[
-			resumerScript ? withEventHostMarks(view, output.html, policyTable) : output.html,
+			resumerScript
+				? withEventHostMarks(view, output.html, policyTable, output.structure?.anchors)
+				: output.html,
 			options.armEmission,
 			renderSyncPolicyTableScript(policyTable.policies),
 			resumerScript,
@@ -745,7 +749,10 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 				) || branchServedArmEventNames(branch).length > 0,
 		) ||
 		// Async boundary arm events also nest under armRecords (D3).
-		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0)
+		view.asyncBoundaries.some((boundary) => boundaryArmEventNames(boundary).length > 0) ||
+		boundaryArmBranches(view.asyncBoundaries).some(
+			(branch) => branchServedArmEventNames(branch).length > 0,
+		)
 	);
 }
 
@@ -801,6 +808,24 @@ function boundaryArmEventNames(
 			repeat.rowEvents.map((event) => event.eventName),
 		),
 	];
+}
+
+// A child's @if in a @try arm is filed under that arm; its painted arm is on the page as much as the arm's own events are.
+function boundaryArmBranches(
+	boundaries: ProtocolViewPayload['asyncBoundaries'],
+): NonNullable<ProtocolViewPayload['branches']> {
+	return boundaries.flatMap((boundary) => {
+		const armRecords = boundary.armRecords as
+			| ProtocolArmRecordSet
+			| ReadonlyArray<unknown>
+			| undefined;
+		return armRecords && !Array.isArray(armRecords)
+			? ((armRecords as ProtocolArmRecordSet).branches ?? []).filter(
+					(branch) =>
+						(branch as { readonly servedArmRecords?: unknown }).servedArmRecords,
+				)
+			: [];
+	}) as unknown as NonNullable<ProtocolViewPayload['branches']>;
 }
 
 // An escalating branch's served arm holds the events the page actually painted;
@@ -1001,6 +1026,7 @@ export function withEventHostMarks(
 	>,
 	html: string,
 	policyTable: ReturnType<typeof createSyncPolicyTable>,
+	anchors: NonNullable<SsrRenderOutput['structure']>['anchors'] = [],
 ): string {
 	const tree = servedElementTree(html);
 	const marks: EventHostMarks = new Map();
@@ -1050,6 +1076,29 @@ export function withEventHostMarks(
 			const index = arm.get(repeat.parentHostNodeId);
 			if (index !== undefined)
 				addRowPolicyMarks(marks, tree, offset + index, repeat, policyTable);
+		}
+	}
+	// Placed from where the render put the @if within its arm, counted from the arm's own anchor.
+	const placedAt = (kind: string, id: string) =>
+		anchors.find((candidate) => candidate.kind === kind && candidate.id === id)?.elementStart;
+	for (const boundary of view.asyncBoundaries) {
+		const armStart = placedAt('async', boundary.id);
+		const offset = tree.commentElementIndexes[boundary.startAnchor.index];
+		if (armStart === undefined || offset === undefined) continue;
+		for (const branch of boundaryArmBranches([boundary])) {
+			const branchStart = placedAt('branch', branch.id);
+			if (branchStart === undefined) continue;
+			const set = branch.servedArmRecords!;
+			const arm = indexes(set.locators);
+			for (const event of set.events) {
+				const policy = policyTable.entry(event.syncPolicy);
+				const index = arm.get(event.hostNodeId);
+				if (policy !== undefined && index !== undefined)
+					addEventHostEntry(marks, offset + branchStart - armStart + index, {
+						name: event.eventName,
+						policy,
+					});
+			}
 		}
 	}
 	for (const branch of view.branches ?? [])
@@ -1141,6 +1190,7 @@ function deferredEventNames(view: ProtocolViewPayload): ReadonlyArray<string> {
 				...branchServedArmEventNames(branch),
 			]),
 			...view.asyncBoundaries.flatMap(boundaryArmEventNames),
+			...boundaryArmBranches(view.asyncBoundaries).flatMap(branchServedArmEventNames),
 		]),
 	];
 }
@@ -1294,11 +1344,15 @@ function viewSyncPolicies(view: ProtocolViewPayload): ReadonlyArray<ProtocolSync
 				: [];
 		}),
 		// An @if arm's events cancel at once too, from its painted arm or its served records.
-		...(view.branches ?? []).flatMap((branch) => [
-			...(branch.armRecords ?? []).flatMap((arm) => arm.events),
-			...(branch.servedArmRecords?.events ?? []),
-			...(branch.servedArmRecords?.keyedRepeats ?? []).flatMap((repeat) => repeat.rowEvents),
-		]),
+		...[...(view.branches ?? []), ...boundaryArmBranches(view.asyncBoundaries)].flatMap(
+			(branch) => [
+				...(branch.armRecords ?? []).flatMap((arm) => arm.events),
+				...(branch.servedArmRecords?.events ?? []),
+				...(branch.servedArmRecords?.keyedRepeats ?? []).flatMap(
+					(repeat) => repeat.rowEvents,
+				),
+			],
+		),
 	].flatMap((event) => (event.syncPolicy ? [event.syncPolicy] : []));
 }
 

@@ -126,6 +126,7 @@ export function createArmCommitter(
 		readonly registerKeyedRepeats?: (
 			records: ReadonlyArray<ResumeKeyedRepeatRecord>,
 			moved?: (read: SlotRead) => boolean,
+			computed?: ArmCommitUpdate['computed'],
 		) => Promise<void>;
 		readonly asyncBoundaryWiring?: () => Promise<AsyncBoundaryWiring> | undefined;
 		readonly documentHost?: CommitDocument;
@@ -212,6 +213,16 @@ export async function registerArmRecordSet(
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
 		deps.addEventRecord(element, record);
 	}
+	// A branch's served arm is painted with this one: its records register now, so a press in this task finds its handler.
+	const served = materialized.branches.flatMap((branch) =>
+		branch.servedArmRecords && branch.startAnchor && 'nodeType' in branch.startAnchor
+			? [
+					registerArmRecordSet(deps, installEventType, branch as ResumeArmRange, {
+						armRecords: branch.servedArmRecords,
+					}),
+				]
+			: [],
+	);
 	for (const handle of materialized.elementHandles) {
 		const element = materialized.elementsByHostId.get(handle.hostNodeId);
 		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
@@ -233,7 +244,7 @@ export async function registerArmRecordSet(
 		await deps.registerComputedRefreshes(update.computed!);
 	}
 	if (materialized.keyedRepeats.length)
-		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved);
+		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved, update.computed);
 	if (deps.addBehaviors && materialized.behaviors.length) {
 		const byHost = new Map<string, ResumeBehaviorRecord[]>();
 		for (const behavior of materialized.behaviors) {
@@ -243,6 +254,7 @@ export async function registerArmRecordSet(
 		}
 		for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
 	}
+	await Promise.all(served);
 	if (materialized.branches.length)
 		await deps.registerArmBranches?.(boundary.id, materialized.branches);
 	if (update.armRecords.asyncBoundaries?.length)
@@ -264,9 +276,12 @@ function installArmEventTypes(
 	installEventType: (eventType: string) => void,
 ): void {
 	for (const event of records.events) installEventType(event.eventName);
-	for (const branch of records.branches ?? [])
+	for (const branch of records.branches ?? []) {
 		for (const arm of branch.armRecords ?? [])
 			for (const event of arm.events) installEventType(event.eventName);
+		if (branch.servedArmRecords)
+			installArmEventTypes(branch.servedArmRecords, installEventType);
+	}
 	for (const repeat of records.keyedRepeats ?? [])
 		for (const event of repeat.rowEvents) installEventType(event.eventName);
 }
