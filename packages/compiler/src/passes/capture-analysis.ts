@@ -22,7 +22,11 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../artifact-helpers/graph-paths.ts';
-import { protocolInstanceQualifies, valueAlongPaths } from '@markless/serializer';
+import {
+	PROTOCOL_PROPS_GRAPH_NODE_ID,
+	protocolInstanceQualifies,
+	valueAlongPaths,
+} from '@markless/serializer';
 import { componentEdgeInstancePath } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
 import { isEventAttribute } from '../ast/events.ts';
@@ -287,15 +291,29 @@ function importedCaptureSymbols(
 							)
 						: slot.propName && !republished
 							? keepConstantFields(
-									edgePaths.map((path) =>
-										propCaptureRoute(
+									edgePaths.map((path) => {
+										const ownRead = captureSlotReadInContext(slot)
+											? ownPropRead(captureSymbol.kind, slot)
+											: undefined;
+										const route = propCaptureRoute(
 											path,
 											slot.propName as string,
 											slot.path,
 											input,
 											absentPropIsUndefined(slot),
-										),
-									),
+											ownRead,
+										);
+										// The child's symbol reads this slot, so a value worked out from the row comes from the instance's own props too.
+										return ownRead &&
+											route.kind === 'unsupported-opaque' &&
+											route.rowValue === true
+											? ownInstancePropRoute(
+													edge.id,
+													path.map((step) => step.id),
+													ownRead,
+												)
+											: route;
+									}),
 									slot.fieldPaths ?? [slot.path],
 								)
 							: slot.routes.flatMap((route): CaptureSlotRoute[] =>
@@ -346,6 +364,44 @@ function importedCaptureSymbols(
 			},
 		];
 	});
+}
+
+/** Whether a symbol's emitted body reads this slot through its capture context rather than straight from the graph. */
+export function captureSlotReadInContext(slot: CaptureSlot): boolean {
+	return slot.routes.some(
+		(route) =>
+			route.componentEdgeId !== undefined ||
+			// A composing module supplies this slot's edge.
+			route.kind === 'widget-callback-route' ||
+			// This module already resolved the slot itself.
+			route.kind === 'callback-slot-route',
+	);
+}
+
+// A derive or runner the edge places in a row reads that row's item from its own instance's props, as a local symbol's does.
+function ownPropRead(
+	kind: PlannedSymbol['kind'],
+	slot: CaptureSlot,
+): RowItemDeriveRead | undefined {
+	return slot.propName && (kind === 'sync-computed-derive' || kind === 'async-computed-runner')
+		? { graphNodeId: PROTOCOL_PROPS_GRAPH_NODE_ID, path: [slot.propName, ...slot.path] }
+		: undefined;
+}
+
+// The read a derive makes of the props of the instance its edge path ends at.
+function ownInstancePropRoute(
+	componentEdgeId: string,
+	componentEdgePath: ReadonlyArray<string>,
+	read: RowItemDeriveRead,
+): CaptureSlotRoute {
+	return {
+		kind: 'graph-reference',
+		componentEdgeId,
+		componentEdgePath,
+		graphNodeId: read.graphNodeId,
+		path: read.path,
+		ownerEdgeCount: componentEdgePath.length,
+	};
 }
 
 // A republished claim's graph reads name the child module's nodes, which this module holds under the edge's instance.
@@ -1169,14 +1225,7 @@ function resolvePropCaptureRoute(
 
 	const rowItem = rowItemPath(prop.source, edge, input);
 	if (rowItem && deriveRead && edgeIndex === componentEdgePath.length - 1)
-		return {
-			kind: 'graph-reference',
-			componentEdgeId: terminalEdgeId,
-			componentEdgePath: edgePathIds,
-			graphNodeId: deriveRead.graphNodeId,
-			path: deriveRead.path,
-			ownerEdgeCount: componentEdgePath.length,
-		};
+		return ownInstancePropRoute(terminalEdgeId, edgePathIds, deriveRead);
 	const rows =
 		rowItem && edge.keyedRepeatScopeIds.length > 1
 			? nestedRowSteps(rowItem.itemName, edge, input)
@@ -1617,8 +1666,8 @@ function opaqueSlotDiagnostics(symbol: {
 					why: route.unroutableHandler
 						? route.unroutableHandler.why
 						: route.absentProp
-						? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
-						: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
+							? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
+							: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
 					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
 					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
@@ -1632,10 +1681,10 @@ function opaqueSlotDiagnostics(symbol: {
 							message: route.unroutableHandler
 								? route.unroutableHandler.rewrite
 								: route.absentProp
-								? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-								: isEventAttribute(propName)
-									? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
-									: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
+									? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
+									: isEventAttribute(propName)
+										? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
+										: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},
 					],
 					docsUrl: 'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
