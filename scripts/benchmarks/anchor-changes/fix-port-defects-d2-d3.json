@@ -111,6 +111,74 @@
 			"delta": 114,
 			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 393,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code (rendered bytes, CI linux run 43181569339)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 147,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code (rendered bytes, CI linux run 43181569339)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "the same commit-time code is preloaded at load: download gzip only, executed chars unchanged (CI linux run 43181569339)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "the same commit-time code is preloaded at load: download gzip only, executed chars unchanged (CI linux run 43181569339)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 110,
+			"reason": "the same commit-time code is preloaded at load: download gzip only, executed chars unchanged (CI linux run 43181569339)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 210,
+			"reason": "the same commit-time code is preloaded at load: download gzip only, executed chars unchanged (CI linux run 43181569339)",
+			"date": "2026-11-12"
 		}
 	]
 }
