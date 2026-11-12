@@ -214,14 +214,10 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 	  };
 
-export type SemanticComponentEdge = {
+export type SemanticComponentEdge = SemanticAsyncArmPlacement & {
 	readonly id: string;
 	readonly parentComponentName: string;
 	readonly childComponentName: string;
-	// Present when the component renders inside an @try arm: its graph-reference
-	// props are boundary reads (need 10 — the arm may touch the async computed
-	// only through child props).
-	readonly asyncBoundaryId?: string;
 	// The nearest `@try` with a `@catch` whose @try arm holds this component: its handlers' rejections render there.
 	readonly catchBoundaryId?: string;
 	readonly importSource?: string;
@@ -246,6 +242,12 @@ export type SemanticComponentEdge = {
 	readonly branchArms?: ReadonlyArray<SemanticBranchArm>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
 };
+
+// Present when the component renders inside an @try: its graph-reference props are boundary
+// reads, and the arm (0 = @try, 1 = @pending, 2 = @catch) is where its records are filed.
+export type SemanticAsyncArmPlacement =
+	| { readonly asyncBoundaryId: string; readonly asyncBoundaryArm: number }
+	| { readonly asyncBoundaryId?: undefined; readonly asyncBoundaryArm?: undefined };
 
 export type SemanticBranchArm = { readonly branchSiteId: string; readonly arm: number };
 
