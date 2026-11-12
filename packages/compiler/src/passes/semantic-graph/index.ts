@@ -96,6 +96,7 @@ import {
 	collectManagedAriaBusyDiagnostics,
 } from './async-refresh-facts.ts';
 import { collectSubmitHoldFacts } from './submit-hold-marks.ts';
+import { collectInPlaceForms } from './in-place-forms.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
 
 export async function buildSemanticGraph(
@@ -207,6 +208,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
+	collectInPlaceForms(graph, state.hostParents, state.postForms, () => state.nextEventId++);
 	keepRejectingChildCatches(graph, input.importedModuleInterfaces);
 	mintAsyncBoundaryGates(graph);
 	collectComputedDependencyCycleDiagnostics(graph);

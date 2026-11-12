@@ -176,6 +176,12 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
 	if (isHostElement && hostNodeId) collectAuthoredAriaMarks(node, tagName, hostNodeId, state);
+	if (tagName === 'form' && hostNodeId && state.currentCatchBoundaryId && formMayPost(node))
+		state.postForms.push({
+			hostNodeId,
+			catchBoundaryId: state.currentCatchBoundaryId,
+			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+		});
 	const moduleScopeClass = state.currentStyleScopeClass;
 	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
@@ -1685,6 +1691,22 @@ function collectAuthoredAriaMarks(
 				sourceSpan: sourceSpan(attribute, state.filename),
 			});
 	}
+}
+
+// A written method of "post", or one an expression decides at render; a spread may hide the method, so it is left to the browser.
+function formMayPost(node: AnyNode): boolean {
+	let posts = false;
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) return false;
+		if (getIdentifierName(attribute.name as AnyNode | undefined) !== 'method') continue;
+		const value = attribute.value as AnyNode | undefined;
+		const literal = value?.type === 'Literal' ? value : unwrapExpressionContainer(value);
+		posts =
+			literal?.type === 'Literal'
+				? typeof literal.value === 'string' && literal.value.toLowerCase() === 'post'
+				: literal !== undefined && literal !== null;
+	}
+	return posts;
 }
 
 // Only a control whose written attributes make it submit its enclosing form: a static submit type, no form= and no spread.

@@ -28,12 +28,14 @@ export function collectSubmitHoldFacts(
 		const hosts = new Set([formId, ...ancestors(formId)]);
 		return graph.events.filter((event) => event.eventName === 'submit' && hosts.has(event.hostNodeId));
 	};
-	for (const { hostNodeId, sourceSpan } of authored.ariaBusy)
-		if (
-			tags.get(hostNodeId) === 'form' &&
-			submitEvents(hostNodeId).some((event) => event.handlerReturnsPromise || event.handlerMayReject)
-		)
+	for (const { hostNodeId, sourceSpan } of authored.ariaBusy) {
+		if (tags.get(hostNodeId) !== 'form') continue;
+		const events = submitEvents(hostNodeId);
+		if (events.some((event) => event.handlerReturnsPromise || event.handlerMayReject))
 			graph.diagnostics.push(submitHoldAriaDiagnostic(sourceSpan));
+		else if (events.some((event) => event.inPlaceSubmit))
+			graph.diagnostics.push(submitHoldAriaDiagnostic(sourceSpan, true));
+	}
 	const leaveAlone = new Set<SemanticGraphArtifact['events'][number]>();
 	for (const { hostNodeId } of authored.submitAriaDisabled) {
 		const form = ancestors(hostNodeId).find((host) => tags.get(host) === 'form');
