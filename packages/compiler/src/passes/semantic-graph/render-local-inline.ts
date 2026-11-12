@@ -10,6 +10,7 @@ import {
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import type { SemanticGraphDependency } from '../../artifacts.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 import {
 	graphBindingMap,
@@ -569,9 +570,15 @@ export function liftArmRenderLocalValue(
 	const guard = armGuardCondition(state);
 	if (!guard) return null;
 	const definitions = [...guard.definitions, ...inlined.definitions];
-	const dependencies = [expression, ...guard.nodes, ...definitions].flatMap((node) =>
+	const shownDependencies = [expression, ...inlined.definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
+	const dependencies = [
+		...shownDependencies,
+		...[...guard.nodes, ...guard.definitions].flatMap((node) =>
+			collectGraphDependencies(node, state),
+		),
+	];
 	const asyncNodeIds = new Set(
 		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
 	);
@@ -591,9 +598,43 @@ export function liftArmRenderLocalValue(
 		undefined,
 		true,
 	);
-	if (lifted)
+	if (lifted) {
 		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		markArmGuardDependencies(
+			lifted.graphNodeId,
+			shownDependencies,
+			dependencies.slice(shownDependencies.length),
+			state,
+		);
+	}
 	return lifted;
+}
+
+// A read of the same cell at a path prefix reads this one too: `props` covers `props.subject`.
+const covers = (reader: SemanticGraphDependency, read: SemanticGraphDependency) =>
+	reader.graphNodeId === read.graphNodeId &&
+	reader.path.length <= read.path.length &&
+	reader.path.every((segment, index) => segment === read.path[index]);
+
+// Only a cell the arm test reads and the shown value does not is the guard's alone.
+function markArmGuardDependencies(
+	graphNodeId: string,
+	shown: ReadonlyArray<SemanticGraphDependency>,
+	guard: ReadonlyArray<SemanticGraphDependency>,
+	state: WalkState,
+): void {
+	const guardOnly = (dependency: SemanticGraphDependency) =>
+		guard.some((read) => covers(read, dependency) && covers(dependency, read)) &&
+		!shown.some((reader) => covers(reader, dependency));
+	const index = state.graph.graphBindings.findIndex((binding) => binding.id === graphNodeId);
+	const binding = state.graph.graphBindings[index];
+	if (!binding?.dependencies?.some(guardOnly)) return;
+	state.graph.graphBindings[index] = {
+		...binding,
+		dependencies: binding.dependencies.map((dependency) =>
+			guardOnly(dependency) ? { ...dependency, armGuard: true as const } : dependency,
+		),
+	};
 }
 
 // The enclosing arms' conditions with body locals inlined, so a lifted value is only computed where its arm renders.

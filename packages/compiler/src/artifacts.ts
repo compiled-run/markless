@@ -757,6 +757,8 @@ export type SemanticGraphDependency = {
 	readonly path: ReadonlyArray<string>;
 	/** Text only: the control showing it writes this state from its own handler. */
 	readonly writtenByControl?: true;
+	/** Read only by an enclosing @if or @switch test, so the arm's value is computed only where it shows. */
+	readonly armGuard?: true;
 };
 
 export type SemanticHostNode = {
@@ -1150,6 +1152,8 @@ export type SemanticTemplateRead = {
 	readonly readNames?: ReadonlyArray<string>;
 	// The expression as written, when `source` carries a body function spliced into its call.
 	readonly authoredSource?: string;
+	// The graph path a plain read names when written through `?.` or `!`: `data.name` for `data?.name`.
+	readonly pathSource?: string;
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
 	// The async values a row expression reads beside its row item, which its @try waits on.

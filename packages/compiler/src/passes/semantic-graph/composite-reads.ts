@@ -82,14 +82,42 @@ export function isCompositeTemplateExpression(
 	);
 }
 
-// `a?.b.c` is the plain graph read `a.b.c` (optionalMemberReadSource); only other chains need a computed.
+// `a?.b.c` is the plain graph read `a.b.c` (memberReadPath); only other chains need a computed.
 export function isDottedPath(node: AnyNode | undefined): boolean {
 	if (node?.type === 'Identifier') return true;
+	if (node?.type === 'TSNonNullExpression') return isDottedPath(node.expression as AnyNode);
 	return (
 		node?.type === 'MemberExpression' &&
 		node.computed !== true &&
 		isDottedPath(node.object as AnyNode | undefined)
 	);
+}
+
+/** The graph path `a.b.c` that `a?.b.c`, `a!.b.c` or `(a).b.c` reads: a graph read through a missing value is already undefined. */
+export function memberReadPath(node: AnyNode | undefined): string | null {
+	const segments: string[] = [];
+	let cursor = node;
+	while (cursor) {
+		if (
+			cursor.type === 'ChainExpression' ||
+			cursor.type === 'TSNonNullExpression' ||
+			cursor.type === 'ParenthesizedExpression'
+		) {
+			cursor = cursor.expression as AnyNode | undefined;
+			continue;
+		}
+		if (cursor.type === 'MemberExpression' && cursor.computed !== true) {
+			const property = cursor.property as AnyNode | undefined;
+			const name = property?.type === 'Identifier' ? getIdentifierName(property) : null;
+			if (!name) return null;
+			segments.unshift(name);
+			cursor = cursor.object as AnyNode | undefined;
+			continue;
+		}
+		const root = cursor.type === 'Identifier' ? getIdentifierName(cursor) : null;
+		return root ? [root, ...segments].join('.') : null;
+	}
+	return null;
 }
 
 // A call belongs to a read only when it is a method ON a read value, the way

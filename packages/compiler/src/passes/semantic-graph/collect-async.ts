@@ -11,6 +11,7 @@ import {
 	resolveGraphPath,
 	semanticAliasMap,
 	uniqueBy,
+	templateReadPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { placeAsyncArmText } from './collect-elements.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
@@ -244,7 +245,7 @@ export function collectAsyncBoundaryDiagnostics(graph: MutableSemanticGraphArtif
 	for (const read of graph.templateReads) {
 		if (read.asyncBoundaryId) continue;
 
-		const resolved = resolveGraphPath(read.source, bindings, aliases);
+		const resolved = resolveGraphPath(templateReadPath(read), bindings, aliases);
 		if (!resolved) continue;
 		if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
 			continue;

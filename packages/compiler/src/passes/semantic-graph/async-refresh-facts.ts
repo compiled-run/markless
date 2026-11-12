@@ -7,7 +7,7 @@ import type {
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
+	templateReadPath,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
@@ -103,8 +103,8 @@ export function collectAsyncInputBesideValueDiagnostics(
 	graph: RefreshGraph &
 		Pick<SemanticGraphArtifact, 'filename'> & { diagnostics: SemanticGraphDiagnostic[] },
 ): void {
-	const { inputsOf, readAsyncValues, readNodes, hostsById, bindingsById, reach } =
-		refreshContext(graph);
+	const { readAsyncValues, readNodes, hostsById, bindingsById } = refreshContext(graph);
+	const { shownInputs, fetchInputs } = inputEdges(graph, bindingsById);
 	for (const boundary of graph.asyncBoundaries) {
 		const reads = boundaryReads(graph, boundary.id, readNodes, readAsyncValues);
 		const values = [...new Set(reads.flatMap((read) => read.asyncValues))];
@@ -112,21 +112,84 @@ export function collectAsyncInputBesideValueDiagnostics(
 		for (const { read, hostNodeId, asyncValues } of reads) {
 			if (!read || read.target.kind !== 'text' || asyncValues.length > 0) continue;
 			if (CONTROL_TAGS.has(hostsById.get(hostNodeId)?.tagName ?? '')) continue;
-			const shown = reach(readNodes(read)).plain;
-			const value = values.find((id) => [...inputsOf(id)].some((input) => shown.has(input)));
+			const shown = shownInputs(read);
+			const value = values.find((id) => [...fetchInputs(id).keys()].some((key) => shown.has(key)));
 			if (!value) continue;
-			const input = [...inputsOf(value)].find((id) => shown.has(id))!;
-			if (hostWrites(graph, hostNodeId).has(input)) continue;
+			const input = [...fetchInputs(value).values()].find((edge) => shown.has(edge.key))!;
+			if (hostWrites(graph, hostNodeId).has(input.graphNodeId)) continue;
 			graph.diagnostics.push(
 				asyncInputBesideValueDiagnostic({
 					read: read.authoredSource ?? read.source,
-					input: bindingsById.get(input)?.name ?? input,
+					input: input.name,
 					value: bindingsById.get(value)?.name ?? value,
 					span: read.sourceSpan,
 				}),
 			);
 		}
 	}
+}
+
+type InputEdge = { readonly key: string; readonly graphNodeId: string; readonly name: string };
+
+// Inputs keyed per prop, not per props object: `{a}` beside a value fetched with `b` reads no input of it.
+function inputEdges(
+	graph: RefreshGraph,
+	bindingsById: ReadonlyMap<string, SemanticGraphBinding>,
+) {
+	const edgeOf = (graphNodeId: string, path: ReadonlyArray<string>): InputEdge | null => {
+		const binding = bindingsById.get(graphNodeId);
+		if (binding?.kind !== 'state' && binding?.kind !== 'prop') return null;
+		const prop = graphNodeId === 'prop:props' ? path[0] : undefined;
+		if (graphNodeId === 'prop:props' && prop === undefined) return null;
+		return prop === undefined
+			? { key: graphNodeId, graphNodeId, name: binding.name }
+			: { key: `${graphNodeId}.${prop}`, graphNodeId, name: prop };
+	};
+	const collect = (
+		graphNodeId: string,
+		into: Map<string, InputEdge>,
+		seen: Set<string>,
+		throughAsync: boolean,
+	): void => {
+		if (seen.has(graphNodeId)) return;
+		seen.add(graphNodeId);
+		const binding = bindingsById.get(graphNodeId);
+		if (binding?.kind !== 'computed') return;
+		for (const dependency of binding.dependencies ?? []) {
+			if (dependency.armGuard) continue;
+			const edge = edgeOf(dependency.graphNodeId, dependency.path);
+			if (edge) into.set(edge.key, edge);
+			const upstream = bindingsById.get(dependency.graphNodeId);
+			if (upstream?.kind === 'computed' && (throughAsync || upstream.async !== true))
+				collect(dependency.graphNodeId, into, seen, throughAsync);
+		}
+	};
+	const fetched = new Map<string, ReadonlyMap<string, InputEdge>>();
+	const fetchInputs = (graphNodeId: string): ReadonlyMap<string, InputEdge> => {
+		let inputs = fetched.get(graphNodeId);
+		if (!inputs) {
+			const into = new Map<string, InputEdge>();
+			collect(graphNodeId, into, new Set(), true);
+			fetched.set(graphNodeId, (inputs = into));
+		}
+		return inputs;
+	};
+	const shownInputs = (read: SemanticTemplateRead): ReadonlySet<string> => {
+		const into = new Map<string, InputEdge>();
+		if (read.computedGraphNodeId) collect(read.computedGraphNodeId, into, new Set(), false);
+		else {
+			const resolved = resolveGraphPath(
+				templateReadPath(read),
+				graphBindingMap(graph, null, read.componentName),
+				semanticAliasMap(graph as SemanticGraphArtifact, null, read.componentName),
+			);
+			const edge = resolved ? edgeOf(resolved.binding.id, resolved.path) : null;
+			if (edge) into.set(edge.key, edge);
+			else if (resolved) collect(resolved.binding.id, into, new Set(), false);
+		}
+		return new Set(into.keys());
+	};
+	return { shownInputs, fetchInputs };
 }
 
 /**
@@ -210,7 +273,7 @@ function refreshContext(graph: RefreshGraph) {
 		if (read.computedGraphNodeId) return [read.computedGraphNodeId];
 		const gates = (read.asyncGateReads ?? []).map((gate) => gate.graphNodeId);
 		const resolved = resolveGraphPath(
-			optionalMemberReadSource(read.source),
+			templateReadPath(read),
 			graphBindingMap(graph, null, read.componentName),
 			semanticAliasMap(graph as SemanticGraphArtifact, null, read.componentName),
 		);

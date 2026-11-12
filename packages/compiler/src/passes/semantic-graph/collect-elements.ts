@@ -30,6 +30,7 @@ import {
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
+	templateReadPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { collectAttachStartDiagnostic, isProjectedChildren } from './attach-start.ts';
 import { collectComponentEdge, receivedHandlerRelay } from './collect-components.ts';
@@ -47,6 +48,7 @@ import {
 	type CompositeReadOptions,
 	isCompositeTemplateExpression,
 	isDottedPath,
+	memberReadPath,
 	joinReadSources,
 	liftArmModuleValue,
 	mintTemplateExpressionComputed,
@@ -324,11 +326,11 @@ function templateReadSource(
 	composite: { readonly graphNodeId: string; readonly splicedSource?: string } | null,
 	expression: AnyNode,
 	state: WalkState,
-): { readonly source: string; readonly authoredSource?: string } {
+): { readonly source: string; readonly authoredSource?: string; readonly pathSource?: string } {
 	const authored = expressionSource(expression, state.source);
-	return composite?.splicedSource
-		? { source: composite.splicedSource, authoredSource: authored }
-		: { source: authored };
+	if (composite?.splicedSource) return { source: composite.splicedSource, authoredSource: authored };
+	const path = composite ? null : memberReadPath(expression);
+	return path && path !== authored ? { source: authored, pathSource: path } : { source: authored };
 }
 
 // The first interpolation carries the joined text's computed; the rest carry null and ship nothing.
@@ -916,7 +918,7 @@ export function collectElementHandleDiagnostics(
 	);
 	for (const read of graph.templateReads) {
 		const readScope = scopeOf(read.componentName);
-		const resolved = resolveGraphPath(read.source, readScope.bindings, readScope.aliases);
+		const resolved = resolveGraphPath(templateReadPath(read), readScope.bindings, readScope.aliases);
 		if (!resolved || resolved.binding.kind !== 'element') continue;
 		const handleName = resolved.binding.name;
 		if (resolved.path.length > 0) {

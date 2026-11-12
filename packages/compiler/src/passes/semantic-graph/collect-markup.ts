@@ -24,7 +24,6 @@ import {
 } from '../../ast/tsrx.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
@@ -57,6 +56,7 @@ import { propsRestSignature } from './spread-event-guard.ts';
 import type { MutableSemanticGraphArtifact } from './types.ts';
 import { rawElementText } from '../../ast/raw-text.ts';
 import { aliasedItemPath, repeatItemBinding, type RepeatItemAlias } from './repeat-item-binding.ts';
+import { memberReadPath } from './composite-reads.ts';
 
 // HTML void elements: a closing tag for one is parsed as a second element (`</br>` is another `<br>`).
 export const VOID_TAG_NAMES: ReadonlySet<string> = new Set([
@@ -1130,6 +1130,7 @@ function expressionResidue(
 		componentName,
 		attributeName === 'style' &&
 			(expression.type === 'ObjectExpression' || expression.type === 'Identifier'),
+		memberReadPath(expression) ?? source,
 	);
 	if (residue.kind !== 'authored-expression' || residue.source !== source) return residue;
 	// No computed stands behind it, so the render writes the object's CSS text itself.
@@ -1147,6 +1148,7 @@ function sourceResidue(
 	repeat: RowNames | { readonly id: string; readonly itemName: string } | null,
 	componentName: string,
 	loweredStyle = false,
+	memberPath = source,
 ): SemanticMarkupResidue {
 	if (repeat && (source === repeat.itemName || source.startsWith(`${repeat.itemName}.`))) {
 		const path =
@@ -1158,7 +1160,6 @@ function sourceResidue(
 	const aliased = repeat && 'aliases' in repeat ? aliasedItemPath(repeat.aliases, source) : null;
 	if (repeat && aliased && aliased.every((part) => /^[\w$]+$/.test(part)))
 		return { kind: 'repeat-item', repeatId: repeat.id, path: aliased };
-	const memberPath = optionalMemberReadSource(source);
 	const resolved = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(memberPath)
 		? // Component scope only: a factory local and a component's shared-instance
 			// local routinely share a name, and the instance is what markup names.

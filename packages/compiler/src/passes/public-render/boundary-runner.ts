@@ -3,6 +3,7 @@ import {
 	graphBindingMap,
 	resolveGraphPath,
 	runtimeGraphReadPath,
+	templateReadPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 
@@ -167,6 +168,7 @@ function collectBoundaryGateReads(
 	);
 	type GateRead = {
 		readonly source: string;
+		readonly pathSource?: string;
 		readonly asyncBoundaryId?: string | undefined;
 		readonly computedGraphNodeId?: string | undefined;
 		// The edge already names the node, so a same-named local elsewhere in the module cannot shadow it.
@@ -177,7 +179,7 @@ function collectBoundaryGateReads(
 		...semanticGraph.templateReads.flatMap((read): ReadonlyArray<GateRead> =>
 			read.asyncGateReads &&
 			!resolveGraphPath(
-				read.source,
+				templateReadPath(read),
 				scoped(boundaryComponent.get(read.asyncBoundaryId ?? '')).bindings,
 				scoped(boundaryComponent.get(read.asyncBoundaryId ?? '')).aliases,
 			)
@@ -229,7 +231,7 @@ function collectBoundaryGateReads(
 					? { binding: composite, path: [] }
 					: named
 						? { binding: named, path: read.path ?? [] }
-						: resolveGraphPath(read.source, bindings, aliases);
+						: resolveGraphPath(templateReadPath(read), bindings, aliases);
 				if (!resolved) {
 					unresolvedSources.push(read.source);
 					continue;
