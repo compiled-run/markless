@@ -454,9 +454,7 @@ function capabilityModuleIds(
 	];
 }
 
-// Records served inside arms and rows ride outside the flat payload streams. Every one the compiler
-// plans is enumerated here; an arm it does not plan (an escalating branch, a component-rooted row)
-// leaves the answer undefined, so consumers keep treating those records as unlisted.
+// Component rows and arms that run a component render records this view declares; an imported child's are in its own map.
 function nestedRecordDemand(
 	view: ProtocolViewPayload,
 	symbolDemand: ReadonlyMap<string, ReadonlyArray<string>>,
@@ -472,13 +470,13 @@ function nestedRecordDemand(
 		behaviors: [] as object[],
 		elementHandles: [] as object[],
 		keyedRepeats: [] as Repeat[],
-		branches: [] as ProtocolArmBranchRecord[],
-		asyncBoundaries: [],
+		branches: [] as object[],
+		asyncBoundaries: [] as object[],
 	};
-	let enumerable = true;
+	let rendersComponents = false;
 	const hostNodeId = 'nested';
 	const visitRepeat = (repeat: Repeat) => {
-		if (repeat.rowComponent) enumerable = false;
+		if (repeat.rowComponent) rendersComponents = true;
 		for (const event of repeat.rowEvents) nested.events.push({ ...event, hostNodeId });
 		for (const handle of repeat.rowElementHandles ?? [])
 			nested.elementHandles.push({ ...handle, hostNodeId });
@@ -499,13 +497,21 @@ function nestedRecordDemand(
 	};
 	for (const repeat of view.keyedRepeats ?? []) visitRepeat(repeat);
 	for (const branch of view.branches ?? []) {
-		if (branch.escalates) enumerable = false;
+		if (branch.escalates) rendersComponents = true;
 		for (const arm of branch.armRecords ?? []) visitArm(arm);
 		if (branch.servedArmRecords) visitArm(branch.servedArmRecords);
 	}
 	for (const boundary of view.asyncBoundaries ?? [])
 		for (const arm of [boundary.armRecords ?? []].flat()) visitArm(arm);
-	if (!enumerable) return {};
+	if (rendersComponents) {
+		for (const event of view.events ?? []) nested.events.push({ ...event, hostNodeId });
+		nested.domUpdates.push(...(view.domUpdates ?? []));
+		nested.behaviors.push(...(view.behaviors ?? []));
+		nested.elementHandles.push(...(view.elementHandles ?? []));
+		nested.keyedRepeats.push(...(view.keyedRepeats ?? []));
+		nested.branches.push(...(view.branches ?? []));
+		nested.asyncBoundaries.push(...(view.asyncBoundaries ?? []));
+	}
 	const records = payloadDemandRecords(
 		nested as unknown as ProtocolViewPayload,
 		symbolDemand,
