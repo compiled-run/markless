@@ -261,6 +261,8 @@ export type ResumeArmBranchRecord = {
 		| { readonly strategy: 'arm-branch-comment' | 'dom-order-comment'; readonly index: number }
 		| ResumeDomComment;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
+	// An escalated branch's painted arm, as a record set of its own.
+	readonly servedArmRecords?: ResumeArmRecordSet;
 	// Present once the record is bound to its live boundary at registration.
 	readonly armBoundaryId?: string;
 	readonly composedInstancePath?: ResumeBranchRecord['composedInstancePath'];

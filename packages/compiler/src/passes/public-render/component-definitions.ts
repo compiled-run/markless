@@ -96,7 +96,9 @@ export function collectPublicRenderComponentDefinitions(
 				id: edge.id,
 				childComponentName: edge.childComponentName,
 				...(edge.importSource ? { importSource: edge.importSource } : {}),
-				...(edge.asyncBoundaryId ? { asyncBoundaryId: edge.asyncBoundaryId } : {}),
+				...(edge.asyncBoundaryId
+					? { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm }
+					: {}),
 				hostPrefix: componentEdgeHostSegment(edge, input.semanticGraph.componentEdges),
 				symbolPrefix: componentEdgeInstanceSegment(
 					edge,

@@ -25,6 +25,7 @@ import {
 	marklessSsrRemapGraphOutput,
 	marklessSsrSpreadProps,
 	type MarklessSsrComposedChild,
+	type SsrAsyncArmPlacement,
 } from '../fns/ssr.ts';
 import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
@@ -101,12 +102,11 @@ export type PrerenderDataDefinition = {
 	readonly initializers?: Readonly<Record<string, unknown>>;
 	readonly branches?: PrerenderRenderData['branches'];
 	readonly boundaries?: PrerenderRenderData['boundaries'];
-	readonly edges?: ReadonlyArray<{
+	readonly edges?: ReadonlyArray<SsrAsyncArmPlacement & {
 		readonly id: string;
 		readonly childComponentName: string;
 		// Set when the edge crosses a module boundary: its key in `surface.imports`.
 		readonly importSource?: string;
-		readonly asyncBoundaryId?: string;
 		readonly hostPrefix: string;
 		readonly symbolPrefix: string;
 		readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -982,6 +982,7 @@ type PrerenderBoundModule = {
 
 export type PrerenderBoundComposer = {
 	readonly symbolPrefix: string;
+	// Reads as a compiled symbol does: an async computed's node is its snapshot.
 	readonly read: PrerenderRead;
 	readonly module?: PrerenderBoundModule;
 	// The edge that placed this composer, so a symbol its child bound rebinds once per enclosing instance.
@@ -1127,7 +1128,7 @@ export function evaluatePrerenderDataComponent(input: {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, read);
+	ownModule.instanceReads.set(input.symbolPrefix, symbolRead);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -1200,7 +1201,7 @@ export function evaluatePrerenderDataComponent(input: {
 								? scope.module && marklessPlacedInstanceRead(scope.module, placed)
 								: scope.read;
 						if (holder) return holder(local, path);
-						const own = read(graphNodeId, path);
+						const own = symbolRead(graphNodeId, path);
 						return own === undefined && scope.symbolPrefix.endsWith(at)
 							? scope.read(local, path)
 							: own;
@@ -1504,7 +1505,7 @@ export function evaluatePrerenderDataComponent(input: {
 									hostPrefix,
 									symbolPrefix,
 									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
-									asyncBoundaryId: edge.asyncBoundaryId,
+									...asyncArmPlacement(edge),
 									boundSymbols: edge.boundSymbols ?? {},
 									callbackProps: {},
 								});
@@ -1590,7 +1591,7 @@ export function evaluatePrerenderDataComponent(input: {
 									boundSymbols: edge.boundSymbols,
 									composer: {
 										symbolPrefix: input.symbolPrefix,
-										read,
+										read: symbolRead,
 										module: ownModule,
 										bound: input.composer &&
 											input.boundSymbols && {
@@ -1642,7 +1643,7 @@ export function evaluatePrerenderDataComponent(input: {
 										hostPrefix,
 										symbolPrefix,
 										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
-										asyncBoundaryId: edge.asyncBoundaryId,
+										...asyncArmPlacement(edge),
 										boundSymbols: edge.boundSymbols ?? {},
 										callbackProps: callbacks,
 										// Where this child's own composition puts the children written into it,
@@ -1826,4 +1827,10 @@ function placeMaterializedChild<
 				: { ...token, anchorId: idPrefix + token.anchorId },
 		),
 	};
+}
+
+function asyncArmPlacement(edge: SsrAsyncArmPlacement): SsrAsyncArmPlacement {
+	return edge.asyncBoundaryId === undefined
+		? {}
+		: { asyncBoundaryId: edge.asyncBoundaryId, asyncBoundaryArm: edge.asyncBoundaryArm };
 }

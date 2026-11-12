@@ -1185,6 +1185,9 @@ function resolvePropCaptureRoute(
 			graphNodeId: scoped?.binding.id ?? prop.graphNodeId,
 			path: [...(scoped?.path ?? prop.path), ...forwardedPath, ...readPath],
 			...(edgeIndex < componentEdgePath.length - 1 ? { ownerEdgeCount: edgeIndex } : {}),
+			...(scoped?.binding.kind === 'computed' && scoped.binding.async === true
+				? { asyncValue: true as const }
+				: {}),
 		};
 	}
 	if (prop.kind === 'serializable') {

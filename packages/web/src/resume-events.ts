@@ -609,7 +609,6 @@ export function createEventWiring(input: {
 			throw unmatchedDispatchError(event, selector);
 		}
 		if (!options.syncPolicyAlreadyApplied && runPolicy) {
-			marklessControlEditsRead(event);
 			applyPolicies(path, event);
 			options.syncPolicyAlreadyApplied = true;
 		}
@@ -930,7 +929,10 @@ export function createEventWiring(input: {
 	const applyPolicies = (path: ReturnType<typeof collectDispatchPath>, event: ResumeDomEvent) => {
 		for (const matched of path) {
 			const policy = ('rowMatch' in matched ? matched.rowMatch.rowEvent : matched.eventRecord).syncPolicy;
-			if (policy) runPolicy?.(policy, input.graph, event);
+			if (!policy) continue;
+			// Only a policy that runs reads the edit; an input event with none keeps its text held until its handler does.
+			marklessControlEditsRead(event);
+			runPolicy?.(policy, input.graph, event);
 		}
 	};
 	const applySyncPolicy = (event: ResumeDomEvent): void => {
