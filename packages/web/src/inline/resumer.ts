@@ -501,14 +501,15 @@ function runPrerenderSettleBoot(
 		// waits for the fill. Dispatching it first would boot a runtime whose
 		// records still describe @pending — and whichever trigger group
 		// covered the gesture would leave the boundary unowned.
-		const done = ready.then(() => resume({ root, event, element: event.target, eventRecord: null }));
 		const handling = (root.__mH ||= new Map());
 		let settle!: () => void;
 		handling.set(event, [
-			new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
+			new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
 			settle,
 		]);
-		return done;
+		return ready
+			.then(() => resume({ root, event, element: event.target, eventRecord: null }))
+			.finally(settle);
 	};
 	eventNames.map(
 		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
@@ -808,23 +809,24 @@ function runPrerenderInlineResumer(
 		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
-		const done = (loaded ||= loadModule(resumeModuleUrl)).then(
-			(module) =>
-				root.__mL === life &&
-				module.resumeContainerEvent({
-					root,
-					event,
-					element: event.target,
-					eventRecord: null,
-				}),
-		);
 		const handling = (root.__mH ||= new Map());
 		let settle!: () => void;
 		handling.set(event, [
-			new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
+			new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
 			settle,
 		]);
-		return done;
+		return (loaded ||= loadModule(resumeModuleUrl))
+			.then(
+				(module) =>
+					root.__mL === life &&
+					module.resumeContainerEvent({
+						root,
+						event,
+						element: event.target,
+						eventRecord: null,
+					}),
+			)
+			.finally(settle);
 	};
 	eventNames.map(
 		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
@@ -1008,20 +1010,22 @@ function runInlineResumer(
 	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
 		root.__marklessDelegatedDispatch = true;
 		pin();
-		// A failed import is not kept: the next forward or wake imports again.
-		const done = (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
-			throw ((root.__mResume = undefined), error);
-		})).then((module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }));
 		const event = !input.logOnly && input.event;
+		let settle: (() => void) | undefined;
 		if (event) {
 			const handling = (root.__mH ||= new Map());
-			let settle!: () => void;
 			handling.set(event, [
-				new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
-				settle,
+				new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
+				settle!,
 			]);
 		}
-		return done;
+		// A failed import is not kept: the next forward or wake imports again.
+		// Settled on the returned chain, so a failed forward still surfaces as this listener's rejection.
+		return (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		}))
+			.then((module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }))
+			.finally(settle);
 	};
 	// The entry for this event name on one element: [ref, policy], either possibly undefined.
 	const entryOf = (element: Element, eventName: string) => {
