@@ -90,17 +90,45 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	 * written (`writing`); it ends with the last of them. While a save is written, a run that lands is kept in `landed`, published if
 	 * the hold ends with nothing newer running. A failed save's hold outlives a run in flight to tag that run's landing.
 	 */
-	entryHold?: {
-		readonly version: number;
-		readonly previous: RuntimeGraphAsyncSnapshot;
-		holders: number;
-		writing: number;
-		landed?: (failed: boolean) => boolean;
-		failed?: true;
-	};
+	entryHold?: EntryHold;
 	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
 	quiet?: boolean;
 };
+
+// An entry hold marks its value while it has holders; with none left and a run in flight, that run's landing ends it.
+export const HOLD_MARKING = 0;
+export const HOLD_ENDING = 1;
+export type HoldPhase = typeof HOLD_MARKING | typeof HOLD_ENDING;
+// How the saves that held a value ended; a later one only raises it: answered, one failed, or the page went elsewhere.
+export const SAVES_ANSWERED = 0;
+export const SAVES_FAILED = 1;
+export const SAVES_LEFT = 2;
+export type SavesOutcome = typeof SAVES_ANSWERED | typeof SAVES_FAILED | typeof SAVES_LEFT;
+
+/**
+ * Marks a value busy ahead of what will refresh it: handlers that write one of its key inputs (`holders`) and saves still being
+ * written (`writing`). While a save is written, a run that lands is kept in `landed`, published if the hold ends with nothing
+ * newer running. `outcome` is what the publish that ends the mark says.
+ */
+export type EntryHold = {
+	phase: HoldPhase;
+	readonly version: number;
+	readonly previous: RuntimeGraphAsyncSnapshot;
+	holders: number;
+	writing: number;
+	outcome: SavesOutcome;
+	landed?: (outcome: SavesOutcome) => boolean;
+};
+
+/** Throws when a hold could not move from `from` to `to`: a hold ends only from ending, and a new holder brings it back. */
+export function assertHoldMove(from: HoldPhase, to: HoldPhase): void {
+	if (from === to) throw new Error(`Markless entry hold: no move from ${from} to ${to}`);
+}
+
+export function moveHold(hold: EntryHold, to: HoldPhase): void {
+	if (import.meta.env?.DEV) assertHoldMove(hold.phase, to);
+	hold.phase = to;
+}
 
 /** What started a run: a graph write, or a page shown again re-asking a settled value; neither for a plain read. */
 export type RunCause = 'write' | 'revalidate';
@@ -133,7 +161,7 @@ export type AsyncRefresh = {
 	readonly advance: (node: RuntimeAsyncComputedNode, cause?: RunCause) => void;
 	readonly start: AsyncPlaneContext['start'];
 	readonly markEntry: (node: RuntimeAsyncComputedNode, save?: boolean) => void;
-	readonly endEntry: (node: RuntimeAsyncComputedNode, save?: 'saved' | 'failed') => void;
+	readonly endEntry: (node: RuntimeAsyncComputedNode, save?: 'saved' | 'failed' | 'left') => void;
 	readonly fail: (node: RuntimeAsyncComputedNode, error: unknown) => void;
 };
 

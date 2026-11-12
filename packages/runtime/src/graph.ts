@@ -84,9 +84,10 @@ export type AsyncComputedPlane = {
 	readonly markEntry: (graphNodeId: string, save?: boolean) => void;
 	/**
 	 * Ends one `markEntry` hold; the mark ends with the last holder. `save` ends a save's hold, which no write stands behind,
-	 * so it ends without waiting for a pending flush; `'failed'` makes the publish that ends the mark announce a failure.
+	 * so it ends without waiting for a pending flush; `'failed'` makes the publish that ends the mark announce a failure, and
+	 * `'left'` (the page went elsewhere) makes it end silently.
 	 */
-	readonly endEntry: (graphNodeId: string, save?: 'saved' | 'failed') => void;
+	readonly endEntry: (graphNodeId: string, save?: 'saved' | 'failed' | 'left') => void;
 	/** Installs matched values, from `@markless/runtime/graph-held`. */
 	readonly holdInputs: (factory: HeldInputsPlaneFactory) => void;
 	readonly shownRead: (
@@ -156,6 +157,8 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly quiet?: boolean;
 			/** Published when a save that held this value failed: the busy marks clearing announce a failure. */
 			readonly writeFailed?: true;
+			/** Published when a save that held this value sent the page elsewhere: the busy marks clear without a word. */
+			readonly pageLeft?: true;
 	  }
 	| {
 			readonly status: 'rejected';
@@ -167,6 +170,7 @@ export type RuntimeGraphAsyncSnapshot =
 			readonly valueKey?: unknown;
 			readonly quiet?: boolean;
 			readonly writeFailed?: true;
+			readonly pageLeft?: true;
 	  };
 
 export type RuntimeGraphAsyncComputed = {

@@ -65,7 +65,7 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 			server.failReads--;
 			return json('Loading failed', 500);
 		}
-		return json({ items, run: count });
+		return json({ items, run: count, query: url.search });
 	}
 	server.posts.push(`${method} ${url.pathname} ${String(body ?? '')}`);
 	server.sent?.();
@@ -94,11 +94,11 @@ export function installServer() {
 	globalThis.fetch = stub as typeof fetch;
 }
 
-export async function loadItems(path = '/mut/items'): Promise<{ items: string[]; run: number }> {
-	if (typeof window === 'undefined') return { items: [...server.items], run: 0 };
+export async function loadItems(path = '/mut/items'): Promise<{ items: string[]; run: number; query?: string }> {
+	if (typeof window === 'undefined') return { items: [...server.items], run: 0, query: path.includes('?') ? path.slice(path.indexOf('?')) : '' };
 	const response = await fetch(path);
 	if (!response.ok) throw new Error(await response.text());
-	return (await response.json()) as { items: string[]; run: number };
+	return (await response.json()) as { items: string[]; run: number; query?: string };
 }
 
 export async function addItem(name: string): Promise<void> {

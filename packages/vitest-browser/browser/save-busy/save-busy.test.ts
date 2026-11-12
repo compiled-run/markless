@@ -5,7 +5,9 @@ import { deferred, poll, shows, text } from '../back-revalidate/support.ts';
 import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
 import { WriterRows } from '../mutations-refresh/writer-row.tsrx';
 import { ChainSaves } from './chain-saves.tsrx';
+import { end as endWrite } from '../../../web/src/resume-return-reask.ts';
 import { Saves } from './saves.tsrx';
+import { SearchSaves } from './search-saves.tsrx';
 import { SoloSave } from './solo-save.tsrx';
 
 // A save sent from a handler marks what will load again, and the control that sent it, until that reload settles.
@@ -174,19 +176,26 @@ for (const [mode, mount, readsBefore] of modes) {
 		await savesAndRefreshes(container, '[data-child-save]', readsBefore, 'Ada, Linus');
 	});
 
-	test(`${mode}: a handler that awaits something else first is marked from its save, not before`, async () => {
+	test(`${mode}: a save sent after an await marks the content from the send and no control, since its sender cannot be named`, async () => {
 		const container = await mounted(await mount());
 		const names = at(container, '[data-names]');
 		const control = at(container, '[data-check-save]');
+		const history = [track(names), track(control)];
 		const checked = deferred<void>();
+		const answered = deferred<void>();
 		server.handlerWait = checked.promise;
+		server.nextPost = [{ wait: answered.promise }];
 		control.click();
 		await expect.poll(() => server.handlersStarted, poll).toBe(1);
 		await nextFrame();
 		expect([marked(names), marked(control)]).toEqual([false, false]);
-		await savesAndRefreshes(container, '[data-check-save]', readsBefore, 'Ada, Grace', () =>
-			checked.resolve(),
-		);
+		checked.resolve();
+		await expect.poll(() => server.posts.length, poll).toBe(1);
+		await expect.poll(() => marked(names), poll).toBe(true);
+		answered.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([[false, true, false], [false]]);
 	});
 
 	test(`${mode}: a handler that never saves marks nothing`, async () => {
@@ -553,7 +562,7 @@ for (const [mode, mount, readsBefore] of modes) {
 		]);
 	});
 
-	test(`${mode}: only the control whose handler sent the save is marked, not one still awaiting something else`, async () => {
+	test(`${mode}: only the control whose handler sent the save is marked, and the reload does not wait for a handler still awaiting something else`, async () => {
 		const container = await mounted(await mount());
 		const waiting = at(container, '[data-noop]');
 		const like = at(container, '[data-like]');
@@ -568,26 +577,27 @@ for (const [mode, mount, readsBefore] of modes) {
 		await expect.poll(() => marked(like), poll).toBe(true);
 		expect(marked(waiting)).toBe(false);
 		answered.resolve();
-		await waitFrames(2);
-		expect(marked(waiting)).toBe(false);
-		done.resolve();
 		await shows(container, '[data-names]', 'Ada, Grace');
 		await allClear(container);
 		expect(history.map((each) => each())).toEqual([[false], [false, true, false]]);
+		done.resolve();
 	});
 
-	test(`${mode}: a save retried in the same handler after it failed marks its control again`, async () => {
+	test(`${mode}: a retry sent after the failed save's await is a second round: the content is marked again, the control only for the first`, async () => {
 		const container = await mounted(await mount());
 		const names = at(container, '[data-names]');
 		const control = at(container, '[data-retry]');
+		const history = track(control);
 		const retried = deferred<void>();
 		server.nextPost = [{ status: 422, body: 'No', now: true }, { wait: retried.promise }];
 		control.click();
 		await expect.poll(() => server.posts.length, poll).toBe(2);
-		await expect.poll(() => [names, control].map(marked), poll).toEqual([true, true]);
+		await expect.poll(() => marked(names), poll).toBe(true);
+		expect(marked(control)).toBe(false);
 		retried.resolve();
 		await shows(container, '[data-names]', 'Ada, Grace');
 		await allClear(container);
+		expect(history()).toEqual([false, true, false]);
 	});
 
 	test(`${mode}: a save that fails during another save's reload announces its failure once, and the next save says Updated`, async () => {
@@ -710,4 +720,76 @@ for (const [mode, mount, readsBefore] of modes) {
 			await expect.poll(() => marked(control), poll).toBe(false);
 			expect(document.querySelectorAll('[aria-busy]').length).toBe(0);
 		});
+
+	test(`${mode}: a quiet poll already loading when the save is sent is marked from the send`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const history = track(names);
+		const tick = deferred<void>();
+		server.pollGate = tick.promise;
+		at(container, '[data-start-poll]').click();
+		await nextFrame();
+		const pollAnswer = deferred<void>();
+		server.holdReads = pollAnswer.promise;
+		tick.resolve();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		await waitFrames(2);
+		expect(marked(names)).toBe(false);
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		const like = at(container, '[data-like]');
+		const markedOnSend = sentAndMarked(names, like);
+		like.click();
+		await markedOnSend();
+		server.holdReads = undefined;
+		pollAnswer.resolve();
+		await waitFrames(4);
+		expect(marked(names)).toBe(true);
+		answered.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history()).toEqual([false, true, false]);
+	});
+
+	test(`${mode}: a search key typed while a save is out shows the newest answer when the save's reload lands`, async () => {
+		const container = (await (mode === 'CSR' ? render(SearchSaves) : renderSSR(SearchSaves))).container as HTMLElement;
+		await shows(container, '[data-found]', '?q=a');
+		const found = at(container, '[data-found]');
+		const history = track(found);
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		at(container, '[data-search-save]').click();
+		await expect.poll(() => marked(found), poll).toBe(true);
+		const input = at(container, '[data-query]') as HTMLInputElement;
+		input.value = 'ab';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await expect.poll(() => server.gets.includes('/mut/items?q=ab'), poll).toBe(true);
+		await waitFrames(4);
+		expect([found.textContent, marked(found)]).toEqual(['?q=a', true]);
+		answered.resolve();
+		await shows(container, '[data-found]', '?q=ab');
+		await allClear(container);
+		expect(history()).toEqual([false, true, false]);
+		expect(server.gets.at(-1)).toBe('/mut/items?q=ab');
+	});
+
+	test(`${mode}: a save that sends the page elsewhere ends its round at once and says nothing`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const like = at(container, '[data-like]');
+		const said = listen();
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		like.click();
+		await expect.poll(() => [names, like].map(marked), poll).toEqual([true, true]);
+		endWrite('left');
+		await allClear(container);
+		answered.resolve();
+		await waitFrames(4);
+		expect(reads()).toBe(readsBefore);
+		at(container, '[data-like]').click();
+		await shows(container, '[data-names]', 'Ada, Grace, Grace');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Updated']);
+	});
 }

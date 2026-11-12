@@ -1,36 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/event-current-target"
-			],
-			"delta": 304,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-events"
-			],
-			"delta": 102,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-return-reask"
-			],
-			"delta": 2481,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -59,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 2481,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"delta": 2584,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -71,8 +41,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 54,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"delta": -13,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -104,8 +74,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 2481,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"delta": 2584,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -116,8 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 20,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"delta": 14,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -128,80 +98,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 60,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 980,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 1354,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 979,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 49,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 49,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 49,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged",
+			"delta": -21,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		}
 	]

@@ -523,6 +523,8 @@ function asyncCommitPaths(
 	const paths: ReadonlyArray<string>[] = [];
 	if (previous.status !== next.status) paths.push(['status']);
 	if (previous.version !== next.version) paths.push(['version']);
+	// A run already loading that a save turns loud changes only how it is shown.
+	if (!snapshotField(previous, 'quiet') !== !snapshotField(next, 'quiet')) paths.push(['quiet']);
 	if (!Object.is(snapshotField(previous, 'key'), snapshotField(next, 'key'))) paths.push(['key']);
 	if (!Object.is(snapshotField(previous, 'error'), snapshotField(next, 'error'))) {
 		paths.push(['error']);

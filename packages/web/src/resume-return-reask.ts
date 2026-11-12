@@ -52,8 +52,10 @@ export type WritePhase = typeof WRITE_IDLE | typeof WRITE_WRITING | typeof WRITE
 type Versions = ReadonlyMap<string, number>;
 /** The values a round's writes hold busy, each with its graph. */
 type Held = Map<RuntimeAsyncComputedNode, Graph>;
-/** A round being written: the dispatches the refresh waits for, the ones whose controls it marks, and what it holds. */
-type Round = { readonly writers: Set<DispatchSpan>; readonly senders: Set<DispatchSpan>; readonly held: Held };
+/** A round being written: the dispatches known to have sent its writes, which the refresh waits for and whose controls it marks, and what it holds. */
+type Round = { readonly senders: Set<DispatchSpan>; readonly held: Held };
+/** How a write ended: answered `ok`, failed, or answered by sending the page somewhere else. */
+export type WriteOutcome = 'saved' | 'failed' | 'left';
 // Each phase holds only what it means: writes in flight while writing, the versions owed once they settle.
 type WriteState =
 	| { readonly phase: typeof WRITE_IDLE }
@@ -73,7 +75,7 @@ export function assertWriteMove(from: WritePhase, to: WritePhase): void {
 	let allowed: boolean;
 	switch (to) {
 		case WRITE_IDLE:
-			allowed = from === WRITE_WRITING || from === WRITE_OWED;
+			allowed = from !== WRITE_IDLE;
 			break;
 		case WRITE_WRITING:
 			allowed = from === WRITE_IDLE || from === WRITE_WRITING;
@@ -124,12 +126,17 @@ function roundDone(senders: Iterable<DispatchSpan>): void {
 	}
 }
 
-function endHolds(held: Held, outcome: 'saved' | 'failed', graph?: Graph): void {
+function endHolds(held: Held, outcome: WriteOutcome, graph?: Graph): void {
 	for (const [node, owner] of held)
 		if (!graph || owner === graph) {
 			held.delete(node);
 			owner.asyncPlane?.()?.endEntry(node.graphNodeId, outcome);
 		}
+}
+
+function reloading(): boolean {
+	for (const reload of reloads) for (const node of reload.asked) if (node.snapshot.status === 'pending') return true;
+	return false;
 }
 
 // Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks.
@@ -143,7 +150,7 @@ function settleReload(reload: Reload): void {
 
 function refreshIfOwed(): void {
 	if (state.phase !== WRITE_OWED) return;
-	for (const writer of state.writers) if (dispatchSpans().has(writer)) return;
+	for (const sender of state.senders) if (dispatchSpans().has(sender)) return;
 	const { due, senders, held } = state;
 	move({ phase: WRITE_IDLE });
 	const reload: Reload = { senders, asked: [...held.keys()], starting: new Set(due.keys()), stops: [] };
@@ -173,23 +180,17 @@ function refreshIfOwed(): void {
 			);
 }
 
-// A write sent in a dispatch's own synchronous run is that dispatch's; one sent after an await could be any open one's, so those with no save out are preferred.
-function sendersOf(open: ReadonlySet<DispatchSpan>): DispatchSpan[] {
-	const current = currentDispatch();
-	if (current && open.has(current)) return [current];
-	const fresh = [...open].filter((span) => !rounds.has(span));
-	return fresh.length > 0 ? fresh : [...open];
-}
-
-// Marked at the send: the values the refresh will re-ask, held until the round ends, and the sender's control.
+// A write sent in a dispatch's own synchronous run is that dispatch's; one sent after an await is no one's the browser can name.
 function begin(open: ReadonlySet<DispatchSpan>): void {
-	const senders = sendersOf(open);
-	for (const span of open) span.closed = refreshIfOwed;
-	for (const span of senders)
+	const current = currentDispatch();
+	const senders = current && open.has(current) ? [current] : [];
+	for (const span of senders) {
+		span.closed = refreshIfOwed;
 		if (!rounds.has(span)) {
 			span.refreshed = new Promise((done) => rounds.set(span, done));
 			if (span.control) holdBusy(span.control, span, true);
 		}
+	}
 	const now: WriteState = state;
 	const held: Held = now.phase === WRITE_IDLE ? new Map() : now.held;
 	for (const container of containers)
@@ -198,19 +199,24 @@ function begin(open: ReadonlySet<DispatchSpan>): void {
 				held.set(node, container[0]);
 				container[0].asyncPlane?.()?.markEntry(node.graphNodeId, true);
 			}
-	if (now.phase === WRITE_IDLE)
-		return move({ phase: WRITE_WRITING, inFlight: 1, writers: new Set(open), senders: new Set(senders), held });
-	const round = { writers: new Set([...now.writers, ...open]), senders: new Set([...now.senders, ...senders]), held };
+	if (now.phase === WRITE_IDLE) return move({ phase: WRITE_WRITING, inFlight: 1, senders: new Set(senders), held });
+	const round = { senders: new Set([...now.senders, ...senders]), held };
 	if (now.phase === WRITE_OWED) return move({ phase: WRITE_WRITING_SUCCEEDED, inFlight: 1, ...round });
 	move({ phase: now.phase, inFlight: now.inFlight + 1, ...round });
 }
 
-function end(ok: boolean): void {
+/** One write in flight ended; a page left behind ends the whole round at once, silently. */
+export function end(outcome: WriteOutcome): void {
 	if (state.phase !== WRITE_WRITING && state.phase !== WRITE_WRITING_SUCCEEDED) return;
-	const phase = ok ? WRITE_WRITING_SUCCEEDED : state.phase;
+	const { senders, held } = state;
+	if (outcome === 'left') {
+		move({ phase: WRITE_IDLE });
+		endHolds(held, 'left');
+		return roundDone(senders);
+	}
+	const phase = outcome === 'saved' ? WRITE_WRITING_SUCCEEDED : state.phase;
 	const inFlight = state.inFlight - 1;
-	const { writers, senders, held } = state;
-	if (inFlight > 0) return move({ phase, inFlight, writers, senders, held });
+	if (inFlight > 0) return move({ phase, inFlight, senders, held });
 	if (phase === WRITE_WRITING) {
 		move({ phase: WRITE_IDLE });
 		endHolds(held, 'failed');
@@ -222,7 +228,7 @@ function end(ok: boolean): void {
 		for (const node of shown(container)) if (!writerRuns.has(node)) versions.set(node.graphNodeId, node.version);
 		due.set(container, versions);
 	}
-	move({ phase: WRITE_OWED, writers, senders, due, held });
+	move({ phase: WRITE_OWED, senders, due, held });
 	refreshIfOwed();
 }
 
@@ -243,7 +249,7 @@ function warnIfResent(method: string, url: string): void {
 				continue;
 			}
 			console.warn(
-				`Markless: a ${method} to ${url} was sent outside any event handler while async values loaded again after a save. ` +
+				`Markless: a ${method} to ${url} was sent outside any event handler's own run while async values loaded again after a save. ` +
 					'If an async value sends it after an await, that reload sent it again. Send writes from event handlers.',
 			);
 			return;
@@ -263,15 +269,17 @@ function patchFetch(): void {
 		if (READS.has(method) || !sameOrigin(url)) return response;
 		if (recipe) writerRuns.add(recipe);
 		const open = dispatchSpans();
-		if (open.size === 0) {
+		const current = currentDispatch();
+		// A write no dispatch can be named for, sent while a reload is loading, is what a recipe that reload re-ran sends after an await.
+		if (open.size === 0 || (!(current && open.has(current)) && reloading())) {
 			if (!recipe && (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__))
 				warnIfResent(method, url);
 			return response;
 		}
 		begin(open);
 		response.then(
-			(answer) => end(answer.ok),
-			() => end(false),
+			(answer) => end(answer.ok ? 'saved' : 'failed'),
+			() => end('failed'),
 		);
 		return response;
 	};
