@@ -3,6 +3,7 @@ import { resolve } from 'pathe';
 import { rolldown } from 'rolldown';
 import { expect, test } from 'vitest';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { MARKLESS_NAV_SWAP_DEADLINE_MS } from '../../src/navigation-timing.ts';
 
 // A navigation abandoned while its stylesheets load leaves them hidden; the next one that reuses them must show them.
 test('a stylesheet an abandoned navigation hid is shown by the navigation that reuses it', async () => {
@@ -24,8 +25,8 @@ test('a stylesheet an abandoned navigation hid is shown by the navigation that r
 			const { mergeHead } = await import(url);
 			const parse = (head) => new DOMParser().parseFromString('<html><head>' + head + '</head><body></body></html>', 'text/html');
 			const next = '<style data-markless-css="/a.css">p{color:red}</style>';
-			await mergeHead(document, parse(next), 'data-markless-css');
-			const reused = await mergeHead(document, parse(next), 'data-markless-css');
+			await mergeHead(document, parse(next), 'data-markless-css', ${MARKLESS_NAV_SWAP_DEADLINE_MS});
+			const reused = await mergeHead(document, parse(next), 'data-markless-css', ${MARKLESS_NAV_SWAP_DEADLINE_MS});
 			reused.show();
 			return [...document.querySelectorAll('style')].map((style) => style.getAttribute('media'));
 		})()`);
@@ -56,7 +57,7 @@ test('the next head keeps its order, and only its stylesheets (unapplied) and pr
 				'<html><head><meta name="keywords" content="new"><meta charset="utf-8"><style>p{color:red}</style><title>New</title><style>b{color:blue}</style></head><body></body></html>',
 				'text/html',
 			);
-			const merged = await mergeHead(document, next, 'data-markless-css');
+			const merged = await mergeHead(document, next, 'data-markless-css', ${MARKLESS_NAV_SWAP_DEADLINE_MS});
 			const before = read();
 			merged.show();
 			return [before, read()];

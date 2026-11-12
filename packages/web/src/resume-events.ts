@@ -294,6 +294,27 @@ function queueDeferredHost(root: unknown, host: unknown, eventName: string): voi
 		);
 }
 
+// Events a started runtime received and has not handled: an in-place navigation retires the page only once they are.
+export const CONTAINER_HANDLING_PROPERTY = '__mH';
+
+type ContainerHandling = Map<object, readonly [handled: Promise<unknown>, settle: () => void]>;
+export type HandlingRoot = { [CONTAINER_HANDLING_PROPERTY]?: ContainerHandling };
+
+function marklessEventReceived(root: object, event: object): () => void {
+	const handling = ((root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY] ??= new Map());
+	const entry = handling.get(event);
+	if (entry) return entry[1];
+	let resolve!: () => void;
+	const handled = new Promise<void>((done) => (resolve = done));
+	const settle = () => (resolve(), handling.delete(event));
+	handling.set(event, [handled, settle]);
+	return settle;
+}
+
+function marklessEventHandled(root: object, event: object): void {
+	(root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY]?.get(event)?.[1]();
+}
+
 export function createEventWiring(input: {
 	readonly root: ResumeDomElement;
 	readonly graph: RuntimeGraph;
@@ -500,12 +521,18 @@ export function createEventWiring(input: {
 	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
 		// Another dispatch's flush may land while this one's handler still loads.
 		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
-		return dispatchArrived(event, dispatchOptions).finally(releaseArrivingEdits);
+		const handled = marklessEventReceived(input.root, event);
+		return dispatchArrived(event, handled, dispatchOptions).finally(() => {
+			handled();
+			releaseArrivingEdits();
+		});
 	}
 	async function dispatchArrived(
 		event: ResumeDomEvent,
+		handled: () => void,
 		dispatchOptions?: ResumeDispatchOptions,
 	): Promise<void> {
+		const queueRelease = input.root.__marklessReleaseDispatch;
 		const moved = keyTargetAfterHandlerFocus(event, input.root);
 		if (moved) Object.defineProperty(event, 'target', { value: moved });
 		const target = event.target;
@@ -513,7 +540,11 @@ export function createEventWiring(input: {
 			...dispatchOptions,
 			// A key the browser would have sent to an element with no handler does nothing there.
 			...(moved ? { ignoreUnmatched: true } : {}),
-			releaseQueue: input.root.__marklessReleaseDispatch,
+			// An authored await also ends what a navigation waits for.
+			releaseQueue: () => {
+				queueRelease?.();
+				handled();
+			},
 		};
 		if (!target) throw unmatchedDispatchError(event, undefined);
 		const selector = describeResumeEventTarget(target);
@@ -790,6 +821,8 @@ export function createEventWiring(input: {
 							.then((module) => start((submitHold = module)))
 							.catch(() => undefined);
 					}
+					// A body that returns a promise owns what follows, which may be the navigation it started.
+					marklessEventHandled(input.root, event);
 					return await Promise.resolve(result).catch(async (error: unknown) => {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});

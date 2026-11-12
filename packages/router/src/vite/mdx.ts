@@ -225,6 +225,8 @@ function renderMdxResumeHandler(): string[] {
 			[
 				'export async function resumeContainerEvent(input) {',
 				'  if (await tryResumeMdxScalar(input, marklessMdxLoadScalarPlan, marklessMdxLoadSymbol)) return;',
+				// The execution log forwards an event no record names only to record it.
+				'  if (input.logOnly && !input.root.__asyncResumeRuntimeStarted) return;',
 				'  input.root.__asyncResumeRuntimeStarted = true;',
 				"  const { resumeFromPayloadDocument } = await (marklessResumeModule ??= import('@markless/core/web/resume').catch(error => { marklessResumeModule = undefined; throw error; }));",
 				'  const { runtime } = await resumeFromPayloadDocument({',

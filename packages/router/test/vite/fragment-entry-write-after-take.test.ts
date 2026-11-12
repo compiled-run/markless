@@ -3,6 +3,7 @@ import { resolve } from 'pathe';
 import { rolldown } from 'rolldown';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { MARKLESS_NAV_SWAP_DEADLINE_MS } from '../../src/navigation-timing.ts';
 
 // A write between a click and its swap makes the page it fetched stale, as it does a page fetched ahead.
 
@@ -58,7 +59,7 @@ async function install(page: Page): Promise<void> {
 	await page.waitForFunction(
 		() => 'navigate' in ((window as never as { __swap?: object }).__swap ?? {}),
 	);
-	await page.evaluate((deadline) => {
+	await page.evaluate(([deadline, swapDeadline]) => {
 		type Entry = {
 			at: number;
 			writes: number;
@@ -92,12 +93,14 @@ async function install(page: Page): Promise<void> {
 			servedBodyAttributesProperty: '__servedBody',
 			stylesheetKeyAttribute: 'data-css',
 			retireProperty: '__retire',
+			handlingProperty: '__handling',
 			reaskProperty: '__reask',
 			sharedInstances: ['__shared', 'data-shared-resume'],
 			streamExecutorGlobal: '__exec',
 			streamedArmSelector: 'template[data-streamed]',
 			streamOpenProperty: '__streamOpen',
 			pendingDeadlineMs: deadline,
+			swapDeadlineMs: swapDeadline,
 			renderedEvent: 'rendered',
 			requestPrefix: '/_f',
 			regionEndMarker: '<!--end-->',
@@ -290,7 +293,7 @@ async function install(page: Page): Promise<void> {
 			done: (index: number) => navs[index],
 			arm: (text: string) => `<p data-arm>${text}</p>${config.appendMarker}`,
 		};
-	}, DEADLINE_MS);
+	}, [DEADLINE_MS, MARKLESS_NAV_SWAP_DEADLINE_MS]);
 }
 
 type H = {

@@ -172,9 +172,8 @@ export default function Sidebar({ pathname }: { readonly pathname: string }) @{
 			const token = branch?.getAttribute('data-section');
 			if (token) opened = withSection(opened, token, branch?.getAttribute('aria-expanded') === 'true');
 		}}
-		onSidebarleave={() => {
-			const token = document.querySelector('#docs-sidebar .branch[aria-expanded="true"]:has([aria-current="page"])')?.getAttribute('data-section');
-			if (token) opened = withSection(opened, token, true);
+		onSidebarleave={(event) => {
+			if (event.detail) opened = withSection(opened, event.detail, true);
 		}}
 		onSidebararrive={() => {
 			const kept = opened.split(' ');
