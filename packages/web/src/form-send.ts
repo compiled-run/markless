@@ -5,8 +5,6 @@ import type { KeptSubmission } from './inline/sync-policy-core.ts';
 import { holdSubmit } from './submit-hold.ts';
 
 // Loaded on the first submit sent in place. A field named like a form property shadows it, so the form is read through its prototype.
-const formElements = (form: HTMLFormElement): HTMLFormControlsCollection =>
-	Object.getOwnPropertyDescriptor(HTMLFormElement.prototype, 'elements')!.get!.call(form);
 
 // The browser sends each line break in a field as CRLF.
 const crlf = (value: string) => value.replace(/\r\n|\r|\n/g, '\r\n');
@@ -73,7 +71,7 @@ export async function sendInPlace(
 		holdSubmit(
 			form,
 			by,
-			submitRecord({ elements: formElements(form) }),
+			submitRecord(form),
 			record.authoredSubmitAriaDisabled,
 		),
 	);
@@ -106,6 +104,9 @@ export async function sendInPlace(
 			: response.redirected
 				? new URL(response.url)
 				: undefined;
+	// Only a web address is followed: a javascript: or data: location would run on this page, which a native submit never does.
+	if (landed && landed.protocol !== 'http:' && landed.protocol !== 'https:')
+		throw new Error('The save answered with a redirect that is not a web address.');
 	if (landed && landed.origin !== location.origin) return location.assign(landed.href);
 	if (landed && pageKey(landed) !== pageKey(new URL(location.href))) return follow(landed);
 	if (record.inPlaceSubmit === 'reset') HTMLFormElement.prototype.reset.call(form);

@@ -22,6 +22,9 @@ export default function Shelf() @{
 					<button type="submit" data-submit>Add</button>
 					<button type="submit" formaction="/api/todos?to=/done" data-submit-done>Add and finish</button>
 					<button type="submit" formmethod="get" formaction="/done" data-submit-get>Look</button>
+					<button type="submit" formtarget="_self" formaction="/api/todos?answer&self" data-submit-self>
+						Add here
+					</button>
 					<button type="submit" formaction="/api/todos?answer" data-submit-answer>Add, plain answer</button>
 				</form>
 				<form method="post" action="/api/todos" data-shadow-form>
@@ -39,6 +42,10 @@ export default function Shelf() @{
 				<form method="post" action="/legacy-save" data-legacy-form>
 					<input name="title" data-legacy-title aria-label="Legacy title" />
 					<button type="submit" data-legacy-submit>Save through middleware</button>
+				</form>
+				<form method="post" action="/api/todos?to=javascript:window.__xss=1" data-script-form>
+					<input name="title" value="script" />
+					<button type="submit" data-script-submit>Follow a script address</button>
 				</form>
 				<form method="post" action="/api/todos?to=https://elsewhere.example/checkout" data-checkout-form>
 					<input name="title" value="checkout" />

@@ -1,5 +1,10 @@
 // An in-page stand-in for the app's API routes: same-origin URLs under /mut/, answered without a network.
-export type Answer = { readonly status?: number; readonly body?: unknown; readonly wait?: Promise<unknown> };
+export type Answer = {
+	readonly status?: number;
+	readonly body?: unknown;
+	readonly wait?: Promise<unknown>;
+	readonly headers?: Record<string, string>;
+};
 
 type Server = {
 	items: string[];
@@ -38,10 +43,10 @@ export function resetServer() {
 	server.nextPost = [];
 }
 
-const json = (body: unknown, status = 200) =>
+const json = (body: unknown, status = 200, headers: Record<string, string> = {}) =>
 	new Response(typeof body === 'string' ? body : JSON.stringify(body), {
 		status,
-		headers: { 'content-type': typeof body === 'string' ? 'text/plain' : 'application/json' },
+		headers: { 'content-type': typeof body === 'string' ? 'text/plain' : 'application/json', ...headers },
 	});
 
 async function answer(url: URL, method: string, body: unknown): Promise<Response> {
@@ -62,7 +67,7 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 	else await new Promise((resolve) => setTimeout(resolve, 5));
 	const status = planned.status ?? 200;
 	if (status < 400 && url.pathname === '/mut/items' && typeof body === 'string' && body) server.items = [...server.items, body];
-	return json(planned.body ?? { ok: status < 400 }, status);
+	return json(planned.body ?? { ok: status < 400 }, status, planned.headers);
 }
 
 // Installed before the runtime wraps fetch, so its write watch sees these calls as the page's own.

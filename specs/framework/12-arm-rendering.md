@@ -469,10 +469,17 @@ across all three cases:
     value, and no referrer under `rel="noreferrer"`. It carries the request
     header `IN_PLACE_REQUEST_HEADER` (`packages/web/src/fns/in-place-headers.ts`).
   - Answer: the generated wrapper of every router `api/` route, after the
-    cross-site write check, answers a marked request's 301, 302 or 303 with
-    a body-less 200 carrying the location in `IN_PLACE_LOCATION_HEADER`
-    and every other header (cookies included); a 307 or 308, which repeats
-    the `POST`, is left to `fetch` as the browser would. So the page a
+    cross-site write check, answers a marked `POST`'s 301, 302 or 303 (a
+    `Response`, or h3's `redirect()` answer, which has the same shape)
+    whose location resolves to an `http:` or `https:` address with a
+    body-less 200 carrying the location in `IN_PLACE_LOCATION_HEADER` and
+    every other header (cookies included), `cache-control: no-store` and
+    `vary` on the request header; `content-length` and `content-encoding`
+    are dropped and the redirect's body is cancelled. Any other method,
+    any other location, and a 307 or 308 (which repeats the `POST`) keep
+    the redirect. The client follows only an `http:` or `https:` location;
+    any other is a failed save in the `@catch`, so no `javascript:` or
+    `data:` address runs on the page. So the page a
     redirect names is never rendered and thrown away: a location on this
     page refreshes the shown values; another page of this site is followed
     as a link click (the router swaps it in place); another site loads
@@ -493,7 +500,11 @@ across all three cases:
   - Not covered: a prerendered client-rendered page's boot applies no
     sync policies, so its forms keep the browser's submit; a form inside a
     shadow root is not dispatched; a form whose `@try` is in another
-    component file is not seen and stays the browser's.
+    component file is not seen and stays the browser's. If the page is
+    replaced by an in-place navigation after the boot has kept a submit
+    but before the dispatch reaches the sender, the submission leaves with
+    the page and nothing is sent, as a navigation started right after a
+    native submit replaces it.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client

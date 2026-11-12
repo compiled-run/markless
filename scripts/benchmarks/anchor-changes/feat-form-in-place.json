@@ -35,174 +35,6 @@
 			"date": "2026-11-12"
 		},
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/in-place-headers"
-			],
-			"set": 319,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/form-send"
-			],
-			"set": 2722,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/event-current-target"
-			],
-			"delta": 58,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/inline/sync-policy-core"
-			],
-			"delta": 1762,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 451,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-return-reask"
-			],
-			"delta": 363,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 112,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/in-place-headers"
-			],
-			"set": 319,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/form-send"
-			],
-			"set": 2722,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/event-current-target"
-			],
-			"delta": 58,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/inline/sync-policy-core"
-			],
-			"delta": 1762,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 451,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-return-reask"
-			],
-			"delta": 363,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 88,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 112,
-			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -360,6 +192,174 @@
 			],
 			"delta": 1769,
 			"reason": "review round: the docs site downloads the grown check and write watch in its packed runtime chunks (CI linux against main b68276492)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/in-place-headers"
+			],
+			"set": 319,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/form-send"
+			],
+			"set": 2723,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 451,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 363,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 52,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/in-place-headers"
+			],
+			"set": 319,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/form-send"
+			],
+			"set": 2723,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 451,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 363,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 89,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 33,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
 			"date": "2026-11-12"
 		}
 	]

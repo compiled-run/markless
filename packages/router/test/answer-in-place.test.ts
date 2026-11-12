@@ -8,12 +8,23 @@ import { __marklessAnswerInPlace, __marklessRefuseCrossSiteWrite } from '../src/
 // A form Markless sends in place marks its request; the api/ wrapper answers that request's redirect without one.
 
 const own = 'https://shop.example';
-const event = (headers: Record<string, string>) => ({
-	req: new Request(`${own}/api/cart`, { method: 'POST', headers }),
+const event = (headers: Record<string, string>, method = 'POST') => ({
+	req: new Request(`${own}/api/cart`, { method, headers }),
 	url: new URL(`${own}/api/cart`),
 });
+const marked = { [IN_PLACE_REQUEST_HEADER]: '1' };
 const redirect = (status: number, location = '/cart') =>
-	new Response(null, { status, headers: { location, 'set-cookie': 'flash=Added; Path=/' } });
+	new Response('<a href="/cart">moved</a>', {
+		status,
+		headers: {
+			location,
+			'set-cookie': 'flash=Added; Path=/',
+			'cache-control': 'public, max-age=600',
+			'content-length': '25',
+			'content-encoding': 'identity',
+			vary: 'accept',
+		},
+	});
 
 test.each([301, 302, 303])(
 	'a marked request’s %s becomes a body-less 200 with the location in a header and its cookies kept',
@@ -53,4 +64,29 @@ test('the mark does not get a cross-site write past the guard, which runs first'
 		origin: 'https://evil.example',
 	});
 	expect(__marklessRefuseCrossSiteWrite(marked)?.status).toBe(403);
+});
+
+test('a GET, HEAD or OPTIONS with the mark gets the redirect untouched: only the POST Markless sends is answered', () => {
+	for (const method of ['GET', 'HEAD', 'OPTIONS']) {
+		const moved = redirect(303);
+		expect(__marklessAnswerInPlace(event(marked, method), moved)).toBe(moved);
+	}
+});
+
+test('a location that is not a web address keeps its redirect, so no javascript: or data: address reaches the page', () => {
+	for (const location of ['javascript:alert(1)', 'data:text/html,<p>hi</p>', 'JavaScript:void(0)']) {
+		const moved = redirect(303, location);
+		expect(__marklessAnswerInPlace(event(marked), moved)).toBe(moved);
+	}
+	const elsewhere = __marklessAnswerInPlace(event(marked), redirect(303, 'https://pay.example/checkout')) as Response;
+	expect(elsewhere.headers.get(IN_PLACE_LOCATION_HEADER)).toBe('https://pay.example/checkout');
+});
+
+test('h3’s redirect(), which answers with its own response class, is answered in place too', () => {
+	// The shape h3 2's redirect() returns: a status, a Headers object and a string body, not a Response.
+	const h3Redirect = { status: 302, statusText: 'Found', body: '<html></html>', headers: new Headers({ location: '/cart' }) };
+	const answer = __marklessAnswerInPlace(event(marked), h3Redirect) as Response;
+	expect(answer).toBeInstanceOf(Response);
+	expect(answer.status).toBe(200);
+	expect(answer.headers.get(IN_PLACE_LOCATION_HEADER)).toBe('/cart');
 });

@@ -338,6 +338,33 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		expect(errors).toEqual([]);
 		await close();
 	});
+	test('a redirect to a javascript: address runs nothing: the save fails into @catch', async () => {
+		const { page, documents, close } = await open(true);
+		await page.click('[data-script-submit]');
+		await page.waitForSelector('[data-error]');
+		expect(await page.evaluate(() => (window as unknown as { __xss?: number }).__xss)).toBeUndefined();
+		expect(documents).toEqual(['GET /']);
+		await close();
+	});
+
+	test('a submitter with formtarget="_self" and its own formaction is sent in place to that action', async () => {
+		const { page, documents, close } = await open(true);
+		await page.fill('[data-title]', 'Here');
+		await page.click('[data-submit-self]');
+		await listed(page, 'application/x-www-form-urlencoded: Here');
+		expect((await requests()).filter((line) => line.startsWith('POST'))).toEqual(['POST /api/todos?answer&self']);
+		expect(documents).toEqual(['GET /']);
+		await close();
+	});
+
+	test('a script’s requestSubmit() is sent in place like a press', async () => {
+		const { page, documents, close } = await open(true);
+		await page.fill('[data-title]', 'Requested');
+		await page.evaluate(() => (document.querySelector('[data-add-form]') as HTMLFormElement).requestSubmit());
+		await listed(page, 'Requested');
+		expect(documents).toEqual(['GET /']);
+		await close();
+	});
 });
 
 describe('the page’s own submit listeners come first', () => {
@@ -381,6 +408,31 @@ describe('the page’s own submit listeners come first', () => {
 		).toEqual([false, false]);
 		expect(posts).toEqual([['/api/todos', 200]]);
 		expect(documents).toEqual(['GET /']);
+		await close();
+	});
+	test('a capture-phase listener on the window that cancels wins too', async () => {
+		const { page, close } = await open(true);
+		await page.evaluate(() => window.addEventListener('submit', (event) => event.preventDefault(), { capture: true, once: true }));
+		await page.fill('[data-title]', 'Cancelled in capture');
+		await page.click('[data-submit]');
+		await page.fill('[data-expression-title]', 'After the capture cancel');
+		await page.click('[data-expression-submit]');
+		await listed(page, 'After the capture cancel');
+		expect((await requests()).filter((line) => line.startsWith('POST'))).toEqual(['POST /api/todos']);
+		expect(await titles(page)).not.toContain('Cancelled in capture');
+		await close();
+	});
+
+	test('a listener that stops the event leaves the submit to the browser, which sends it once', async () => {
+		const { page, documents, close } = await open(true);
+		await page.evaluate(() =>
+			document.querySelector('[data-add-form]')!.addEventListener('submit', (event) => event.stopPropagation()),
+		);
+		await page.fill('[data-title]', 'Stopped on the form');
+		await page.click('[data-submit]');
+		await page.waitForURL(server!.origin + '/');
+		await listed(page, 'Stopped on the form');
+		expect(documents).toEqual(['GET /', 'POST /api/todos', 'GET /']);
 		await close();
 	});
 });

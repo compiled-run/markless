@@ -49,8 +49,13 @@ type SubmitControl = {
 
 /** What a submit carries: every control's value, checked state, chosen options and files, read before any handler runs. */
 export function submitRecord(form: { readonly elements: ArrayLike<unknown> }): string {
+	// A field named `elements` would shadow the form's own list.
+	const elements =
+		globalThis.HTMLFormElement && form instanceof HTMLFormElement
+			? Reflect.get(HTMLFormElement.prototype, 'elements', form)
+			: form.elements;
 	return JSON.stringify(
-		Array.from(form.elements as ArrayLike<SubmitControl>, (control) => [
+		Array.from(elements as ArrayLike<SubmitControl>, (control) => [
 			control.files
 				? Array.from(control.files, (file) => [file.name, file.size, file.lastModified])
 				: control.selectedOptions

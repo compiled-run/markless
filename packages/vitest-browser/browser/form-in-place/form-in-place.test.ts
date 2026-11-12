@@ -4,6 +4,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { deferred, poll, shows, text } from '../back-revalidate/support.ts';
 import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
 import { keptSubmission } from '../../../web/src/event-current-target.ts';
+import { IN_PLACE_LOCATION_HEADER } from '../../../web/src/fns/in-place-headers.ts';
 import { PlainForm } from './plain-form.tsrx';
 
 // A form with no handler that posts to this origin is sent from its dispatch: busy until the reload lands, failures in @catch.
@@ -74,4 +75,12 @@ test('CSR: the page’s own listener runs first, sees the submit not cancelled, 
 	expect(await keptSubmission(heard!)).toBeUndefined();
 	expect(server.posts).toEqual([]);
 	expect(form.hasAttribute('aria-busy')).toBe(false);
+});
+
+test('SSR: an answer pointing at an address that is not a web address is a failed save, and nothing runs', async () => {
+	const { container } = await renderSSR(PlainForm);
+	server.nextPost = [{ headers: { [IN_PLACE_LOCATION_HEADER]: 'javascript:window.__formXss=1' } }];
+	(container as HTMLElement).querySelector<HTMLButtonElement>('[data-submit]')!.click();
+	await shows(container as HTMLElement, '[data-failed]', 'The save answered with a redirect that is not a web address.');
+	expect((window as unknown as { __formXss?: number }).__formXss).toBeUndefined();
 });
