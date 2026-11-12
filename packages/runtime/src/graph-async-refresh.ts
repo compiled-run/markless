@@ -42,9 +42,9 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		if (snapshot.status !== 'pending') for (const heard of state.settled) heard(node);
 		// A reader blocked on this value runs again once it settles, also when the answer compares equal and dirties no path it reads.
 		if (snapshot.status !== 'pending' && previous.status === 'pending')
-			for (const reader of blockedReaders)
-				if (reader.phase !== NODE_BLOCKED) blockedReaders.delete(reader);
-				else if (asyncInputWhere(reader, (input) => input === node)) state.invalidate(reader);
+			for (const reader of nodes.values())
+				if (reader.phase === NODE_BLOCKED && asyncInputWhere(reader, (input) => input === node))
+					state.invalidate(reader);
 		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
 			void (state.flush?.() ?? Promise.resolve()).then(() => {
 				for (const held of heldOnInputs) endEntry(held);
@@ -53,8 +53,6 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 	// Entry marks that outlived their handler: the write reaches them only through an async input still refreshing loudly.
 	const heldOnInputs = new Set<RuntimeAsyncComputedNode>();
-	// Values moved to blocked here; each is checked again when read, since other moves leave it.
-	const blockedReaders = new Set<RuntimeAsyncComputedNode>();
 
 	const asyncInputWhere = (
 		node: RuntimeAsyncComputedNode,
@@ -112,7 +110,6 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		node.controller?.abort();
 		node.controller = undefined;
 		move(node, NODE_BLOCKED);
-		blockedReaders.add(node);
 		node.waitingFor = undefined;
 		const version = ++node.version;
 		const key = (node.snapshot as { readonly key?: unknown }).key;
@@ -163,7 +160,6 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			}
 			// Only a run on shown inputs lands pending.
 			move(node, snapshot.status === 'pending' ? NODE_BLOCKED : NODE_SETTLED);
-			if (snapshot.status === 'pending') blockedReaders.add(node);
 			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
 		};
 		const commitRejected = (error: unknown): void =>

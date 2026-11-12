@@ -19,7 +19,13 @@ import {
 	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
-import { dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget, submitRecord } from './event-current-target.ts';
+import {
+	dispatchSpans,
+	type DispatchSpan,
+	keptSubmission,
+	marklessRunAtCurrentTarget,
+	submitRecord,
+} from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -879,14 +885,18 @@ export function createEventWiring(input: {
 				// stopping entry's own writes still commit - the `finally` flushes them.
 				if (stopsImmediately?.()) return;
 			}
-			// A form with no handler whose submit its policy kept from the browser: sent here, as a handler's save is.
-			if (form && record.inPlaceSubmit && event.defaultPrevented)
-				await (submitHold ? Promise.resolve(submitHold) : import('./submit-hold.ts'))
-					.then((module) =>
-						(submitHold = module).sendInPlace(event as unknown as SubmitEvent, record, (end) => {
-							hold = Promise.resolve(end);
-							marklessEventHandled(input.root, event);
-						}),
+			// A form with no handler whose submit was kept from the browser once every listener passed: sent here, as a handler's save is.
+			const kept = form && record.inPlaceSubmit ? await keptSubmission(event) : undefined;
+			if (kept)
+				await import('./form-send.ts')
+					.then(
+						(module) =>
+							module.sendInPlace(event as unknown as SubmitEvent, kept, record, (end) => {
+								hold = Promise.resolve(end);
+								marklessEventHandled(input.root, event);
+							}),
+						// A sender that cannot load leaves the submit to the browser, which would have sent it.
+						() => kept.native(),
 					)
 					.catch(async (error: unknown) => {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;

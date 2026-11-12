@@ -8,6 +8,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from './link-attributes.ts';
+import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
@@ -196,6 +197,24 @@ export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Respons
 				headers: { 'content-type': 'text/plain; charset=utf-8' },
 			})
 		: undefined;
+}
+
+// The redirects after which the browser fetches the location with GET; a 307 or 308 repeats the POST, so it stays the browser's.
+const REDIRECTS_TO_GET: ReadonlySet<number> = new Set([301, 302, 303]);
+
+/**
+ * A form Markless sends in place marks its request; this api/ route's redirect then answers with no body and its location
+ * in a header, with every other header (cookies included), so the page that location names is not fetched and thrown away.
+ * Runs after the cross-site check, so the mark changes only how an accepted request's redirect is answered.
+ */
+export function __marklessAnswerInPlace(event: RuntimeHttpEvent, answer: unknown): unknown {
+	if (!(answer instanceof Response) || !REDIRECTS_TO_GET.has(answer.status)) return answer;
+	const location = answer.headers.get('location');
+	if (location === null || !event.req?.headers.get(IN_PLACE_REQUEST_HEADER)) return answer;
+	const headers = new Headers(answer.headers);
+	headers.delete('location');
+	headers.set(IN_PLACE_LOCATION_HEADER, location);
+	return new Response(null, { status: 200, headers });
 }
 
 export const Html = Object.assign(

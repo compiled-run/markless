@@ -1,3 +1,5 @@
+import type { KeptSubmission } from './inline/sync-policy-core.ts';
+
 // A handler runs after the browser's listener returned; currentTarget names its element for its synchronous part.
 export function marklessRunAtCurrentTarget<A, T>(
 	event: unknown,
@@ -62,4 +64,9 @@ export function holdBusy(host: BusyHost, owner: object, busy: boolean): void {
 		busyOwners.delete(host);
 		host.removeAttribute?.('aria-busy');
 	}
+}
+
+/** The submission the in-place check kept from the browser for this event (`__mKept`, written by its serialized source), once the event is done. */
+export function keptSubmission(event: object): Promise<KeptSubmission | undefined> | undefined {
+	return (event as { __mKept?: Promise<KeptSubmission | undefined> }).__mKept;
 }

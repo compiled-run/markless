@@ -109,9 +109,14 @@ With JavaScript, Markless sends the same request without leaving the page:
 - From the press until the list has loaded again, the form has `aria-busy="true"` and the button that sent it has `aria-disabled="true"`, as for [a form whose handler is sending](/concepts/events). Pressing the button again while nothing changed sends nothing.
 - A redirect back to the page you are on keeps the page: the values it shows inside a `@try` load again, and the form is cleared, as a freshly loaded page would show it. A form with a field that shows state, such as `value={title}`, keeps what it shows.
 - A redirect to another page of your app opens that page the way a link does, without a full page load.
+- A redirect to another site, such as a payment or sign-in page, loads that site, as the browser would.
 - An answer that is not a success (a status of 400 or more) shows in the form's `@catch`, and the page and what was typed stay. The message is the `message` of a JSON answer, the text of a `text/plain` answer, or otherwise the status text. A failed connection shows the browser's own error.
 
-The endpoint gets the request the browser would send: the same address, method and encoding (including files, for `enctype="multipart/form-data"`), and the name and value of the button that was pressed. Markless reads only where a redirect points; it does not show the page that the redirect leads to.
+The endpoint gets the request the browser would send: the same address, method and encoding (including files, for `enctype="multipart/form-data"`), and the name and value of the button that was pressed. Markless marks the request with a header, and the code that wraps every endpoint answers a marked request's `301`, `302` or `303` with the address in a header instead of a redirect. So your server does no more work than it would without JavaScript: the page the redirect names is never rendered and thrown away, and a one-time message the `POST` sets in a cookie is still there for the page that shows it. A `307` or `308`, which asks the browser to send the `POST` again, is left to the browser.
+
+Your page's own JavaScript comes first. A `submit` listener you add with `addEventListener` runs before Markless decides, sees `event.defaultPrevented` as `false`, and if it calls `event.preventDefault()`, Markless sends nothing.
+
+If the code that sends the form cannot load, for example on a lost connection, the browser sends the form itself, as it would without JavaScript. Until it is sent, the form already has `aria-busy="true"`.
 
 This happens for a form inside a `@try` that has a `@catch`, whose `method` is `post` (written as text, or as an expression that is `post` when the form is sent), and that has no `onSubmit` on it or on an element around it. Everything else stays the browser's:
 
@@ -120,8 +125,10 @@ This happens for a form inside a `@try` that has a `@catch`, whose `method` is `
 - An `action`, or a button's `formaction`, on another site goes there.
 - A button with `formmethod="get"` loads the page it names.
 - `rel="external"` on the form loads the answer as a page, the same way it makes a link do a full page load.
+- A form inside a component whose `@try` is in another component file stays the browser's, because the build decides which `@catch` would show its failure from the file it compiles, one file at a time.
+- A redirect that does not come from an endpoint, such as one from middleware, is followed by the request itself; one to another site then fails and shows in `@catch`, so give such a form `rel="external"`.
 
-The check that decides this is about 400 bytes, and only pages with such a form carry it.
+The check that decides this is about 650 bytes compressed, and only pages with such a form carry it.
 
 ## Middleware runs on every request
 

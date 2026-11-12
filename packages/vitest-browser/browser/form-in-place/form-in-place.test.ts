@@ -3,6 +3,7 @@ import { userEvent } from 'vitest/browser';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { deferred, poll, shows, text } from '../back-revalidate/support.ts';
 import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
+import { keptSubmission } from '../../../web/src/event-current-target.ts';
 import { PlainForm } from './plain-form.tsrx';
 
 // A form with no handler that posts to this origin is sent from its dispatch: busy until the reload lands, failures in @catch.
@@ -23,7 +24,7 @@ async function sendsInPlace(container: HTMLElement) {
 	submitter.focus();
 	await userEvent.keyboard('{Enter}');
 	await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
-	expect(submitter.getAttribute('aria-disabled')).toBe('true');
+	await expect.poll(() => submitter.getAttribute('aria-disabled'), poll).toBe('true');
 	expect(document.activeElement).toBe(submitter);
 	submitter.click();
 	answer.resolve();
@@ -55,4 +56,22 @@ test('SSR: a failed answer reaches @catch with its text, and the typed value sta
 	await shows(container as HTMLElement, '[data-failed]', 'Name taken');
 	expect(field.value).toBe('Taken');
 	expect(field.isConnected).toBe(true);
+});
+
+test('CSR: the page’s own listener runs first, sees the submit not cancelled, and when it cancels, nothing is sent', async () => {
+	const container = (await render(PlainForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	const form = container.querySelector<HTMLFormElement>('[data-form]')!;
+	let heard: SubmitEvent | undefined;
+	const seen: boolean[] = [];
+	form.addEventListener('submit', (event) => {
+		seen.push(event.defaultPrevented);
+		heard = event;
+		event.preventDefault();
+	});
+	container.querySelector<HTMLButtonElement>('[data-submit]')!.click();
+	expect(seen).toEqual([false]);
+	expect(await keptSubmission(heard!)).toBeUndefined();
+	expect(server.posts).toEqual([]);
+	expect(form.hasAttribute('aria-busy')).toBe(false);
 });

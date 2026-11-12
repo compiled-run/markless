@@ -431,43 +431,69 @@ across all three cases:
     `@try`/`@catch` gets no record, and the browser submits it. A submit
     handler in another component around the form is not seen; that form is
     both sent in place and handed to the handler.
-  - Submit-time check, one function shared by the boot and the runtime
-    (`submitsInPlace`): not already prevented; the method (the
-    submitter's `formmethod`, else the form's) is `post`; the target
-    (the submitter's `formtarget`, else the form's,
-    else a `<base target>`) is empty or `_self`; the form's `rel` has no
-    `external`; and the action (the submitter's `formaction`, else the
-    form's) has this page's origin. When any fails the submit is the
-    browser's. The boot evaluates it before any listener below the
-    container root, so a listener added with `addEventListener` on the
-    form sees an already prevented event. The check ships as its own
-    inline script only on a page whose records hold an in-place form; the
-    boot's sync-policy variants carry only the call (about 30 bytes).
+  - Never worse than the browser's own submit: with JavaScript on, the
+    page's listeners and the server see what they would see without it.
+  - Submit-time check, one self-contained function shared by the boot and
+    the runtime (`inPlaceSubmission`, `packages/web/src/inline/sync-policy-core.ts`).
+    The policy does not cancel at once: it waits until the event has
+    passed every listener (a bubble listener on the window, registered for
+    that one event), so every listener on the page runs first and sees
+    `defaultPrevented` false. Only if none cancelled it, and the event
+    reached the window, is the submit kept from the browser and sent in
+    place. A listener that cancels it sends nothing through Markless; one
+    that stops it leaves it to the browser. It is kept when the method
+    (the submitter's `formmethod`, else the form's) is `post`; the target
+    (`formtarget`, else the form's, else a `<base target>`) is empty or
+    `_self`; the form's `rel` has no `external`; and the action
+    (`formaction`, else the form's) has this page's origin. The form is
+    read through `HTMLFormElement.prototype` and `Element.prototype`, since
+    a field named `action`, `target`, `method`, `enctype`, `relList`,
+    `elements` or `reset` shadows the form's own property. The event
+    carries a promise of the kept submission, which the dispatch awaits.
+    The check ships as its own inline script only on a page whose records
+    hold an in-place form; the boot's sync-policy variants carry only the
+    call.
+  - First press: the boot marks the kept form `aria-busy` at once, before
+    the runtime has loaded. If the runtime or the sender cannot load, the
+    browser's own submit runs (`requestSubmit` through the prototype,
+    with the submitter), so a form that would have worked natively still
+    works. A repeat pressed before the hold module has loaded is sent, as
+    for handlers.
   - Send: inside the submit's own dispatch, as a handler's save, so the
     refresh after a save, the form submit pending marks and repeat hold,
-    and the handler-rejection rule apply unchanged. The record of what is
-    sent is read when the dispatch reaches the form. The request is the
-    one the browser would send: the action URL, `POST`, a body in the
-    chosen encoding (`multipart/form-data` as form data with files,
-    `application/x-www-form-urlencoded` with each file's name,
-    `text/plain` as `name=value` lines), the submitter's name and value,
-    and no referrer under `rel="noreferrer"`.
-  - Answer: `fetch` follows redirects. A success whose final address is
-    another page (path and query) of the app is followed as a link click,
-    so the router swaps it in place, or the browser loads it when no
-    router is present; the redirected page's body is cancelled unread.
-    Any other success keeps the page: the shown values refresh, and the
-    form resets when `inPlaceSubmit` is `reset`, matching the fresh form a
-    post-redirect-get load shows. A non-`ok` answer rejects into the
-    `@catch` with an `Error` whose message is a JSON body's `message`, a
-    `text/plain` body, or the status text; a network failure rejects with
-    the browser's error. In both the content and typed values stay.
+    and the handler-rejection rule apply unchanged. The request is the one
+    the browser would send: the action URL, `POST`, a body in the chosen
+    encoding (`multipart/form-data` as form data with files,
+    `application/x-www-form-urlencoded` with each file's name, `text/plain`
+    as `name=value` lines; line breaks as CRLF), the submitter's name and
+    value, and no referrer under `rel="noreferrer"`. It carries the request
+    header `IN_PLACE_REQUEST_HEADER` (`packages/web/src/fns/in-place-headers.ts`).
+  - Answer: the generated wrapper of every router `api/` route, after the
+    cross-site write check, answers a marked request's 301, 302 or 303 with
+    a body-less 200 carrying the location in `IN_PLACE_LOCATION_HEADER`
+    and every other header (cookies included); a 307 or 308, which repeats
+    the `POST`, is left to `fetch` as the browser would. So the page a
+    redirect names is never rendered and thrown away: a location on this
+    page refreshes the shown values; another page of this site is followed
+    as a link click (the router swaps it in place); another site loads
+    with `location.assign`. A save whose answer leaves the page asks
+    nothing on it again. A route the wrapper does not answer (middleware,
+    or a same-origin URL outside `api/`) keeps today's behaviour: `fetch`
+    follows its redirect and the followed page is rendered once and not
+    shown. Any other success keeps the page: the shown values refresh,
+    and the form resets (through the prototype) when `inPlaceSubmit` is
+    `reset`. A non-`ok` answer rejects into the `@catch` with an `Error`
+    whose message is a JSON body's `message`, a `text/plain` body, or the
+    status text; a network failure rejects with the browser's error. In
+    both the content and typed values stay. The mark changes only how an
+    accepted request's redirect is answered, never whether a write is
+    accepted.
   - Opt-out without a new word: `rel="external"` on the form, the same
     token that makes the router leave a link to the browser.
   - Not covered: a prerendered client-rendered page's boot applies no
     sync policies, so its forms keep the browser's submit; a form inside a
-    shadow root is not dispatched. A repeat pressed before the hold module
-    has loaded is sent, as for handlers.
+    shadow root is not dispatched; a form whose `@try` is in another
+    component file is not seen and stays the browser's.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client

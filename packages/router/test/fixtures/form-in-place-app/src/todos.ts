@@ -1,6 +1,8 @@
+import { waitAt } from './gates.ts';
+
 export type Todo = { readonly id: number; readonly title: string };
 
-const store = globalThis as typeof globalThis & { __formTodos?: Todo[]; __formSlowReads?: number };
+const store = globalThis as typeof globalThis & { __formTodos?: Todo[]; __formHeldReads?: number };
 
 export function todosOnServer(): Todo[] {
 	return (store.__formTodos ??= [{ id: 1, title: 'Write the report' }]);
@@ -11,15 +13,15 @@ export function addTodoOnServer(title: string): void {
 	todos.push({ id: todos.length + 1, title });
 }
 
-// The next read waits, so a test can see the form stay busy until the refresh lands.
-export function slowNextRead(): void {
-	store.__formSlowReads = (store.__formSlowReads ?? 0) + 1;
+// The next read waits at the "read" gate, so a test sees the form stay busy until the refresh lands.
+export function holdNextRead(): void {
+	store.__formHeldReads = (store.__formHeldReads ?? 0) + 1;
 }
 
-export async function readDelay(): Promise<void> {
-	if (!store.__formSlowReads) return;
-	store.__formSlowReads--;
-	await new Promise((resolve) => setTimeout(resolve, 800));
+export async function readGate(): Promise<void> {
+	if (!store.__formHeldReads) return;
+	store.__formHeldReads--;
+	await waitAt('read');
 }
 
 export async function loadTodos(): Promise<Todo[]> {
@@ -27,4 +29,9 @@ export async function loadTodos(): Promise<Todo[]> {
 	const response = await fetch('/api/todos', { cache: 'no-store' });
 	if (!response.ok) throw new Error(`todos: ${response.status}`);
 	return (await response.json()) as Todo[];
+}
+
+export async function loadFlash(): Promise<string> {
+	if (typeof window === 'undefined') return '';
+	return (await fetch('/api/flash', { cache: 'no-store' })).text();
 }

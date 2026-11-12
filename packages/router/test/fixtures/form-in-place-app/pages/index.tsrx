@@ -1,9 +1,10 @@
 import { computed, state } from '@markless/core';
-import { loadTodos } from '../src/todos.ts';
+import { loadFlash, loadTodos } from '../src/todos.ts';
 
 // Plain forms: sent in place with JavaScript on, as the browser sends them with it off.
 export default function Shelf() @{
 	const todos = computed(async () => await loadTodos());
+	const flash = computed(async () => await loadFlash());
 	let draft = state('');
 	const method = 'post';
 
@@ -23,6 +24,27 @@ export default function Shelf() @{
 					<button type="submit" formmethod="get" formaction="/done" data-submit-get>Look</button>
 					<button type="submit" formaction="/api/todos?answer" data-submit-answer>Add, plain answer</button>
 				</form>
+				<form method="post" action="/api/todos" data-shadow-form>
+					<input name="title" data-shadow-title aria-label="Shadow title" />
+					<input type="hidden" name="target" value="elsewhere" />
+					<input type="hidden" name="method" value="get" />
+					<input type="hidden" name="reset" value="kept" />
+					<button type="submit" name="action" value="archive" data-shadow-archive>Archive</button>
+					<button type="submit" name="action" value="keep">Keep</button>
+				</form>
+				<form method="post" action="/api/todos?encoding" data-lines-form>
+					<textarea name="title" data-lines aria-label="Lines"></textarea>
+					<button type="submit" data-lines-submit>Add lines</button>
+				</form>
+				<form method="post" action="/legacy-save" data-legacy-form>
+					<input name="title" data-legacy-title aria-label="Legacy title" />
+					<button type="submit" data-legacy-submit>Save through middleware</button>
+				</form>
+				<form method="post" action="/api/todos?to=https://elsewhere.example/checkout" data-checkout-form>
+					<input name="title" value="checkout" />
+					<button type="submit" data-checkout-submit>Check out</button>
+				</form>
+				<p data-flash>{flash}</p>
 				<form method="post" action="/api/todos?encoding" enctype="multipart/form-data" data-file-form>
 					<input type="file" name="file" data-file aria-label="File" />
 					<button type="submit" data-file-submit>Upload</button>

@@ -7,7 +7,8 @@ import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
-// A plain <form method="post"> to an api/ route: the browser's own submit with JavaScript off, sent in place with it on.
+// A plain <form method="post"> to an api/ route: the browser's own submit with JavaScript off, sent in place with it
+// on, and never worse than the browser's: the page's own listeners win, and the server does no work it would not.
 
 vi.setConfig({ testTimeout: 30_000 });
 
@@ -42,7 +43,7 @@ afterAll(async () => {
 	if (root) await rm(root, { recursive: true, force: true });
 });
 
-const titles = (page: Page) => page.locator('[data-list] li').allTextContents();
+const titles = (page: Page, list = '[data-list]') => page.locator(`${list} li`).allTextContents();
 const listed = (page: Page, title: string) =>
 	page.waitForFunction(
 		(title) =>
@@ -50,6 +51,11 @@ const listed = (page: Page, title: string) =>
 		title,
 		{ timeout: 10_000 },
 	);
+// What the server was asked since the last call; the first call in a test clears what earlier tests left.
+const requests = async () =>
+	(await (await fetch(server!.origin + '/api/requests')).json()) as string[];
+const release = (gate: string) => fetch(`${server!.origin}/api/release?gate=${gate}`);
+const pageRenders = (seen: string[], path: string) => seen.filter((line) => line === `GET ${path}`);
 
 async function open(javaScriptEnabled: boolean, path = '/') {
 	const context = await browser!.newContext({
@@ -70,6 +76,7 @@ async function open(javaScriptEnabled: boolean, path = '/') {
 			posts.push([new URL(response.url()).pathname, response.status()]);
 	});
 	await page.goto(server!.origin + path);
+	await requests();
 	return { page, documents, posts, errors, close: () => context.close() };
 }
 
@@ -104,7 +111,7 @@ describe('with JavaScript off, a plain form is the browser’s', () => {
 });
 
 describe('with JavaScript on, the same form is sent in place', () => {
-	test('one POST, no page load; busy from the submit until the refreshed list lands; focus, scroll and the page stay', async () => {
+	test('one POST, no page load and no render of the redirect target; busy from the submit until the refreshed list lands; focus and scroll stay', async () => {
 		const { page, documents, posts, errors, close } = await open(true);
 		await page.fill('[data-other]', 'typed elsewhere');
 		await page.fill('[data-title]', 'Call the plumber slow wait');
@@ -112,14 +119,15 @@ describe('with JavaScript on, the same form is sent in place', () => {
 			list: document.querySelector('[data-list]'),
 			form: document.querySelector('[data-add-form]'),
 		}));
-		const answered = page.waitForResponse((response) => response.request().method() === 'POST');
 		await page.focus('[data-submit]');
 		await page.evaluate(() => window.scrollTo({ top: 120, behavior: 'instant' }));
 		await page.keyboard.press('Enter');
 		await page.waitForFunction(
 			() => document.querySelector('[data-add-form]')?.getAttribute('aria-busy') === 'true',
 		);
-		expect(await page.getAttribute('[data-submit]', 'aria-disabled')).toBe('true');
+		await page.waitForFunction(
+			() => document.querySelector('[data-submit]')?.getAttribute('aria-disabled') === 'true',
+		);
 		expect(
 			await page.evaluate(
 				() => getComputedStyle(document.querySelector('[data-add-form]')!).opacity,
@@ -128,17 +136,23 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		// A person's repeat press: a click Playwright would scroll to and hold back on aria-disabled, then Enter.
 		await page.$eval('[data-submit]', (button) => (button as HTMLButtonElement).click());
 		await page.keyboard.press('Enter');
+		const answered = page.waitForResponse((response) => response.request().method() === 'POST');
+		await release('post');
 		await answered;
-		// The save landed; the list it refreshes is still loading, and the form waits for it.
+		// The save landed; the list it refreshes is held at the read gate, and the form waits for it.
 		expect(await page.getAttribute('[data-add-form]', 'aria-busy')).toBe('true');
 		expect(await titles(page)).not.toContain('Call the plumber slow wait');
+		await release('read');
 		await listed(page, 'Call the plumber slow wait');
 		await page.waitForFunction(
 			() => !document.querySelector('[data-add-form]')?.hasAttribute('aria-busy'),
 		);
 		expect(await page.getAttribute('[data-submit]', 'aria-disabled')).toBeNull();
 		expect(documents).toEqual(['GET /']);
-		expect(posts).toEqual([['/api/todos', 303]]);
+		expect(posts).toEqual([['/api/todos', 200]]);
+		const seen = await requests();
+		expect(seen.filter((line) => line.startsWith('POST'))).toEqual(['POST /api/todos']);
+		expect(pageRenders(seen, '/')).toEqual([]);
 		const kept = await page.evaluate(
 			(held) => ({
 				list: document.querySelector('[data-list]') === held.list,
@@ -156,6 +170,26 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		await close();
 	});
 
+	test('a flash message the POST sets is shown once: no hidden render of the page uses it up', async () => {
+		const { page, close } = await open(true);
+		await page.fill('[data-title]', 'flash one');
+		await page.click('[data-submit]');
+		await page.waitForFunction(
+			() => document.querySelector('[data-flash]')?.textContent === 'Added flash one',
+			undefined,
+			{
+				timeout: 10_000,
+			},
+		);
+		await page.fill('[data-title]', 'quiet two');
+		await page.click('[data-submit]');
+		await listed(page, 'quiet two');
+		await page.waitForFunction(
+			() => document.querySelector('[data-flash]')?.textContent === '',
+		);
+		await close();
+	});
+
 	test('reached by an in-place navigation, the page sends its form in place too', async () => {
 		const { page, documents, posts, close } = await open(true, '/start');
 		await page.click('[data-to-shelf]');
@@ -164,7 +198,7 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		await page.click('[data-submit]');
 		await listed(page, 'After a navigation');
 		expect(documents).toEqual(['GET /start']);
-		expect(posts).toEqual([['/api/todos', 303]]);
+		expect(posts).toEqual([['/api/todos', 200]]);
 		expect(await page.inputValue('[data-title]')).toBe('');
 		await close();
 	});
@@ -207,14 +241,55 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		await close();
 	});
 
-	test('a redirect to another page of the app is an in-place navigation', async () => {
+	test('a redirect to another page of the app is one in-place navigation, and the page left asks nothing again', async () => {
 		const { page, documents, posts, close } = await open(true);
 		await page.fill('[data-title]', 'Then finish');
 		await page.click('[data-submit-done]');
 		await page.waitForSelector('[data-done]');
 		expect(new URL(page.url()).pathname).toBe('/done');
 		expect(documents).toEqual(['GET /']);
-		expect(posts).toEqual([['/api/todos', 303]]);
+		expect(posts).toEqual([['/api/todos', 200]]);
+		const seen = await requests();
+		expect(seen.filter((line) => line.startsWith('POST'))).toEqual([
+			'POST /api/todos?to=/done',
+		]);
+		expect(seen.filter((line) => line.startsWith('GET /done'))).toHaveLength(1);
+		expect(seen.filter((line) => line.startsWith('GET /api/todos'))).toEqual([]);
+		await close();
+	});
+
+	test('a redirect to another site loads that site', async () => {
+		const { page, close } = await open(true);
+		await page.route('https://elsewhere.example/**', (route) =>
+			route.fulfill({
+				status: 200,
+				contentType: 'text/html',
+				body: '<p data-elsewhere>checkout</p>',
+			}),
+		);
+		await page.click('[data-checkout-submit]');
+		await page.waitForSelector('[data-elsewhere]');
+		expect(page.url()).toBe('https://elsewhere.example/checkout');
+		await close();
+	});
+
+	test('a route that is not behind the api/ wrapper still works: its redirect is followed as before', async () => {
+		const { page, documents, close } = await open(true);
+		await page.fill('[data-legacy-title]', 'unused');
+		await page.click('[data-legacy-submit]');
+		await page.waitForFunction(
+			() => !document.querySelector('[data-legacy-form]')?.hasAttribute('aria-busy'),
+			undefined,
+			{
+				timeout: 10_000,
+			},
+		);
+		const seen = await requests();
+		expect(seen).toContain('POST /legacy-save');
+		// The fallback: fetch follows the middleware's redirect, so the page it names is rendered once and not shown.
+		expect(pageRenders(seen, '/')).toHaveLength(1);
+		expect(documents).toEqual(['GET /']);
+		expect(await page.inputValue('[data-legacy-title]')).toBe('');
 		await close();
 	});
 
@@ -248,11 +323,111 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		expect(documents).toEqual(['GET /']);
 		await close();
 	});
+
+	test('fields named action, target, method and reset do not change where the form goes, and it still resets', async () => {
+		const { page, documents, posts, errors, close } = await open(true);
+		await page.fill('[data-shadow-title]', 'Shadowed');
+		await page.click('[data-shadow-archive]');
+		await listed(page, 'Shadowed [archive]');
+		expect(posts).toEqual([['/api/todos', 200]]);
+		expect(documents).toEqual(['GET /']);
+		await page.waitForFunction(
+			() => (document.querySelector('[data-shadow-title]') as HTMLInputElement).value === '',
+		);
+		expect(await page.$('[data-error]')).toBeNull();
+		expect(errors).toEqual([]);
+		await close();
+	});
+});
+
+describe('the page’s own submit listeners come first', () => {
+	test('a listener that cancels the submit sends it itself: Markless sends nothing', async () => {
+		const { page, documents, close } = await open(true);
+		await page.evaluate(() =>
+			document
+				.querySelector('[data-add-form]')!
+				.addEventListener('submit', (event) => event.preventDefault()),
+		);
+		await page.fill('[data-title]', 'Mine to send');
+		await page.click('[data-submit]');
+		// A later form sent in place: once it is listed, the cancelled submit has long been dispatched.
+		await page.fill('[data-expression-title]', 'Sent after the cancelled one');
+		await page.click('[data-expression-submit]');
+		await listed(page, 'Sent after the cancelled one');
+		expect((await requests()).filter((line) => line.startsWith('POST'))).toEqual([
+			'POST /api/todos',
+		]);
+		expect(await titles(page)).not.toContain('Mine to send');
+		expect(await page.getAttribute('[data-add-form]', 'aria-busy')).toBeNull();
+		expect(documents).toEqual(['GET /']);
+		await close();
+	});
+
+	test('a listener that only reads defaultPrevented sees false, and the form is sent once, in place', async () => {
+		const { page, documents, posts, close } = await open(true);
+		await page.evaluate(() => {
+			const seen: boolean[] = [];
+			(window as unknown as { __seen: boolean[] }).__seen = seen;
+			document
+				.querySelector('[data-add-form]')!
+				.addEventListener('submit', (event) => seen.push(event.defaultPrevented));
+			window.addEventListener('submit', (event) => seen.push(event.defaultPrevented));
+		});
+		await page.fill('[data-title]', 'Seen by a listener');
+		await page.click('[data-submit]');
+		await listed(page, 'Seen by a listener');
+		expect(
+			await page.evaluate(() => (window as unknown as { __seen: boolean[] }).__seen),
+		).toEqual([false, false]);
+		expect(posts).toEqual([['/api/todos', 200]]);
+		expect(documents).toEqual(['GET /']);
+		await close();
+	});
+});
+
+describe('the first press, before the runtime has loaded', () => {
+	test('the form is busy at once, and if the runtime cannot load, the browser sends it as it would have', async () => {
+		const context = await browser!.newContext();
+		const page = await context.newPage();
+		const documents: string[] = [];
+		page.on('request', (request) => {
+			if (request.isNavigationRequest() && request.frame() === page.mainFrame())
+				documents.push(`${request.method()} ${new URL(request.url()).pathname}`);
+		});
+		const html = await (await fetch(server!.origin + '/')).text();
+		const runtime = /data-markless-resume-module="([^"]+)"/.exec(html)![1]!;
+		let fail!: () => void;
+		const failing = new Promise<void>((resolve) => (fail = resolve));
+		await page.route(`**${runtime}`, async (route) => {
+			await failing;
+			await route.abort('failed');
+		});
+		await page.goto(server!.origin + '/');
+		await page.fill('[data-title]', 'Sent by the browser');
+		await page.click('[data-submit]');
+		await page.waitForFunction(
+			() => document.querySelector('[data-add-form]')?.getAttribute('aria-busy') === 'true',
+		);
+		fail();
+		await page.waitForFunction(
+			() =>
+				document.querySelector('[data-page]') &&
+				[...document.querySelectorAll('[data-list] li')].some(
+					(li) => li.textContent === 'Sent by the browser',
+				),
+			undefined,
+			{
+				timeout: 10_000,
+			},
+		);
+		expect(documents).toEqual(['GET /', 'POST /api/todos', 'GET /']);
+		await context.close();
+	});
 });
 
 describe('each encoding reaches the route as the browser sends it', () => {
 	for (const javaScriptEnabled of [false, true])
-		test(`files and text/plain, JavaScript ${javaScriptEnabled ? 'on' : 'off'}`, async () => {
+		test(`files, text/plain and textarea line breaks, JavaScript ${javaScriptEnabled ? 'on' : 'off'}`, async () => {
 			const { page, documents, close } = await open(javaScriptEnabled);
 			const name = `note-${javaScriptEnabled ? 'on' : 'off'}.txt`;
 			await page.setInputFiles('[data-file]', {
@@ -266,10 +441,25 @@ describe('each encoding reaches the route as the browser sends it', () => {
 			await page.fill('[data-plain-title]', text);
 			await page.click('[data-plain-submit]');
 			await listed(page, `text/plain: title=${text}`);
+			const lines = `first ${javaScriptEnabled ? 'on' : 'off'}\nsecond`;
+			await page.fill('[data-lines]', lines);
+			await page.click('[data-lines-submit]');
+			await listed(
+				page,
+				`application/x-www-form-urlencoded: first ${javaScriptEnabled ? 'on' : 'off'}⏎second`,
+			);
 			expect(documents).toEqual(
 				javaScriptEnabled
 					? ['GET /']
-					: ['GET /', 'POST /api/todos', 'GET /', 'POST /api/todos', 'GET /'],
+					: [
+							'GET /',
+							'POST /api/todos',
+							'GET /',
+							'POST /api/todos',
+							'GET /',
+							'POST /api/todos',
+							'GET /',
+						],
 			);
 			await close();
 		});
@@ -338,6 +528,55 @@ describe('a submit that is not a same-origin POST in this tab is left to the bro
 		await page.waitForURL(server!.origin + '/');
 		await listed(page, 'From outside');
 		expect(documents).toEqual(['GET /', 'POST /api/todos', 'GET /']);
+		await close();
+	});
+});
+
+describe('forms in keyed rows and in a component rendered several times', () => {
+	test('a form in a keyed row is sent in place to its own action', async () => {
+		const { page, documents, posts, close } = await open(true, '/rows');
+		const before = Number(await page.textContent('[data-total]'));
+		await page.fill('[data-row="work"] [data-row-title]', 'From a row');
+		await page.click('[data-row="work"] [data-row-submit]');
+		await page.waitForFunction(
+			(before) => Number(document.querySelector('[data-total]')?.textContent) === before + 1,
+			before,
+			{
+				timeout: 10_000,
+			},
+		);
+		expect(posts).toEqual([['/api/todos', 200]]);
+		expect((await requests()).filter((line) => line.startsWith('POST'))).toEqual([
+			'POST /api/todos?list=work',
+		]);
+		expect(documents).toEqual(['GET /rows']);
+		await close();
+	});
+
+	test('each instance of a component sends its own form, and a failure shows in its own @catch', async () => {
+		const { page, documents, close } = await open(true, '/rows');
+		const before = Number(await page.textContent('[data-quick="two"] [data-quick-count]'));
+		await page.fill('[data-quick="two"] [data-quick-title]', 'From instance two');
+		await page.click('[data-quick="two"] [data-quick-submit]');
+		await page.waitForFunction(
+			(before) =>
+				Number(
+					document.querySelector('[data-quick="two"] [data-quick-count]')?.textContent,
+				) ===
+				before + 1,
+			before,
+			{ timeout: 10_000 },
+		);
+		expect(await page.inputValue('[data-quick="two"] [data-quick-title]')).toBe('');
+		await page.click('[data-quick="three"] [data-quick-submit]');
+		await page.waitForFunction(
+			() => document.querySelectorAll('[data-quick-error]').length === 1,
+			undefined,
+			{ timeout: 10_000 },
+		);
+		expect(await page.textContent('[data-quick-error]')).toContain('A title is required.');
+		expect(await page.$('[data-quick="two"] [data-quick-count]')).not.toBeNull();
+		expect(documents).toEqual(['GET /rows']);
 		await close();
 	});
 });

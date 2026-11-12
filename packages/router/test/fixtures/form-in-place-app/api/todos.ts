@@ -1,6 +1,6 @@
-import { readDelay, todosOnServer } from '../src/todos.ts';
+import { readGate, todosOnServer } from '../src/todos.ts';
 
 export default async function todos(): Promise<Response> {
-	await readDelay();
+	await readGate();
 	return Response.json(todosOnServer(), { headers: { 'cache-control': 'no-store' } });
 }
