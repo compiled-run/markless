@@ -67,6 +67,40 @@
 			"delta": 17,
 			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 730,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save); measured on PR #642 CI, linux-x64",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 197,
+			"reason": "graph paint hook and write-watch hold (no blink after a save); docs pages also ship the playground compiler's own runtime copy; measured on PR #642 CI, linux-x64",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 515,
+			"reason": "graph paint hook and write-watch hold (no blink after a save); docs pages also ship the playground compiler's own runtime copy; measured on PR #642 CI, linux-x64",
+			"date": "2026-11-12"
 		}
 	]
 }
