@@ -24,12 +24,26 @@ afterEach(async () => {
 });
 
 async function buildAndServe(fixture: string, env: Record<string, string>): Promise<string> {
-	const dist = resolve(fixture, 'dist');
-	await rm(dist, { force: true, recursive: true });
+	await build(fixture, env);
+	return serve(fixture);
+}
+
+async function build(fixture: string, env: Record<string, string>): Promise<void> {
+	await rm(resolve(fixture, 'dist'), { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], {
 		cwd: fixture,
 		env: { ...process.env, ...env },
 	});
+}
+
+let componentRowsBuilt: Promise<void> | undefined;
+async function serveComponentRows(): Promise<string> {
+	await (componentRowsBuilt ??= build(componentRows, {}));
+	return `${await serve(componentRows)}/`;
+}
+
+async function serve(fixture: string): Promise<string> {
+	const dist = resolve(fixture, 'dist');
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
 	)) as { render(): Promise<string> };
@@ -208,5 +222,71 @@ async function exerciseComponentRows(url: string) {
 // Runtime the page's records never name is packed apart; whatever a component row, an @if that runs a
 // component, a form or a poll reaches must arrive with the page's pack, never from a pack left out of it.
 test('a page whose rows are components never fetches the runtime its build left out', async () => {
-	await exerciseComponentRows(`${await buildAndServe(componentRows, {})}/`);
+	await exerciseComponentRows(await serveComponentRows());
+}, 180_000);
+
+type HeldIdle = typeof globalThis & { __heldIdle: Array<() => void> };
+
+// Idle is held, through the clock every root inherits and the browser's own callback, so "before idle" is a state the test reads, not a race.
+function holdIdle() {
+	const held: Array<() => void> = ((globalThis as HeldIdle).__heldIdle = []);
+	Object.defineProperty(Element.prototype, '__mClock', {
+		configurable: true,
+		get: () => ({ frame: (run: () => void) => requestAnimationFrame(run), idle: (run: () => void) => held.push(run) }),
+	});
+	globalThis.requestIdleCallback = ((run: IdleRequestCallback) =>
+		held.push(() => run({ didTimeout: false, timeRemaining: () => 50 }))) as typeof requestIdleCallback;
+}
+
+async function drainIdle(page: Page) {
+	for (let quiet = 0; quiet < 3; ) {
+		const ran = await page.evaluate(() => {
+			const due = (globalThis as HeldIdle).__heldIdle.splice(0);
+			for (const run of due) run();
+			return due.length;
+		});
+		quiet = ran ? 0 : quiet + 1;
+		await page.waitForTimeout(50);
+	}
+}
+
+// The row mint leaves the page's render data to the first row build: a press that adds a component row
+// evaluates it from the pack the page already loaded, before or after the page went idle, and fetches no script.
+test('a component row added before or after the page is idle builds with no script fetched after load', async () => {
+	const url = await serveComponentRows();
+	const browser = await chromium.launch();
+	try {
+		for (const idle of ['held', 'reached'] as const) {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.addInitScript(holdIdle);
+			await page.goto(url, { waitUntil: 'networkidle' });
+			// This fixture's HTML lists no preloads, so a first input loads the page's pack and the row mint with it.
+			const first = page.locator('section[data-shelf="0"]');
+			await first.locator('[data-toggle]').click();
+			await expect.poll(() => first.locator('[data-detail]').textContent()).toBe('Filter: ');
+			await page.waitForLoadState('networkidle');
+			const afterLoad: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'script') afterLoad.push(new URL(request.url()).pathname);
+			});
+			if (idle === 'reached') await drainIdle(page);
+			// Nothing idle has run when the press arrives.
+			else
+				expect(
+					await page.evaluate(() => (globalThis as HeldIdle).__heldIdle.length),
+				).toBeGreaterThan(0);
+			await page.locator('[data-add-shelf]').click();
+			await expect.poll(() => titles(page, 2), { timeout: 10_000 }).toEqual(['Dune', 'Emma']);
+			await page.locator('section[data-shelf="2"] [data-toggle]').click();
+			await expect
+				.poll(() => page.locator('section[data-shelf="2"] [data-detail]').textContent())
+				.toBe('Filter: e');
+			expect({ idle, errors, afterLoad }).toEqual({ idle, errors: [], afterLoad: [] });
+			await page.close();
+		}
+	} finally {
+		await browser.close();
+	}
 }, 180_000);
