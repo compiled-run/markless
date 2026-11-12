@@ -2,10 +2,10 @@ import { copyFile, mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { join } from 'pathe';
-import { createBuilder, createServer } from 'vite';
+import { createServer } from 'vite';
 import { expect, test } from 'vitest';
 import { markless } from '../../core/src/vite.ts';
-import { router } from '../../router/src/vite/index.ts';
+import { buildFixture } from '../../router/test/support/fixture-build.ts';
 
 const packagesRoot = fileURLToPath(new URL('../../', import.meta.url));
 const cycles = fileURLToPath(new URL('./fixtures/component-import-cycle/', import.meta.url));
@@ -54,15 +54,7 @@ async function settle<T>(work: Promise<T>): Promise<{ readonly error?: string } 
 	}
 }
 
-async function build(root: string) {
-	const builder = await createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
-	});
-	return settle(builder.buildApp());
-}
+const build = (root: string) => settle(buildFixture({ root, stallMs: 60_000 }));
 
 test.each(CYCLES)(
 	'a build whose files render each other ($files) stops with the cycle named',
