@@ -101,6 +101,16 @@
 			"delta": 781,
 			"reason": "docs /concepts/state downloads +781 B gzip that is never run at load (code run at load fell by 1 char); the bytes sit in two chunks only the State page loads (xyJ_a4yv / y_XbTJ0G became 1xt3lj5J / rzFTlB5t); cause not traced. Measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd)",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 151,
+			"reason": "the client evaluator passes each child's @try arm (typed required with its boundary) so composition files its @if records under that arm; measured from PR run 43178630340 against main's merge-group run 43169057548 (4ffa885bd)",
+			"date": "2026-11-12"
 		}
 	]
 }
