@@ -19,7 +19,15 @@ import {
 	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
-import { dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget, submitRecord } from './event-current-target.ts';
+import {
+	CONTAINER_HANDLING_PROPERTY,
+	dispatchSpans,
+	type DispatchSpan,
+	type HandlingRoot,
+	marklessEventHandled,
+	marklessRunAtCurrentTarget,
+	submitRecord,
+} from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -294,12 +302,6 @@ function queueDeferredHost(root: unknown, host: unknown, eventName: string): voi
 		);
 }
 
-// Events a started runtime received and has not handled: an in-place navigation retires the page only once they are.
-export const CONTAINER_HANDLING_PROPERTY = '__mH';
-
-type ContainerHandling = Map<object, readonly [handled: Promise<unknown>, settle: () => void]>;
-export type HandlingRoot = { [CONTAINER_HANDLING_PROPERTY]?: ContainerHandling };
-
 function marklessEventReceived(root: object, event: object): () => void {
 	const handling = ((root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY] ??= new Map());
 	const entry = handling.get(event);
@@ -309,10 +311,6 @@ function marklessEventReceived(root: object, event: object): () => void {
 	const settle = () => (resolve(), handling.delete(event));
 	handling.set(event, [handled, settle]);
 	return settle;
-}
-
-function marklessEventHandled(root: object, event: object): void {
-	(root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY]?.get(event)?.[1]();
 }
 
 export function createEventWiring(input: {

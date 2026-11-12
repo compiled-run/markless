@@ -188,6 +188,28 @@ test('compiled closure actions match full resume after every step of every actio
 		).toEqual({ Tab: false, ArrowRight: true });
 		expect(keys.errors).toEqual([]);
 		await keys.page.close();
+
+		// A navigation waits for the container's unhandled events; a lean body that returns a promise is handled when it returns.
+		const hold = await open(browser, 'compiled');
+		let asked!: () => void;
+		const sent = new Promise<void>((done) => (asked = done));
+		await hold.page.route(
+			(url) => url.pathname === '/hold',
+			() => asked(),
+		);
+		await hold.page.locator('[data-hold]').click();
+		await sent;
+		const unhandled = () =>
+			hold.page.evaluate(
+				() =>
+					(document.querySelector('[data-async-container]') as { __mH?: Map<object, unknown> })
+						.__mH?.size ?? 0,
+			);
+		await expect.poll(unhandled).toBe(0);
+		expect(await runtimeStarted(hold.page)).toBe(false);
+		expect(hold.errors).toEqual([]);
+		await hold.page.unrouteAll({ behavior: 'ignoreErrors' });
+		await hold.page.close();
 	} finally {
 		await browser.close();
 		await new Promise((done) => server.close(done));
