@@ -814,12 +814,15 @@ export function createEventWiring(input: {
 					releaseFlush?.();
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
+						// The marks paint with the pass that paints the handler's writes before its first await.
+						const painted = graph.hasPendingFlush?.() ? graph.flush() : undefined;
 						const start = (module: SubmitHoldModule) =>
 							module.holdSubmit(
 								form,
 								(event as unknown as SubmitEvent).submitter,
 								sent!,
 								record.authoredSubmitAriaDisabled,
+								painted,
 							);
 						// A hold that fails to load or start leaves the submission unmarked, never failing it.
 						hold = (submitHold ? Promise.resolve(submitHold) : import('./submit-hold.ts'))

@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 83,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/submit-hold"
+			],
+			"delta": 149,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 8,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 83,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/submit-hold"
+			],
+			"delta": 149,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 14,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 22,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		}
+	]
+}

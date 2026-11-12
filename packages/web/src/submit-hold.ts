@@ -18,25 +18,33 @@ function guard(event: Event): void {
 	}
 }
 
-/** Holds a form for one submission: `sent` is what it carried, read before its handler ran; the call it returns ends the hold. */
+/** Holds a form for one submission: `sent` is what it carried, read before its handler ran; marks wait for `painted`; the call it returns ends the hold. */
 export function holdSubmit(
 	form: HTMLFormElement,
 	submitter: HTMLElement | null,
 	sent: string,
 	authoredAriaDisabled?: true,
+	painted?: Promise<void>,
 ): () => void {
 	addEventListener('submit', guard, true);
 	// A form whose submit control has an author-written aria-disabled leaves aria-disabled to the author on every control.
 	const run: Run = { sent, submitter, marks: !!submitter && !authoredAriaDisabled };
 	running.set(form, [...(running.get(form) ?? []), run]);
-	holdBusy(form, run, true);
-	if (run.marks) submitter!.setAttribute('aria-disabled', 'true');
+	const mark = (on: boolean) => {
+		holdBusy(form, run, on);
+		if (!run.marks) return;
+		if (on) submitter!.setAttribute('aria-disabled', 'true');
+		else if (!running.get(form)?.some((other) => other.marks && other.submitter === submitter))
+			submitter!.removeAttribute('aria-disabled');
+	};
+	const marked = Promise.resolve(painted).then(
+		() => mark(true),
+		() => mark(true),
+	);
 	return () => {
 		const left = (running.get(form) ?? []).filter((other) => other !== run);
 		if (left.length > 0) running.set(form, left);
 		else running.delete(form);
-		holdBusy(form, run, false);
-		if (run.marks && !left.some((other) => other.marks && other.submitter === submitter))
-			submitter!.removeAttribute('aria-disabled');
+		void marked.then(() => mark(false));
 	};
 }

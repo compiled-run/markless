@@ -282,6 +282,8 @@ Anywhere else, the handler stops at that `await`, state it changed before keeps 
 
 ## A form shows that it is sending
 
+You don't need to write `aria-disabled` or `disabled` on a form's submit button to show it is sending. Markless marks the button for you. You may still write your own; see the end of this section.
+
 While an `onSubmit` handler that returns a promise is still running, Markless marks the form for you. The form gets `aria-busy="true"`, and the button that sent it gets `aria-disabled="true"`. If the handler saved something and the page loads its data again because of it, the marks stay until that new data is on screen. Otherwise they go away when the promise finishes, whether it worked or failed. You write no extra state for this, only CSS:
 
 ```css
@@ -297,7 +299,7 @@ form[aria-busy='true'] button {
 
 `aria-disabled` doesn't stop the button working on its own. Markless stops a press that would send exactly what is already being sent: the same values in every field, from the same button. That press does nothing, with no message. If the person changed a field first, or pressed a different submit button, that is a new submission, and it is sent at once. A press made before Markless has loaded the code that does this, on the very first submit of a page, can still be sent twice. A handler that returns no promise marks nothing. A form with no handler that posts to your own [API route](/router/api-routes) is marked the same way while Markless sends it.
 
-If you write `aria-disabled` on a submit button yourself, for example `aria-disabled={!ready}` to show the form isn't ready, Markless leaves `aria-disabled` alone on every button of that form and still marks the form busy. Style the sending state from the form's `aria-busy`, as above.
+If you write `aria-disabled` on a submit button yourself, for example `aria-disabled={!ready}` to show the form isn't ready, Markless leaves `aria-disabled` alone on every button of that form and still marks the form busy. Your attribute then follows your own state. State your handler sets before its first `await` shows on the page at the same moment as the form's `aria-busy`. Style the sending state from the form's `aria-busy`, as above.
 
 Markless sets the form's `aria-busy`, so the build refuses an `aria-busy` you write on such a form. To mark a form that is busy for another reason, use a class or a `data-` attribute. See [`MARKLESS_ASYNC_ARIA_BUSY_MANAGED`](/errors/MARKLESS_ASYNC_ARIA_BUSY_MANAGED).
 
