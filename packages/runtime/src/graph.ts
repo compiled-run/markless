@@ -411,6 +411,8 @@ export type RuntimeGraph = {
 	readonly hasPendingFlush?: () => boolean;
 	/** Keeps the scheduled flush back until each returned release has run once; `flush()` itself still runs. */
 	readonly holdFlush?: () => () => void;
+	/** A state write `hold` answers true for keeps its value but paints only once replayed through `changed`. */
+	readonly holdPaint?: (hold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined) => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -505,7 +507,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const current = cells.get(graphNodeId);
 			try {
 				const value = initialize();
-				if (!Object.is(current, value)) commitCell(graphNodeId, [], value);
+				if (!Object.is(current, value)) commitCell(graphNodeId, [], value, markDirtyPath);
 			} catch {}
 		}
 
@@ -530,10 +532,15 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush();
 	};
 
-	const commitCell = (graphNodeId: string, path: ReadonlyArray<string>, value: unknown): void => {
+	let paintHold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined;
+	const markWritten = (graphNodeId: string, path: ReadonlyArray<string>): void => {
+		if (!paintHold || computedNodes.has(graphNodeId) || !paintHold(graphNodeId, path)) markDirtyPath(graphNodeId, path);
+	};
+
+	const commitCell = (graphNodeId: string, path: ReadonlyArray<string>, value: unknown, mark = markWritten): void => {
 		const current = cells.get(graphNodeId);
 		cells.set(graphNodeId, writePath(current, path, value));
-		markDirtyPath(graphNodeId, dirtyPathForGraphWrite(current, path));
+		mark(graphNodeId, dirtyPathForGraphWrite(current, path));
 	};
 
 	/**
@@ -809,7 +816,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const result = applyCollectionCall(target, call.method, call.args ?? []);
 
 			if (collectionCallMutated(call.method, result, beforeMutation)) {
-				markDirtyPath(call.graphNodeId, path);
+				markWritten(call.graphNodeId, path);
 			}
 
 			return result;
@@ -817,7 +824,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		delete(deletion) {
 			const outcome = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (outcome.mutated) {
-				markDirtyPath(deletion.graphNodeId, deletion.path);
+				markWritten(deletion.graphNodeId, deletion.path);
 			}
 
 			return outcome.result;
@@ -873,6 +880,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			};
 		},
 		hasPendingFlush,
+		holdPaint(hold) {
+			paintHold = hold;
+		},
 		holdFlush() {
 			flushHolds++;
 			let held = true;

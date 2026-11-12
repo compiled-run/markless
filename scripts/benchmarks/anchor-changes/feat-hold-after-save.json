@@ -1,0 +1,72 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 253,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 730,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 253,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 730,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 17,
+			"reason": "write watch holds a handler's own-run state until its save's reload lands (no blink after a save)",
+			"date": "2026-11-12"
+		}
+	]
+}

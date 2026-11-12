@@ -33,8 +33,15 @@ export const MARKLESS_DISPATCHES_GLOBAL = '__marklessDispatches';
  * A dispatch's user-action token: `open` until its handlers return. The write watch sets `closed` to hear when its flush ends,
  * and `refreshed` when it sends a write: it settles once the reload that write caused has landed, or at once when none follows.
  * `control` is the element whose handler runs, held busy from the write's send until that settle; a submit's form holds itself.
+ * `wrote` names, per graph, the state the dispatch's own synchronous run wrote.
  */
-export type DispatchSpan = { open: boolean; closed?: () => void; refreshed?: Promise<void>; readonly control?: Element };
+export type DispatchSpan = {
+	open: boolean;
+	closed?: () => void;
+	refreshed?: Promise<void>;
+	wrote?: Map<object, Set<string>>;
+	readonly control?: Element;
+};
 
 type DispatchingHost = { __marklessDispatching?: DispatchSpan };
 
