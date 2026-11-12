@@ -19,6 +19,7 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
+import type { HandlingRoot } from '../resume-events.ts';
 import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
 import type {
 	ProtocolInstancePaths,
@@ -172,6 +173,7 @@ export type MarklessSettledArmHandoff = {
 
 type InlineRoot = HTMLElement &
 	EarlyEventRoot &
+	HandlingRoot &
 	OverlayInstalledRoot &
 	OverlayPrimedDismissalHost & {
 		__asyncResumeRuntimeStarted?: boolean;
@@ -499,7 +501,14 @@ function runPrerenderSettleBoot(
 		// waits for the fill. Dispatching it first would boot a runtime whose
 		// records still describe @pending — and whichever trigger group
 		// covered the gesture would leave the boundary unowned.
-		return ready.then(() => resume({ root, event, element: event.target, eventRecord: null }));
+		const done = ready.then(() => resume({ root, event, element: event.target, eventRecord: null }));
+		const handling = (root.__mH ||= new Map());
+		let settle!: () => void;
+		handling.set(event, [
+			new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
+			settle,
+		]);
+		return done;
 	};
 	eventNames.map(
 		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
@@ -799,7 +808,7 @@ function runPrerenderInlineResumer(
 		if (root.__mL !== life) return root.removeEventListener(event.type, dispatch, true);
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
-		return (loaded ||= loadModule(resumeModuleUrl)).then(
+		const done = (loaded ||= loadModule(resumeModuleUrl)).then(
 			(module) =>
 				root.__mL === life &&
 				module.resumeContainerEvent({
@@ -809,6 +818,13 @@ function runPrerenderInlineResumer(
 					eventRecord: null,
 				}),
 		);
+		const handling = (root.__mH ||= new Map());
+		let settle!: () => void;
+		handling.set(event, [
+			new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
+			settle,
+		]);
+		return done;
 	};
 	eventNames.map(
 		(root.__marklessListen = (eventName) => root.addEventListener(eventName, dispatch, true)),
@@ -993,9 +1009,19 @@ function runInlineResumer(
 		root.__marklessDelegatedDispatch = true;
 		pin();
 		// A failed import is not kept: the next forward or wake imports again.
-		return (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+		const done = (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
 			throw ((root.__mResume = undefined), error);
 		})).then((module) => root.__mL === life && module.resumeContainerEvent({ root, ...input }));
+		const event = !input.logOnly && input.event;
+		if (event) {
+			const handling = (root.__mH ||= new Map());
+			let settle!: () => void;
+			handling.set(event, [
+				new Promise<void>((resolve) => done.then((settle = () => (resolve(), handling.delete(event))), settle)),
+				settle,
+			]);
+		}
+		return done;
 	};
 	// The entry for this event name on one element: [ref, policy], either possibly undefined.
 	const entryOf = (element: Element, eventName: string) => {

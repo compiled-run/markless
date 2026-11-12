@@ -38,6 +38,8 @@ export const EVENT_ONLY_RESUMER_ATTRIBUTION = {
 	reportedFailureContainment: 18,
 	// Paired OXC builds measured 1,402 -> 1,415: a failed resume import is dropped, so the next click or wake imports again.
 	failedImportRetry: 13,
+	// Paired OXC builds measured 1,415 -> 1,484: an event received before the runtime starts is recorded where a navigation waits for it, so its handler still runs.
+	inlineEventRecord: 69,
 	gzipCrossTerm: 3,
 };
 
