@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { createRuntimeGraph as createGraph } from '../src/index.ts';
 import { createAsyncComputedPlane } from '../src/graph-async.ts';
 import { createHeldInputsPlane } from '../src/graph-held.ts';
+import { assertHoldMove, HOLD_ENDING, HOLD_MARKING } from '../src/graph-async-load.ts';
 
 // Pins what an async value does through its life, as seen from reads, runs and abort signals.
 
@@ -453,7 +454,7 @@ test('a handler rejection on a blocked value keeps it blocked: the input landing
 	expect(orders.runs.map((run) => run.key)).toEqual(['ada']);
 });
 
-test('an entry mark shows a settled value busy and its end restores it when no run started', async () => {
+test('an entry mark shows a settled value busy and the last of its holders to end restores it when no run started', async () => {
 	const { graph, runner, plane } = single();
 	graph.read('computed:user', ['status']);
 	runner.runs[0]!.resolve('a');
@@ -469,6 +470,10 @@ test('an entry mark shows a settled value busy and its end restores it when no r
 	});
 	plane.markEntry('computed:user');
 	expect(snapshot(graph, 'computed:user')).toMatchObject({ version: 2 });
+	// A second holder (a save sent by the same handler) keeps the mark until it ends too.
+	plane.endEntry('computed:user');
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending', version: 2 });
 	plane.endEntry('computed:user');
 	await graph.flush();
 	expect(snapshot(graph, 'computed:user')).toBe(settled);
@@ -481,6 +486,89 @@ test('an entry mark shows a settled value busy and its end restores it when no r
 		version: 3,
 		key: 2,
 	});
+});
+
+test('a mark with no write behind it ends at once, even while its own flush is still pending', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	runner.runs[0]!.resolve('a');
+	await tick();
+	await graph.flush();
+	const settled = snapshot(graph, 'computed:user');
+	plane.markEntry('computed:user');
+	expect(graph.hasPendingFlush?.()).toBe(true);
+	plane.endEntry('computed:user', true);
+	expect(snapshot(graph, 'computed:user')).toBe(settled);
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toBe(settled);
+	expect(runner.runs).toHaveLength(1);
+});
+
+test('a run that lands while a save holds the value is kept until the save ends, then superseded by a newer run', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	runner.runs[0]!.resolve('a');
+	await tick();
+	plane.markEntry('computed:user', true);
+	graph.write({ graphNodeId: 'state:id', value: 2 });
+	await graph.flush();
+	runner.runs[1]!.resolve('b');
+	await tick();
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending', value: 'a' });
+	plane.endEntry('computed:user', 'saved');
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', value: 'b' });
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('writeFailed');
+});
+
+test('a failed save on a value already loading tags the landing of that run, and only that one', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	plane.markEntry('computed:user', true);
+	plane.endEntry('computed:user', 'failed');
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending' });
+	runner.runs[0]!.resolve('a');
+	await tick();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', value: 'a', writeFailed: true });
+	graph.write({ graphNodeId: 'state:id', value: 2 });
+	await graph.flush();
+	runner.runs[1]!.resolve('b');
+	await tick();
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('writeFailed');
+});
+
+test('a save that sent the page elsewhere ends its mark silently, and a later failure still says so', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	runner.runs[0]!.resolve('a');
+	await tick();
+	plane.markEntry('computed:user', true);
+	plane.endEntry('computed:user', 'left');
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', value: 'a', pageLeft: true });
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('writeFailed');
+	plane.markEntry('computed:user', true);
+	plane.endEntry('computed:user', 'failed');
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', writeFailed: true });
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('pageLeft');
+});
+
+test('a hold whose holders are gone with a run in flight is ending until that run lands, and a new holder makes it marking again', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	const node = plane.nodes.get('computed:user')!;
+	plane.markEntry('computed:user', true);
+	plane.endEntry('computed:user', 'failed');
+	expect(node.entryHold).toMatchObject({ phase: HOLD_ENDING, holders: 0, writing: 0 });
+	plane.markEntry('computed:user', true);
+	expect(node.entryHold).toMatchObject({ phase: HOLD_MARKING, writing: 1 });
+	plane.endEntry('computed:user', 'saved');
+	expect(node.entryHold).toMatchObject({ phase: HOLD_ENDING });
+	runner.runs[0]!.resolve('a');
+	await tick();
+	expect(node.entryHold).toBeUndefined();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', writeFailed: true });
+	expect(() => assertHoldMove(HOLD_ENDING, HOLD_ENDING)).toThrow(/no move/);
 });
 
 test('an entry mark whose handler wrote the key is replaced by the real run, loud, and its end changes nothing', async () => {

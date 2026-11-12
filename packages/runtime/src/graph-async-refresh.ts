@@ -6,6 +6,13 @@ import {
 	NODE_RUNNING,
 	NODE_RUNNING_ON_SHOWN,
 	NODE_SETTLED,
+	HOLD_ENDING,
+	HOLD_MARKING,
+	moveHold,
+	SAVES_ANSWERED,
+	SAVES_FAILED,
+	SAVES_LEFT,
+	type SavesOutcome,
 	type AsyncPlaneState,
 	type AsyncRefresh,
 	type RunCause,
@@ -19,6 +26,19 @@ function lastGood(
 	if (snapshot.status === 'fulfilled') return { value: snapshot.value, valueKey: snapshot.key };
 	if (snapshot.status !== 'idle' && 'valueKey' in snapshot)
 		return { value: snapshot.value, valueKey: snapshot.valueKey };
+}
+
+// The publish that ends a save's mark: a failure says so, and a page left behind ends it without a word.
+function saysOutcome(snapshot: RuntimeGraphAsyncSnapshot, outcome: SavesOutcome): RuntimeGraphAsyncSnapshot {
+	const told = snapshot as { readonly writeFailed?: true; readonly pageLeft?: true };
+	if (outcome === SAVES_ANSWERED && !told.writeFailed && !told.pageLeft) return snapshot;
+	// An earlier save's outcome on a kept snapshot is not this one's.
+	const plain = { ...snapshot } as { writeFailed?: true; pageLeft?: true };
+	delete plain.writeFailed;
+	delete plain.pageLeft;
+	if (outcome === SAVES_FAILED) plain.writeFailed = true;
+	if (outcome === SAVES_LEFT) plain.pageLeft = true;
+	return plain as RuntimeGraphAsyncSnapshot;
 }
 
 /** The refresh half of an async plane: loaded with its first run, failure, handler rejection or entry mark. */
@@ -47,7 +67,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 					state.invalidate(reader);
 		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
 			void (state.flush?.() ?? Promise.resolve()).then(() => {
-				for (const held of heldOnInputs) endEntry(held);
+				for (const held of heldOnInputs) release(held);
 			});
 	};
 
@@ -146,6 +166,23 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 		const land = (snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>): void => {
 			if (node.version !== version) return;
+			const hold = node.entryHold;
+			// A save still being written holds this value: an answer from before it lands only when the save ends, so the mark never drops.
+			if (hold?.writing && snapshot.status !== 'pending') {
+				hold.landed = (outcome) => settle(snapshot, outcome);
+				for (const heard of state.settled) heard(node);
+				return;
+			}
+			// A hold whose holders are gone waited for this run: its landing ends it and says how the saves ended.
+			const ending = hold?.phase === HOLD_ENDING;
+			if (ending) node.entryHold = undefined;
+			settle(snapshot, ending ? hold.outcome : SAVES_ANSWERED);
+		};
+		const settle = (
+			snapshot: Exclude<RuntimeGraphAsyncSnapshot, { readonly status: 'idle' }>,
+			outcome: SavesOutcome,
+		): boolean => {
+			if (node.version !== version) return false;
 			const landed = snapshot.status !== 'rejected';
 			if (landed) {
 				if (inputs) {
@@ -160,7 +197,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			}
 			// Only a run on shown inputs lands pending.
 			move(node, snapshot.status === 'pending' ? NODE_BLOCKED : NODE_SETTLED);
-			publish(node, node.quiet ? { ...snapshot, quiet: true } : snapshot, landed);
+			publish(node, saysOutcome(node.quiet ? { ...snapshot, quiet: true } : snapshot, outcome), landed);
+			return true;
 		};
 		const commitRejected = (error: unknown): void =>
 			land({ status: 'rejected', version, key, error, ...kept });
@@ -241,43 +279,93 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	};
 
 	// Same key, so the real run the write starts replaces this pending snapshot with no gap.
-	const markEntry = (node: RuntimeAsyncComputedNode): void => {
-		if (node.entryHold || node.phase === NODE_IDLE || node.snapshot.status === 'pending')
+	// A handler's key write and the saves it sends may all hold one value; the mark ends with the last of them.
+	const markEntry = (node: RuntimeAsyncComputedNode, save?: boolean): void => {
+		const hold = node.entryHold;
+		if (hold) {
+			if (hold.phase === HOLD_ENDING) moveHold(hold, HOLD_MARKING);
+			if (save) hold.writing++;
+			else hold.holders++;
 			return;
+		}
+		if (node.phase === NODE_IDLE) return;
+		// A value already loading is held as it is, so that run cannot land while the save is out; a quiet one turns loud.
+		if (node.snapshot.status === 'pending') {
+			if (!save) return;
+			node.entryHold = { phase: HOLD_MARKING, version: node.version, previous: node.snapshot, holders: 0, writing: 1, outcome: SAVES_ANSWERED };
+			if (!node.snapshot.quiet) return;
+			node.quiet = false;
+			const loud: { quiet?: boolean } = { ...node.snapshot };
+			delete loud.quiet;
+			publish(node, loud as RuntimeGraphAsyncSnapshot);
+			void state.flush?.();
+			return;
+		}
 		const previous = node.snapshot;
 		const version = ++node.version;
-		node.entryHold = { version, previous };
+		node.entryHold = { phase: HOLD_MARKING, version, previous, holders: save ? 0 : 1, writing: save ? 1 : 0, outcome: SAVES_ANSWERED };
 		node.quiet = false;
 		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
 		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
 		void state.flush?.();
 	};
 
-	const endEntry = (node: RuntimeAsyncComputedNode): void => {
+	const endEntry = (node: RuntimeAsyncComputedNode, save?: 'saved' | 'failed' | 'left'): void => {
 		const hold = node.entryHold;
 		if (!hold) return;
+		if (!save) hold.holders--;
+		else {
+			hold.writing--;
+			hold.outcome = Math.max(hold.outcome, save === 'left' ? SAVES_LEFT : save === 'failed' ? SAVES_FAILED : SAVES_ANSWERED) as SavesOutcome;
+		}
+		if (hold.holders + hold.writing === 0) release(node, save !== undefined);
+	};
+
+	const release = (node: RuntimeAsyncComputedNode, unwritten?: boolean): void => {
+		const hold = node.entryHold;
+		if (!hold) return;
+		const landed = hold.landed;
+		if (landed) {
+			hold.landed = undefined;
+			node.entryHold = undefined;
+			heldOnInputs.delete(node);
+			// A newer run superseded the kept answer: the outcome rides on that run instead.
+			if (!landed(hold.outcome) && hold.outcome !== SAVES_ANSWERED) {
+				moveHold(hold, HOLD_ENDING);
+				node.entryHold = hold;
+			}
+			return;
+		}
+		// A run started since the mark, or the value was loading when it was marked: that run settles the mark as any run does.
+		const inFlight = node.version !== hold.version || hold.previous.status === 'pending';
 		// A cell-backed computed between the write and this key only recomputes in the next flush.
-		if (node.version === hold.version && state.hasPendingFlush?.()) {
+		if (!unwritten && !inFlight && state.hasPendingFlush?.()) {
 			void state.flush?.().then(() => {
-				if (node.entryHold === hold) endEntry(node);
+				if (node.entryHold === hold) release(node);
 			});
 			return;
 		}
 		if (
-			node.version === hold.version &&
+			!inFlight &&
 			asyncInputWhere(node, (input) => input.snapshot.status === 'pending' && input.snapshot.quiet !== true)
 		) {
 			heldOnInputs.add(node);
 			return;
 		}
 		const outlived = heldOnInputs.delete(node);
+		// The outcome rides on the landing of the run in flight.
+		if (inFlight) {
+			if (hold.outcome === SAVES_ANSWERED) node.entryHold = undefined;
+			else moveHold(hold, HOLD_ENDING);
+			return;
+		}
 		node.entryHold = undefined;
-		if (node.version !== hold.version) return;
 		// Below a failed link the value goes where any reader of a failed input goes.
 		if (outlived && asyncInputWhere(node, (input) => input.snapshot.status === 'rejected')) advance(node);
 		if (node.version !== hold.version) return;
 		// A new version, so the block settles on it: its input's failure was held back while this value was busy.
-		publish(node, outlived ? ({ ...hold.previous, version: ++node.version } as RuntimeGraphAsyncSnapshot) : hold.previous);
+		const restored = outlived ? { ...hold.previous, version: ++node.version } : hold.previous;
+		publish(node, saysOutcome(restored as RuntimeGraphAsyncSnapshot, hold.outcome));
 		void state.flush?.();
 	};
 
