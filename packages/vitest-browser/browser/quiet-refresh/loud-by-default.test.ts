@@ -2,6 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { AttachPoll } from './attach-poll.tsrx';
 import { OtherCallers } from './other-callers.tsrx';
+import { PollAwaiting } from './poll-awaiting.tsrx';
 
 // A refresh is loud whoever started it, unless a repeating timer (a poll) did; a first load is never marked or announced.
 afterEach(() => cleanup());
@@ -61,9 +62,9 @@ async function loudRefresh(container: HTMLElement, selector: string, start: () =
 	expect(watch().said).toEqual(['Updating…', 'Updated']);
 }
 
-const mounts: ReadonlyArray<readonly [string, { readonly callers: Mount; readonly poll: Mount }]> = [
-	['CSR', { callers: () => render(OtherCallers), poll: () => render(AttachPoll) }],
-	['SSR', { callers: () => renderSSR(OtherCallers), poll: () => renderSSR(AttachPoll) }],
+const mounts: ReadonlyArray<readonly [string, { readonly callers: Mount; readonly poll: Mount; readonly awaiting: Mount }]> = [
+	['CSR', { callers: () => render(OtherCallers), poll: () => render(AttachPoll), awaiting: () => render(PollAwaiting) }],
+	['SSR', { callers: () => renderSSR(OtherCallers), poll: () => renderSSR(AttachPoll), awaiting: () => renderSSR(PollAwaiting) }],
 ];
 
 for (const [mode, mount] of mounts) {
@@ -109,5 +110,21 @@ for (const [mode, mount] of mounts) {
 		await expect.poll(() => Number(text(container, '[data-feed]')), poll).toBeGreaterThanOrEqual(101);
 		await wait(60);
 		expect(watch(), 'neither the first load nor a tick marks or announces').toEqual({ marked: false, said: [] });
+	});
+
+	test(`${mode}: a click made while a poll's tick waits on its own await is marked busy and announced`, async () => {
+		const container = await mounted(await mount.awaiting());
+		await expect.poll(() => text(container, '[data-orders]'), poll).toBe('orders: all');
+		await expect.poll(() => container.querySelector('[data-listening]'), poll).not.toBeNull();
+		container.querySelector<HTMLButtonElement>('[data-start-poll]')!.click();
+		// Ticks every 50 ms, each waiting 2 s: from here on some tick is always mid-await.
+		await wait(300);
+		await loudRefresh(
+			container,
+			'[data-orders]',
+			() => container.querySelector<HTMLButtonElement>('[data-open]')!.click(),
+			'orders: all',
+			'orders: open',
+		);
 	});
 }

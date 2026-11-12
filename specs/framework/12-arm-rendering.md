@@ -219,9 +219,14 @@ across all three cases:
   `globalThis.setInterval` or `self.setInterval`, when the module binds none
   of those names itself) and passes the tick through
   `marklessRepeatingTimer` (`@markless/web/fns/repeating-timer`), which
-  marks the tick's turn quiet until it returns or the promise it returns
-  settles. A callback prop the tick calls keeps that turn once its code has
-  loaded. An answer that lands carries its own quietness to the values that
+  marks the tick's synchronous run quiet, ending when that run returns or
+  throws, never held by a promise the tick returns: a hung request in a tick
+  must not keep the page quiet. A callback prop the tick calls in that run
+  keeps the turn once its code has loaded, through its own awaits. So the
+  quiet poll is a tick that changes state directly and lets the async value
+  do the fetch; a tick that writes after its own `await` is loud. A save
+  sent while a poll runs is still marked from the send and announced (the
+  save hold below). An answer that lands carries its own quietness to the values that
   read it, so a poll's refresh is quiet all the way down a chain and a
   click's is loud all the way down, whatever turn is open when it lands. A
   quiet refresh still swaps in the new content the moment it lands, and a
@@ -232,9 +237,9 @@ across all three cases:
   shown content to mark. Limits: a `setInterval` in a plain `.ts` module or
   a library is not lowered, so its poll is loud; a poll written as a chain
   of `setTimeout` calls is loud, because each call is a one-off timer; and
-  JavaScript carries no context across an `await`, so while a quiet tick is
-  still waiting on its own `await`, a write from an unrelated click in that
-  window is quiet too.
+  JavaScript carries no context across an `await`, so while a callback prop
+  a tick called is still waiting on its own `await`, a write from an
+  unrelated listener in that window is quiet too.
 - Refresh after a save (2026-11-11, owner): when an event handler's write
   succeeds, every async value the page shows inside a `@try`, and every
   async value those read through sync computeds or other async values,
@@ -613,10 +618,10 @@ none changes a ruling above.
 - Reveal ordering groups (deferred, D6). Authors cannot ask for
   parallel/sequential/reverse reveal; streamed reveals follow the
   compiler-known dependency order only.
-- Loud vs quiet across awaits (open, D8 "Quiet re-settle"). While a quiet
-  tick is still waiting on its own `await`, any write in that window is
-  quiet, an unrelated click's included. Closing it needs the compiler to
-  rewrap each `await`, or a platform async context.
+- Loud vs quiet across awaits (open, D8 "Quiet re-settle"). While a
+  callback prop a tick called is still waiting on its own `await`, any write
+  in that window that no handler's entry mark covers is quiet. Closing it
+  needs the compiler to rewrap each `await`, or a platform async context.
 - Async reads inside `@pending` and `@catch` (deferred). The rules above
   cover the `@try` arm's async reads; reading an async value directly in a
   `@pending` or `@catch` arm is not specified.

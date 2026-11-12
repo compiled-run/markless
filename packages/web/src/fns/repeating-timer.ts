@@ -1,4 +1,4 @@
-// The callback an authored `setInterval` repeats: its writes, and what it awaits, refresh quietly.
+// The callback an authored `setInterval` repeats: what its synchronous run writes, or calls, refreshes quietly.
 type RepeatingTimerContext = {
 	readonly graph?: { readonly markQuietStart?: () => void; readonly markQuietEnd?: () => void };
 };
@@ -12,17 +12,11 @@ export function marklessRepeatingTimer<A extends unknown[], R>(
 	if (typeof tick !== 'function' || !graph?.markQuietStart) return tick;
 	return function (this: unknown, ...args: A): R {
 		graph.markQuietStart!();
-		const end = () => graph.markQuietEnd?.();
-		let result: R;
+		// Ends with the synchronous run, not the tick's promise: a hung fetch must not keep the page quiet.
 		try {
-			result = tick.apply(this, args);
-		} catch (error) {
-			end();
-			throw error;
+			return tick.apply(this, args);
+		} finally {
+			graph.markQuietEnd?.();
 		}
-		if (typeof (result as PromiseLike<unknown> | undefined)?.then === 'function')
-			(result as PromiseLike<unknown>).then(end, end);
-		else end();
-		return result;
 	};
 }
