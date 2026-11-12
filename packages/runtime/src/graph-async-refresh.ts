@@ -40,6 +40,11 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		});
 		state.scheduleFlush();
 		if (snapshot.status !== 'pending') for (const heard of state.settled) heard(node);
+		// A reader blocked on this value runs again once it settles, also when the answer compares equal and dirties no path it reads.
+		if (snapshot.status !== 'pending' && previous.status === 'pending')
+			for (const reader of nodes.values())
+				if (reader.phase === NODE_BLOCKED && asyncInputWhere(reader, (input) => input === node))
+					state.invalidate(reader);
 		if (snapshot.status !== 'pending' && heldOnInputs.size > 0)
 			void (state.flush?.() ?? Promise.resolve()).then(() => {
 				for (const held of heldOnInputs) endEntry(held);

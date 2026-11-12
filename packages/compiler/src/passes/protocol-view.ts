@@ -1253,6 +1253,7 @@ function wiredArmRecordSet(
 				eventName: event.eventName,
 				syncPolicy: event.syncPolicy,
 				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
+				...submitEventFacts(input, event),
 			})),
 		behaviors: withBehaviorSymbols(
 			input,
@@ -1708,12 +1709,15 @@ function submitEventFacts(
 	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },
 ): ProtocolSubmitEventFacts {
-	return input.semanticGraph?.events.some(
+	const same = input.semanticGraph?.events.filter(
 		(candidate) =>
-			candidate.authoredSubmitAriaDisabled &&
-			candidate.hostNodeId === event.hostNodeId &&
-			candidate.eventName === event.eventName,
-	)
-		? { authoredSubmitAriaDisabled: true }
-		: {};
+			candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
+	);
+	const inPlace = same?.find((candidate) => candidate.inPlaceSubmit)?.inPlaceSubmit;
+	return {
+		...(same?.some((candidate) => candidate.authoredSubmitAriaDisabled) && {
+			authoredSubmitAriaDisabled: true,
+		}),
+		...(inPlace && { inPlaceSubmit: inPlace }),
+	};
 }
