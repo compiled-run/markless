@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 528,
-			"reason": "arm-shapes-agree (PR #641): the docs playground ships the compiler, which grows by the AST read-path helper for ?. and ! reads, the per-prop refresh-warning walk and a longer arm-refusal suggestion; nothing more runs at load; measured on CI run 43235930492 against main's merge-queue run 43216434114",
+			"delta": 581,
+			"reason": "arm-shapes-agree (PR #641): the docs playground ships the compiler, which grows by the AST read-path helper for ?. and ! reads, the per-prop refresh-warning walk, a longer arm-refusal suggestion, and (review) arm-guard matching by graph cell and path instead of source text; nothing more runs at load; measured on CI run 43255303066 against main's merge-queue run 43216434114",
 			"date": "2026-11-12"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 528,
-			"reason": "arm-shapes-agree (PR #641): the docs playground ships the compiler, which grows by the AST read-path helper for ?. and ! reads, the per-prop refresh-warning walk and a longer arm-refusal suggestion; nothing more runs at load; measured on CI run 43235930492 against main's merge-queue run 43216434114",
+			"delta": 581,
+			"reason": "arm-shapes-agree (PR #641): the docs playground ships the compiler, which grows by the AST read-path helper for ?. and ! reads, the per-prop refresh-warning walk, a longer arm-refusal suggestion, and (review) arm-guard matching by graph cell and path instead of source text; nothing more runs at load; measured on CI run 43255303066 against main's merge-queue run 43216434114",
 			"date": "2026-11-12"
 		}
 	]
