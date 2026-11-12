@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const ROW_MINT_UNSUPPORTED = 'MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED';
 
@@ -86,10 +87,11 @@ export function Lists() @{
 	expect(inner?.rowComponent).toEqual({ componentName: 'Lists', rowChunkId: 'repeat:repeat:1:row' });
 });
 
-test('a nested @for whose rows hold an @if inside an @if arm is refused, not dropped', async () => {
-	const result = await compileTsrxModule({
-		filename: 'src/Page.tsrx',
-		source: `
+test('a nested @for whose rows hold an @if inside an @if arm runs in the browser, or is refused, never dropped', async () => {
+	const compilePage = (unlinked: string) =>
+		compileTsrxModule({
+			filename: 'src/Page.tsrx',
+			source: `
 import { state } from '@markless/core';
 
 export function Lists() @{
@@ -103,11 +105,21 @@ export function Lists() @{
 		}
 	</section>
 }
-`,
-		symbols: [],
-	});
+${unlinked}`,
+			symbols: [],
+		});
+	const shipped = await compilePage('');
+	expect(shipped.symbolModules.armEscalationCandidates ?? []).toHaveLength(1);
+	expect(shipped.symbolModules.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+		expect.arrayContaining(['MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER']),
+	);
 	expect(
-		result.symbolModules.diagnostics.filter(
+		shipped.symbolModules.diagnostics.filter(
+			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toEqual([]);
+	expect(
+		(await compilePage(UNLINKED_RENDER)).symbolModules.diagnostics.filter(
 			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		),
 	).toEqual([expect.objectContaining({ severity: 'error' })]);

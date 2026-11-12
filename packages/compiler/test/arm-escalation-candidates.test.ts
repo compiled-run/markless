@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import { linkedRenderDataBoundarySymbols } from '../src/passes/link/interface-link.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const OWN_STATE_CHILD = `
 import { state } from '@markless/core';
@@ -44,15 +45,24 @@ test('an arm holding a component that keeps its own value is recorded as an esca
 	expect(candidates[0]?.symbolId).toBeTruthy();
 });
 
-// Fail-closed: recording a candidate never clears the refusal on its own. Only
-// a linker that actually emits the escalation symbol may retire it.
-test('an unfulfilled candidate still carries its loud refusal', async () => {
-	const compiled = await compilePage(OWN_STATE_CHILD);
+// Fail-closed: a candidate the page cannot re-render, because a component it
+// renders has no interface in this compile, keeps its loud refusal.
+test('a candidate the page cannot re-render still carries its loud refusal', async () => {
+	const compiled = await compilePage(OWN_STATE_CHILD + UNLINKED_RENDER);
 	const diagnostic = compiled.symbolModules.diagnostics.find(
 		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);
 	expect(diagnostic?.severity).toBe('error');
 	expect(diagnostic?.message).toContain('keeps a `hits` of its own');
+});
+
+test('a candidate the page can re-render ships with no refusal', async () => {
+	const compiled = await compilePage(OWN_STATE_CHILD);
+	expect(
+		compiled.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toBeUndefined();
 });
 
 // A linker that names no branch export fulfills nothing: the capability stays
@@ -175,8 +185,8 @@ test('an imported child given a value that changes escalates and says it renders
 	expect(
 		result.symbolModules.diagnostics.find(
 			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
-		)?.severity,
-	).toBe('error');
+		),
+	).toBeUndefined();
 });
 
 const IMPORTED_SCENE = `
@@ -273,6 +283,12 @@ test('an @if holding a @try block escalates and says the @try block renders in t
 	expect(
 		compiled.symbolModules.diagnostics.find(
 			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toBeUndefined();
+	const unlinked = await compilePage(ASYNC_LIST_IN_IF + UNLINKED_RENDER, 'src/Finder.tsrx');
+	expect(
+		unlinked.symbolModules.diagnostics.find(
+			(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		)?.message,
 	).toBe('this @if (shown) cannot be rebuilt when shown changes because it holds a @try block.');
 	const symbols = linkedRenderDataBoundarySymbols({
@@ -359,6 +375,12 @@ for (const [shape, source, filename, test_, runs, refusal] of [
 		);
 		expect(
 			compiled.symbolModules.diagnostics.find(
+				(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+			),
+		).toBeUndefined();
+		const unlinked = await compilePage(source + UNLINKED_RENDER, filename);
+		expect(
+			unlinked.symbolModules.diagnostics.find(
 				(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 			)?.message,
 		).toBe(`this @if (${test_}) cannot be rebuilt when ${test_} changes because ${refusal}.`);

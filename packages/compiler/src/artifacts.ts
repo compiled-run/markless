@@ -2387,6 +2387,8 @@ export type SymbolModulesInput = {
 	readonly captureAnalysis: CaptureAnalysisArtifact;
 	readonly renderData?: RenderDataArtifact;
 	readonly publicRenderPlan?: PublicRenderPlanArtifact;
+	// A re-render of the page answers an arm only when the module emitted render data.
+	readonly publicRenderModule?: Pick<PublicRenderModuleArtifact, 'renderDataModuleSource'>;
 	// Boundary update modules return the planned records of the arm they render.
 	readonly protocolView?: ProtocolViewPayloadWithArmRecords;
 	// Consumer builds drop the authored-source strings: nothing reads them at
@@ -2421,8 +2423,9 @@ export type SymbolModulesDiagnostic = CompilerDiagnostic & {
  * A branch this pass could build no arm parts for, whose every refusal was a
  * same-module component that has to run. Rebuilding the markup here is
  * impossible, but re-rendering the page through the prerender evaluator does
- * run the component, so the link pass may fulfill the candidate with an
- * escalation symbol. Until something fulfills it, the refusal beside it stands.
+ * run the component. This pass accepts the candidate, and drops the refusal
+ * beside it, when the module has render data and every component it renders
+ * is linked; the link pass then emits the escalation symbol on the same facts.
  */
 export type ArmEscalationCandidate = {
 	readonly branchSiteId: string;

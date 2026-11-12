@@ -115,6 +115,7 @@ import {
 } from './public-render/shared.ts';
 import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
 import { captureSlotReadInContext } from './capture-analysis.ts';
+import { prerenderInterfacesComplete } from './link/interfaces-complete.ts';
 
 /**
  * The branch sites whose every arm refusal a page re-render can answer. The
@@ -292,7 +293,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 			: {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
-			...branchArms.diagnostics,
+			...withoutAcceptedArmRefusals(input, branchArms, modules),
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
@@ -1406,6 +1407,36 @@ type ArmPartsContext = {
 	};
 	readonly refusals?: ArmRefusal[];
 };
+
+// An arm a page re-render answers ships, so its refusal goes; the warning that it renders in the browser stays.
+function withoutAcceptedArmRefusals(
+	input: SymbolModulesInput,
+	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'diagnostics' | 'escalationCandidates'>,
+	modules: ReadonlyArray<GeneratedSymbolModule>,
+): ReadonlyArray<SymbolModulesDiagnostic> {
+	if (
+		branchArms.escalationCandidates.length === 0 ||
+		!input.publicRenderModule?.renderDataModuleSource ||
+		!input.semanticGraph ||
+		!prerenderInterfacesComplete({ semanticGraph: input.semanticGraph }, input.source ?? {})
+	)
+		return branchArms.diagnostics;
+	const emitted = new Set(modules.map((module) => module.symbolId));
+	const accepted = new Set(
+		branchArms.escalationCandidates
+			.filter((candidate) => !emitted.has(candidate.symbolId))
+			.map((candidate) => candidate.symbolId),
+	);
+	return branchArms.diagnostics.filter(
+		(diagnostic) =>
+			!(
+				diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
+				diagnostic.severity === 'error' &&
+				typeof diagnostic.symbolId === 'string' &&
+				accepted.has(diagnostic.symbolId)
+			),
+	);
+}
 
 function renderBranchArms(
 	input: SymbolModulesInput,

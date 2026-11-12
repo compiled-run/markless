@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 // An @if decided by an expression of props is the caller's to flip, exactly like one decided by a bare prop.
 const UNSUPPORTED = 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED';
@@ -57,7 +58,7 @@ test('an arm a flip still cannot rebuild warns, not errors, when an expression o
 	expect(diagnostics.map((entry) => entry.severity)).toEqual(['warning']);
 });
 
-test('an arm decided by state still refuses as an error', async () => {
+test('an arm decided by state refuses as an error where the page cannot re-render', async () => {
 	const keeper = `function Keeper() @{
 	let hits = state(0);
 	<button onClick={() => hits++}>{hits}</button>
@@ -73,7 +74,7 @@ export default function Owned() @{
 		@if (open) { <Keeper /> }
 	</section>
 }
-`,
+${UNLINKED_RENDER}`,
 		symbols: [],
 	});
 	expect(

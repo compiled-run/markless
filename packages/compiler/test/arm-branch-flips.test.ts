@@ -9,6 +9,13 @@ import { planPayloadArena } from '../src/passes/payload-arena.ts';
 import { createProtocolViewPayload } from '../src/passes/protocol-view.ts';
 import { planPublicRender } from '../src/passes/public-render/plan.ts';
 import { planSymbolResolver } from '../src/passes/symbol-resolver.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
+
+const refusalOf = (result: Awaited<ReturnType<typeof compileTsrxModule>>) =>
+	result.symbolModules.diagnostics.find(
+		(diagnostic) =>
+			diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' && diagnostic.severity === 'error',
+	);
 
 // D1 tier 3 inside arms (T104): an @if inside an async boundary arm gets real
 // flip machinery — a branch record nested under the boundary's armRecords in
@@ -319,17 +326,15 @@ export function App() @{
 });
 
 // The refresh records of an imported child belong to ITS module, and this one
-// cannot address them, so a value that changes after the child is shown is
-// refused rather than shown once and left stale.
-test('a page-level @if refuses an imported component showing a value that changes', async () => {
+// cannot address them, so the markup is not rebuilt: the arm runs the child in
+// the browser when the page can be re-rendered, and is refused otherwise.
+test('a page-level @if runs an imported component showing a value that changes, and refuses it where the page cannot re-render', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Panel.tsrx',
 		source: `export function Panel({ label }) @{ <em class="panel">{label}</em> }`,
 		symbols: [],
 	});
-	const result = await compileTsrxModule({
-		filename: 'src/LivePanel.tsrx',
-		source: `
+	const page = `
 import { state } from '@markless/core';
 import { Panel } from './Panel.tsrx';
 
@@ -342,20 +347,23 @@ export function App() @{
 		@if (armed) { <Panel label={label} /> }
 	</main>
 }
-`,
-		symbols: [],
-		importedModuleInterfaces: { './Panel.tsrx': child.moduleGraphInterface },
-	});
-	const diagnostic = result.symbolModules.diagnostics[0];
-	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
-	expect(diagnostic?.message).toContain(
+`;
+	const compile = (source: string) =>
+		compileTsrxModule({
+			filename: 'src/LivePanel.tsrx',
+			source,
+			symbols: [],
+			importedModuleInterfaces: { './Panel.tsrx': child.moduleGraphInterface },
+		});
+	expect(refusalOf(await compile(page))).toBeUndefined();
+	expect(refusalOf(await compile(page + UNLINKED_RENDER))?.message).toContain(
 		'<Panel> shows a value that changes after it is shown',
 	);
 });
 
-// A component that has to run has no arm material to publish, so the caller
-// still refuses - the same refusal it gave before any of this existed.
-test('a page-level @if whose imported component has to run still refuses', async () => {
+// A component that has to run has no arm material to publish, so the arm runs
+// it in the browser, and is refused where the page cannot be re-rendered.
+test('a page-level @if whose imported component has to run refuses where the page cannot re-render', async () => {
 	const child = await compileTsrxModule({
 		filename: 'src/Counter.tsrx',
 		source: `
@@ -371,7 +379,8 @@ export function Counter({ label }) @{
 	expect(child.moduleGraphInterface.render.components[0]?.armMaterial).toBeUndefined();
 	const result = await compileTsrxModule({
 		filename: 'src/ImportedCounter.tsrx',
-		source: `
+		source:
+			`
 import { state } from '@markless/core';
 import { Counter } from './Counter.tsrx';
 
@@ -383,19 +392,18 @@ export function App() @{
 		@if (armed) { <Counter label="ready" /> }
 	</main>
 }
-`,
+` + UNLINKED_RENDER,
 		symbols: [],
 		importedModuleInterfaces: { './Counter.tsrx': child.moduleGraphInterface },
 	});
-	const diagnostic = result.symbolModules.diagnostics[0];
-	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
-	expect(diagnostic?.message).toContain('<Counter> has to run to produce its content');
+	expect(refusalOf(result)?.message).toContain('<Counter> has to run to produce its content');
 });
 
-test('a page-level @if whose component has to run refuses at build time, in author words', async () => {
+test('a page-level @if whose component has to run refuses where the page cannot re-render, in author words', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/PagePanel.tsrx',
-		source: `
+		source:
+			`
 import { state } from '@markless/core';
 
 function Panel({ label }) @{
@@ -411,7 +419,7 @@ export function App() @{
 		@if (armed) { <Panel label="ready" /> }
 	</main>
 }
-`,
+` + UNLINKED_RENDER,
 		symbols: [],
 	});
 	const record = result.protocolView.branches?.[0];
@@ -553,12 +561,14 @@ export function App() @{
 // T057 wall 2 is NOT lifted, and the reason is the NAME the value reaches the
 // page under: a rendered child's cell is composed as `c0:state:hits`, while an
 // arm the parent rebuilds addresses the plain `state:hits`. A closed arm has no
-// value to read and an open one reads a node the child never wrote, so the
-// refusal stays fail-closed and now names the value that blocked it.
-test('a page-level @if whose component brings state of its own still refuses', async () => {
+// value to read and an open one reads a node the child never wrote, so the arm
+// runs the child in the browser, and where the page cannot be re-rendered the
+// refusal stays fail-closed and names the value that blocked it.
+test('a page-level @if whose component brings state of its own refuses where the page cannot re-render', async () => {
 	const result = await compileTsrxModule({
 		filename: 'src/OwnStatePanel.tsrx',
-		source: `
+		source:
+			`
 import { state } from '@markless/core';
 
 function Panel({ label }) @{
@@ -574,12 +584,10 @@ export function App() @{
 		@if (armed) { <Panel label="ready" /> }
 	</main>
 }
-`,
+` + UNLINKED_RENDER,
 		symbols: [],
 	});
-	const diagnostic = result.symbolModules.diagnostics[0];
-	expect(diagnostic?.code).toBe('MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED');
-	expect(diagnostic?.message).toContain(
+	expect(refusalOf(result)?.message).toContain(
 		'<Panel> keeps a `hits` of its own that only running it works out',
 	);
 	// No record pointing at a flip module the build refused to write.

@@ -4,6 +4,7 @@
 // known. Resolution is an input: the pass never resolves or loads a specifier,
 // and virtual module naming stays with the caller that owns the module ids.
 import { compileTsrxModule } from '../../compile-module.ts';
+import { prerenderInterfacesComplete } from './interfaces-complete.ts';
 import {
 	componentEdgeSymbolRoutes,
 	type ComponentEdgeSymbolRoute,
@@ -14,7 +15,6 @@ import type {
 	LinkedBoundarySymbol,
 	LinkedBoundarySymbolsInput,
 	LinkedInterfaceClaim,
-	LinkedInterfaceCompleteness,
 	LinkedInterfaceImport,
 	LinkedInterfacesArtifact,
 	LinkedInterfacesInput,
@@ -156,17 +156,7 @@ function hashedInterface(value: ModuleGraphInterfaceArtifact | undefined): unkno
 	};
 }
 
-export function prerenderInterfacesComplete(
-	compiled: Pick<CompileTsrxModuleResult, 'semanticGraph'>,
-	link: LinkedInterfaceCompleteness,
-): boolean {
-	return compiled.semanticGraph.componentEdges.every(
-		(edge) =>
-			!edge.importSource ||
-			link.artifactChildMaterializations?.[edge.id] !== undefined ||
-			link.importedModuleInterfaces?.[edge.importSource] !== undefined,
-	);
-}
+export { prerenderInterfacesComplete };
 
 export function linkedRenderDataBoundarySymbols(
 	input: LinkedBoundarySymbolsInput,

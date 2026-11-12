@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 const noteSource = (onOpen: string, afterField: string) => `
 import { state } from '@markless/core';
@@ -139,7 +140,7 @@ export function Rows() @{
 	expect(branchModule(result) ?? '').toMatch(/"attribute": \{ "name": "title", "itemPath": \["label"\] \}/);
 });
 
-test('a repeated row holding an @if inside an @if still refuses, in author words', async () => {
+test('a repeated row holding an @if inside an @if refuses where the page cannot re-render, in author words', async () => {
 	const result = await compile(
 		'src/Rows.tsrx',
 		`
@@ -158,7 +159,7 @@ export function Rows() @{
 			</ul>
 		}
 	</div>
-}`,
+}${UNLINKED_RENDER}`,
 	);
 	const diagnostic = result.symbolModules.diagnostics.find(
 		(entry) => entry.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
