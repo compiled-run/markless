@@ -1376,7 +1376,7 @@ export default function OneSave() @{
 
 ### Can an attribute value be a template string?
 
-Yes. Any expression works, template strings included: `href={`/stocks/${symbol}`}` or `data-testid={`row-${symbol}`}`. The attribute follows the state it reads. See [Conditionals](/concepts/conditionals#any-expression-can-be-an-attribute-value).
+Yes. An attribute takes any expression in braces, template strings included, and follows the state it reads. [Conditionals](/concepts/conditionals#any-expression-can-be-an-attribute-value) has an example with `href`, `class` and `data-testid`.
 
 ### How do I pass values and a callback to a child component?
 
