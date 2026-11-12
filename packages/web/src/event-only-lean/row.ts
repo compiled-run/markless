@@ -23,6 +23,7 @@ import {
 	resolveResult,
 	resolveSymbol,
 	resumeFullEventOnly,
+	runAsDispatch,
 	shadowLeanActionPlanGraph,
 	syncPolicyGraphNodeIds,
 } from './lean-shared.ts';
@@ -84,19 +85,27 @@ export async function resumeScalarRowEventFromPayloadDocument(
 		),
 	};
 	executeLeanActionPlanWrite(graph, action.plan, rowLocals);
-	for (const symbolId of activeRecord.symbolIds) {
-		const symbol = await resolveSymbol(input.loadSymbol(symbolId));
-		void (await resolveResult(
-			marklessRunAtCurrentTarget(input.event, rowDispatch.element, symbol, {
-				graph: shadowLeanActionPlanGraph(graph),
-				event: input.event,
-				element: rowDispatch.element,
-				getElementHandle: () => undefined,
-				locals: rowLocals,
-			}),
-		));
-	}
-	await graph.flush();
+	await runAsDispatch(
+		input.event,
+		rowDispatch.element,
+		async (own) => {
+			for (const symbolId of activeRecord.symbolIds) {
+				const symbol = await resolveSymbol(input.loadSymbol(symbolId));
+				void (await resolveResult(
+					own(() =>
+						marklessRunAtCurrentTarget(input.event, rowDispatch.element, symbol, {
+							graph: shadowLeanActionPlanGraph(graph),
+							event: input.event,
+							element: rowDispatch.element,
+							getElementHandle: () => undefined,
+							locals: rowLocals,
+						}),
+					),
+				));
+			}
+		},
+		() => graph.flush(),
+	);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await import('../debug-channel.ts')
 			.then((debug) =>

@@ -898,3 +898,64 @@ test.each([
 		}
 	},
 );
+
+// A row rooted by a component, or an arm that runs one, renders records its own component declared in this
+// module, so this module's view enumerates them; an imported child's records are its own module's map.
+test.each([
+	{
+		name: 'a row that is the component',
+		filename: '/workspace/src/Shelf.tsrx',
+		source: `import { state } from '@markless/core';
+		function Book(props) @{
+			let open = state(false);
+			<li><button onClick={() => (open = !open)}>{props.book.title}</button>@if (open) { <p>blurb</p> }</li>
+		}
+		export default function Shelf() @{
+			let books = state([{ id: 1, title: 'Dune' }]);
+			<ul>@for (const book of books; key book.id) { <Book book={book} /> }</ul>
+		}`,
+		rows: true,
+	},
+	{
+		name: 'a row element wrapping the component',
+		filename: '/workspace/src/Roster.tsrx',
+		source: `import { state } from '@markless/core';
+		function Crew({ member }) @{
+			let shown = state('');
+			<div><input onInput={(event) => (shown = event.currentTarget.value)} />@if (shown === member.name) { <em>match</em> } @else { <i>{shown}</i> }</div>
+		}
+		export default function Roster() @{
+			let members = state([{ key: 'a', name: 'Ada' }]);
+			<section>@for (const member of members; key member.key) { <article><Crew member={member} /></article> }</section>
+		}`,
+		rows: true,
+	},
+	{
+		name: 'an @if whose arm runs a component holding an async value',
+		filename: '/workspace/src/Directory.tsrx',
+		source: `import { computed, state } from '@markless/core';
+		function Profile(props) @{
+			const user = computed(async () => ({ name: 'u' + props.id }));
+			<article>@try { <h3>{user.name}</h3> } @pending { <i>wait</i> } @catch { <b>no</b> }</article>
+		}
+		export default function Directory() @{
+			let picked = state(0);
+			<nav><select onChange={(event) => (picked = Number(event.currentTarget.value))}><option value="1">one</option></select>@if (picked > 0) { <aside><Profile id={picked} /><a onClick={() => (picked = 0)}>x</a></aside> }</nav>
+		}`,
+		rows: false,
+	},
+])('records a component renders inside rows or arms are listed: $name', async ({ filename, source, rows }) => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({ filename, symbols: [], source });
+	if (rows) expect(result.protocolView.keyedRepeats?.some((repeat) => repeat.rowComponent)).toBe(true);
+	else expect(result.protocolView.branches?.some((branch) => branch.escalates)).toBe(true);
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.nestedRecordModuleIds).toEqual(
+			expect.arrayContaining(['web/resume-events', 'web/resume-branches', 'web/resume-commit-arm']),
+		);
+		if (!rows)
+			expect(map.nestedRecordModuleIds).toEqual(
+				expect.arrayContaining(['web/resume-async-wiring', 'web/fns/async-plane']),
+			);
+	}
+});

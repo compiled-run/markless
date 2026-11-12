@@ -244,11 +244,86 @@ across all three cases:
   libraries' handlers are not such dispatches. It succeeds when its
   response is `ok`. Writes are never aborted, and latest-wins never applies
   to them. The refresh runs once, after every write in flight has settled
-  and every dispatch that was in flight when one of them was sent has ended
-  (the browser cannot attribute a request to one handler, so all of them
-  count); a dispatch that never ends holds it. It is loud: a save the
+  and every dispatch known to have sent one of them has ended (2026-11-11,
+  PM: a write sent in a dispatch's own synchronous run, before its first
+  `await` or in a callback prop the handler calls there, is that
+  dispatch's; a write sent after an `await` is no dispatch's, so its
+  refresh waits for none). A dispatch that is merely running when a write
+  is sent, such as one waiting for a dialog, holds nothing; a sender that
+  never ends holds its refresh. It is loud: a save the
   person started is the person's change, so readers are marked busy and the
-  refresh is announced as in the re-settle rule above. Inputs re-ask before
+  refresh is announced as in the re-settle rule above. Busy from the send
+  (2026-11-11, owner, research UC3, UC4 and UC6): the marks start when the
+  write is sent, not when it answers. At that moment every value the
+  refresh will re-ask (the same set, writers excluded) is held busy: a
+  settled value takes the entry mark a handler writing its key input takes,
+  and a value already loading is held as it is; one loading quietly (a
+  poll) turns loud, so it is marked from the send too. While any write
+  that holds a value is still out, a run of that value that lands (a poll,
+  a key the handler changed, the previous save's refresh) is kept, not
+  published, and the value stays marked; the refresh's own run supersedes
+  it, and the kept answer is published only if the hold ends with nothing
+  newer running. The holds end when every write of the round has settled
+  and its known senders have ended, as the refresh starts; from then each
+  value's mark clears when its own refreshed answer lands. So the mark is
+  continuous from the send until that answer, and a second save sent while
+  the first one's refresh loads keeps one continuous mark and one
+  announcement pair. Holds count their holders: a handler's key write and
+  every save holding a value each end their own hold. A hold whose holders
+  are gone while a run is in flight is ending: that run's landing ends it
+  and says how the saves ended. The content's mark lands with the first
+  graph flush after the send, which can be one frame later when that flush
+  waits for code still loading (the busy-marking module loads on a page's
+  first loud refresh, never at page load).
+  Only a known sender's element is marked: the element whose handler sent
+  the write in its own synchronous run, set in the same task so it shows in
+  the frame after the send. A write sent after an `await` marks the content
+  but no control, because the browser cannot name its sender, and its round
+  ends when that write has answered and its refresh has landed; the same
+  handler saving again is a second round and a second refresh. A `submit`
+  dispatch marks no control here; its form holds itself (Form submit
+  pending below). Each sending dispatch has its own round: it opens at its
+  first write, and again for a write sent in its own run after an earlier
+  round of the same dispatch ended. Its control's mark and its `refreshed`
+  promise, which the form's hold waits on, end when no value its round
+  asked is pending any more, heard in the flush pass that publishes the
+  last answer, after the subscriptions that clear the content's marks in
+  that pass, so control, form and content clear in one frame; or at once
+  when every write in the round failed. A container that unregisters (a
+  navigation that removes the page) drops its values from every round, so
+  a control in a part that stays is released. Control, form and content
+  share `aria-busy` through its owners; an `aria-busy` the author wrote on
+  such a control is cleared with it. The lean event path that runs a
+  container's first event, before its full runtime loads, opens the same
+  dispatch, so a control in a part with no async value of its own is
+  marked too. The browser cannot tell a write is coming before it is sent
+  (the analyzer has no fact for a `fetch` call site), so a handler that
+  awaits something else first is marked from its write, and a handler that
+  never writes marks nothing. When every write fails or answers with a
+  non-`ok` status, the holds end as the last one settles, before the
+  handler's own continuation runs, so a handler that throws on the failure
+  reaches `@catch` with nothing marked; a value whose earlier refresh is
+  still loading stays marked until that refresh lands. A write whose answer
+  sends the page elsewhere ends its round at once and silently (the write
+  watch's `'left'` outcome): for a form sent in place, an answer that names
+  another page of the site, or a redirect `fetch` followed to one; a
+  handler's own request that `fetch` redirected stays on the page. A quiet refresh (a timer, a poll) marks nothing
+  on its own. Announcements ride the value marks, one pair per continuous
+  busy span: "Updating…" once they have held for the settle deadline (250
+  ms), then one closing line a reveal cadence (300 ms) after the last
+  clears; a span that ends sooner says only the closing line. That line is
+  "Updated", or "Update failed" when a save that held one of the span's
+  values failed (a network error, a 4xx or 5xx, whether the handler ignores
+  it or throws into `@catch`) or a refreshed answer was rejected: the
+  failure travels on the snapshot that ends that value's mark
+  (`writeFailed`), so only the blocks whose marks it held can say it, once.
+  The announcer counts a busy block by its anchor, so content the block
+  re-renders while busy does not end its share; a block whose anchor left
+  the page no longer counts. Limits: a save a recipe sends after its
+  dispatch ended (the draft-row recipe) marks and reloads nothing; and on a
+  server-rendered page, a reader blocked behind an input a failed save
+  marked asks its unchanged key once when the input is given back.
+  Inputs re-ask before
   their readers, so a value keyed by another async value waits for that
   input's answer and runs once. A value that started a run after the writes
   settled (the handler changed its key) is not asked again. A value whose
@@ -269,15 +344,22 @@ across all three cases:
   own `signal` (`AbortSignal.timeout`). Every container wired when the
   writes settle refreshes, including one a navigation rendered while a
   write was in flight. A recipe that sends a write after an `await` is not
-  attributed: a refresh re-runs it and sends the write again, and if a
-  dispatch is in flight when it is sent it counts as a new write. Authoring
+  attributed: a refresh re-runs it and sends the write again. A write that
+  no dispatch can be named for, sent while a refresh that itself came from
+  such a write still has a re-asked value loading, is not a new save, so
+  such a recipe stops after one extra round (one more write, one more
+  refresh). A handler's write sent after an `await` while a known sender's
+  refresh loads is a save as any other and refreshes the page; the cost of
+  the bound is that one sent after an `await` while a refresh from another
+  unnamed write is loading is not refreshed. Authoring
   rule: writes start before a recipe's first `await` or live in handlers;
   in development the runtime warns when a write is sent outside any
   dispatch while a run a refresh started is still loading. No compile-time
   check exists, because the analyzer has no fact for a fetch call site's
   method or for what a recipe reaches across functions. Validated by
   `packages/vitest-browser/browser/mutations-refresh` and the docs recipe
-  `async-recipes/mugs.tsrx`.
+  `async-recipes/mugs.tsrx`; the marks from the send by
+  `packages/vitest-browser/browser/save-busy`.
 - Matched values during a re-settle (2026-11-04, async-error-states): the
   held content keeps showing pairs that belong together. A binding in the
   arm that reads the refreshing value beside an input of its key shows that

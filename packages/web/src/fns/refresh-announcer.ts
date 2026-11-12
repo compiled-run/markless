@@ -15,7 +15,11 @@ export const REFRESH_ANNOUNCEMENT = {
 // An author who put the block inside their own live region (or aria-live="off") owns its announcements.
 const AUTHOR_OWNED = '[aria-live],[role="status"],[role="alert"],[role="log"]';
 
-const busy = new Set<object>();
+// Each busy block's anchor: a block whose anchor has left the page no longer counts as busy, however often its content re-rendered.
+const busy = new Map<object, { readonly isConnected?: boolean } | undefined>();
+const forgetGone = () => {
+	for (const [key, alive] of busy) if (alive?.isConnected === false) busy.delete(key);
+};
 let failed = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let region: HTMLElement | undefined;
@@ -53,16 +57,25 @@ function say(text: string, after: number): void {
 export function refreshChanged(
 	key: object,
 	nowBusy: boolean,
-	refreshFailed: boolean,
+	closing: 'failed' | 'silent' | undefined,
 	hosts: Iterable<object>,
+	alive?: { readonly isConnected?: boolean },
 ): void {
-	failed ||= refreshFailed;
+	if (closing === 'silent') {
+		if (!busy.delete(key)) return;
+		forgetGone();
+		// The page went elsewhere: the busy line not yet said is dropped, and nothing follows it.
+		if (busy.size === 0) clearTimeout(timer);
+		return;
+	}
+	failed ||= closing === 'failed';
 	if (nowBusy) {
 		const shown = [...hosts] as Host[];
 		const document = shown[0]?.ownerDocument;
 		if (!document?.body || shown.some((host) => host.closest?.(AUTHOR_OWNED))) return;
+		forgetGone();
 		const wasQuiet = busy.size === 0;
-		busy.add(key);
+		busy.set(key, alive);
 		if (!wasQuiet) return;
 		const live = regionIn(document);
 		// A burst that starts again before the settled line is read keeps the Updating line already said.
@@ -70,7 +83,9 @@ export function refreshChanged(
 		live.textContent = '';
 		return say(REFRESH_ANNOUNCEMENT.busy, MARKLESS_PENDING_SETTLE_DEADLINE_MS);
 	}
-	if (!busy.delete(key) || busy.size > 0) return;
+	if (!busy.delete(key)) return;
+	forgetGone();
+	if (busy.size > 0) return;
 	const text = failed ? REFRESH_ANNOUNCEMENT.failed : REFRESH_ANNOUNCEMENT.settled;
 	failed = false;
 	say(text, MARKLESS_REVEAL_TRAIN_CADENCE_MS);
