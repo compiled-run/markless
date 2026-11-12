@@ -79,102 +79,6 @@
 			"path": [
 				"loadWeight",
 				"linux-x64",
-				"bench /",
-				"executedChars"
-			],
-			"delta": 238,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 1211,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 14,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 1211,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 14,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 1211,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"executedChars"
-			],
-			"delta": -166,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 1323,
-			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
 				"docs /",
 				"executedChars"
 			],
@@ -360,6 +264,100 @@
 			],
 			"delta": 33,
 			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold (CI linux)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 121,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 14,
+			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -210,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1474,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
 			"date": "2026-11-12"
 		}
 	]
