@@ -26,7 +26,7 @@ test('the arm refusal suggests only restructures that build, never moving the @i
 		(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 	);
 	const suggestion = refusal?.suggestions?.[0]?.message ?? '';
-	expect(suggestion).toContain('hidden={!(picked !== null)}');
+	expect(suggestion).toContain('hide it with the `hidden` attribute instead of the @if');
 	expect(suggestion).toContain('declare what it keeps in the component that owns the @if');
 	expect(suggestion).toContain('Moving the @if into the component does not help');
 	expect(JSON.stringify(collectTsrxModuleDiagnostics(result))).not.toContain('marklessProps');

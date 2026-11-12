@@ -1674,7 +1674,7 @@ function branchArmUnsupportedDiagnostic(
 		source: branch.testSource,
 		suggestions: [
 			{
-				message: `Render the component outside the ${label} and hide it with an attribute${branch.kind === 'switch' ? '' : `, such as hidden={!(${branch.testSource})}`}; or declare what it keeps in the component that owns the ${label} and read it inside the ${label}; or keep the ${label} content to plain elements, text, and state reads. Moving the ${label} into the component does not help: there it tests a prop, and a prop that changes is refused the same way.`,
+				message: `Render the component outside the ${label} and hide it with the \`hidden\` attribute instead of the ${label}; or declare what it keeps in the component that owns the ${label} and read it inside the ${label}; or keep the ${label} content to plain elements, text, and state reads. Moving the ${label} into the component does not help: there it tests a prop, and a prop that changes is refused the same way.`,
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
