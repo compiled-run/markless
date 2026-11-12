@@ -134,27 +134,27 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.371,
-		"cpuS": 2659.9,
-		"peakRssMb": 4367,
+		"calibrationS": 1.342,
+		"cpuS": 2774.9,
+		"peakRssMb": 4042,
 		"shards": {
 			"1/3": {
-				"cpuS": 884,
-				"peakRssMb": 4078
+				"cpuS": 990.8,
+				"peakRssMb": 4027
 			},
 			"2/3": {
-				"cpuS": 782.1,
-				"peakRssMb": 4367
+				"cpuS": 814.9,
+				"peakRssMb": 4042
 			},
 			"3/3": {
-				"cpuS": 993.8,
-				"peakRssMb": 4338
+				"cpuS": 969.2,
+				"peakRssMb": 3281
 			}
 		},
 		"runs": [
-			"42802493087"
+			"43134571598"
 		],
-		"sha": "0ae70e4224dacc75ebad7ad6d0971858b231e2bc"
+		"sha": "64b23daf0637be44c7adf26fc4215ee0e67e5755"
 	},
 	"history": [
 		{
@@ -198,6 +198,22 @@
 				"42842994876"
 			],
 			"reason": "12 green CI measurements of one test set (main eb049036d, run 42842994876 attempts 1-10: 4 samples of shard 1, 3 of shard 2, 5 of shard 3) on AMD EPYC 7763, 9V45, 9V74 and Intel Xeon 8573C runners; the first margin came from 4 samples a shard and same-tree peak RSS ranged 3881-4448 MB on shard 1"
+		},
+		{
+			"date": "2026-11-12",
+			"change": "anchors",
+			"from": {
+				"cpuS": 2659.9,
+				"peakRssMb": 4367
+			},
+			"to": {
+				"cpuS": 2774.9,
+				"peakRssMb": 4042
+			},
+			"runs": [
+				"43134571598"
+			],
+			"reason": "router and bundler test builds left the vitest workers (buildFixture child processes, one build at a time on a 16 GB runner): 12 green CI measurements per shard on this tree (run 43134571598), shard medians 4027/4042/3281 MB against 4078/4367/4338, and against the old 4367 MB anchor 18% of runs would fail as stale; CPU at the anchors' speed moved +6.6% in this run, +0.5% in run 43132031162 on the same tests and +2.7% on main's last 31 runs, inside the 20.4% band"
 		}
 	]
 }

@@ -3,8 +3,8 @@ import { readFile, rm } from 'node:fs/promises';
 import { gzipSync } from 'node:zlib';
 import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
+import { buildFixture } from '../../router/test/support/fixture-build.ts';
 
 const fixtures = resolve(import.meta.dirname, '../fixtures');
 const outRoots: string[] = [];
@@ -20,13 +20,11 @@ async function build(name: string) {
 	const root = resolve(fixtures, name);
 	const outDir = resolve(root, 'node_modules/.markless-direct-startup');
 	outRoots.push(outDir);
-	const builder = await createBuilder({
-		configFile: resolve(root, 'vite.config.ts'),
+	await buildFixture({
 		root,
-		logLevel: 'error',
+		configFile: resolve(root, 'vite.config.ts'),
 		build: { outDir, emptyOutDir: true },
 	});
-	await builder.buildApp();
 	const html = await readFile(resolve(outDir, 'index.html'), 'utf8');
 	const startup = [...html.matchAll(/(?:src|href)=["']?\.?\/?([^"' >]+\.js)/g)].map(
 		(match) => match[1]!,

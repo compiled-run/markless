@@ -37,7 +37,8 @@
 				"build",
 				"createBuilder"
 			],
-			"why": "Vite's build API: the importer builds an app in process"
+			"why": "Vite's build API: the importer builds an app in process",
+			"inProcess": true
 		}
 	],
 	"tests": [
@@ -189,5 +190,74 @@
 			"test": "scripts/benchmarks/perf-guards/first-use.test.ts",
 			"why": "launches Chromium from `require('playwright')` through createRequire, which is not an import"
 		}
-	]
+	],
+	"inWorkerBuilds": {
+		"why": "A test under these folders builds through buildFixture (packages/router/test/support/fixture-build.ts), a child process that exits after the build. A listed test builds in its worker, and holds a build slot for its whole run (scripts/ci/in-worker-build-slot.ts), because Rolldown keeps a build's memory until the process exits.",
+		"scope": [
+			"packages/bundler/test/",
+			"packages/router/test/"
+		],
+		"tests": [
+			{
+				"test": "packages/bundler/test/browser-node-guard.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary"
+			},
+			{
+				"test": "packages/bundler/test/bundle-size-symbol-table.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary"
+			},
+			{
+				"test": "packages/bundler/test/compile-cache-size.test.ts",
+				"why": "reads the compiler's in-process compile cache size from a plugin at buildEnd"
+			},
+			{
+				"test": "packages/bundler/test/dense-async-symbol-table.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary"
+			},
+			{
+				"test": "packages/bundler/test/failed-build-compile-store.test.ts",
+				"why": "checks the compile store on disk at the moment the build's promise settles in this process"
+			},
+			{
+				"test": "packages/bundler/test/nested-child-compile-error.test.ts",
+				"why": "builds one entry with marklessClient (write: false) for its compile diagnostic; buildFixture builds whole apps with markless() and router(), and races it against a timeout in this process"
+			},
+			{
+				"test": "packages/bundler/test/projection-live-arm.test.ts",
+				"why": "builds one entry with marklessClient (write: false) for its compile diagnostic; buildFixture builds whole apps with markless() and router()"
+			},
+			{
+				"test": "packages/bundler/test/prop-decided-arm-callers.test.ts",
+				"why": "builds one entry with marklessClient (write: false) for its compile diagnostic; buildFixture builds whole apps with markless() and router()"
+			},
+			{
+				"test": "packages/bundler/test/prop-decided-row-callers.test.ts",
+				"why": "builds one entry with marklessClient (write: false) for its compile diagnostic; buildFixture builds whole apps with markless() and router()"
+			},
+			{
+				"test": "packages/bundler/test/render-data-capabilities.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary, and globals the plugins set in this process"
+			},
+			{
+				"test": "packages/bundler/test/rolldown.test.ts",
+				"why": "reads the build's in-memory output (write: false) through plugins written in the test, which cannot cross a process boundary, and globals the plugins set in this process"
+			},
+			{
+				"test": "packages/bundler/test/separate-client-build.test.ts",
+				"why": "asserts which process each environment builds in, against this process's pid"
+			},
+			{
+				"test": "packages/bundler/test/server-chunk-size.test.ts",
+				"why": "builds a fixture module that a plugin written in the test supplies"
+			},
+			{
+				"test": "packages/bundler/test/template-dynamic-import.test.ts",
+				"why": "reads the build's in-memory output (write: false)"
+			},
+			{
+				"test": "packages/bundler/test/transform-memos-released.test.ts",
+				"why": "reads the compiler's in-process transform memos from a plugin"
+			}
+		]
+	}
 }

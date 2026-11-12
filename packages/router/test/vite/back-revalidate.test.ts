@@ -12,9 +12,9 @@ import {
 	type Page,
 } from '@playwright/test';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // Back and Forward show the page as it was left at once, then its async values re-ask quietly and update in place.
 

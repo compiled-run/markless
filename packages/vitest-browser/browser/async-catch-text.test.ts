@@ -140,3 +140,25 @@ test("SSR: a keyed row's own @catch text streamed after the first flush updates 
 	await updatesInPlace(slow, '[data-region="slow"] [data-next]', 'Slow down. (try 2 for slow)');
 	await updatesInPlace(slow, '[data-region="slow"] [data-next]', 'Slow down. (try 3 for slow)');
 });
+
+test("SSR: a click on a streamed row's @catch before the page wakes reaches that page's code when another streamed page came first", async () => {
+	const held: Array<() => void> = [];
+	Object.defineProperty(Element.prototype, '__mClock', {
+		configurable: true,
+		get: () => ({ frame: (run: () => void) => run(), idle: (run: () => void) => held.push(run) }),
+	});
+	try {
+		const first = await renderStream(SlowPage);
+		appendStreamed(renderServerHTML(first.shell).container, first.appends[0]!);
+		await expect.poll(() => textOf('[data-error]'), WAIT).toBe('Attempt 1: Slow down.');
+		const second = await renderStream(SlowRows);
+		appendStreamed(renderServerHTML(second.shell).container, second.appends[0]!);
+		const slow = '[data-region="slow"] [data-error]';
+		await expect.poll(() => textOf(slow), WAIT).toBe('Slow down. (try 1 for slow)');
+		expect(held.length).toBeGreaterThan(0);
+		await updatesInPlace(slow, '[data-region="slow"] [data-next]', 'Slow down. (try 2 for slow)');
+	} finally {
+		delete (Element.prototype as { __mClock?: unknown }).__mClock;
+		for (const run of held.splice(0)) run();
+	}
+});

@@ -2,11 +2,9 @@ import { existsSync } from 'node:fs';
 import { mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterEach, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { prerenderedClientUrls } from '../../src/vite/nitro-prerender.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const roots: string[] = [];
@@ -71,16 +69,12 @@ async function app(): Promise<string> {
 	return root;
 }
 
-async function build(root: string, nitro: Record<string, unknown> = {}): Promise<void> {
-	const builder = await createBuilder({
+const build = (root: string, nitro: Record<string, unknown> = {}) =>
+	buildFixture({
 		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless({ experimentalNativePacking: true }), router()],
+		markless: { experimentalNativePacking: true },
 		nitro: { prerender: { routes: ['/', '/about'] }, ...nitro },
-	} as Parameters<typeof createBuilder>[0]);
-	await builder.buildApp();
-}
+	});
 
 // Every client file a prerendered page loads: script and preload URLs plus import map targets.
 async function prerenderedReferences(publicDir: string): Promise<Map<string, string[]>> {
@@ -129,31 +123,23 @@ test('a rebuild prerenders pages that load only files the rebuild emitted, whate
 
 test('a build whose prerendered page loads a client file the build did not emit fails', async () => {
 	const root = await app();
-	const injectMissingFiles = {
-		name: 'inject-missing-files',
-		setup(nitro: {
-			hooks: {
-				hook(
-					name: string,
-					run: (route: { route: string; contents?: string }) => void,
-				): void;
-			};
-		}) {
-			nitro.hooks.hook('prerender:generate', (route) => {
-				if (route.route !== '/about' || !route.contents) return;
-				route.contents = route.contents
-					.replace(
-						'<head>',
-						'<head><link rel="modulepreload" href="/build/chunk-gone0000.js">',
-					)
-					.replace(
-						'{"imports":{',
-						'{"imports":{"@markless/c/gone0000":"/build/chunk-gone1111.js",',
-					);
-			});
-		},
-	};
-	await expect(build(root, { modules: [injectMissingFiles] })).rejects.toThrow(
+	// A Nitro module given by path, since the build runs in another process.
+	await writeFile(
+		join(root, 'inject-missing-files.mjs'),
+		`export default {
+	name: 'inject-missing-files',
+	setup(nitro) {
+		nitro.hooks.hook('prerender:generate', (route) => {
+			if (route.route !== '/about' || !route.contents) return;
+			route.contents = route.contents
+				.replace('<head>', '<head><link rel="modulepreload" href="/build/chunk-gone0000.js">')
+				.replace('{"imports":{', '{"imports":{"@markless/c/gone0000":"/build/chunk-gone1111.js",');
+		});
+	},
+};
+`,
+	);
+	await expect(build(root, { modules: [join(root, 'inject-missing-files.mjs')] })).rejects.toThrow(
 		/about[\s\S]*\/build\/chunk-gone0000\.js[\s\S]*\/build\/chunk-gone1111\.js/,
 	);
 }, 120_000);

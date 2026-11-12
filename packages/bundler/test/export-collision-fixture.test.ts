@@ -5,8 +5,8 @@ import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium } from '@playwright/test';
 import { resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
+import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import { listenOnFreePort } from './helpers/listen.ts';
 
 // The linker keys a composed child by the module it is imported from, not by its declared name.
@@ -27,13 +27,11 @@ test('CSR: same-name default and named exports from different directories render
 	const fixtureRoot = resolve(root, 'packages/bundler/fixtures/vite-csr-export-collision');
 	const outDir = resolve(fixtureRoot, 'node_modules/.markless-export-collision');
 	outRoots.push(outDir);
-	const builder = await createBuilder({
-		configFile: resolve(fixtureRoot, 'vite.config.ts'),
+	await buildFixture({
 		root: fixtureRoot,
-		logLevel: 'error',
+		configFile: resolve(fixtureRoot, 'vite.config.ts'),
 		build: { outDir, emptyOutDir: true },
 	});
-	await builder.buildApp();
 
 	const server = createServer(async (request, response) => {
 		const path = request.url === '/' ? '/index.html' : request.url!.split('?')[0]!;

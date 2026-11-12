@@ -1,11 +1,9 @@
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // prefetch={false} works on an <a> and on a component that spreads its props onto
 // one; on a component that spreads onto anything else the build says so.
@@ -24,17 +22,12 @@ async function app(misplacedPage: boolean) {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
-	return createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
-	}).then((builder) => ({ root, builder }));
+	return root;
 }
 
 test('prefetch={false} on an anchor and on a component that forwards to one reaches the anchor', async () => {
-	const { root, builder } = await app(false);
-	await builder.buildApp();
+	const root = await app(false);
+	await buildFixture({ root });
 	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
@@ -48,6 +41,6 @@ test('prefetch={false} on an anchor and on a component that forwards to one reac
 }, 180_000);
 
 test('prefetch={false} on a component that spreads onto a button fails the build', async () => {
-	const { builder } = await app(true);
-	await expect(builder.buildApp()).rejects.toThrow(/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED/);
+	const root = await app(true);
+	await expect(buildFixture({ root })).rejects.toThrow(/MARKLESS_ELEMENT_ONLY_ATTRIBUTE_MISPLACED/);
 }, 180_000);
