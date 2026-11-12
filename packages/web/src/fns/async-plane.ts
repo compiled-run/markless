@@ -186,6 +186,8 @@ async function asyncComputedFromRecord(
 					graphNodeId: computed.graphNodeId,
 					deriveSymbolId: runnerSymbolId,
 				});
+			// A run superseded while its code loaded never starts: its result is dropped, and its body would still send requests.
+			if (signal.aborted) throw signal.reason;
 			return runRecipe(graph.asyncPlane?.()?.nodes.get(computed.graphNodeId), () =>
 				runner({
 					// Inputs held at what the screen shows reach the runner, which reads through the graph.
