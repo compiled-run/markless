@@ -85,8 +85,19 @@ export type RuntimeAsyncComputedNode = RuntimeGraphAsyncComputed & {
 	servedKey?: { readonly key: unknown };
 	/** The key of the run on held inputs, in flight or landed, while its async inputs still refresh. */
 	waitingFor?: { readonly key: unknown };
-	/** A handler that writes one of this node's key inputs marked it busy before running; cleared on `endEntry`, or left for the real run to clear once it lands. */
-	entryHold?: { readonly version: number; readonly previous: RuntimeGraphAsyncSnapshot; holders: number };
+	/**
+	 * Marked busy ahead of what will refresh it: by handlers that write one of its key inputs (`holders`) and by saves still being
+	 * written (`writing`); it ends with the last of them. While a save is written, a run that lands is kept in `landed`, published if
+	 * the hold ends with nothing newer running. A failed save's hold outlives a run in flight to tag that run's landing.
+	 */
+	entryHold?: {
+		readonly version: number;
+		readonly previous: RuntimeGraphAsyncSnapshot;
+		holders: number;
+		writing: number;
+		landed?: (failed: boolean) => boolean;
+		failed?: true;
+	};
 	/** Set when the run that is in flight started outside a user action; carried onto every snapshot that run publishes. */
 	quiet?: boolean;
 };
@@ -121,8 +132,8 @@ export type AsyncPlaneState = AsyncPlaneContext & {
 export type AsyncRefresh = {
 	readonly advance: (node: RuntimeAsyncComputedNode, cause?: RunCause) => void;
 	readonly start: AsyncPlaneContext['start'];
-	readonly markEntry: (node: RuntimeAsyncComputedNode) => void;
-	readonly endEntry: (node: RuntimeAsyncComputedNode, unwritten?: boolean) => void;
+	readonly markEntry: (node: RuntimeAsyncComputedNode, save?: boolean) => void;
+	readonly endEntry: (node: RuntimeAsyncComputedNode, save?: 'saved' | 'failed') => void;
 	readonly fail: (node: RuntimeAsyncComputedNode, error: unknown) => void;
 };
 
@@ -226,7 +237,7 @@ export function createAsyncPlane(
 		if (node) withRefresh((loaded) => call(loaded, node));
 	};
 
-	return {
+	const plane: AsyncComputedPlane = {
 		nodes,
 		read(node, path) {
 			if (written?.has(node)) startWritten();
@@ -243,11 +254,11 @@ export function createAsyncPlane(
 			written.set(node, written.get(node) || byAction);
 		},
 		startWritten,
-		markEntry(graphNodeId) {
-			forward(graphNodeId, (loaded, node) => loaded.markEntry(node));
+		markEntry(graphNodeId, save) {
+			forward(graphNodeId, (loaded, node) => loaded.markEntry(node, save));
 		},
-		endEntry(graphNodeId, unwritten) {
-			forward(graphNodeId, (loaded, node) => loaded.endEntry(node, unwritten));
+		endEntry(graphNodeId, save) {
+			forward(graphNodeId, (loaded, node) => loaded.endEntry(node, save));
 		},
 		failHandler(graphNodeId, error) {
 			forward(graphNodeId, (loaded, node) => loaded.fail(node, error));
@@ -280,7 +291,8 @@ export function createAsyncPlane(
 			for (const graphNodeId of graphNodeIds) visit(graphNodeId);
 			return ordered;
 		},
-		refreshAfterWrite(versions) {
+		// `started` hears when the re-asked runs have started, which waits for the refresh code to load.
+		refreshAfterWrite(versions, started) {
 			const due: RuntimeAsyncComputedNode[] = [];
 			for (const [graphNodeId, version] of versions) {
 				const node = nodes.get(graphNodeId);
@@ -290,12 +302,20 @@ export function createAsyncPlane(
 				// A read still in flight from before the writes settled may carry the old answer, so it starts over.
 				if (node.phase === NODE_PLANNED || node.phase === NODE_RUNNING) due.push(node);
 			}
-			if (due.length === 0) return Promise.resolve();
+			if (due.length === 0) {
+				withRefresh(() => started?.());
+				return Promise.resolve();
+			}
 			const { settled, flush } = context();
 			return new Promise<void>((resolve) => {
 				const waiting = new Set(due);
 				const heard = (node: RuntimeAsyncComputedNode) => {
-					if (!waiting.delete(node) || waiting.size > 0) return;
+					if (!waiting.delete(node)) return;
+					// A reader behind an answer a save still holds runs once the hold ends, so it is not waited for here.
+					for (const other of waiting)
+						if (plane.withInputs([other.graphNodeId]).some((input) => input !== other && input.entryHold?.landed))
+							waiting.delete(other);
+					if (waiting.size > 0) return;
 					settled.delete(heard);
 					void (flush?.() ?? Promise.resolve()).then(() => resolve());
 				};
@@ -305,6 +325,7 @@ export function createAsyncPlane(
 						if (node.phase === NODE_PLANNED) loaded.advance(node);
 						else if (node.phase === NODE_RUNNING && node.version === versions.get(node.graphNodeId))
 							loaded.start(node, (node.snapshot as { readonly key?: unknown }).key);
+					started?.();
 				});
 			});
 		},
@@ -334,4 +355,5 @@ export function createAsyncPlane(
 			};
 		},
 	};
+	return plane;
 }

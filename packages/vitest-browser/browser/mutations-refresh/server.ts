@@ -10,6 +10,8 @@ type Server = {
 	handlerWait?: Promise<unknown>;
 	lateGate?: Promise<unknown>;
 	pollGate?: Promise<unknown>;
+	/** How many of the next reads answer 500. */
+	failReads?: number;
 	/** Called as each write arrives, before it is answered. */
 	sent?: () => void;
 	searches: number;
@@ -37,6 +39,7 @@ export function resetServer() {
 	server.handlerWait = undefined;
 	server.lateGate = undefined;
 	server.pollGate = undefined;
+	server.failReads = undefined;
 	server.sent = undefined;
 	server.searches = 0;
 	server.handlersStarted = 0;
@@ -58,6 +61,10 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 		const items = [...server.items];
 		if (server.holdReads) await server.holdReads;
 		await new Promise((resolve) => setTimeout(resolve, 5));
+		if (server.failReads) {
+			server.failReads--;
+			return json('Loading failed', 500);
+		}
 		return json({ items, run: count });
 	}
 	server.posts.push(`${method} ${url.pathname} ${String(body ?? '')}`);
@@ -90,6 +97,7 @@ export function installServer() {
 export async function loadItems(path = '/mut/items'): Promise<{ items: string[]; run: number }> {
 	if (typeof window === 'undefined') return { items: [...server.items], run: 0 };
 	const response = await fetch(path);
+	if (!response.ok) throw new Error(await response.text());
 	return (await response.json()) as { items: string[]; run: number };
 }
 

@@ -1,97 +1,15 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-return-reask"
-			],
-			"delta": 1597,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 444,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 671,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 447,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 11,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 11,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 11,
-			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
 				"web/event-current-target"
 			],
-			"delta": 31,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"delta": 33,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -100,9 +18,9 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 61,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
-			"date": "2026-11-11"
+			"delta": 223,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -111,9 +29,9 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 1597,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"delta": 2480,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -123,8 +41,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 24,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
+			"delta": 81,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -134,9 +52,9 @@
 				"@fixtures/vite-plus",
 				"web/event-current-target"
 			],
-			"delta": 31,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"delta": 33,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -145,9 +63,9 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 61,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, and holds the control until that refresh settles (WRITE_RELOADING)",
-			"date": "2026-11-11"
+			"delta": 223,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -156,9 +74,9 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 1597,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"delta": 2480,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -168,8 +86,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 14,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
+			"delta": 42,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
 		{
@@ -180,8 +98,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 48,
-			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
+			"delta": 82,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		}
 	]

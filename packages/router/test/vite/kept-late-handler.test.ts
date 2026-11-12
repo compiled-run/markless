@@ -365,6 +365,47 @@ test('a form whose save is still out when the reader navigates releases its hold
 	await page.close();
 });
 
+test('a button in the kept part whose save is reloading the page when the reader navigates is released, and nothing stays busy', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	const saves: string[] = [];
+	await page.route(
+		(url) => url.pathname === '/save',
+		async (route) => {
+			saves.push(`${route.request().method()} ${route.request().postData()}`);
+			await route.fulfill({ status: 204 });
+		},
+	);
+	await page.goto(`${origin}/guide`);
+	await page.waitForFunction(() => document.querySelector('[data-names]')?.textContent === 'Ada');
+	await page.evaluate(() => {
+		(globalThis as { namesGate?: Promise<unknown> }).namesGate = new Promise(() => {});
+	});
+	await page.click('[data-shell-save]');
+	await page.waitForFunction(() => document.querySelector('[data-shell-save]')?.getAttribute('aria-busy') === 'true');
+	await page.waitForFunction(() => document.querySelector('[data-names]')?.getAttribute('aria-busy') === 'true');
+	const control = await page.$('[data-shell-save]');
+	await page.click('[data-nav="reference"]');
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	await control!.evaluate(
+		(element) =>
+			new Promise<void>((done) => {
+				if (!element.hasAttribute('aria-busy')) return done();
+				new MutationObserver((_records, observer) => {
+					if (element.hasAttribute('aria-busy')) return;
+					observer.disconnect();
+					done();
+				}).observe(element, { attributes: true, attributeFilter: ['aria-busy'] });
+			}),
+	);
+	expect(await control!.evaluate((element) => element.isConnected)).toBe(true);
+	expect(await page.evaluate(() => document.querySelectorAll('[aria-busy]').length)).toBe(0);
+	expect(saves).toEqual(['POST shell']);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
 test('a handler that returns the navigation it starts does not hold that navigation back', async () => {
 	const page = await browser!.newPage();
 	const errors: string[] = [];

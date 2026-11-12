@@ -10,7 +10,7 @@ import type { LeanActionPlan, LeanPlan, RuntimeDemandMap } from './lean-shared.t
 // The scalar-core path only produces a plan when the event record is present,
 // so its plan type carries that record.
 type ScalarCorePlan = LeanPlan & { readonly eventRecord: EventOnlyResumeRecord };
-import { resumeFullEventOnly } from './lean-shared.ts';
+import { resumeFullEventOnly, runAsDispatch } from './lean-shared.ts';
 import { marklessRunAtCurrentTarget } from '../event-current-target.ts';
 import { pageNodes } from '../resume-anchor-census.ts';
 import type { ProtocolSyncPolicyCondition } from '../../../serializer/src/protocol.ts';
@@ -47,18 +47,26 @@ export async function resumeScalarCoreEventFromPayloadDocument(
 		runSyncPolicyActions(plan.eventRecord.syncPolicy, graph, input.event);
 	}
 	executePlanWrite(graph, action.plan);
-	for (const symbolId of plan.eventRecord.symbolIds) {
-		const symbol = await resolve(input.loadSymbol(symbolId));
-		void (await resolve(
-			marklessRunAtCurrentTarget(input.event, element, symbol, {
-				graph: shadowGraph(graph),
-				event: input.event,
-				element,
-				getElementHandle: () => undefined,
-			}),
-		));
-	}
-	await graph.flush();
+	await runAsDispatch(
+		input.event,
+		element,
+		async (own) => {
+			for (const symbolId of plan.eventRecord.symbolIds) {
+				const symbol = await resolve(input.loadSymbol(symbolId));
+				void (await resolve(
+					own(() =>
+						marklessRunAtCurrentTarget(input.event, element, symbol, {
+							graph: shadowGraph(graph),
+							event: input.event,
+							element,
+							getElementHandle: () => undefined,
+						}),
+					),
+				));
+			}
+		},
+		() => graph.flush(),
+	);
 	if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 		await import('../debug-channel.ts')
 			.then((debug) =>

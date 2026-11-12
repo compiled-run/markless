@@ -1,5 +1,5 @@
 import type { ArmRowsAnchor } from '../resume-repeat-branch-arm.ts';
-import { holdBusy, writeWatch } from '../event-current-target.ts';
+import { holdBusy } from '../event-current-target.ts';
 import { boundaryBusyHosts, type BusyNode } from '../resume-refresh-busy.ts';
 import type {
 	ResumeArmRecordSet,
@@ -54,11 +54,12 @@ function note(
 	snapshot: unknown,
 	showsSettledContent: boolean,
 ): void {
-	const { status, quiet } =
-		(snapshot as { readonly status?: unknown; readonly quiet?: unknown } | null) ?? {};
+	const { status, quiet, writeFailed } =
+		(snapshot as { readonly status?: unknown; readonly quiet?: unknown; readonly writeFailed?: unknown } | null) ?? {};
 	const busy = busyOf(boundary);
 	const wasPending = busy.pending.has(graphNodeId);
-	if (status === 'rejected' && wasPending) busy.failed = true;
+	// A failed refresh, or a failed save whose hold ends here: the clearing these marks announce says the update failed.
+	if ((status === 'rejected' || writeFailed === true) && wasPending) busy.failed = true;
 	if (status === 'pending' && showsSettledContent) {
 		if (quiet === true) return;
 		busy.pending.add(graphNodeId);
@@ -120,7 +121,7 @@ function loadAnnouncer(): Promise<typeof import('./refresh-announcer.ts')> {
 
 function announce(busy: BoundaryBusy, hosts: Set<BusyNode>): void {
 	const nowBusy = busy.marked.size === 0;
-	const failed = !nowBusy && (writeWatch.takeFailure?.() === true || busy.failed === true);
+	const failed = !nowBusy && busy.failed === true;
 	busy.failed = false;
 	const key = busy.pending;
 	void loadAnnouncer().then((module) => module.refreshChanged(key, nowBusy, failed, hosts));

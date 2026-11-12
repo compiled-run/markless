@@ -12,6 +12,7 @@ export default function LeaveNote() @{
 		<button type="button" data-note-press onClick={() => note.presses++}>{`presses ${note.presses}`}</button>
 		<span data-left>{note.left}</span>
 		<button type="button" data-go onClick={() => navigate('/reference')}>{'Go to the reference page'}</button>
+		<button type="button" data-shell-save onClick={async () => void (await fetch('/save', { method: 'POST', body: 'shell' }))}>{'Save from the shell'}</button>
 		<nav class="leave-links" aria-label="Pages">
 			<Link href="/guide" data-nav="guide">{'Guide'}</Link>
 			<Link href="/reference" data-nav="reference">{'Reference'}</Link>

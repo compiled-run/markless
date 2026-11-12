@@ -249,47 +249,66 @@ across all three cases:
   count); a dispatch that never ends holds it. It is loud: a save the
   person started is the person's change, so readers are marked busy and the
   refresh is announced as in the re-settle rule above. Busy from the send
-  (2026-11-11, owner, research UC3 and UC4): the marks start when the write
-  is sent, not when it answers. At that moment every value the refresh will
-  re-ask (the same set, writers excluded) takes the entry mark a handler
-  writing its key input takes, so each element reading it carries
-  `aria-busy="true"` while the write is out; the refresh's own runs take
-  that mark over, so it never drops between the write answering and the
-  re-ask starting. The content's mark lands with the first graph flush after
-  the send, which can be one frame later when that flush waits for code still
-  loading (the busy-marking module loads on a page's first loud refresh, never
-  at page load). An entry mark has holders: a handler's key write and the
-  save it sends both hold the value, and the mark ends with the last of them,
-  so a key written to the value it already has leaves no gap. The element
-  whose dispatch sent the write (the clicked control, also when a child
-  component calls the handler it was given) carries `aria-busy="true"` from
-  the send itself, set in the same task so it shows in the frame after the
-  send; a `submit` dispatch marks no control here, because its form holds
-  itself (Form submit pending below). Control, form and content marks share
-  `aria-busy` through its owners and end at one settle: the end of the
-  dispatch's refresh round, heard in the flush pass that publishes the last
-  re-asked answer, after the subscriptions that clear the content's marks in
-  that pass (so all three clear in one frame), or at once when every write
-  in the round failed. Each
-  dispatch owns its own mark, so a write that fails while another
-  dispatch's refresh still loads clears only its own. An `aria-busy` the
+  (2026-11-11, owner, research UC3, UC4 and UC6): the marks start when the
+  write is sent, not when it answers. At that moment every value the
+  refresh will re-ask (the same set, writers excluded) is held busy: a
+  settled value takes the entry mark a handler writing its key input takes,
+  and a value already loading is held as it is. While any write that holds
+  a value is still being written, a run of that value that lands (a poll, a
+  key the handler changed, the previous save's refresh) is kept, not
+  published, and the value stays marked; the refresh's own run supersedes
+  it, and the kept answer is published only if the hold ends with nothing
+  newer running. So the mark is continuous from the send until the
+  refresh's answer lands, whatever else runs, and a second save sent while
+  the first one's refresh loads keeps one continuous mark and one
+  announcement pair. Holds count their holders: a handler's key write and
+  every save holding a value each end their own hold. The content's mark
+  lands with the first graph flush after the send, which can be one frame
+  later when that flush waits for code still loading (the busy-marking
+  module loads on a page's first loud refresh, never at page load). Each
+  value's mark clears when its own refreshed answer lands.
+  The control marked is the element whose handler sent the write. A write
+  sent in a dispatch's own synchronous run (before its first `await`, or in
+  a callback prop the handler calls there) is that dispatch's. A write sent
+  after an `await` cannot be told apart by the browser, so it is credited to
+  every open dispatch with no save of its own out, or to all of them when
+  each has one. A `submit` dispatch marks no control here; its form holds
+  itself (Form submit pending below). Each sending dispatch has its own
+  round: it opens at its first write, and again for a write sent after an
+  earlier round of the same dispatch ended (a retry after a failure). Its
+  control's mark and its `refreshed` promise, which the form's hold waits
+  on, end when no value its round asked is pending any more, heard in the
+  flush pass that publishes the last answer, after the subscriptions that
+  clear the content's marks in that pass, so control, form and content clear
+  in one frame; or at once when every write in the round failed. A container
+  that unregisters (a navigation that removes the page) drops its values
+  from every round, so a control in a part that stays is released. Control,
+  form and content share `aria-busy` through its owners; an `aria-busy` the
   author wrote on such a control is cleared with it. The browser cannot tell
   a write is coming before it is sent (the analyzer has no fact for a
   `fetch` call site), so a handler that awaits something else first is
   marked from its write, and a handler that never writes marks nothing. A
   handler that never finishes holds its round, so its marks and the refresh
-  wait for it. When every write fails or answers with a non-`ok` status, the
-  marks clear as the last one settles, before the handler's own
+  wait for it. When every write fails or answers with a non-`ok` status,
+  the holds end as the last one settles, before the handler's own
   continuation runs, so a handler that throws on the failure reaches
-  `@catch` with nothing marked. A quiet refresh (a timer, a poll) sends no
-  write from a dispatch and marks nothing. Announcements ride the value
-  marks, one pair per save: "Updating…" once they have held for the settle
-  deadline (250 ms), then one closing line a reveal cadence (300 ms) after
-  the last clears; a save that answers sooner says only the closing line.
-  That line is "Updated", or "Update failed" when the round's writes all
-  failed (a network error, a 4xx or 5xx, whether the handler ignores it or
-  throws into `@catch`): the write watch's phase record carries that
-  outcome (`WRITE_FAILED`) until the marks' clearing reads it, once.
+  `@catch` with nothing marked. A quiet refresh (a timer, a poll) marks
+  nothing on its own; one that lands while a save is out is kept as above.
+  Announcements ride the value marks, one pair per continuous busy span:
+  "Updating…" once they have held for the settle deadline (250 ms), then
+  one closing line a reveal cadence (300 ms) after the last clears; a span
+  that ends sooner says only the closing line. That line is "Updated", or
+  "Update failed" when a save that held one of the span's values failed
+  (a network error, a 4xx or 5xx, whether the handler ignores it or throws
+  into `@catch`) or a refreshed answer was rejected: the failure travels on
+  the snapshot that ends that value's mark (`writeFailed`), so only the
+  blocks whose marks it held can say it, once. The lean event path that
+  runs a container's first event, before its full runtime loads, opens the
+  same dispatch, so a control in a part with no async value of its own is
+  marked too. Limits: a save a recipe sends after its dispatch ended (the
+  draft-row recipe) marks and reloads nothing; and on a server-rendered
+  page, a reader blocked behind an input a failed save marked asks its
+  unchanged key once when the input is given back.
   Inputs re-ask before
   their readers, so a value keyed by another async value waits for that
   input's answer and runs once. A value that started a run after the writes

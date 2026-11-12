@@ -503,6 +503,40 @@ test('a mark with no write behind it ends at once, even while its own flush is s
 	expect(runner.runs).toHaveLength(1);
 });
 
+test('a run that lands while a save holds the value is kept until the save ends, then superseded by a newer run', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	runner.runs[0]!.resolve('a');
+	await tick();
+	plane.markEntry('computed:user', true);
+	graph.write({ graphNodeId: 'state:id', value: 2 });
+	await graph.flush();
+	runner.runs[1]!.resolve('b');
+	await tick();
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending', value: 'a' });
+	plane.endEntry('computed:user', 'saved');
+	await graph.flush();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', value: 'b' });
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('writeFailed');
+});
+
+test('a failed save on a value already loading tags the landing of that run, and only that one', async () => {
+	const { graph, runner, plane } = single();
+	graph.read('computed:user', ['status']);
+	plane.markEntry('computed:user', true);
+	plane.endEntry('computed:user', 'failed');
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'pending' });
+	runner.runs[0]!.resolve('a');
+	await tick();
+	expect(snapshot(graph, 'computed:user')).toMatchObject({ status: 'fulfilled', value: 'a', writeFailed: true });
+	graph.write({ graphNodeId: 'state:id', value: 2 });
+	await graph.flush();
+	runner.runs[1]!.resolve('b');
+	await tick();
+	expect(snapshot(graph, 'computed:user')).not.toHaveProperty('writeFailed');
+});
+
 test('an entry mark whose handler wrote the key is replaced by the real run, loud, and its end changes nothing', async () => {
 	const { graph, runner, plane } = single();
 	graph.read('computed:user', ['status']);

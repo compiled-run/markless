@@ -4,7 +4,7 @@ import {
 } from '../pending-timing.ts';
 
 // One shared polite status region outside the app: a live region inside an aria-busy element can go silent (NVDA + Firefox).
-type Host = { closest?: (selector: string) => unknown; ownerDocument?: Document | null };
+type Host = { closest?: (selector: string) => unknown; ownerDocument?: Document | null; isConnected?: boolean };
 
 export const REFRESH_ANNOUNCEMENT = {
 	busy: 'Updating…',
@@ -15,7 +15,11 @@ export const REFRESH_ANNOUNCEMENT = {
 // An author who put the block inside their own live region (or aria-live="off") owns its announcements.
 const AUTHOR_OWNED = '[aria-live],[role="status"],[role="alert"],[role="log"]';
 
-const busy = new Set<object>();
+// Each busy block's marked elements: a block whose elements have all left the page no longer counts as busy.
+const busy = new Map<object, Host[]>();
+const forgetGone = () => {
+	for (const [key, hosts] of busy) if (hosts.every((host) => host.isConnected === false)) busy.delete(key);
+};
 let failed = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 let region: HTMLElement | undefined;
@@ -61,8 +65,9 @@ export function refreshChanged(
 		const shown = [...hosts] as Host[];
 		const document = shown[0]?.ownerDocument;
 		if (!document?.body || shown.some((host) => host.closest?.(AUTHOR_OWNED))) return;
+		forgetGone();
 		const wasQuiet = busy.size === 0;
-		busy.add(key);
+		busy.set(key, shown);
 		if (!wasQuiet) return;
 		const live = regionIn(document);
 		// A burst that starts again before the settled line is read keeps the Updating line already said.
@@ -70,7 +75,9 @@ export function refreshChanged(
 		live.textContent = '';
 		return say(REFRESH_ANNOUNCEMENT.busy, MARKLESS_PENDING_SETTLE_DEADLINE_MS);
 	}
-	if (!busy.delete(key) || busy.size > 0) return;
+	if (!busy.delete(key)) return;
+	forgetGone();
+	if (busy.size > 0) return;
 	const text = failed ? REFRESH_ANNOUNCEMENT.failed : REFRESH_ANNOUNCEMENT.settled;
 	failed = false;
 	say(text, MARKLESS_REVEAL_TRAIN_CADENCE_MS);

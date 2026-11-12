@@ -3,7 +3,10 @@ import { commands } from 'vitest/browser';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { deferred, poll, shows, text } from '../back-revalidate/support.ts';
 import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
+import { WriterRows } from '../mutations-refresh/writer-row.tsrx';
+import { ChainSaves } from './chain-saves.tsrx';
 import { Saves } from './saves.tsrx';
+import { SoloSave } from './solo-save.tsrx';
 
 // A save sent from a handler marks what will load again, and the control that sent it, until that reload settles.
 installServer();
@@ -35,6 +38,9 @@ const at = (container: ParentNode, selector: string) => {
 };
 const marked = (element: Element) => element.getAttribute('aria-busy') === 'true';
 const nextFrame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+const waitFrames = async (count: number) => {
+	for (let at = 0; at < count; at++) await nextFrame();
+};
 const allClear = (container: ParentNode) =>
 	expect.poll(() => container.querySelectorAll('[aria-busy]').length, poll).toBe(0);
 
@@ -89,7 +95,9 @@ function sentAndMarked(names: Element, control: Element): () => Promise<void> {
 }
 
 // The frame in which each element gained and lost aria-busy, counted by requestAnimationFrame.
-function frames(elements: ReadonlyArray<Element>): () => Array<{ readonly on: number[]; readonly off: number[] }> {
+function frames(
+	elements: ReadonlyArray<Element>,
+): () => Array<{ readonly on: number[]; readonly off: number[] }> {
 	let frame = 0;
 	let running = true;
 	const tick = () => {
@@ -107,7 +115,11 @@ function frames(elements: ReadonlyArray<Element>): () => Array<{ readonly on: nu
 		}
 	});
 	for (const element of elements)
-		observer.observe(element, { attributes: true, attributeFilter: ['aria-busy'], attributeOldValue: true });
+		observer.observe(element, {
+			attributes: true,
+			attributeFilter: ['aria-busy'],
+			attributeOldValue: true,
+		});
 	return () => {
 		running = false;
 		observer.disconnect();
@@ -338,9 +350,12 @@ for (const [mode, mount, readsBefore] of modes) {
 			like.click();
 			at(container, '[data-form-submit]').click();
 			await expect.poll(() => server.posts.length, poll).toBe(2);
-			await expect.poll(() => [names, like, form].map(marked), poll).toEqual([true, true, true]);
+			await expect
+				.poll(() => [names, like, form].map(marked), poll)
+				.toEqual([true, true, true]);
 			const seen = frames([names, like, form]);
-			const [first, second] = order === 'form first' ? [formSave, likeSave] : [likeSave, formSave];
+			const [first, second] =
+				order === 'form first' ? [formSave, likeSave] : [likeSave, formSave];
 			first.resolve();
 			await nextFrame();
 			await nextFrame();
@@ -441,4 +456,258 @@ for (const [mode, mount, readsBefore] of modes) {
 			[false, true, false],
 		]);
 	});
+
+	test(`${mode}: a poll that lands while a save is out keeps the mark and adds no announcement`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const like = at(container, '[data-like]');
+		const history = [track(names), track(like)];
+		const said = listen();
+		const tick = deferred<void>();
+		server.pollGate = tick.promise;
+		at(container, '[data-start-poll]').click();
+		await nextFrame();
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		like.click();
+		await expect.poll(() => [names, like].map(marked), poll).toEqual([true, true]);
+		await expect.poll(said, poll).toEqual(['Updating…']);
+		tick.resolve();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		await waitFrames(4);
+		expect([names, like].map(marked)).toEqual([true, true]);
+		answered.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Updating…', 'Updated']);
+		expect(history.map((each) => each())).toEqual([
+			[false, true, false],
+			[false, true, false],
+		]);
+	});
+
+	test(`${mode}: a poll alone marks nothing and says nothing before the next save's pair`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const history = track(names);
+		const said = listen();
+		const tick = deferred<void>();
+		server.pollGate = tick.promise;
+		at(container, '[data-start-poll]').click();
+		tick.resolve();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		await waitFrames(4);
+		expect(history()).toEqual([false]);
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		at(container, '[data-like]').click();
+		await expect.poll(said, poll).toEqual(['Updating…']);
+		answered.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await expect.poll(said, poll).toEqual(['Updating…', 'Updated']);
+	});
+
+	test(`${mode}: a second save sent during the first save's reload keeps one mark and one announcement pair`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const history = track(names);
+		const said = listen();
+		const held = deferred<void>();
+		const second = deferred<void>();
+		server.holdReads = held.promise;
+		server.nextPost = [{}, { wait: second.promise }];
+		at(container, '[data-like]').click();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		at(container, '[data-child-save]').click();
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		await expect.poll(said, poll).toEqual(['Updating…']);
+		server.holdReads = undefined;
+		held.resolve();
+		await waitFrames(4);
+		expect(marked(names)).toBe(true);
+		expect(names.textContent).toBe('Ada');
+		second.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace, Linus');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Updating…', 'Updated']);
+		expect(history()).toEqual([false, true, false]);
+	});
+
+	test(`${mode}: a handler that changes a key input, then saves, stays marked when the changed value lands first`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const control = at(container, '[data-key-change-save]');
+		const history = [track(names), track(control)];
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		control.click();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		await waitFrames(4);
+		expect([names, control].map(marked)).toEqual([true, true]);
+		answered.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([
+			[false, true, false],
+			[false, true, false],
+		]);
+	});
+
+	test(`${mode}: only the control whose handler sent the save is marked, not one still awaiting something else`, async () => {
+		const container = await mounted(await mount());
+		const waiting = at(container, '[data-noop]');
+		const like = at(container, '[data-like]');
+		const history = [track(waiting), track(like)];
+		const done = deferred<void>();
+		server.handlerWait = done.promise;
+		waiting.click();
+		await expect.poll(() => server.handlersStarted, poll).toBe(1);
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		like.click();
+		await expect.poll(() => marked(like), poll).toBe(true);
+		expect(marked(waiting)).toBe(false);
+		answered.resolve();
+		await waitFrames(2);
+		expect(marked(waiting)).toBe(false);
+		done.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([[false], [false, true, false]]);
+	});
+
+	test(`${mode}: a save retried in the same handler after it failed marks its control again`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const control = at(container, '[data-retry]');
+		const retried = deferred<void>();
+		server.nextPost = [{ status: 422, body: 'No', now: true }, { wait: retried.promise }];
+		control.click();
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		await expect.poll(() => [names, control].map(marked), poll).toEqual([true, true]);
+		retried.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+	});
+
+	test(`${mode}: a save that fails during another save's reload announces its failure once, and the next save says Updated`, async () => {
+		const container = await mounted(await mount());
+		const said = listen();
+		const held = deferred<void>();
+		server.holdReads = held.promise;
+		server.nextPost = [{}, { status: 409, body: 'Taken' }];
+		at(container, '[data-like]').click();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		at(container, '[data-ignore-status]').click();
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		await expect.poll(said, poll).toEqual(['Updating…']);
+		server.holdReads = undefined;
+		held.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Updating…', 'Update failed']);
+		at(container, '[data-like]').click();
+		await shows(container, '[data-names]', 'Ada, Grace, Grace');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Updating…', 'Update failed', 'Updated']);
+	});
+
+	test(`${mode}: a reload that fails after a good save keeps the content, opens @catch after it, and says Update failed`, async () => {
+		const container = await mounted(await mount());
+		const names = at(container, '[data-names]');
+		const said = listen();
+		server.failReads = 1;
+		at(container, '[data-like]').click();
+		await shows(container, '[data-failed]', 'Loading failed');
+		expect(names.isConnected).toBe(true);
+		expect(names.textContent).toBe('Ada');
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Update failed']);
+	});
+
+	test(`${mode}: a chain of async values held by a save stays marked through the input's reload and clears once`, async () => {
+		const container = (await (mode === 'CSR' ? render(ChainSaves) : renderSSR(ChainSaves)))
+			.container as HTMLElement;
+		await shows(container, '[data-people]', 'Ada');
+		await shows(container, '[data-count]', '1');
+		const count = at(container, '[data-count]');
+		const people = at(container, '[data-people]');
+		const history = [track(count), track(people)];
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		at(container, '[data-chain-save]').click();
+		await expect.poll(() => [count, people].map(marked), poll).toEqual([true, true]);
+		answered.resolve();
+		await shows(container, '[data-people]', 'Ada, Grace');
+		await shows(container, '[data-count]', '2');
+		await allClear(container);
+		expect(history.map((each) => each())).toEqual([
+			[false, true, false],
+			[false, true, false],
+		]);
+		expect(server.gets.filter((get) => get.startsWith('/mut/items?count='))).toEqual(
+			mode === 'CSR' ? ['/mut/items?count=1', '/mut/items?count=2'] : ['/mut/items?count=2'],
+		);
+	});
+
+	test(`${mode}: a chain held by a save that fails gives every mark back at once and loads nothing`, async () => {
+		const container = (await (mode === 'CSR' ? render(ChainSaves) : renderSSR(ChainSaves)))
+			.container as HTMLElement;
+		await shows(container, '[data-count]', '1');
+		const before = server.gets.length;
+		const said = listen();
+		const answered = deferred<void>();
+		server.nextPost = [{ status: 409, body: 'Taken', wait: answered.promise }];
+		at(container, '[data-chain-ignore]').click();
+		await expect.poll(() => marked(at(container, '[data-count]')), poll).toBe(true);
+		answered.resolve();
+		await allClear(container);
+		await expect.poll(said, poll).toEqual(['Update failed']);
+		// The input is not asked again. A served reader blocked behind the marked input asks its unchanged key once (known gap).
+		expect(server.gets.slice(before).filter((get) => get.includes('v=people'))).toEqual([]);
+		expect(server.gets.slice(before).filter((get) => get.includes('count='))).toEqual(
+			mode === 'CSR' ? [] : ['/mut/items?count=1'],
+		);
+		expect(text(container, '[data-count]')).toBe('1');
+	});
+
+	test(`${mode}: a draft row that saves from its recipe after its dispatch ended marks nothing and reloads nothing`, async () => {
+		const container = (await (mode === 'CSR' ? render(WriterRows) : renderSSR(WriterRows)))
+			.container as HTMLElement;
+		await shows(container, '[data-names]', 'Ada');
+		const names = at(container, '[data-names]');
+		const history = track(names);
+		const before = reads();
+		const answered = deferred<void>();
+		server.nextPost = [{ wait: answered.promise }];
+		at(container, '[data-draft-add]').click();
+		await expect
+			.poll(() => container.querySelector('[data-draft]')?.textContent, poll)
+			.toBe('Draft');
+		await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Draft']);
+		await waitFrames(2);
+		expect(container.querySelectorAll('[aria-busy]').length).toBe(0);
+		answered.resolve();
+		await shows(container, '[data-saved]', 'Draft');
+		await waitFrames(2);
+		expect(history()).toEqual([false]);
+		expect(reads()).toBe(before);
+		expect(text(container, '[data-names]')).toBe('Ada');
+	});
+
+	if (mode === 'CSR')
+		test(`${mode}: a container removed while its reload runs releases the control that saved, in another container`, async () => {
+			const solo = (await render(SoloSave)).container as HTMLElement;
+			await shows(solo, '[data-ready]', 'ready');
+			const screen = await mount();
+			await mounted(screen);
+			const control = at(solo, '[data-solo]');
+			server.holdReads = new Promise(() => {});
+			control.click();
+			await expect.poll(reads, poll).toBe(readsBefore + 1);
+			expect(marked(control)).toBe(true);
+			(screen as unknown as { unmount: () => void }).unmount();
+			await expect.poll(() => marked(control), poll).toBe(false);
+			expect(document.querySelectorAll('[aria-busy]').length).toBe(0);
+		});
 }

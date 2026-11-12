@@ -24,8 +24,8 @@ export const MARKLESS_DISPATCHES_GLOBAL = '__marklessDispatches';
  */
 export type DispatchSpan = { open: boolean; closed?: () => void; refreshed?: Promise<void>; readonly control?: Element };
 
-/** Set by the write watch once it loads: true once for a refresh round whose writes all failed after marking. */
-export const writeWatch: { takeFailure?: () => boolean } = {};
+/** The dispatch whose handler is in its synchronous run now: a write sent then is that dispatch's own. */
+export const dispatching: { span?: DispatchSpan } = {};
 
 export function dispatchSpans(): Set<DispatchSpan> {
 	const host = globalThis as { [MARKLESS_DISPATCHES_GLOBAL]?: Set<DispatchSpan> };

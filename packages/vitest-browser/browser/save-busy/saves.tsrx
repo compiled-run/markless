@@ -54,6 +54,29 @@ export function Saves() @{
 		</button>
 		<button
 			type="button"
+			data-key-change-save
+			onClick={async () => {
+				poll = poll + 1;
+				await addItem('Grace');
+			}}
+		>
+			Change the key, then save
+		</button>
+		<button
+			type="button"
+			data-retry
+			onClick={async () => {
+				try {
+					await addItem('Bad');
+				} catch {
+					await addItem('Grace');
+				}
+			}}
+		>
+			Save, and once more if it fails
+		</button>
+		<button
+			type="button"
 			data-save-then-wait
 			onClick={async () => {
 				await addItem('Grace');
