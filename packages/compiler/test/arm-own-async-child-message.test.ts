@@ -35,4 +35,10 @@ test('the arm refusal suggests only restructures that build, never moving the @i
 	expect(suggestion).toContain('declare what it keeps in the component that owns the @if');
 	expect(suggestion).toContain('Moving the @if into the component does not help');
 	expect(JSON.stringify(collectTsrxModuleDiagnostics(result))).not.toContain('marklessProps');
+	const shipped = await compileTsrxModule({ filename: 'src/accounts.tsrx', source, symbols: [] });
+	expect(
+		collectTsrxModuleDiagnostics(shipped).some(
+			(diagnostic) => diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
+		),
+	).toBe(false);
 });

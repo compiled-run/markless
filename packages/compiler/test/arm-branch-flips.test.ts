@@ -377,7 +377,7 @@ export function Counter({ label }) @{
 		symbols: [],
 	});
 	expect(child.moduleGraphInterface.render.components[0]?.armMaterial).toBeUndefined();
-	const result = await compileTsrxModule({
+	const compileWith = (unlinked: string) => compileTsrxModule({
 		filename: 'src/ImportedCounter.tsrx',
 		source:
 			`
@@ -392,15 +392,17 @@ export function App() @{
 		@if (armed) { <Counter label="ready" /> }
 	</main>
 }
-` + UNLINKED_RENDER,
+` + unlinked,
 		symbols: [],
 		importedModuleInterfaces: { './Counter.tsrx': child.moduleGraphInterface },
 	});
+	expect(refusalOf(await compileWith(''))).toBeUndefined();
+	const result = await compileWith(UNLINKED_RENDER);
 	expect(refusalOf(result)?.message).toContain('<Counter> has to run to produce its content');
 });
 
 test('a page-level @if whose component has to run refuses where the page cannot re-render, in author words', async () => {
-	const result = await compileTsrxModule({
+	const compileWith = (unlinked: string) => compileTsrxModule({
 		filename: 'src/PagePanel.tsrx',
 		source:
 			`
@@ -419,9 +421,11 @@ export function App() @{
 		@if (armed) { <Panel label="ready" /> }
 	</main>
 }
-` + UNLINKED_RENDER,
+` + unlinked,
 		symbols: [],
 	});
+	expect(refusalOf(await compileWith(''))).toBeUndefined();
+	const result = await compileWith(UNLINKED_RENDER);
 	const record = result.protocolView.branches?.[0];
 	const diagnostic = result.symbolModules.diagnostics.find(
 		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
@@ -565,7 +569,7 @@ export function App() @{
 // runs the child in the browser, and where the page cannot be re-rendered the
 // refusal stays fail-closed and names the value that blocked it.
 test('a page-level @if whose component brings state of its own refuses where the page cannot re-render', async () => {
-	const result = await compileTsrxModule({
+	const compileWith = (unlinked: string) => compileTsrxModule({
 		filename: 'src/OwnStatePanel.tsrx',
 		source:
 			`
@@ -584,9 +588,11 @@ export function App() @{
 		@if (armed) { <Panel label="ready" /> }
 	</main>
 }
-` + UNLINKED_RENDER,
+` + unlinked,
 		symbols: [],
 	});
+	expect(refusalOf(await compileWith(''))).toBeUndefined();
+	const result = await compileWith(UNLINKED_RENDER);
 	expect(refusalOf(result)?.message).toContain(
 		'<Panel> keeps a `hits` of its own that only running it works out',
 	);

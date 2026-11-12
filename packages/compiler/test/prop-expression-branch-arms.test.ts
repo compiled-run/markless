@@ -58,12 +58,12 @@ test('an arm a flip still cannot rebuild warns, not errors, when an expression o
 	expect(diagnostics.map((entry) => entry.severity)).toEqual(['warning']);
 });
 
-test('an arm decided by state refuses as an error where the page cannot re-render', async () => {
+test('an arm decided by state ships where the page re-renders and refuses as an error where it cannot', async () => {
 	const keeper = `function Keeper() @{
 	let hits = state(0);
 	<button onClick={() => hits++}>{hits}</button>
 }`;
-	const compiled = await compileTsrxModule({
+	const owned = (unlinked: string) => compileTsrxModule({
 		filename: 'src/Owned.tsrx',
 		source: `import { state } from '@markless/core';
 ${keeper}
@@ -74,12 +74,13 @@ export default function Owned() @{
 		@if (open) { <Keeper /> }
 	</section>
 }
-${UNLINKED_RENDER}`,
+${unlinked}`,
 		symbols: [],
 	});
-	expect(
-		collectTsrxModuleDiagnostics(compiled)
+	const severities = async (unlinked: string) =>
+		collectTsrxModuleDiagnostics(await owned(unlinked))
 			.filter((entry) => entry.code === UNSUPPORTED)
-			.map((entry) => entry.severity),
-	).toEqual(['error']);
+			.map((entry) => entry.severity);
+	expect(await severities('')).toEqual([]);
+	expect(await severities(UNLINKED_RENDER)).toEqual(['error']);
 });
