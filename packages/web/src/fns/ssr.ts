@@ -112,6 +112,7 @@ type SsrBoundaryRecord = SsrAnchoredRecord & {
 	readonly armRecords?: SsrArmRecordSet | ReadonlyArray<SsrArmRecordSet>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
+	readonly asyncSources?: Readonly<Record<string, ReadonlyArray<string>>>;
 };
 type SsrViewDraft = SsrRecord & {
 	readonly locators: ReadonlyArray<SsrLocatorRecord>;
@@ -1535,17 +1536,14 @@ export function marklessSsrAppendChildView(context: {
 				callbackSymbolIds.set(symbolId, callbackSymbolId);
 	}
 	const childInstancePath = marklessComposedInstancePath(context.child);
-	for (const [graphNodeId, symbolId] of Object.entries<string>(childView.asyncRunners ?? {})) {
-		const mapped = marklessSsrRemapChildGraph(
-			{ graphNodeId, path: [] },
-			context.child.graphProps,
-			childInstancePath,
-		);
-		context.asyncRunners[mapped?.graphNodeId ?? graphNodeId] = marklessBoundSymbolId(
+	const childGraphNodeId = (graphNodeId: string) =>
+		marklessSsrRemapChildGraph({ graphNodeId, path: [] }, context.child.graphProps, childInstancePath)
+			?.graphNodeId ?? graphNodeId;
+	for (const [graphNodeId, symbolId] of Object.entries<string>(childView.asyncRunners ?? {}))
+		context.asyncRunners[childGraphNodeId(graphNodeId)] = marklessBoundSymbolId(
 			context.child,
 			symbolId,
 		);
-	}
 	for (const locator of childView.locators)
 		context.locators.push({
 			...locator,
@@ -1774,15 +1772,16 @@ export function marklessSsrAppendChildView(context: {
 			...(boundary.updateSymbolId &&
 				marklessSsrComposedRoutes(boundary, context.child, childInstancePath)),
 			...(boundary.runnerGraphNodeId
-				? {
-						runnerGraphNodeId:
-							marklessSsrRemapChildGraph(
-								{ graphNodeId: boundary.runnerGraphNodeId, path: [] },
-								context.child.graphProps,
-								childInstancePath,
-							)?.graphNodeId ?? boundary.runnerGraphNodeId,
-					}
+				? { runnerGraphNodeId: childGraphNodeId(boundary.runnerGraphNodeId) }
 				: {}),
+			...(boundary.asyncSources && {
+				asyncSources: Object.fromEntries(
+					Object.entries(boundary.asyncSources).map(([read, sources]) => [
+						childGraphNodeId(read),
+						sources.map(childGraphNodeId),
+					]),
+				),
+			}),
 			asyncReads: marklessSsrRemapChildReads(
 				boundary.asyncReads,
 				context.child.graphProps,
