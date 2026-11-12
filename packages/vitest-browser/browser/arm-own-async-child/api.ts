@@ -10,6 +10,7 @@ export function resetLoads(): void {
 	waiting.length = 0;
 	subjectLog.length = 0;
 	labelLog.length = 0;
+	duringLabel = undefined;
 }
 
 export function waitingFor(id: number): number {
@@ -36,7 +37,19 @@ export function loadSubject(id: number, round: number): Promise<{ name: string }
 	});
 }
 
+let duringLabel: (() => void) | undefined;
+
+/** Resolves the next time a label derives in the browser: inside the render that opens its panel. */
+export function nextLabel(): Promise<void> {
+	return new Promise((resolve) => (duringLabel = resolve));
+}
+
 export function recordLabel(id: number, count: number): string {
-	if (typeof document !== 'undefined') labelLog.push(id);
+	if (typeof document !== 'undefined') {
+		labelLog.push(id);
+		const run = duringLabel;
+		duringLabel = undefined;
+		run?.();
+	}
 	return `label ${id} ${count}`;
 }

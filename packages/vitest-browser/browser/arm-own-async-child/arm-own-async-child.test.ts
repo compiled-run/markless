@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { labelLog, resetLoads, settleAll, subjectLog, waitingFor } from './api.ts';
+import HeldPicker from './held-panel.tsrx';
 import LabelPicker from './label-panel.tsrx';
 import SubjectPicker from './subject-panel.tsrx';
 import OpenSubjectPicker from './subject-picker-open.tsrx';
@@ -8,7 +9,8 @@ import OpenSubjectPicker from './subject-picker-open.tsrx';
 beforeEach(resetLoads);
 afterEach(cleanup);
 
-const text = (selector: string) => document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
+const text = (selector: string) =>
+	document.querySelector(selector)?.textContent?.replace(/\s+/g, ' ').trim() ?? null;
 const click = (selector: string) => document.querySelector<HTMLElement>(selector)!.click();
 const panel = () =>
 	document.querySelector('[data-panel]')
@@ -79,8 +81,8 @@ test('SSR: the same @if served open keeps working after close and reopen', async
 	await refreshesSwitchesClosesAndRetries();
 });
 
-// Known defect: a closed arm's component keeps its computeds wired to its props, so closing runs them with the value that closed the arm.
-test.fails('a closed panel loads nothing: closing and reopening asks for each subject once', async () => {
+// A closed arm's component stops following its props, so closing never runs its computeds with the value that closed it.
+test('a closed panel loads nothing: closing and reopening asks for each subject once', async () => {
 	await render(SubjectPicker);
 	click('[data-open-one]');
 	await settle(1);
@@ -93,12 +95,42 @@ test.fails('a closed panel loads nothing: closing and reopening asks for each su
 	expect(subjectLog).toEqual([1, 1]);
 });
 
-test.fails('a closed panel derives nothing: its sync computed never sees the value that closed it', async () => {
+test('a closed panel derives nothing: its sync computed never sees the value that closed it', async () => {
 	await render(LabelPicker);
 	click('[data-open-one]');
 	await expect.poll(() => text('[data-name]')).toBe('label 1 0');
 	click('[data-close]');
 	await expect.poll(() => document.querySelector('[data-panel]')).toBeNull();
-	await new Promise((resolve) => setTimeout(resolve, 50));
+	// The reopen's pass runs after the closing one, so a derive the close caused has logged by then.
+	click('[data-open-one]');
+	await expect.poll(() => text('[data-name]')).toBe('label 1 0');
 	expect(labelLog).not.toContain(null);
+});
+
+// Known defect, also on main: a close that lands after the arm commits but before its values first run is read through the
+// panel's bound captures, which name the parent's value, so the first run sees the value that closed it.
+test.fails('closing an @if right after it opens runs nothing with the closing value', async () => {
+	await render(HeldPicker);
+	// The handler closes the @if once the render that opens it has derived the panel's label.
+	click('[data-open-then-close]');
+	await expect.poll(() => labelLog.length).toBeGreaterThan(0);
+	// The reopen's pass runs after the one the close started, so a feed that close let through has run by then.
+	click('[data-open-one]');
+	await settle(1);
+	await expect.poll(() => text('[data-name]')).toBe('subject 1 round 0');
+	expect(subjectLog).toEqual([1]);
+});
+
+// Known defect: an @if served open composed its child on the server, and the served page does not name the child's live props,
+// so closing it still runs the child's computeds with the value that closed it.
+test.fails('an @if served open loads nothing when it closes', async () => {
+	await render(OpenSubjectPicker);
+	await settle(1);
+	await shows('subject 1 round 0');
+	click('[data-close]');
+	await expect.poll(panel).toBeNull();
+	click('[data-open-one]');
+	await settle(1);
+	await shows('subject 1 round 0');
+	expect(subjectLog).not.toContain(null);
 });

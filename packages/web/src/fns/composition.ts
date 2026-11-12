@@ -13,7 +13,10 @@ import {
 import type { MarklessRowTemplate, MarklessWidgetRegistry } from './instance-scope.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
-import { protocolStateVersion } from '../../../serializer/src/protocol-constants.ts';
+import {
+	PROTOCOL_PROPS_GRAPH_NODE_ID as PROPS,
+	protocolStateVersion,
+} from '../../../serializer/src/protocol-constants.ts';
 
 // Composition works on the DRAFT payload the compiled render modules build:
 // mutable, partially populated, and carrying producer fields composition itself
@@ -61,6 +64,8 @@ export type ComposePropRoute = ComposeGraphRead & { readonly name: string };
 export type ComposeStateNode = {
 	readonly graphNodeId: string;
 	readonly directValue?: unknown;
+	/** On a prop cell an escalated arm placed: where each live prop's value comes from. */
+	readonly follows?: ReadonlyArray<ComposeGraphRead & { readonly prop: string }>;
 	readonly [key: string]: unknown;
 };
 export type ComposeStateComputed = ComposeStateNode & {
@@ -245,9 +250,17 @@ export function marklessQualifyChildState(
 	graphProps: ComposeGraphProps,
 	instancePath: string,
 ) {
+	// An instance an escalated arm placed reads its props off its own cell, which the arm keeps fed while it shows.
+	const fed = state.cells?.some((cell) => cell.graphNodeId === PROPS && cell.follows);
 	state.cells = (state.cells ?? []).map((cell) => ({
 		...cell,
 		graphNodeId: marklessComposedGraphNodeId(cell.graphNodeId, instancePath),
+		...(cell.follows && {
+			follows: cell.follows.flatMap((follow) => {
+				const mapped = marklessCsrRemapChildGraph(follow, graphProps, instancePath);
+				return mapped ? [{ ...mapped, prop: follow.prop }] : [];
+			}),
+		}),
 	}));
 	state.computed = (state.computed ?? []).map((computed) => ({
 		...computed,
@@ -255,7 +268,8 @@ export function marklessQualifyChildState(
 		...(computed.dependencies && {
 			dependencies: computed.dependencies.map(
 				(dependency) =>
-					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) ?? {
+					(fed && ownPropRead(dependency, instancePath)) ||
+					marklessCsrRemapChildGraph(dependency, graphProps, instancePath) || {
 						...dependency,
 						graphNodeId: marklessComposedGraphNodeId(
 							dependency.graphNodeId,
@@ -855,6 +869,13 @@ export function marklessCsrChildReadIsStatic(
 	// static undefined and rendered its final answer with it.
 	if (!binding) return true;
 	return binding.kind !== undefined && binding.kind !== 'graph-reference';
+}
+
+function ownPropRead(read: ComposeGraphRead, instancePath: string): ComposeGraphRead | undefined {
+	const graphNodeId = marklessComposedGraphNodeId(PROPS, instancePath);
+	if (read.graphNodeId === PROPS) return { ...read, graphNodeId };
+	const name = marklessCompositionPropName(read.graphNodeId, read.path);
+	return name === null ? undefined : { ...read, graphNodeId, path: [name, ...read.path] };
 }
 
 function marklessCompositionPropName(
