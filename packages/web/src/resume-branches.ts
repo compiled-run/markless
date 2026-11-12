@@ -218,8 +218,11 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
-						// An arm another commit replaced took this flip's range with it; that commit wired its own.
-						if (branch.armBoundaryId && detached(input.root, branch.startAnchor))
+						// An arm another commit replaced took this flip's range with it, or a row built again took its id; either wired its own.
+						if (
+							branchesById.get(branch.id) !== branch ||
+							(branch.armBoundaryId && detached(input.root, branch.startAnchor))
+						)
 							return release();
 						// Hold the prior arm while the deciding async computed re-runs (the branch's only test read).
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
