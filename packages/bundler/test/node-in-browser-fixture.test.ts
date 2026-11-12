@@ -1,6 +1,7 @@
 import { join, resolve } from 'pathe';
-import { createBuilder, createServer } from 'vite';
+import { createServer } from 'vite';
 import { expect, test, vi } from 'vitest';
+import { buildFixture } from '../../router/test/support/fixture-build.ts';
 
 // A whole Vite build: 2.6 s alone at load average 54, past 5 s in the pre-commit unit lane.
 vi.setConfig({ testTimeout: 30_000 });
@@ -18,13 +19,13 @@ const modules = [
 ];
 
 test('the build fails and names every module from the page to the Node import', async () => {
-	const builder = await createBuilder({
-		root: fixture,
-		configFile: join(fixture, 'vite.config.ts'),
-		logLevel: 'silent',
-		build: { write: false },
-	});
-	await expect(builder.buildApp()).rejects.toThrow(
+	await expect(
+		buildFixture({
+			root: fixture,
+			configFile: join(fixture, 'vite.config.ts'),
+			build: { write: false },
+		}),
+	).rejects.toThrow(
 		[
 			'  index.html',
 			'  → src/main.ts',

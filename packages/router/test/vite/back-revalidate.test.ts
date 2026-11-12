@@ -11,12 +11,10 @@ import {
 	type LaunchOptions,
 	type Page,
 } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
+import { buildFixture } from '../support/fixture-build.ts';
 
 // Back and Forward show the page as it was left at once, then its async values re-ask quietly and update in place.
 
@@ -39,13 +37,7 @@ beforeAll(async () => {
 		join(root, 'node_modules/nitro'),
 		'dir',
 	);
-	const builder = await createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
-	});
-	await builder.buildApp();
+	await buildFixture({ root });
 	server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});

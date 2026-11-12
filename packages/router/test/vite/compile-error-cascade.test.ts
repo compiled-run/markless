@@ -2,10 +2,8 @@ import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { stripVTControlCharacters } from 'node:util';
 import { dirname, join, resolve } from 'pathe';
-import { createBuilder } from 'vite';
 import { afterAll, expect, test } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
+import { buildFixture, type FixtureBuildError } from '../support/fixture-build.ts';
 
 // A component that fails to compile is read by every module that imports it.
 // Those reads used to fail with MARKLESS_SOURCE_SYMBOL_CLAIMS_UNSEALED, an
@@ -50,19 +48,11 @@ async function buildErrors(component: string): Promise<ReadonlyArray<string>> {
 		await mkdir(dirname(join(root, file)), { recursive: true });
 		await writeFile(join(root, file), source);
 	}
-	const builder = await createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
-	});
 	try {
-		await builder.buildApp();
+		await buildFixture({ root });
 	} catch (error) {
-		const errors = (error as { errors?: ReadonlyArray<unknown> }).errors ?? [error];
-		return errors.map((entry) =>
-			stripVTControlCharacters(String((entry as { message?: unknown }).message ?? entry)),
-		);
+		const { errors = [error as Error] } = error as FixtureBuildError;
+		return errors.map((entry) => stripVTControlCharacters(entry.message));
 	}
 	return [];
 }

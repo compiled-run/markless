@@ -2,20 +2,12 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, realpath, rm, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { createBuilder } from 'vite';
 import { expect, test } from 'vitest';
-import { markless } from '../../core/src/vite.ts';
-import { router } from '../../router/src/vite/index.ts';
+import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import { generateBuildScaleApp } from '../../../scripts/benchmarks/build-scale/generate.mjs';
 
 async function build(root: string): Promise<Map<string, string>> {
-	const builder = await createBuilder({
-		root,
-		configFile: false,
-		logLevel: 'silent',
-		plugins: [markless(), router()],
-	});
-	await builder.buildApp();
+	await buildFixture({ root });
 	const output = join(await realpath(root), '.output/public');
 	const files = new Map<string, string>();
 	for (const entry of await readdir(output, { recursive: true, withFileTypes: true }))
