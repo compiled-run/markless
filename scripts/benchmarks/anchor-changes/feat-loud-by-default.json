@@ -6,22 +6,10 @@
 				"loadWeight",
 				"linux-x64",
 				"docs /",
-				"executedChars"
-			],
-			"delta": -33,
-			"reason": "loud-by-default refresh: the docs pages that load the in-browser compiler worker gain its setInterval lowering, and every page's shared runtime changes slightly (/ui/accordion, no compiler, +76 B); measured on Linux, PR run 43195994376 against merge-queue run 43184438514 of the merge-base",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 537,
-			"reason": "loud-by-default refresh: the docs pages that load the in-browser compiler worker gain its setInterval lowering, and every page's shared runtime changes slightly (/ui/accordion, no compiler, +76 B); measured on Linux, PR run 43195994376 against merge-queue run 43184438514 of the merge-base",
+			"delta": 519,
+			"reason": "loud-by-default refresh: the docs pages that load the in-browser compiler worker gain its setInterval lowering, and the shared runtime changes slightly; measured on Linux, PR run 43210985926 against merge-queue run 43203875902 of main 3b94e68ad",
 			"date": "2026-11-12"
 		},
 		{
@@ -32,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 772,
-			"reason": "loud-by-default refresh: the docs pages that load the in-browser compiler worker gain its setInterval lowering, and every page's shared runtime changes slightly (/ui/accordion, no compiler, +76 B); measured on Linux, PR run 43195994376 against merge-queue run 43184438514 of the merge-base",
+			"delta": 890,
+			"reason": "loud-by-default refresh: the docs pages that load the in-browser compiler worker gain its setInterval lowering, and the shared runtime changes slightly; measured on Linux, PR run 43210985926 against merge-queue run 43203875902 of main 3b94e68ad",
 			"date": "2026-11-12"
 		}
 	]
