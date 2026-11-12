@@ -3,6 +3,8 @@ import { computed, state } from '@markless/core';
 export default function SaveShelf() @{
 	const names = computed(async () => {
 		await Promise.resolve();
+		// A test holds the browser's reload here; the server render never waits.
+		await (globalThis as { namesGate?: Promise<unknown> }).namesGate;
 		return 'Ada';
 	});
 	let status = state('idle');

@@ -17,5 +17,5 @@ export default function requests(http: MiddlewareHttpContext) {
 	if (page && /(?:^|;\s*)flash=[^;]/.test(http.request.headers.get('cookie') ?? ''))
 		http.response.headers.append('set-cookie', 'flash=; Path=/; Max-Age=0');
 	if (pathname === '/legacy-save' && http.request.method === 'POST')
-		return new Response(null, { status: 303, headers: { location: '/' } });
+		return new Response(null, { status: 303, headers: { location: http.url.searchParams.get('to') ?? '/' } });
 }

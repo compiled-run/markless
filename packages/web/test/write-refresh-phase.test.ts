@@ -8,15 +8,21 @@ import {
 	type WritePhase,
 } from '../src/resume-return-reask.ts';
 
-const phases = [WRITE_IDLE, WRITE_WRITING, WRITE_WRITING_SUCCEEDED, WRITE_OWED] as const;
+const phases = [
+	WRITE_IDLE,
+	WRITE_WRITING,
+	WRITE_WRITING_SUCCEEDED,
+	WRITE_OWED,
+] as const;
 const allowed: ReadonlyArray<readonly [WritePhase, WritePhase]> = [
 	[WRITE_IDLE, WRITE_WRITING], // the first write is sent
 	[WRITE_WRITING, WRITE_WRITING], // another write is sent, or one fails while others are in flight
 	[WRITE_WRITING, WRITE_WRITING_SUCCEEDED], // a write succeeds
-	[WRITE_WRITING, WRITE_IDLE], // the last write in flight fails and none succeeded
+	[WRITE_WRITING, WRITE_IDLE], // the last write in flight fails and none succeeded, or one sent the page elsewhere
 	[WRITE_WRITING, WRITE_OWED], // the only write in flight succeeds
 	[WRITE_WRITING_SUCCEEDED, WRITE_WRITING_SUCCEEDED], // more writes are sent or settle
 	[WRITE_WRITING_SUCCEEDED, WRITE_OWED], // the last write settles after one succeeded
+	[WRITE_WRITING_SUCCEEDED, WRITE_IDLE], // a write's answer sent the page elsewhere: the round ends at once
 	[WRITE_OWED, WRITE_WRITING_SUCCEEDED], // a new write is sent while the refresh waits for its handlers
 	[WRITE_OWED, WRITE_IDLE], // the handlers ended, so the refresh runs
 ];

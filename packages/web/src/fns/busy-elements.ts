@@ -19,7 +19,8 @@ type BoundaryBusy = {
 	boundary?: BusyBoundary;
 	readonly pending: Set<string>;
 	marked: Set<BusyNode>;
-	failed?: boolean;
+	/** What the clearing of these marks says instead of "Updated": a failure, or nothing because the page went elsewhere. */
+	closing?: 'failed' | 'silent';
 };
 
 // The shown arm's bindings as its records name them: each DOM update and keyed list host with the graph node it reads.
@@ -54,11 +55,19 @@ function note(
 	snapshot: unknown,
 	showsSettledContent: boolean,
 ): void {
-	const { status, quiet } =
-		(snapshot as { readonly status?: unknown; readonly quiet?: unknown } | null) ?? {};
+	const { status, quiet, writeFailed, pageLeft } =
+		(snapshot as {
+			readonly status?: unknown;
+			readonly quiet?: unknown;
+			readonly writeFailed?: unknown;
+			readonly pageLeft?: unknown;
+		} | null) ?? {};
 	const busy = busyOf(boundary);
 	const wasPending = busy.pending.has(graphNodeId);
-	if (status === 'rejected' && wasPending) busy.failed = true;
+	// A failed refresh, or a failed save whose hold ends here: the clearing these marks announce says the update failed.
+	if ((status === 'rejected' || writeFailed === true) && wasPending && busy.closing !== 'silent') busy.closing = 'failed';
+	// A save's hold ended because the page went elsewhere: its clearing says nothing.
+	if (pageLeft === true && wasPending) busy.closing = 'silent';
 	if (status === 'pending' && showsSettledContent) {
 		if (quiet === true) return;
 		busy.pending.add(graphNodeId);
@@ -120,10 +129,11 @@ function loadAnnouncer(): Promise<typeof import('./refresh-announcer.ts')> {
 
 function announce(busy: BoundaryBusy, hosts: Set<BusyNode>): void {
 	const nowBusy = busy.marked.size === 0;
-	const failed = !nowBusy && busy.failed === true;
-	busy.failed = false;
+	const closing = nowBusy ? undefined : busy.closing;
+	busy.closing = undefined;
 	const key = busy.pending;
-	void loadAnnouncer().then((module) => module.refreshChanged(key, nowBusy, failed, hosts));
+	const alive = busy.boundary?.startAnchor as { readonly isConnected?: boolean } | undefined;
+	void loadAnnouncer().then((module) => module.refreshChanged(key, nowBusy, closing, hosts, alive));
 }
 
 // A quiet refresh never joined `busy`, so its failure has no transition to ride; it speaks on its own.

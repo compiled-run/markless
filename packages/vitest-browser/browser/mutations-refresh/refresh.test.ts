@@ -166,31 +166,27 @@ test('a write that never settles holds the refresh, until the page gives up on i
 	expect(reads()).toBe(2);
 });
 
-test('the refresh waits for every handler that was running when the write was sent, and only those', async () => {
+test('the refresh waits for the handler that sent the write, not for another handler that is merely running', async () => {
 	const container = (await render(Shelf)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');
 	const unrelated = deferred<void>();
 	server.handlerWait = unrelated.promise;
 	click(container, '[data-slow]');
 	click(container, '[data-add]');
-	await expect.poll(() => server.posts.length, poll).toBe(1);
-	await settle(300);
-	expect(reads()).toBe(1);
-	unrelated.resolve();
 	await shows(container, '[data-names]', 'Ada, Grace');
 	expect(reads()).toBe(2);
+	unrelated.resolve();
 
 	const later = deferred<void>();
 	server.handlerWait = later.promise;
-	const sent = deferred<void>();
-	server.nextPost = [{ wait: sent.promise }];
-	click(container, '[data-add-two]');
+	click(container, '[data-add-then-wait]');
 	await expect.poll(() => server.posts.length, poll).toBe(2);
-	click(container, '[data-slow]');
-	sent.resolve();
-	await shows(container, '[data-names]', 'Ada, Grace, Linus');
-	expect(reads()).toBe(3);
+	await expect.poll(() => server.handlersStarted, poll).toBe(2);
+	await settle(300);
+	expect(reads()).toBe(2);
 	later.resolve();
+	await shows(container, '[data-names]', 'Ada, Grace, Grace');
+	expect(reads()).toBe(3);
 });
 
 test('a write sent while a refresh waits for its handler joins that refresh', async () => {
@@ -340,7 +336,7 @@ test('today: an analytics POST a handler sends counts as a save and reloads the 
 	expect(server.posts).toEqual(['POST /mut/track click']);
 });
 
-test('today: a write an async value sends after an await while a handler runs counts as a new save', async () => {
+test('a write an async value sends after an await counts once, and its own reload stops the chain: one extra round, then none', async () => {
 	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 	try {
 		const container = (await render(LateWriter)).container as HTMLElement;
@@ -356,11 +352,11 @@ test('today: a write an async value sends after an await while a handler runs co
 		await expect.poll(() => server.handlersStarted, poll).toBe(1);
 		gate.resolve();
 		await expect.poll(() => server.posts.length, poll).toBe(3);
-		await settle(150);
-		expect(reads()).toBe(2);
+		await shows(container, '[data-stamp]', 'stamped');
 		handler.resolve();
-		await expect.poll(() => reads(), poll).toBe(3);
-		await expect.poll(() => server.posts.length, poll).toBe(4);
+		await settle(150);
+		// The write the reload's stamp sent is a save with no named sender; its reload re-runs the stamp once more, and that write stops the chain.
+		expect(reads()).toBe(3);
 		expect(server.posts.filter((post) => post.includes('/mut/visits'))).toHaveLength(3);
 	} finally {
 		warn.mockRestore();

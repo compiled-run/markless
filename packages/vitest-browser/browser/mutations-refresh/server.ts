@@ -4,6 +4,7 @@ export type Answer = {
 	readonly body?: unknown;
 	readonly wait?: Promise<unknown>;
 	readonly headers?: Record<string, string>;
+	readonly now?: true;
 };
 
 type Server = {
@@ -14,6 +15,11 @@ type Server = {
 	holdReads?: Promise<unknown>;
 	handlerWait?: Promise<unknown>;
 	lateGate?: Promise<unknown>;
+	pollGate?: Promise<unknown>;
+	/** How many of the next reads answer 500. */
+	failReads?: number;
+	/** Called as each write arrives, before it is answered. */
+	sent?: () => void;
 	searches: number;
 	handlersStarted: number;
 	nextPost: Array<Answer>;
@@ -38,6 +44,9 @@ export function resetServer() {
 	server.holdReads = undefined;
 	server.handlerWait = undefined;
 	server.lateGate = undefined;
+	server.pollGate = undefined;
+	server.failReads = undefined;
+	server.sent = undefined;
 	server.searches = 0;
 	server.handlersStarted = 0;
 	server.nextPost = [];
@@ -58,13 +67,18 @@ async function answer(url: URL, method: string, body: unknown): Promise<Response
 		const items = [...server.items];
 		if (server.holdReads) await server.holdReads;
 		await new Promise((resolve) => setTimeout(resolve, 5));
-		return json({ items, run: count });
+		if (server.failReads) {
+			server.failReads--;
+			return json('Loading failed', 500);
+		}
+		return json({ items, run: count, query: url.search });
 	}
 	server.posts.push(`${method} ${url.pathname} ${String(body ?? '')}`);
+	server.sent?.();
 	if (url.pathname === '/mut/search') return json({ run: ++server.searches });
 	const planned = server.nextPost.shift() ?? {};
 	if (planned.wait) await planned.wait;
-	else await new Promise((resolve) => setTimeout(resolve, 5));
+	else if (!planned.now) await new Promise((resolve) => setTimeout(resolve, 5));
 	const status = planned.status ?? 200;
 	if (status < 400 && url.pathname === '/mut/items' && typeof body === 'string' && body) server.items = [...server.items, body];
 	return json(planned.body ?? { ok: status < 400 }, status, planned.headers);
@@ -86,10 +100,11 @@ export function installServer() {
 	globalThis.fetch = stub as typeof fetch;
 }
 
-export async function loadItems(path = '/mut/items'): Promise<{ items: string[]; run: number }> {
-	if (typeof window === 'undefined') return { items: [...server.items], run: 0 };
+export async function loadItems(path = '/mut/items'): Promise<{ items: string[]; run: number; query?: string }> {
+	if (typeof window === 'undefined') return { items: [...server.items], run: 0, query: path.includes('?') ? path.slice(path.indexOf('?')) : '' };
 	const response = await fetch(path);
-	return (await response.json()) as { items: string[]; run: number };
+	if (!response.ok) throw new Error(await response.text());
+	return (await response.json()) as { items: string[]; run: number; query?: string };
 }
 
 export async function addItem(name: string): Promise<void> {

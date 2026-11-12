@@ -27,6 +27,7 @@ import {
 	keptSubmission,
 	marklessEventHandled,
 	marklessRunAtCurrentTarget,
+	runAsDispatchOwn,
 	submitRecord,
 } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
@@ -767,11 +768,14 @@ export function createEventWiring(input: {
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
-		const userActionToken: DispatchSpan = { open: true };
 		const form =
 			event.type === 'submit' && event.target?.tagName === 'FORM'
 				? (event.target as unknown as HTMLFormElement)
 				: undefined;
+		const userActionToken: DispatchSpan = {
+			open: true,
+			control: event.type === 'submit' ? undefined : (element as unknown as Element),
+		};
 		// What the submit carries, read before its handler can change the form; the hold, loaded only for a submission still running.
 		let sent: string | undefined;
 		let hold: Promise<(() => void) | undefined> | undefined;
@@ -798,14 +802,17 @@ export function createEventWiring(input: {
 					else graph.markQuietStart?.();
 					marklessControlEditsRead(event);
 					if (form && !held) sent ??= submitRecord(form);
-					const result = marklessRunAtCurrentTarget(context.event, element, symbol, {
-						...context,
-						...(rowScope && marklessIsBoundSymbolId(symbolId)
-							? marklessRowScopedSymbolContext(context, rowScope)
-							: {}),
-						invokeCallback,
-						invokeSymbol,
-					});
+					// A write sent in this synchronous run is this dispatch's own.
+					const result = runAsDispatchOwn(userActionToken, () =>
+						marklessRunAtCurrentTarget(context.event, element, symbol, {
+							...context,
+							...(rowScope && marklessIsBoundSymbolId(symbolId)
+								? marklessRowScopedSymbolContext(context, rowScope)
+								: {}),
+							invokeCallback,
+							invokeSymbol,
+						}),
+					);
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
 						const start = (module: SubmitHoldModule) =>
@@ -883,11 +890,14 @@ export function createEventWiring(input: {
 			if (kept)
 				await import('./form-send.ts')
 					.then(
+						// The submission is this dispatch's own save, so its reload is the one the form's hold waits for.
 						(module) =>
-							module.sendInPlace(event as unknown as SubmitEvent, kept, record, (end) => {
-								hold = Promise.resolve(end);
-								marklessEventHandled(input.root, event);
-							}),
+							runAsDispatchOwn(userActionToken, () =>
+								module.sendInPlace(event as unknown as SubmitEvent, kept, record, (end) => {
+									hold = Promise.resolve(end);
+									marklessEventHandled(input.root, event);
+								}),
+							),
 						// A sender that cannot load leaves the submit to the browser, which would have sent it.
 						() => kept.native(),
 					)

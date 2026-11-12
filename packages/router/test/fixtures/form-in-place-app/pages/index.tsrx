@@ -42,6 +42,7 @@ export default function Shelf() @{
 				<form method="post" action="/legacy-save" data-legacy-form>
 					<input name="title" data-legacy-title aria-label="Legacy title" />
 					<button type="submit" data-legacy-submit>Save through middleware</button>
+					<button type="submit" formaction="/legacy-save?to=/done" data-legacy-done>Save and finish through middleware</button>
 				</form>
 				<form method="post" action="/api/todos?to=javascript:window.__xss=1" data-script-form>
 					<input name="title" value="script" />
