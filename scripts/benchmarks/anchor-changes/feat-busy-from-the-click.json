@@ -1,6 +1,108 @@
 {
 	"changes": [
 		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 304,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 102,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 2481,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 849,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1223,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 850,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 31,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask, waits a run that lands meanwhile, and marks only the control that sent it, until its own round's values settle; code run at load unchanged (+0 against the same base)",
+			"date": "2026-11-12"
+		},
+		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -41,7 +143,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 56,
+			"delta": 54,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
