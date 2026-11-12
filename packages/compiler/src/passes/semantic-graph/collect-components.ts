@@ -2,7 +2,11 @@ import { componentExportPath, linkedComponentTarget } from '../link/component-ta
 import { isEventAttribute } from '../../ast/events.ts';
 import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
-import type { SemanticComponentEdge, SemanticComponentPropBinding } from '../../artifacts.ts';
+import type {
+	SemanticAsyncArmPlacement,
+	SemanticComponentEdge,
+	SemanticComponentPropBinding,
+} from '../../artifacts.ts';
 import {
 	getComponentFunction,
 	getElementAttributes,
@@ -175,12 +179,7 @@ export function collectComponentEdge(
 		id: edgeId,
 		parentComponentName: state.currentComponentName,
 		childComponentName,
-		...(state.currentAsyncBoundaryId
-			? {
-					asyncBoundaryId: state.currentAsyncBoundaryId,
-					asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
-				}
-			: {}),
+		...asyncArmPlacement(state),
 		...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),
@@ -866,4 +865,13 @@ function serializableLiteralValue(
 	if (node.type !== 'Literal') return { known: false };
 
 	return { known: true, value: node.value };
+}
+
+function asyncArmPlacement(state: WalkState): SemanticAsyncArmPlacement {
+	return state.currentAsyncBoundaryId
+		? {
+				asyncBoundaryId: state.currentAsyncBoundaryId,
+				asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+			}
+		: {};
 }

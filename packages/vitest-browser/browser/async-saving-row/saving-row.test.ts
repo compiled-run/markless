@@ -4,6 +4,7 @@ import FailingPage from './failing-page.tsrx';
 import InstantPage from './instant-page.tsrx';
 import Page from './page.tsrx';
 import ProfilePage from './profile-page.tsrx';
+import RowPage from './row-page.tsrx';
 import { answerSaves } from './save.ts';
 
 // A component rendered inside an @try arm opens its own @if from its own state:
@@ -101,4 +102,13 @@ test('CSR: a component in the @catch arm opens its own @if', async () => {
 test('SSR: a component in the @catch arm opens its own @if, streamed after the first flush', async () => {
 	await mountStreamed(await renderStream(FailingPage));
 	await caughtNoteOpensAndCloses();
+});
+
+test('SSR: a row component in a keyed @for opens its own @if, streamed after the first flush', async () => {
+	await mountStreamed(await renderStream(RowPage));
+	await expect.poll(() => document.querySelector('[data-more]')?.textContent ?? null, WAIT).toBe('Buy milk');
+	document.querySelector<HTMLButtonElement>('[data-more]')!.click();
+	await expect.poll(shown, WAIT).toBe('Notes for Buy milk');
+	document.querySelector<HTMLButtonElement>('[data-more]')!.click();
+	await expect.poll(shown, WAIT).toBe(null);
 });

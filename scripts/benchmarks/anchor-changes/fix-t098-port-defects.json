@@ -87,7 +87,7 @@
 				"executedChars"
 			],
 			"delta": -1,
-			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto; on the State page that is +781 B gzip downloaded and -1 char executed at load",
+			"reason": "docs /concepts/state downloads +781 B gzip that is never run at load (code run at load fell by 1 char); the bytes sit in two chunks only the State page loads (xyJ_a4yv / y_XbTJ0G became 1xt3lj5J / rzFTlB5t); cause not traced. Measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd)",
 			"date": "2026-11-12"
 		},
 		{
@@ -99,7 +99,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 781,
-			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto; on the State page that is +781 B gzip downloaded and -1 char executed at load",
+			"reason": "docs /concepts/state downloads +781 B gzip that is never run at load (code run at load fell by 1 char); the bytes sit in two chunks only the State page loads (xyJ_a4yv / y_XbTJ0G became 1xt3lj5J / rzFTlB5t); cause not traced. Measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd)",
 			"date": "2026-11-12"
 		}
 	]

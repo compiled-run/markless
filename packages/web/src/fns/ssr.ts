@@ -167,10 +167,11 @@ export const MARKLESS_SSR_CALLBACKS_PROP = '__marklessSsrCallbacks';
 type SsrChildProps = Readonly<Record<string, unknown>> & {
 	readonly __marklessSsrCallbacks?: Readonly<Record<string, string>>;
 };
-export type MarklessSsrComposedChild = ComposeChild & {
-	readonly asyncBoundaryId?: string;
-	// The arm of that @try holding the child: 0 = @try, 1 = @pending, 2 = @catch.
-	readonly asyncBoundaryArm?: number;
+// A child inside an @try names the arm holding it (0 = @try, 1 = @pending, 2 = @catch).
+export type SsrAsyncArmPlacement =
+	| { readonly asyncBoundaryId: string; readonly asyncBoundaryArm: number }
+	| { readonly asyncBoundaryId?: undefined; readonly asyncBoundaryArm?: undefined };
+export type MarklessSsrComposedChild = ComposeChild & SsrAsyncArmPlacement & {
 	readonly callbackProps?: Readonly<Record<string, string>>;
 	readonly output?: SsrChildOutput;
 };
