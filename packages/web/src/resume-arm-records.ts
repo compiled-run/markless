@@ -232,25 +232,20 @@ function materializeArmBranchRecords(
 		anchor as { readonly strategy?: string; readonly index?: number } | undefined;
 	// A composed child's own branch arrives still spelling the index it counted in
 	// its OWN module's census, which names nothing here; its anchors carry its
-	// instance-prefixed id, so the anchor text is the exact page-wide address.
+	// instance-prefixed id, or its module id when the arm was drawn at its owner.
 	const composed = (record: ResumeArmBranchRecord) =>
 		planned(record.startAnchor)?.strategy === 'dom-order-comment';
-	const census = records.some((record) =>
-		composed(record) ? record.sourceId : planned(record.startAnchor)?.index !== undefined,
+	const census = records.some(
+		(record) => composed(record) || planned(record.startAnchor)?.index !== undefined,
 	)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
-	let pageComments: ReadonlyArray<ResumeDomComment> | undefined;
-	const anchorNamed = (text: string): ResumeDomComment | undefined => {
-		pageComments ??= pageCommentCensus(input.root, true);
-		return pageComments.find((comment) => commentText(comment) === text);
-	};
 	return records.map((record) => {
 		if (composed(record)) {
-			// An arm drawn at its composed owner spells that owner's branches by their module ids, unique within the arm.
 			const own = (mark: string) =>
-				anchorNamed(`${mark}markless:branch:${record.id}`) ??
-				census.find((comment) => commentText(comment) === `${mark}markless:branch:${record.sourceId}`);
+				census.find((comment) =>
+					[record.id, record.sourceId].some((id) => commentText(comment) === `${mark}markless:branch:${id}`),
+				);
 			const startAnchor = own('');
 			const endAnchor = own('/');
 			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
