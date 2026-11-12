@@ -215,6 +215,39 @@ When an element should stay on the page, with its scroll position and its typed 
 </button>
 ```
 
+## Any expression can be an attribute value
+
+An attribute takes any expression in braces, template strings included. Each one follows the state it reads:
+
+```tsrx title="ticker.tsrx"
+import { state } from '@markless/core';
+
+export default function Ticker() @{
+	let symbol = state('ACME');
+	let rising = state(true);
+
+	<section>
+		<a
+			href={`/stocks/${symbol}`}
+			class={`ticker ${rising ? 'up' : 'down'}`}
+			data-testid={`row-${symbol}`}
+		>
+			{symbol}
+		</a>
+		<button
+			onClick={() => {
+				symbol = 'INIT';
+				rising = false;
+			}}
+		>
+			Next
+		</button>
+	</section>
+}
+```
+
+Press **Next**: the link's `href`, `class` and `data-testid` change to match.
+
 ## An attribute that comes and goes
 
 For one attribute, you don't need an `@if`. Give it a value that can be missing:
