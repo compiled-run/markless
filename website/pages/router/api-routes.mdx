@@ -128,7 +128,7 @@ This happens for a form inside a `@try` that has a `@catch`, whose `method` is `
 - A form inside a component whose `@try` is in another component file stays the browser's, because the build decides which `@catch` would show its failure from the file it compiles, one file at a time.
 - A redirect that does not come from an endpoint, such as one from middleware, is followed by the request itself; one to another site then fails and shows in `@catch`, so give such a form `rel="external"`.
 
-The check that decides this is about 650 bytes compressed, and only pages with such a form carry it.
+The check that decides this is about 700 bytes compressed, and only pages with such a form carry it.
 
 ## Middleware runs on every request
 
