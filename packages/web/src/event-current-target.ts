@@ -14,6 +14,16 @@ export function marklessRunAtCurrentTarget<A, T>(
 	}
 }
 
+// Events a container has not handled yet; an in-place navigation waits for them.
+export const CONTAINER_HANDLING_PROPERTY = '__mH';
+
+type ContainerHandling = Map<object, readonly [handled: Promise<unknown>, settle: () => void]>;
+export type HandlingRoot = { [CONTAINER_HANDLING_PROPERTY]?: ContainerHandling };
+
+export function marklessEventHandled(root: object, event: unknown): void {
+	(root as HandlingRoot)[CONTAINER_HANDLING_PROPERTY]?.get(event as object)?.[1]();
+}
+
 // The DOM dispatches in flight, kept on the window so the click path loads none of the write watch.
 export const MARKLESS_DISPATCHES_GLOBAL = '__marklessDispatches';
 

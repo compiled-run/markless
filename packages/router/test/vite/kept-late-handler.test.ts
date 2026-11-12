@@ -32,7 +32,7 @@ beforeAll(async () => {
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
 	server = await startFixtureDev(root);
 	origin = server.origin;
-	for (const path of ['/guide', '/reference', '/changelog', '/plain']) await fetch(`${origin}${path}`);
+	for (const path of ['/guide', '/reference', '/changelog', '/plain', '/rows']) await fetch(`${origin}${path}`);
 	browser = await launchBrowser(chromium);
 	handlerModules = await firstRunModules();
 });
@@ -277,11 +277,107 @@ test('a navigation still swaps in when an event the page sent before its runtime
 	expect(new URL(page.url()).pathname).toBe('/reference');
 	expect(await shown(page)).toEqual({ title: 'Reference page', left: 'none', saved: null });
 	expect(await heard(page)).toBe('heard 0');
+	expect(await unhandledCount(page)).toBe(0);
 	expect(await page.textContent('main')).toBe(
 		'Reference pageThe reference page has its own content, which a navigation replaces.',
 	);
 	expect(errors).toEqual([]);
 	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.close();
+});
+
+test('a forward whose resume module fails to load is reported once, leaves no record, and the navigation after it completes', async () => {
+	const probe = await browser!.newPage();
+	await probe.goto(`${origin}/guide`);
+	const modules = await probe.evaluate(() =>
+		[...document.querySelectorAll('[data-markless-resume-module]')].map(
+			(script) => new URL(script.getAttribute('data-markless-resume-module')!, location.href).href,
+		),
+	);
+	await probe.close();
+	expect(modules.length).toBeGreaterThan(0);
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await swapDeadline(page, LONG_DEADLINE_MS);
+	await page.route(
+		(url) => modules.includes(url.href),
+		(route) => route.abort(),
+	);
+	await page.goto(`${origin}/guide`);
+	await page.evaluate(() =>
+		document.querySelector('[data-leave-note]')!.dispatchEvent(new CustomEvent('navleave', { detail: 'guide' })),
+	);
+	await expect.poll(() => errors.length).toBe(1);
+	expect(errors[0]).toMatch(/dynamically imported module/);
+	expect(await unhandledCount(page)).toBe(0);
+	await page.evaluate(() => document.querySelector<HTMLAnchorElement>('[data-nav="reference"]')!.click());
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	expect(await shown(page)).toEqual({ title: 'Reference page', left: 'none', saved: null });
+	// The next page asks for the same blocked module on its own; only that import fails again.
+	expect(errors.every((message) => /dynamically imported module/.test(message))).toBe(true);
+	await page.unrouteAll({ behavior: 'ignoreErrors' });
+	await page.close();
+});
+
+test('an event on a kept part after an in-place navigation is handled before the next navigation swaps in', async () => {
+	const { page, errors, rest, release } = await heldPage(LONG_DEADLINE_MS);
+	await page.evaluate(() => document.querySelector<HTMLAnchorElement>('[data-nav="reference"]')!.click());
+	await rest();
+	release();
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	await rest();
+	expect(await heard(page)).toBe('heard 1');
+	await page.evaluate(() => {
+		document.querySelector('[data-leave-note]')!.dispatchEvent(new CustomEvent('navleave', { detail: 'reference' }));
+		document.querySelector<HTMLAnchorElement>('[data-nav="changelog"]')!.click();
+	});
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Changelog page');
+	await rest();
+	// The page's own listener tells both parts it leaves "guide" on every link click.
+	expect(await shown(page)).toEqual({ title: 'Changelog page', left: 'guide', saved: 'guide' });
+	expect(await heard(page)).toBe('heard 3');
+	expect(await unhandledCount(page)).toBe(0);
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a link click on a page that forwards it records nothing, so the navigation does not wait for the forward', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/rows`);
+	// Rows take clicks and the page has a branch, so the boot forwards a click on the link too.
+	expect(
+		await page.evaluate(() => {
+			document.querySelector<HTMLAnchorElement>('[data-nav="reference"]')!.click();
+			return [...document.querySelectorAll('[data-async-container]')].map(
+				(container) =>
+					(container as Element & { __mH?: Map<object, unknown> }).__mH?.size ?? 0,
+			);
+		}),
+	).not.toContain(1);
+	await page.waitForFunction(() => document.querySelector('[data-title]')?.textContent === 'Reference page');
+	expect(errors).toEqual([]);
+	await page.close();
+});
+
+test('a row click before the runtime starts is recorded until it is handled', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${origin}/rows`);
+	expect(
+		await page.evaluate(() => {
+			document.querySelector<HTMLButtonElement>('[data-pick="b"]')!.click();
+			return (
+				document.querySelector('[data-async-container]') as Element & { __mH?: Map<object, unknown> }
+			).__mH?.size;
+		}),
+	).toBe(1);
+	await page.waitForFunction(() => document.querySelector('[data-picked]')?.textContent === 'b');
+	await expect.poll(() => unhandledCount(page)).toBe(0);
+	expect(errors).toEqual([]);
 	await page.close();
 });
 

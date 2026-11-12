@@ -19,7 +19,7 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
-import type { HandlingRoot } from '../resume-events.ts';
+import type { HandlingRoot } from '../event-current-target.ts';
 import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
 import type {
 	ProtocolInstancePaths,
@@ -502,11 +502,13 @@ function runPrerenderSettleBoot(
 		// records still describe @pending — and whichever trigger group
 		// covered the gesture would leave the boundary unowned.
 		const handling = (root.__mH ||= new Map());
-		let settle!: () => void;
-		handling.set(event, [
-			new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
-			settle,
-		]);
+		let settle: (() => void) | undefined;
+		// A followed link is the navigation itself: it holds none back.
+		if (!(event.target as Element).closest?.('a[href]'))
+			handling.set(event, [
+				new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
+				settle!,
+			]);
 		return ready
 			.then(() => resume({ root, event, element: event.target, eventRecord: null }))
 			.finally(settle);
@@ -810,11 +812,13 @@ function runPrerenderInlineResumer(
 		root.__marklessDelegatedDispatch = true;
 		if (!root.__marklessCensus) census(root, pathsAttribute);
 		const handling = (root.__mH ||= new Map());
-		let settle!: () => void;
-		handling.set(event, [
-			new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
-			settle,
-		]);
+		let settle: (() => void) | undefined;
+		// A followed link is the navigation itself: it holds none back.
+		if (!(event.target as Element).closest?.('a[href]'))
+			handling.set(event, [
+				new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
+				settle!,
+			]);
 		return (loaded ||= loadModule(resumeModuleUrl))
 			.then(
 				(module) =>
@@ -1007,12 +1011,13 @@ function runInlineResumer(
 	addEventListener('load', () => (globalThis.requestIdleCallback || setTimeout)(pin), {
 		once: true,
 	});
-	const forward = (input: Omit<InlineDispatchInput, 'root'>) => {
+	// `recorded`: a host on the press path names a record for the event, so a navigation waits for it.
+	const forward = (input: Omit<InlineDispatchInput, 'root'>, recorded?: unknown) => {
 		root.__marklessDelegatedDispatch = true;
 		pin();
-		const event = !input.logOnly && input.event;
+		const event = input.event;
 		let settle: (() => void) | undefined;
-		if (event) {
+		if (recorded && event) {
 			const handling = (root.__mH ||= new Map());
 			handling.set(event, [
 				new Promise<void>((resolve) => (settle = () => (resolve(), handling.delete(event)))),
@@ -1370,7 +1375,7 @@ function runInlineResumer(
 						(input as { syncPolicyAlreadyApplied?: boolean }).syncPolicyAlreadyApplied =
 							policyApplied;
 					}
-					return forward(input);
+					return forward(input, 1);
 				}
 				scoped = true;
 			}
