@@ -111,6 +111,106 @@
 			"delta": 131,
 			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/composition"
+			],
+			"delta": 750,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 685,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 529,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 875,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 444,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 444,
+			"reason": "closed-arm-teardown (PR #643): a component an @if arm places reads its props off its own cell, fed while the arm shows, so closing stops its computeds and every reader sees a reloaded prop; at load only one check per composed child runs, the feed and evaluator code run when an arm opens; measured on CI run 43272501638 against main's merge-queue run 43261200539",
+			"date": "2026-11-12"
 		}
 	]
 }
