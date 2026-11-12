@@ -1,3 +1,5 @@
+import type { KeptSubmission } from './inline/sync-policy-core.ts';
+
 // A handler runs after the browser's listener returned; currentTarget names its element for its synchronous part.
 export function marklessRunAtCurrentTarget<A, T>(
 	event: unknown,
@@ -67,8 +69,13 @@ type SubmitControl = {
 
 /** What a submit carries: every control's value, checked state, chosen options and files, read before any handler runs. */
 export function submitRecord(form: { readonly elements: ArrayLike<unknown> }): string {
+	// A field named `elements` would shadow the form's own list.
+	const elements =
+		globalThis.HTMLFormElement && form instanceof HTMLFormElement
+			? Reflect.get(HTMLFormElement.prototype, 'elements', form)
+			: form.elements;
 	return JSON.stringify(
-		Array.from(form.elements as ArrayLike<SubmitControl>, (control) => [
+		Array.from(elements as ArrayLike<SubmitControl>, (control) => [
 			control.files
 				? Array.from(control.files, (file) => [file.name, file.size, file.lastModified])
 				: control.selectedOptions
@@ -92,4 +99,9 @@ export function holdBusy(host: BusyHost, owner: object, busy: boolean): void {
 		busyOwners.delete(host);
 		host.removeAttribute?.('aria-busy');
 	}
+}
+
+/** The submission the in-place check kept from the browser for this event (`__mKept`, written by its serialized source), once the event is done. */
+export function keptSubmission(event: object): Promise<KeptSubmission | undefined> | undefined {
+	return (event as { __mKept?: Promise<KeptSubmission | undefined> }).__mKept;
 }

@@ -1,108 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/event-current-target"
-			],
-			"delta": 304,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 102,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-return-reask"
-			],
-			"delta": 2584,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -13,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/event-current-target"
-			],
-			"delta": 304,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 102,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-return-reask"
-			],
-			"delta": 2584,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 14,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -21,
-			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -202,6 +100,174 @@
 			],
 			"delta": 94,
 			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; none of it runs before a save. Executed at load unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 513,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 594,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 2954,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/in-place-headers"
+			],
+			"delta": 0,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/form-send"
+			],
+			"delta": 0,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 75,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 513,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 594,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 2954,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/in-place-headers"
+			],
+			"delta": 0,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/form-send"
+			],
+			"delta": 0,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 112,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 84,
+			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
 			"date": "2026-11-12"
 		}
 	]

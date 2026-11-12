@@ -152,6 +152,8 @@ export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
 export type AsyncPlaneState = AsyncPlaneContext & {
 	/** Called for each settled snapshot a value publishes, as it publishes. */
 	readonly settled: Set<(node: RuntimeAsyncComputedNode) => void>;
+	/** Asks a value to run again in the next microtask, as a write to one of its inputs does. */
+	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly derivedCells: Map<string, Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>>;
 	readonly staleDerives: Map<string, number>;
 };
@@ -198,6 +200,17 @@ export function createAsyncPlane(
 	let bound: AsyncRefresh | undefined;
 	let queued: Array<(bound: AsyncRefresh) => void> | undefined;
 	let replaying: boolean | undefined;
+	// Inputs written in one synchronous turn start one run per value, on the final inputs; a read in between starts them first.
+	let written: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
+	const invalidate = (node: RuntimeAsyncComputedNode): void => {
+		if (node.phase === NODE_IDLE) return;
+		if (!written) {
+			written = new Map();
+			queueMicrotask(startWritten);
+		}
+		const byAction = context().isUserAction?.();
+		written.set(node, written.get(node) || byAction);
+	};
 	// Built on first use: a page whose values all arrived settled may never need it.
 	const context = (): AsyncPlaneState =>
 		(state ??= {
@@ -205,6 +218,7 @@ export function createAsyncPlane(
 			asyncComputedNodes: nodes,
 			move: moveNode,
 			settled: new Set(),
+			invalidate,
 			derivedCells: new Map(),
 			staleDerives: new Map(),
 			start: (...args) => bound!.start(...args),
@@ -244,9 +258,7 @@ export function createAsyncPlane(
 		}
 	};
 	for (const each of asyncComputed ?? []) add(createNode(each));
-	// Inputs written in one synchronous turn start one run per value, on the final inputs; a read in between starts them first.
-	let written: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
-	const startWritten = (): void => {
+	function startWritten(): void {
 		const batch = written;
 		written = undefined;
 		batch?.forEach((byAction, node) =>
@@ -259,7 +271,7 @@ export function createAsyncPlane(
 				}
 			}),
 		);
-	};
+	}
 	const forward = (graphNodeId: string, call: (bound: AsyncRefresh, node: RuntimeAsyncComputedNode) => void): void => {
 		const node = nodes.get(graphNodeId);
 		if (node) withRefresh((loaded) => call(loaded, node));
@@ -272,15 +284,7 @@ export function createAsyncPlane(
 			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node));
 			return peek(node, path);
 		},
-		invalidate(node) {
-			if (node.phase === NODE_IDLE) return;
-			if (!written) {
-				written = new Map();
-				queueMicrotask(startWritten);
-			}
-			const byAction = context().isUserAction?.();
-			written.set(node, written.get(node) || byAction);
-		},
+		invalidate,
 		startWritten,
 		markEntry(graphNodeId, save) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node, save));

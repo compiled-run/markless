@@ -10,6 +10,13 @@ import {
 	type ProtocolStreamedArmPatch,
 	type ProtocolViewPayload,
 } from '../src/index.ts';
+import {
+	constantSyncPolicyCode,
+	formatEventHostEntries,
+	IN_PLACE_SUBMIT_POLICY,
+	isInPlaceSubmitPolicy,
+	parseEventHostEntries,
+} from '../src/protocol.ts';
 
 test('streamed arm patches keep the served arm beside its records', () => {
 	const patch = [
@@ -895,4 +902,52 @@ test('authoredSubmitAriaDisabled other than true is refused', () => {
 	expect(() => decodePayloadScripts(renderPayloadScripts({ state, view } as never))).toThrow(
 		/authoredSubmitAriaDisabled/,
 	);
+});
+
+test('a submit record the runtime sends in place carries inPlaceSubmit through payload scripts; other values are refused', () => {
+	const state: ProtocolStatePayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		cells: [],
+		computed: [],
+	};
+	const form = (hostNodeId: string, inPlaceSubmit: 'reset' | 'keep') => ({
+		hostNodeId,
+		eventName: 'submit',
+		symbolIds: [],
+		syncPolicy: IN_PLACE_SUBMIT_POLICY,
+		inPlaceSubmit,
+	});
+	const view: ProtocolViewPayload = {
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [form('h1', 'reset'), form('h2', 'keep'), form('h3', 'reset')],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+	};
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view }));
+	expect(decoded.view.events.map((event) => [event.inPlaceSubmit, event.syncPolicy])).toEqual([
+		['reset', IN_PLACE_SUBMIT_POLICY],
+		['keep', IN_PLACE_SUBMIT_POLICY],
+		['reset', IN_PLACE_SUBMIT_POLICY],
+	]);
+	const refused = { ...view, events: [{ ...form('h1', 'reset'), inPlaceSubmit: 'clear' }] };
+	expect(() =>
+		decodePayloadScripts(renderPayloadScripts({ state, view: refused } as never)),
+	).toThrow(/inPlaceSubmit/);
+});
+
+test('the in-place submit policy is served as the constant code f, and read back', () => {
+	expect(constantSyncPolicyCode(IN_PLACE_SUBMIT_POLICY)).toBe('f');
+	expect(isInPlaceSubmitPolicy(IN_PLACE_SUBMIT_POLICY)).toBe(true);
+	expect(
+		isInPlaceSubmitPolicy({
+			when: { type: 'submits-in-place' },
+			actions: ['preventDefault', 'stopPropagation'],
+		}),
+	).toBe(false);
+	const served = formatEventHostEntries([{ name: 'submit', ref: 0, policy: 'f' }]);
+	expect(served).toBe('submit:0!f');
+	expect(parseEventHostEntries(served)).toEqual([{ name: 'submit', ref: 0, policy: 'f' }]);
 });

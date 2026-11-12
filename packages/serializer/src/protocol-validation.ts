@@ -226,6 +226,7 @@ export function assertProtocolViewPayload(
 			assertSyncPolicy(event.syncPolicy, `${context}.syncPolicy`);
 		}
 		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', context);
+		assertOptionalInPlaceSubmit(event, context);
 	}
 
 	for (const [index, domUpdate] of domUpdates.entries()) {
@@ -878,6 +879,7 @@ function assertRowEvents(value: unknown, context: string): void {
 			assertSyncPolicy(event.syncPolicy, `${eventContext}.syncPolicy`);
 		}
 		assertOptionalTrueField(event, 'authoredSubmitAriaDisabled', eventContext);
+		assertOptionalInPlaceSubmit(event, eventContext);
 		if (event.arm !== undefined) {
 			assertRecordShape(event.arm, `${eventContext}.arm`);
 			assertNonNegativeIntegerField(event.arm, 'slot', `${eventContext}.arm`);
@@ -1697,6 +1699,15 @@ function assertSyncPolicyBranch(value: unknown, context: string): void {
 	}
 }
 
+function assertOptionalInPlaceSubmit(record: Record<string, unknown>, context: string): void {
+	const value = record.inPlaceSubmit;
+	if (value === undefined || value === 'reset' || value === 'keep') return;
+	throw invalidPayloadShapeError(
+		contextPayloadType(context),
+		`Invalid ${context}: expected inPlaceSubmit to be 'reset' or 'keep'.`,
+	);
+}
+
 function assertSyncPolicyCondition(value: unknown, context: string): void {
 	assertRecordShape(value, context);
 
@@ -1744,6 +1755,8 @@ function assertSyncPolicyCondition(value: unknown, context: string): void {
 		}
 		return;
 	}
+
+	if (value.type === 'submits-in-place') return;
 
 	if (value.type === 'event-equals') {
 		assertStringField(value, 'field', context);

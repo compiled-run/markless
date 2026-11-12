@@ -1,6 +1,7 @@
 import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
+import { IN_PLACE_LOCATION_HEADER } from './fns/in-place-headers.ts';
 
 // Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
@@ -256,6 +257,14 @@ function warnIfResent(method: string, url: string): void {
 		}
 }
 
+// A form sent in place whose answer points at another page leaves this one, so nothing shown here is asked again.
+function leavesPage(answer: Response): boolean {
+	const pointed = answer.headers.get(IN_PLACE_LOCATION_HEADER);
+	if (pointed === null) return false;
+	const landed = new URL(pointed, answer.url || location.href);
+	return landed.origin !== location.origin || landed.pathname + landed.search !== location.pathname + location.search;
+}
+
 let patched = false;
 function patchFetch(): void {
 	if (patched || typeof globalThis.fetch !== 'function' || typeof location === 'undefined') return;
@@ -278,7 +287,7 @@ function patchFetch(): void {
 		}
 		begin(open);
 		response.then(
-			(answer) => end(answer.ok ? 'saved' : 'failed'),
+			(answer) => end(leavesPage(answer) ? 'left' : answer.ok ? 'saved' : 'failed'),
 			() => end('failed'),
 		);
 		return response;

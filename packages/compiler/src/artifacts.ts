@@ -868,6 +868,9 @@ export type SemanticSyncPolicyCondition =
 			readonly type: 'event-equals';
 			readonly field: string;
 			readonly value: unknown;
+	  }
+	| {
+			readonly type: 'submits-in-place';
 	  };
 
 export type SemanticSyncPolicyAction = 'preventDefault' | 'stopPropagation';
@@ -909,6 +912,8 @@ export type SemanticEvent = {
 	readonly syncPolicy?: SemanticSyncPolicy;
 	/** A submit event whose form has a submit control with an author-written aria-disabled, which a submitting form then leaves alone. */
 	readonly authoredSubmitAriaDisabled?: true;
+	/** No handler: a form that may post, inside a `@try` with a `@catch`, which the runtime sends in place; `keep` when a field in it is bound. */
+	readonly inPlaceSubmit?: 'reset' | 'keep';
 };
 
 export type SemanticGraphDiagnostic = CompilerDiagnostic & {

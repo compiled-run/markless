@@ -19,6 +19,7 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
+import { inPlaceSubmission } from './sync-policy-core.ts';
 import type { HandlingRoot } from '../event-current-target.ts';
 import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
 import type {
@@ -332,6 +333,14 @@ export function createInlineResumerStorageWakeSource(
 	wakes: InlineWakeSources = authoredInlineWakeSources(),
 ): string {
 	return `;(${wakes.storageWake})(${JSON.stringify(slotSymbolKey)},${renderedJson},()=>${selfWakeCall(resumeModuleUrl, wakes)});`;
+}
+
+// The window property holding the in-place submit check, written only by pages with a form the runtime sends in place.
+export const IN_PLACE_CHECK = '__mInPlace';
+
+/** The in-place submit check, emitted once per page that has a form the runtime sends in place. */
+export function createInlineInPlaceCheckSource(): string {
+	return `;self.${IN_PLACE_CHECK}||=${inPlaceSubmission.toString()};`;
 }
 
 // Appended only to a page whose state declares an app-scoped shared() definition: the
@@ -1047,6 +1056,8 @@ function runInlineResumer(
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;
 		__mxLog?: Set<string>;
+		// IN_PLACE_CHECK: this serialized function cannot import the name.
+		__mInPlace?: typeof inPlaceSubmission;
 	};
 	if (__MARKLESS_INLINE_GRAPH_SYNC_POLICY__ && __MARKLESS_INLINE_SHARED_GRAPH_POLICY__) {
 		const shared = (globalScope.__marklessInlineSyncPolicy ||= {});
@@ -1224,6 +1235,7 @@ function runInlineResumer(
 		runSyncPolicy = (code, event) => {
 			if (!/\d/.test(code)) {
 				if (code.includes('p')) event.preventDefault();
+				if (code == 'f') globalScope.__mInPlace?.(event as SubmitEvent, true);
 				if (code.includes('s')) event.stopPropagation();
 				return;
 			}
