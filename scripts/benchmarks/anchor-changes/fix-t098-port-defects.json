@@ -1,0 +1,72 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 94,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 94,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
+			"date": "2026-11-12"
+		}
+	]
+}

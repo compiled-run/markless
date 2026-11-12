@@ -107,6 +107,7 @@ export type PrerenderDataDefinition = {
 		// Set when the edge crosses a module boundary: its key in `surface.imports`.
 		readonly importSource?: string;
 		readonly asyncBoundaryId?: string;
+		readonly asyncBoundaryArm?: number;
 		readonly hostPrefix: string;
 		readonly symbolPrefix: string;
 		readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -1505,6 +1506,7 @@ export function evaluatePrerenderDataComponent(input: {
 									symbolPrefix,
 									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									asyncBoundaryId: edge.asyncBoundaryId,
+									asyncBoundaryArm: edge.asyncBoundaryArm,
 									boundSymbols: edge.boundSymbols ?? {},
 									callbackProps: {},
 								});
@@ -1643,6 +1645,7 @@ export function evaluatePrerenderDataComponent(input: {
 										symbolPrefix,
 										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 										asyncBoundaryId: edge.asyncBoundaryId,
+										asyncBoundaryArm: edge.asyncBoundaryArm,
 										boundSymbols: edge.boundSymbols ?? {},
 										callbackProps: callbacks,
 										// Where this child's own composition puts the children written into it,

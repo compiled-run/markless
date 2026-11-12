@@ -169,6 +169,8 @@ type SsrChildProps = Readonly<Record<string, unknown>> & {
 };
 export type MarklessSsrComposedChild = ComposeChild & {
 	readonly asyncBoundaryId?: string;
+	// The arm of that @try holding the child: 0 = @try, 1 = @pending, 2 = @catch.
+	readonly asyncBoundaryArm?: number;
 	readonly callbackProps?: Readonly<Record<string, string>>;
 	readonly output?: SsrChildOutput;
 };
@@ -1114,7 +1116,7 @@ function marklessSsrComposedView(
 	);
 	const asyncRunners: Record<string, string> = { ...view.asyncRunners };
 	const externalSymbolIds = new Set<string>();
-	const boundaryArmBranches = new Map<string, SsrBranchRecord[]>();
+	const boundaryArmBranches = new Map<string, Map<number, SsrBranchRecord[]>>();
 	for (const child of childData) {
 		if (child.view)
 			marklessSsrAppendChildView({
@@ -1157,12 +1159,13 @@ function marklessSsrComposedView(
 	);
 	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
 		const composed = boundaryArmBranches.get(boundary.id);
-		if (!composed?.length || !Array.isArray(boundary.armRecords)) return boundary;
+		if (!composed?.size || !Array.isArray(boundary.armRecords)) return boundary;
 		return {
 			...boundary,
-			armRecords: boundary.armRecords.map((arm, index) =>
-				index === 0 ? { ...arm, branches: [...(arm.branches ?? []), ...composed] } : arm,
-			),
+			armRecords: boundary.armRecords.map((arm, index) => {
+				const armBranches = composed.get(index);
+				return armBranches ? { ...arm, branches: [...(arm.branches ?? []), ...armBranches] } : arm;
+			}),
 		};
 	});
 	const armizedBoundaries = marklessSsrArmizeBoundaries(
@@ -1512,7 +1515,7 @@ export function marklessSsrAppendChildView(context: {
 	readonly asyncBoundaries: SsrBoundaryRecord[];
 	readonly asyncRunners: Record<string, string>;
 	readonly externalSymbolIds: Set<string>;
-	readonly boundaryArmBranches: Map<string, SsrBranchRecord[]>;
+	readonly boundaryArmBranches: Map<string, Map<number, SsrBranchRecord[]>>;
 }) {
 	const childView = context.child.view;
 	const propEvents = context.child.output?.propEvents ?? [];
@@ -1757,10 +1760,12 @@ export function marklessSsrAppendChildView(context: {
 				: {}),
 		};
 		if (context.child.asyncBoundaryId) {
-			const armBranches =
-				context.boundaryArmBranches.get(context.child.asyncBoundaryId) ?? [];
-			armBranches.push(mappedBranch);
-			context.boundaryArmBranches.set(context.child.asyncBoundaryId, armBranches);
+			const arms =
+				context.boundaryArmBranches.get(context.child.asyncBoundaryId) ??
+				new Map<number, SsrBranchRecord[]>();
+			const arm = context.child.asyncBoundaryArm ?? 0;
+			arms.set(arm, [...(arms.get(arm) ?? []), mappedBranch]);
+			context.boundaryArmBranches.set(context.child.asyncBoundaryId, arms);
 		} else {
 			context.branches.push(mappedBranch);
 		}

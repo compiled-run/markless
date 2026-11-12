@@ -175,7 +175,12 @@ export function collectComponentEdge(
 		id: edgeId,
 		parentComponentName: state.currentComponentName,
 		childComponentName,
-		...(state.currentAsyncBoundaryId ? { asyncBoundaryId: state.currentAsyncBoundaryId } : {}),
+		...(state.currentAsyncBoundaryId
+			? {
+					asyncBoundaryId: state.currentAsyncBoundaryId,
+					asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
+				}
+			: {}),
 		...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 		...importSource,
 		sourceSpan: sourceSpan(node, state.filename),

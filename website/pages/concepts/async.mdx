@@ -846,7 +846,33 @@ export function loadForecast(
 - `retry` waits 1 second after the first failure and 2 seconds after the second. After the last try, it throws that try's error, and `@catch` shows it.
 - Picking another city aborts the `signal`. The request and `wait` both listen to it, so the old loop stops at once, and the new city starts its own loop.
 - `reset` runs the computed again, which starts a fresh loop of three tries.
-- There is no try count to read. A page that wants to show one, such as "Attempt 2 of 3", keeps it in its own `state`.
+- There is no try count to show while the loop runs. A `computed` can't write `state`, so the build refuses a loop that counts into the page's own `state`. The page shows `@pending` through every try.
+
+To say how many tries failed, put the count in the error the loop throws. `retryCounted` wraps `retry`; call it in place of `retry` in `backoff.tsrx`, and `@catch` shows "Tried 3 times. Service down."
+
+```ts title="retry-counted.ts"
+import { retry } from './retry.ts';
+
+type Options = {
+	tries: number;
+	signal: AbortSignal;
+};
+
+export async function retryCounted<T>(
+	load: () => Promise<T>,
+	{ tries, signal }: Options,
+): Promise<T> {
+	try {
+		return await retry(load, { tries, signal });
+	} catch (error) {
+		if (signal.aborted) throw error;
+		const reason = error instanceof Error ? error.message : String(error);
+		throw new Error(`Tried ${tries} times. ${reason}`);
+	}
+}
+```
+
+A cancelled loop rethrows the abort as it is, so picking another city never shows a count.
 
 ### Load again when the person comes back
 

@@ -222,6 +222,8 @@ export type SemanticComponentEdge = {
 	// props are boundary reads (need 10 — the arm may touch the async computed
 	// only through child props).
 	readonly asyncBoundaryId?: string;
+	// Which arm of that @try holds the component: 0 = @try, 1 = @pending, 2 = @catch.
+	readonly asyncBoundaryArm?: number;
 	// The nearest `@try` with a `@catch` whose @try arm holds this component: its handlers' rejections render there.
 	readonly catchBoundaryId?: string;
 	readonly importSource?: string;
