@@ -5,6 +5,7 @@ import FormPage from './form-page.tsrx';
 import StreamedFlagPage from './streamed-flag-page.tsrx';
 import StreamedFormPage from './streamed-form-page.tsrx';
 import StreamedTabsPage from './streamed-tabs-page.tsrx';
+import StreamedTwinPage from './streamed-twin-page.tsrx';
 
 // A child's @if arm holds a component with a handler and an @for or @if over the async value
 // the child got as a prop; the arm is open at load, pressed as it paints, then closed and reopened.
@@ -143,5 +144,16 @@ test("SSR stream: a child's @if inside a streamed @try flips", async () => {
 	await expect.poll(() => find('[data-other]') !== null).toBe(true);
 	find('[data-tab]')!.click();
 	await expect.poll(() => find('[data-first]')?.textContent ?? null).toBe('2');
+	expect(pageErrors).toEqual([]);
+});
+
+test("SSR stream: the second of two children's forms in one streamed @try is handled where it is", async () => {
+	await playStream(renderStream(StreamedTwinPage));
+	await expect.poll(() => document.querySelectorAll('form').length).toBe(2);
+	const second = document.querySelectorAll('form')[1]!;
+	second.querySelector<HTMLElement>('[data-submit]')!.click();
+	await expect.poll(() => second.querySelector('[data-handled]')!.textContent).toBe('1');
+	expect(document.querySelectorAll('[data-handled]')[0]!.textContent).toBe('0');
+	expect(submittedNatively).toBe(0);
 	expect(pageErrors).toEqual([]);
 });

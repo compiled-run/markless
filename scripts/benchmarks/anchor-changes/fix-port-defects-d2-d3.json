@@ -8,7 +8,7 @@
 				"web/prerender/evaluator"
 			],
 			"delta": 24,
-			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"reason": "the client evaluator hands a child's bound symbols the read compiled symbols get, so a computed over an async prop reads its value: render-time code",
 			"date": "2026-11-12"
 		},
 		{
@@ -64,7 +64,7 @@
 				"web/prerender/evaluator"
 			],
 			"delta": 24,
-			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"reason": "the client evaluator hands a child's bound symbols the read compiled symbols get, so a computed over an async prop reads its value: render-time code",
 			"date": "2026-11-12"
 		},
 		{
