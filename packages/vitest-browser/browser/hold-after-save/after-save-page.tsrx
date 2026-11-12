@@ -80,6 +80,25 @@ export default function AfterSavePage() @{
 				</button>
 				<button data-abort onClick={() => stopSave()}>Stop</button>
 				<button
+					data-save-then-wait
+					onClick={async () => {
+						await addTodo('Kale');
+						await somethingElse();
+					}}
+				>
+					Save, then wait
+				</button>
+				<button
+					data-quick
+					onClick={async () => {
+						status = 'Saving';
+						await addTodo('Bread');
+						status = 'Saved';
+					}}
+				>
+					Save
+				</button>
+				<button
 					data-cancel
 					onClick={async () => {
 						await Promise.resolve();

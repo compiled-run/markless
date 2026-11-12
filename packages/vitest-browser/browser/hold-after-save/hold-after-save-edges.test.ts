@@ -85,6 +85,29 @@ for (const mode of MODES) {
 		expect((await stop()).painted).toContain('Saved');
 	});
 
+	test(`${mode}: an early reload still waits for another handler in the same round that is running`, async () => {
+		await ready(mode, 'after');
+		const saved = hold();
+		const working = hold();
+		server.holdSaves = saved.promise;
+		server.holdHandler = working.promise;
+		const waiting = document.querySelector('[data-save-then-wait]')!;
+		click('[data-save-then-wait]');
+		click('[data-quick]');
+		await expect.poll(() => text('[data-status]'), poll).toBe('Saving');
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		const reads = server.reads;
+		saved.resolve();
+		await frames(5);
+		expect(waiting.getAttribute('aria-busy')).toBe('true');
+		expect(server.reads).toBe(reads);
+		expect(text('[data-status]')).toBe('Saving');
+		working.resolve();
+		await expect.poll(() => where('Kale'), poll).toBe('saved');
+		await expect.poll(() => text('[data-status]'), poll).toBe('Saved');
+		await expect.poll(() => waiting.getAttribute('aria-busy'), poll).toBe(null);
+	});
+
 	test(`${mode}: a handler that writes a held state and then changes what the list reads loads it once`, async () => {
 		await ready(mode, 'after');
 		const reads = server.reads;

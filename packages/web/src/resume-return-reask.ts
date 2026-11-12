@@ -151,8 +151,7 @@ function holdPaint(graph: Graph) {
 		for (const [sender, round] of rounds)
 			if (sender.wrote?.get(graph)?.has(graphNodeId) && reloadOwed(sender)) {
 				round.parked.push(() => graph.changed?.({ graphNodeId, path }));
-				// The sender went on past its save, so the reload starts once this run of it ends, not when it returns.
-				if (state.phase === WRITE_OWED) queueMicrotask(() => refreshIfOwed(true));
+				if (state.phase === WRITE_OWED) queueMicrotask(() => refreshIfOwed(sender));
 				return true;
 			}
 		return false;
@@ -183,9 +182,10 @@ function settleReload(reload: Reload): void {
 	roundDone(reload.senders);
 }
 
-function refreshIfOwed(now?: boolean): void {
+// `wentOn` is a sender that went on past its save, so the reload need not wait for it to return.
+function refreshIfOwed(wentOn?: DispatchSpan): void {
 	if (state.phase !== WRITE_OWED) return;
-	if (!now) for (const sender of state.senders) if (dispatchSpans().has(sender)) return;
+	for (const sender of state.senders) if (sender !== wentOn && dispatchSpans().has(sender)) return;
 	const { due, senders, held } = state;
 	move({ phase: WRITE_IDLE });
 	const reload: Reload = { senders, asked: [...held.keys()], starting: new Set(due.keys()), stops: [] };
