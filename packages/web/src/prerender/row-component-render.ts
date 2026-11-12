@@ -289,7 +289,6 @@ function renderRowComponentEdge(
 					hostPrefix: rowSegment + projectedEdge.hostPrefix,
 					symbolPrefix: ownerSymbolPrefix + rowSegment + projectedEdge.symbolPrefix,
 					graphProps: runtimeEdgeProps(projectedEdge.props, definition.state.computed),
-					asyncBoundaryId: projectedEdge.asyncBoundaryId,
 					boundSymbols: projectedEdge.boundSymbols ?? {},
 					callbackProps: part.callbacks,
 					childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
@@ -461,6 +460,7 @@ function renderRowComponentEdge(
 							)
 						: renderRowChild(),
 					(output) => {
+					// No asyncBoundaryId here or on a part: the @try around the row is outside this render, so its @if records stay the row's own.
 					const child: MarklessSsrComposedChild = {
 						output: output as SsrComposableChildOutput,
 						hostPrefix,
@@ -468,7 +468,6 @@ function renderRowComponentEdge(
 						// argument; symbol ids have no such channel and take it here.
 						symbolPrefix: ownerSymbolPrefix + symbolPrefix,
 						graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
-						asyncBoundaryId: edge.asyncBoundaryId,
 						boundSymbols: edge.boundSymbols ?? {},
 						callbackProps: callbacks,
 						childrenWidgetRoot: sharedSeedPass()?.childrenWidgetRoot?.(
