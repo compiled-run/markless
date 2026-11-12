@@ -399,6 +399,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 	const resolverSource = adaptImportedCaptureResolver(
 		emitSymbolResolverModule({
 			literalImports: input.experimentalNativePacking,
+			bundlerVisibleImports: input.experimentalNativePacking,
 			resolverId: input.experimentalNativePacking
 				? `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodedModuleId}`
 				: undefined,

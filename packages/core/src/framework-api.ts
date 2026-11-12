@@ -58,17 +58,29 @@ export class FrameworkApiRuntimeError extends Error implements FrameworkApiRunti
 	}
 }
 
+/**
+ * A value the page watches: assign to it or change it in place, and whatever reads it updates. Typed `T`; widen it with `state<Todo[]>([])`.
+ * Holds plain data (text, numbers, objects, arrays, Map, Set, Date), shown or not. Keep a class instance such as an `AbortController` in a variable of a plain `.ts` module instead.
+ */
 export function state<T>(initial: T): T {
 	return frameworkApi<T>('state', initial);
 }
 
 /** What an async computed's function receives on each run. */
 export type AsyncComputedRecipe = {
-	/** Aborts when a newer run starts or this run's answer will no longer be used. */
+	/**
+	 * Aborts when a newer run starts or this run's answer will no longer be used. Pass it to `fetch`.
+	 * Event handlers get no signal: to cancel a save that a newer one replaces, keep an `AbortController` in a plain `.ts` module.
+	 */
 	readonly signal: AbortSignal;
 };
 
+/**
+ * An async value, typed as what the promise resolves to, never a promise. Read it inside `@try`; `@pending` shows before the first answer and `@catch` shows a failed load or a rejected handler inside it.
+ * Only the newest run's answer is shown; an older one that lands late is dropped. A save sent from a handler loads it again; one sent before the handler's first `await` also marks its button `aria-busy`, not disabled, until the new answer is shown.
+ */
 export function computed<T>(derive: (recipe: AsyncComputedRecipe) => Promise<T>): Awaited<T>;
+/** A value worked out from the state it reads, kept up to date as that state changes. */
 export function computed<T>(derive: () => T): AsyncComputedValue<T>;
 export function computed<T>(derive: (recipe: AsyncComputedRecipe) => T): AsyncComputedValue<T> {
 	return frameworkApi<AsyncComputedValue<T>>('computed', derive);

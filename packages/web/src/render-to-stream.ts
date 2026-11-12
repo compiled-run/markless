@@ -415,7 +415,12 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const servedArmRecords = withPaintedBranchArms(armRecords, output) as ProtocolArmRecordSet;
+	const armEvents = withServedBranchArmEvents(
+		armRecords as ProtocolArmRecordSet,
+		renderedAnchor.elementStart,
+		output.structure?.anchors ?? [],
+	);
+	const servedArmRecords = withPaintedBranchArms(armEvents, output) as ProtocolArmRecordSet;
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
@@ -430,11 +435,47 @@ function renderArmAppend(
 		: JSON.stringify(arm.boundaryId);
 
 	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
+		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
+}
+
+type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
+	readonly servedArmRecords?: ProtocolArmRecordSet;
+};
+
+// The stream boot reads only the arm's own events, so an @if's painted arm lends its events and their hosts to the arm,
+// placed where the render put the @if.
+function withServedBranchArmEvents(
+	armRecords: ProtocolArmRecordSet,
+	armStart: number,
+	anchors: NonNullable<SsrRenderOutput['structure']>['anchors'],
+): ProtocolArmRecordSet {
+	const branches = (armRecords.branches ?? []) as ReadonlyArray<ServedBranch>;
+	if (!branches.some((branch) => branch.servedArmRecords?.events.length)) return armRecords;
+	const locators = [...armRecords.locators];
+	const events = [...armRecords.events];
+	for (const branch of branches) {
+		const served = branch.servedArmRecords;
+		const anchor = anchors.find(
+			(candidate) => candidate.kind === 'branch' && candidate.id === branch.id,
+		);
+		if (!served?.events.length || !anchor) continue;
+		const placed = new Map(served.locators.map((locator) => [locator.hostNodeId, locator]));
+		for (const event of served.events) {
+			const locator = placed.get(event.hostNodeId);
+			if (!locator) continue;
+			if (!locators.some((held) => held.hostNodeId === locator.hostNodeId))
+				locators.push({
+					...locator,
+					index: anchor.elementStart - armStart + locator.index,
+				});
+			events.push(event);
+		}
+	}
+	return { ...armRecords, locators, events };
 }
 
 // A streamed arm can land after the page changed state, so its branches name the arm this render painted.
