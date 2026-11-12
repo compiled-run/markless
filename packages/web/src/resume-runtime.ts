@@ -300,6 +300,7 @@ export function createResumeRuntime(
 	}
 	async function armRegistrationDeps(
 		records: ArmCommitUpdate['armRecords'],
+		servedBehaviors?: string[],
 	): Promise<ArmRegistrationDeps> {
 		const eventWiring = await getEvents();
 		await eventWiring.prepareSyncPolicy(records.events, []);
@@ -336,7 +337,8 @@ export function createResumeRuntime(
 				? async (hostNodeId, records) => {
 						behaviorHostIds.add(hostNodeId);
 						behaviors.addBehaviorRecords(hostNodeId, records);
-						await behaviors.activateBehaviors(hostNodeId, { flush: false });
+						if (servedBehaviors) servedBehaviors.push(hostNodeId);
+						else await behaviors.activateBehaviors(hostNodeId, { flush: false });
 					}
 				: undefined,
 			asyncBoundaryWiring: () => asyncBoundaryWiring?.(),
@@ -367,13 +369,13 @@ export function createResumeRuntime(
 		else if (phase === 1)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
-	async function registerServedBoundaryArms(): Promise<void> {
+	async function registerServedBoundaryArms(servedBehaviors: string[]): Promise<void> {
 		for (const boundary of asyncBoundariesById.values()) {
 			const armRecords = boundary.armRecords as ResumeArmRecordSet | undefined;
 			if (!armRecords || Array.isArray(armRecords)) continue;
 			const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
 			await registerArmRecordSet(
-				await armRegistrationDeps(armRecords),
+				await armRegistrationDeps(armRecords, servedBehaviors),
 				installArmEventType,
 				boundary,
 				{ armRecords },
@@ -445,7 +447,8 @@ export function createResumeRuntime(
 				state: input.state,
 			});
 		await registerComputedRefreshes(input.state?.computed ?? [], input.state?.sharedSeeds);
-		await registerServedBoundaryArms();
+		const servedBehaviors: string[] = [];
+		await registerServedBoundaryArms(servedBehaviors);
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
 		).startResumeRuntime({
@@ -473,6 +476,8 @@ export function createResumeRuntime(
 		});
 		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
 		if (storagePlane) await input.graph.flush();
+		// After the journal listener exists, or what a served arm's attach writes never reaches the page.
+		for (const hostNodeId of servedBehaviors) await behaviorRuntime?.activateBehaviors(hostNodeId);
 		if (
 			(input.root as { readonly __mSharedReconcile?: true }).__mSharedReconcile &&
 			(await (
