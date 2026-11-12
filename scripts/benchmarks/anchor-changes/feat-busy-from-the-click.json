@@ -1,108 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-return-reask"
-			],
-			"delta": 2584,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/event-current-target"
-			],
-			"delta": 304,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-events"
-			],
-			"delta": 102,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 1103,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 1460,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 1104,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 94,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 94,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 94,
-			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -202,6 +100,108 @@
 			],
 			"delta": 30,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a quiet run in flight turns loud, a run landing meanwhile waits) and marks the control of the dispatch known to have sent it, through shared aria-busy owners, until its round's values settle; resume-events names the dispatch in its synchronous run",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 2817,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 304,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 143,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1199,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1556,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1200,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "busy from the send. Downloaded at load on pages with async values because the async wiring imports the write watch (resume-return-reask) and the event path carries resume-events and event-current-target; at load wiring only patches fetch and registers the container (as #608 did), the new marking runs only when a save is sent, and executed code at load is unchanged; the lean event path (loaded on a container's first event) now opens a dispatch span",
 			"date": "2026-11-12"
 		}
 	]
