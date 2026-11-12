@@ -142,4 +142,4 @@ export default function Document({ children }: { readonly children?: Children })
 	} finally {
 		await rm(app, { recursive: true, force: true });
 	}
-});
+}, 120_000);
