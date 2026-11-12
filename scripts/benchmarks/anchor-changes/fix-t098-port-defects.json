@@ -67,6 +67,40 @@
 			"delta": 2,
 			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them: +152 B rendered in web/fns/ssr and +94 B in web/prerender/evaluator, +2 B gzip emitted runtime, measured against the merge base on this machine",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 152,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto; on the State page that is +781 B gzip downloaded and -1 char executed at load",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 781,
+			"reason": "a component in an @try arm files its @if records under the arm that holds it, so a streamed arm carries them; measured from PR run 43171877292 against main's merge-group run 43169057548 (4ffa885bd), the tree the PR run merged onto; on the State page that is +781 B gzip downloaded and -1 char executed at load",
+			"date": "2026-11-12"
 		}
 	]
 }
