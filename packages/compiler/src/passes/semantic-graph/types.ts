@@ -117,6 +117,13 @@ export type PendingElementHandleIdref = Omit<
 /** An `aria-busy` the author wrote on a host element, static or bound. */
 export type AuthoredAriaBusy = { readonly hostNodeId: string; readonly sourceSpan?: SourceSpan };
 
+/** A `<form>` whose method may be post, inside a `@try` whose `@catch` would take its failure. */
+export type PostFormCandidate = {
+	readonly hostNodeId: string;
+	readonly catchBoundaryId: string;
+	readonly componentName?: string;
+};
+
 export type WalkState = {
 	readonly filename: string;
 	readonly moduleId: string;
@@ -190,6 +197,7 @@ export type WalkState = {
 	authoredAriaBusy: AuthoredAriaBusy[];
 	// aria-disabled written on a control that submits its form.
 	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
+	postForms: PostFormCandidate[];
 	currentHelperCall: HelperStateCallSite | null;
 	helperFunctions: Map<string, AnyNode>;
 	// `checkbox.root` -> `CheckboxRoot` for module-scope objects that hold
@@ -345,6 +353,7 @@ export function createWalkState(input: {
 		pendingElementHandleIdrefs: [],
 		authoredAriaBusy: [],
 		authoredSubmitAriaDisabled: [],
+		postForms: [],
 		currentHelperCall: null,
 		helperFunctions: new Map(),
 		memberTagTargets: new Map(),

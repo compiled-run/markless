@@ -46,6 +46,8 @@ export {
 export {
 	constantSyncPolicyCode,
 	formatEventHostEntries,
+	IN_PLACE_SUBMIT_POLICY,
+	isInPlaceSubmitPolicy,
 	parseEventHostEntries,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_EVENT_HOST_DELEGATED_REF,
@@ -101,6 +103,10 @@ export type ProtocolSyncPolicyCondition =
 			readonly type: 'event-equals';
 			readonly field: string;
 			readonly value: unknown;
+	  }
+	| {
+			/** The submit event sends a same-origin POST in this tab: the runtime sends it in place instead. */
+			readonly type: 'submits-in-place';
 	  };
 
 export type ProtocolSyncPolicyBranch = {
@@ -133,7 +139,16 @@ export type ProtocolEventRecord = {
 } & ProtocolSubmitEventFacts;
 
 /** On a submit event record: a control that submits this form has an author-written aria-disabled, so a submitting form marks no control. */
-export type ProtocolSubmitEventFacts = { readonly authoredSubmitAriaDisabled?: true };
+export type ProtocolSubmitEventFacts = {
+	readonly authoredSubmitAriaDisabled?: true;
+	/**
+	 * A form with no submit handler that the runtime sends in place, and what a successful send does to its fields:
+	 * `reset` shows the fresh form a reload would, `keep` leaves a form whose fields are bound to state as it is.
+	 */
+	readonly inPlaceSubmit?: ProtocolInPlaceSubmit;
+};
+
+export type ProtocolInPlaceSubmit = 'reset' | 'keep';
 
 export function protocolEventActionKind(
 	record: Pick<ProtocolEventRecord, 'action'>,

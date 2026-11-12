@@ -1,0 +1,304 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 449,
+			"reason": "a plain POST form is sent in place: the dispatch step that sends it through the hold, the write watch and the enclosing @catch (CI linux: +449 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1386,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/form-send"
+			],
+			"set": 2734,
+			"reason": "review round: the in-place sender is its own module, loaded on the first submit sent in place, so packing can leave it off pages without such a form (CI linux: 2734 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/in-place-headers"
+			],
+			"set": 331,
+			"reason": "review round: the request and answer header names the sender and the router's api/ wrapper share (CI linux: 331 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "review round: the in-place check waits for every listener, reads the form through its prototype and falls back to the browser's submit (CI linux: 1980 -> 3100 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 363,
+			"reason": "review round: the write watch asks nothing again after a save whose answer leaves the page (CI linux: +363 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1769,
+			"reason": "review round: the docs site downloads the grown check and write watch in its packed runtime chunks (CI linux against main b68276492)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/in-place-headers"
+			],
+			"set": 319,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/form-send"
+			],
+			"set": 2723,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 451,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 363,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 52,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/in-place-headers"
+			],
+			"set": 319,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/form-send"
+			],
+			"set": 2723,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 1762,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 451,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 363,
+			"reason": "review round: the in-place check waits for every listener and reads the form through its prototype (sync-policy-core), the sender moves to its own lazily loaded web/form-send with the api/ redirect answer, the write watch skips a save that leaves the page (resume-return-reask, web/fns/in-place-headers)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 89,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 33,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/event-current-target"
+			],
+			"delta": 209,
+			"reason": "re-review: the submit record reads a form's controls through the prototype, so a field named elements cannot turn off the identical-resubmit hold (CI linux)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 1309,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1474,
+			"reason": "re-review: the wrapper's http(s) check and the grown submit record ship in the packed runtime chunks downloaded at load (CI linux against main 96f1a7532); code executed at load unchanged within main's own run-to-run range",
+			"date": "2026-11-12"
+		}
+	]
+}

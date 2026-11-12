@@ -7,7 +7,7 @@ import type { ProtocolSyncPolicy } from './protocol.ts';
  * element's position. Grammar: entries joined by `;`, each
  * `name[:ref][!policy]`, where `ref` is the record's index in its region's event
  * list (or `-` for an event an external delegate owns) and `policy` is `p`, `s`,
- * `ps` or an index into the container's sync-policy table.
+ * `ps`, `f` (prevent a submit the runtime sends in place) or an index into the container's sync-policy table.
  */
 export const PROTOCOL_EVENT_HOST_ATTRIBUTE = 'm:on';
 /** The inert script holding each distinct conditional sync policy of a container once. */
@@ -18,7 +18,14 @@ export const PROTOCOL_EVENT_HOST_REF_SEPARATOR = ':';
 export const PROTOCOL_EVENT_HOST_POLICY_SEPARATOR = '!';
 export const PROTOCOL_EVENT_HOST_DELEGATED_REF = '-';
 
-export type ProtocolConstantSyncPolicyCode = 'p' | 's' | 'ps';
+export type ProtocolConstantSyncPolicyCode = 'p' | 's' | 'ps' | 'f';
+
+const CONSTANT_CODES: ReadonlySet<string> = new Set<ProtocolConstantSyncPolicyCode>([
+	'p',
+	's',
+	'ps',
+	'f',
+]);
 
 export type ProtocolEventHostEntry = {
 	readonly name: string;
@@ -52,10 +59,9 @@ export function parseEventHostEntries(value: string): ProtocolEventHostEntry[] {
 				...(policy === undefined
 					? {}
 					: {
-							policy:
-								policy === 'p' || policy === 's' || policy === 'ps'
-									? policy
-									: Number(policy),
+							policy: CONSTANT_CODES.has(policy)
+								? (policy as ProtocolConstantSyncPolicyCode)
+								: Number(policy),
 						}),
 			};
 		});
@@ -69,6 +75,7 @@ export function constantSyncPolicyCode(
 	policy: ProtocolSyncPolicy,
 ): ProtocolConstantSyncPolicyCode | undefined {
 	const branches = 'branches' in policy ? policy.branches : [policy];
+	if (isInPlaceSubmitPolicy(policy)) return 'f';
 	let prevent = false;
 	let stop = false;
 	for (const branch of branches) {
@@ -90,5 +97,20 @@ export function syncPolicyNeverActs(policy: ProtocolSyncPolicy): boolean {
 		(branch) =>
 			branch.actions.length === 0 ||
 			(branch.when.type === 'constant-truthy' && !branch.when.value),
+	);
+}
+
+/** The policy the analyzer gives a form the runtime sends in place: prevent the browser's submit when it would be a same-origin POST here. */
+export const IN_PLACE_SUBMIT_POLICY = {
+	when: { type: 'submits-in-place' },
+	actions: ['preventDefault'],
+} as const satisfies ProtocolSyncPolicy;
+
+export function isInPlaceSubmitPolicy(policy: ProtocolSyncPolicy): boolean {
+	return (
+		!('branches' in policy) &&
+		policy.when.type === 'submits-in-place' &&
+		policy.actions.length === 1 &&
+		policy.actions[0] === 'preventDefault'
 	);
 }

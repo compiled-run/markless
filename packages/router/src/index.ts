@@ -8,6 +8,7 @@ import {
 	REPLACE_ATTRIBUTE,
 	SCROLL_ATTRIBUTE,
 } from './link-attributes.ts';
+import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from '@markless/web/fns/in-place-headers';
 import { HTML_ATTRIBUTES_SLOT } from './route-dom.ts';
 import { rememberRequestLocals } from './request-locals.ts';
 
@@ -196,6 +197,40 @@ export function __marklessRefuseCrossSiteWrite(event: RuntimeHttpEvent): Respons
 				headers: { 'content-type': 'text/plain; charset=utf-8' },
 			})
 		: undefined;
+}
+
+// The redirects after which the browser fetches the location with GET; a 307 or 308 repeats the POST, so it stays the browser's.
+const REDIRECTS_TO_GET: ReadonlySet<number> = new Set([301, 302, 303]);
+
+/**
+ * A form Markless sends in place marks its POST; this api/ route's redirect to an http(s) page then answers with no
+ * body and its location in a header, with every other header (cookies included), so the page that location names is
+ * not fetched and thrown away. Runs after the cross-site check, so the mark changes only how an accepted request's
+ * redirect is answered; the answer is never stored, and any other method or location keeps the redirect.
+ */
+export function __marklessAnswerInPlace(event: RuntimeHttpEvent, answer: unknown): unknown {
+	const request = event.req;
+	// A Response, or an answer shaped like one (h3's redirect() returns its own HTTPResponse class).
+	const shaped = answer as { readonly status?: unknown; readonly headers?: unknown; readonly body?: unknown } | null;
+	if (typeof shaped?.status !== 'number' || !(shaped.headers instanceof Headers)) return answer;
+	if (!REDIRECTS_TO_GET.has(shaped.status)) return answer;
+	if (request?.method !== 'POST' || !request.headers.get(IN_PLACE_REQUEST_HEADER)) return answer;
+	const location = shaped.headers.get('location');
+	if (location === null) return answer;
+	let landed: URL;
+	try {
+		landed = new URL(location, event.url ?? request.url);
+	} catch {
+		return answer;
+	}
+	if (landed.protocol !== 'http:' && landed.protocol !== 'https:') return answer;
+	if (shaped.body instanceof ReadableStream) void shaped.body.cancel().catch(() => {});
+	const headers = new Headers(shaped.headers);
+	for (const name of ['location', 'content-length', 'content-encoding']) headers.delete(name);
+	headers.set(IN_PLACE_LOCATION_HEADER, location);
+	headers.set('cache-control', 'no-store');
+	headers.append('vary', IN_PLACE_REQUEST_HEADER);
+	return new Response(null, { status: 200, headers });
 }
 
 export const Html = Object.assign(

@@ -66,15 +66,15 @@ test('a cached endpoint refuses a cross-site write before its cache can answer',
 	await writeFile(file, wrapper);
 	try {
 		const { default: handler } = (await import(/* @vite-ignore */ file)) as {
-			default: (event: { req: Request; url: URL }) => Response;
+			default: (event: { req: Request; url: URL }) => Promise<Response>;
 		};
 		const send = (headers: Record<string, string>) =>
 			handler({
 				req: new Request(`${own}/api/tally`, { method: 'POST', headers }),
 				url: new URL(`${own}/api/tally`),
 			});
-		expect(send({ 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' }).status).toBe(403);
-		expect(send({ 'sec-fetch-site': 'same-origin', origin: own })).toBe(stored);
+		expect((await send({ 'sec-fetch-site': 'cross-site', origin: 'https://evil.example' })).status).toBe(403);
+		expect(await send({ 'sec-fetch-site': 'same-origin', origin: own })).toBe(stored);
 	} finally {
 		await rm(file, { force: true });
 		vi.doUnmock('nitro');

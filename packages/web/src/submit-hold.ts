@@ -1,6 +1,6 @@
 import { holdBusy, submitRecord } from './event-current-target.ts';
 
-// Loaded only for a submit whose handler returns a promise: the form is busy, and its submitter marked, until that submission is done.
+// Loaded on the first submit whose handler returns a promise or that is sent in place: the form is busy, and its submitter marked, until that submission is done.
 type Run = { readonly sent: string; readonly submitter: HTMLElement | null; readonly marks: boolean };
 
 const running = new WeakMap<HTMLFormElement, ReadonlyArray<Run>>();
