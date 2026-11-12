@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "row mint host built once with the runtime's lifetime reader so a build that resumes after dispose stops: bench +2 B gzip, +2 chars run (darwin, deterministic: 93917 -> 93919 B on all three routes); linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "row mint host built once with the runtime's lifetime reader so a build that resumes after dispose stops: bench +2 B gzip, +2 chars run (darwin, deterministic: 93917 -> 93919 B on all three routes); linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "row mint host built once with the runtime's lifetime reader so a build that resumes after dispose stops: bench +2 B gzip, +2 chars run (darwin, deterministic: 93917 -> 93919 B on all three routes); linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs +20 B gzip on every route; linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637): docs / 1698206 -> 1698226, /ui/accordion 502712 -> 502732",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs +20 B gzip on every route; linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637): docs / 1698206 -> 1698226, /ui/accordion 502712 -> 502732",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 20,
+			"reason": "row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs +20 B gzip on every route; linux CI run 43203600266 (PR #639, f1f902481) vs queue run 43203199736 (main b2fccd550 + #637): docs / 1698206 -> 1698226, /ui/accordion 502712 -> 502732",
+			"date": "2026-11-12"
+		}
+	]
+}
