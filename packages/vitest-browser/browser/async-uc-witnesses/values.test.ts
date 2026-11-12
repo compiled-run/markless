@@ -47,11 +47,11 @@ const chainMounts = { csr: () => render(ChainMarks), ssr: () => renderSSR(ChainM
 const chainBusy = (container: HTMLElement) =>
 	['depot', 'route', 'eta'].filter((name) => busy(container, `[data-${name}]`)).join(' ');
 
-each('a background refresh down a chain marks no value', chainMounts, async (container) => {
+each('a poll\'s refresh down a chain marks no value', chainMounts, async (container) => {
 	await expect.poll(() => text(container, '[data-eta]'), poll).toBe('north-depot-route-eta');
 	hold('depot:south', 'route:south-depot', 'eta:south-depot-route');
 	const stop = watch(container, { busy: () => chainBusy(container) });
-	click(container, '[data-later]');
+	click(container, '[data-poll]');
 	await expect.poll(() => asked.includes('depot:south'), poll).toBe(true);
 	release('depot:south');
 	await expect.poll(() => asked.includes('route:south-depot'), poll).toBe(true);

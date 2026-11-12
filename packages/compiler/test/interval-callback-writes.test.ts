@@ -240,7 +240,7 @@ export default function Page() @{
 
 	expect(result.symbolModules.diagnostics).toEqual([]);
 	const starter = eventSymbolSources(result).find((source) => source.includes('setInterval'));
-	expect(starter).toContain('window.setInterval(async () => {');
+	expect(starter).toContain('window.setInterval(marklessRepeatingTimer(context, async () => {');
 	expect(starter).toContain('await marklessInvokeCallbackSlot(context, "');
 });
 
@@ -258,7 +258,7 @@ export function Panel() @{
 `);
 
 	expect(eventSymbolSources(result)).toEqual([
-		expect.stringContaining('window.setInterval(() => {'),
+		expect.stringContaining('window.setInterval(marklessRepeatingTimer(context, () => {'),
 	]);
 });
 

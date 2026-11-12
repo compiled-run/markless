@@ -184,7 +184,6 @@ test('a key change restarts: the old run aborts and its late settle is ignored',
 		version: 2,
 		key: 2,
 		value: 'fresh',
-		quiet: true,
 	});
 	runner.runs[0]!.reject(new Error('late'));
 	await tick();
@@ -225,7 +224,6 @@ test('a re-run keeps the last good value readable while pending and after a fail
 		error,
 		value: 'a',
 		valueKey: 1,
-		quiet: true,
 	});
 });
 

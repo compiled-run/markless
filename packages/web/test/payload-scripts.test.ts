@@ -741,13 +741,12 @@ test('payload script resume restores fulfilled async computed snapshots before r
 	await settleMicrotasks();
 	await resumed.graph.flush();
 
-	// A plain `graph.write` outside a user action is a quiet refresh: no busy mark, no announcement.
+	// A plain `graph.write` outside a repeating timer's turn is a loud refresh.
 	expect(resumed.graph.read('computed:details')).toEqual({
 		status: 'fulfilled',
 		version: 2,
 		key: 'grace',
 		value: { title: 'User grace' },
-		quiet: true,
 	});
 });
 

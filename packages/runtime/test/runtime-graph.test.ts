@@ -1446,13 +1446,12 @@ test('runtime graph versions async computed requests and ignores stale completio
 
 	expect(runs[0].signal.aborted).toBe(true);
 	expect(runs).toHaveLength(2);
-	// A plain `graph.write` outside a user action starts a quiet refresh: no busy mark, no announcement.
+	// A plain `graph.write` outside a repeating timer's turn starts a loud refresh.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
 		value: undefined,
-		quiet: true,
 	});
 	expect(graph.takeJournal()).toEqual([
 		{ type: 'setText', locator: 'text:user', value: 'pending' },
@@ -1462,13 +1461,12 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Still quiet: the stale resolution it ignores does not change that.
+	// Still loud: the stale resolution it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
 		value: undefined,
-		quiet: true,
 	});
 	expect(graph.takeJournal()).toEqual([]);
 
@@ -1476,13 +1474,12 @@ test('runtime graph versions async computed requests and ignores stale completio
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Still the same quiet refresh: it lands quiet too.
+	// Still the same loud refresh: it lands loud too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,
 		key: 'b',
 		value: 'Bob',
-		quiet: true,
 	});
 	expect(graph.takeJournal()).toEqual([{ type: 'setText', locator: 'text:user', value: 'Bob' }]);
 });
@@ -1545,26 +1542,24 @@ test('runtime graph ignores stale rejected async computed completions', async ()
 	await drainMicrotasks();
 	await graph.flush();
 
-	// Still quiet: the stale rejection it ignores does not change that.
+	// Still loud: the stale rejection it ignores does not change that.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'pending',
 		version: 2,
 		key: 'b',
 		value: undefined,
-		quiet: true,
 	});
 	expect(graph.takeJournal()).toEqual([]);
 
 	second.resolve('Bob');
 	await drainMicrotasks();
 
-	// Still the same quiet refresh: it lands quiet too.
+	// Still the same loud refresh: it lands loud too.
 	expect(graph.read('computed:user')).toEqual({
 		status: 'fulfilled',
 		version: 2,
 		key: 'b',
 		value: 'Bob',
-		quiet: true,
 	});
 	expect(graph.takeJournal()).toEqual([{ type: 'setText', locator: 'text:user', value: 'Bob' }]);
 });

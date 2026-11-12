@@ -2,7 +2,7 @@ import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { answer, answerAt, calls, requested, resetCalls } from './gate.ts';
 import Inbox from './inbox.tsrx';
-import { frames, restoreTab, setTabHidden, settles, watchLoudness } from './support.ts';
+import { frames, restoreTab, setTabHidden, settles } from './support.ts';
 
 afterEach(async () => {
 	restoreTab();
@@ -25,34 +25,39 @@ async function loaded() {
 	await settles(shown).toEqual(['0 unread']);
 }
 
-async function refreshesQuietlyOnReturnAndReconnect() {
-	const loudness = watchLoudness();
+const marked = () => document.querySelector('[aria-busy="true"]') !== null;
+
+// A browser event is not a repeating timer, so each reload marks the old count busy until the new one lands.
+async function refreshesLoudlyOnReturnAndReconnect() {
 	setTabHidden(true);
 	await frames();
 	expect(requested('inbox')).toBe(1);
 	setTabHidden(false);
 	await settles(() => requested('inbox')).toBe(2);
 	expect(shown()).toEqual(['0 unread']);
+	await settles(marked).toBe(true);
 	answer('inbox', unread(3));
 	await settles(shown).toEqual(['3 unread']);
+	await settles(marked).toBe(false);
 
 	reconnect();
 	await settles(() => requested('inbox')).toBe(3);
+	await settles(marked).toBe(true);
 	answer('inbox', unread(5));
 	await settles(shown).toEqual(['5 unread']);
+	await settles(marked).toBe(false);
 	await frames();
 	expect(requested('inbox')).toBe(3);
-	expect(loudness()).toEqual({ busy: 0, said: [] });
 }
 
-test('CSR: coming back to the tab or reconnecting loads again, quietly', async () => {
+test('CSR: coming back to the tab or reconnecting loads again, marked busy', async () => {
 	resetCalls();
 	await render(Inbox);
 	await loaded();
-	await refreshesQuietlyOnReturnAndReconnect();
+	await refreshesLoudlyOnReturnAndReconnect();
 });
 
-test('SSR: once the resumed page is idle, coming back to the tab or reconnecting loads again, quietly', async () => {
+test('SSR: once the resumed page is idle, coming back to the tab or reconnecting loads again, marked busy', async () => {
 	resetCalls();
 	await renderSSR(Inbox);
 	expect(shown()).toEqual(['0 unread']);
@@ -64,7 +69,7 @@ test('SSR: once the resumed page is idle, coming back to the tab or reconnecting
 	}).toBe(1);
 	answer('inbox');
 	await frames();
-	await refreshesQuietlyOnReturnAndReconnect();
+	await refreshesLoudlyOnReturnAndReconnect();
 });
 
 test('CSR: reconnecting after a failed first load recovers from @catch', async () => {

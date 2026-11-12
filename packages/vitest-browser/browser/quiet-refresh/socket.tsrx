@@ -4,12 +4,12 @@ function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// A socket message callback is not an event handler, so its write stays quiet like a poll's.
+// A socket message callback is not a repeating timer, so its refresh is loud; the fetch outlasts the settle deadline.
 export function Socket() @{
 	let tick = state(0);
 	const feed = computed(async () => {
 		const key = tick;
-		await delay(10);
+		await delay(300);
 		return 'live-' + key;
 	});
 

@@ -71,9 +71,9 @@ async function browserSourceWaits(mount: () => Promise<{ readonly container: unk
 	expect(stop().waiting).toEqual([true, false]);
 }
 
-// Gap: the browser-only request runs with the first answer on screen and no busy mark, because attach's write counts as a background change.
-test.fails('a source that exists only in the browser shows its wait (client-rendered)', () => browserSourceWaits(() => render(BrowserSource)));
-test.fails('a source that exists only in the browser shows its wait (server-rendered)', () => browserSourceWaits(() => renderSSR(BrowserSource)));
+// Attach's write is not a repeating timer's, so the browser-only request marks the first answer it replaces.
+test('a source that exists only in the browser shows its wait (client-rendered)', () => browserSourceWaits(() => render(BrowserSource)));
+test('a source that exists only in the browser shows its wait (server-rendered)', () => browserSourceWaits(() => renderSSR(BrowserSource)));
 
 const bothAsked = (city: string) => asked.includes(`sky:${city}`) && asked.includes(`air:${city}`);
 

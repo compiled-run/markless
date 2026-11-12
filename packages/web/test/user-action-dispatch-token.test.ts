@@ -111,7 +111,7 @@ test('a callback the handler fires and forgets keeps the user action through its
 	]);
 });
 
-test('the dispatcher marks a DOM event body loud and a call made after the dispatch ended quiet, so no handler module carries a wrap', async () => {
+test('the dispatcher marks no turn quiet except a call made from inside a repeating timer\'s quiet turn', async () => {
 	const save = element('BUTTON');
 	const root = element('SECTION', [save]);
 	root.__marklessDelegatedDispatch = true;
@@ -123,8 +123,6 @@ test('the dispatcher marks a DOM event body loud and a call made after the dispa
 					if (!handlerContext) {
 						const graph = context!.graph!;
 						for (const [name, label] of [
-							['markUserActionStart', 'loud-start'],
-							['markUserActionEnd', 'loud-end'],
 							['markQuietStart', 'quiet-start'],
 							['markQuietEnd', 'quiet-end'],
 						] as const) {
@@ -151,7 +149,16 @@ test('the dispatcher marks a DOM event body loud and a call made after the dispa
 	await runtime.dispatch({ type: 'click', target: save } as never, { ignoreUnmatched: true });
 	order.length = 0;
 	await runtime.dispatch({ type: 'click', target: save } as never, { ignoreUnmatched: true });
+	// A socket message or a one-off timer calling back after the dispatch ended.
 	await handlerContext!.invokeSymbol!('symbol:callback', { ...handlerContext });
+	expect(order).toEqual(['handler', 'callback']);
 
-	expect(order).toEqual(['loud-start', 'handler', 'loud-end', 'quiet-start', 'callback', 'quiet-end']);
+	// A repeating timer's tick calling back: the callee keeps the tick's quiet turn after its code arrives.
+	order.length = 0;
+	const graph = handlerContext!.graph as { markQuietStart(): void; markQuietEnd(): void };
+	graph.markQuietStart();
+	const called = handlerContext!.invokeSymbol!('symbol:callback', { ...handlerContext });
+	graph.markQuietEnd();
+	await called;
+	expect(order).toEqual(['quiet-start', 'quiet-end', 'quiet-start', 'callback', 'quiet-end']);
 });

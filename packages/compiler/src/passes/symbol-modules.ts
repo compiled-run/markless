@@ -58,7 +58,7 @@ import {
 	type ForeignScopeRefusal,
 } from './foreign-scope.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
-import { createSourceMemo, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
+import { createSourceMemo, moduleSemantics, ownedModuleAstOrNull } from './semantic-graph/shared-ast.ts';
 import { valueModuleImports } from './semantic-graph/imports.ts';
 import {
 	arrayNode,
@@ -209,6 +209,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 	const boundaryArmsById = renderBoundaryArms(input.renderData, asyncComputedNodeIds);
 	const sourceFileName = input.source?.filename ?? 'markless-module.tsrx';
 	const authoredSource = input.source?.source ?? '';
+	const timerGlobals = repeatingTimerGlobals(input.source);
 	const emittedModules: GeneratedSymbolModule[] = input.symbolResolver.symbols.flatMap(
 		(symbol) => {
 			if (unsupportedCaptureSymbolIds.has(symbol.id)) return [];
@@ -271,6 +272,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				input.renderData,
 				input.omitAuthoredSource === true,
 				sourceFileName,
+				timerGlobals,
 			);
 		},
 	);
@@ -2327,6 +2329,7 @@ function emitSymbolModule(
 	renderData: SymbolModulesInput['renderData'],
 	omitAuthoredSource: boolean,
 	sourceFileName: string,
+	repeatingTimerGlobals: ReadonlySet<string>,
 ): GeneratedSymbolModule[] {
 	if (symbol.kind === 'sync-computed-derive') {
 		return [
@@ -2356,6 +2359,7 @@ function emitSymbolModule(
 		sourceFileName,
 		localNames,
 		usesArgumentVector,
+		repeatingTimerGlobals,
 	});
 	if (!emitted) return [];
 
@@ -6151,6 +6155,8 @@ export type EventHandlerEmissionInput = {
 	readonly moduleImports?: readonly SemanticModuleImport[];
 	/** An attach behavior's parameter is its element, not an event. */
 	readonly parametersFrom?: 'element';
+	/** `repeatingTimerGlobals`: names a `setInterval` call reaches the browser's timer through; omitted means none. */
+	readonly repeatingTimerGlobals?: ReadonlySet<string>;
 };
 
 /** The body of the `/* scalar leaf marker: ... *\/` comment, delimiters excluded. */
@@ -6336,6 +6342,15 @@ export function buildEventHandlerEmission(
 							kind: 'named' as const,
 							localName: CATCH_RESET_FN,
 							source: '@markless/web/fns/catch-reset',
+						}),
+					]
+				: []),
+			...(referenced.has(REPEATING_TIMER_FN)
+				? [
+						moduleImportNode({
+							kind: 'named' as const,
+							localName: REPEATING_TIMER_FN,
+							source: '@markless/web/fns/repeating-timer',
 						}),
 					]
 				: []),
@@ -6849,6 +6864,7 @@ type EventHandlerRewrite = {
 	readonly claimedWrites: Set<LoweredStateWrite>;
 	readonly claimedHandleCalls: Set<EventElementHandleCall>;
 	readonly boundHandleNames: ReadonlySet<string>;
+	readonly repeatingTimerGlobals: ReadonlySet<string>;
 };
 
 function eventHandlerRewrite(
@@ -6892,6 +6908,7 @@ function eventHandlerRewrite(
 		claimedWrites: new Set(),
 		claimedHandleCalls: new Set(),
 		boundHandleNames: new Set(),
+		repeatingTimerGlobals: input.repeatingTimerGlobals ?? new Set(),
 	};
 }
 
@@ -7047,6 +7064,9 @@ function rewriteEventHandlerNode(
 
 	const unclaimedWrite = unclaimedWriteNode(node, rewrite);
 	if (unclaimedWrite) return carryEventHandlerComments(node, unclaimedWrite);
+
+	const timer = repeatingTimerCallNode(node, rewrite);
+	if (timer) return carryEventHandlerComments(node, timer);
 
 	if (node.type === 'ChainExpression' && isNode(node.expression)) {
 		return chainExpressionNode(node, rewriteEventHandlerNode(node.expression, node, rewrite));
@@ -7767,6 +7787,63 @@ const WRITE_THROUGH_FN = 'marklessWriteThrough';
 const OBJECT_ASSIGN_FN = 'marklessObjectAssign';
 const CHANGED_FN = 'marklessChanged';
 const CATCH_RESET_FN = 'marklessCatchReset';
+const REPEATING_TIMER_FN = 'marklessRepeatingTimer';
+// The browser's `setInterval`, called bare or through one of these globals.
+const REPEATING_TIMER_ROOTS = ['setInterval', 'window', 'globalThis', 'self'] as const;
+
+/** The timer roots the authored module binds nowhere, so the analyzer resolves each use to the browser's global. */
+function repeatingTimerGlobals(source: SymbolModulesInput['source']): ReadonlySet<string> {
+	if (!source) return new Set();
+	try {
+		const bound = new Set(moduleSemantics(source.source, source.filename).bindings.map((binding) => binding.name));
+		return new Set(REPEATING_TIMER_ROOTS.filter((name) => !bound.has(name)));
+	} catch {
+		// The semantic pass owns parse diagnostics; an unreadable module wraps nothing.
+		return new Set();
+	}
+}
+
+function reachesRepeatingTimer(callee: AnyNode, rewrite: EventHandlerRewrite): boolean {
+	const global = (node: AnyNode, name?: string) => {
+		const found = getIdentifierName(node);
+		return (
+			node.type === 'Identifier' &&
+			!!found &&
+			(name === undefined || found === name) &&
+			rewrite.repeatingTimerGlobals.has(found) &&
+			!rewrite.boundHandleNames.has(found) &&
+			!rewrite.localNames.has(found)
+		);
+	};
+	if (callee.type === 'Identifier') return global(callee, 'setInterval');
+	return (
+		callee.type === 'MemberExpression' &&
+		callee.computed !== true &&
+		isNode(callee.object) &&
+		isNode(callee.property) &&
+		getIdentifierName(callee.property) === 'setInterval' &&
+		callee.object.type === 'Identifier' &&
+		getIdentifierName(callee.object) !== 'setInterval' &&
+		global(callee.object)
+	);
+}
+
+// `setInterval(tick, ms)` keeps its shape; the tick runs as a repeating timer's turn, so the poll it drives refreshes quietly.
+function repeatingTimerCallNode(node: AnyNode, rewrite: EventHandlerRewrite): EmissionNode | null {
+	if (node.type !== 'CallExpression' || node.optional === true || !isNode(node.callee)) return null;
+	if (!reachesRepeatingTimer(node.callee, rewrite)) return null;
+	const [tick, ...rest] = asNodes(node.arguments);
+	if (!tick || tick.type === 'SpreadElement') return null;
+	const walk = (child: AnyNode) => rewriteEventHandlerNode(child, node, rewrite);
+	return {
+		...(node as unknown as EmissionNode),
+		callee: walk(node.callee),
+		arguments: [
+			callNode(identifierNode(REPEATING_TIMER_FN), [identifierNode('context'), walk(tick)]),
+			...rest.map(walk),
+		],
+	};
+}
 const HANDLER_CATCH_FN = 'marklessHandlerCatch';
 const HANDLER_CATCH_RETURNED_FN = 'marklessHandlerCatchReturned';
 const HANDLER_CATCH_ERROR_NAME = '__marklessHandlerError';
@@ -8440,6 +8517,8 @@ export type SymbolModuleEmissionInput = {
 	readonly localNames?: ReadonlySet<string>;
 	/** Whether some other symbol binds this one as a callback route. */
 	readonly usesArgumentVector?: boolean;
+	/** `repeatingTimerGlobals`: names a `setInterval` call reaches the browser's timer through. */
+	readonly repeatingTimerGlobals?: ReadonlySet<string>;
 };
 
 /** The symbol kinds `buildSymbolModuleEmission` can print from nodes today. */
@@ -8538,6 +8617,7 @@ export function buildSymbolModuleEmission(
 				moduleDeclarations: input.moduleDeclarations,
 				moduleImports: input.moduleImports,
 				parametersFrom: 'element',
+				...(input.repeatingTimerGlobals ? { repeatingTimerGlobals: input.repeatingTimerGlobals } : {}),
 			});
 		if (!canEmitBehaviorModule(symbol)) return null;
 
@@ -8575,6 +8655,7 @@ export function buildSymbolModuleEmission(
 			sourceFileName: input.sourceFileName,
 			moduleDeclarations: input.moduleDeclarations,
 			moduleImports: input.moduleImports,
+			...(input.repeatingTimerGlobals ? { repeatingTimerGlobals: input.repeatingTimerGlobals } : {}),
 		});
 	}
 
