@@ -258,3 +258,27 @@ test('a constant shown inside an @if on a prop does not read the prop the @if te
 	expect(warnings(propFetched('subject !== null', '{attempts + 1}'))).toEqual([]);
 	expect(warnings(propFetched('tick > 0', '{attempts + 1}'))).toEqual([]);
 });
+
+test('a prop the shown text reads stays an input when the @if test spells it differently', () => {
+	const source = `import { computed } from '@markless/core';
+
+export default function Editor(props: { subject: number | null }) @{
+	const offset = 1;
+	const record = computed(async () => ({ title: 'r' + props.subject }));
+
+	@if (props.subject !== null) {
+		@try {
+			<section>
+				<p>{record.title}</p>
+				<p>{(props?.subject ?? 0) + offset}</p>
+			</section>
+		} @pending {
+			<p>loading</p>
+		}
+	}
+}
+`;
+	expect(warnings(source).map((diagnostic) => diagnostic.source)).toEqual([
+		'(props?.subject ?? 0) + offset',
+	]);
+});

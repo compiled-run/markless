@@ -21,8 +21,6 @@ export default function CustomerCard() @{
 			<p data-asserted title={customer!.plan.tier}>{customer!.plan.tier}</p>
 		} @pending {
 			<p data-asserted-loading>Loading</p>
-		} @catch {
-			<p data-asserted-failed>No customer</p>
 		}
 	</article>
 }

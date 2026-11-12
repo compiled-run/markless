@@ -10,6 +10,7 @@ import {
 	type AnyNode,
 } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
+import type { SemanticGraphDependency } from '../../artifacts.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 import {
 	graphBindingMap,
@@ -599,24 +600,39 @@ export function liftArmRenderLocalValue(
 	);
 	if (lifted) {
 		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
-		const shown = new Set(shownDependencies.map((dependency) => dependency.source));
-		markArmGuardDependencies(lifted.graphNodeId, shown, state);
+		markArmGuardDependencies(
+			lifted.graphNodeId,
+			shownDependencies,
+			dependencies.slice(shownDependencies.length),
+			state,
+		);
 	}
 	return lifted;
 }
 
+// A read of the same cell at a path prefix reads this one too: `props` covers `props.subject`.
+const covers = (reader: SemanticGraphDependency, read: SemanticGraphDependency) =>
+	reader.graphNodeId === read.graphNodeId &&
+	reader.path.length <= read.path.length &&
+	reader.path.every((segment, index) => segment === read.path[index]);
+
+// Only a cell the arm test reads and the shown value does not is the guard's alone.
 function markArmGuardDependencies(
 	graphNodeId: string,
-	shown: ReadonlySet<string>,
+	shown: ReadonlyArray<SemanticGraphDependency>,
+	guard: ReadonlyArray<SemanticGraphDependency>,
 	state: WalkState,
 ): void {
+	const guardOnly = (dependency: SemanticGraphDependency) =>
+		guard.some((read) => covers(read, dependency) && covers(dependency, read)) &&
+		!shown.some((reader) => covers(reader, dependency));
 	const index = state.graph.graphBindings.findIndex((binding) => binding.id === graphNodeId);
 	const binding = state.graph.graphBindings[index];
-	if (!binding?.dependencies?.some((dependency) => !shown.has(dependency.source))) return;
+	if (!binding?.dependencies?.some(guardOnly)) return;
 	state.graph.graphBindings[index] = {
 		...binding,
 		dependencies: binding.dependencies.map((dependency) =>
-			shown.has(dependency.source) ? dependency : { ...dependency, armGuard: true as const },
+			guardOnly(dependency) ? { ...dependency, armGuard: true as const } : dependency,
 		),
 	};
 }
