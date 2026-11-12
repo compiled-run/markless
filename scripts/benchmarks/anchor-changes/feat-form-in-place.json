@@ -15,30 +15,6 @@
 			"path": [
 				"loadWeight",
 				"linux-x64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": -32,
-			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 1341,
-			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
 				"docs /concepts/state",
 				"executedChars"
 			],
@@ -360,6 +336,30 @@
 			],
 			"delta": 1323,
 			"reason": "review round: packed builds download the grown check and the write watch at load (CI linux against main 09e0967a8: bench +1211 B gzip in all, docs /ui/accordion +1323 B); code executed at load moves +14 chars on /records, the routes whose count main itself varies by up to 224 chars between runs",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -33,
+			"reason": "review round: the docs site downloads the grown check and write watch in its packed runtime chunks (CI linux against main b68276492)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1769,
+			"reason": "review round: the docs site downloads the grown check and write watch in its packed runtime chunks (CI linux against main b68276492)",
 			"date": "2026-11-12"
 		}
 	]
