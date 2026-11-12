@@ -45,6 +45,8 @@ type ServedTree = {
 	readonly childCounts: ReadonlyArray<number>;
 	/** Per page-level comment anchor in DOM order, the index the next element takes. */
 	readonly commentElementIndexes: ReadonlyArray<number>;
+	/** Per page-level comment anchor in DOM order, its text. */
+	readonly commentData: ReadonlyArray<string>;
 	/** Per element, the html offset just past its tag name, where an attribute can be written. */
 	readonly nameEnds: ReadonlyArray<number>;
 	/** Per element, the steps of an element address below it: child elements, and -1 for each block. */
@@ -66,6 +68,7 @@ export function servedElementTree(html: string): ServedTree {
 		inText[parent] = text;
 	};
 	const commentElementIndexes: number[] = [];
+	const commentData: string[] = [];
 	const nameEnds = [0];
 	const addressSteps: number[][] = [[]];
 	const blockSteps = new Map<number, number[]>();
@@ -96,8 +99,10 @@ export function servedElementTree(html: string): ServedTree {
 				if (!isUncountedComment({ nodeType: 8, data }))
 					blockSteps.set(commentElementIndexes.length, steps);
 			}
-			if (!isUncountedComment({ nodeType: 8, data }))
+			if (!isUncountedComment({ nodeType: 8, data })) {
 				commentElementIndexes.push(elements.length);
+				commentData.push(data);
+			}
 			continue;
 		}
 		const next = html[open + 1] ?? '';
@@ -163,7 +168,15 @@ export function servedElementTree(html: string): ServedTree {
 		if (FOREIGN_ROOTS.has(lower)) foreignDepth++;
 		stack.push({ tag, index });
 	}
-	return { elements, childCounts, commentElementIndexes, nameEnds, addressSteps, blockSteps };
+	return {
+		elements,
+		childCounts,
+		commentElementIndexes,
+		commentData,
+		nameEnds,
+		addressSteps,
+		blockSteps,
+	};
 }
 
 /** Writes `attribute="value"` on each element the map names by its index in servedElementTree(html). */

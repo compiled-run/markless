@@ -17,6 +17,7 @@ import type {
 	SymbolResolverPlan,
 } from '../artifacts.ts';
 import {
+	asyncComputedReadPath,
 	graphBindingMap,
 	resolveGraphPath,
 	semanticAliasMap,
@@ -624,7 +625,8 @@ function qualifiedRoute(
 		};
 	}
 	if (route.kind !== 'graph-reference') return route;
-	const { ownerEdgeCount, ...rest } = route;
+	const { ownerEdgeCount, asyncValue, ...own } = route;
+	const rest = asyncValue ? { ...own, path: asyncComputedReadPath(own.path) } : own;
 	const composerPath = ownerPath(ownerEdgeCount);
 	return composerPath && protocolInstanceQualifies(rest.graphNodeId) === true
 		? { ...rest, graphNodeId: composerPath + rest.graphNodeId }

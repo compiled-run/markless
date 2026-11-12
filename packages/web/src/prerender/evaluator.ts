@@ -982,6 +982,7 @@ type PrerenderBoundModule = {
 
 export type PrerenderBoundComposer = {
 	readonly symbolPrefix: string;
+	// Reads as a compiled symbol does: an async computed's node is its snapshot.
 	readonly read: PrerenderRead;
 	readonly module?: PrerenderBoundModule;
 	// The edge that placed this composer, so a symbol its child bound rebinds once per enclosing instance.
@@ -1127,7 +1128,7 @@ export function evaluatePrerenderDataComponent(input: {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, read);
+	ownModule.instanceReads.set(input.symbolPrefix, symbolRead);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -1200,7 +1201,7 @@ export function evaluatePrerenderDataComponent(input: {
 								? scope.module && marklessPlacedInstanceRead(scope.module, placed)
 								: scope.read;
 						if (holder) return holder(local, path);
-						const own = read(graphNodeId, path);
+						const own = symbolRead(graphNodeId, path);
 						return own === undefined && scope.symbolPrefix.endsWith(at)
 							? scope.read(local, path)
 							: own;
@@ -1590,7 +1591,7 @@ export function evaluatePrerenderDataComponent(input: {
 									boundSymbols: edge.boundSymbols,
 									composer: {
 										symbolPrefix: input.symbolPrefix,
-										read,
+										read: symbolRead,
 										module: ownModule,
 										bound: input.composer &&
 											input.boundSymbols && {

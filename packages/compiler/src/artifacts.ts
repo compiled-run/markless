@@ -2233,6 +2233,8 @@ export type CaptureSlotRoute =
 			readonly path: ReadonlyArray<string>;
 			/** Edges of `componentEdgePath` above the component that owns `graphNodeId`, when a prop forwarded it from further up. */
 			readonly ownerEdgeCount?: number;
+			/** `graphNodeId` is an async computed: the browser graph holds its snapshot, and the prop is its settled value. */
+			readonly asyncValue?: true;
 	  }
 	| {
 			readonly kind: 'compiler-known-constant';

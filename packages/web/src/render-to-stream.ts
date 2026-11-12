@@ -30,6 +30,8 @@ import {
 	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
+import { servedElementTree } from './locator-paths.ts';
+import { BRANCH_ANCHOR_PREFIX } from './resume-arm-records.ts';
 import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
@@ -415,7 +417,12 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const servedArmRecords = withPaintedBranchArms(armRecords, output) as ProtocolArmRecordSet;
+	const armEvents = withArmBranches(
+		armRecords as ProtocolArmRecordSet,
+		armHtml,
+		(output.view?.branches ?? []) as ReadonlyArray<ServedBranch>,
+	);
+	const servedArmRecords = withPaintedBranchArms(armEvents, output) as ProtocolArmRecordSet;
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
@@ -430,11 +437,57 @@ function renderArmAppend(
 		: JSON.stringify(arm.boundaryId);
 
 	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armRecords as ProtocolArmRecordSet, armHtml)}</template>` +
+		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
+}
+
+type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
+	readonly sourceId?: string;
+	readonly servedArmRecords?: ProtocolArmRecordSet;
+};
+
+// The render lists a composed child's @if at page level; one whose anchors stream in this arm belongs to the arm, and the
+// stream boot reads only the arm's own events, so a branch's served arm lends its events and their hosts to the arm.
+function withArmBranches(
+	armRecords: ProtocolArmRecordSet,
+	armHtml: string,
+	pageBranches: ReadonlyArray<ServedBranch>,
+): ProtocolArmRecordSet {
+	if (!pageBranches.length && !armRecords.branches?.length) return armRecords;
+	const tree = servedElementTree(armHtml);
+	const anchorOf = (branch: ServedBranch) =>
+		tree.commentData.findIndex((data) =>
+			[branch.id, branch.sourceId].some((id) => id && data === BRANCH_ANCHOR_PREFIX + id),
+		);
+	const own = (armRecords.branches ?? []) as ReadonlyArray<ServedBranch>;
+	const branches = [
+		...own,
+		...pageBranches.filter(
+			(branch) => anchorOf(branch) >= 0 && !own.some((held) => held.id === branch.id),
+		),
+	];
+	if (branches.length === own.length) return armRecords;
+	const locators = [...armRecords.locators];
+	const events = [...armRecords.events];
+	for (const branch of branches) {
+		const served = branch.servedArmRecords;
+		const anchor = anchorOf(branch);
+		if (!served?.events.length || anchor < 0) continue;
+		// Arm locators count from the arm's first element; the served arm's from its branch anchor.
+		const offset = tree.commentElementIndexes[anchor]! - 1;
+		const placed = new Map(served.locators.map((locator) => [locator.hostNodeId, locator]));
+		for (const event of served.events) {
+			const locator = placed.get(event.hostNodeId);
+			if (!locator) continue;
+			if (!locators.some((held) => held.hostNodeId === locator.hostNodeId))
+				locators.push({ ...locator, index: offset + locator.index });
+			events.push(event);
+		}
+	}
+	return { ...armRecords, locators, events, branches };
 }
 
 // A streamed arm can land after the page changed state, so its branches name the arm this render painted.

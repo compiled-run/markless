@@ -1,0 +1,116 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 24,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 40,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 393,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 157,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 101,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 24,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 40,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 393,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 157,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 114,
+			"reason": "a @try arm that commits in the browser registers the handlers of a child's @if arm painted inside it, and primes its rows from its own computed values: commit-time code",
+			"date": "2026-11-12"
+		}
+	]
+}

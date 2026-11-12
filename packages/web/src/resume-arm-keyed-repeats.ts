@@ -19,13 +19,15 @@ export async function wireArmKeyedRepeats(
 	},
 	rowComponentHost?: import('./fns/row-component-mint.ts').RowComponentMintHost,
 	moved?: (read: SlotRead) => boolean,
+	// The arm's own records: a computed a component in the arm declares is not in the page's.
+	armComputed?: NonNullable<ResumeRuntimeInput['state']>['computed'],
 ): Promise<void> {
 	const { primeKeyedRepeatCollections, wireKeyedRepeats } =
 		await import('./resume-keyed-repeats-lazy.ts');
 	await primeKeyedRepeatCollections({
 		graph: runtime.graph,
 		repeats: records,
-		computed: runtime.state?.computed ?? [],
+		computed: [...(runtime.state?.computed ?? []), ...(armComputed ?? [])],
 		root: runtime.root,
 		loadSymbol: runtime.loadSymbol,
 		elementHandles: host.elementHandles,

@@ -303,8 +303,18 @@ export function createResumeRuntime(
 		servedBehaviors?: string[],
 	): Promise<ArmRegistrationDeps> {
 		const eventWiring = await getEvents();
-		await eventWiring.prepareSyncPolicy(records.events, []);
-		const behaviors = records.behaviors.length > 0 ? await loadBehaviorRuntime() : undefined;
+		// An escalated branch's painted arm registers with this one.
+		const sets = [
+			records,
+			...(records.branches ?? []).flatMap((branch) => branch.servedArmRecords ?? []),
+		];
+		await eventWiring.prepareSyncPolicy(
+			sets.flatMap((set) => set.events),
+			[],
+		);
+		const behaviors = sets.some((set) => set.behaviors.length)
+			? await loadBehaviorRuntime()
+			: undefined;
 		return {
 			root: input.root,
 			elementsByHostId,
@@ -318,7 +328,7 @@ export function createResumeRuntime(
 			loadSymbol: input.loadSymbol,
 			getElementHandle: elementHandles.get,
 			storeHostSubscription,
-			registerKeyedRepeats: async (records, moved) => {
+			registerKeyedRepeats: async (records, moved, computed) => {
 				await eventWiring.prepareSyncPolicy(
 					[],
 					records.flatMap((repeat) => repeat.rowEvents),
@@ -331,6 +341,7 @@ export function createResumeRuntime(
 					{ elementsByHostId, events: eventWiring, elementHandles, storeHostSubscription },
 					{ runtimeInput: input, armRegistrationDeps, installArmEventType, elementsByHostId },
 					moved,
+					computed,
 				);
 			},
 			addBehaviors: behaviors

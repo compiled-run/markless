@@ -112,7 +112,7 @@ export type PaintedArmClaim = {
 	readonly claim: (target: unknown) => void;
 };
 
-const BRANCH_ANCHOR_PREFIX = 'markless:branch:';
+export const BRANCH_ANCHOR_PREFIX = 'markless:branch:';
 
 type SiblingNode = ResumeDomNode & {
 	readonly data?: string;
