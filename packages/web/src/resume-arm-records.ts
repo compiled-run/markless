@@ -18,7 +18,7 @@ import type {
 // Arm-branch anchors index in their owning boundary's census, never the page's.
 function isArmBranchAnchorComment(comment: ResumeDomComment): boolean {
 	const text = comment.data ?? (comment as { readonly textContent?: string }).textContent ?? '';
-	return text.startsWith('markless:arm-branch:') || text.startsWith('/markless:arm-branch:');
+	return /^\/?markless:(?:arm-)?branch:/.test(text);
 }
 
 export {
@@ -235,8 +235,8 @@ function materializeArmBranchRecords(
 	// instance-prefixed id, so the anchor text is the exact page-wide address.
 	const composed = (record: ResumeArmBranchRecord) =>
 		planned(record.startAnchor)?.strategy === 'dom-order-comment';
-	const census = records.some(
-		(record) => !composed(record) && planned(record.startAnchor)?.index !== undefined,
+	const census = records.some((record) =>
+		composed(record) ? record.sourceId : planned(record.startAnchor)?.index !== undefined,
 	)
 		? armBranchCommentCensus(input.root, input.startAnchor, input.endAnchor)
 		: [];
@@ -247,8 +247,12 @@ function materializeArmBranchRecords(
 	};
 	return records.map((record) => {
 		if (composed(record)) {
-			const startAnchor = anchorNamed(`markless:branch:${record.id}`);
-			const endAnchor = anchorNamed(`/markless:branch:${record.id}`);
+			// An arm drawn at its composed owner spells that owner's branches by their module ids, unique within the arm.
+			const own = (mark: string) =>
+				anchorNamed(`${mark}markless:branch:${record.id}`) ??
+				census.find((comment) => commentText(comment) === `${mark}markless:branch:${record.sourceId}`);
+			const startAnchor = own('');
+			const endAnchor = own('/');
 			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
 			return { ...record, startAnchor, endAnchor };
 		}

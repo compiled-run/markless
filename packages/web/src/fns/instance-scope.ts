@@ -1202,6 +1202,7 @@ function composedBoundaryArmRecords(
 					branches: set.branches.map((branch) => ({
 						...branch,
 						id: prefix + branch.id,
+						sourceId: branch.sourceId ?? branch.id,
 						testReads: branch.testReads.map(qualifyRead),
 						...(contentReadsOf(branch)
 							? { contentReads: contentReadsOf(branch)!.map(qualifyRead) }
