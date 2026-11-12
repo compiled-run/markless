@@ -1,0 +1,88 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -122,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -223,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "composed @if arms find nested anchors in the arm's own census and a rebuilt row's stale flips release themselves: +34 B gzip in the load runtime against the merge base; executed moves are measurement swing",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 33,
+			"reason": "the row @if fixes add +33 B gzip to the load runtime on this page against merge base b68276492 (PR run 43150210594 vs merge-group run 43148360681); the rest of the +62 B over the anchor is main already sitting +29 B over it after #632",
+			"date": "2026-11-12"
+		}
+	]
+}
