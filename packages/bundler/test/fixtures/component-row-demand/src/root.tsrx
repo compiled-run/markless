@@ -1,10 +1,12 @@
 import { computed, state } from '@markless/core';
 import { addBook, listBooks, readBook } from './api.ts';
+import Catalog from './catalog.tsrx';
 
 export function App() @{
 	let reload = state(0);
 	let polls = state(0);
 	let editing = state<number | null>(null);
+	let browsing = state(false);
 	let shelves = state([
 		{ id: 0, filter: '' },
 		{ id: 1, filter: 'u' },
@@ -35,6 +37,10 @@ export function App() @{
 		}
 		@if (editing !== null) {
 			<Editor id={editing} onClose={() => (editing = null)} />
+		}
+		<button data-browse onClick={() => (browsing = !browsing)}>Browse</button>
+		@if (browsing) {
+			<Catalog filter="d" />
 		}
 		<Composer onSaved={() => reload++} />
 	</main>

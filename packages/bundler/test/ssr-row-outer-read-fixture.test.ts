@@ -8,7 +8,9 @@ import { chromium, type Page } from '@playwright/test';
 import { resolve } from 'pathe';
 import { afterEach, describe, expect, test } from 'vitest';
 import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
-import { MARKLESS_BYTE_ATTRIBUTION } from '../src/build/chunking.ts';
+import { runtimeModuleIdFromOrigin } from '../src/build/bundle-graph.ts';
+import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
+import { readInteractionClosuresAsset } from '../src/build/interaction-closures.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -122,20 +124,28 @@ for (const [label, env] of [
 const titles = (page: Page, shelf: number) =>
 	page.locator(`section[data-shelf="${shelf}"] [data-title]`).allTextContents();
 
-// The runtime modules each served file holds, from the build's own byte attribution.
-async function runtimeByFile(): Promise<Map<string, string[]>> {
-	const attribution = JSON.parse(
+// Files of the packs no route loads, and the runtime they hold, from the pack planner's own manifest.
+async function leftOutOfThePage(): Promise<{ files: Set<string>; runtime: string[] }> {
+	const asset = readInteractionClosuresAsset(
 		await readFile(
-			marklessBuildManifestPath(resolve(componentRows, 'dist'), MARKLESS_BYTE_ATTRIBUTION),
+			marklessBuildManifestPath(resolve(componentRows, 'dist'), MARKLESS_INTERACTION_CLOSURES),
 			'utf8',
 		),
-	) as { chunks: Record<string, { modules: [kind: string, id: string, bytes: number][] }> };
-	return new Map(
-		Object.entries(attribution.chunks).map(([file, chunk]) => [
-			`/build/${file}`,
-			chunk.modules.filter(([kind]) => kind === 'runtime').map(([, id]) => id),
-		]),
 	);
+	const routeFiles = new Set(
+		asset.routes.flatMap((route) => [...(route.files?.firstUse ?? []), ...(route.files?.render ?? [])]),
+	);
+	const files = new Set<string>();
+	const runtime: string[] = [];
+	for (const [name, packFiles] of Object.entries(asset.packFiles ?? {})) {
+		if (packFiles.some((file) => routeFiles.has(file))) continue;
+		for (const file of packFiles) files.add(`/${file}`);
+		for (const id of asset.packs[name] ?? []) {
+			const runtimeId = runtimeModuleIdFromOrigin(resolve(componentRows, id));
+			if (runtimeId) runtime.push(runtimeId);
+		}
+	}
+	return { files, runtime };
 }
 
 async function exerciseComponentRows(url: string) {
@@ -144,17 +154,16 @@ async function exerciseComponentRows(url: string) {
 		const page = await browser.newPage();
 		const errors: string[] = [];
 		page.on('pageerror', (error) => errors.push(error.message));
-		await page.goto(url, { waitUntil: 'networkidle' });
-		await expect.poll(() => titles(page, 0)).toEqual(['Dune', 'Emma', 'Ubik']);
-		await expect.poll(() => titles(page, 1)).toEqual(['Dune', 'Ubik']);
-		// With no preloads in this document, the first input loads the page's pack.
-		const first = page.locator('section[data-shelf="0"]');
-		await first.locator('[data-toggle]').click();
-		await expect.poll(() => first.locator('[data-detail]').textContent()).toBe('Filter: ');
 		const fetched: string[] = [];
 		page.on('request', (request) => {
 			if (request.resourceType() === 'script') fetched.push(new URL(request.url()).pathname);
 		});
+		await page.goto(url, { waitUntil: 'networkidle' });
+		await expect.poll(() => titles(page, 0)).toEqual(['Dune', 'Emma', 'Ubik']);
+		await expect.poll(() => titles(page, 1)).toEqual(['Dune', 'Ubik']);
+		const first = page.locator('section[data-shelf="0"]');
+		await first.locator('[data-toggle]').click();
+		await expect.poll(() => first.locator('[data-detail]').textContent()).toBe('Filter: ');
 		await first.locator('[data-toggle]').click();
 		await expect.poll(() => first.locator('[data-detail]').count()).toBe(0);
 		await first.locator('[data-edit]').nth(1).click();
@@ -179,16 +188,25 @@ async function exerciseComponentRows(url: string) {
 		await expect.poll(() => page.locator('[data-polls]').textContent()).toBe('3');
 		await expect.poll(() => titles(page, 1)).toEqual(['Dune', 'Ubik']);
 
+		await page.locator('[data-browse]').click();
+		const catalog = page.locator('[data-catalog]');
+		await expect.poll(() => catalog.locator('[data-pick]').allTextContents()).toEqual(['Dune']);
+		await catalog.locator('[data-pick]').click();
+		await expect.poll(() => catalog.locator('[data-picked]').textContent()).toBe('Dune');
+		await page.locator('[data-browse]').click();
+		await expect.poll(() => catalog.count()).toBe(0);
+
 		expect(errors).toEqual([]);
-		const runtime = await runtimeByFile();
-		expect(fetched.flatMap((file) => runtime.get(file) ?? [])).toEqual([]);
+		const leftOut = await leftOutOfThePage();
+		expect(leftOut.runtime).toContain('web/resume-repeat-branch-arm');
+		expect(fetched.filter((file) => leftOut.files.has(file))).toEqual([]);
 	} finally {
 		await browser.close();
 	}
 }
 
 // Runtime the page's records never name is packed apart; whatever a component row, an @if that runs a
-// component, a form or a poll reaches must arrive with the page's pack, never at a later input.
-test('a page whose rows are components loads no runtime after its first input', async () => {
+// component, a form or a poll reaches must arrive with the page's pack, never from a pack left out of it.
+test('a page whose rows are components never fetches the runtime its build left out', async () => {
 	await exerciseComponentRows(`${await buildAndServe(componentRows, {})}/`);
 }, 180_000);
