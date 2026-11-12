@@ -65,10 +65,10 @@ for (const mode of MODES) {
 		working.resolve();
 		await expect.poll(() => text('[data-status]'), poll).toBe('Ready');
 		const { painted } = await stop();
-		// The button stays busy from the save until the handler returns.
+		// The button stays busy from the save until its reload lands, as for a handler that returns.
 		expect(painted.slice(painted.findIndex(([status]) => status === 'Saving'))).toEqual([
 			['Saving', 'none', 'true'],
-			['Saved', 'saved', 'true'],
+			['Saved', 'saved', null],
 			['Ready', 'saved', null],
 		]);
 	});

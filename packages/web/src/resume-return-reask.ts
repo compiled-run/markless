@@ -126,14 +126,12 @@ function reloadOwed(sender: DispatchSpan): boolean {
 	return false;
 }
 
-// Paints what a sender's round kept back once its reload landed; the round and its marks end once the sender has returned too.
+// Ends each sender's round: the writes it kept off screen, its control's mark, and the `refreshed` a form's hold waits on.
 function roundDone(senders: Iterable<DispatchSpan>): void {
 	for (const sender of senders) {
 		const round = rounds.get(sender);
-		if (!round) continue;
-		if (reloadOwed(sender)) continue;
-		for (const paint of round.parked.splice(0)) paint();
-		if (dispatchSpans().has(sender) || ('senders' in state && state.senders.has(sender))) continue;
+		if (!round || reloadOwed(sender)) continue;
+		for (const paint of round.parked) paint();
 		rounds.delete(sender);
 		round.done();
 		if (sender.control) holdBusy(sender.control, sender, false);
@@ -222,10 +220,7 @@ function begin(open: ReadonlySet<DispatchSpan>): void {
 	const current = currentDispatch();
 	const senders = current && open.has(current) ? [current] : [];
 	for (const span of senders) {
-		span.closed = () => {
-			refreshIfOwed();
-			roundDone([span]);
-		};
+		span.closed = refreshIfOwed;
 		if (!rounds.has(span)) {
 			span.refreshed = new Promise((done) => rounds.set(span, { done, parked: [] }));
 			if (span.control) holdBusy(span.control, span, true);
