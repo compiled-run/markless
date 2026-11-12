@@ -1,7 +1,7 @@
 import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
-import { IN_PLACE_LOCATION_HEADER } from './fns/in-place-headers.ts';
+import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from './fns/in-place-headers.ts';
 
 // Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
@@ -135,8 +135,10 @@ function endHolds(held: Held, outcome: WriteOutcome, graph?: Graph): void {
 		}
 }
 
-function reloading(): boolean {
-	for (const reload of reloads) for (const node of reload.asked) if (node.snapshot.status === 'pending') return true;
+// A reload that no named dispatch started (it came from a write sent after an await) is still loading.
+function reloadingUnattributed(): boolean {
+	for (const reload of reloads)
+		if (reload.senders.size === 0) for (const node of reload.asked) if (node.snapshot.status === 'pending') return true;
 	return false;
 }
 
@@ -250,16 +252,18 @@ function warnIfResent(method: string, url: string): void {
 				continue;
 			}
 			console.warn(
-				`Markless: a ${method} to ${url} was sent outside any event handler's own run while async values loaded again after a save. ` +
-					'If an async value sends it after an await, that reload sent it again. Send writes from event handlers.',
+				`Markless: a ${method} to ${url} was sent outside any event handler's own run while async values loaded again after a save, ` +
+					'so it did not count as a save and nothing loaded again for it. An async value that sends a write after an await sends it ' +
+					'again on every reload; a handler that saves after an await in that moment is not reloaded. Send writes from event handlers, before their first await.',
 			);
 			return;
 		}
 }
 
 // A form sent in place whose answer points at another page leaves this one, so nothing shown here is asked again.
-function leavesPage(answer: Response): boolean {
-	const pointed = answer.headers.get(IN_PLACE_LOCATION_HEADER);
+function leavesPage(answer: Response, inPlace: boolean): boolean {
+	// A form sent in place also follows a redirect fetch already took, which a handler's own request never does.
+	const pointed = answer.headers.get(IN_PLACE_LOCATION_HEADER) ?? (inPlace && answer.redirected ? answer.url : null);
 	if (pointed === null) return false;
 	const landed = new URL(pointed, answer.url || location.href);
 	return landed.origin !== location.origin || landed.pathname + landed.search !== location.pathname + location.search;
@@ -279,15 +283,17 @@ function patchFetch(): void {
 		if (recipe) writerRuns.add(recipe);
 		const open = dispatchSpans();
 		const current = currentDispatch();
-		// A write no dispatch can be named for, sent while a reload is loading, is what a recipe that reload re-ran sends after an await.
-		if (open.size === 0 || (!(current && open.has(current)) && reloading())) {
+		// A write no dispatch can be named for, sent while a reload that no named dispatch started is loading, may be what a
+		// recipe that reload re-ran sends after an await; counting it could loop, so the reload chain stops there.
+		if (open.size === 0 || (!(current && open.has(current)) && reloadingUnattributed())) {
 			if (!recipe && (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__))
 				warnIfResent(method, url);
 			return response;
 		}
 		begin(open);
+		const inPlace = new Headers(init?.headers ?? request?.headers).has(IN_PLACE_REQUEST_HEADER);
 		response.then(
-			(answer) => end(leavesPage(answer) ? 'left' : answer.ok ? 'saved' : 'failed'),
+			(answer) => end(leavesPage(answer, inPlace) ? 'left' : answer.ok ? 'saved' : 'failed'),
 			() => end('failed'),
 		);
 		return response;

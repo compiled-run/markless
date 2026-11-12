@@ -293,6 +293,19 @@ describe('with JavaScript on, the same form is sent in place', () => {
 		await close();
 	});
 
+	test('a redirect fetch followed to another page leaves this one: one in-place navigation, and nothing here is asked again', async () => {
+		const { page, documents, close } = await open(true);
+		await page.fill('[data-legacy-title]', 'unused');
+		await page.click('[data-legacy-done]');
+		await page.waitForSelector('[data-done]');
+		expect(new URL(page.url()).pathname).toBe('/done');
+		expect(documents).toEqual(['GET /']);
+		const seen = await requests();
+		expect(seen).toContain('POST /legacy-save?to=/done');
+		expect(seen.filter((line) => line.startsWith('GET /api/todos'))).toEqual([]);
+		await close();
+	});
+
 	test('an answer with no redirect keeps the page, refreshes it and shows a fresh form', async () => {
 		const { page, documents, posts, close } = await open(true);
 		await page.fill('[data-title]', 'Plain answer');

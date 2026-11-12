@@ -792,4 +792,23 @@ for (const [mode, mount, readsBefore] of modes) {
 		await allClear(container);
 		await expect.poll(said, poll).toEqual(['Updated']);
 	});
+
+	test(`${mode}: a save sent after an await while another save's reload loads still reloads with its data`, async () => {
+		const container = await mounted(await mount());
+		const held = deferred<void>();
+		const checked = deferred<void>();
+		server.holdReads = held.promise;
+		server.handlerWait = checked.promise;
+		at(container, '[data-like]').click();
+		await expect.poll(reads, poll).toBe(readsBefore + 1);
+		at(container, '[data-check-save]').click();
+		await expect.poll(() => server.handlersStarted, poll).toBe(1);
+		checked.resolve();
+		await expect.poll(() => server.posts.length, poll).toBe(2);
+		server.holdReads = undefined;
+		held.resolve();
+		await shows(container, '[data-names]', 'Ada, Grace, Grace');
+		await allClear(container);
+		expect(reads()).toBe(readsBefore + 2);
+	});
 }

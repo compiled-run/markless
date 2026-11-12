@@ -305,7 +305,9 @@ across all three cases:
   reaches `@catch` with nothing marked; a value whose earlier refresh is
   still loading stays marked until that refresh lands. A write whose answer
   sends the page elsewhere ends its round at once and silently (the write
-  watch's `'left'` outcome). A quiet refresh (a timer, a poll) marks nothing
+  watch's `'left'` outcome): for a form sent in place, an answer that names
+  another page of the site, or a redirect `fetch` followed to one; a
+  handler's own request that `fetch` redirected stays on the page. A quiet refresh (a timer, a poll) marks nothing
   on its own. Announcements ride the value marks, one pair per continuous
   busy span: "Updating…" once they have held for the settle deadline (250
   ms), then one closing line a reveal cadence (300 ms) after the last
@@ -343,10 +345,13 @@ across all three cases:
   writes settle refreshes, including one a navigation rendered while a
   write was in flight. A recipe that sends a write after an `await` is not
   attributed: a refresh re-runs it and sends the write again. A write that
-  no dispatch can be named for, sent while an earlier save's refresh still
-  has a re-asked value loading, is not a new save, so such a recipe cannot
-  loop; the cost is that a handler's own write sent after an `await` in
-  that window is not refreshed either. Authoring
+  no dispatch can be named for, sent while a refresh that itself came from
+  such a write still has a re-asked value loading, is not a new save, so
+  such a recipe stops after one extra round (one more write, one more
+  refresh). A handler's write sent after an `await` while a known sender's
+  refresh loads is a save as any other and refreshes the page; the cost of
+  the bound is that one sent after an `await` while a refresh from another
+  unnamed write is loading is not refreshed. Authoring
   rule: writes start before a recipe's first `await` or live in handlers;
   in development the runtime warns when a write is sent outside any
   dispatch while a run a refresh started is still loading. No compile-time

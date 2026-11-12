@@ -336,7 +336,7 @@ test('today: an analytics POST a handler sends counts as a save and reloads the 
 	expect(server.posts).toEqual(['POST /mut/track click']);
 });
 
-test('a write an async value sends after an await while its reload loads is not a new save, so it cannot loop', async () => {
+test('a write an async value sends after an await counts once, and its own reload stops the chain: one extra round, then none', async () => {
 	const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 	try {
 		const container = (await render(LateWriter)).container as HTMLElement;
@@ -355,8 +355,9 @@ test('a write an async value sends after an await while its reload loads is not 
 		await shows(container, '[data-stamp]', 'stamped');
 		handler.resolve();
 		await settle(150);
-		expect(reads()).toBe(2);
-		expect(server.posts.filter((post) => post.includes('/mut/visits'))).toHaveLength(2);
+		// The write the reload's stamp sent is a save with no named sender; its reload re-runs the stamp once more, and that write stops the chain.
+		expect(reads()).toBe(3);
+		expect(server.posts.filter((post) => post.includes('/mut/visits'))).toHaveLength(3);
 	} finally {
 		warn.mockRestore();
 	}
