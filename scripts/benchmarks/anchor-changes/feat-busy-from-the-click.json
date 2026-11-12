@@ -1,6 +1,88 @@
 {
 	"changes": [
 		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 1597,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 444,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 671,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 447,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 11,
+			"reason": "busy from the send: a save marks what its refresh will re-ask and the control that sent it, through shared aria-busy owners, until its round ends; the write watch module runs only when a save is sent, and code run at load is unchanged",
+			"date": "2026-11-12"
+		},
+		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -41,9 +123,9 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 34,
+			"delta": 24,
 			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -86,9 +168,9 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 11,
+			"delta": 14,
 			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"date": "2026-11-12"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -98,9 +180,9 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 43,
+			"delta": 48,
 			"reason": "busy from the send: a save marks the values its refresh will re-ask and the control that sent it when it is sent, through the shared aria-busy owners, until its dispatch's refresh round ends in the flush pass that clears the content; a failed round is announced as failed",
-			"date": "2026-11-11"
+			"date": "2026-11-12"
 		}
 	]
 }
