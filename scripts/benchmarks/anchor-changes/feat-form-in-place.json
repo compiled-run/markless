@@ -101,6 +101,180 @@
 			"delta": 65,
 			"reason": "a plain POST form is sent in place: the shared submit check in sync-policy-core, the dispatch step in resume-events, the sender in the lazily loaded submit-hold",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 642,
+			"reason": "a plain POST form is sent in place: the submit check runs synchronously in the policy evaluator (CI linux: +642 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 449,
+			"reason": "a plain POST form is sent in place: the dispatch step that sends it through the hold, the write watch and the enclosing @catch (CI linux: +449 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/submit-hold"
+			],
+			"delta": 2220,
+			"reason": "a plain POST form is sent in place: the sender joins the hold module, loaded on the first submit that is sent in place or whose handler returns a promise (CI linux: +2220 B rendered)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 13,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 827,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 13,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 827,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 13,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 827,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -32,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1341,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1386,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 939,
+			"reason": "a plain POST form is sent in place: packed builds download the grown submit-hold, resume-events and sync-policy-core in the runtime chunks at load (CI linux: bench +827 B gzip, docs +939 to +1386 B gzip); code executed at load is unchanged within 13 chars",
+			"date": "2026-11-12"
 		}
 	]
 }
