@@ -24,8 +24,24 @@ export const MARKLESS_DISPATCHES_GLOBAL = '__marklessDispatches';
  */
 export type DispatchSpan = { open: boolean; closed?: () => void; refreshed?: Promise<void>; readonly control?: Element };
 
+type DispatchingHost = { __marklessDispatching?: DispatchSpan };
+
 /** The dispatch whose handler is in its synchronous run now: a write sent then is that dispatch's own. */
-export const dispatching: { span?: DispatchSpan } = {};
+export function currentDispatch(): DispatchSpan | undefined {
+	return (globalThis as DispatchingHost).__marklessDispatching;
+}
+
+/** Runs `handler` as `span`'s own synchronous run. */
+export function runAsDispatchOwn<T>(span: DispatchSpan, handler: () => T): T {
+	const host = globalThis as DispatchingHost;
+	const outer = host.__marklessDispatching;
+	host.__marklessDispatching = span;
+	try {
+		return handler();
+	} finally {
+		host.__marklessDispatching = outer;
+	}
+}
 
 export function dispatchSpans(): Set<DispatchSpan> {
 	const host = globalThis as { [MARKLESS_DISPATCHES_GLOBAL]?: Set<DispatchSpan> };

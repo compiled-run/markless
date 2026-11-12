@@ -7,7 +7,7 @@
 				"@fixtures/vite-csr",
 				"web/event-current-target"
 			],
-			"delta": 33,
+			"delta": 304,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -18,7 +18,7 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 223,
+			"delta": 102,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -29,7 +29,7 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 2480,
+			"delta": 2481,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -41,7 +41,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 81,
+			"delta": 56,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -52,7 +52,7 @@
 				"@fixtures/vite-plus",
 				"web/event-current-target"
 			],
-			"delta": 33,
+			"delta": 304,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -63,7 +63,7 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 223,
+			"delta": 102,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -74,7 +74,7 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 2480,
+			"delta": 2481,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -86,7 +86,7 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 42,
+			"delta": 20,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		},
@@ -98,7 +98,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 82,
+			"delta": 60,
 			"reason": "busy from the send: a save holds the values its refresh will re-ask (a run landing meanwhile waits) and marks the control whose dispatch sent it, through shared aria-busy owners, until its own round's values settle; resume-events marks which dispatch is in its synchronous run",
 			"date": "2026-11-12"
 		}

@@ -1,4 +1,4 @@
-import { dispatching, dispatchSpans, type DispatchSpan } from '../event-current-target.ts';
+import { dispatchSpans, runAsDispatchOwn, type DispatchSpan } from '../event-current-target.ts';
 import type {
 	ProtocolStatePayload,
 	ProtocolSyncPolicyCondition,
@@ -473,15 +473,7 @@ export async function runAsDispatch(
 	flush: () => Promise<void>,
 ): Promise<void> {
 	const span: DispatchSpan = { open: true, control: event.type === 'submit' ? undefined : (control as Element) };
-	const own = <T>(handler: () => T): T => {
-		const outer = dispatching.span;
-		dispatching.span = span;
-		try {
-			return handler();
-		} finally {
-			dispatching.span = outer;
-		}
-	};
+	const own = <T>(handler: () => T): T => runAsDispatchOwn(span, handler);
 	dispatchSpans().add(span);
 	try {
 		await run(own);

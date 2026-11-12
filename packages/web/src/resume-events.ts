@@ -19,7 +19,13 @@ import {
 	marklessNoteArrivingControlEdits,
 	marklessNoteControlEdits,
 } from './control-edit-hold.ts';
-import { dispatching, dispatchSpans, type DispatchSpan, marklessRunAtCurrentTarget, submitRecord } from './event-current-target.ts';
+import {
+	dispatchSpans,
+	type DispatchSpan,
+	marklessRunAtCurrentTarget,
+	runAsDispatchOwn,
+	submitRecord,
+} from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
 	ElementHandleRegistry,
@@ -803,21 +809,16 @@ export function createEventWiring(input: {
 					marklessControlEditsRead(event);
 					if (form && !held) sent ??= submitRecord(form);
 					// A write sent in this synchronous run is this dispatch's own.
-					const outer = dispatching.span;
-					dispatching.span = userActionToken;
-					let result: unknown;
-					try {
-						result = marklessRunAtCurrentTarget(context.event, element, symbol, {
+					const result = runAsDispatchOwn(userActionToken, () =>
+						marklessRunAtCurrentTarget(context.event, element, symbol, {
 							...context,
 							...(rowScope && marklessIsBoundSymbolId(symbolId)
 								? marklessRowScopedSymbolContext(context, rowScope)
 								: {}),
 							invokeCallback,
 							invokeSymbol,
-						});
-					} finally {
-						dispatching.span = outer;
-					}
+						}),
+					);
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
 						const start = (module: SubmitHoldModule) =>

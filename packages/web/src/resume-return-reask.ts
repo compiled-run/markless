@@ -1,6 +1,6 @@
 import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
-import { dispatching, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
+import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
 
 // Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
@@ -175,7 +175,7 @@ function refreshIfOwed(): void {
 
 // A write sent in a dispatch's own synchronous run is that dispatch's; one sent after an await could be any open one's, so those with no save out are preferred.
 function sendersOf(open: ReadonlySet<DispatchSpan>): DispatchSpan[] {
-	const current = dispatching.span;
+	const current = currentDispatch();
 	if (current && open.has(current)) return [current];
 	const fresh = [...open].filter((span) => !rounds.has(span));
 	return fresh.length > 0 ? fresh : [...open];
