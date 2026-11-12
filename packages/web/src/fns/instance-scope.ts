@@ -13,6 +13,7 @@ import { marklessSettled, marklessThen, type Awaitable } from '../ssr-data/await
 import type {
 	ComposedArmRecordQualifier,
 	ResumeAsyncBoundaryRecord,
+	ResumePropFeed,
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeKeyedRepeatRecord,
@@ -1289,6 +1290,7 @@ function composedBoundaryArmRecords(
 type ComposedUpdate = {
 	readonly armRecords: ResumeArmRecordSet;
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
+	readonly propFeeds?: ReadonlyArray<ResumePropFeed>;
 	readonly moduleRootPath?: string;
 	readonly computed?: ReadonlyArray<{
 		readonly graphNodeId: string;
@@ -1306,7 +1308,7 @@ function composedBranchUpdate<U extends ComposedUpdate>(
 	// Past one level of nesting the symbol prefix differs from the host prefix the branch id carries.
 	const symbolPrefix = marklessInstancePath(branch.symbolId);
 	if (!symbolPrefix) return update;
-	return composedUpdateNodes(branch, update, graph, symbolPrefix, {
+	const composed = composedUpdateNodes(branch, update, graph, symbolPrefix, {
 		...update,
 		armRecords: composedBoundaryArmRecords(
 			branch,
@@ -1317,6 +1319,17 @@ function composedBranchUpdate<U extends ComposedUpdate>(
 			update.moduleRootPath,
 		),
 	});
+	// The arm's symbols read the owner's own prop cell, so it follows its routes too while the arm shows.
+	const propCellId = marklessComposedGraphNodeId(PROPS, symbolPrefix, marklessGraphWidgetRegistry(graph));
+	const ownerFeeds = (branch.composedGraphProps ?? []).map((route) => ({
+		graphNodeId: route.graphNodeId,
+		path: route.path ?? [],
+		propCellId,
+		prop: route.name,
+	}));
+	return ownerFeeds.length > 0
+		? { ...composed, propFeeds: [...ownerFeeds, ...(composed.propFeeds ?? [])] }
+		: composed;
 }
 
 // A settled @try arm of a composed child: its cells and computeds take the prefix its records take.
@@ -1353,6 +1366,15 @@ function composedUpdateNodes<U extends ComposedUpdate>(
 	return {
 		...qualified,
 		...(update.cells && { cells: update.cells.map((cell) => ({ ...cell, graphNodeId: node(cell.graphNodeId) })) }),
+		...(update.propFeeds && {
+			propFeeds: update.propFeeds.map((feed) => ({
+				...feed,
+				...(marklessPropRoute(owner.composedGraphProps, feed.graphNodeId, feed.path) ?? {
+					graphNodeId: node(feed.graphNodeId),
+				}),
+				propCellId: node(feed.propCellId),
+			})),
+		}),
 		...(update.computed && {
 			computed: update.computed.map((computed) => ({
 				...computed,

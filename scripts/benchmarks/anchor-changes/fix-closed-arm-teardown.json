@@ -1,0 +1,116 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-constants"
+			],
+			"delta": 77,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/composition"
+			],
+			"delta": 750,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 529,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 875,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 123,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-constants"
+			],
+			"delta": 77,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/composition"
+			],
+			"delta": 750,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 529,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 875,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 131,
+			"reason": "A component an @if arm places reads its props off its own cell, fed while the arm shows: closing stops its computeds and every reader sees a reloaded prop. Feeds run only when an arm opens; composition adds one check per placed child.",
+			"date": "2026-11-12"
+		}
+	]
+}

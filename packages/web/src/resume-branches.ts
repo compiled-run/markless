@@ -8,6 +8,7 @@ import type {
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
+	ResumePropFeed,
 	ResumeViewRecord,
 } from './resume-types.ts';
 
@@ -185,7 +186,8 @@ function createBranchRegistration(
 					...(composedArmRecordQualifier()?.branchUpdate?.(branch, update as never, input.graph) ?? update),
 					html,
 				};
-				return input.prepareArmCommit(branch, armUpdate);
+				const commit = await input.prepareArmCommit(branch, armUpdate);
+				return () => commit().then(() => feedArmProps(update.arm, armUpdate.propFeeds ?? []));
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
@@ -209,6 +211,34 @@ function createBranchRegistration(
 				{ type: 'removeRange', locator: `branch:${branch.id}` },
 				{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
 			] as DomJournalResult;
+		}
+		// What the arm holds reads its props off its own cells: each follows its source while the branch shows this arm.
+		const feedReleases: Array<() => void> = [];
+		function feedArmProps(arm: number, feeds: ReadonlyArray<ResumePropFeed>) {
+			for (const release of feedReleases.splice(0)) release();
+			for (const feed of feeds) {
+				const follow = () =>
+					input.graph.write({
+						graphNodeId: feed.propCellId,
+						path: [feed.prop],
+						value: input.graph.read(feed.graphNodeId, feed.path),
+					});
+				follow();
+				const release = onceRelease(
+					input.graph.subscribe({
+						id: `branch-prop:${branch.id}:${feed.propCellId}:${feed.prop}`,
+						graphNodeId: feed.graphNodeId,
+						path: feed.path,
+						run() {
+							if (branchesById.get(branch.id) !== branch || readBranchArm(input.graph, branch) !== arm)
+								return release();
+							follow();
+						},
+					}),
+				);
+				feedReleases.push(release);
+				input.storeContainerSubscription(release);
+			}
 		}
 		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
 			const release = onceRelease(
