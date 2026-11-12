@@ -214,8 +214,17 @@ function createBranchRegistration(
 		}
 		// What the arm holds reads its props off its own cells: each follows its source while the branch shows this arm.
 		const feedReleases: Array<() => void> = [];
+		// A row built again or a range another commit replaced took this branch's wiring with it.
+		const wired = () =>
+			branchesById.get(branch.id) === branch && !(branch.armBoundaryId && detached(input.root, branch.startAnchor));
+		const releasedWithArm = (release: () => void, at = branch.armBoundaryId) => {
+			if (at) armFlipReleasesByBoundary.set(at, [...(armFlipReleasesByBoundary.get(at) ?? []), release]);
+			input.storeContainerSubscription(release);
+		};
 		function feedArmProps(arm: number, feeds: ReadonlyArray<ResumePropFeed>) {
 			for (const release of feedReleases.splice(0)) release();
+			const shown = () => wired() && readBranchArm(input.graph, branch) === arm;
+			if (!shown()) return;
 			for (const feed of feeds) {
 				const follow = () =>
 					input.graph.write({
@@ -230,14 +239,13 @@ function createBranchRegistration(
 						graphNodeId: feed.graphNodeId,
 						path: feed.path,
 						run() {
-							if (branchesById.get(branch.id) !== branch || readBranchArm(input.graph, branch) !== arm)
-								return release();
+							if (!shown()) return release();
 							follow();
 						},
 					}),
 				);
 				feedReleases.push(release);
-				input.storeContainerSubscription(release);
+				releasedWithArm(release);
 			}
 		}
 		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
@@ -248,12 +256,7 @@ function createBranchRegistration(
 					graphNodeId: read.graphNodeId,
 					path: read.path,
 					async run() {
-						// An arm another commit replaced took this flip's range with it, or a row built again took its id; either wired its own.
-						if (
-							branchesById.get(branch.id) !== branch ||
-							(branch.armBoundaryId && detached(input.root, branch.startAnchor))
-						)
-							return release();
+						if (!wired()) return release();
 						// Hold the prior arm while the deciding async computed re-runs (the branch's only test read).
 						if (kind === 'test' && input.holdPendingFlip?.(read.graphNodeId)) return;
 						const arm = branch.testReads.length
@@ -264,12 +267,7 @@ function createBranchRegistration(
 					},
 				}),
 			);
-			if (branch.armBoundaryId) {
-				const releases = armFlipReleasesByBoundary.get(branch.armBoundaryId) ?? [];
-				releases.push(release);
-				armFlipReleasesByBoundary.set(branch.armBoundaryId, releases);
-			}
-			input.storeContainerSubscription(release);
+			releasedWithArm(release);
 		}
 		for (const testRead of branch.testReads) wireRead('test', testRead);
 		for (const contentRead of branch.contentReads ?? []) wireRead('content', contentRead);

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { labelLog, resetLoads, settleAll, subjectLog, waitingFor } from './api.ts';
+import HeldPicker from './held-panel.tsrx';
 import LabelPicker from './label-panel.tsrx';
 import SubjectPicker from './subject-panel.tsrx';
 import OpenSubjectPicker from './subject-picker-open.tsrx';
@@ -106,6 +107,20 @@ test('a closed panel derives nothing: its sync computed never sees the value tha
 	expect(labelLog).not.toContain(null);
 });
 
+// Known defect, also on main: a close that lands after the arm commits but before its values first run is read through the
+// panel's bound captures, which name the parent's value, so the first run sees the value that closed it.
+test.fails('closing an @if right after it opens runs nothing with the closing value', async () => {
+	await render(HeldPicker);
+	// The handler closes the @if once the render that opens it has derived the panel's label.
+	click('[data-open-then-close]');
+	await expect.poll(() => labelLog.length).toBeGreaterThan(0);
+	// The reopen's pass runs after the one the close started, so a feed that close let through has run by then.
+	click('[data-open-one]');
+	await settle(1);
+	await expect.poll(() => text('[data-name]')).toBe('subject 1 round 0');
+	expect(subjectLog).toEqual([1]);
+});
+
 // Known defect: an @if served open composed its child on the server, and the served page does not name the child's live props,
 // so closing it still runs the child's computeds with the value that closed it.
 test.fails('an @if served open loads nothing when it closes', async () => {
@@ -117,5 +132,5 @@ test.fails('an @if served open loads nothing when it closes', async () => {
 	click('[data-open-one]');
 	await settle(1);
 	await shows('subject 1 round 0');
-	expect(subjectLog).toEqual([1, 1]);
+	expect(subjectLog).not.toContain(null);
 });
