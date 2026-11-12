@@ -55,6 +55,78 @@
 			"delta": 256,
 			"reason": "served @catch attach runs after the journal listener exists so its state writes reach the page; module loads on first wake, not at page load (CI run 43116536172 measured +246 B rendered; +256 B against the merge-base on a Mac)",
 			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": -2,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 44,
+			"reason": "resume runtime is fetched with the page and grew for served @catch attach; code run at load unchanged (CI run 43123401138 against main run 43119491828)",
+			"date": "2026-11-12"
 		}
 	]
 }
