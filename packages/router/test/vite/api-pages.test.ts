@@ -3,10 +3,7 @@ import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser } from '@playwright/test';
-import { createBuilder } from 'vite';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
-import { markless } from '@markless/bundler/vite';
-import { router } from '../../src/vite/index.ts';
 import { fragmentPageUrl } from '../../src/vite/fragment-navigation.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -39,16 +36,6 @@ async function app(files: Record<string, string> = {}): Promise<string> {
 	);
 	return root;
 }
-
-const build = async (root: string) =>
-	(
-		await createBuilder({
-			root,
-			configFile: false,
-			logLevel: 'silent',
-			plugins: [markless(), router()],
-		})
-	).buildApp();
 
 beforeAll(async () => {
 	const root = await app();
@@ -105,7 +92,7 @@ test('the build stops when a page and an endpoint answer one address', async () 
 	const root = await app({
 		'api/index.ts': 'export default function index() {\n\treturn Response.json({});\n}\n',
 	});
-	await expect(build(root)).rejects.toThrow(
+	await expect(buildFixture({ root })).rejects.toThrow(
 		'Route conflict: /api is answered by both a page and an endpoint:\n- pages/api/index.tsrx\n- api/index.ts',
 	);
 });

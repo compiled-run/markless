@@ -30,6 +30,7 @@ import {
 	withArmEventHostMarks,
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
+import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -553,6 +554,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		}`
 		: '';
 	const debugActivate = debugEnabled ? 'if (md) try { md.activate(); } catch {}' : '';
+	// One executor serves every streamed page in the document, so a boot imports the arm's own root's module.
 	const wake = resumeModuleUrl
 		? `
 		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
@@ -581,7 +583,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				if (r.__marklessDispatch) return r.__marklessDispatch(input);
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;
-				const mod = await import(${JSON.stringify(resumeModuleUrl)});
+				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
+				const mod = await import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)});
 				await mod.resumeContainerEvent(input);
 			};
 			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
