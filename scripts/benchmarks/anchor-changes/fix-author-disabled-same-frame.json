@@ -79,6 +79,136 @@
 			"delta": 22,
 			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/submit-hold"
+			],
+			"delta": 149,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 225,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 43,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927; this page also carries the events and conditionals docs text change, because its search chunk imports the compiled concept pages",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927; this page also carries the events and conditionals docs text change, because its search chunk imports the compiled concept pages",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927; this page also carries the events and conditionals docs text change, because its search chunk imports the compiled concept pages",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 248,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927; this page also carries the events and conditionals docs text change, because its search chunk imports the compiled concept pages",
+			"date": "2026-11-12"
 		}
 	]
 }
