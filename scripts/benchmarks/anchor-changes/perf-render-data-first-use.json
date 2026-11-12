@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -2,
+			"reason": "the mint's host is built once in the resume runtime, not in its start module: bench / 94012 -> 94010 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -2,
+			"reason": "the mint's host is built once in the resume runtime, not in its start module: bench /records 94012 -> 94010 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -2,
+			"reason": "the mint's host is built once in the resume runtime, not in its start module: bench /settings 94012 -> 94010 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 10,
+			"reason": "the row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs / 1698532 -> 1698542 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 10,
+			"reason": "the row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs /concepts/state 2246348 -> 2246358 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 15,
+			"reason": "the row mint evaluates render data at the first row build and its host carries the runtime's lifetime reader: docs /ui/accordion 502966 -> 502981 B gzip at load; linux CI run 43211529235 (PR #639, 455b0af03) vs merge-queue run 43203875902 (main 3b94e68ad)",
+			"date": "2026-11-12"
+		}
+	]
+}

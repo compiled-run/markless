@@ -11,6 +11,7 @@ import { marklessBuildManifestPath } from '../src/build/build-manifests.ts';
 import { runtimeModuleIdFromOrigin } from '../src/build/bundle-graph.ts';
 import { MARKLESS_INTERACTION_CLOSURES } from '../src/build/chunking.ts';
 import { readInteractionClosuresAsset } from '../src/build/interaction-closures.ts';
+import { lazyRenderDataEntryId, servedRenderDataEntryId } from '../src/transform.ts';
 
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
@@ -24,16 +25,42 @@ afterEach(async () => {
 });
 
 async function buildAndServe(fixture: string, env: Record<string, string>): Promise<string> {
-	const dist = resolve(fixture, 'dist');
-	await rm(dist, { force: true, recursive: true });
+	await build(fixture, env);
+	return serve(fixture);
+}
+
+async function build(fixture: string, env: Record<string, string>): Promise<void> {
+	await rm(resolve(fixture, 'dist'), { force: true, recursive: true });
 	await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], {
 		cwd: fixture,
 		env: { ...process.env, ...env },
 	});
+}
+
+// How the page's component rows reach its render data: the served subset, or, on a page with prerender records, the whole module.
+const renderDataPaths = {
+	served: {},
+	records: { MARKLESS_PRERENDER_WAKE: '1' },
+} as const;
+type RenderDataPath = keyof typeof renderDataPaths;
+let componentRowsBuilt: { readonly path: RenderDataPath; readonly done: Promise<void> } | undefined;
+async function serveComponentRows(path: RenderDataPath = 'served'): Promise<string> {
+	if (componentRowsBuilt?.path !== path)
+		componentRowsBuilt = { path, done: build(componentRows, renderDataPaths[path]) };
+	await componentRowsBuilt.done;
+	return `${await serve(componentRows, { clientHead: true })}/`;
+}
+
+// With `clientHead`, the page is served as a production document is: the client build's head, preloads and all.
+async function serve(fixture: string, options: { clientHead?: boolean } = {}): Promise<string> {
+	const dist = resolve(fixture, 'dist');
 	const entry = (await import(
 		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?test=${Date.now()}`
 	)) as { render(): Promise<string> };
-	const html = `<!doctype html><html><body>${await entry.render()}</body></html>`;
+	const head = options.clientHead
+		? (await readFile(resolve(dist, 'index.html'), 'utf8')).replace('<div id="app"></div>', '')
+		: '';
+	const html = `<!doctype html><html><head>${head}</head><body>${await entry.render()}</body></html>`;
 	server = createServer(async (request, response) => {
 		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
 		if (path === '/') {
@@ -208,5 +235,94 @@ async function exerciseComponentRows(url: string) {
 // Runtime the page's records never name is packed apart; whatever a component row, an @if that runs a
 // component, a form or a poll reaches must arrive with the page's pack, never from a pack left out of it.
 test('a page whose rows are components never fetches the runtime its build left out', async () => {
-	await exerciseComponentRows(`${await buildAndServe(componentRows, {})}/`);
+	await exerciseComponentRows(await serveComponentRows());
+}, 180_000);
+
+type HeldIdle = typeof globalThis & { __heldIdle: Array<() => void> };
+
+// Idle is held, through the clock every root inherits and the browser's own callback, so "before idle" is a state the test reads, not a race.
+function holdIdle() {
+	const held: Array<() => void> = ((globalThis as HeldIdle).__heldIdle = []);
+	Object.defineProperty(Element.prototype, '__mClock', {
+		configurable: true,
+		get: () => ({ frame: (run: () => void) => requestAnimationFrame(run), idle: (run: () => void) => held.push(run) }),
+	});
+	globalThis.requestIdleCallback = ((run: IdleRequestCallback) =>
+		held.push(() => run({ didTimeout: false, timeRemaining: () => 50 }))) as typeof requestIdleCallback;
+}
+
+async function drainIdle(page: Page) {
+	for (let quiet = 0; quiet < 3; ) {
+		const ran = await page.evaluate(() => {
+			const due = (globalThis as HeldIdle).__heldIdle.splice(0);
+			for (const run of due) run();
+			return due.length;
+		});
+		quiet = ran ? 0 : quiet + 1;
+		await page.waitForTimeout(50);
+	}
+}
+
+// The render data the row loader names, as the pack planner placed it: in the page's own pack, and which one.
+async function routePackRenderData(): Promise<{ served: boolean; whole: boolean }> {
+	const asset = readInteractionClosuresAsset(
+		await readFile(
+			marklessBuildManifestPath(resolve(componentRows, 'dist'), MARKLESS_INTERACTION_CLOSURES),
+			'utf8',
+		),
+	);
+	const routeFiles = new Set(
+		asset.routes.flatMap((route) => [...(route.files?.firstUse ?? []), ...(route.files?.render ?? [])]),
+	);
+	const inRoutePacks = new Set(
+		Object.entries(asset.packs).flatMap(([name, ids]) =>
+			(asset.packFiles?.[name] ?? []).some((file) => routeFiles.has(file)) ? ids : [],
+		),
+	);
+	const root = encodeURIComponent('src/root.tsrx');
+	return {
+		served: inRoutePacks.has(servedRenderDataEntryId(root)),
+		whole: inRoutePacks.has(lazyRenderDataEntryId(root)),
+	};
+}
+
+// The row mint leaves the page's render data to the first row build: a press that adds a component row
+// evaluates it from the pack the page already loaded, right after load or once the page is idle, and fetches no script.
+for (const path of Object.keys(renderDataPaths) as RenderDataPath[])
+test(`a component row added right after load or once the page is idle fetches no script (${path} render data)`, async () => {
+	const url = await serveComponentRows(path);
+	expect(await routePackRenderData()).toEqual(
+		path === 'served' ? { served: true, whole: false } : { served: false, whole: true },
+	);
+	const browser = await chromium.launch();
+	try {
+		for (const idle of ['held', 'reached'] as const) {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.addInitScript(holdIdle);
+			await page.goto(url, { waitUntil: 'networkidle' });
+			const afterLoad: string[] = [];
+			page.on('request', (request) => {
+				if (request.resourceType() === 'script') afterLoad.push(new URL(request.url()).pathname);
+			});
+			// Held, no idle callback has run when the press arrives.
+			if (idle === 'reached') await drainIdle(page);
+			await page.locator('[data-add-shelf]').click();
+			await expect.poll(() => page.locator('section[data-shelf]').count()).toBe(3);
+			// On the records path an added component row renders empty, on main too: a separate defect.
+			if (path === 'served') {
+				await expect.poll(() => titles(page, 2), { timeout: 10_000 }).toEqual(['Dune', 'Emma']);
+				await page.locator('section[data-shelf="2"] [data-toggle]').click();
+				await expect
+					.poll(() => page.locator('section[data-shelf="2"] [data-detail]').textContent())
+					.toBe('Filter: e');
+			}
+			await page.waitForLoadState('networkidle');
+			expect({ path, idle, errors, afterLoad }).toEqual({ path, idle, errors: [], afterLoad: [] });
+			await page.close();
+		}
+	} finally {
+		await browser.close();
+	}
 }, 180_000);
