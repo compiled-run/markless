@@ -20,7 +20,18 @@ export function ChainMarks() @{
 	<section>
 		<button type="button" data-south onClick={() => (region = 'south')}>South</button>
 		<button type="button" data-again onClick={() => (round = round + 1)}>Again</button>
-		<button type="button" data-later onClick={() => setTimeout(() => (region = 'south'), 0)}>Later</button>
+		<button
+			type="button"
+			data-poll
+			onClick={() => {
+				const id = setInterval(() => {
+					clearInterval(id);
+					region = 'south';
+				}, 0);
+			}}
+		>
+			Poll
+		</button>
 		@try {
 			<div data-board>
 				<p data-depot>{depot.id}</p>

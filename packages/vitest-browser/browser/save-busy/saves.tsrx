@@ -37,7 +37,14 @@ export function Saves() @{
 		<button
 			type="button"
 			data-start-poll
-			onClick={() => void server.pollGate?.then(() => setTimeout(() => (poll = poll + 1)))}
+			onClick={() =>
+				void server.pollGate?.then(() => {
+					const id = setInterval(() => {
+						clearInterval(id);
+						poll = poll + 1;
+					});
+				})
+			}
 		>
 			Poll
 		</button>

@@ -156,6 +156,8 @@ export type AsyncPlaneState = AsyncPlaneContext & {
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
 	readonly derivedCells: Map<string, Array<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>>;
 	readonly staleDerives: Map<string, number>;
+	/** Runs `run` with what it invalidates decided as `quiet`, whatever turn is open: an answer landing refreshes its readers as it was refreshed. */
+	readonly decidedAs: (quiet: boolean, run: () => void) => void;
 };
 
 /** Runs, refresh scheduling, entry marks and failures: `@markless/runtime/graph-async-refresh`. */
@@ -208,8 +210,8 @@ export function createAsyncPlane(
 			written = new Map();
 			queueMicrotask(startWritten);
 		}
-		const byAction = context().isUserAction?.();
-		written.set(node, written.get(node) || byAction);
+		const quiet = context().isQuiet?.() === true;
+		written.set(node, (written.get(node) ?? true) && quiet);
 	};
 	// Built on first use: a page whose values all arrived settled may never need it.
 	const context = (): AsyncPlaneState =>
@@ -223,14 +225,22 @@ export function createAsyncPlane(
 			staleDerives: new Map(),
 			start: (...args) => bound!.start(...args),
 			peek,
-			isUserAction:
-				internals.isUserAction && (() => replaying ?? internals.isUserAction!()),
+			isQuiet: internals.isQuiet && (() => replaying ?? internals.isQuiet!()),
+			decidedAs: (quiet, run) => {
+				const outer = replaying;
+				replaying = quiet;
+				try {
+					run();
+				} finally {
+					replaying = outer;
+				}
+			},
 		});
 	const withRefresh = (run: (bound: AsyncRefresh) => void): void => {
 		if (bound) return run(bound);
-		const byAction = context().isUserAction?.();
+		const quiet = context().isQuiet?.();
 		const replay = (loaded: AsyncRefresh) => {
-			replaying = byAction;
+			replaying = quiet;
 			try {
 				run(loaded);
 			} finally {
@@ -261,9 +271,9 @@ export function createAsyncPlane(
 	function startWritten(): void {
 		const batch = written;
 		written = undefined;
-		batch?.forEach((byAction, node) =>
+		batch?.forEach((quiet, node) =>
 			withRefresh((loaded) => {
-				replaying = byAction;
+				replaying = quiet;
 				try {
 					loaded.advance(node, 'write');
 				} finally {

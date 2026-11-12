@@ -792,13 +792,11 @@ export function createEventWiring(input: {
 				// The caller's writes wait for this symbol's own, so loading its code splits no task.
 				const releaseFlush = held ? input.graph.holdFlush?.() : undefined;
 				const { graph } = context;
-				let loud: boolean | undefined;
+				let quiet = false;
 				try {
 					const symbol = await input.loadSymbol(symbolId);
-					// A write this body makes is loud only inside a DOM dispatch; the same body a timer reaches later is quiet.
-					loud = context.userActionToken?.open === true;
-					if (loud) graph.markUserActionStart?.();
-					else graph.markQuietStart?.();
+					quiet = context.quietTurn === true;
+					if (quiet) graph.markQuietStart?.();
 					marklessControlEditsRead(event);
 					if (form && !held) sent ??= submitRecord(form);
 					// A write sent in this synchronous run is this dispatch's own.
@@ -832,8 +830,7 @@ export function createEventWiring(input: {
 						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
 					});
 				} finally {
-					if (loud) graph.markUserActionEnd?.();
-					else if (loud === false) graph.markQuietEnd?.();
+					if (quiet) graph.markQuietEnd?.();
 					releaseFlush?.();
 				}
 			};
@@ -841,17 +838,18 @@ export function createEventWiring(input: {
 			// body no caller awaits, so its failure is reported here rather than
 			// escaping the dispatch as an unhandled rejection.
 			const invokeSymbol = async (symbolId: string, context: ResumeSymbolContext) => {
-				// Decided when called, not when the callee's code arrives: a timer calling back after the caller finished is quiet.
+				// Decided when called, not when the callee's code arrives.
 				const calleeToken = context.userActionToken?.open ? { open: true } : undefined;
+				// The callback channel belongs to this dispatch, so a context that arrived without one runs on the dispatch's own graph.
+				const graph = context.graph ?? input.graph;
 				try {
-					// The callback channel belongs to this dispatch, so a context that
-					// arrived without one runs on the dispatch's own graph.
 					return await runSymbol(
 						symbolId,
 						{
 							...context,
-							graph: context.graph ?? input.graph,
+							graph,
 							userActionToken: calleeToken,
+							quietTurn: graph.isQuiet?.() ? true : undefined,
 						},
 						true,
 					);

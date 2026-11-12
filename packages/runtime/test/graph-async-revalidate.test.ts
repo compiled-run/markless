@@ -48,16 +48,14 @@ test('revalidating a fulfilled value re-runs it with the same key, quietly', asy
 	});
 });
 
-test('a revalidation started inside a user action is still quiet', async () => {
+test('a revalidation started outside any quiet turn is still quiet', async () => {
 	const runs = scriptedRuns();
 	const graph = quoteGraph(runs.run);
 	graph.read('computed:quote', ['status']);
 	runs.settles[0]!.resolve('first');
 	await tick();
 
-	graph.markUserActionStart!();
 	graph.asyncPlane!()!.rerun('computed:quote', true);
-	graph.markUserActionEnd!();
 	expect(graph.read('computed:quote', []) as object).toMatchObject({ status: 'pending', quiet: true });
 });
 

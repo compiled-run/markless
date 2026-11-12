@@ -58,8 +58,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly landWithoutObservers: (land: () => void) => void;
 	/** Runs the flush now, ignoring any `holdFlush` in effect; only `markEntry`/`endEntry` use it, to stay visible through a held dispatch. */
 	readonly flush?: () => Promise<void>;
-	/** True while an event handler's own turn, through its awaited continuations, is running. */
-	readonly isUserAction?: () => boolean;
+	/** True while a repeating timer's turn, through its awaited continuations, is running: a write made then refreshes quietly. */
+	readonly isQuiet?: () => boolean;
 	/** True while a write's dirty paths are still queued or being processed; `endEntry` waits on this before concluding a handler's write never reached anything. */
 	readonly hasPendingFlush?: () => boolean;
 };
@@ -392,13 +392,11 @@ export type RuntimeGraph = {
 		plane: AsyncComputedPlaneFactory,
 		held?: HeldInputsPlaneFactory,
 	) => boolean;
-	/** Code running inside a real DOM event's dispatch started: a write made before the matching `markUserActionEnd` starts a loud refresh. Nests. */
-	readonly markUserActionStart?: () => void;
-	/** Ends the turn `markUserActionStart` opened. */
-	readonly markUserActionEnd?: () => void;
-	/** Code outside any DOM dispatch started: a write made before the matching `markQuietEnd` is quiet even while an unrelated user action is open. */
+	/** A repeating timer's turn started: a write made before the matching `markQuietEnd` refreshes quietly, even while a user action is open. Nests. */
 	readonly markQuietStart?: () => void;
 	readonly markQuietEnd?: () => void;
+	/** Whether a repeating timer's turn is open, so a callee it calls can keep that turn once its code has loaded. */
+	readonly isQuiet?: () => boolean;
 	/**
 	 * Optional so a facade over a subset of this contract stays a `RuntimeGraph`;
 	 * a caller without it gets the flush-time answer it always had.
@@ -470,10 +468,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const dirtyPaths: DirtyPath[] = [];
 	const journal: DomJournalEntry[] = [];
 	let flushPhase: FlushPhase = FLUSH_IDLE;
-	// Nests: a handler whose own wait overlaps another handler's stays counted until both end.
-	let userActionDepth = 0;
-	// A handler ended with its writes still queued: they stay loud for that one flush pass only.
-	let flushUserAction = false;
 	let quietDepth = 0;
 	let notifyingWrite = false;
 	// The awaitable for the pass the phase says is active; never read to decide anything.
@@ -641,8 +635,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		flush() {
 			return flush();
 		},
-		isUserAction() {
-			return quietDepth === 0 && (userActionDepth > 0 || flushUserAction);
+		isQuiet() {
+			return quietDepth > 0;
 		},
 		hasPendingFlush() {
 			return hasPendingFlush();
@@ -832,26 +826,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		asyncPlane() {
 			return asyncPlane;
 		},
-		markUserActionStart() {
-			userActionDepth++;
-		},
-		markUserActionEnd() {
-			userActionDepth = Math.max(0, userActionDepth - 1);
-			if (
-				userActionDepth === 0 &&
-				((flushPhase !== FLUSH_IDLE && flushPhase !== FLUSH_TAIL) || dirtyPaths.length > 0)
-			) {
-				flushUserAction = true;
-				// The dispatch awaits and reports this same flush; here it only ends the latch.
-				const end = () => void (flushUserAction = false);
-				void flush().then(end, end);
-			}
-		},
 		markQuietStart() {
 			quietDepth++;
 		},
 		markQuietEnd() {
 			quietDepth = Math.max(0, quietDepth - 1);
+		},
+		isQuiet() {
+			return quietDepth > 0;
 		},
 		defineAsyncComputed(asyncComputed, factory, held) {
 			const id = asyncComputed.graphNodeId;

@@ -373,6 +373,8 @@ export type ResumeSymbolContext = {
 	readonly releaseQueue?: () => void;
 	// Open while this call runs inside a real DOM event's dispatch.
 	readonly userActionToken?: { readonly open: boolean };
+	// Called from a repeating timer's turn: its writes refresh quietly.
+	readonly quietTurn?: true;
 };
 export type ResumeBehaviorCleanup = () => void;
 export type ResumeSymbol = (

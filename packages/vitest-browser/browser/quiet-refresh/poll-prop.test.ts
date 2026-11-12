@@ -3,7 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { PollThroughNestedProps } from './poll-nested-props.tsrx';
 import { PollThroughProp } from './poll-prop.tsrx';
 
-// A callback prop called by a timer or socket through capture-slot dispatch stays quiet; only a live DOM dispatch makes it loud.
+// A callback prop called through capture-slot dispatch is loud unless a repeating timer's tick calls it.
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -111,31 +111,29 @@ test('SSR: the same forwarded callback prop invoked by a timer stays quiet', asy
 	await quietTimerScenario(await renderSSR(PollThroughProp));
 });
 
-async function quietSocketScenario(screen: Screen) {
+async function loudSocketScenario(screen: Screen) {
 	const container = await mounted(screen);
 	await expect.poll(() => text(container, '[data-orders]'), poll).toBe('100');
-	const dispatch = () => window.dispatchEvent(new Event('mock-socket-message'));
 
-	const sawBusy = sampleBusy(container, '[data-orders]');
-	const said = listen();
 	click(container, '[data-connect]');
 	// Wait for the handler's one-off module load before dispatching once.
 	await wait(150);
-	dispatch();
-	await expect.poll(() => numberOf(container, '[data-orders]'), poll).toBeGreaterThanOrEqual(101);
-	await wait(60);
-	expect(sawBusy(), 'the same callback prop invoked by a socket message never sets aria-busy').not.toContain(
-		true,
-	);
-	expect(said(), 'the same callback prop invoked by a socket message announces nothing').toEqual([]);
+	const said = listen();
+	window.dispatchEvent(new Event('mock-socket-message'));
+	await expect.poll(() => busy(container, '[data-orders]'), poll).toBe(true);
+	expect(text(container, '[data-orders]'), 'the kept value stays while busy').toBe('100');
+	await expect.poll(() => text(container, '[data-orders]'), poll).toBe('101');
+	await expect.poll(() => busy(container, '[data-orders]'), poll).toBe(false);
+	await expect.poll(() => document.querySelector(REGION)?.textContent, poll).toBe('Updated');
+	expect(said(), 'the same callback prop invoked by a socket message is loud').toEqual(['Updating…', 'Updated']);
 }
 
-test('CSR: the same forwarded callback prop invoked by a socket message stays quiet', async () => {
-	await quietSocketScenario(await render(PollThroughProp));
+test('CSR: the same forwarded callback prop invoked by a socket message is loud', async () => {
+	await loudSocketScenario(await render(PollThroughProp));
 });
 
-test('SSR: the same forwarded callback prop invoked by a socket message stays quiet', async () => {
-	await quietSocketScenario(await renderSSR(PollThroughProp));
+test('SSR: the same forwarded callback prop invoked by a socket message is loud', async () => {
+	await loudSocketScenario(await renderSSR(PollThroughProp));
 });
 
 test('CSR: the forwarded callback prop called after the click handler\'s own await is loud', async () => {
@@ -158,8 +156,8 @@ test('CSR: an awaiting callback prop forwarded through two components stays quie
 	await quietTimerScenario(await render(PollThroughNestedProps));
 });
 
-test('CSR: an awaiting callback prop forwarded through two components stays quiet from a socket message', async () => {
-	await quietSocketScenario(await render(PollThroughNestedProps));
+test('CSR: an awaiting callback prop forwarded through two components is loud from a socket message', async () => {
+	await loudSocketScenario(await render(PollThroughNestedProps));
 });
 
 test('SSR: an awaiting callback prop forwarded through two components is loud on click', async () => {
@@ -174,6 +172,6 @@ test('SSR: an awaiting callback prop forwarded through two components stays quie
 	await quietTimerScenario(await renderSSR(PollThroughNestedProps));
 });
 
-test('SSR: an awaiting callback prop forwarded through two components stays quiet from a socket message', async () => {
-	await quietSocketScenario(await renderSSR(PollThroughNestedProps));
+test('SSR: an awaiting callback prop forwarded through two components is loud from a socket message', async () => {
+	await loudSocketScenario(await renderSSR(PollThroughNestedProps));
 });

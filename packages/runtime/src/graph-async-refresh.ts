@@ -156,10 +156,9 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const controller = new AbortController();
 		const version = ++node.version;
 		node.controller = controller;
-		// Read in the writing turn: a demanded or entry-held run is loud, and a revalidation is always quiet.
+		// Read in the writing turn: a demanded or entry-held run is loud, a revalidation is always quiet, and a write is quiet only in a repeating timer's turn.
 		node.quiet =
-			cause === 'revalidate' ||
-			(!node.entryHold && cause === 'write' && (state.isUserAction ? !state.isUserAction() : false));
+			cause === 'revalidate' || (!node.entryHold && cause === 'write' && state.isQuiet?.() === true);
 		// A re-run keeps the last good value readable while pending and after a failure (spec D8); a first run has none.
 		const kept = lastGood(node.snapshot);
 		publish(node, pendingSnapshot(node, version, key));
@@ -197,7 +196,10 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			}
 			// Only a run on shown inputs lands pending.
 			move(node, snapshot.status === 'pending' ? NODE_BLOCKED : NODE_SETTLED);
-			publish(node, saysOutcome(node.quiet ? { ...snapshot, quiet: true } : snapshot, outcome), landed);
+			const quiet = node.quiet === true;
+			state.decidedAs(quiet, () =>
+				publish(node, saysOutcome(quiet ? { ...snapshot, quiet: true } : snapshot, outcome), landed),
+			);
 			return true;
 		};
 		const commitRejected = (error: unknown): void =>

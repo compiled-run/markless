@@ -5,7 +5,7 @@ import { FailingPoll } from './failing-poll.tsrx';
 import { PollAndButton } from './poll-and-button.tsrx';
 import { Socket } from './socket.tsrx';
 
-// A refresh caused outside an event handler is quiet (no busy mark, no announcement) but still updates, and fails with @catch after kept content.
+// A refresh a repeating timer starts is quiet (no busy mark, no announcement) but still updates, and fails with @catch after kept content; any other caller is loud.
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -117,27 +117,25 @@ test('SSR: the same value refreshed by a click is marked busy and announced', as
 async function socketScenario(screen: Screen) {
 	const container = await mounted(screen);
 	await expect.poll(() => text(container, '[data-feed]'), poll).toBe('live-0');
-	const dispatch = () => window.dispatchEvent(new Event('mock-socket-message'));
 
-	const sawBusy = sampleBusy(container, '[data-feed]');
-	const said = listen();
 	click(container, '[data-connect]');
-	// Wait for the handler's one-off module load, then dispatch once: re-dispatching would restart the fetch forever.
+	// Wait for the handler's one-off module load, then dispatch once.
 	await wait(150);
-	dispatch();
+	const said = listen();
+	window.dispatchEvent(new Event('mock-socket-message'));
+	await expect.poll(() => busy(container, '[data-feed]'), poll).toBe(true);
+	expect(text(container, '[data-feed]'), 'the kept value stays while busy').toBe('live-0');
 	await expect.poll(() => text(container, '[data-feed]'), poll).toBe('live-1');
-	dispatch();
-	await expect.poll(() => text(container, '[data-feed]'), poll).toBe('live-2');
-	await wait(60);
-	expect(sawBusy(), 'a socket-driven refresh never sets aria-busy').not.toContain(true);
-	expect(said(), 'a socket-driven refresh announces nothing').toEqual([]);
+	await expect.poll(() => busy(container, '[data-feed]'), poll).toBe(false);
+	await expect.poll(() => document.querySelector(REGION)?.textContent, poll).toBe('Updated');
+	expect(said(), 'a socket-driven refresh announces Updating then Updated').toEqual(['Updating…', 'Updated']);
 }
 
-test('CSR: a socket-style message callback refreshes the value quietly', async () => {
+test('CSR: a socket-style message callback refreshes the value loudly', async () => {
 	await socketScenario(await render(Socket));
 });
 
-test('SSR: a socket-style message callback refreshes the value quietly', async () => {
+test('SSR: a socket-style message callback refreshes the value loudly', async () => {
 	await socketScenario(await renderSSR(Socket));
 });
 

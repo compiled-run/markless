@@ -207,32 +207,39 @@ across all three cases:
   boundary can be silenced by NVDA with Firefox, so announcements belong in a
   status element outside the boundary.
 - Quiet re-settle (2026-11-06, async-error-states, submit-quiet-design.md
-  Q2): a refresh starts quiet when the write that changed the async value's
-  key did not happen inside an event handler's own turn — a `setInterval`/
-  `setTimeout` callback, a socket or `EventSource` message, or a promise
-  continuation no handler started. A quiet refresh gets neither the busy
-  mark above nor the announcement (`refresh-announcer.ts`); it still swaps
-  in the new content the moment it lands, and a quiet refresh that rejects
-  still follows the failed-refresh rule below (the kept content stays, the
-  `@catch` arm opens right after it) and still announces, because a silent
-  failure is worse than an unexpected one. A write inside an event handler
-  is loud — marked and announced as above — including a write the handler
-  makes after an `await`: the compiler wraps the whole handler body, start
-  to its eventual return or throw, in one mark, so a write anywhere in that
-  body is loud regardless of which statement made it. Only a real DOM
-  event's dispatch opens a user action, and it reaches other code through
-  an explicit token the dispatch hands to every symbol it runs, not through
-  wall-clock nesting: a callback prop the handler calls (directly, through
-  any number of wrapper components, or fired and forgotten) inherits it at
-  the moment of the call and keeps it for its whole body, awaits included;
-  the same callback called by a timer or socket message after the dispatch
-  ended carries a closed token and is quiet, even while an unrelated click
-  is still open. So the same value is quiet when a poll bumps its key and
-  loud when a button does. Known gap, not yet closed: JavaScript carries no
-  context across an `await` by itself, so plain (non-symbol) code such as
-  a timer callback that writes directly, firing while some handler is still
-  waiting on its own `await`, is counted loud too. Closing it needs the
-  compiler to rewrap each `await`, or a platform async context.
+  Q2; rule changed 2026-11-11, owner, research UC4, UC6, UC37 and UC38): a
+  refresh is loud by default, and quiet only when a repeating timer started
+  it. Loud means the busy mark above and the announcement
+  (`refresh-announcer.ts`). So a click, a socket or `EventSource` message, a
+  `window` listener (a keyboard shortcut), a one-off `setTimeout` (a
+  debounced search), a write an attach makes, and a promise continuation all
+  start loud refreshes. Quiet means a `setInterval` callback written in a
+  `.tsrx` handler, callback prop or attach: the compiler sees the call
+  through the analyzer (`setInterval`, `window.setInterval`,
+  `globalThis.setInterval` or `self.setInterval`, when the module binds none
+  of those names itself) and passes the tick through
+  `marklessRepeatingTimer` (`@markless/web/fns/repeating-timer`), which
+  marks the tick's synchronous run quiet, ending when that run returns or
+  throws, never held by a promise the tick returns: a hung request in a tick
+  must not keep the page quiet. A callback prop the tick calls in that run
+  keeps the turn once its code has loaded, through its own awaits. So the
+  quiet poll is a tick that changes state directly and lets the async value
+  do the fetch; a tick that writes after its own `await` is loud. A save
+  sent while a poll runs is still marked from the send and announced (the
+  save hold below). An answer that lands carries its own quietness to the values that
+  read it, so a poll's refresh is quiet all the way down a chain and a
+  click's is loud all the way down, whatever turn is open when it lands. A
+  quiet refresh still swaps in the new content the moment it lands, and a
+  quiet refresh that rejects still follows the failed-refresh rule below
+  (the kept content stays, the `@catch` arm opens right after it) and still
+  announces, because a silent failure is worse than an unexpected one. A
+  first load is never marked or announced, whoever started it: it has no
+  shown content to mark. Limits: a `setInterval` in a plain `.ts` module or
+  a library is not lowered, so its poll is loud; a poll written as a chain
+  of `setTimeout` calls is loud, because each call is a one-off timer; and
+  JavaScript carries no context across an `await`, so while a callback prop
+  a tick called is still waiting on its own `await`, a write from an
+  unrelated listener in that window is quiet too.
 - Refresh after a save (2026-11-11, owner): when an event handler's write
   succeeds, every async value the page shows inside a `@try`, and every
   async value those read through sync computeds or other async values,
@@ -611,11 +618,10 @@ none changes a ruling above.
 - Reveal ordering groups (deferred, D6). Authors cannot ask for
   parallel/sequential/reverse reveal; streamed reveals follow the
   compiler-known dependency order only.
-- Loud vs quiet across awaits in plain code (open, D8 "Quiet re-settle").
-  Plain (non-symbol) code, such as a timer callback that writes directly, is
-  counted loud while any handler is still waiting on its own `await`.
-  Closing it needs the compiler to rewrap each `await`, or a platform async
-  context.
+- Loud vs quiet across awaits (open, D8 "Quiet re-settle"). While a
+  callback prop a tick called is still waiting on its own `await`, any write
+  in that window that no handler's entry mark covers is quiet. Closing it
+  needs the compiler to rewrap each `await`, or a platform async context.
 - Async reads inside `@pending` and `@catch` (deferred). The rules above
   cover the `@try` arm's async reads; reading an async value directly in a
   `@pending` or `@catch` arm is not specified.
