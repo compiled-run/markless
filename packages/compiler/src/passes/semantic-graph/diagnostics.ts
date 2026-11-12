@@ -756,15 +756,21 @@ export function managedAriaBusyDiagnostic(span: SourceSpan | undefined): Semanti
 }
 
 /** An authored aria-busy on a form that a running submit handler marks busy. */
-export function submitHoldAriaDiagnostic(span: SourceSpan | undefined): SemanticGraphDiagnostic {
+export function submitHoldAriaDiagnostic(
+	span: SourceSpan | undefined,
+	sentInPlace = false,
+): SemanticGraphDiagnostic {
 	return {
 		code: 'MARKLESS_ASYNC_ARIA_BUSY_MANAGED',
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'aria-busy is written on a form Markless marks busy while it submits',
-		message:
-			'aria-busy on this form is managed while its submit handler runs; style the busy form with form[aria-busy="true"] instead.',
-		why: 'This form has a submit handler that can return a promise, so each submit sets aria-busy="true" on the form until the submission and the reload it caused are done, and then removes it. That replaces whatever the attribute said, so the authored value never reaches assistive tech.',
+		message: sentInPlace
+			? 'aria-busy on this form is managed while Markless sends it; style the busy form with form[aria-busy="true"] instead.'
+			: 'aria-busy on this form is managed while its submit handler runs; style the busy form with form[aria-busy="true"] instead.',
+		why: sentInPlace
+			? 'This form posts to this site and has no submit handler, so Markless sends it without loading a new page and sets aria-busy="true" on the form until the answer and the reload it caused are done, and then removes it. That replaces whatever the attribute said, so the authored value never reaches assistive tech.'
+			: 'This form has a submit handler that can return a promise, so each submit sets aria-busy="true" on the form until the submission and the reload it caused are done, and then removes it. That replaces whatever the attribute said, so the authored value never reaches assistive tech.',
 		primarySpan: span,
 		passId: 'tsrx-semantic-graph',
 		artifactKeys: ['semanticGraph'],

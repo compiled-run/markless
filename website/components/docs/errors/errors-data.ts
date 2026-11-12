@@ -342,7 +342,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's4',
-					text: ' while that value loads again. A form whose submit handler returns a promise gets ',
+					text: ' while that value loads again. A form gets ',
 				},
 				{
 					id: 's5',
@@ -351,7 +351,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 				},
 				{
 					id: 's6',
-					text: ' while it is sending. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
+					text: ' while it is sending: one whose submit handler returns a promise, and a plain form that posts to your site, which Markless sends without leaving the page. Each is removed when the work ends, whether it worked or failed. Your value would be overwritten, so screen readers would never hear what you wrote.',
 				},
 			],
 			how: [

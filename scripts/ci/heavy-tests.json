@@ -110,6 +110,7 @@
 		"packages/router/test/vite/document-navigation.test.ts",
 		"packages/router/test/vite/fixed-route-rows.test.ts",
 		"packages/router/test/vite/foreign-dom-before-wake.test.ts",
+		"packages/router/test/vite/form-in-place.test.ts",
 		"packages/router/test/vite/fragment-cache.test.ts",
 		"packages/router/test/vite/fragment-entry-write-after-take.test.ts",
 		"packages/router/test/vite/fragment-head-merge.test.ts",

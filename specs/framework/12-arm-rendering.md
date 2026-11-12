@@ -412,6 +412,62 @@ across all three cases:
     attribute.
   - A form inside a shadow root is not marked: the submit event does not
     leave the shadow tree, so it reaches no dispatcher outside it.
+- Form sent in place (2026-11-11, owner): a `<form>` with
+  no `submit` handler is sent by the runtime without a page load when the
+  analyzer and the submit both say it is a same-origin `POST` in this tab.
+  The server side is the app's own route (a router `api/` endpoint or any
+  same-origin URL); Markless adds no client action API.
+  - Analyzer fact: a host `<form>` whose `method` is the string `post` in
+    any case, or an expression (decided at submit), inside a `@try` that
+    has a `@catch`, with no `submit` handler on it or on an enclosing
+    element of the same component, and no spread attribute. It gets a
+    `submit` record with no symbols, the sync policy
+    `{ when: { type: 'submits-in-place' }, actions: ['preventDefault'] }`
+    (served as the event-host code `f`) and `inPlaceSubmit`: `keep` when
+    an element in the form has a bound property (a field showing state),
+    otherwise `reset`. The `@try` joins the boundaries whose `@catch` takes
+    handler failures, so it carries `catchesHandlers` and its own gate. A
+    form with a method other than `post`, a spread, or no enclosing
+    `@try`/`@catch` gets no record, and the browser submits it. A submit
+    handler in another component around the form is not seen; that form is
+    both sent in place and handed to the handler.
+  - Submit-time check, one function shared by the boot and the runtime
+    (`submitsInPlace`): not already prevented; the method (the
+    submitter's `formmethod`, else the form's) is `post`; the target
+    (the submitter's `formtarget`, else the form's,
+    else a `<base target>`) is empty or `_self`; the form's `rel` has no
+    `external`; and the action (the submitter's `formaction`, else the
+    form's) has this page's origin. When any fails the submit is the
+    browser's. The boot evaluates it before any listener below the
+    container root, so a listener added with `addEventListener` on the
+    form sees an already prevented event. The check ships as its own
+    inline script only on a page whose records hold an in-place form; the
+    boot's sync-policy variants carry only the call (about 30 bytes).
+  - Send: inside the submit's own dispatch, as a handler's save, so the
+    refresh after a save, the form submit pending marks and repeat hold,
+    and the handler-rejection rule apply unchanged. The record of what is
+    sent is read when the dispatch reaches the form. The request is the
+    one the browser would send: the action URL, `POST`, a body in the
+    chosen encoding (`multipart/form-data` as form data with files,
+    `application/x-www-form-urlencoded` with each file's name,
+    `text/plain` as `name=value` lines), the submitter's name and value,
+    and no referrer under `rel="noreferrer"`.
+  - Answer: `fetch` follows redirects. A success whose final address is
+    another page (path and query) of the app is followed as a link click,
+    so the router swaps it in place, or the browser loads it when no
+    router is present; the redirected page's body is cancelled unread.
+    Any other success keeps the page: the shown values refresh, and the
+    form resets when `inPlaceSubmit` is `reset`, matching the fresh form a
+    post-redirect-get load shows. A non-`ok` answer rejects into the
+    `@catch` with an `Error` whose message is a JSON body's `message`, a
+    `text/plain` body, or the status text; a network failure rejects with
+    the browser's error. In both the content and typed values stay.
+  - Opt-out without a new word: `rel="external"` on the form, the same
+    token that makes the router leave a link to the browser.
+  - Not covered: a prerendered client-rendered page's boot applies no
+    sync policies, so its forms keep the browser's submit; a form inside a
+    shadow root is not dispatched. A repeat pressed before the hold module
+    has loaded is sent, as for handlers.
 
 Fast paths never show pending — testable as a frame-sampled invariant. Once
 pending UI shows, it stays a minimum duration (no blink). The client
@@ -447,9 +503,9 @@ none changes a ruling above.
 - Optimistic edits of existing rows (open). Adding a row optimistically is
   quiet, but an optimistic edit of a row already shown (a like, a toggle)
   still marks that row busy while its save runs.
-- Mutations (partly specified). Refresh after a save and form submit
-  pending are ruled above. Narrowing which values a save refreshes is not
-  approved; the native form upgrade is not specified here.
+- Mutations (partly specified). Refresh after a save, form submit
+  pending and form sent in place are ruled above. Narrowing which values a
+  save refreshes is not approved.
 - Requests from inside an async value (open, owner, D8 "Refresh after a
   save"). Today a non-`GET` request a recipe sends counts as a write, which
   keeps a recipe that saves (a draft row) from being sent twice, but treats

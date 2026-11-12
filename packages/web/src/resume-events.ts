@@ -773,7 +773,7 @@ export function createEventWiring(input: {
 			event.type === 'submit' && event.target?.tagName === 'FORM'
 				? (event.target as unknown as HTMLFormElement)
 				: undefined;
-		// What the submit carries, read before its handler can change the form; the hold, loaded only for a handler that returns a promise.
+		// What the submit carries, read before its handler can change the form; the hold, loaded only for a submission still running.
 		let sent: string | undefined;
 		let hold: Promise<(() => void) | undefined> | undefined;
 		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
@@ -879,6 +879,18 @@ export function createEventWiring(input: {
 				// stopping entry's own writes still commit - the `finally` flushes them.
 				if (stopsImmediately?.()) return;
 			}
+			// A form with no handler whose submit its policy kept from the browser: sent here, as a handler's save is.
+			if (form && record.inPlaceSubmit && event.defaultPrevented)
+				await (submitHold ? Promise.resolve(submitHold) : import('./submit-hold.ts'))
+					.then((module) =>
+						(submitHold = module).sendInPlace(event as unknown as SubmitEvent, record, (end) => {
+							hold = Promise.resolve(end);
+							marklessEventHandled(input.root, event);
+						}),
+					)
+					.catch(async (error: unknown) => {
+						if (!(await input.failEnclosingCatch?.(element, error))) throw error;
+					});
 		} catch (error) {
 			await report(error, activeSymbolId);
 			throw error;

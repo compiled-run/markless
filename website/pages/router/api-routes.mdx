@@ -61,6 +61,68 @@ If a proxy in front of your app changes the host or the scheme (`https` to `http
 
 There is no switch to trust another site's pages. If another site needs to write, have its server call your endpoint, with whatever credentials you choose to check.
 
+## A form can post straight to an endpoint
+
+A plain HTML form can send its fields to an endpoint, with no handler of your own:
+
+```tsrx title="pages/index.tsrx"
+import { computed } from '@markless/core';
+
+export default function Todos() @{
+	const todos = computed(async () => (await fetch('/api/todos')).json() as Promise<Array<{ id: number; title: string }>>);
+
+	@try {
+		<form method="post" action="/api/todos">
+			<input name="title" />
+			<button type="submit">Add</button>
+		</form>
+		<ul>
+			@for (const todo of todos; key todo.id) {
+				<li>{todo.title}</li>
+			}
+		</ul>
+	} @pending {
+		<p>Loading</p>
+	} @catch (error, reset) {
+		<p>{error.message} <button type="button" onClick={reset}>Dismiss</button></p>
+	}
+}
+```
+
+```ts title="api/todos.post.ts"
+import type { EndpointHttpContext } from '@markless/router';
+
+const todos: Array<{ id: number; title: string }> = [];
+
+export default async function addTodo({ request }: EndpointHttpContext) {
+	const title = String((await request.formData()).get('title') ?? '').trim();
+	if (!title) return new Response('A title is required.', { status: 422 });
+	todos.push({ id: todos.length + 1, title });
+	return new Response(null, { status: 303, headers: { location: '/' } });
+}
+```
+
+The endpoint answers `303` with a `location`: a *redirect*, which tells the browser which page to show next. Without JavaScript, the browser does what it always does with a form: it sends the `POST`, follows the redirect and loads the page again, now with the new item.
+
+With JavaScript, Markless sends the same request without leaving the page:
+
+- From the press until the list has loaded again, the form has `aria-busy="true"` and the button that sent it has `aria-disabled="true"`, as for [a form whose handler is sending](/concepts/events). Pressing the button again while nothing changed sends nothing.
+- A redirect back to the page you are on keeps the page: the values it shows inside a `@try` load again, and the form is cleared, as a freshly loaded page would show it. A form with a field that shows state, such as `value={title}`, keeps what it shows.
+- A redirect to another page of your app opens that page the way a link does, without a full page load.
+- An answer that is not a success (a status of 400 or more) shows in the form's `@catch`, and the page and what was typed stay. The message is the `message` of a JSON answer, the text of a `text/plain` answer, or otherwise the status text. A failed connection shows the browser's own error.
+
+The endpoint gets the request the browser would send: the same address, method and encoding (including files, for `enctype="multipart/form-data"`), and the name and value of the button that was pressed. Markless reads only where a redirect points; it does not show the page that the redirect leads to.
+
+This happens for a form inside a `@try` that has a `@catch`, whose `method` is `post` (written as text, or as an expression that is `post` when the form is sent), and that has no `onSubmit` on it or on an element around it. Everything else stays the browser's:
+
+- A form outside any `@try` with a `@catch` loads the answer as a page, because there is nowhere on the page to show a failure.
+- A `target` other than `_self`, on the form, on the button as `formtarget`, or on a `<base>` element, sends the form where it says.
+- An `action`, or a button's `formaction`, on another site goes there.
+- A button with `formmethod="get"` loads the page it names.
+- `rel="external"` on the form loads the answer as a page, the same way it makes a link do a full page load.
+
+The check that decides this is about 400 bytes, and only pages with such a form carry it.
+
 ## Middleware runs on every request
 
 A file in `middleware/` runs before every page and endpoint. The full-stack starter ships this one:

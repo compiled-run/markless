@@ -27,6 +27,7 @@ import {
 	formatEventHostEntries,
 	syncPolicyNeverActs,
 	type ProtocolEventHostEntry,
+	type ProtocolSubmitEventFacts,
 } from '@markless/serializer/protocol';
 import {
 	classifyResumeRecordDelta,
@@ -43,6 +44,7 @@ import {
 	createInlineResumerReturnWakeSource,
 	createInlineResumerStorageWakeSource,
 	createInlineResumerSharedWakeSource,
+	createInlineInPlaceCheckSource,
 	renderPrerenderInlineResumerSource,
 	renderInlineResumerPageSource,
 	INLINE_PAGE_FORWARDS_UNKNOWN,
@@ -309,7 +311,8 @@ export async function assembleSsrContainer(
 							? ''
 							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
 						sharedWakeSource(state) +
-						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes),
+						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes) +
+						(sendsFormInPlace(view) ? createInlineInPlaceCheckSource() : ''),
 					artifactSources?.defer,
 					artifactSources?.wakes,
 				)
@@ -586,6 +589,37 @@ function renderStorageSeedScript(
 	// The cookie is read first: it is the value a server render with this request saw.
 	const source = `(()=>{const s=globalThis[Symbol.for(${JSON.stringify(STORAGE_SLOT_SYMBOL_KEY)})]||={},c=document.cookie.split('; ');for(const[k,d,a,f,n]of ${escapeScriptJson(JSON.stringify(seeds.map((seed) => [seed.slotKey, seed.driverKey, storageAttributeName(seed.driverKey), seed.fallback, storageCookieName(seed.driverKey)])))}){let v=f;try{const e=c.find(e=>e.startsWith(n+'='));v=e?decodeURIComponent(e.slice(n.length+1)):localStorage.getItem(d)??f}catch{}s[k]=v;document.documentElement.setAttribute(a,v)}})()`;
 	return `<script${nonceAttribute}>${escapeInlineScript(source)}</script>`;
+}
+
+type EventLists = {
+	readonly events?: ReadonlyArray<ProtocolSubmitEventFacts>;
+	readonly keyedRepeats?: ReadonlyArray<{
+		readonly rowEvents?: ReadonlyArray<ProtocolSubmitEventFacts>;
+	}>;
+	readonly branches?: ReadonlyArray<{ readonly armRecords?: ReadonlyArray<EventLists> }>;
+	readonly asyncBoundaries?: ReadonlyArray<{
+		readonly armRecords?: EventLists | ReadonlyArray<EventLists>;
+	}>;
+};
+
+// A form the runtime sends in place, anywhere in the page's records: its page carries the check the boot runs on submit.
+function sendsFormInPlace(lists: EventLists): boolean {
+	const sets = (records: EventLists | ReadonlyArray<EventLists> | undefined) =>
+		records === undefined
+			? []
+			: Array.isArray(records)
+				? (records as ReadonlyArray<EventLists>)
+				: [records as EventLists];
+	return (
+		!!lists.events?.some((event) => event.inPlaceSubmit) ||
+		!!lists.keyedRepeats?.some((repeat) =>
+			repeat.rowEvents?.some((event) => event.inPlaceSubmit),
+		) ||
+		!!lists.branches?.some((branch) => sets(branch.armRecords).some(sendsFormInPlace)) ||
+		!!lists.asyncBoundaries?.some((boundary) =>
+			sets(boundary.armRecords).some(sendsFormInPlace),
+		)
+	);
 }
 
 // Only app-scoped instances are shared with other containers; container and subtree instances are a container's own.

@@ -19,6 +19,7 @@ import type { OverlayInstalledRoot, OverlayPrimedDismissalHost } from '../overla
 import { INLINE_DEFER_LOADER_SOURCE, inlineDeferSource, type MarklessDefer } from './defer.ts';
 import type { EarlyEventRoot } from './early-events.ts';
 import { marklessServedCensus } from './served-census.ts';
+import { submitsInPlace } from './sync-policy-core.ts';
 import { expandRecordTemplates } from '../../../serializer/src/protocol-record-templates.ts';
 import type {
 	ProtocolInstancePaths,
@@ -334,6 +335,14 @@ export function createInlineResumerStorageWakeSource(
 
 // Appended only to a page whose state declares an app-scoped shared() definition: the
 // container joins the document's dormant list, so another container's write can wake it.
+// The window property holding the in-place submit check, written only by pages with a form the runtime sends in place.
+export const IN_PLACE_CHECK = '__mInPlace';
+
+/** The in-place submit check, emitted once per page that has a form the runtime sends in place. */
+export function createInlineInPlaceCheckSource(): string {
+	return `;self.${IN_PLACE_CHECK}||=${submitsInPlace.toString()};`;
+}
+
 export function createInlineResumerSharedWakeSource(
 	instancesProperty: string,
 	instancesVersion: number,
@@ -1012,6 +1021,8 @@ function runInlineResumer(
 	const globalScope = globalThis as typeof globalThis & {
 		__marklessInlineSyncPolicy?: InlineSyncPolicyRuntime;
 		__mxLog?: Set<string>;
+		// IN_PLACE_CHECK: this serialized function cannot import the name.
+		__mInPlace?: typeof submitsInPlace;
 	};
 	if (__MARKLESS_INLINE_GRAPH_SYNC_POLICY__ && __MARKLESS_INLINE_SHARED_GRAPH_POLICY__) {
 		const shared = (globalScope.__marklessInlineSyncPolicy ||= {});
@@ -1188,7 +1199,11 @@ function runInlineResumer(
 		let table: ReadonlyArray<ProtocolSyncPolicy> | undefined;
 		runSyncPolicy = (code, event) => {
 			if (!/\d/.test(code)) {
-				if (code.includes('p')) event.preventDefault();
+				if (
+					code.includes('p') ||
+					(code == 'f' && globalScope.__mInPlace?.(event as SubmitEvent))
+				)
+					event.preventDefault();
 				if (code.includes('s')) event.stopPropagation();
 				return;
 			}
