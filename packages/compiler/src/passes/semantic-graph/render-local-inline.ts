@@ -297,6 +297,20 @@ export function resetRelay(
 	return boundaryId !== undefined ? { name, boundaryId } : undefined;
 }
 
+// The `@catch (error, reset)` reset bindings a function names, from the analyzer's resolved references.
+export function catchResetUses(
+	node: AnyNode,
+	state: WalkState,
+): ReadonlyArray<{ readonly name: string; readonly boundaryId: string }> {
+	if (state.catchResetBoundaries.size === 0) return [];
+	const uses = new Map<string, { readonly name: string; readonly boundaryId: string }>();
+	walkNode(node, (candidate) => {
+		const use = resetRelay(candidate, state);
+		if (use) uses.set(use.name, use);
+	});
+	return [...uses.values()];
+}
+
 // A row, an arm and a nested `@{ ... }` have no body of their own in the render, so a slot
 // reading a `const` declared in one carries that const's definition instead.
 export function inlineNestedTemplateLocals(node: AnyNode, state: WalkState): string | null {

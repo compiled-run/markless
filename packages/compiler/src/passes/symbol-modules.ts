@@ -114,6 +114,7 @@ import {
 	SSR_CALLBACKS_PROP_NAME,
 } from './public-render/shared.ts';
 import { captureSlotFoldsToConstant } from './symbol-resolver.ts';
+import { captureSlotReadInContext } from './capture-analysis.ts';
 
 /**
  * The branch sites whose every arm refusal a page re-render can answer. The
@@ -146,16 +147,7 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 				: [
 						[
 							symbol.symbolId,
-							symbol.captureSlots.filter((slot) =>
-								slot.routes.some(
-									(route) =>
-										route.componentEdgeId !== undefined ||
-										// A composing module supplies this slot's edge.
-										route.kind === 'widget-callback-route' ||
-										// This module already resolved the slot itself.
-										route.kind === 'callback-slot-route',
-								),
-							),
+							symbol.captureSlots.filter(captureSlotReadInContext),
 						] as const,
 					],
 		),
@@ -1610,10 +1602,12 @@ const BRANCH_ARM_RENDERS_IN_BROWSER_CODE = 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWS
 function armComponentNames(input: SymbolModulesInput, branch: RenderDataBranch): string[] {
 	const edges = input.semanticGraph?.componentEdges ?? [];
 	return branch.armChunkIds.flatMap((chunkId) =>
-		(input.renderData?.chunks.find((chunk) => chunk.id === chunkId)?.slots ?? []).flatMap((slot) =>
-			slot.kind === 'child-component'
-				? (edges.find((edge) => edge.id === slot.componentEdgeId)?.childComponentName ?? [])
-				: [],
+		(input.renderData?.chunks.find((chunk) => chunk.id === chunkId)?.slots ?? []).flatMap(
+			(slot) =>
+				slot.kind === 'child-component'
+					? (edges.find((edge) => edge.id === slot.componentEdgeId)?.childComponentName ??
+						[])
+					: [],
 		),
 	);
 }
@@ -3375,7 +3369,11 @@ function stateInitializerPropReadStatements(
 function devEnabledNode(): EmissionNode {
 	return logicalNode(
 		'||',
-		binaryNode('===', unaryNode('typeof', identifierNode('__MARKLESS_DEV_ENABLED__')), literalNode('undefined')),
+		binaryNode(
+			'===',
+			unaryNode('typeof', identifierNode('__MARKLESS_DEV_ENABLED__')),
+			literalNode('undefined'),
+		),
 		identifierNode('__MARKLESS_DEV_ENABLED__'),
 	);
 }
@@ -4391,8 +4389,13 @@ function asyncRunnerDependencyStatements(
 	for (const dependency of dependencies) {
 		const binding = asyncRunnerDependencyBinding(dependency);
 		if (!binding) continue;
-		const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, dependency));
-		byName.set(binding.name, [...(byName.get(binding.name) ?? []), { binding, dependency, slot }]);
+		const slot = captureSlots.find((candidate) =>
+			captureSlotMatchesRead(candidate, dependency),
+		);
+		byName.set(binding.name, [
+			...(byName.get(binding.name) ?? []),
+			{ binding, dependency, slot },
+		]);
 	}
 
 	return [...byName].map(([name, reads]) => {
@@ -4900,7 +4903,11 @@ export function buildAsyncBoundaryUpdateEmission(
 					...(records
 						? [
 								ifStatementNode(
-									logicalNode('&&', devEnabledNode(), memberChainNode('context.armRecordsOnly')),
+									logicalNode(
+										'&&',
+										devEnabledNode(),
+										memberChainNode('context.armRecordsOnly'),
+									),
 									returnStatementNode(identifierNode('marklessBoundaryRecords')),
 								),
 							]
@@ -6270,11 +6277,11 @@ export function buildEventHandlerEmission(
 		? carried.bodyStatements
 		: isAsync
 			? [handlerCatchNode(carried.bodyStatements, catchRunner)]
-			: carried.bodyStatements.map((statement) => catchReturnedPromises(statement, catchRunner));
+			: carried.bodyStatements.map((statement) =>
+					catchReturnedPromises(statement, catchRunner),
+				);
 	const catchFn = isAsync ? HANDLER_CATCH_FN : HANDLER_CATCH_RETURNED_FN;
-	const referenced = catchRunner
-		? new Set([...carried.referenced, catchFn])
-		: carried.referenced;
+	const referenced = catchRunner ? new Set([...carried.referenced, catchFn]) : carried.referenced;
 	const imports = uniqueModuleImports(
 		[
 			...(symbol.moduleImports ?? []),
@@ -6380,7 +6387,9 @@ export function buildEventHandlerEmission(
 					...(entryMarks
 						? [
 								entryMarkCallStatement(ENTRY_MARK_START_FN, entryMarks),
-								tryFinallyNode(bodyStatements, [entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks)]),
+								tryFinallyNode(bodyStatements, [
+									entryMarkCallStatement(ENTRY_MARK_END_FN, entryMarks),
+								]),
 							]
 						: bodyStatements),
 				]),
@@ -7763,7 +7772,9 @@ const HANDLER_CATCH_RETURNED_FN = 'marklessHandlerCatchReturned';
 const HANDLER_CATCH_ERROR_NAME = '__marklessHandlerError';
 
 // A value that reads an input beside async values changes in place between settles.
-function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanticGraph']): ReadonlySet<string> {
+function valuesChangingBetweenSettles(
+	semanticGraph: SymbolModulesInput['semanticGraph'],
+): ReadonlySet<string> {
 	const graphBindings = semanticGraph?.graphBindings ?? [];
 	const bindings = new Map(graphBindings.map((binding) => [binding.id, binding]));
 	const asyncBacked = (graphNodeId: string) => {
@@ -7775,9 +7786,12 @@ function valuesChangingBetweenSettles(semanticGraph: SymbolModulesInput['semanti
 			.filter((binding) => {
 				if (binding.kind !== 'computed') return false;
 				const dependencies = binding.dependencies ?? [];
-				const readsInput = dependencies.some((dependency) => !asyncBacked(dependency.graphNodeId));
+				const readsInput = dependencies.some(
+					(dependency) => !asyncBacked(dependency.graphNodeId),
+				);
 				return binding.async === true
-					? readsInput && dependencies.some((dependency) => asyncBacked(dependency.graphNodeId))
+					? readsInput &&
+							dependencies.some((dependency) => asyncBacked(dependency.graphNodeId))
 					: readsInput;
 			})
 			.map((binding) => binding.id),
@@ -7836,7 +7850,10 @@ function catchResetCall(reset: {
 }
 
 // An async handler's rejection renders in its nearest `@catch` instead of reaching the page uncaught.
-function handlerCatchNode(body: ReadonlyArray<EmissionNode>, runnerGraphNodeId: string): EmissionNode {
+function handlerCatchNode(
+	body: ReadonlyArray<EmissionNode>,
+	runnerGraphNodeId: string,
+): EmissionNode {
 	return {
 		type: 'TryStatement',
 		block: { type: 'BlockStatement', body: body.map(awaitReturns) },
@@ -7900,10 +7917,18 @@ function awaitReturns(node: EmissionNode): EmissionNode {
 	return next as EmissionNode;
 }
 
-const FUNCTION_NODE_TYPES = new Set(['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression']);
+const FUNCTION_NODE_TYPES = new Set([
+	'FunctionDeclaration',
+	'FunctionExpression',
+	'ArrowFunctionExpression',
+]);
 
 function isEmissionNode(value: unknown): value is EmissionNode {
-	return typeof value === 'object' && value !== null && typeof (value as { type?: unknown }).type === 'string';
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		typeof (value as { type?: unknown }).type === 'string'
+	);
 }
 
 // A `@catch (error, reset)` reset the handler names, unless one of its own bindings shadows it.
@@ -8504,6 +8529,7 @@ export function buildSymbolModuleEmission(
 						asyncComputedGraphNodeIds(input.semanticGraph),
 					),
 					writes: symbol.graphAccess.writes,
+					...(symbol.graphAccess.catchResets ? { catchResets: symbol.graphAccess.catchResets } : {}),
 				},
 				localNames: input.localNames ?? emptyLocalNames,
 				captureSlots: [],

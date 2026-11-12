@@ -1625,6 +1625,10 @@ function emitResumeContainerEvent(
 	const actionScopedLean =
 		leanMode === 'scalar' && scalarSpecializations.length > 0 && !prerenderDataId;
 
+	// The execution log forwards an event no record names only to record it; it never starts the runtime.
+	const logOnlyReturn = executionLogEnabled
+		? ['\tif (input.logOnly && !input.root.__asyncResumeRuntimeStarted) return;']
+		: [];
 	if (needsFullResume && !actionScopedLean) {
 		// Branch flips need graph subscriptions and range replacement: start the
 		// full resume runtime once, mark the container so the inline resumer
@@ -1632,6 +1636,7 @@ function emitResumeContainerEvent(
 		return [
 			fullResumeHandoff,
 			'export async function resumeContainerEvent(input) {',
+			...logOnlyReturn,
 			'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 			'}',
 		].join('\n');
@@ -1673,7 +1678,9 @@ function emitResumeContainerEvent(
 			].join('\n');
 		}
 		if (leanMode === 'row') {
-			return ['export async function resumeContainerEvent(input) {', ...row, '}'].join('\n');
+			return ['export async function resumeContainerEvent(input) {', ...logOnlyReturn, ...row, '}'].join(
+				'\n',
+			);
 		}
 		return [
 			fullResumeHandoff,
@@ -1683,6 +1690,7 @@ function emitResumeContainerEvent(
 			'		await marklessResumeSpecializedScalarEvent(input);',
 			'		return;',
 			'	}',
+			...logOnlyReturn,
 			...row,
 			'}',
 		].join('\n');
@@ -1693,6 +1701,7 @@ function emitResumeContainerEvent(
 	return [
 		fullResumeHandoff,
 		'export async function resumeContainerEvent(input) {',
+		...logOnlyReturn,
 		'	await marklessFullResumeHandoff({ ...input, document: input.root });',
 		'}',
 	].join('\n');

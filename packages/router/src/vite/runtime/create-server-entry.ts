@@ -29,7 +29,11 @@ import {
 	STREAM_ARM_EXECUTOR_GLOBAL,
 	STREAMED_ARM_SELECTOR,
 } from '@markless/web/render-to-stream';
-import { CONTAINER_REASK_PROPERTY, CONTAINER_RETIRE_PROPERTY } from '@markless/web/render-to-string';
+import {
+	CONTAINER_HANDLING_PROPERTY,
+	CONTAINER_REASK_PROPERTY,
+	CONTAINER_RETIRE_PROPERTY,
+} from '@markless/web/render-to-string';
 import {
 	CONTAINER_ATTRIBUTE,
 	PROTOCOL_CONTAINER_END_COMMENT,
@@ -60,7 +64,10 @@ import {
 } from './link-bridge-module.ts';
 import { documentHandlersMessage } from './document-handlers.ts';
 import { createPageHttp } from './page-http.ts';
-import { MARKLESS_NAV_SETTLE_DEADLINE_MS } from '../../navigation-timing.ts';
+import {
+	MARKLESS_NAV_SETTLE_DEADLINE_MS,
+	MARKLESS_NAV_SWAP_DEADLINE_MS,
+} from '../../navigation-timing.ts';
 import { MARKLESS_ROUTER_RENDERED_EVENT } from '../../route-state.ts';
 import { fragmentPage, placePage, splitPageHtml, type PageHtml } from './page-region.ts';
 import {
@@ -1315,12 +1322,14 @@ function fragmentConfig(
 		servedBodyAttributesProperty: SERVED_BODY_ATTRIBUTES_PROPERTY,
 		stylesheetKeyAttribute: STYLESHEET_KEY_ATTRIBUTE,
 		retireProperty: CONTAINER_RETIRE_PROPERTY,
+		handlingProperty: CONTAINER_HANDLING_PROPERTY,
 		reaskProperty: CONTAINER_REASK_PROPERTY,
 		sharedInstances: [PROTOCOL_SHARED_INSTANCES_PROPERTY, RESUME_MODULE_ATTRIBUTE],
 		streamExecutorGlobal: STREAM_ARM_EXECUTOR_GLOBAL,
 		streamedArmSelector: STREAMED_ARM_SELECTOR,
 		streamOpenProperty: PROTOCOL_STREAM_OPEN_PROPERTY,
 		pendingDeadlineMs: MARKLESS_NAV_SETTLE_DEADLINE_MS,
+		swapDeadlineMs: MARKLESS_NAV_SWAP_DEADLINE_MS,
 		renderedEvent: MARKLESS_ROUTER_RENDERED_EVENT,
 		requestPrefix: FRAGMENT_PATH_PREFIX,
 		regionEndMarker: FRAGMENT_REGION_END,

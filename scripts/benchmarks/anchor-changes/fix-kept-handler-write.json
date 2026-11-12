@@ -1,0 +1,236 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 783,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 119,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 783,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 117,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 118,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); loads with the first handled event, not at page load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 129,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 337,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); MDX and TSRX full, row and mixed resume modules return on the execution log's logOnly forward instead of booting the runtime, and the fragment config names the swap deadline (T059). Measured on PR #617 CI (linux-x64) as the overage over the anchor after merging main (#608, #618, #620); the split between this PR's code and drift in its own cost is not measured",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 396,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); MDX and TSRX full, row and mixed resume modules return on the execution log's logOnly forward instead of booting the runtime, and the fragment config names the swap deadline (T059). Measured on PR #617 CI (linux-x64) as the overage over the anchor after merging main (#608, #618, #620); the split between this PR's code and drift in its own cost is not measured",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 358,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030); MDX and TSRX full, row and mixed resume modules return on the execution log's logOnly forward instead of booting the runtime, and the fragment config names the swap deadline (T059). Measured on PR #617 CI (linux-x64) as the overage over the anchor after merging main (#608, #618, #620); the split between this PR's code and drift in its own cost is not measured",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"router/vite/entries/fragment-entry"
+			],
+			"delta": 360,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": 149,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 815,
+			"reason": "an in-place navigation waits for the events the leaving page's runtime received, so a lazy handler's write reaches the kept part on the next page (T030). Measured on PR #603 CI (linux-x64) as the overage over the anchor; the modules run with the first handled event or navigation and are only preloaded at load",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 26,
+			"reason": "the router's fragment config, which the link bridge runs at load, names the container property for unhandled events (\"handlingProperty\":\"__mH\", 26 chars) so an in-place navigation can wait for them (T030). Measured on PR #617 CI (linux-x64) against main at the same noise level: bench / 11711 -> 11737, /records 11619 -> 11646, /settings 11677 -> 11703",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 22,
+			"reason": "the router's fragment config, which the link bridge runs at load, carries the swap deadline (\"swapDeadlineMs\":3000, 22 chars) next to the pending deadline (T059). Measured on PR #617 CI (linux-x64): bench / 11737 -> 11759, /records 11646 -> 11668, /settings 11703 -> 11725",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 22,
+			"reason": "the router's fragment config, which the link bridge runs at load, carries the swap deadline (\"swapDeadlineMs\":3000, 22 chars) next to the pending deadline (T059). Measured on PR #617 CI (linux-x64): bench / 11737 -> 11759, /records 11646 -> 11668, /settings 11703 -> 11725",
+			"date": "2026-11-11"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 22,
+			"reason": "the router's fragment config, which the link bridge runs at load, carries the swap deadline (\"swapDeadlineMs\":3000, 22 chars) next to the pending deadline (T059). Measured on PR #617 CI (linux-x64): bench / 11737 -> 11759, /records 11646 -> 11668, /settings 11703 -> 11725",
+			"date": "2026-11-11"
+		}
+	]
+}
