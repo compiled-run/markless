@@ -74,6 +74,17 @@ test('CSR: the saving row shows while the save runs', async () => {
 	await savingRowShowsWhileTheSaveRuns();
 });
 
+test('CSR: text typed the moment the list appears reaches the submit handler, on every render', async () => {
+	// The first input wakes the runtime; its start-up paint must not put the field back to its old value.
+	for (let attempt = 0; attempt < 40; attempt++) {
+		await render(Page);
+		await expect.poll(() => document.querySelectorAll('li').length, { ...WAIT, interval: 1 }).toBe(1);
+		await savingRowShowsWhileTheSaveRuns();
+		answerSaves();
+		await cleanup();
+	}
+});
+
 test('SSR: the saving row shows while the save runs, list served inline', async () => {
 	await renderSSR(InstantPage);
 	await savingRowShowsWhileTheSaveRuns();
