@@ -1,0 +1,38 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 95,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 95,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "A @try inside a composed child spells its computed-to-async-value table in the child's ids, so a refresh marks the elements that read the value instead of missing computed readers or marking the whole block (refresh-time code, not run at load)",
+			"date": "2026-11-12"
+		}
+	]
+}
