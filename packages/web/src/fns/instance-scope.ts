@@ -1105,6 +1105,7 @@ function composedBoundaryArmRecords(
 	const { prefix, symbols } = prefixes;
 	const instancePath = marklessInstancePath(symbols);
 	const registry = marklessGraphWidgetRegistry(graph);
+	const node = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	const routes = boundary.composedGraphProps ?? [];
 	const symbol = (symbolId: string) =>
 		(moduleRootPath !== undefined && protocolBoundSymbolBase(symbolId) ? moduleRootPath : symbols) +
@@ -1237,14 +1238,20 @@ function composedBoundaryArmRecords(
 				return {
 					...nested,
 					id,
-					runnerGraphNodeId:
-						nested.runnerGraphNodeId &&
-						marklessComposedGraphNodeId(nested.runnerGraphNodeId, instancePath, registry),
+					runnerGraphNodeId: nested.runnerGraphNodeId && node(nested.runnerGraphNodeId),
 					...(nested.updateSymbolId && { updateSymbolId: symbol(nested.updateSymbolId) }),
 					asyncReads: nested.asyncReads.map((read) => ({
 						...qualifyRead(read),
 						...(read.runnerSymbolId && { runnerSymbolId: symbol(read.runnerSymbolId) }),
 					})),
+					...(nested.asyncSources && {
+						asyncSources: Object.fromEntries(
+							Object.entries(nested.asyncSources).map(([read, sources]) => [
+								node(read),
+								sources.map(node),
+							]),
+						),
+					}),
 					...(routes.length > 0 && {
 						composedInstancePath: instancePath,
 						composedGraphProps: routes,
