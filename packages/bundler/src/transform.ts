@@ -256,8 +256,13 @@ function servedRenderDataId(encodedModuleId: string): string {
 	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served:${encodedModuleId}`;
 }
 
-function servedRenderDataEntryId(encodedModuleId: string): string {
+export function servedRenderDataEntryId(encodedModuleId: string): string {
 	return `${MARKLESS_VIRTUAL_PREFIX}render-data-served-entry:${encodedModuleId}`;
+}
+
+// A page with prerender records hands its component rows this whole render data instead of the served one.
+export function lazyRenderDataEntryId(encodedModuleId: string): string {
+	return `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`;
 }
 
 // What a client render of a server-rendered app's module imports on demand: only `render()` runs it.
@@ -562,7 +567,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		prerenderInterfacesComplete(compiled, input);
 	const lazyRenderDataId =
 		canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
-			? `${MARKLESS_VIRTUAL_PREFIX}render-data-entry:${encodedModuleId}`
+			? lazyRenderDataEntryId(encodedModuleId)
 			: undefined;
 	const servedRenderData =
 		linkedClientRenderData && lazyRenderDataId

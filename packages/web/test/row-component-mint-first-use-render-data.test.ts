@@ -55,7 +55,21 @@ test('a container disposed while its first build waits for the render data build
 	const building = Promise.resolve(mint.rows(repeat, {} as never, new Map()));
 	disposed = true;
 	answer(page);
-	const commit = await building;
-	await commit();
+	// The page names no `Card`, so a build that ran on would reject.
+	await expect(building).resolves.toBeTypeOf('function');
 	expect(mint.mintRow({} as never, repeat, { id: 'a' })).toBeUndefined();
+});
+
+test('two builds while the render data loads evaluate it once', async () => {
+	let evaluated = 0;
+	let answer!: (surface: PrerenderDataSurface) => void;
+	const mint = mintFor(
+		() => (evaluated++, new Promise<PrerenderDataSurface>((done) => (answer = done))),
+		[{ id: 'a' }],
+	);
+	const first = Promise.resolve(mint.rows(repeat, {} as never, new Map())).catch(() => undefined);
+	const second = Promise.resolve(mint.rows(repeat, {} as never, new Map())).catch(() => undefined);
+	answer(page);
+	await Promise.all([first, second]);
+	expect(evaluated).toBe(1);
 });
