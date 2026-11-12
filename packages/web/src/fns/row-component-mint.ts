@@ -82,6 +82,8 @@ export type RowComponentMintHost = {
 	readonly installArmEventType: (eventType: string) => void;
 	/** The page's live host census, read to place the repeat inside a rendered widget. */
 	readonly elementsByHostId?: ReadonlyMap<string, ResumeDomElement>;
+	/** True once the runtime that owns the container has been disposed. */
+	readonly disposed?: () => boolean;
 };
 
 export type MintedRow = {
@@ -245,6 +247,8 @@ export function marklessRowComponentMint(
 										},
 									),
 									(enclosing) => {
+										// The first build waits for the page's render data; a container disposed meanwhile has no rows to build.
+										if (rowHost.disposed?.()) return undefined;
 										const items = readKeyedRepeatCollection(rowGraph, repeat);
 										return marklessWalk(items.length, (rowIndex) => {
 											const item = items[rowIndex];

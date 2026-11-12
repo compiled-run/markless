@@ -102,6 +102,7 @@ export async function startResumeRuntime(input: {
 		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
 	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
+	readonly rowComponentHost: import('./fns/row-component-mint.ts').RowComponentMintHost;
 }): Promise<() => AsyncBoundarySettleTracker | undefined> {
 	const {
 		runtimeInput,
@@ -173,12 +174,7 @@ export async function startResumeRuntime(input: {
 				renderData: runtimeInput.renderData,
 				root: runtimeInput.root,
 			},
-			{
-				runtimeInput,
-				armRegistrationDeps: input.armRegistrationDeps,
-				installArmEventType: input.installArmEventType,
-				elementsByHostId: prepared.elementsByHostId,
-			},
+			input.rowComponentHost,
 		);
 	}
 	// Not gated on a keyed repeat: a family whose parts are written flat has a

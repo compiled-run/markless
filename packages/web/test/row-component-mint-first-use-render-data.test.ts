@@ -17,12 +17,17 @@ const repeat = {
 	rowComponent: { componentName: 'Card' },
 } as never;
 
-function mintFor(renderData: () => PrerenderDataSurface, rows: unknown[]) {
+function mintFor(
+	renderData: () => PrerenderDataSurface | Promise<PrerenderDataSurface>,
+	rows: unknown[],
+	disposed = () => false,
+) {
 	return marklessRowComponentMint(renderData, { read: () => rows } as never, {
 		runtimeInput: { loadSymbol: () => undefined, root: {} },
 		armRegistrationDeps: async () => ({}),
 		installArmEventType: () => undefined,
 		elementsByHostId: new Map(),
+		disposed,
 	} as never);
 }
 
@@ -37,4 +42,20 @@ test("the first component-row build evaluates the page's render data", async () 
 	const mint = mintFor(() => (evaluated++, page), [{ id: 'a' }]);
 	await Promise.resolve(mint.rows(repeat, {} as never, new Map())).catch(() => undefined);
 	expect(evaluated).toBe(1);
+});
+
+test('a container disposed while its first build waits for the render data builds no row', async () => {
+	let disposed = false;
+	let answer!: (surface: PrerenderDataSurface) => void;
+	const mint = mintFor(
+		() => new Promise<PrerenderDataSurface>((done) => (answer = done)),
+		[{ id: 'a' }],
+		() => disposed,
+	);
+	const building = Promise.resolve(mint.rows(repeat, {} as never, new Map()));
+	disposed = true;
+	answer(page);
+	const commit = await building;
+	await commit();
+	expect(mint.mintRow({} as never, repeat, { id: 'a' })).toBeUndefined();
 });

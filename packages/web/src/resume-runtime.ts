@@ -63,6 +63,13 @@ export function createResumeRuntime(
 		value: (type: string) => (input.root.__marklessListen?.(type), addEventType(type)),
 	});
 	const ignoredDisposedEventTargets = new WeakSet<ResumeDomElement>();
+	const rowComponentHost: import('./fns/row-component-mint.ts').RowComponentMintHost = {
+		runtimeInput: input,
+		armRegistrationDeps,
+		installArmEventType,
+		elementsByHostId,
+		disposed: () => phase === 2,
+	};
 	const hostSubscriptionReleases = new Map<string, Array<() => void>>(),
 		containerSubscriptionReleases: Array<() => void> = [];
 	const asyncBoundariesById = prepared.asyncBoundariesById;
@@ -329,7 +336,7 @@ export function createResumeRuntime(
 					input,
 					records,
 					{ elementsByHostId, events: eventWiring, elementHandles, storeHostSubscription },
-					{ runtimeInput: input, armRegistrationDeps, installArmEventType, elementsByHostId },
+					rowComponentHost,
 					moved,
 				);
 			},
@@ -473,6 +480,7 @@ export function createResumeRuntime(
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 			armRegistrationDeps,
 			installArmEventType,
+			rowComponentHost,
 		});
 		// The seeded-value reconcile flushed before the journal listener existed; the graph kept its entries.
 		if (storagePlane) await input.graph.flush();
