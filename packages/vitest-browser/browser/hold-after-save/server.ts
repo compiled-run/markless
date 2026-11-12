@@ -10,6 +10,8 @@ type Server = {
 	posts: string[];
 	holdReads?: Promise<unknown>;
 	holdSaves?: Promise<unknown>;
+	holdHandler?: Promise<unknown>;
+	stop?: () => void;
 	failReads: number;
 	next: number;
 };
@@ -38,7 +40,7 @@ export function resetServer(): void {
 const answer = (body: unknown, status = 200) =>
 	new Response(typeof body === 'string' ? body : JSON.stringify(body), { status });
 
-async function respond(url: URL, method: string, body: string): Promise<Response> {
+async function respond(url: URL, method: string, body: string, signal?: AbortSignal | null): Promise<Response> {
 	if (method === 'GET') {
 		server.reads++;
 		const shelf: Shelf = { name: server.name, todos: [...server.todos], likes: server.likes };
@@ -50,7 +52,11 @@ async function respond(url: URL, method: string, body: string): Promise<Response
 		return answer(shelf);
 	}
 	server.posts.push(`${url.pathname} ${body}`);
-	if (server.holdSaves) await server.holdSaves;
+	if (server.holdSaves)
+		await new Promise((done, fail) => {
+			void server.holdSaves!.then(done);
+			signal?.addEventListener('abort', () => fail(signal.reason));
+		});
 	if (body.includes('fail')) return answer(`Could not save ${body}`, 500);
 	switch (url.pathname) {
 		case '/hold/todos':
@@ -75,7 +81,7 @@ export function installServer(): void {
 	const stub = async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = new URL(String(input), location.href);
 		if (!url.pathname.startsWith('/hold/')) return real(input, init);
-		return respond(url, (init?.method ?? 'GET').toUpperCase(), String(init?.body ?? ''));
+		return respond(url, (init?.method ?? 'GET').toUpperCase(), String(init?.body ?? ''), init?.signal);
 	};
 	(stub as { __holdStub?: true }).__holdStub = true;
 	globalThis.fetch = stub as typeof fetch;
@@ -88,12 +94,25 @@ export async function loadShelf(): Promise<Shelf> {
 	return (await response.json()) as Shelf;
 }
 
-async function save(path: string, body: string): Promise<void> {
-	const response = await fetch(path, { method: 'POST', body });
+async function save(path: string, body: string, signal?: AbortSignal): Promise<void> {
+	const response = await fetch(path, { method: 'POST', body, signal });
 	if (!response.ok) throw new Error(await response.text());
 }
 
-export const addTodo = (title: string) => save('/hold/todos', title);
+export const addTodo = (title: string, signal?: AbortSignal) => save('/hold/todos', title, signal);
 export const like = () => save('/hold/like', '');
 export const rename = (name: string) => save('/hold/rename', name);
 export const remove = (id: string) => save('/hold/delete', id);
+
+// Work a handler does after its save, finished when the test lets it.
+export async function somethingElse(): Promise<void> {
+	await server.holdHandler;
+}
+
+export function addStoppable(title: string): Promise<void> {
+	const controller = new AbortController();
+	server.stop = () => controller.abort();
+	return addTodo(title, controller.signal);
+}
+
+export const stopSave = (): void => server.stop?.();

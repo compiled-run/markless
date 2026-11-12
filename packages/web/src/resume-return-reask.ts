@@ -119,13 +119,22 @@ function shown([graph, boundaries]: Container): RuntimeAsyncComputedNode[] {
 	return graph.asyncPlane?.()?.withInputs(shownIds(boundaries)) ?? [];
 }
 
-// Ends each sender's round: the writes it kept off screen, its control's mark, and the `refreshed` a form's hold waits on.
+// A sender's save answered and the reload it owes has not landed.
+function reloadOwed(sender: DispatchSpan): boolean {
+	if (state.phase === WRITE_OWED && state.senders.has(sender)) return true;
+	for (const reload of reloads) if (reload.senders.has(sender)) return true;
+	return false;
+}
+
+// Paints what a sender's round kept back once its reload landed; the round and its marks end once the sender has returned too.
 function roundDone(senders: Iterable<DispatchSpan>): void {
 	for (const sender of senders) {
 		const round = rounds.get(sender);
 		if (!round) continue;
+		if (reloadOwed(sender)) continue;
+		for (const paint of round.parked.splice(0)) paint();
+		if (dispatchSpans().has(sender) || ('senders' in state && state.senders.has(sender))) continue;
 		rounds.delete(sender);
-		for (const paint of round.parked) paint();
 		round.done();
 		if (sender.control) holdBusy(sender.control, sender, false);
 	}
@@ -142,7 +151,12 @@ function holdPaint(graph: Graph) {
 			return false;
 		}
 		for (const [sender, round] of rounds)
-			if (sender.wrote?.get(graph)?.has(graphNodeId)) return !!round.parked.push(() => graph.changed?.({ graphNodeId, path }));
+			if (sender.wrote?.get(graph)?.has(graphNodeId) && reloadOwed(sender)) {
+				round.parked.push(() => graph.changed?.({ graphNodeId, path }));
+				// The sender went on past its save, so the reload starts once this run of it ends, not when it returns.
+				if (state.phase === WRITE_OWED) queueMicrotask(() => refreshIfOwed(true));
+				return true;
+			}
 		return false;
 	};
 }
@@ -171,9 +185,9 @@ function settleReload(reload: Reload): void {
 	roundDone(reload.senders);
 }
 
-function refreshIfOwed(): void {
+function refreshIfOwed(now?: boolean): void {
 	if (state.phase !== WRITE_OWED) return;
-	for (const sender of state.senders) if (dispatchSpans().has(sender)) return;
+	if (!now) for (const sender of state.senders) if (dispatchSpans().has(sender)) return;
 	const { due, senders, held } = state;
 	move({ phase: WRITE_IDLE });
 	const reload: Reload = { senders, asked: [...held.keys()], starting: new Set(due.keys()), stops: [] };
@@ -208,7 +222,10 @@ function begin(open: ReadonlySet<DispatchSpan>): void {
 	const current = currentDispatch();
 	const senders = current && open.has(current) ? [current] : [];
 	for (const span of senders) {
-		span.closed = refreshIfOwed;
+		span.closed = () => {
+			refreshIfOwed();
+			roundDone([span]);
+		};
 		if (!rounds.has(span)) {
 			span.refreshed = new Promise((done) => rounds.set(span, { done, parked: [] }));
 			if (span.control) holdBusy(span.control, span, true);
