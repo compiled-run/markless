@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1166,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 4219,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -12780,
+			"reason": "component rows list their runtime: docs first round -10.6 to -12.8 KB gzip; runtime moved to shared packs adds files to the idle-prefetch window on / and /concepts/state",
+			"date": "2026-11-12"
+		}
+	]
+}
