@@ -492,6 +492,73 @@ const forecast = computed(async ({ signal }) => {
 });
 ```
 
+### Cancel a save when a newer one starts
+
+A handler has no `signal` of its own. To cancel a save that a newer one replaces, keep an `AbortController` for the newest save, and abort it when the next save starts:
+
+```tsrx title="nickname.tsrx"
+import { computed, state } from '@markless/core';
+import { loadNickname, saveNickname } from './nickname.ts';
+
+export default function Nickname() @{
+	let draft = state('');
+	const nickname = computed(async () => await loadNickname());
+
+	<section>
+		@try {
+			<div>
+				<p>Nickname: {nickname}</p>
+				<input
+					value={draft}
+					onInput={(event) => (draft = event.currentTarget.value)}
+				/>
+				<button onClick={async () => await saveNickname(draft)}>
+					Save
+				</button>
+			</div>
+		} @pending {
+			<p>Loading</p>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</section>
+}
+```
+
+```ts title="nickname.ts"
+// The newest save's controller. It lives here, not in the component, because the page never shows it.
+let latest: AbortController | undefined;
+
+export async function loadNickname(): Promise<string> {
+	const response = await fetch('/api/nickname');
+	return response.text();
+}
+
+export async function saveNickname(name: string) {
+	latest?.abort();
+	const controller = new AbortController();
+	latest = controller;
+	try {
+		const response = await fetch('/api/nickname', {
+			method: 'POST',
+			body: name,
+			signal: controller.signal,
+		});
+		if (!response.ok) throw new Error(`Saving failed (${response.status})`);
+	} catch (error) {
+		if (controller.signal.aborted) return;
+		throw error;
+	}
+}
+```
+
+Type a name and press **Save**, then type another and press **Save** again before the first answers. The first request is aborted, `saveNickname` returns quietly for it, and only the newer save loads the nickname again. A failure of the newest save still shows in `@catch`.
+
+- **The controller lives in a plain `.ts` module**, in a variable the handler reads and replaces through the functions it imports. The page never shows it, so it doesn't need to be watched.
+- **Not in a plain `let` in the component body.** The body runs only for the first render, so a handler can't keep a body variable from one click to the next. The build stops with [`MARKLESS_HANDLER_READS_RENDER_LOCAL`](/errors/MARKLESS_HANDLER_READS_RENDER_LOCAL). A value the page never shows but that is plain data, such as a count of presses, goes in `state()` like any other value.
+- **Not in `state()`.** An `AbortController` is a class instance, and state doesn't hold class instances yet (see [What the page can't watch](/concepts/state#what-the-page-cant-watch)).
+- **An aborted save is not a failure.** Return when `controller.signal.aborted` is true, as `saveNickname` does, or the abort error shows in `@catch`. While the newer save is out, the page waits for it before loading again.
+
 ## Two slow spots wait on their own
 
 Each `@try` settles by itself. Give every slow value its own block, and the fast one shows first.
@@ -1262,6 +1329,85 @@ If the handler is inside a `@try` with a `@catch`, the error shows there, as in 
 ### What if answers arrive out of order?
 
 The newest input wins. Only the run that started last can put its answer on the page. An older run that finishes later is dropped, whether it succeeds or fails. Pass [`signal`](#cancel-stale-work-with-signal) to `fetch` to cancel the older request too.
+
+### Where does a handler keep a value the page never shows?
+
+Plain data, such as a count of presses, goes in `state()` even if the page never shows it. A class instance, such as an `AbortController`, goes in a variable of a plain `.ts` module that the handler imports. A plain `let` in the component body doesn't work for either. See [Cancel a save when a newer one starts](#cancel-a-save-when-a-newer-one-starts).
+
+### Is a button disabled while its async click handler runs?
+
+No. A button whose `onClick` sends a save, before its first `await`, gets `aria-busy="true"` from the click until the reload after the save is on the page, so you can style it. It is not disabled and gets no `aria-disabled`: another press runs the handler again and sends another save. A handler that sends no save marks nothing. A form is different: while its `onSubmit` runs, its submit button gets `aria-disabled="true"`, and a second press that would send the same thing does nothing. See [A form shows that it is sending](/concepts/events#a-form-shows-that-it-is-sending).
+
+To allow one save at a time from a button, keep a `saving` state and check it in the handler:
+
+```tsrx title="one-save.tsrx"
+import { computed, state } from '@markless/core';
+import { loadMugs, saveMug } from './mugs.ts';
+
+export default function OneSave() @{
+	let saving = state(false);
+	const mugs = computed(async () => await loadMugs());
+
+	<section>
+		@try {
+			<p>Mugs: {mugs.length}</p>
+		} @pending {
+			<p>Counting mugs</p>
+		}
+		<button
+			aria-disabled={saving}
+			onClick={async () => {
+				if (saving) return;
+				saving = true;
+				try {
+					await saveMug('Tall mug');
+				} finally {
+					saving = false;
+				}
+			}}
+		>
+			Add a tall mug
+		</button>
+	</section>
+}
+```
+
+`aria-disabled` makes the button report as unavailable and keeps keyboard focus on it, which `disabled` would not. It doesn't stop presses on its own; the `if (saving) return;` line does.
+
+### Can an attribute value be a template string?
+
+Yes. Any expression works, template strings included: `href={`/stocks/${symbol}`}` or `data-testid={`row-${symbol}`}`. The attribute follows the state it reads. See [Conditionals](/concepts/conditionals#any-expression-can-be-an-attribute-value).
+
+### How do I pass values and a callback to a child component?
+
+Write the child as a function in the same file, or in its own file, and give its props a type. A callback prop is a function the parent passes; the child calls it, and the parent's own code changes the parent's state:
+
+```tsrx title="profile.tsrx"
+import { state } from '@markless/core';
+
+type GreetingProps = {
+	readonly name: string;
+	readonly onRename: (next: string) => void;
+};
+
+function Greeting({ name, onRename }: GreetingProps) @{
+	<div>
+		<p>Hello, {name}</p>
+		<button onClick={() => onRename('Grace')}>Rename</button>
+	</div>
+}
+
+export default function Profile() @{
+	let name = state('Ada');
+
+	<section>
+		<Greeting name={name} onRename={(next) => (name = next)} />
+		<p>Saved as {name}</p>
+	</section>
+}
+```
+
+Press **Rename**: the child calls `onRename('Grace')`, and both lines change. Each prop the child reads follows the parent's state. A callback prop takes at most one parameter; to pass more, pass one object, as in `onSave({ name, age })` (see [`MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED`](/errors/MARKLESS_CALLBACK_PROP_ARITY_UNSUPPORTED)). A callback can be `async`: a save it sends marks the child's button that ran it, and a failure goes to the nearest `@catch` around the child.
 
 ### Can I add or remove an attribute without an `@if`?
 
