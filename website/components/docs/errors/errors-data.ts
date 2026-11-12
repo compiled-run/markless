@@ -2191,13 +2191,13 @@ export const errorEntries: readonly ErrorEntry[] = [
 		printed: [
 			'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: this <label> (<testSource>) cannot be rebuilt when <testSource> changes because <detail>.',
 			'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
-			'Move the component outside the <label> and hide it with an attribute, lift its state up to the component that owns the <label>, or keep the <label> content to plain elements, text, and state reads.',
+			'Render the component outside the <label> and hide it with an attribute<branch>; or declare what it keeps in the component that owns the <label> and read it inside the <label>; or keep the <label> content to plain elements, text, and state reads. Moving the <label> into the component does not help: there it tests a prop, and a prop that changes is refused the same way.',
 			'https://markless.dev/errors/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
 		],
 		structured: true,
 		why: 'Showing or hiding this content replaces it wholesale from compiled markup plus value reads. A component is rebuilt from the markup its own file compiled, so one that brings state of its own or shows a function it was handed, and cannot be run in the browser instead, has nothing left to be rebuilt from, and the browser would ask for code the build never wrote. That failure stops every other update in the same component.',
 		suggestion:
-			'Move the component outside the <label> and hide it with an attribute, lift its state up to the component that owns the <label>, or keep the <label> content to plain elements, text, and state reads.',
+			'Render the component outside the <label> and hide it with an attribute<branch>; or declare what it keeps in the component that owns the <label> and read it inside the <label>; or keep the <label> content to plain elements, text, and state reads. Moving the <label> into the component does not help: there it tests a prop, and a prop that changes is refused the same way.',
 		allow: [
 			{
 				id: 'l0',

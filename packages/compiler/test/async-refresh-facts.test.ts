@@ -224,3 +224,37 @@ test('text outside the writing control, in a container with a handler, or in a c
 	expect(writtenByControl(pager('<button onClick={() => console.log(page)}>Page {page} of {rows.count}</button>'))).toEqual([]);
 	expect(writtenByControl(pager('<ul>@for (const n of rows.pages; key n) {<li><button onClick={() => (page = n)}>{n}: {page} of {rows.count}</button></li>}</ul>'))).toEqual([]);
 });
+
+const propFetched = (armTest: string, tryText: string) => `import { computed } from '@markless/core';
+
+export default function Editor({ subject, tick }: { subject: number | null; tick: number }) @{
+	const attempts = 0;
+	const record = computed(async () => {
+		void tick;
+		return subject === null ? null : { title: 'r' + subject };
+	});
+
+	@if (${armTest}) {
+		@try {
+			<section>
+				<p>{record?.title}</p>
+				<p>${tryText}</p>
+			</section>
+		} @pending {
+			<p>loading</p>
+		}
+	}
+}
+`;
+
+test('text that shows a prop the async value is fetched with names that prop', () => {
+	const found = warnings(propFetched('subject !== null', '{subject}'));
+	expect(found.map((diagnostic) => diagnostic.message)).toEqual([
+		'{subject} reads "subject", which "record" is fetched with, but not "record" itself. During a refresh it shows the new "subject" next to the old "record".',
+	]);
+});
+
+test('a constant shown inside an @if on a prop does not read the prop the @if tests', () => {
+	expect(warnings(propFetched('subject !== null', '{attempts + 1}'))).toEqual([]);
+	expect(warnings(propFetched('tick > 0', '{attempts + 1}'))).toEqual([]);
+});

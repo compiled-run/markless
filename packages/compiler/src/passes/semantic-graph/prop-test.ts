@@ -3,11 +3,11 @@ import { expressionSource } from '../../ast/source.ts';
 import type { SemanticPropTest } from '../../artifacts.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
 	resolveGraphPath,
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '@markless/serializer';
+import { memberReadPath } from './composite-reads.ts';
 import type { WalkState } from './types.ts';
 
 const COMPARE = new Set(['===', '!==', '==', '!=']);
@@ -58,7 +58,7 @@ export function propTestOf(
 }
 
 function propRead(node: AnyNode, state: WalkState): SemanticPropTest | undefined {
-	const source = optionalMemberReadSource(expressionSource(node, state.source));
+	const source = memberReadPath(node) ?? expressionSource(node, state.source);
 	const componentName = state.currentComponentName;
 	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId, componentName);
 	const root = /^[A-Za-z_$][\w$]*/.exec(source)?.[0];

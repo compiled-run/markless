@@ -569,9 +569,15 @@ export function liftArmRenderLocalValue(
 	const guard = armGuardCondition(state);
 	if (!guard) return null;
 	const definitions = [...guard.definitions, ...inlined.definitions];
-	const dependencies = [expression, ...guard.nodes, ...definitions].flatMap((node) =>
+	const shownDependencies = [expression, ...inlined.definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
+	const dependencies = [
+		...shownDependencies,
+		...[...guard.nodes, ...guard.definitions].flatMap((node) =>
+			collectGraphDependencies(node, state),
+		),
+	];
 	const asyncNodeIds = new Set(
 		state.graph.graphBindings.flatMap((binding) => (binding.asyncCapable ? [binding.id] : [])),
 	);
@@ -591,9 +597,28 @@ export function liftArmRenderLocalValue(
 		undefined,
 		true,
 	);
-	if (lifted)
+	if (lifted) {
 		for (const definition of new Set(definitions)) collectDefinitionReads(definition, state);
+		const shown = new Set(shownDependencies.map((dependency) => dependency.source));
+		markArmGuardDependencies(lifted.graphNodeId, shown, state);
+	}
 	return lifted;
+}
+
+function markArmGuardDependencies(
+	graphNodeId: string,
+	shown: ReadonlySet<string>,
+	state: WalkState,
+): void {
+	const index = state.graph.graphBindings.findIndex((binding) => binding.id === graphNodeId);
+	const binding = state.graph.graphBindings[index];
+	if (!binding?.dependencies?.some((dependency) => !shown.has(dependency.source))) return;
+	state.graph.graphBindings[index] = {
+		...binding,
+		dependencies: binding.dependencies.map((dependency) =>
+			shown.has(dependency.source) ? dependency : { ...dependency, armGuard: true as const },
+		),
+	};
 }
 
 // The enclosing arms' conditions with body locals inlined, so a lifted value is only computed where its arm renders.

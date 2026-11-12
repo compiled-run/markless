@@ -17,7 +17,7 @@ import type {
 } from '../artifacts.ts';
 import {
 	graphBindingMap,
-	optionalMemberReadSource,
+	templateReadPath,
 	resolveGraphPath,
 	semanticAliasMap,
 	splitStaticGraphPath,
@@ -56,7 +56,7 @@ export function lowerStateAccess(input: StateLoweringInput): StateLoweringArtifa
 		const lookup = scopedGraphLookup(input, null, read.componentName);
 		const resolved = resolveStateGraphPath(
 			input,
-			optionalMemberReadSource(read.source),
+			templateReadPath(read),
 			lookup,
 			null,
 			read.componentName,
@@ -682,7 +682,7 @@ export function staticTemplateReadDiagnostic(
 		bindings: graphBindingMap(semanticGraph, null, read.componentName),
 		aliases: semanticAliasMap(semanticGraph, null, read.componentName),
 	};
-	if (resolveGraphPath(optionalMemberReadSource(read.source), lookup.bindings, lookup.aliases))
+	if (resolveGraphPath(templateReadPath(read), lookup.bindings, lookup.aliases))
 		return null;
 	const readSource = read.readNames?.find(
 		(name) => lookup.bindings.has(name) || lookup.aliases.has(name),
