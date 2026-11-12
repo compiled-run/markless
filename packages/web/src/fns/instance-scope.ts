@@ -1345,11 +1345,10 @@ function composedUpdateNodes<U extends ComposedUpdate>(
 	const registry = marklessGraphWidgetRegistry(graph);
 	const node = (graphNodeId: string) => marklessComposedGraphNodeId(graphNodeId, instancePath, registry);
 	const read = <R extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(dependency: R): R => {
+		const graphNodeId = node(dependency.graphNodeId);
 		const route = marklessPropRoute(owner.composedGraphProps, dependency.graphNodeId, dependency.path);
-		// The derive symbol still reads the props it was rendered with: point that read at the live route.
-		return route
-			? { ...dependency, ...route, reads: { graphNodeId: node(dependency.graphNodeId), path: dependency.path } }
-			: { ...dependency, graphNodeId: node(dependency.graphNodeId) };
+		// The derive symbol still reads the props it was rendered with: send that read to the live route.
+		return { ...dependency, graphNodeId, ...(route && { ...route, reads: { graphNodeId, path: dependency.path } }) };
 	};
 	return {
 		...qualified,
