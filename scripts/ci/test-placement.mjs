@@ -1,14 +1,17 @@
 #!/usr/bin/env node
-// Fails when a node-project test that reaches a heavy entry (an app build or a browser launch) is missing from heavy-tests.json, or a listed one no longer does.
+// Fails when a node-project test that reaches a heavy entry (an app build or a browser launch) is missing from heavy-tests.json, or a listed one no longer does,
+// and when a router or bundler test builds in its own worker without being named in its "inWorkerBuilds".
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadProjectGraph } from '../../packages/analyzer/test-support/project-graph.ts';
 import {
 	checkPlacement,
 	heavyTests,
 	loadTestClosure,
 } from '../../packages/analyzer/test-support/test-placement.ts';
+import { checkInWorkerBuilds, inWorkerBuilds } from './in-worker-builds.ts';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const MANIFEST = resolve(repoRoot, 'scripts/ci/heavy-tests.json');
@@ -64,8 +67,23 @@ async function main(args) {
 		return 0;
 	}
 	const problems = checkPlacement(manifest, heavy, tests, closure.tracked);
-	const summary = `${tests.length} node-project tests, ${heavy.size} reach a heavy entry, ${manifest.declared.length} declared heavy by hand (${closure.edges.size} modules parsed in ${closure.rounds} rounds)`;
-	if (!problems.length) {
+	const rule = manifest.inWorkerBuilds;
+	const { graph } = await loadProjectGraph(repoRoot);
+	const inWorker = inWorkerBuilds(
+		graph,
+		tests,
+		manifest.entries.filter((entry) => entry.inProcess),
+		rule.scope,
+	);
+	const workerProblems = checkInWorkerBuilds(rule, inWorker);
+	const summary = `${tests.length} node-project tests, ${heavy.size} reach a heavy entry, ${manifest.declared.length} declared heavy by hand, ${inWorker.size} build in their worker (${closure.edges.size} modules parsed in ${closure.rounds} rounds)`;
+	for (const problem of workerProblems)
+		console.error(
+			problem.kind === 'unlisted'
+				? `::error::${problem.path} builds an app inside its test worker (${problem.detail}). Build through buildFixture (packages/router/test/support/fixture-build.ts), which builds in a child process; if the test needs the build in its own process, name it with the reason under "inWorkerBuilds" in scripts/ci/heavy-tests.json.`
+				: `::error::${problem.path} is named under "inWorkerBuilds" but ${problem.detail}; remove it.`,
+		);
+	if (!problems.length && !workerProblems.length) {
 		console.log(`test placement: ${summary}; scripts/ci/heavy-tests.json agrees`);
 		return 0;
 	}
@@ -81,7 +99,7 @@ async function main(args) {
 		else console.error(`::error::${problem.kind}: ${problem.path}: ${problem.detail}`);
 	}
 	console.error(
-		`test placement: ${summary}; ${problems.length} problem(s). \`node scripts/ci/test-placement.mjs --write\` rewrites "tests" from the graph for review.`,
+		`test placement: ${summary}; ${problems.length + workerProblems.length} problem(s). \`node scripts/ci/test-placement.mjs --write\` rewrites "tests" from the graph for review.`,
 	);
 	return 1;
 }
