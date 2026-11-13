@@ -69,13 +69,11 @@ const loaded = async (page: Page): Promise<Loaded> => {
 					(error: Error) => error.name,
 				),
 			};
-		// WebKit rejects decode() when it swaps a responsive image's request, so wait for the image itself to finish; a broken one is complete too.
+		// An image is done once it has a size or has failed; WebKit can briefly report an adopted image complete before its load restarts.
+		const broken = (window as unknown as { __brokenImages: WeakSet<Element> }).__brokenImages;
 		await Promise.all(
 			[...document.querySelectorAll<HTMLImageElement>('[data-image]')].map(async (image) => {
-				while (!(await image.decode().then(
-					() => true,
-					() => image.complete,
-				)))
+				while (!(image.complete && image.naturalWidth > 0) && !broken.has(image))
 					await new Promise((done) => {
 						image.addEventListener('load', done, { once: true });
 						image.addEventListener('error', done, { once: true });
@@ -132,6 +130,20 @@ for (const [name, browserType] of [
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(String(error)));
+			// An image or media request that fails is named, so a missing image says why.
+			page.on('requestfailed', (request) => {
+				if (['image', 'media'].includes(request.resourceType()))
+					errors.push(`${request.url()} failed: ${request.failure()?.errorText}`);
+			});
+			page.on('response', (response) => {
+				if (['image', 'media'].includes(response.request().resourceType()) && response.status() >= 400)
+					errors.push(`${response.url()} answered ${response.status()}`);
+			});
+			await page.addInitScript(() => {
+				const broken = new WeakSet<Element>();
+				Object.assign(window, { __brokenImages: broken });
+				document.addEventListener('error', (event) => broken.add(event.target as Element), true);
+			});
 			await page.goto(origin + path, { waitUntil: 'load' });
 			return { page, errors };
 		};
@@ -156,11 +168,11 @@ for (const [name, browserType] of [
 			await page.locator('[data-go="media"]').click();
 			await page.waitForFunction(() => document.querySelector('[data-page="media"]'));
 			const result = await loaded(page);
+			expect(errors).toEqual([]);
 			expect(result).toEqual(expected);
 			for (const media of Object.values(result.media))
 				expect(media.readyState).toBeGreaterThan(0);
 			expect(documents.filter((path) => path !== '/frame.html')).toEqual([]);
-			expect(errors).toEqual([]);
 			await page.close();
 		});
 
