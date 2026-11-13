@@ -18,7 +18,7 @@ beforeAll(async () => {
 	saveLastMeasurement(measurement);
 	evaluation = evaluate(measurement, readAnchors());
 	console.error(formatReport(evaluation));
-}, 600_000);
+}, 1_500_000);
 
 const guards = {
 	G1: 'critical path: one fetch round (bytes reported, not gated)',

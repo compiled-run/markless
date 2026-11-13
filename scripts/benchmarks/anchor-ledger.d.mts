@@ -13,6 +13,7 @@ export type ChangeFile = { readonly name: string; readonly changes: readonly Anc
 
 export const CHANGES_DIR: string;
 export const FIXTURE_RUNTIME_ANCHORS_PATH: string;
+export const BUILD_SCALE_BUDGETS_PATH: string;
 export const SURFACES: Record<string, { readonly path: string }>;
 export function formatChange(entry: AnchorChange): string;
 export function readChangeFiles(dir?: string): ChangeFile[];

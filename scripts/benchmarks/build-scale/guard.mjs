@@ -1,13 +1,22 @@
 // Builds the generated app at two sizes and fails when build memory, build CPU, the client module count, the largest chunk or the largest
 // build artifact passes its budget, or the built server cannot answer a page.
 import { spawn } from 'node:child_process';
-import { readFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { MARKLESS_SERVER_CHUNK_MAX_BYTES } from '../../../packages/bundler/src/build/chunking.ts';
+import { formatChange, readAnchorsWithChanges, recordChange } from '../anchor-ledger.mjs';
 
-const config = JSON.parse(readFileSync(new URL('./budgets.json', import.meta.url), 'utf8'));
+// Counts are the same on every run, so they are held exactly: each change records its own delta in its change file, and those add up.
+const EXACT_COUNTS = { clientModules: 'client modules', compiles: 'whole-module compiles' };
+const ACCEPT = 'node scripts/benchmarks/build-scale/guard.mjs accept --reason "<one line>"';
+const USAGE = `usage:
+  node scripts/benchmarks/build-scale/guard.mjs
+  ${ACCEPT} [--client-modules <n> --compiles <n>]
+    accept records this tree's client module and whole-module compile counts at the larger size, minus what main and
+    the other branches' change files already hold; without the counts it builds the app once to measure them`;
+
+const config = readAnchorsWithChanges('build-scale');
 const budgets = Object.fromEntries(
 	Object.entries(config.budgets).map(([name, budget]) => [name, budget.bytes ?? budget.value]),
 );
@@ -101,6 +110,60 @@ async function serves(dir, path, text) {
 	}
 }
 
+function flag(args, name) {
+	const i = args.indexOf(name);
+	return i < 0 ? undefined : args[i + 1];
+}
+
+async function accept(args) {
+	const reason = flag(args, '--reason');
+	if (!reason?.trim()) throw new Error(USAGE);
+	let counts = {
+		clientModules: flag(args, '--client-modules'),
+		compiles: flag(args, '--compiles'),
+	};
+	if (counts.clientModules === undefined || counts.compiles === undefined) {
+		const dir = await mkdtemp(join(tmpdir(), 'markless-build-scale-'));
+		try {
+			const measured = await build(join(dir, 'app'), config.pages.at(-1));
+			counts = { clientModules: measured.modules.client, compiles: measured.compiles };
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+		}
+	}
+	const { file, changes } = recordChange(
+		'build-scale',
+		{
+			head: (anchors) => {
+				for (const name of Object.keys(EXACT_COUNTS)) {
+					const value = Number(counts[name]);
+					if (!Number.isInteger(value)) throw new Error(`${name}: ${counts[name]} is not a count`);
+					anchors.budgets[name].value = value;
+				}
+				return anchors;
+			},
+			base: (anchors) => anchors,
+			covers: (entry) => entry.path[1] in EXACT_COUNTS,
+		},
+		{ reason },
+	);
+	console.log(
+		changes.length
+			? `recorded in ${file}:\n${changes.map((entry) => `  ${formatChange(entry)}`).join('\n')}`
+			: 'the counts match what is recorded; nothing to record',
+	);
+}
+
+const argv = process.argv.slice(2);
+if (argv[0] === 'accept') {
+	await accept(argv.slice(1));
+	process.exit(0);
+}
+if (argv.length) {
+	console.error(USAGE);
+	process.exit(2);
+}
+
 const work = await mkdtemp(join(tmpdir(), 'markless-build-scale-'));
 try {
 	const [small, large] = config.pages;
@@ -142,20 +205,27 @@ try {
 		if (over) failures.push(name);
 	}
 	// Module and compile counts do not vary between runs, so any rise is real: each module costs Rolldown memory and time, each compile a result held until buildEnd.
-	const countRows = [
-		['client modules', atLarge.modules.client, budgets.clientModules],
-		[
-			'client modules per page',
-			perPageOf((build) => build.modules.client),
-			budgets.clientModulesPerPage,
-		],
-		['whole-module compiles', atLarge.compiles, budgets.compiles],
-	];
-	for (const [name, measured, budget] of countRows) {
-		const value = Math.round(measured * 10) / 10;
-		const over = value > budget;
-		console.log(`${over ? 'FAIL' : 'ok  '} ${name}: ${value} (budget ${budget})`);
-		if (over) failures.push(name);
+	const exact = { clientModules: atLarge.modules.client, compiles: atLarge.compiles };
+	for (const [key, name] of Object.entries(EXACT_COUNTS)) {
+		const value = exact[key];
+		const recorded = budgets[key];
+		const off = value - recorded;
+		const why =
+			off > 0
+				? `: ${off} more than recorded. If the change is intended, record it: ${ACCEPT}`
+				: off < 0
+					? `: ${-off} fewer than recorded. Record the win: ${ACCEPT}`
+					: '';
+		console.log(`${off ? 'FAIL' : 'ok  '} ${name}: ${value} (recorded ${recorded})${why}`);
+		if (off) failures.push(name);
+	}
+	{
+		const value = Math.round(perPageOf((build) => build.modules.client) * 10) / 10;
+		const over = value > budgets.clientModulesPerPage;
+		console.log(
+			`${over ? 'FAIL' : 'ok  '} client modules per page: ${value} (budget ${budgets.clientModulesPerPage})`,
+		);
+		if (over) failures.push('client modules per page');
 	}
 	// Build time: CPU, which a busy runner moves far less than wall time, per page and as growth with page count.
 	// Per page it is read against a fixed workload on the same runner, because CI's runners differ in speed by 1.7x.
@@ -188,7 +258,7 @@ try {
 	if (page) failures.push('server answers a page');
 	if (failures.length) {
 		console.error(
-			`\nbuild-scale guard failed: ${failures.join(', ')}. A budget in scripts/benchmarks/build-scale/budgets.json changes only with a measured, stated reason (docs/ci-process.md section 6).`,
+			`\nbuild-scale guard failed: ${failures.join(', ')}. A budget in scripts/benchmarks/build-scale/budgets.json changes only with a measured, stated reason; the client module and whole-module compile counts move only through a change file written by \`${ACCEPT}\` (docs/ci-process.md section 6).`,
 		);
 		process.exitCode = 1;
 	}
