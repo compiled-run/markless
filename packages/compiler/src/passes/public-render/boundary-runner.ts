@@ -19,7 +19,7 @@ export type BoundaryRunnerResolution = {
 	readonly authored: BoundaryRunnerRead | null;
 	readonly runnerGraphNodeId: string | null;
 	readonly reads: ReadonlyArray<BoundaryRunnerRead>;
-	// Joined template values the settled block reads, computed once its gate settles.
+	// Joined template values and @if/@switch tests the settled block reads, computed once its gate settles.
 	readonly derivedGraphNodeIds: ReadonlyArray<string>;
 	readonly unresolvedSources: ReadonlyArray<string>;
 };
@@ -174,6 +174,8 @@ function collectBoundaryGateReads(
 		// The edge already names the node, so a same-named local elsewhere in the module cannot shadow it.
 		readonly graphNodeId?: string;
 		readonly path?: ReadonlyArray<string>;
+		// An `@if`/`@switch` test: the settled block picks its arm from it.
+		readonly branchTest?: true;
 	};
 	const boundaryReads: ReadonlyArray<GateRead> = [
 		...semanticGraph.templateReads.flatMap((read): ReadonlyArray<GateRead> =>
@@ -212,6 +214,18 @@ function collectBoundaryGateReads(
 					: [],
 			),
 		),
+		...semanticGraph.branchSites.flatMap((site): ReadonlyArray<GateRead> =>
+			site.asyncBoundaryId && site.asyncBoundaryArm === 0 && !site.testReadsRowItem
+				? [
+						{
+							source: site.testSource,
+							asyncBoundaryId: site.asyncBoundaryId,
+							computedGraphNodeId: site.testComputedGraphNodeId,
+							branchTest: true,
+						},
+					]
+				: [],
+		),
 	];
 
 	return new Map(
@@ -233,7 +247,7 @@ function collectBoundaryGateReads(
 						? { binding: named, path: read.path ?? [] }
 						: resolveGraphPath(templateReadPath(read), bindings, aliases);
 				if (!resolved) {
-					unresolvedSources.push(read.source);
+					if (!read.branchTest) unresolvedSources.push(read.source);
 					continue;
 				}
 				if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
@@ -246,10 +260,12 @@ function collectBoundaryGateReads(
 				});
 				// A template value that also reads state is gated by its async inputs alone, so a
 				// write to that state updates it in place instead of settling the block again.
+				// A test is derived once its async inputs settle, so the arm the server picks reads their values.
 				const derived =
 					resolved.binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) &&
 					asyncInputs.length > 0 &&
-					(resolved.binding.joinsText === true ||
+					(read.branchTest === true ||
+						resolved.binding.joinsText === true ||
 						asyncInputs.length < (resolved.binding.dependencies ?? []).length);
 				if (derived) derivedGraphNodeIds.add(resolved.binding.id);
 				const gates = derived
