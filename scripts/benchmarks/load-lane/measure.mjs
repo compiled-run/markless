@@ -20,6 +20,8 @@ const app = resolve(process.argv[2]);
 const runs = Number(process.argv[3] ?? 5);
 const filledSelector = process.env.FILLED ?? '[data-list] li';
 const clickSelector = process.env.CLICK ?? 'main > button';
+// The element whose text the click changes; defaults to the clicked element itself.
+const effectSelector = process.env.EFFECT ?? clickSelector;
 
 const port = await new Promise((done) => {
 	const server = createServer().listen(0, '127.0.0.1', () => {
@@ -31,11 +33,22 @@ const server = spawn(process.execPath, [resolve(app, '.output/server/index.mjs')
 	env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
 	stdio: ['ignore', 'pipe', 'pipe'],
 });
-const url = `http://127.0.0.1:${port}/`;
-for (let i = 0; i < 100; i++) {
-	if (await fetch(url).then((r) => r.ok, () => false)) break;
+const origin = `http://127.0.0.1:${port}`;
+const url = `${origin}${process.env.PATHNAME ?? '/'}`;
+// A signed-in page: LOGIN names a module exporting `login(browser, origin)` that resolves to the session's cookies.
+let cookies = [];
+for (let i = 0; i < 600; i++) {
+	if (await fetch(origin).then(() => true, () => false)) break;
 	await new Promise((r) => setTimeout(r, 100));
 }
+
+if (process.env.LOGIN) {
+	const { login } = await import(resolve(process.env.LOGIN));
+	const loginBrowser = await chromium.launch();
+	cookies = await login(loginBrowser, origin);
+	await loginBrowser.close();
+}
+const cookieHeader = () => cookies.map((cookie) => `${cookie.name}=${cookie.value}`).join('; ');
 
 const masks = (scripts, into = new Map()) => {
 	for (const script of scripts) {
@@ -53,6 +66,7 @@ const loads = [];
 try {
 	for (let run = 0; run < runs; run++) {
 		const page = await openPage(browser, { coverage: true });
+		await page.page.context().addCookies(cookies);
 		await page.page.addInitScript(() => (Math.random = () => 0.5));
 		const bodies = new Map();
 		page.page.on('response', async (response) => {
@@ -79,7 +93,7 @@ try {
 		const gestureChars = total(masks(await page.coverage.take()));
 		const gestureScripts = page.state.js.load.length - gestureJs;
 		const gzip = loadJs.reduce((sum, src) => sum + (bodies.has(src) ? gzipSync(bodies.get(src)).length : 0), 0);
-		const html = await fetch(url).then((r) => r.text());
+		const html = await fetch(url, { headers: { cookie: cookieHeader() } }).then((r) => r.text());
 		loads.push({
 			idleChars,
 			filledChars,
@@ -98,14 +112,16 @@ try {
 	const clicks = [];
 	for (let run = 0; run < runs; run++) {
 		const page = await openPage(browser);
+		await page.page.context().addCookies(cookies);
 		await page.goto(url);
 		await page.page.waitForSelector(filledSelector, { timeout: 10000 }).catch(() => {});
 		await page.idle();
 		page.state.phase = 'input';
 		const cdp = await page.page.context().newCDPSession(page.page);
 		await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
-		await page.page.evaluate((selector) => {
-			const target = document.querySelector(selector);
+		await page.page.evaluate(([selector, effect]) => {
+			const pressed = document.querySelector(selector);
+			const target = document.querySelector(effect);
 			window.__click = { before: target.textContent };
 			new PerformanceObserver((list) => {
 				for (const entry of list.getEntries())
@@ -115,12 +131,12 @@ try {
 				for (const entry of list.getEntries())
 					window.__click.longest = Math.max(window.__click.longest ?? 0, entry.duration);
 			}).observe({ type: 'longtask' });
-			target.addEventListener('pointerdown', (event) => (window.__click.start = event.timeStamp), { capture: true });
+			pressed.addEventListener('pointerdown', (event) => (window.__click.start = event.timeStamp), { capture: true });
 			new MutationObserver(() => {
 				if (window.__click.start !== undefined && window.__click.updated === undefined && target.textContent !== window.__click.before)
 					window.__click.updated = performance.now() - window.__click.start;
 			}).observe(target, { subtree: true, characterData: true, childList: true });
-		}, clickSelector);
+		}, [clickSelector, effectSelector]);
 		await page.page.click(clickSelector);
 		await page.page.waitForFunction(() => window.__click.updated !== undefined, null, { timeout: 10000 }).catch(() => {});
 		await page.settle();
