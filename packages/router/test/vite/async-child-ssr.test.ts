@@ -179,3 +179,56 @@ for (const placement of ['direct', 'framed', 'deep', 'opened']) {
 		await expectReRuns(run, id, 1);
 	});
 }
+
+// A child that takes its props as one bag and reads members of it in its async value reads the page's values on every run.
+test('a child that takes its props as one bag re-runs with the page\'s params and url', async () => {
+	const id = 'served-bag';
+	const run = await openNote(`/note/bag/${id}?tab=info`);
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	expect(run.asked).toEqual([`GET ?id=${id}&tab=info`]);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+});
+
+test('a note the server renders in an @if arm open at load re-runs with the page\'s params and url, also after the arm closes and reopens', async () => {
+	const id = 'served-open';
+	const run = await openNote(`/note/served-open/${id}?tab=info`);
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	await run.page.locator('#toggle').click();
+	await expect.poll(() => run.page.locator('#note').count()).toBe(0);
+	await run.page.locator('#toggle').click();
+	await expectNote(run, `note ${id} tab info rev 0 #1`);
+	await run.page.locator('#again').click();
+	await expectNote(run, `note ${id} tab info rev 0 #2`);
+	expect(run.asked.every((entry) => entry === `GET ?id=${id}&tab=info`)).toBe(true);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+});
+
+test('a component row whose async value reads the page\'s params and url streams, then re-runs with them', async () => {
+	const id = 'served-rows';
+	const run = await openNote(`/note/rows/${id}?tab=info`);
+	const row = (part: string) => run.page.locator(`li[data-part="${part}"]`);
+	const shown = async (part: string) =>
+		(await row(part).locator('[data-note-failed]').count())
+			? `failed: ${await row(part).locator('[data-note-failed]').textContent()}`
+			: await row(part).locator('[data-note]').textContent({ timeout: 100 }).catch(() => null);
+	for (const part of ['a', 'b'])
+		await expect.poll(() => shown(part), { timeout: 5_000 }).toBe(`note ${id}-${part} tab info rev 0 #1`);
+	await run.page.waitForLoadState('networkidle');
+	expect(run.asked).toEqual([]);
+	await row('b').locator('[data-again]').click();
+	await expect.poll(() => shown('b'), { timeout: 5_000 }).toBe(`note ${id}-b tab info rev 0 #2`);
+	expect(await shown('a')).toBe(`note ${id}-a tab info rev 0 #1`);
+	expect(run.asked).toEqual([`GET ?id=${id}-b&tab=info`]);
+	expect(run.errors).toEqual([]);
+	await run.page.close();
+});

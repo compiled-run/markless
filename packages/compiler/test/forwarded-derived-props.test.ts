@@ -1,5 +1,9 @@
 import { expect, test } from 'vitest';
-import { compileTsrxModule, type ModuleGraphInterfaceArtifact } from '../src/index.ts';
+import {
+	collectTsrxModuleDiagnostics,
+	compileTsrxModule,
+	type ModuleGraphInterfaceArtifact,
+} from '../src/index.ts';
 
 // A component whose computed reads a prop publishes it, and a module forwarding its own prop
 // into that component publishes its own prop in turn, so each composer serves the value.
@@ -236,4 +240,30 @@ export function Detail({ place }: { readonly place: { readonly search: string; r
 	expect(runner?.source).toContain('read("prop:props", ["place", "search"])');
 	expect(runner?.source).toContain('read("prop:props", ["place", "pathname"])');
 	expect(runner?.source).not.toContain('read("prop:props", ["place"])');
+});
+
+// A whole-bag read cannot be routed to the page, and the child's own cell drops routed keys, so the build refuses it rather than ship undefined fields.
+test('an async value handed the whole props bag, named or spread, is refused at build', async () => {
+	for (const [signature, argument] of [
+		['props: Props', 'props'],
+		['{ ...rest }: Props', '{ ...rest }'],
+	]) {
+		const result = await compileTsrxModule({
+			filename: 'src/detail.tsrx',
+			source: `import { computed, state } from '@markless/core';
+type Props = { readonly slug: string; readonly place: { readonly search: string } };
+async function fetchNote(bag: Props, round: number) { return bag.slug + bag.place.search + round; }
+export function Detail(${signature}) @{
+	let round = state(1);
+	const note = computed(async () => fetchNote(${argument}, round));
+	<section>@try {<p>{note}</p>} @pending {<p>loading</p>}<button onClick={() => round++}>again</button></section>
+}`,
+			symbols: [],
+		});
+		expect(
+			collectTsrxModuleDiagnostics(result)
+				.filter((diagnostic) => diagnostic.severity === 'error')
+				.map((diagnostic) => diagnostic.code),
+		).toEqual(['MARKLESS_CAPTURE_OPAQUE_PROP']);
+	}
 });

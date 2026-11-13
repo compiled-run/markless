@@ -5,6 +5,9 @@ import Direct from './direct.tsrx';
 import Framed from './framed.tsrx';
 import { asked, resetNotes } from './load.ts';
 import Opened from './opened.tsrx';
+import Bag from './bag.tsrx';
+import Rows from './rows.tsrx';
+import ServedOpen from './served-open.tsrx';
 
 // A child's async value reads the page's `params.id` and a `url` search value it was handed. Every re-run in
 // the browser (a state write, a save's reload, a new route) reads what the first run read, wherever the child
@@ -99,4 +102,87 @@ test("server-rendered, in a click-opened @if arm: every run reads the page's par
 	await expect.poll(shown).toBe('note abc info rev 0 #1');
 	await reRuns(1);
 	expect(asked.filter((entry) => entry === 'save abc')).toHaveLength(1);
+});
+
+async function served(stream: Promise<{ readonly shell: string; readonly appends: ReadonlyArray<string> }>) {
+	const { shell, appends } = await stream;
+	const { container } = renderServerHTML(shell);
+	for (const chunk of appends) appendStreamed(container, chunk);
+}
+
+const bagReRuns = async () => {
+	click('[data-again]');
+	await expect.poll(shown).toBe('note abc info rev 0 #2');
+	click('[data-next]');
+	await expect.poll(shown).toBe('note xyz more rev 0 #2');
+	expect(asked.filter((entry) => entry.includes('undefined'))).toEqual([]);
+};
+
+test('client-rendered, a child that takes its props as one bag: every run reads the page\'s params and url', async () => {
+	await render(Bag);
+	await expect.poll(shown).toBe('note abc info rev 0 #1');
+	await bagReRuns();
+});
+
+test('server-rendered, a child that takes its props as one bag: every run reads the page\'s params and url', async () => {
+	await served(renderStream(Bag));
+	await expect.poll(shown).toBe('note abc info rev 0 #1');
+	expect(asked).toEqual([]);
+	await bagReRuns();
+});
+
+const reopenReRuns = async () => {
+	click('[data-again]');
+	await expect.poll(shown).toBe('note abc info rev 0 #2');
+	click('[data-toggle]');
+	await expect.poll(() => document.querySelector('[data-note]')).toBeNull();
+	click('[data-toggle]');
+	await expect.poll(shown).toBe('note abc info rev 0 #1');
+	click('[data-again]');
+	await expect.poll(shown).toBe('note abc info rev 0 #2');
+	click('[data-next]');
+	await expect.poll(shown).toBe('note xyz more rev 0 #2');
+	expect(asked.filter((entry) => entry.includes('undefined'))).toEqual([]);
+};
+
+test('client-rendered, in an @if arm open at load: re-runs, then close and reopen, read the page\'s params and url', async () => {
+	await render(ServedOpen);
+	await expect.poll(shown).toBe('note abc info rev 0 #1');
+	await reopenReRuns();
+});
+
+test('server-rendered, in an @if arm open at load: re-runs, then close and reopen, read the page\'s params and url', async () => {
+	await served(renderStream(ServedOpen));
+	await expect.poll(shown).toBe('note abc info rev 0 #1');
+	expect(asked).toEqual([]);
+	await reopenReRuns();
+});
+
+const rowText = (part: string) => {
+	const row = document.querySelector(`li[data-part="${part}"]`);
+	const failed = row?.querySelector('[data-note-failed]');
+	return failed ? `failed: ${failed.textContent}` : (row?.querySelector('[data-note]')?.textContent ?? null);
+};
+
+const rowReRuns = async () => {
+	(document.querySelector('li[data-part="b"] [data-again]') as HTMLElement).click();
+	await expect.poll(() => rowText('b')).toBe('note abc-b info rev 0 #2');
+	expect(rowText('a')).toBe('note abc-a info rev 0 #1');
+	click('[data-next]');
+	await expect.poll(() => rowText('a')).toBe('note xyz-a more rev 0 #1');
+	await expect.poll(() => rowText('b')).toBe('note xyz-b more rev 0 #2');
+	expect(asked.filter((entry) => entry.includes('undefined'))).toEqual([]);
+};
+
+test('client-rendered, a component row: each row\'s re-run reads the page\'s params and url', async () => {
+	await render(Rows);
+	for (const part of ['a', 'b']) await expect.poll(() => rowText(part)).toBe(`note abc-${part} info rev 0 #1`);
+	await rowReRuns();
+});
+
+test('server-rendered, a component row: each row streams, then re-runs with the page\'s params and url', async () => {
+	await served(renderStream(Rows));
+	for (const part of ['a', 'b']) await expect.poll(() => rowText(part)).toBe(`note abc-${part} info rev 0 #1`);
+	expect(asked).toEqual([]);
+	await rowReRuns();
 });
