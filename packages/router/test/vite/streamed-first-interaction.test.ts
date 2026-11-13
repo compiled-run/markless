@@ -185,8 +185,8 @@ test('after Back and Forward the page still answers its first interaction', asyn
 	}
 });
 
-// A proxy that ends the response where the first streamed arm would begin, as a dropped connection or a cancelled stream does.
-async function cutBeforeArms(upstream: string) {
+// A proxy that ends the response where the first streamed arm would begin: cleanly, or by failing the body as the host does when a settle errors.
+async function cutBeforeArms(upstream: string, fail = false) {
 	const proxy = createServer(async (request, response) => {
 		const answer = await fetch(`${upstream}${request.url}`, { headers: { accept: 'text/html' } });
 		response.writeHead(answer.status, { 'content-type': answer.headers.get('content-type') ?? 'text/html' });
@@ -196,7 +196,10 @@ async function cutBeforeArms(upstream: string) {
 			held += decoder.decode(chunk, { stream: true });
 			const at = held.indexOf('<template m:arm');
 			if (at >= 0) {
-				response.end(held.slice(0, at));
+				if (!fail) return void response.end(held.slice(0, at));
+				response.write(held.slice(0, at));
+				// The shell reaches the browser first; then the body fails, as when the host errors it after a failed settle.
+				setTimeout(() => response.socket?.destroy(), 500);
 				return;
 			}
 		}
@@ -245,6 +248,19 @@ test('a streamed answer that never arrives wakes the runtime and the block settl
 		await expect.poll(() => titles(page, 'remote'), { timeout: 10_000 }).toEqual(['Dune', 'Emma', 'Ulysses']);
 		expect(await browserRuns(page)).toBeGreaterThan(0);
 		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+		await proxy.close();
+	}
+});
+
+// Same on main: a failed body leaves the document loading, so nothing on the page learns the answer will not come.
+test.fails('a streamed answer that never arrives because the body failed settles with no click', async () => {
+	const proxy = await cutBeforeArms(server!.origin, true);
+	const page = await browser!.newPage();
+	try {
+		await page.goto(`${proxy.origin}/`, { waitUntil: 'commit' });
+		await expect.poll(() => titles(page, 'all'), { timeout: 10_000 }).toEqual(['Dune', 'Emma', 'Ulysses']);
 	} finally {
 		await page.close();
 		await proxy.close();
