@@ -1,5 +1,5 @@
 import type { AsyncComputedPlane, PaintHoldInternals, PaintHoldPlane, RuntimeGraph } from '@markless/runtime';
-import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
+import { NODE_DROPPED, type RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from './fns/in-place-headers.ts';
 
@@ -310,21 +310,24 @@ function endHolds(held: Held, outcome: WriteOutcome, graph?: Graph): void {
 	for (const [node, owner] of held)
 		if (!graph || owner === graph) {
 			held.delete(node);
-			owner.asyncPlane?.()?.endEntry(node.graphNodeId, outcome);
+			if (node.phase !== NODE_DROPPED) owner.asyncPlane?.()?.endEntry(node.graphNodeId, outcome);
 		}
 }
+
+// A value whose arm closed keeps the pending look its mark gave it, but nothing will settle it.
+const waitedFor = (node: RuntimeAsyncComputedNode) => node.snapshot.status === 'pending' && node.phase !== NODE_DROPPED;
 
 // A reload that no named dispatch started (it came from a write sent after an await) is still loading.
 function reloadingUnattributed(): boolean {
 	for (const reload of reloads)
-		if (reload.senders.size === 0) for (const node of reload.asked) if (node.snapshot.status === 'pending') return true;
+		if (reload.senders.size === 0) for (const node of reload.asked) if (waitedFor(node)) return true;
 	return false;
 }
 
 // Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks; the marks end when that pass lands.
 function settleReload(reload: Reload, landed?: Promise<void>): void {
 	if (!reloads.has(reload) || reload.starting.size > 0) return;
-	for (const node of reload.asked) if (node.snapshot.status === 'pending') return;
+	for (const node of reload.asked) if (waitedFor(node)) return;
 	reloads.delete(reload);
 	for (const stop of reload.stops.splice(0)) stop?.();
 	roundDone(reload.senders, false, landed);

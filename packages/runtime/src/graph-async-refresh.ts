@@ -1,6 +1,7 @@
 import type { RuntimeGraphAsyncSnapshot, RuntimeGraphRead } from './graph.ts';
 import {
 	NODE_BLOCKED,
+	NODE_DROPPED,
 	NODE_IDLE,
 	NODE_PLANNED,
 	NODE_RUNNING,
@@ -326,7 +327,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 
 	const release = (node: RuntimeAsyncComputedNode, unwritten?: boolean): void => {
 		const hold = node.entryHold;
-		if (!hold) return;
+		if (!hold) return void (node.phase === NODE_DROPPED && heldOnInputs.delete(node));
 		const landed = hold.landed;
 		if (landed) {
 			hold.landed = undefined;

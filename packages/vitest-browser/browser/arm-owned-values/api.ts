@@ -39,3 +39,8 @@ export function double(count: number): number {
 	if (typeof document !== 'undefined') derives.push(value);
 	return value;
 }
+
+/** A save the page's own route answers when the test does. */
+export async function saveNote(note: string): Promise<void> {
+	await fetch('/api/arm-notes', { method: 'POST', body: JSON.stringify({ note }) });
+}
