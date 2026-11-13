@@ -657,7 +657,6 @@ function returnWakeSource(
 		: '';
 }
 
-// Each storage cell's slot key and the value this render gave it.
 function streamedWakeSource(
 	view: ProtocolViewPayload,
 	streamed: ReadonlySet<string> | undefined,
@@ -668,6 +667,7 @@ function streamedWakeSource(
 	return ids.length > 0 ? createInlineResumerStreamedWakeSource(resumeModuleUrl, ids, wakes) : '';
 }
 
+// Each storage cell's slot key and the value this render gave it.
 function storageWakeSource(
 	state: ProtocolStatePayload,
 	resumeModuleUrl: string | undefined,
