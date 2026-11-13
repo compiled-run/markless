@@ -16,16 +16,19 @@ type Server = {
 	saved: Map<string, string[]>;
 	/** Every child that derived from a board, with the arm it was written for and the parity it saw. */
 	derives: string[];
+	/** Every row detail the browser asked for, answered at once. */
+	details: string[];
 };
 
 const shared = globalThis as typeof globalThis & { __gridServer?: Server };
-export const server: Server = (shared.__gridServer ??= { log: [], waiting: [], saved: new Map(), derives: [] });
+export const server: Server = (shared.__gridServer ??= { log: [], waiting: [], saved: new Map(), derives: [], details: [] });
 
 export function resetServer(): void {
 	server.log = [];
 	server.waiting = [];
 	server.saved = new Map();
 	server.derives = [];
+	server.details = [];
 }
 
 export function boardFor(subject: string, round: number, saved: ReadonlyArray<string> = []): Board {
@@ -63,6 +66,11 @@ function held(request: string): Promise<void> {
 }
 
 async function answer(url: URL, method: string, body: string): Promise<Response> {
+	if (method === 'GET' && url.pathname === '/grid/detail') {
+		const id = url.searchParams.get('id') ?? '';
+		server.details.push(id);
+		return json({ id, note: `detail of ${id}` });
+	}
 	if (method === 'GET') {
 		const subject = url.searchParams.get('subject') ?? '';
 		const round = Number(url.searchParams.get('round'));
@@ -117,4 +125,10 @@ export async function failSave(subject: string): Promise<void> {
 export function derive(arm: string, board: Board): string {
 	if (typeof window !== 'undefined') server.derives.push(`${arm}:${board.parity}`);
 	return `${arm} card for ${board.title}`;
+}
+
+export async function loadDetail(id: string): Promise<{ id: string; note: string }> {
+	if (typeof window === 'undefined') return { id, note: `detail of ${id}` };
+	const response = await fetch(`/grid/detail?id=${id}`);
+	return (await response.json()) as { id: string; note: string };
 }

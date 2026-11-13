@@ -95,7 +95,7 @@ async function answer(request: string) {
 	release(request);
 }
 
-// Every frame and mutation while it runs: the claim is that the place never shows `@pending` or loses its content.
+// Samples every frame and mutation: the claim is that the place never shows `@pending` or loses its content.
 function neverAbsent() {
 	const seen: string[] = [];
 	const look = () => {
@@ -174,7 +174,6 @@ export class Timeline {
 		this.logFrom = server.log.length;
 	}
 
-	/** Loads the current board for an opening place, which shows `@pending` until it answers. */
 	private async opensLoading() {
 		const request = boardRequest(this.model.subject, this.model.round);
 		await answer(request);
@@ -308,7 +307,9 @@ export class Timeline {
 			await expect.poll(waitingRequests, poll).toContain(request);
 			click('[data-grid-close]');
 			this.model.open = false;
-			await this.shows(this.expected());
+			const { shape } = this.run;
+			const shown = boardFor(this.model.subject, this.model.round - 1, server.saved.get(this.model.subject));
+			await this.shows(shape.closed(shape.liveWhileClosed ? shown : undefined));
 			release(request);
 			this.model.loadedRound = this.model.round;
 			await this.settled([request]);
@@ -339,7 +340,7 @@ export function fullTimeline(run: Run, skip: ReadonlyArray<Step> = []) {
 
 /** The first render and then one step: the reduced repro a pinned cell runs. */
 export function oneStep(run: Run, step: Step) {
-	return new Timeline({ patience: 1_500, ...run }).runSteps(step === 'first render' ? [step] : ['first render', step]);
+	return new Timeline({ patience: 1_000, ...run }).runSteps(step === 'first render' ? [step] : ['first render', step]);
 }
 
 // A stream append is parsed after the shell, so its inline scripts run as it lands.
@@ -362,4 +363,8 @@ export async function playStream(stream: Promise<{ readonly shell: string; reado
 	expect(appends.length, 'chunks streamed after the shell').toBeGreaterThan(0);
 	const { container } = renderServerHTML(shell);
 	for (const chunk of appends) appendStreamed(container, chunk);
+}
+
+export function someSteps(run: Run, steps: ReadonlyArray<Step>) {
+	return new Timeline(run).runSteps(steps.filter((step) => applies(run.shape, step)));
 }
