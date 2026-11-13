@@ -14,6 +14,7 @@ import './twins.tsrx';
 import './deep.tsrx';
 import './arm.tsrx';
 import './still.tsrx';
+import './caught.tsrx';
 
 // The kernel, on the whole render data and on the served subset, and the evaluator settle the same arm of a
 // component placed below the module root; through the qualifier that re-spells them in page space, they must
@@ -69,7 +70,7 @@ function ownerPaths(surface: Surface, chain: ReadonlyArray<string>, rowsBefore: 
 		symbols += row + edge.symbolPrefix;
 		hosts += row + edge.hostPrefix;
 	}
-	return { symbols, hosts, parentSymbols, edge: edge! };
+	return { symbols, hosts, parentSymbols, edge };
 }
 
 type Fixture = {
@@ -79,6 +80,7 @@ type Fixture = {
 	// Page-space values the live graph holds when the answer lands, keyed by instance path then local id.
 	readonly values: (paths: { readonly symbols: string; readonly parentSymbols: string }) => Readonly<Record<string, unknown>>;
 	readonly shows: ReadonlyArray<string>;
+	readonly status?: 'fulfilled' | 'rejected';
 };
 
 const fixtures: ReadonlyArray<Fixture> = [
@@ -158,6 +160,17 @@ const fixtures: ReadonlyArray<Fixture> = [
 		}),
 		shows: ['Dune 0'],
 	},
+	{
+		// The module root owns this boundary and its answer failed: the kernel draws the @catch arm unplaced.
+		file: 'caught.tsrx',
+		chain: ['Caught'],
+		status: 'rejected',
+		values: ({ symbols }) => ({
+			[`${symbols}state:reload`]: 0,
+			[`${symbols}computed:todos`]: { status: 'rejected', version: 2, key: null, error: { message: 'offline' } },
+		}),
+		shows: ['Could not load'],
+	},
 ];
 
 beforeAll(() => installMarklessComposedArmRecords());
@@ -222,7 +235,7 @@ for (const fixture of fixtures)
 			id: paths.hosts + boundaryId,
 			...(updateSymbolId && { updateSymbolId: paths.symbols + updateSymbolId }),
 			composedInstancePath: paths.symbols,
-			composedGraphProps: (paths.edge.props ?? []).flatMap((prop) =>
+			composedGraphProps: (paths.edge?.props ?? []).flatMap((prop) =>
 				prop.kind === 'graph-reference' && prop.graphNodeId
 					? [{ name: prop.name, graphNodeId: paths.parentSymbols + prop.graphNodeId, path: prop.path ?? [] }]
 					: [],
@@ -234,7 +247,7 @@ for (const fixture of fixtures)
 			renderSettledArm({
 				surface: drawn as never,
 				boundaryId,
-				status: 'fulfilled',
+				status: fixture.status ?? 'fulfilled',
 				read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
 				placement: (name) => branchOwnerPlacement(drawn as never, name, graph as never),
 			});
@@ -243,7 +256,7 @@ for (const fixture of fixtures)
 		const evaluated = await renderThroughEvaluator(
 			surface as never,
 			boundaryId,
-			'fulfilled',
+			fixture.status ?? 'fulfilled',
 			graph as never,
 			loadSymbol,
 			boundary.id,
@@ -271,7 +284,7 @@ for (const fixture of fixtures)
 		} as unknown as Rendered;
 
 		for (const text of fixture.shows) expect(viaKernel.html).toContain(text);
-		expect(kernel.moduleRootPath).toBe(MODULE_ROOT);
+		expect(kernel.moduleRootPath).toBe(fixture.chain.length > 1 ? MODULE_ROOT : undefined);
 		expect(committed(viaKernel, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
 		expect(committed(viaServed, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
 	});
