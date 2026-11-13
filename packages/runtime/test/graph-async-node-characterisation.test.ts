@@ -452,6 +452,30 @@ test('a handler rejection on a blocked value keeps it blocked: the input landing
 	expect(orders.runs.map((run) => run.key)).toEqual(['ada']);
 });
 
+test("a handler rejection outlasts the re-run its own failed save's end asked for, when both land in one turn", async () => {
+	const { graph, user, orders, plane } = chained(true);
+	graph.read('computed:orders', ['status']);
+	user.runs[0]!.resolve({ name: 'ada' });
+	await tick();
+	await graph.flush();
+	orders.runs[0]!.resolve(['tea']);
+	await tick();
+	await graph.flush();
+	// The order a lazily loaded refresh half replays a failed save in: both marks, both ends, then the handler's rejection.
+	const error = new Error('handler');
+	plane.markEntry('computed:user', true);
+	plane.markEntry('computed:orders', true);
+	plane.endEntry('computed:user', 'failed');
+	plane.endEntry('computed:orders', 'failed');
+	plane.failHandler('computed:orders', error);
+	await tick();
+	await graph.flush();
+	expect(snapshot(graph, 'computed:orders')).toMatchObject({ status: 'rejected', error, value: ['tea'] });
+	expect(orders.runs).toHaveLength(1);
+	expect(plane.rerun('computed:orders')).toBe(true);
+	expect(orders.runs.map((run) => run.key)).toEqual(['ada', 'ada']);
+});
+
 test('an entry mark shows a settled value busy and the last of its holders to end restores it when no run started', async () => {
 	const { graph, runner, plane } = single();
 	graph.read('computed:user', ['status']);
