@@ -20,6 +20,7 @@ export const FIXTURE_RUNTIME_ANCHORS_PATH = join(
 	ROOT,
 	'packages/bundler/test/fixture-runtime-anchors.json',
 );
+export const BUILD_SCALE_BUDGETS_PATH = join(import.meta.dirname, 'build-scale/budgets.json');
 
 const PERF_GUARD_NAMES = {
 	allowFullResume: 'lean',
@@ -88,6 +89,14 @@ export const SURFACES = {
 			}
 			return anchors;
 		},
+	},
+	'build-scale': {
+		path: BUILD_SCALE_BUDGETS_PATH,
+		subjectDepth: () => 2,
+		label: (subject) => ({ guard: 'build-scale', subject: subject[1] }),
+		unit: (path) =>
+			({ clientModules: 'client modules', compiles: 'whole-module compiles' })[path[1]] ?? '',
+		normalize: (anchors) => anchors,
 	},
 };
 

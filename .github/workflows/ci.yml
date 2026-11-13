@@ -1170,6 +1170,10 @@ jobs:
         if: needs.lanes.outputs.run_perf_guards == 'true'
         runs-on: ubuntu-26.04
         timeout-minutes: 30
+        permissions:
+            contents: read
+            # Reads the CI measurements of the commits G16 judges each page's download against.
+            actions: read
         env:
             PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}-ms-playwright
             NPM_CONFIG_AUDIT: 'false'
@@ -1183,6 +1187,8 @@ jobs:
             - uses: actions/checkout@v4
               with:
                   persist-credentials: false
+                  # The baseline walks up to 300 first parents for the commit each page's growth is counted from.
+                  fetch-depth: 301
 
             - uses: pnpm/action-setup@v4
               with:
@@ -1225,6 +1231,9 @@ jobs:
               run: pnpm --dir packages/vitest-browser exec playwright install chromium
 
             - name: Run the performance guards
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  MARKLESS_PERF_GUARD_BASELINE: ci
               run: pnpm perf:guard
 
             # A Linux anchor is accepted from this file: pnpm perf:guard:accept <guard> <subject> --from last-measurement.json
@@ -1235,7 +1244,8 @@ jobs:
                   name: perf-guards-measurement
                   path: /tmp/markless-perf-guards/last-measurement.json
                   if-no-files-found: ignore
-                  retention-days: 7
+                  # Later runs judge downloads against it until the page's anchor next changes.
+                  retention-days: 14
 
             - name: Mark the perf-guards lane complete
               run: echo ok > perf-guards-completed.txt

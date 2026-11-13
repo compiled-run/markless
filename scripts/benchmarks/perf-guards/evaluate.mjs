@@ -104,7 +104,7 @@ function checkLoadWeight(subject, load, platform, anchor, fail, note) {
 			: []),
 		...(grew > BUDGETS.loadDownloadCompositionBytes
 			? [
-					`downloads +${grew} B gzip more than its anchor ${anchor.jsGzipBytes} (allowed ${BUDGETS.loadDownloadCompositionBytes} B for gzip composing accepted changes)`,
+					`downloads +${grew} B gzip more than ${anchor.reference ? referenceLine(anchor.reference) : `its anchor ${anchor.jsGzipBytes}`} (allowed ${BUDGETS.loadDownloadCompositionBytes} B for gzip composing accepted changes)`,
 				]
 			: []),
 	];
@@ -114,9 +114,13 @@ function checkLoadWeight(subject, load, platform, anchor, fail, note) {
 	}
 	note(
 		'G16',
-		`${line}; anchor ${anchor.executedChars} chars run, ${anchor.jsGzipBytes} B gzip downloaded`,
+		`${line}; anchor ${anchor.executedChars} chars run, ${anchor.jsGzipBytes} B gzip downloaded${anchor.reference ? ` (${referenceLine(anchor.reference)})` : ''}`,
 	);
 }
+
+const signed = (value) => `${value >= 0 ? '+' : ''}${value}`;
+const referenceLine = ({ commit, run, measured, recorded }) =>
+	`${measured} B measured on ${commit.slice(0, 10)}${run ? ` (CI run ${run})` : ''} ${signed(recorded)} B recorded since`;
 
 function checkPreload(subject, preload, fail, note) {
 	if (preload.missingFiles.length)

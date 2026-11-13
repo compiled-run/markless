@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 0,
+			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"date": "2026-11-13"
+		}
+	]
+}

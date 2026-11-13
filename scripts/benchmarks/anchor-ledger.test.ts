@@ -19,7 +19,7 @@ import {
 	recordChange,
 	SURFACES,
 } from './anchor-ledger.mjs';
-import { covers } from './perf-guards/cli.mjs';
+import { covers, withoutExecutedNoise } from './perf-guards/cli.mjs';
 
 type Load = { executedChars: number; jsGzipBytes: number };
 type Anchors = {
@@ -489,5 +489,31 @@ describe('perf-guard accept replaces its own earlier entries', () => {
 				reason: 'x',
 			}),
 		).toBe(true);
+	});
+});
+
+describe('accepting load', () => {
+	test('a page whose executed chars moved only by run-to-run noise records no executed change', () => {
+		const base = {
+			loadWeight: {
+				'linux-x64': {
+					'bench /records': { executedChars: 11_681, jsGzipBytes: 93_327 },
+					'docs /': { executedChars: 25_873, jsGzipBytes: 1_694_913 },
+				},
+			},
+		};
+		const head = {
+			loadWeight: {
+				'linux-x64': {
+					'bench /records': { executedChars: 11_905, jsGzipBytes: 93_420 },
+					'docs /': { executedChars: 26_300, jsGzipBytes: 1_695_000 },
+				},
+			},
+		};
+		expect(diffAnchors(base, withoutExecutedNoise(head, base))).toEqual([
+			{ path: ['loadWeight', 'linux-x64', 'bench /records', 'jsGzipBytes'], delta: 93 },
+			{ path: ['loadWeight', 'linux-x64', 'docs /', 'executedChars'], delta: 427 },
+			{ path: ['loadWeight', 'linux-x64', 'docs /', 'jsGzipBytes'], delta: 87 },
+		]);
 	});
 });

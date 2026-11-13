@@ -10,6 +10,8 @@ import {
 	readAnchorsWithChanges,
 	recordChange,
 } from '../anchor-ledger.mjs';
+import { applyBaseline } from './baseline.mjs';
+import { BUDGETS } from './config.mjs';
 import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
@@ -19,11 +21,15 @@ const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs check [--no-build] [--sites bench,docs] [--from <measurement.json>]
   node scripts/benchmarks/perf-guards/cli.mjs measure [--no-build] [--out <file>]
   node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last | --from <file>] [--base <file>] [--no-build]
-    accept records this tree's measurement minus its merge-base's; without --base it measures the merge-base in a throwaway checkout`;
+    accept records this tree's measurement minus its merge-base's; without --base it measures the merge-base in a throwaway checkout.
+    A load change for Linux comes from two CI artifacts (gh run download <run> -n perf-guards-measurement): --from this pull
+    request's run, --base the merge-queue run of its merge-base. Each recorded change is judged on its own: CI compares a
+    page's download with its base's measurement plus the change, so changes queued together do not count against each other.
+    Record every page your change grows, even by a few bytes: growth nobody records adds up across pull requests.`;
 
-/** anchors.json with every pending change file in scripts/benchmarks/anchor-changes applied. */
+/** anchors.json with every pending change file applied, and G16 downloads moved onto CI's baseline when one is named. */
 export function readAnchors() {
-	return readAnchorsWithChanges('perf-guards');
+	return applyBaseline(readAnchorsWithChanges('perf-guards'));
 }
 
 export function saveLastMeasurement(measurement) {
@@ -177,6 +183,22 @@ export function accept(
 	return next;
 }
 
+/** `head` with each page's executed chars put back to `base`'s when they moved no more than one run of the same tree can. */
+export function withoutExecutedNoise(head, base) {
+	const next = structuredClone(head);
+	for (const [platform, pages] of Object.entries(next.loadWeight ?? {}))
+		for (const [page, load] of Object.entries(pages)) {
+			const before = base.loadWeight?.[platform]?.[page];
+			if (
+				before &&
+				Math.abs(load.executedChars - before.executedChars) <=
+					BUDGETS.loadExecutionSwingChars
+			)
+				load.executedChars = before.executedChars;
+		}
+	return next;
+}
+
 /** Which of this branch's earlier entries an accept of `guard subject` replaces. */
 export function covers(guard, subject, platform = LOAD_PLATFORM) {
 	return (entry) => {
@@ -268,18 +290,23 @@ async function main(argv) {
 			throw new Error(
 				`the merge-base was measured on ${base.platform} and this tree on ${platform}; measure both on one platform`,
 			);
+		const anchorBase = (anchors) => {
+			try {
+				return accept(anchors, { ...base, platform }, guard, subject, reason);
+			} catch (error) {
+				if (error.code === 'NO_MEASURED_SUBJECT') return anchors;
+				throw error;
+			}
+		};
 		const { file, changes } = recordChange(
 			'perf-guards',
 			{
-				head: (anchors) => accept(anchors, measurement, guard, subject, reason),
-				base: (anchors) => {
-					try {
-						return accept(anchors, { ...base, platform }, guard, subject, reason);
-					} catch (error) {
-						if (error.code === 'NO_MEASURED_SUBJECT') return anchors;
-						throw error;
-					}
-				},
+				head: (anchors) =>
+					withoutExecutedNoise(
+						accept(anchors, measurement, guard, subject, reason),
+						anchorBase(structuredClone(anchors)),
+					),
+				base: anchorBase,
 				covers: covers(guard, subject, platform),
 			},
 			{ reason },
