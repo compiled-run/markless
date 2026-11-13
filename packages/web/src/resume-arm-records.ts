@@ -255,10 +255,15 @@ function materializeArmBranchRecords(
 		const endIndex = planned(record.endAnchor)?.index;
 		if (startIndex === undefined || endIndex === undefined) return record;
 		// A branch nested in another's arm is found by name: planned indexes count siblings only.
-		const named = (index: number, text: string) =>
-			[census[index], ...census].find((comment) => comment && commentText(comment) === text);
-		const startAnchor = named(startIndex, `markless:arm-branch:${record.id}`);
-		const endAnchor = named(endIndex, `/markless:arm-branch:${record.id}`);
+		// An arm a composed child drew in the browser spells its module id, as above.
+		const named = (index: number, mark: string) =>
+			[census[index], ...census].find(
+				(comment) =>
+					comment &&
+					[record.id, record.sourceId].some((id) => id && commentText(comment) === `${mark}markless:arm-branch:${id}`),
+			);
+		const startAnchor = named(startIndex, '');
+		const endAnchor = named(endIndex, '/');
 		if (!startAnchor || !endAnchor) throw missingArmBranchAnchorError(record.id, startIndex);
 		return { ...record, startAnchor, endAnchor };
 	});
