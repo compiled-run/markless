@@ -380,9 +380,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		chunk: symbolModuleIdOf(module.symbolId),
 		exportName: symbolExportNames[index]!,
 	}));
-	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(
+	const linkInput = withServedRenderData(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
+		servedRenderDataEntryId(encodedModuleId),
+		input.prerenderRecords === true,
 	);
+	const linkedBoundarySymbols = linkedRenderDataBoundarySymbols(linkInput);
 	const symbolRows = [
 		...compilerSymbolRows,
 		...linkedBoundarySymbols.map((symbol) => symbol.row),
@@ -569,10 +572,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		canonicalRenderData && compiled.publicRenderModule.renderDataModuleSource
 			? lazyRenderDataEntryId(encodedModuleId)
 			: undefined;
-	const servedRenderData =
-		linkedClientRenderData && lazyRenderDataId
-			? compiled.publicRenderModule.servedRenderData
-			: undefined;
+	const servedRenderData = linkInput.servedRenderDataId
+		? compiled.publicRenderModule.servedRenderData
+		: undefined;
 	const virtualModules: MarklessVirtualModule[] = [
 		...(compiled.publicRenderModule.renderDataModuleSource
 			? [
@@ -1086,6 +1088,22 @@ function bareNameImportAliases(
 		if (entry) claimed.set(edge.childComponentName, entry);
 	}
 	return [...claimed];
+}
+
+// A client module whose linked render data is canonical also ships the served subset a component-row build reads.
+function withServedRenderData<T extends ReturnType<typeof linkedSymbolInput>>(
+	linkInput: T,
+	servedRenderDataId: string,
+	prerenderRecords: boolean,
+): T & { readonly servedRenderDataId?: string } {
+	const { compiled, link } = linkInput;
+	const serves =
+		linkInput.clientLink &&
+		!prerenderRecords &&
+		!!compiled.publicRenderModule.renderDataModuleSource &&
+		!!compiled.publicRenderModule.servedRenderData &&
+		prerenderInterfacesComplete(compiled, link);
+	return serves ? { ...linkInput, servedRenderDataId } : linkInput;
 }
 
 async function prerenderDataModuleSource(

@@ -3220,6 +3220,8 @@ export type LinkedBoundarySymbolsInput = {
 	// both arrive as inputs rather than being derived here.
 	readonly clientLink: boolean;
 	readonly renderDataId: string;
+	/** The served render data a component-row build already evaluates; a boundary update reads it first. */
+	readonly servedRenderDataId?: string;
 	readonly resolverId: string;
 	readonly symbolModuleId: (symbolId: string) => string;
 	readonly boundaryExportName: (index: number) => string;

@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 144,
+			"reason": "a boundary update imports the served render data instead of the whole module, so a docs page whose update symbols load at load ships that subset: docs / 1694993 -> 1695137 B gzip at load; linux CI run 43390525658 (PR #676, 01f4b076f) vs run 43383046934 (PR #648 b03e295c0 on main 8dc4ed8e6, the same base)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 461,
+			"reason": "a boundary update imports the served render data instead of the whole module, so a docs page whose update symbols load at load ships that subset: docs /concepts/state 2239111 -> 2239572 B gzip at load; linux CI run 43390525658 (PR #676, 01f4b076f) vs run 43383046934 (PR #648 b03e295c0 on main 8dc4ed8e6, the same base)",
+			"date": "2026-11-13"
+		}
+	]
+}

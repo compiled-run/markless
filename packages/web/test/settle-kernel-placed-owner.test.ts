@@ -479,3 +479,38 @@ test('an authored expression that throws in the reader hands the arm to the eval
 		),
 	).toContain('authored residue: attempt + 1');
 });
+
+// An update symbol hands the kernel the served render data a row build already ran; the whole module loads only for a refusal.
+test('a served surface the kernel draws from never loads the whole render data', async () => {
+	const { graph } = instanceGraph('Shelf', 'title', 'c1:r:2:c0:');
+	const whole = vi.fn(async () => placedListSurface(shapes[0]!));
+	const rendered = await renderPrerenderBoundary(
+		placedListSurface(shapes[0]!) as never,
+		'boundary:3',
+		'fulfilled',
+		graph,
+		async () => undefined,
+		'c1:r:2:c0:boundary:3',
+		whole,
+	);
+	expect(rendered.html).toContain('Dune');
+	expect(whole).not.toHaveBeenCalled();
+	expect(evaluator.renderPrerenderBoundary).not.toHaveBeenCalled();
+});
+
+test('a render the kernel refuses on the served surface goes to the evaluator with the whole render data', async () => {
+	const { graph } = instanceGraph('Shelf', 'title', 'c1:r:2:c0:');
+	const wholeSurface = placedListSurface(shapes[0]!);
+	const whole = vi.fn(async () => wholeSurface);
+	await renderPrerenderBoundary(
+		placedListSurface(shapes[0]!) as never,
+		'boundary:3',
+		'rejected',
+		graph,
+		async () => undefined,
+		'c1:r:2:c0:boundary:3',
+		whole,
+	);
+	expect(whole).toHaveBeenCalledOnce();
+	expect(evaluator.renderPrerenderBoundary.mock.calls[0]![0]).toBe(wholeSurface);
+});

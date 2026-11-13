@@ -218,6 +218,7 @@ function linkedBoundaryUpdateSymbols(
 						boundaryId: boundary.id,
 						exportName,
 						renderDataId: input.renderDataId,
+						...(input.servedRenderDataId && { servedRenderDataId: input.servedRenderDataId }),
 						resolverId: input.resolverId,
 						routes,
 					}),
@@ -280,13 +281,24 @@ function linkedRenderDataBoundarySymbolSource(input: {
 	readonly boundaryId: string;
 	readonly exportName: string;
 	readonly renderDataId: string;
+	readonly servedRenderDataId?: string;
 	readonly resolverId: string;
 	readonly routes: ReadonlyArray<ComponentEdgeSymbolRoute>;
 }): string {
+	const served = input.servedRenderDataId;
 	return [
-		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBoundary'),
+		...linkedRenderDataSymbolPreamble(
+			served ? { ...input, renderDataId: served } : input,
+			'renderPrerenderBoundary',
+		),
+		// The settle kernel draws from the served data; only a render it refuses loads the whole module.
+		...(served
+			? [
+					`const marklessWholePrerenderData = () => import(${JSON.stringify(input.renderDataId)}).then((module) => module.marklessPrerenderData);`,
+				]
+			: []),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol, context.asyncBoundary?.id);`,
+		`\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, ${JSON.stringify(input.boundaryId)}, context.status, context.graph, marklessLoadLinkedSymbol, context.asyncBoundary?.id${served ? ', marklessWholePrerenderData' : ''});`,
 		'\treturn { ...rendered, arm: context.status === "rejected" ? 2 : 0 };',
 		'}',
 	].join('\n');

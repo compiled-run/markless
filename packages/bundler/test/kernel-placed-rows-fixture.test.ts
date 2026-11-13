@@ -143,6 +143,7 @@ async function addedListFill(page: Page, url: string, rowStandsFirst: boolean) {
 	await cdp.send('Profiler.enable');
 	await cdp.send('Profiler.startPreciseCoverage', { callCount: true, detailed: false });
 	await page.goto(url, { waitUntil: 'networkidle' });
+	const fetched: string[] = [];
 	await expect.poll(() => page.locator('[data-view="1"] [data-row]').count()).toBeGreaterThan(0);
 	// Counts reset on each take. A row whose components the evaluator renders stands only once their answers land.
 	if (rowStandsFirst) {
@@ -154,6 +155,10 @@ async function addedListFill(page: Page, url: string, rowStandsFirst: boolean) {
 		await cdp.send('Profiler.takePreciseCoverage');
 		await page.locator('[data-add]').click();
 	}
+	// This fixture's document names no preloads, so the press may load the page's pack; the answer must not fetch.
+	page.on('request', (request) => {
+		if (request.resourceType() === 'script') fetched.push(new URL(request.url()).pathname);
+	});
 	await page.evaluate(() => (globalThis as typeof globalThis & { __release?: () => void }).__release?.());
 	await expect.poll(() => page.locator('[data-view="2"] [data-row]').count()).toBeGreaterThan(0);
 	await page.waitForLoadState('networkidle');
@@ -161,6 +166,7 @@ async function addedListFill(page: Page, url: string, rowStandsFirst: boolean) {
 		result: ReadonlyArray<Parameters<typeof executedSources>[0][number] & { scriptId: string }>;
 	};
 	await cdp.detach();
+	expect(fetched).toEqual([]);
 	return executedSources(result.map((script) => ({ ...script, url: script.url || (urls.get(script.scriptId) ?? '') })));
 }
 
