@@ -1,8 +1,10 @@
 import { dirname, join, normalize, relative } from 'pathe';
-import { DEBUGGING_PLAYBOOK_HINT } from '@markless/compiler';
+import { DEBUGGING_PLAYBOOK_HINT, type JavaScriptAstNode } from '@markless/compiler';
 import { rootRelativeId } from '../module-id.ts';
 import { MARKLESS_VIRTUAL_PREFIX } from '../transform.ts';
 import type { MarklessSymbolManifestEntry, MarklessTransformManifest } from '../types.ts';
+import { parseChunkCode, spansAnyOffset, textOffsets } from './chunk-ast.ts';
+import { childNodes, staticSpecifier } from './dynamic-import-scan.ts';
 import { executionLogIdentityOffsets } from './execution-log-hooks.ts';
 import { PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
@@ -133,14 +135,14 @@ export function verifyGeneratedSymbolTableRoutes(
 				continue;
 			}
 
-			const specifier = tableRouteSpecifier(table, symbol, routeChunk.fileName, errors);
-			if (!specifier) {
-				continue;
-			}
-
-			const claimedChunk = resolveChunkSpecifier(routeChunk.fileName, specifier);
+			const claimedChunk =
+				table.literalLoads && table.moduleUrls.length === 0
+					? literalTableClaim(table, symbol, routeChunk, errors)
+					: tableRouteClaim(table, symbol, routeChunk.fileName, errors);
+			if (!claimedChunk) continue;
 			const reason =
-				table.literalLoads && literalLoadReaches(chunks, routeChunk, claimedChunk, symbol)
+				table.literalLoads &&
+				literalLoadReaches(chunks, routeChunk, table, claimedChunk, symbol)
 					? undefined
 					: routeTerminationError(chunks, routeChunk, claimedChunk, symbol);
 			if (reason) {
@@ -213,6 +215,7 @@ type ParsedSymbolTable = {
 	readonly moduleUrls: readonly string[];
 	readonly exportNames: readonly string[];
 	readonly rows: ReadonlyMap<string, readonly [moduleIndex: number, exportIndex: number]>;
+	readonly end: number;
 };
 
 function findSymbolTable(
@@ -243,28 +246,140 @@ function findSymbolTable(
 		if (rows.size === 0) continue;
 		const score = symbols.filter((symbol) => exportNames.includes(symbol.exportName)).length;
 		if (score > 0 && score > bestScore) {
-			bestMatch = { literalLoads: identity !== undefined, moduleUrls, exportNames, rows };
+			bestMatch = {
+				literalLoads: identity !== undefined,
+				moduleUrls,
+				exportNames,
+				rows,
+				end: (match.index ?? 0) + match[0].length,
+			};
 			bestScore = score;
 		}
 	}
 	return bestMatch;
 }
 
-function tableRouteSpecifier(
+function tableRow(
 	table: ParsedSymbolTable,
 	symbol: MarklessSymbolManifestEntry,
 	resolverFileName: string,
 	errors: SymbolTableIntegrityError[],
-): string | undefined {
+): readonly [number, number] | undefined {
 	const row = table.rows.get(symbol.symbolId);
-	if (!row) {
+	if (!row)
 		errors.push({
 			symbolId: symbol.symbolId,
 			claimedChunk: resolverFileName,
 			reason: 'emitted symbol table has no row for this compiler symbol',
 		});
+	return row;
+}
+
+function literalTableClaim(
+	table: ParsedSymbolTable,
+	symbol: MarklessSymbolManifestEntry,
+	resolverChunk: GeneratedChunk,
+	errors: SymbolTableIntegrityError[],
+): string | undefined {
+	const row = tableRow(table, symbol, resolverChunk.fileName, errors);
+	if (!row) return undefined;
+	const claimedChunk = tableLoaderTargets(resolverChunk, table)?.get(symbol.symbolId);
+	const exportName = table.exportNames[row[1]];
+	if (claimedChunk && exportName === symbol.exportName) return claimedChunk;
+	errors.push({
+		symbolId: symbol.symbolId,
+		claimedChunk: claimedChunk ?? resolverChunk.fileName,
+		reason: claimedChunk
+			? `emitted symbol table claims export ${exportName ?? `<missing index ${row[1]}>`} instead of ${symbol.exportName}`
+			: 'emitted resolver has no loader for this compiler symbol',
+	});
+	return undefined;
+}
+
+type LoaderObject = { readonly start: number; readonly targets: ReadonlyMap<string, string> };
+const loaderObjectsByChunk = new WeakMap<
+	GeneratedChunk,
+	{ code: string; objects: LoaderObject[] }
+>();
+
+// A packed resolver loads each symbol through `"<symbol id>": () => import("<chunk>")`, possibly behind Vite's
+// preload helper; a loader with no import() reads a module Rolldown placed in the resolver's own chunk.
+// Several resolvers can share a chunk and their symbol ids, so a table owns the first loader object after it.
+function tableLoaderTargets(
+	chunk: GeneratedChunk,
+	table: ParsedSymbolTable,
+): ReadonlyMap<string, string> | undefined {
+	return loaderObjects(chunk).find(
+		(object) =>
+			object.start >= table.end &&
+			[...table.rows.keys()].every((id) => object.targets.has(id)),
+	)?.targets;
+}
+
+function loaderObjects(chunk: GeneratedChunk): LoaderObject[] {
+	const known = loaderObjectsByChunk.get(chunk);
+	if (known?.code === chunk.code) return known.objects;
+	const objects: LoaderObject[] = [];
+	const parsed = parseChunkCode(chunk.fileName, chunk.code);
+	const imports = textOffsets(chunk.code, 'import');
+	const arrows = textOffsets(chunk.code, '=>');
+	const firstImport = (node: JavaScriptAstNode): string | undefined => {
+		if (node.type === 'ImportExpression')
+			return staticSpecifier((node as { source?: unknown }).source);
+		for (const child of childNodes(node))
+			if (spansAnyOffset(imports, child)) {
+				const found = firstImport(child);
+				if (found !== undefined) return found;
+			}
 		return undefined;
-	}
+	};
+	const loaderTarget = (property: unknown): [string, string] | undefined => {
+		const { type, key, value } = property as {
+			type: string;
+			key?: { type: string; value?: unknown };
+			value?: JavaScriptAstNode & { params?: readonly unknown[] };
+		};
+		if (
+			type !== 'Property' ||
+			key?.type !== 'Literal' ||
+			typeof key.value !== 'string' ||
+			value?.type !== 'ArrowFunctionExpression' ||
+			value.params?.length !== 0
+		)
+			return undefined;
+		const specifier = firstImport(value);
+		return [
+			key.value,
+			specifier === undefined
+				? chunk.fileName
+				: resolveChunkSpecifier(chunk.fileName, specifier),
+		];
+	};
+	const visit = (node: JavaScriptAstNode): void => {
+		if (node.type === 'ObjectExpression') {
+			const targets = new Map<string, string>();
+			for (const property of (node as { properties?: readonly unknown[] }).properties ?? []) {
+				const target = loaderTarget(property);
+				if (target) targets.set(...target);
+			}
+			if (targets.size) objects.push({ start: (node as { start: number }).start, targets });
+		}
+		for (const child of childNodes(node)) if (spansAnyOffset(arrows, child)) visit(child);
+	};
+	if (!parsed.errors.length) visit(parsed.program as unknown as JavaScriptAstNode);
+	objects.sort((a, b) => a.start - b.start);
+	loaderObjectsByChunk.set(chunk, { code: chunk.code, objects });
+	return objects;
+}
+
+function tableRouteClaim(
+	table: ParsedSymbolTable,
+	symbol: MarklessSymbolManifestEntry,
+	resolverFileName: string,
+	errors: SymbolTableIntegrityError[],
+): string | undefined {
+	const row = tableRow(table, symbol, resolverFileName, errors);
+	if (!row) return undefined;
 
 	const specifier = table.moduleUrls[row[0]];
 	if (!specifier) {
@@ -284,7 +399,7 @@ function tableRouteSpecifier(
 		});
 		return undefined;
 	}
-	return specifier;
+	return resolveChunkSpecifier(resolverFileName, specifier);
 }
 
 function verifyDirectRoute(
@@ -510,22 +625,18 @@ function findSourceChunk(
 function literalLoadReaches(
 	chunks: ReadonlyMap<string, GeneratedChunk>,
 	resolverChunk: GeneratedChunk,
+	table: ParsedSymbolTable,
 	claimedChunk: string,
 	symbol: MarklessSymbolManifestEntry,
 ): boolean {
 	const target = chunks.get(claimedChunk);
-	if (!target || !hasLiteralLoader(resolverChunk.code, symbol.symbolId)) return false;
+	if (!target || !tableLoaderTargets(resolverChunk, table)?.has(symbol.symbolId)) return false;
 	return (
 		symbolRenderedExports(target, normalizeVirtualId(symbol.virtualModuleId)).includes(
 			symbol.exportName,
 		) &&
 		(target === resolverChunk || dynamicRouteReachesChunk(chunks, resolverChunk, claimedChunk))
 	);
-}
-
-function hasLiteralLoader(code: string, symbolId: string): boolean {
-	const key = symbolId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-	return new RegExp(`(["'])${key}\\1\\s*:\\s*\\(\\s*\\)\\s*=>`).test(code);
 }
 
 function findChunkForVirtualId(

@@ -47,7 +47,7 @@ export function scanEmittedDynamicImports(code: string, chunkFileName: string): 
 	return [...specifiers];
 }
 
-function staticSpecifier(source: unknown): string | undefined {
+export function staticSpecifier(source: unknown): string | undefined {
 	const node = Array.isArray(source) ? (source[0] as JavaScriptAstNode) : source;
 	if (!node || typeof node !== 'object') return undefined;
 	const astNode = node as JavaScriptAstNode & {
@@ -65,7 +65,7 @@ function staticSpecifier(source: unknown): string | undefined {
 	return undefined;
 }
 
-function childNodes(node: JavaScriptAstNode): JavaScriptAstNode[] {
+export function childNodes(node: JavaScriptAstNode): JavaScriptAstNode[] {
 	const children: JavaScriptAstNode[] = [];
 	for (const key in node) {
 		const value = (node as Record<string, unknown>)[key];
