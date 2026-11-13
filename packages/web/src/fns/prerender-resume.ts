@@ -14,7 +14,8 @@ import { resumeFromPrerenderRecordsImpl } from '../payload-resume.ts';
 import { wakeNoopResume } from '../payload-resume-registry.ts';
 import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
-import { isSettleKernelUnsupported, renderSettledArm, settlesPlacedOwner } from '../settle-kernel.ts';
+import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
+import { branchOwnerPlacement } from '../prerender/owner-placement.ts';
 
 // The full prerender evaluator re-evaluates the ENTIRE render-data surface to
 // obtain one boundary arm, and a static import of it here is what drags that
@@ -62,11 +63,6 @@ export async function renderPrerenderBoundary(
 	pageBoundaryId?: string,
 ) {
 	if (isPrerenderDataSurface(page)) {
-		// Only the boundary's own update symbol re-spells a placed owner's computeds and bound ids.
-		const place =
-			pageBoundaryId && settlesPlacedOwner(page as never, boundaryId)
-				? (await import('../prerender/owner-placement.ts')).branchOwnerPlacement
-				: undefined;
 		try {
 			const kernel = renderSettledArm({
 				surface: page as never,
@@ -74,7 +70,10 @@ export async function renderPrerenderBoundary(
 				status,
 				read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
 				serializeComputed: serializeRuntimeAsyncSnapshots as never,
-				...(place && { placement: (owner: string) => place(page as never, owner, graph as never) }),
+				// Only the boundary's own update symbol re-spells a placed owner's computeds and bound ids.
+				...(pageBoundaryId && {
+					placement: (owner: string) => branchOwnerPlacement(page as never, owner, graph as never),
+				}),
 			});
 			return {
 				html: kernel.html,
