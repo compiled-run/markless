@@ -24,38 +24,6 @@ export default function SiteNavbar({ pathname }: { readonly pathname: string }) 
 				color: var(--ink);
 			}
 
-			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				z-index: 1;
-				border-radius: inherit;
-				pointer-events: none;
-			}
-
-			.nav-pill::before,
-			.nav-pill::after {
-				inset: -2px;
-			}
-
-			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
-			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
-				visibility: hidden;
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
-				background-image: var(--grain-fiber);
-				mix-blend-mode: var(--grain-fiber-blend);
-				opacity: var(--grain-fiber-opacity);
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				background-image: var(--grain-speck);
-				mix-blend-mode: var(--grain-speck-blend);
-				opacity: var(--grain-speck-opacity);
-			}
 		</style>
 	</header>
 }
@@ -105,6 +73,39 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 		</navbar.root>
 
 		<style>
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			.nav-pill::before,
+			.nav-pill::after {
+				inset: -2px;
+			}
+
+			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
+			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
+				visibility: hidden;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
+			}
+
 			.nav-shade {
 				display: none;
 			}
@@ -225,6 +226,43 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					transition: none;
 				}
 			}
+
+			/* The bar's translate makes it the containing block of the box, so the offsets are from the bar's padding box. */
+			.nav-box {
+				position: fixed;
+				top: calc(100% + 1rem + 2px);
+				left: 50%;
+				box-sizing: border-box;
+				inline-size: 37.5rem;
+				block-size: 28rem;
+				margin: 0;
+				border-radius: 1rem;
+				translate: -50% 0;
+			}
+
+			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. */
+			.nav-box {
+				z-index: 59;
+				display: none;
+				background: var(--raised);
+				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
+				opacity: 0;
+				transition:
+					opacity 150ms ease,
+					translate var(--spring-slide-ms) var(--spring-slide),
+					display 150ms allow-discrete;
+			}
+
+			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
+			.nav-pill[ui-open] .nav-box {
+				display: block;
+				opacity: 1;
+
+				@starting-style {
+					opacity: 0;
+					translate: -50% -0.5rem;
+				}
+			}
 		</style>
 	</div>
 }
@@ -278,8 +316,8 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				color: var(--on-accent);
 			}
 
-			/* The bar's translate makes it the containing block of the panels and the box behind them, so the offsets are from the bar's padding box. */
-			:is(.nav-panel, .nav-box) {
+			/* The bar's translate makes it the containing block of the panels, so the offsets are from the bar's padding box. */
+			.nav-panel {
 				position: fixed;
 				top: calc(100% + 1rem + 2px);
 				left: 50%;
@@ -289,30 +327,6 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				margin: 0;
 				border-radius: 1rem;
 				translate: -50% 0;
-			}
-
-			/* One box behind every panel, as shadcn's viewport: it stays put while the panels inside it change. */
-			.nav-box {
-				z-index: 59;
-				display: none;
-				background: var(--raised);
-				box-shadow: 6px 6px 0 color-mix(in oklch, var(--muted-ink) 70%, transparent);
-				opacity: 0;
-				transition:
-					opacity 150ms ease,
-					translate var(--spring-slide-ms) var(--spring-slide),
-					display 150ms allow-discrete;
-			}
-
-			/* Opening from closed drops the box a few pixels and settles it; it never slides sideways. */
-			.nav-pill[ui-open] .nav-box {
-				display: block;
-				opacity: 1;
-
-				@starting-style {
-					opacity: 0;
-					translate: -50% -0.5rem;
-				}
 			}
 
 			.nav-panel {
@@ -353,6 +367,54 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				transition: display var(--spring-slide-ms) allow-discrete;
 			}
 
+			@media (prefers-reduced-motion: reduce) {
+				.nav-panel {
+					transition: none;
+				}
+			}
+		</style>
+	</navbar.item>
+}
+
+function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
+	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
+		<CardArt card={card} class="card-art" />
+		<span class="card-scrim" aria-hidden="true"></span>
+		<span class="card-text">
+			<span class="card-label">
+				{card.label}
+				@if (card.external) {
+					<lucide.arrowupright class="card-out" aria-hidden="true" />
+				}
+			</span>
+			<span class="card-note">{card.description}</span>
+		</span>
+		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
+
+		<style>
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
+			}
+
 			@media (prefers-reduced-motion: no-preference) {
 				.nav-panel > .card {
 					transition: translate var(--spring-slide-ms) var(--spring-slide);
@@ -379,31 +441,6 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 				}
 			}
 
-			@media (prefers-reduced-motion: reduce) {
-				.nav-panel {
-					transition: none;
-				}
-			}
-		</style>
-	</navbar.item>
-}
-
-function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
-	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
-		<CardArt card={card} class="card-art" />
-		<span class="card-scrim" aria-hidden="true"></span>
-		<span class="card-text">
-			<span class="card-label">
-				{card.label}
-				@if (card.external) {
-					<lucide.arrowupright class="card-out" aria-hidden="true" />
-				}
-			</span>
-			<span class="card-note">{card.description}</span>
-		</span>
-		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
-
-		<style>
 			.card {
 				position: relative;
 				display: flex;
@@ -576,6 +613,59 @@ function SearchButton() @{
 					rotate: -14deg;
 				}
 			}
+
+			/* The wash spreads after the ink lands, like paint soaking into the paper. */
+			.theme-toggle-wash {
+				fill: var(--yellow);
+				opacity: 0.75;
+				mix-blend-mode: multiply;
+				transform-origin: center;
+				transform-box: fill-box;
+
+				html[data-theme-switching] & {
+					transition:
+						scale 520ms 160ms ease-out,
+						opacity 520ms 160ms ease-out;
+
+					@starting-style {
+						scale: 0.3;
+						opacity: 0;
+					}
+				}
+
+				html.dark & {
+					fill: color-mix(in srgb, var(--yellow) 60%, var(--cream));
+					opacity: 1;
+					mix-blend-mode: normal;
+				}
+			}
+
+			.theme-toggle-hatch {
+				fill: none;
+				stroke: currentColor;
+				stroke-width: 0.6;
+				stroke-linecap: round;
+				opacity: 0.75;
+			}
+
+			.theme-toggle-ink {
+				fill: currentColor;
+			}
+
+			.theme-toggle-over-wash {
+				display: none;
+
+				html.dark & {
+					display: inline;
+					color: var(--on-accent);
+				}
+			}
+
+			@media (prefers-reduced-motion: reduce) {
+				html[data-theme-switching] .theme-toggle-wash {
+					transition: none;
+				}
+			}
 		</style>
 	</navbar.trigger>
 }
@@ -732,6 +822,34 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 		</modal.root>
 
 		<style>
+			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				content: '';
+				position: absolute;
+				inset: 0;
+				z-index: 1;
+				border-radius: inherit;
+				pointer-events: none;
+			}
+
+			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
+			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
+				visibility: hidden;
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
+				background-image: var(--grain-fiber);
+				mix-blend-mode: var(--grain-fiber-blend);
+				opacity: var(--grain-fiber-opacity);
+			}
+
+			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
+				background-image: var(--grain-speck);
+				mix-blend-mode: var(--grain-speck-blend);
+				opacity: var(--grain-speck-opacity);
+			}
+
 			.mobile-nav {
 				display: block;
 			}

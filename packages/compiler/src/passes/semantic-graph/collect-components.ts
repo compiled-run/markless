@@ -543,7 +543,7 @@ function componentPropBindings(
 }
 
 /**
- * The call-site `class` with the calling module's style-scope class composed in.
+ * The call-site `class` with the calling component's hash class composed in.
  * A literal composes at build time; a dynamic value is only known at runtime, so
  * the scope rides in a computed of its own - a graph-reference prop carries a
  * node id and nothing beside it. Null when neither shape fits, and the caller

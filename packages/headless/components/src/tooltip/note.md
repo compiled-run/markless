@@ -100,17 +100,13 @@ tree order and both tips stack against the second trigger. The browser lane
 measures exactly that — pull the `anchor-scope` rule and the isolation row fails
 by 21px, which is how it was checked rather than assumed.
 
-### The selectors are discriminated by structure, because the scope class is not
+### Each part's rules reach only that part
 
-The compiled scope class is per **module**, not per component, so all three
-blocks share one class and each block's rules can reach the other parts'
-elements. The subjects are therefore chosen to be structurally unique inside this
-module: the trigger is the only `button`, the tip is the only element carrying
-`overlay`, and the root is the `div` that is left (`div:not([overlay])`). Rename
-a part's element and the discriminator has to be re-picked in the same change.
+Each part's `<style>` block gets a hash class of its own, so a block's rules reach
+only the elements that part renders, never another part's.
 
 **Consumer children are not reachable by these rules and never will be.** The
-scope class is minted only onto elements this module renders, so a consumer's own
+hash class is minted only onto elements the part renders, so a consumer's own
 `<button>` inside `tooltip.content` carries no class and cannot be caught by
 `button { anchor-name: … }`. That is a property of the scoping, not a promise
 this family makes.

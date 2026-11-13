@@ -6,10 +6,8 @@ import type { CompilerDiagnostic } from '../../diagnostics.ts';
 import { componentMarkupRoot } from './component-markup-root.ts';
 import { unsupportedRenderConstructDiagnostic } from './diagnostics.ts';
 
-// Scoped <style> blocks per the accepted Option A draft in
-// specs/framework/08-deferred-decisions.md: one build-hashed scope class per
-// component; every selector's subject compound gains the class; host elements
-// gain the class in emitted HTML; the compiled CSS ships through the bundler.
+// Scoped <style> blocks (TSRX spec 4.5, https://tsrx.dev/specification): each component's blocks
+// share one hash class, so no rule reaches another component, in this file or any other.
 export type PublicRenderStyleScope = {
 	readonly scopeId: string;
 	readonly cssText: string;
@@ -28,26 +26,26 @@ export function collectStyleScopes(
 	return compileStyleNodes(findStyleNodes(root), filename, moduleId);
 }
 
-// The module, not the selected render root, owns the shipped CSS: every
-// component mints the module's scope class onto its own elements, so a block
-// left behind here paints nothing while its class is still stamped in the HTML.
+// Every component's sheet ships with the module, not only the render root's: a component mints its own
+// hash class onto its elements, so a sheet left behind here paints nothing while the class is stamped.
 export function collectModuleStyleScopes(
 	ast: AnyNode,
 	filename: string,
 	moduleId: string,
 ): StyleScopeCollection {
-	const shipped: AnyNode[] = [];
+	const styleScopes: PublicRenderStyleScope[] = [];
+	const diagnostics: CompilerDiagnostic[] = [];
 	const covered = new Set<AnyNode>();
 	for (const statement of asNodes(ast.body)) {
 		const component = getComponentFunction(statement);
 		if (!component) continue;
 		const root = componentMarkupRoot(component.node);
 		if (!root) continue;
-		for (const styleNode of findStyleNodes(root)) {
-			if (covered.has(styleNode)) continue;
-			covered.add(styleNode);
-			shipped.push(styleNode);
-		}
+		const own = findStyleNodes(root).filter((styleNode) => !covered.has(styleNode));
+		for (const styleNode of own) covered.add(styleNode);
+		const compiled = compileStyleNodes(own, filename, moduleId);
+		styleScopes.push(...compiled.styleScopes);
+		diagnostics.push(...compiled.diagnostics);
 	}
 	const strayDiagnostics = findStyleNodes(ast)
 		.filter((styleNode) => !covered.has(styleNode))
@@ -62,11 +60,7 @@ export function collectModuleStyleScopes(
 					'Move the block inside the markup a component returns, or into an imported stylesheet.',
 			}),
 		);
-	const compiled = compileStyleNodes(shipped, filename, moduleId);
-	return {
-		styleScopes: compiled.styleScopes,
-		diagnostics: [...compiled.diagnostics, ...strayDiagnostics],
-	};
+	return { styleScopes, diagnostics: [...diagnostics, ...strayDiagnostics] };
 }
 
 const STYLESHEET_REQUEST = /\.(?:css|less|sass|scss|styl|stylus|pcss|postcss|sss)$/;
@@ -129,9 +123,8 @@ function compileStyleNodes(
 	filename: string,
 	moduleId: string,
 ): StyleScopeCollection {
-	if (styleNodes.length === 0) return { styleScopes: [], diagnostics: [] };
-
-	const scopeId = styleScopeId(moduleId);
+	const scopeId = styleScopeId(moduleId, styleNodes);
+	if (scopeId === null) return { styleScopes: [], diagnostics: [] };
 	const diagnostics: CompilerDiagnostic[] = [];
 	const cssParts: string[] = [];
 
@@ -264,11 +257,14 @@ export function takesStyleScopeClass(tagName: string): boolean {
 	return !UNSTYLED_DOCUMENT_TAGS.has(tagName.toLowerCase());
 }
 
-// FNV-1a over the module id: stable per component module, runtime-agnostic.
-function styleScopeId(moduleId: string): string {
+// FNV-1a over the module id and the offset of the first block with a body; null when every block is self-closing.
+function styleScopeId(moduleId: string, styleNodes: ReadonlyArray<AnyNode>): string | null {
+	const first = styleNodes.find((styleNode) => styleNode.closingElement);
+	if (!first) return null;
+	const key = `${moduleId}:${first.start as number}`;
 	let hash = 0x811c9dc5;
-	for (let index = 0; index < moduleId.length; index++) {
-		hash ^= moduleId.charCodeAt(index);
+	for (let index = 0; index < key.length; index++) {
+		hash ^= key.charCodeAt(index);
 		hash = Math.imul(hash, 0x01000193) >>> 0;
 	}
 	return `mk-${hash.toString(36)}`;

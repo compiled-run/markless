@@ -13,10 +13,7 @@ import type {
 // the surface points at it, and the geometry beyond one default `position-area`
 // is the consumer's stylesheet. Nothing here measures a box, so a surface served
 // already showing is placed on its first layout.
-// The scope class these <style> blocks compile against is per MODULE, so each
-// block's subject must be structurally unique across every part: the trigger is
-// the module's only button carrying `aria-haspopup`, the surface its only element
-// carrying `overlay`, and the root the div that is left.
+// Each part's <style> block reaches only that part's own elements, never another part's.
 // `@layer markless` is what keeps these defaults losing to a consumer's own
 // unlayered rules without a specificity fight.
 

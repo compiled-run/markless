@@ -187,7 +187,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			...(formSpan ? { sourceSpan: formSpan } : {}),
 			...(formLeavesByDesign(node) ? { leavesByDesign: true as const } : {}),
 		});
-	const moduleScopeClass = state.currentStyleScopeClass;
+	const componentScopeClass = state.currentStyleScopeClass;
 	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
 	for (const attribute of getElementAttributes(node)) {
 		collectAttribute(
@@ -199,7 +199,7 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 			isHostElement,
 		);
 	}
-	state.currentStyleScopeClass = moduleScopeClass;
+	state.currentStyleScopeClass = componentScopeClass;
 
 	if (isHostElement) {
 		joinHostText(node, state);

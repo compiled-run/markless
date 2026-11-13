@@ -151,17 +151,14 @@ confining it to that root's subtree. Without it `position-anchor` resolves to th
 *last* matching anchor in tree order and both cards stack against the second
 trigger, which the geometry row catches.
 
-The compiled scope class is per **module**, not per component, so each block's
-subject is chosen to be structurally unique inside this module: the trigger is
-the only `a`, the card is the only element carrying `overlay`, and the root is the
-`div` left over. Rename a part's element and the discriminator has to be re-picked
-in the same change.
+Each part's `<style>` block gets a hash class of its own, so a block's rules reach
+only the elements that part renders, never another part's.
 
 **The hazard this family is the first to face, and it is clean.** A card
 *contains* consumer links, so `a { anchor-name: --ui-hovercard; }` looks like it
 could catch them and mint duplicate anchors — where "last anchor in source order
 wins" would silently drag every card onto the wrong element. It cannot happen: the
-scope class is minted only onto elements this module renders, so a consumer's
+hash class is minted only onto elements the part renders, so a consumer's
 `<a>` inside `hovercard.content` carries no class and no rule here can reach it.
 Tooltip states this as a property of the scoping; here it is load-bearing, so
 `two-cards.tsrx` measures it — the consumer link's computed `anchor-name` is

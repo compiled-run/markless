@@ -9,10 +9,7 @@ import type {
 // The tip is placed by CSS anchoring alone: the trigger declares the anchor, the
 // tip points at it, and the geometry is the consumer's stylesheet. Nothing here
 // measures a box, so a tip served already showing is placed on its first layout.
-// The scope class these <style> blocks compile against is per MODULE, so each
-// block's subject must be structurally unique across all three parts: the trigger
-// is this module's only button, the tip is its only element carrying `overlay`,
-// and the root is the div that is left.
+// Each part's <style> block reaches only that part's own elements, never another part's.
 
 export const tooltipState = shared(
 	() => {
