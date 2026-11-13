@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"constructGlue",
+				"event handler"
+			],
+			"delta": 47,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: the minimal fixture's handler (count = count + 1) emits 3184 -> 3231 B of glue, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64); only handlers with such an assignment pay it, and code executed at load does not change",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 317,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 1697578 -> 1697895 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 1697578 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 180,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 2241729 -> 2241909 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 2241729 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 51,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 500099 -> 500150 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 500099 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		}
+	]
+}
