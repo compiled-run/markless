@@ -26,8 +26,8 @@
 				"runtimeModules",
 				"web/resume-return-reask"
 			],
-			"delta": 1079,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 8691 -> 9770 B rendered, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 8691 B",
+			"delta": 1235,
+			"reason": "overlapping saves hold: each sender keeps its own round until the shared reload after every overlapping save lands, and an answer from a save a page-leaving answer already ended counts toward no later round: 8691 -> 9926 B rendered, measured on PR #663 CI run 43445571063 (head 1a507dd8c, linux-x64) against the main anchor 8691 B",
 			"date": "2026-11-13"
 		},
 		{
@@ -108,8 +108,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 382,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 499018 -> 499400 B gzip downloaded at load, measured on PR #663 CI run 43385368664 (head 386641201, linux-x64) against the main anchor 499018 B; executed chars at load unchanged (24666); not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
+			"delta": 451,
+			"reason": "overlapping saves hold: 499018 -> 499469 B gzip downloaded at load, measured on PR #663 CI run 43445571063 (head 1a507dd8c, linux-x64) against the main anchor 499018 B; executed chars at load unchanged (24664); not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
 			"date": "2026-11-13"
 		},
 		{
