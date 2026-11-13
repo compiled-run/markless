@@ -213,16 +213,14 @@ export async function registerArmRecordSet(
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
 		deps.addEventRecord(element, record);
 	}
-	// A branch's served arm is painted with this one: its records register now, so a press in this task finds its handler.
-	const served = materialized.branches.flatMap((branch) =>
-		branch.servedArmRecords && branch.startAnchor && 'nodeType' in branch.startAnchor
-			? [
-					registerArmRecordSet(deps, installEventType, branch as ResumeArmRange, {
-						armRecords: branch.servedArmRecords,
-					}),
-				]
-			: [],
-	);
+	// A painted branch arm registers now for a press in this task; its lists wire below, with this arm's computeds.
+	const servedRepeats: ResumeKeyedRepeatRecord[] = [];
+	const served = materialized.branches.flatMap((branch) => {
+		const set = branch.servedArmRecords;
+		if (!set || !branch.startAnchor || !('nodeType' in branch.startAnchor)) return [];
+		servedRepeats.push(...(set.keyedRepeats ?? []));
+		return [registerArmRecordSet(deps, installEventType, branch as ResumeArmRange, { armRecords: { ...set, keyedRepeats: [] } })];
+	});
 	for (const handle of materialized.elementHandles) {
 		const element = materialized.elementsByHostId.get(handle.hostNodeId);
 		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
@@ -243,8 +241,11 @@ export async function registerArmRecordSet(
 		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
 		await deps.registerComputedRefreshes(update.computed!);
 	}
-	if (materialized.keyedRepeats.length)
-		await deps.registerKeyedRepeats?.(materialized.keyedRepeats, update.moved, update.computed);
+	const keyedRepeats = [
+		...materialized.keyedRepeats,
+		...servedRepeats.filter((repeat) => deps.elementsByHostId.has(repeat.parentHostNodeId)),
+	];
+	if (keyedRepeats.length) await deps.registerKeyedRepeats?.(keyedRepeats, update.moved, update.computed);
 	if (deps.addBehaviors && materialized.behaviors.length) {
 		const byHost = new Map<string, ResumeBehaviorRecord[]>();
 		for (const behavior of materialized.behaviors) {
