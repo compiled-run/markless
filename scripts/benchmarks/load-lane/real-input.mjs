@@ -45,7 +45,7 @@ try {
 			const page = await context.newPage();
 			const requests = [];
 			await page.goto(url, { waitUntil: 'load' });
-			await page.waitForSelector('[data-list] li');
+			await page.waitForSelector(process.env.READY ?? '[data-list] li');
 			await page.evaluate(() => new Promise((done) => requestIdleCallback(() => setTimeout(done, 300), { timeout: 2000 })));
 			page.on('request', (request) => request.resourceType() === 'script' && requests.push(request.url()));
 			const cdp = await context.newCDPSession(page);
