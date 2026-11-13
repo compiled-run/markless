@@ -187,7 +187,9 @@ function createBranchRegistration(
 					html,
 				};
 				const commit = await input.prepareArmCommit(branch, armUpdate);
-				return () => commit().then(() => feedArmProps(update.arm, armUpdate.propFeeds ?? []));
+				const feeds = armUpdate.propFeeds ?? [];
+				// The commit runs the arm's first derives, which read these cells.
+				return () => (shows(update.arm) && feeds.forEach(follow), commit().then(() => feedArmProps(update.arm, feeds)));
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
@@ -221,26 +223,26 @@ function createBranchRegistration(
 			if (at) armFlipReleasesByBoundary.set(at, [...(armFlipReleasesByBoundary.get(at) ?? []), release]);
 			input.storeContainerSubscription(release);
 		};
+		const shows = (arm: number) => wired() && readBranchArm(input.graph, branch) === arm;
+		const follow = (feed: ResumePropFeed) =>
+			input.graph.write({
+				graphNodeId: feed.propCellId,
+				path: [feed.prop],
+				value: input.graph.read(feed.graphNodeId, feed.path),
+			});
 		function feedArmProps(arm: number, feeds: ReadonlyArray<ResumePropFeed>) {
 			for (const release of feedReleases.splice(0)) release();
-			const shown = () => wired() && readBranchArm(input.graph, branch) === arm;
-			if (!shown()) return;
+			if (!shows(arm)) return;
 			for (const feed of feeds) {
-				const follow = () =>
-					input.graph.write({
-						graphNodeId: feed.propCellId,
-						path: [feed.prop],
-						value: input.graph.read(feed.graphNodeId, feed.path),
-					});
-				follow();
+				follow(feed);
 				const release = onceRelease(
 					input.graph.subscribe({
 						id: `branch-prop:${branch.id}:${feed.propCellId}:${feed.prop}`,
 						graphNodeId: feed.graphNodeId,
 						path: feed.path,
 						run() {
-							if (!shown()) return release();
-							follow();
+							if (!shows(arm)) return release();
+							follow(feed);
 						},
 					}),
 				);

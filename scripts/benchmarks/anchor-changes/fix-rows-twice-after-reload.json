@@ -1,0 +1,196 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 73,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 81,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 39,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 35,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 73,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 81,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 39,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 46,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-arm-keyed-repeats"
+			],
+			"delta": 73,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 81,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 39,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 62,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 62,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 62,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 53,
+			"reason": "an opened @if arm copies its live props before its first derives and derives its own list computeds again, so a @for no longer builds reloaded rows twice (CI run 43339537133 against merge-queue run 43293364927)",
+			"date": "2026-11-13"
+		}
+	]
+}

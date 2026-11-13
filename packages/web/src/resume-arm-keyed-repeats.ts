@@ -31,6 +31,7 @@ export async function wireArmKeyedRepeats(
 		root: runtime.root,
 		loadSymbol: runtime.loadSymbol,
 		elementHandles: host.elementHandles,
+		arm: new Set((armComputed ?? []).map((record) => record.graphNodeId)),
 	});
 	for (const record of records)
 		await wireKeyedRepeats(
