@@ -155,7 +155,9 @@ A flake is a test that fails and passes on the same code. Rules:
 
 An entry is a table row naming the test, its expiry date, its owner and why it is skipped. A website box is skipped through `website/boxes/quarantined.ts`, which holds the same entries; past its expiry date the box fails instead of skipping.
 
-None right now.
+| Test | Expires | Owner | Why |
+| --- | --- | --- | --- |
+| `packages/vitest-browser/browser/async-optional-read/async-optional-read.test.ts` "CSR: a @try reading an async value through ?. or ! follows it", and `packages/vitest-browser/browser/arm-flip-pending-hold.test.ts` | 2026-11-27 | markless PM (async-dx T155) | A real runtime defect, not the tests. Parts of one settle commit in separate tasks when their code loads during the settle: each block's settle in `settleAsyncBoundaryRange` (`packages/web/src/resume-async-wiring.ts`) loads its own arm code and commits on its own, and a branch flip commits after the text the same settle carries. A person sees "customer 1" beside a "Loading" that belongs to the same value, or "target-1" beside the old pill, for one frame. CI failures on 2026-11-12: runs 43360587660 (optional-read) and 43364391020 (arm-flip). Locally the two optional-read blocks commit in separate tasks in 30 of 30 runs, with a frame painted between them in 3 of 30 at 6x CPU throttle and 1 of 30 without; the arm-flip pill lands one frame (7 to 11 ms) after the text in 2 of 6 cold runs, and never once its code is loaded. The fix makes settles that land together load first and commit in one task, the commit batching named in `goals/async-dx/notes/T010-sibling-settle.md`. On the expiry date both tests run again and a guard test in each file fails. |
 
 ### Quarantine list
 

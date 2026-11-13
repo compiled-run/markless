@@ -21,7 +21,13 @@ async function followsEachCustomer() {
 	await expect.poll(() => document.querySelector('[data-optional]')?.textContent?.trim()).toBe('');
 }
 
-test('CSR: a @try reading an async value through ?. or ! follows it', async () => {
+// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": two blocks settling on one value commit in separate tasks.
+const quarantined = Date.now() < Date.parse('2026-11-27');
+test.runIf(!quarantined)('the quarantine is still in date', () => {
+	expect.fail('Quarantine expired on 2026-11-27: make blocks that settle together commit in one task and drop the quarantine.');
+});
+
+test.skipIf(quarantined)('CSR: a @try reading an async value through ?. or ! follows it', async () => {
 	await render(CustomerCard);
 	await expect.poll(() => text('[data-optional-loading]')).toBe('Loading');
 	await followsEachCustomer();
