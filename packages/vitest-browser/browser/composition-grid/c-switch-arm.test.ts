@@ -35,10 +35,13 @@ test('renamed: CSR', () => fullTimeline(run(kindView, 'CSR', () => render(KindPa
 test('renamed: SSR', () => fullTimeline(run(kindView, 'SSR', () => renderSSR(KindPage))));
 
 // Known defect: when a reload moves the @switch to another arm, the leaving arm's child derives once more with the
-// value that chose the new arm.
+// value that chose the new arm. An @if open in the first render does the same: such a child reads the page's value
+// directly, not through the gated feed an arm opened later gets.
 test.fails('CSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(switchView, 'CSR', () => render(SwitchPage), true), 'reload while open'));
 test.fails('SSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(switchView, 'SSR', () => renderSSR(SwitchPage), true), 'reload while open'));
 test.fails('renamed: CSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(kindView, 'CSR', () => render(KindPage), true), 'reload while open'));
+test.fails('renamed: SSR: no child derives with the other arm\'s value', () =>
+	oneStep(run(kindView, 'SSR', () => renderSSR(KindPage), true), 'reload while open'));
