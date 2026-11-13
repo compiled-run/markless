@@ -404,6 +404,11 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 	);
 }
 
+/** A module whose output must be remapped against its composer's routes: a computed reads a prop, or a seeded prop bag holds keys a route may carry instead. */
+export function remapsGraphProps(input: PublicRenderModuleInput, seedsPropBag: boolean): boolean {
+	return seedsPropBag || hasPropDependentComputed(input);
+}
+
 
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	const rootChunkId = input.renderData.root?.templateId;

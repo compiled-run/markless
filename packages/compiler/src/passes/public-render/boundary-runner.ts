@@ -103,6 +103,7 @@ export function mintAsyncBoundaryGates(
 				source: gate.name,
 				graphNodeId: gate.id,
 				path: [],
+				local: { name: gate.name, members: 0 },
 			})),
 			...(componentName ? { componentName } : {}),
 		});

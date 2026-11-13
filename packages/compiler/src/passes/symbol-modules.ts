@@ -4499,11 +4499,9 @@ function memberReadsObjectNode(
 const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
 
 /**
- * The local name a dependency binds and the graph path it reads, or `null` when
- * the dependency source is not a plain dotted name.
- *
- * The band-free twin of `asyncRunnerDependencyDeclaration`: same trailing-member
- * arithmetic, with the identifier test inlined so this site reaches no scanner.
+ * The local name a dependency binds, the member reads on it and the graph path the
+ * name itself stands for, from the analyzer's record of where that name's path ends;
+ * `null` when a part is not a plain identifier.
  */
 function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly name: string;
@@ -4511,17 +4509,17 @@ function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
 } | null {
-	const parts = dependency.source.split('.');
-	if (parts.some((part) => !ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
-
-	const [name, ...memberPath] = parts;
-	if (!name) return null;
+	const local = dependency.local;
+	if (!local) return null;
+	const end = dependency.path.length - local.members;
+	const memberPath = dependency.path.slice(end);
+	if (![local.name, ...memberPath].every((part) => ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
 
 	return {
-		name,
+		name: local.name,
 		memberPath,
 		graphNodeId: dependency.graphNodeId,
-		path: dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length)),
+		path: dependency.path.slice(0, end),
 	};
 }
 

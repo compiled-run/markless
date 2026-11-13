@@ -240,6 +240,32 @@ export function Detail({ place }: { readonly place: { readonly search: string; r
 	expect(runner?.source).toContain('read("prop:props", ["place", "search"])');
 	expect(runner?.source).toContain('read("prop:props", ["place", "pathname"])');
 	expect(runner?.source).not.toContain('read("prop:props", ["place"])');
+	// Where `place` ends in each path is the analyzer's record; it stays out of what the page is served.
+	expect(
+		result.semanticGraph.graphBindings.find((binding) => binding.name === 'note')?.dependencies?.map((dependency) => dependency.local),
+	).toEqual([
+		{ name: 'place', members: 1 },
+		{ name: 'place', members: 1 },
+	]);
+	expect(JSON.stringify([result.protocolState, result.protocolView])).not.toContain('"local"');
+});
+
+// Same structure, renamed: the name is destructured from a prop of the prop, so its own path is two segments deep.
+test('a runner reads a member of a name destructured from a nested prop along the whole path', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/report.tsrx',
+		source: `import { computed } from '@markless/core';
+async function fetchReport(region: string) { return region; }
+export function Report({ filters }: { readonly filters: { readonly area: { readonly region: string } } }) @{
+	const { area } = filters;
+	const report = computed(async () => fetchReport(area.region));
+	@try {<p>{report}</p>} @pending {<p>loading</p>}
+}`,
+		symbols: [],
+	});
+	const runner = result.symbolModules.modules.find((module) => module.kind === 'async-computed-runner');
+	expect(runner?.source).toContain('read("prop:props", ["filters", "area", "region"])');
+	expect(runner?.source).not.toContain('read("prop:props", ["filters", "area"])');
 });
 
 // A whole-bag read cannot be routed to the page, and the child's own cell drops routed keys, so the build refuses it rather than ship undefined fields.
@@ -267,3 +293,37 @@ export function Detail(${signature}) @{
 		).toEqual(['MARKLESS_CAPTURE_OPAQUE_PROP']);
 	}
 });
+
+// A gate the compiler mints over a @try's values reads each of them by name, as an authored runner does.
+test('a minted boundary gate runner declares every value it waits on', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/pair.tsrx',
+		source: `import { computed } from '@markless/core';
+async function load(name: string) { return name; }
+export function Pair() @{
+	const left = computed(async () => await load('left'));
+	const right = computed(async () => await load('right'));
+	@try {
+		<div>
+			<p>{left} {right}</p>
+			<button onClick={async () => await load('save')}>Save</button>
+		</div>
+	} @pending {
+		<p>loading</p>
+	} @catch (error) {
+		<p>{error.message}</p>
+	}
+}`,
+		symbols: [],
+	});
+	const gate = result.semanticGraph.graphBindings.find((binding) => binding.name.startsWith('marklessAsyncGate'));
+	expect(gate?.dependencies?.map((dependency) => dependency.local)).toEqual([
+		{ name: 'left', members: 0 },
+		{ name: 'right', members: 0 },
+	]);
+	const runners = result.symbolModules.modules.filter((module) => module.kind === 'async-computed-runner');
+	const gateRunner = runners.find((module) => module.source.includes('[left, right]'));
+	expect(gateRunner?.source).toContain('const left = read("computed:left"');
+	expect(gateRunner?.source).toContain('const right = read("computed:right"');
+});
+

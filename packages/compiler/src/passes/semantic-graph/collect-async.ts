@@ -9,6 +9,7 @@ import type {
 import {
 	graphBindingMap,
 	resolveGraphPath,
+	dependencyLocal,
 	semanticAliasMap,
 	uniqueBy,
 	templateReadPath,
@@ -366,6 +367,7 @@ function graphDependency(
 		source,
 		graphNodeId: resolved.binding.id,
 		path: resolved.path,
+		...dependencyLocal(source, resolved.path),
 	};
 }
 

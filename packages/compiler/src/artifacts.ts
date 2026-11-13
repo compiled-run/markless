@@ -768,6 +768,8 @@ export type SemanticGraphDependency = {
 	readonly writtenByControl?: true;
 	/** Read only by an enclosing @if or @switch test, so the arm's value is computed only where it shows. */
 	readonly armGuard?: true;
+	/** The local name the read starts from, and how many of the last segments of `path` are member reads on it. */
+	readonly local?: { readonly name: string; readonly members: number };
 };
 
 export type SemanticHostNode = {

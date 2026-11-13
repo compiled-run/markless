@@ -928,8 +928,10 @@ export function marklessSsrSeedPropCells(
 		};
 		if (cell.keys && cell.graphNodeId === 'prop:props')
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
+				// A row reads its key back from this cell whatever routes it, so only other keys leave.
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
+						!cell.rowKeys?.includes(key) &&
 						marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
 							? []
 							: [[key, valueOf(key)]],
