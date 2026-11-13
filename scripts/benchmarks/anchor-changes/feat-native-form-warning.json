@@ -1,0 +1,52 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "native-form warning (PR #675): the docs playground's compile worker grows by the warning and its message text, and the shared links manifest and search chunk gain the new /errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE page (the changed files are compile-worker, _markless/links and one build chunk); 1 more character runs at load; measured on CI run 43390284754 against main's merge-queue run 43383372162",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 887,
+			"reason": "native-form warning (PR #675): the docs playground's compile worker grows by the warning and its message text, and the shared links manifest and search chunk gain the new /errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE page (the changed files are compile-worker, _markless/links and one build chunk); 1 more character runs at load; measured on CI run 43390284754 against main's merge-queue run 43383372162",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "native-form warning (PR #675): the docs playground's compile worker grows by the warning and its message text, and the shared links manifest and search chunk gain the new /errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE page (the changed files are compile-worker, _markless/links and one build chunk); 1 more character runs at load; measured on CI run 43390284754 against main's merge-queue run 43383372162",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 954,
+			"reason": "native-form warning (PR #675): the docs playground's compile worker grows by the warning and its message text, and the shared links manifest and search chunk gain the new /errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE page (the changed files are compile-worker, _markless/links and one build chunk); 1 more character runs at load; measured on CI run 43390284754 against main's merge-queue run 43383372162",
+			"date": "2026-11-13"
+		}
+	]
+}
