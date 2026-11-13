@@ -69,12 +69,22 @@ test('in-place navigations leave no window or document listeners behind and reta
 		await cdp.send('HeapProfiler.collectGarbage');
 		await cdp.send('HeapProfiler.collectGarbage');
 		const { nodes, documents } = await cdp.send('Memory.getDOMCounters');
-		// JavaScript objects and the DOM nodes behind them.
-		const heap = (await cdp.send('Runtime.getHeapUsage')) as {
-			usedSize: number;
-			embedderHeapUsedSize?: number;
+		// Reachable objects only: the heap's used size also counts space V8 has not reclaimed, which swung 47 to 192 kB on one tree.
+		const chunks: string[] = [];
+		const collect = ({ chunk }: { chunk: string }) => chunks.push(chunk);
+		cdp.on('HeapProfiler.addHeapSnapshotChunk', collect);
+		await cdp.send('HeapProfiler.takeHeapSnapshot', { reportProgress: false });
+		cdp.off('HeapProfiler.addHeapSnapshotChunk', collect);
+		const { snapshot, nodes: heapNodes } = JSON.parse(chunks.join('')) as {
+			snapshot: { meta: { node_fields: string[] } };
+			nodes: number[];
 		};
-		return { nodes, documents, heapKB: (heap.usedSize + (heap.embedderHeapUsedSize ?? 0)) / 1024 };
+		const fields = snapshot.meta.node_fields;
+		const selfSize = fields.indexOf('self_size');
+		let bytes = 0;
+		for (let index = selfSize; index < heapNodes.length; index += fields.length)
+			bytes += heapNodes[index]!;
+		return { nodes, documents, heapKB: bytes / 1024 };
 	};
 	let n = 0;
 	const navigate = async (times: number) => {
@@ -113,7 +123,7 @@ test('in-place navigations leave no window or document listeners behind and reta
 	expect(after.documents).toBeLessThanOrEqual(settled.documents);
 	// A held page adds about 630 nodes; without one the count does not move.
 	expect(after.nodes).toBeLessThanOrEqual(settled.nodes + 16);
-	// Measured over these ten visits: about 1.5 MB of growth with the leak, about 30 kB without.
+	// Reachable growth over these ten visits without a leak: 39 to 88 kB in 12 runs at 6x CPU throttle.
 	expect(after.heapKB - settled.heapKB).toBeLessThan(300);
 	expect(errors).toEqual([]);
 	await page.close();
