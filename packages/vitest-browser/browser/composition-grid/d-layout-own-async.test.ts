@@ -5,7 +5,7 @@ import ShellOwnPage from './d-shell-own-page.tsrx';
 import FixedInLayoutPage from './d-fixed-page.tsrx';
 import FixedAlonePage from './d-fixed-alone-page.tsrx';
 import { installServer, resetServer, type Board } from './grid-server.ts';
-import { fullTimeline, oneStep, playStream, type Shape } from './timeline.ts';
+import { fullTimeline, playStream, type Shape } from './timeline.ts';
 
 // An other-file child with its own async value, keyed on the page's props, written inside a layout's children.
 installServer();
@@ -38,11 +38,6 @@ test('no props: CSR', () => fullTimeline(fixed('CSR', () => render(FixedInLayout
 test('no props: SSR', () => fullTimeline(fixed('SSR', () => renderSSR(FixedInLayoutPage))));
 test('no layout: SSR streamed', () => fullTimeline(fixed('SSR', () => playStream(renderStream(FixedAlonePage)))));
 
-// Known defect: a child's own async value written inside a layout's children is never sent in the stream; the response
-// ends with the child on @pending and the browser asks for the value again.
-test.fails('SSR streamed: the child\'s value arrives in the stream', () =>
-	oneStep(run(cardView, 'SSR', () => playStream(renderStream(LayoutOwnPage))), 'first render'));
-test.fails('renamed: SSR streamed: the child\'s value arrives in the stream', () =>
-	oneStep(run(ledgerView, 'SSR', () => playStream(renderStream(ShellOwnPage))), 'first render'));
-test.fails('no props: SSR streamed: the child\'s value arrives in the stream', () =>
-	oneStep(fixed('SSR', () => playStream(renderStream(FixedInLayoutPage))), 'first render'));
+test('SSR streamed', () => fullTimeline(run(cardView, 'SSR', () => playStream(renderStream(LayoutOwnPage)))));
+test('renamed: SSR streamed', () => fullTimeline(run(ledgerView, 'SSR', () => playStream(renderStream(ShellOwnPage)))));
+test('no props: SSR streamed', () => fullTimeline(fixed('SSR', () => playStream(renderStream(FixedInLayoutPage)))));
