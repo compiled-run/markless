@@ -49,6 +49,7 @@
 		"packages/bundler/test/bundle-size-symbol-table.test.ts",
 		"packages/bundler/test/chunk-import-map.test.ts",
 		"packages/bundler/test/compile-cache-size.test.ts",
+		"packages/bundler/test/composition-grid-build.test.ts",
 		"packages/bundler/test/computed-chain-growth.test.ts",
 		"packages/bundler/test/dense-async-symbol-table.test.ts",
 		"packages/bundler/test/direct-render-startup.test.ts",
