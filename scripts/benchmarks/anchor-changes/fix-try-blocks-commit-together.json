@@ -1,50 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-async-wiring"
-			],
-			"delta": 562,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-runtime"
-			],
-			"delta": 151,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 85,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 84,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
@@ -188,6 +144,170 @@
 			],
 			"delta": 7,
 			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 225,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 107,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"executedChars"
+			],
+			"delta": 225,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 107,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"executedChars"
+			],
+			"delta": 1,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 107,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": -34,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 201,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 201,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 810,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 409,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
 			"date": "2026-11-13"
 		}
 	]
