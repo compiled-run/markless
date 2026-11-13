@@ -13,6 +13,8 @@ import {
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
+	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
 	type ProtocolArmRecordSet,
 } from '@markless/serializer/protocol';
 import {
@@ -57,8 +59,7 @@ export const MARKLESS_STREAM_FIRST_FLUSH_DEADLINE_MS = 10;
 
 // A navigation that swaps the page out clears this global, retiring the old executor and its queue.
 export const STREAM_ARM_EXECUTOR_GLOBAL = '__mArm';
-export const STREAMED_ARM_SELECTOR =
-	'template[m\\:arm],script[type="markless/arm"],script[type="markless/state-patch"]';
+export const STREAMED_ARM_SELECTOR = `template[m\\:arm],script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"],script[type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}"]`;
 
 export type RenderToStreamOptions = RenderToStringOptions;
 
@@ -438,8 +439,8 @@ function renderArmAppend(
 
 	return (
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
-		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
-		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+		`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
+		`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 		`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
 }
@@ -607,7 +608,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	// One executor serves every streamed page in the document, so a boot imports the arm's own root's module.
 	const wake = resumeModuleUrl
 		? `
-		const rec = d.querySelector('script[type="markless/arm"][data-boundary="' + id + '"]');
+		const rec = d.querySelector('script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"][data-boundary="' + id + '"]');
 		const r = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};

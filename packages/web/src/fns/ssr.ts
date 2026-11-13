@@ -284,8 +284,8 @@ export function marklessSsrRemapGraphOutput(
 	marklessCsrRemapGraphOutput(output, graphProps, instancePath);
 }
 
-// The composer's bound derive reads a live-routed prop off its own node, so the
-// child's seeded copy of that key is never read after resume.
+// Every browser read of a live-routed prop follows the route to the composer's
+// node, which carries it, so the child's seeded copy is never read after resume.
 const marklessSsrRoutedPropCell = new WeakMap<object, (graphProps: ComposeGraphProps) => never[]>();
 
 // The compiled module a composed child was imported from may serve several
@@ -875,7 +875,7 @@ export function marklessSsrCallbackSymbol(
 // the bag, null means a lone prop. A `deriveKeys` property is one only a derive
 // reads, carried when the serializer encodes it, with only the `derivePaths` its
 // derives read; `scalarKeys` is projected children, whose markup the served HTML
-// already holds. Either is dropped when the composer routes it from its own
+// already holds. Any key is dropped when the composer routes it from its own
 // graph, so a copy never ships it twice.
 export function marklessSsrSeedPropCells(
 	state: ComposeStateDraft,
@@ -926,18 +926,13 @@ export function marklessSsrSeedPropCells(
 			valueKind: marklessSsrValueKind(value),
 			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
-		if (
-			cell.keys &&
-			(cell.scalarKeys || cell.deriveKeys || cell.rowKeys) &&
-			cell.graphNodeId === 'prop:props'
-		)
+		if (cell.keys && cell.graphNodeId === 'prop:props')
 			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
-						cell.keys?.includes(key) ||
-						!marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
-							? [[key, valueOf(key)]]
-							: [],
+						marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
+							? []
+							: [[key, valueOf(key)]],
 					),
 				);
 				return (
