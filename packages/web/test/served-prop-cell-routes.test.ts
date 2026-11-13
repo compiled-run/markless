@@ -1,24 +1,21 @@
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
-import { marklessComposeState, marklessSsrSeedPropCells } from '../src/fns/ssr.ts';
+import { marklessSsrRemapGraphOutput, marklessSsrSeedPropCells } from '../src/fns/ssr.ts';
 
-// A served child keeps in its own prop cell only the props its composer does not route live; a routed
-// prop is read back through the route, so the composer's node is its one copy. The child here has no
-// remap hook of its own, like a component that only forwards its props.
+// A served child keeps in its own prop cell only the props its composer does not route live: every
+// browser read of a routed prop, an arm's text included, follows the route to the composer's node.
 
-const seededChild = () =>
-	marklessSsrSeedPropCells(
-		createProtocolStatePayload({ cells: [] }),
-		{ slug: 'abc', place: { search: '?tab=info', pathname: '/n/abc' }, label: 'Notes' },
-		[{ graphNodeId: 'prop:props', keys: ['slug', 'label'], deriveKeys: ['place'], derivePaths: { place: [['search']] } }],
-	);
-
-const propCells = (graphProps: ReadonlyArray<Record<string, unknown>>) =>
-	(
-		marklessComposeState(createProtocolStatePayload({ cells: [] }), [
-			{ hostPrefix: 'c0:', symbolPrefix: 'c0:', graphProps, output: { state: seededChild() } },
-		] as never).cells ?? []
-	).filter((cell) => cell.graphNodeId.endsWith('prop:props'));
+const propCells = (graphProps: ReadonlyArray<Record<string, unknown>>) => {
+	const output = {
+		state: marklessSsrSeedPropCells(
+			createProtocolStatePayload({ cells: [] }),
+			{ slug: 'abc', place: { search: '?tab=info', pathname: '/n/abc' }, label: 'Notes' },
+			[{ graphNodeId: 'prop:props', keys: ['slug', 'label'], deriveKeys: ['place'], derivePaths: { place: [['search']] } }],
+		) as { cells: ReadonlyArray<{ graphNodeId: string; value?: unknown }> },
+	};
+	marklessSsrRemapGraphOutput(output as never, graphProps as never, 'c0:');
+	return output.state.cells.filter((cell) => cell.graphNodeId.endsWith('prop:props'));
+};
 
 test('a routed arm key and a routed derive key both leave the child cell; an unrouted one stays', () => {
 	const cells = propCells([
@@ -32,7 +29,7 @@ test('a routed arm key and a routed derive key both leave the child cell; an unr
 	expect(JSON.stringify(cells[0]?.value)).not.toContain('?tab=info');
 });
 
-test('a child whose every prop is routed ships no prop cell of its own', () => {
+test('a child whose arm-shown prop is routed and that reads no other prop ships no prop cell of its own', () => {
 	const cells = propCells([
 		{ name: 'slug', kind: 'graph-reference', graphNodeId: 'prop:props', path: ['params', 'id'] },
 		{ name: 'place', kind: 'graph-reference', graphNodeId: 'prop:props', path: ['url'] },
