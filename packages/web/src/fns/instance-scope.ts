@@ -1343,7 +1343,14 @@ function composedBoundaryUpdate<U extends ComposedUpdate>(
 	if (!prefixes) return update;
 	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, {
 		...update,
-		armRecords: composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId),
+		armRecords: composedBoundaryArmRecords(
+			boundary,
+			update.armRecords,
+			graph,
+			undefined,
+			renderedBoundaryId,
+			update.moduleRootPath,
+		),
 	});
 }
 
