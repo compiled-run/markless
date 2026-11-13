@@ -220,8 +220,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 172,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 498983 -> 499155 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 498983 B; executed chars at load unchanged; includes the async.mdx rule rewrite, which the docs search chunk loads with every page",
+			"delta": 382,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 499018 -> 499400 B gzip downloaded at load, measured on PR #663 CI run 43385368664 (head 386641201, linux-x64) against the main anchor 499018 B; executed chars at load unchanged (24666); includes the async.mdx rule rewrite, which the docs search chunk loads with every page",
 			"date": "2026-11-13"
 		}
 	]
