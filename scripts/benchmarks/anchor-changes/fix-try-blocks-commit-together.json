@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 562,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 151,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 91,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 562,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 151,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 91,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		}
+	]
+}

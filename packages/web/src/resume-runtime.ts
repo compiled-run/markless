@@ -249,7 +249,11 @@ export function createResumeRuntime(
 			behaviors =
 				behaviorRuntime ??
 				(viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined);
-		branchRuntime = (await import('./resume-branches.ts')).wireBranches(
+		const { wireBranches } = await import('./resume-branches.ts');
+		const eventWiring = await getEvents();
+		// Arms registering at once share the runtime the first of them wired.
+		if (branchRuntime) return branchRuntime;
+		branchRuntime = wireBranches(
 			Object.assign(branchWiring, {
 				root: input.root,
 				graph: input.graph,
@@ -259,7 +263,7 @@ export function createResumeRuntime(
 				elementsByHostId,
 				disposedHosts,
 				elementHandles,
-				events: await getEvents(),
+				events: eventWiring,
 				eventTypes,
 				storeContainerSubscription,
 				storeHostSubscription,
@@ -481,6 +485,7 @@ export function createResumeRuntime(
 			storeContainerSubscription,
 			disposeHost,
 			commitArm: commitBoundaryArm,
+			prepareArmCommit: prepareBoundaryArmCommit,
 			connectBranchWiring: (wiring) => {
 				Object.assign(branchWiring, wiring);
 			},

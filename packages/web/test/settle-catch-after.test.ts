@@ -124,7 +124,9 @@ test('a rejection after a refresh held for a minute keeps the content and commit
 		const publish = async (next: string) => {
 			status = next;
 			version++;
-			for (const subscriber of subscribers) await subscriber.run({ status, version });
+			const landing = [];
+			for (const subscriber of subscribers) landing.push(await subscriber.run({ status, version }));
+			for (const commit of landing) if (typeof commit === 'function') await commit();
 		};
 		await publish('fulfilled');
 		await publish('pending');

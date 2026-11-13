@@ -21,16 +21,36 @@ async function followsEachCustomer() {
 	await expect.poll(() => document.querySelector('[data-optional]')?.textContent?.trim()).toBe('');
 }
 
-// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": two blocks settling on one value commit in separate tasks.
-const quarantined = Date.now() < Date.parse('2026-11-27');
-test.runIf(!quarantined)('the quarantine is still in date', () => {
-	expect.fail('Quarantine expired on 2026-11-27: make blocks that settle together commit in one task and drop the quarantine.');
-});
-
-test.skipIf(quarantined)('CSR: a @try reading an async value through ?. or ! follows it', async () => {
+test('CSR: a @try reading an async value through ?. or ! follows it', async () => {
 	await render(CustomerCard);
 	await expect.poll(() => text('[data-optional-loading]')).toBe('Loading');
 	await followsEachCustomer();
+});
+
+// Each symbol arrives in its own task, 20 ms after the one asked before it, so a block that commits once its own code is in shows alone.
+test('CSR: two blocks settling on one value land in one task when their code arrives in separate tasks', async () => {
+	const base = CustomerCard as unknown as { readonly loadSymbol: (symbolId: string) => unknown };
+	let asked = 0;
+	const samples: string[] = [];
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => samples.push(`${text('[data-optional]') ?? '-'}|${text('[data-asserted]') ?? '-'}`);
+	const observer = new MutationObserver(() => channel.port2.postMessage(0));
+	observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+	try {
+		await render({
+			...base,
+			loadSymbol: (symbolId: string) => {
+				const delay = 20 * ++asked;
+				return new Promise((resolve) => setTimeout(resolve, delay)).then(() => base.loadSymbol(symbolId));
+			},
+		} as typeof CustomerCard);
+		await expect.poll(() => text('[data-asserted]')).toBe('tier 1');
+		await new Promise((resolve) => setTimeout(resolve, 20));
+	} finally {
+		observer.disconnect();
+	}
+	expect(samples.filter((sample) => sample.includes('-') && sample !== '-|-')).toEqual([]);
+	expect(samples.at(-1)).toBe('customer 1|tier 1');
 });
 
 test('SSR: a @try reading an async value through ?. or ! follows it', async () => {
