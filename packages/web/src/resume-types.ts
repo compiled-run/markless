@@ -316,14 +316,6 @@ export type ComposedArmRecordQualifier = ((
 		graph: RuntimeGraph | undefined,
 		renderedBoundaryId?: string,
 	) => U;
-	/** Runs the values of the components each arm of `branch` holds only while that arm shows; answers what to call when an arm leaves. */
-	readonly gateBranchArms?: (
-		graph: RuntimeGraph,
-		branch: ResumeBranchRecord,
-		live: () => number | undefined,
-		picked: () => number,
-		release: (release: () => void) => void,
-	) => (arm: number) => void;
 };
 
 export type ResumeArmRecordSet = {

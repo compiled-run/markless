@@ -135,20 +135,23 @@ function createBranchRegistration(
 		// IDREFs outside the arms follow the PAINTED arm; the served arm never materializes.
 		const paintArm = (arm: number) => {
 			currentArmByBranchId.set(branch.id, arm);
+			// The components an arm holds run their values only while it shows.
+			if (branch.armComponents)
+				void import('./fns/arm-gate.ts').then((gate) =>
+					gate.gateBranchArms(input.graph, branch, currentArmByBranchId, wired, readBranchArm, releasedWithArm),
+				);
 			if (branch.idrefSites?.length)
 				void import('./resume-arm-records-lazy.ts').then((records) =>
 					records.syncBranchIdrefSites(input.elementsByHostId, branch, arm),
 				);
 		};
 		let currentArm = wiredBranchArm(input.graph, branch);
-		let leave: ((arm: number) => void) | undefined;
 		paintArm(currentArm);
 		announceArm(input.root, branch, currentArm);
 		async function replaceArmRange(arm: number) {
 			const painted = currentArm;
 			const symbol = await input.loadSymbol(branch.symbolId);
 			let graph = composedBranchGraph(input.graph, branch);
-			if (arm !== painted) leave?.(painted);
 			if (branch.elementHandleIds)
 				graph = (await import('./resume-arm-records-lazy.ts')).armElementHandleIdGraph(
 					graph,
@@ -229,14 +232,6 @@ function createBranchRegistration(
 			input.storeContainerSubscription(release);
 		};
 		const shows = (arm: number) => wired() && readBranchArm(input.graph, branch) === arm;
-		if (branch.armComponents)
-			leave = composedArmRecordQualifier()?.gateBranchArms?.(
-				input.graph,
-				branch,
-				() => (branchesById.get(branch.id) === branch ? (wired() ? currentArm : -1) : undefined),
-				() => readBranchArm(input.graph, branch),
-				releasedWithArm,
-			);
 		const follow = (feed: ResumePropFeed) =>
 			input.graph.write({
 				graphNodeId: feed.propCellId,

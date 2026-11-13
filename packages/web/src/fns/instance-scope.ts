@@ -16,7 +16,6 @@ import type {
 	ResumePropFeed,
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
-	ResumeBranchRecord,
 	ResumeKeyedRepeatRecord,
 	ResumeSymbol,
 	ResumeSymbolContext,
@@ -1429,79 +1428,6 @@ function composedBoundaryGraph(
 	};
 }
 
-// A composing page's @if and @switch arms hold components: their values run only while the arm shows.
-type ArmGate = { readonly owns: (graphNodeId: string) => boolean; readonly shows: () => boolean };
-// One registration of a branch's gates; it lets go of them once replaced or released, so nothing it held stays reachable.
-type Registration = { gates?: ReadonlyArray<ArmGate> };
-const registrations = new WeakMap<RuntimeGraph, Map<string, Registration>>();
-
-// Whether a node belongs to a component arm `arm` holds: its instance path runs through one of the arm's segments, past any rows.
-function armOwns(branch: ResumeBranchRecord, arm: number, graphNodeId: string): boolean {
-	const owner = marklessInstancePath(branch.id);
-	const path = marklessInstancePath(graphNodeId);
-	if (!path.startsWith(owner)) return false;
-	let rest = path.slice(owner.length);
-	while (rest.startsWith('r:')) rest = rest.slice(rest.indexOf(':', 2) + 1);
-	return !!branch.armComponents?.[arm]?.some((segment) => rest.startsWith(segment));
-}
-
-// A value is owned by every arm holding its component; it may run only while each of them shows.
-function gateBranch(graph: RuntimeGraph, branchId: string, gates: ReadonlyArray<ArmGate>): () => void {
-	let byBranch = registrations.get(graph);
-	if (!byBranch) {
-		const held = (byBranch = new Map());
-		registrations.set(graph, held);
-		graph.gateArms?.((graphNodeId) => {
-			let owned: boolean | undefined;
-			for (const registration of held.values())
-				for (const gate of registration.gates ?? [])
-					if (gate.owns(graphNodeId)) {
-						if (!gate.shows()) return false;
-						owned = true;
-					}
-			return owned;
-		});
-	}
-	const previous = byBranch.get(branchId);
-	if (previous) previous.gates = undefined;
-	const registration: Registration = { gates };
-	byBranch.set(branchId, registration);
-	return () => {
-		registration.gates = undefined;
-		if (byBranch.get(branchId) === registration) byBranch.delete(branchId);
-	};
-}
-
-// `live` answers the painted arm, -1 once the branch's range left the page, and undefined once another registration replaced it.
-function gateBranchArms(
-	graph: RuntimeGraph,
-	branch: ResumeBranchRecord,
-	live: () => number | undefined,
-	picked: () => number,
-	release: (release: () => void) => void,
-): (arm: number) => void {
-	const test = branch.testReads[0];
-	// Painted and still picked; a branch with no test never flips, and a test nothing has derived since the served
-	// render only has the painted arm to go by.
-	const shows = (arm: number) =>
-		live() === arm &&
-		(!test ||
-			picked() === arm ||
-			(branch.takenArm !== undefined && graph.read(test.graphNodeId, test.path) === undefined));
-	release(
-		gateBranch(
-			graph,
-			branch.id,
-			(branch.armComponents ?? []).map((_, arm) => ({
-				owns: (id: string) => live() !== undefined && armOwns(branch, arm, id),
-				shows: () => shows(arm),
-			})),
-		),
-	);
-	// The leaving arm's components are gone: a run still in flight lands nothing, and a reopen starts fresh.
-	return (arm) => graph.asyncPlane?.()?.drop((id) => armOwns(branch, arm, id));
-}
-
 /**
  * Teaches this app's settle path to re-spell a composed child's arm records in
  * page space. The bundler emits a call to it in the generated source/resume
@@ -1516,7 +1442,6 @@ export function installMarklessComposedArmRecords(): void {
 			graph: composedBoundaryGraph,
 			branchUpdate: composedBranchUpdate,
 			boundaryUpdate: composedBoundaryUpdate,
-			gateBranchArms,
 		}),
 	);
 	// An `@if` arm's handles are filed at resume from the arm record, which the

@@ -5,6 +5,17 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
+				"web/fns/arm-gate"
+			],
+			"set": 1972,
+			"reason": "New module: the arm gate, loaded by a branch whose arms hold components that own a computed; a page without one never runs it (1972 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
 				"runtime/graph"
 			],
 			"delta": 208,
@@ -18,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-branches"
 			],
-			"delta": 302,
-			"reason": "Branch wiring hands each arm's components to the arm gate and drops a leaving arm's async values (+302 B rendered, measured by this fixture build); the gate itself ships only to composing pages",
+			"delta": 217,
+			"reason": "Branch wiring loads the arm gate when a branch names the components its arms hold (+217 B rendered, measured by this fixture build)",
 			"date": "2026-11-13"
 		},
 		{
@@ -41,8 +52,19 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 67,
-			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"delta": 393,
+			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (+393 B gzip, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/arm-gate"
+			],
+			"set": 1972,
+			"reason": "New module: the arm gate, loaded by a branch whose arms hold components that own a computed; a page without one never runs it (1972 B rendered, measured by this fixture build)",
 			"date": "2026-11-13"
 		},
 		{
@@ -63,8 +85,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-branches"
 			],
-			"delta": 302,
-			"reason": "Branch wiring hands each arm's components to the arm gate and drops a leaving arm's async values (+302 B rendered, measured by this fixture build); the gate itself ships only to composing pages",
+			"delta": 217,
+			"reason": "Branch wiring loads the arm gate when a branch names the components its arms hold (+217 B rendered, measured by this fixture build)",
 			"date": "2026-11-13"
 		},
 		{
@@ -86,8 +108,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 2,
-			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"delta": -3,
+			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (-3 B gzip, measured by this fixture build)",
 			"date": "2026-11-13"
 		},
 		{
@@ -98,8 +120,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 63,
-			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"delta": 41,
+			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (+41 B gzip, measured by this fixture build)",
 			"date": "2026-11-13"
 		}
 	]

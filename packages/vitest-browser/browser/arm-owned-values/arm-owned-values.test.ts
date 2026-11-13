@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { aborted, derives, loads, resetLoads, settleAll, waitingFor } from './api.ts';
 import FlightOpenPage from './flight-open-page.tsrx';
 import FlightPage from './flight-page.tsrx';
+import HandedOpenPage from './handed-page.tsrx';
 import NestedOpenPage from './nested-open-page.tsrx';
 import NestedPage from './nested-page.tsrx';
 import PlainRowsPage from './plain-rows-page.tsrx';
@@ -31,6 +32,7 @@ const pages = {
 	switched: { CSR: () => render(SwitchPage), SSR: () => renderSSR(SwitchPage) },
 	rows: { CSR: () => render(RowsPage), SSR: () => renderSSR(RowsPage) },
 	plainRows: { CSR: () => render(PlainRowsPage), SSR: () => renderSSR(PlainRowsPage) },
+	handedOpen: { CSR: () => render(HandedOpenPage), SSR: () => renderSSR(HandedOpenPage) },
 } satisfies Record<string, Record<Mode, Mount>>;
 
 async function settle(tag: string, id: number) {
@@ -90,6 +92,21 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(derives).toContain(2);
 		click('[data-open]');
 		await expect.poll(() => text('[data-inside]')).toBe('2');
+	});
+
+	test(`${mode}: an arm open at load whose owner is handed the value loads nothing while closed, and afresh when it reopens`, async () => {
+		await pages.handedOpen[mode]();
+		if (mode === 'CSR') await settle('handed', 1);
+		await expect.poll(() => panel('handed')).toBe('handed 1');
+		click('[data-close]');
+		await expect.poll(() => panel('handed')).toBeNull();
+		click('[data-next]');
+		await passes();
+		expect(loads.filter((load) => load !== 'handed:1')).toEqual([]);
+		click('[data-open]');
+		await expect.poll(() => panel('handed')).toBe('Loading');
+		await settle('handed', 2);
+		await expect.poll(() => panel('handed')).toBe('handed 2');
 	});
 
 	for (const [shape, page] of [

@@ -15,6 +15,7 @@ import type {
 	ProtocolViewPayloadInput,
 	ProtocolViewPayloadWithArmRecords,
 	RenderDataArtifact,
+	SemanticComponentEdge,
 	SemanticKeyedRepeat,
 	SemanticMarkupChunk,
 	SemanticMarkupSlot,
@@ -436,15 +437,40 @@ function branchArmSeedsField(input: ProtocolViewPayloadInput, branchSiteId: stri
 	return armSeeds.length > 0 ? { armSeeds } : {};
 }
 
-// Per arm, the instance segments of the components it holds, however deep: their computeds stop when the arm leaves.
+// Per arm, the instance segments of the components it holds that own a value to stop: their computeds stop when the arm leaves.
 function branchArmComponentsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
 	const edges = input.semanticGraph?.componentEdges ?? [];
 	const armComponents: string[][] = [];
 	for (const edge of edges) {
 		const held = edge.branchArms?.find((arm) => arm.branchSiteId === branchSiteId);
-		if (held) (armComponents[held.arm] ??= []).push(componentEdgeInstanceSegment(edge, edges));
+		if (held && treeOwnsComputed(input, edge, new Set()))
+			(armComponents[held.arm] ??= []).push(componentEdgeInstanceSegment(edge, edges));
 	}
 	return armComponents.length > 0 ? { armComponents: Array.from(armComponents, (arm) => arm ?? []) } : {};
+}
+
+// A computed in the component's tree, or for an imported one a derive over its props or an async value in its module; unknown counts.
+function treeOwnsComputed(input: ProtocolViewPayloadInput, edge: SemanticComponentEdge, seen: Set<string>): boolean {
+	if (edge.importSource !== undefined) {
+		const moduleInterface = input.source?.importedModuleInterfaces?.[edge.importSource];
+		const component = moduleInterface?.render.components.find(
+			(candidate) =>
+				candidate.componentName === edge.childComponentName ||
+				(edge.importedName !== undefined && candidate.exportName === edge.importedName),
+		);
+		return !component || !!component.derivedProps?.length || !!moduleInterface?.asyncPlanes;
+	}
+	if (seen.has(edge.childComponentName)) return false;
+	seen.add(edge.childComponentName);
+	const graph = input.semanticGraph!;
+	return (
+		graph.graphBindings.some(
+			(binding) => binding.kind === 'computed' && binding.componentName === edge.childComponentName,
+		) ||
+		graph.componentEdges.some(
+			(child) => child.parentComponentName === edge.childComponentName && treeOwnsComputed(input, child, seen),
+		)
+	);
 }
 
 // Row event symbols already exist on the row host nodes; the record maps

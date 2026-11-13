@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// A branch record names, per arm, the instance segments of the components that arm holds, so resume can stop their values
-// once the arm no longer shows.
+// A branch record names, per arm, the instance segments of the components that arm holds and that own a computed, so
+// resume can stop their values once the arm no longer shows.
 
 const compile = async (source: string) => {
 	const result = await compileTsrxModule({ filename: 'src/Page.tsrx', source, symbols: [] });
@@ -14,9 +14,9 @@ const armComponents = (result: Awaited<ReturnType<typeof compile>>) =>
 
 test('nested arms: the outer arm holds every component inside it, the inner arm only its own', async () => {
 	const result = await compile(`
-import { state } from '@markless/core';
-function Card({ id }: { id: number }) @{ <p>{id}</p> }
-function Note({ id }: { id: number }) @{ <em>{id}</em> }
+import { computed, state } from '@markless/core';
+function Card({ id }: { id: number }) @{ const label = computed(() => 'card ' + id); <p>{label}</p> }
+function Note({ id }: { id: number }) @{ const label = computed(() => 'note ' + id); <em>{label}</em> }
 export default function Page() @{
 	let outer = state(true);
 	let inner = state(false);
@@ -39,8 +39,8 @@ export default function Page() @{
 
 test('a @switch holding the same component in two arms names each placement under its own arm', async () => {
 	const result = await compile(`
-import { state } from '@markless/core';
-function Panel({ tag }: { tag: string }) @{ <p>{tag}</p> }
+import { computed, state } from '@markless/core';
+function Panel({ tag }: { tag: string }) @{ const label = computed(() => 'panel ' + tag); <p>{label}</p> }
 export default function Page() @{
 	let mode = state('a');
 	<div>
@@ -59,9 +59,11 @@ export default function Page() @{
 	expect(armComponents(result)).toEqual({ 'branch-site:0': [['c0:'], ['c1:']] });
 });
 
-test('a branch that holds no component carries no arm components', async () => {
+test('a branch whose arms hold no component, or only components with no computed, carries no arm components', async () => {
 	const result = await compile(`
 import { state } from '@markless/core';
+function Icon({ name }: { name: string }) @{ <i>{name}</i> }
+function Badge() @{ <b><Icon name="dot" /></b> }
 export default function Page() @{
 	let open = state(false);
 	<div>
@@ -69,18 +71,39 @@ export default function Page() @{
 		@if (open) {
 			<p>Open</p>
 		}
+		@if (!open) {
+			<Badge />
+		}
 	</div>
 }
 `);
-	expect(result.protocolView.branches?.[0]).toBeDefined();
-	expect(result.protocolView.branches?.[0]).not.toHaveProperty('armComponents');
+	expect(result.protocolView.branches).toHaveLength(2);
+	for (const branch of result.protocolView.branches ?? []) expect(branch).not.toHaveProperty('armComponents');
+});
+
+test('a component with no computed of its own is named when one it renders owns one', async () => {
+	const result = await compile(`
+import { computed, state } from '@markless/core';
+function Count({ n }: { n: number }) @{ const twice = computed(() => n * 2); <i>{twice}</i> }
+function Frame({ n }: { n: number }) @{ <b><Count n={n} /></b> }
+export default function Page() @{
+	let n = state(1);
+	<div>
+		<button onClick={() => n++}>More</button>
+		@if (n > 0) {
+			<Frame n={n} />
+		}
+	</div>
+}
+`);
+	expect(armComponents(result)).toEqual({ 'branch-site:0': [['c1:']] });
 });
 
 // Same structure, renamed and reshaped: the component sits in the @else arm, in a @for row, inside a @try.
 test('an @else arm inside a @try names the row component it holds', async () => {
 	const result = await compile(`
 import { computed, state } from '@markless/core';
-function Line({ label }: { label: string }) @{ <li>{label}</li> }
+function Line({ label }: { label: string }) @{ const shown = computed(() => label.toUpperCase()); <li>{shown}</li> }
 async function fetchLabels(): Promise<string[]> { return ['x']; }
 export function Ledger() @{
 	let hidden = state(true);
