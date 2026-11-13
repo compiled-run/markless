@@ -69,10 +69,18 @@ const loaded = async (page: Page): Promise<Loaded> => {
 					(error: Error) => error.name,
 				),
 			};
+		// WebKit rejects decode() when it swaps a responsive image's request, so wait for the image itself to finish; a broken one is complete too.
 		await Promise.all(
-			[...document.querySelectorAll<HTMLImageElement>('[data-image]')].map((image) =>
-				image.decode().catch(() => undefined),
-			),
+			[...document.querySelectorAll<HTMLImageElement>('[data-image]')].map(async (image) => {
+				while (!(await image.decode().then(
+					() => true,
+					() => image.complete,
+				)))
+					await new Promise((done) => {
+						image.addEventListener('load', done, { once: true });
+						image.addEventListener('error', done, { once: true });
+					});
+			}),
 		);
 		const images: Loaded['images'] = {};
 		for (const image of document.querySelectorAll<HTMLImageElement>('[data-image]'))
