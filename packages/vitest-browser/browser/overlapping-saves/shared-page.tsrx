@@ -1,5 +1,5 @@
 import { computed, state } from '@markless/core';
-import { flip, loadBoard } from './server.ts';
+import { flip, leave, loadBoard } from './server.ts';
 
 export default function SharedPage() @{
 	const board = computed(async () => await loadBoard());
@@ -48,6 +48,7 @@ export default function SharedPage() @{
 				}
 			</ul>
 			<p data-failed>{failed}</p>
+			<button data-leave onClick={() => leave()}>Leave</button>
 			</section>
 		} @pending {
 			<p>Loading</p>

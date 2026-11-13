@@ -548,7 +548,16 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 
 		const asyncComputed = asyncPlane?.nodes.get(graphNodeId);
-		if (asyncComputed) return asyncPlane!.read(asyncComputed, path);
+		if (asyncComputed) {
+			// A run this read starts asks with what code holds, not what is still painted.
+			const was = painting;
+			painting = 0;
+			try {
+				return asyncPlane!.read(asyncComputed, path);
+			} finally {
+				painting = was;
+			}
+		}
 
 		const initialize = readInitializers.get(graphNodeId);
 		if (initialize) {

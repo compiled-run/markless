@@ -1255,6 +1255,8 @@ async function seedMintedGraphNodes(
 	const graph = deps.graph;
 	if (!graph) throw new Error('Markless minted row registration has no graph to write into.');
 	for (const cell of state.cells) {
+		// A held state the row read was rendered from its shown value; the graph already holds the written one.
+		if (graph.shows?.(cell.graphNodeId)) continue;
 		const direct = (cell as { readonly directValue?: unknown }).directValue;
 		graph.write({
 			graphNodeId: cell.graphNodeId,

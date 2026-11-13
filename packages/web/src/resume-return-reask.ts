@@ -281,20 +281,25 @@ function senderEnded(sender: DispatchSpan | undefined, saved: boolean): void {
 	const out = round.out - 1;
 	const phase = saved || round.phase === ROUND_SENDING_SAVED ? ROUND_SENDING_SAVED : ROUND_SENDING;
 	if (out > 0) moveRound(round, phase, out);
-	else if (phase === ROUND_SENDING_SAVED) moveRound(round, ROUND_HOLDING, 0);
-	else closeRound(sender, round);
+	else if (phase === ROUND_SENDING_SAVED) {
+		moveRound(round, ROUND_HOLDING, 0);
+		// No round still collecting this sender means no reload is coming for it.
+		if (state.phase === WRITE_IDLE || !state.senders.has(sender)) roundDone([sender]);
+	} else closeRound(sender, round);
 }
 
 /** One write in flight ended, sent by `sender` when one was named; a page left behind ends the whole round at once, silently. */
 export function end(outcome: WriteOutcome, sender?: DispatchSpan): void {
+	// A save whose round a page left already ended counts toward no later round.
+	if (sender && !rounds.has(sender)) return;
+	if (outcome !== 'left') senderEnded(sender, outcome === 'saved');
 	if (state.phase !== WRITE_WRITING && state.phase !== WRITE_WRITING_SUCCEEDED) return;
 	const { senders, held } = state;
 	if (outcome === 'left') {
 		move({ phase: WRITE_IDLE });
 		endHolds(held, 'left');
-		return roundDone(senders, true);
+		return roundDone(rounds.keys(), true);
 	}
-	senderEnded(sender, outcome === 'saved');
 	const phase = outcome === 'saved' ? WRITE_WRITING_SUCCEEDED : state.phase;
 	const inFlight = state.inFlight - 1;
 	if (inFlight > 0) return move({ phase, inFlight, senders, held });

@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
 
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -114,4 +116,28 @@ test('values derived while a state is shown paint what they were derived from, u
 	release('state:label');
 	await macrotask();
 	expect([graph.showing!(), painted.get('state:open')]).toEqual([false, false]);
+});
+
+test('an async value first read while painting a held state loads once, with the written value', async () => {
+	const keys: unknown[] = [];
+	const graph = createRuntimeGraph({
+		async: createAsyncComputedPlane,
+		held: createHeldInputsPlane,
+		cells: [{ graphNodeId: 'state:picked', value: 'none' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:detail',
+				dependencies: [{ graphNodeId: 'state:picked', path: [] }],
+				key: (read) => read('state:picked'),
+				run: ({ key }: { key: unknown }) => (keys.push(key), Promise.resolve({ key })),
+			},
+		],
+	} as never);
+	const release = graph.holdPaint!((graphNodeId) => graphNodeId === 'state:picked');
+	graph.write({ graphNodeId: 'state:picked', value: 'b' });
+	graph.readShown!('computed:detail', ['status']);
+	await macrotask();
+	release('state:picked');
+	await macrotask();
+	expect(keys).toEqual(['b']);
 });

@@ -5,6 +5,7 @@ import {
 	ROUND_HOLDING,
 	ROUND_SENDING,
 	ROUND_SENDING_SAVED,
+	registerWriteRefresh,
 	type RoundPhase,
 	WRITE_IDLE,
 	WRITE_OWED,
@@ -12,6 +13,8 @@ import {
 	WRITE_WRITING_SUCCEEDED,
 	type WritePhase,
 } from '../src/resume-return-reask.ts';
+import { dispatchSpans, runAsDispatchOwn, type DispatchSpan } from '../src/event-current-target.ts';
+import { IN_PLACE_LOCATION_HEADER } from '../src/fns/in-place-headers.ts';
 
 const phases = [
 	WRITE_IDLE,
@@ -62,3 +65,47 @@ for (const from of roundPhases)
 				else expect(run).toThrow(/no round move/);
 			});
 		}
+
+// A fetch whose answers the test hands out one by one, and a control that records its aria-busy.
+function saveRig() {
+	const answers: Array<(answer: Response) => void> = [];
+	globalThis.location ??= new URL('http://write-watch.test/page') as unknown as Location;
+	globalThis.fetch = ((() => new Promise<Response>((answer) => answers.push(answer))) as unknown) as typeof fetch;
+	const control = () => {
+		const attributes = new Map<string, string>();
+		return {
+			attributes,
+			setAttribute: (name: string, value: string) => void attributes.set(name, value),
+			removeAttribute: (name: string) => void attributes.delete(name),
+		};
+	};
+	const send = (span: DispatchSpan) => {
+		dispatchSpans().add(span);
+		void runAsDispatchOwn(span, () => fetch('/save', { method: 'POST' }));
+		span.open = false;
+		dispatchSpans().delete(span);
+		span.closed?.();
+	};
+	return { answers, control, send };
+}
+const turns = async () => {
+	for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+};
+
+test('a save sent after another save left the page ends its busy mark once it answers, though an older save answered first', async () => {
+	const { answers, control, send } = saveRig();
+	const release = registerWriteRefresh({}, new Map());
+	const [older, leaving, later] = [control(), control(), control()];
+	send({ open: true, control: older as unknown as Element });
+	send({ open: true, control: leaving as unknown as Element });
+	answers[1]!(new Response('{}', { headers: { [IN_PLACE_LOCATION_HEADER]: '/elsewhere' } }));
+	await turns();
+	send({ open: true, control: later as unknown as Element });
+	expect(later.attributes.get('aria-busy')).toBe('true');
+	answers[0]!(new Response('{}'));
+	await turns();
+	answers[2]!(new Response('{}'));
+	await turns();
+	expect([older.attributes.has('aria-busy'), leaving.attributes.has('aria-busy'), later.attributes.has('aria-busy')]).toEqual([false, false, false]);
+	release();
+});

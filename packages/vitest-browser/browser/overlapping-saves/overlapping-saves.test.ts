@@ -3,6 +3,8 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { poll } from '../back-revalidate/support.ts';
 import { click, frames, text, texts, watch } from '../hold-after-save/support.ts';
 import AddsPage from './adds-page.tsrx';
+import DetailPage from './detail-page.tsrx';
+import EdgesPage from './edges-page.tsrx';
 import RowCallbackPage from './row-callback-page.tsrx';
 import RowStatePage from './row-state-page.tsrx';
 import { installServer, resetServer, server } from './server.ts';
@@ -25,6 +27,8 @@ const pages = {
 	rowCallback: { CSR: () => render(RowCallbackPage), SSR: () => renderSSR(RowCallbackPage) },
 	toggle: { CSR: () => render(TogglePage), SSR: () => renderSSR(TogglePage) },
 	adds: { CSR: () => render(AddsPage), SSR: () => renderSSR(AddsPage) },
+	detail: { CSR: () => render(DetailPage), SSR: () => renderSSR(DetailPage) },
+	edges: { CSR: () => render(EdgesPage), SSR: () => renderSSR(EdgesPage) },
 };
 
 async function ready(mode: Mode, page: keyof typeof pages, selector = '[data-flag], [data-todo]') {
@@ -207,6 +211,96 @@ for (const mode of MODES) {
 	// A newer press that replaces a whole shared list shows what code holds now, which no longer lists the earlier row.
 	test.fails(`${mode}: today: a shared list replaced whole by a press during an earlier save's reload drops the earlier row's look`, async () => {
 		expect(await startDuringReload(mode, 'rowCallback')).toEqual({ a: ['off', 'on+p', 'on'], b: ['off', 'on+p', 'on'] });
+	});
+
+	test(`${mode}: a save sent after another save's answer left the page ends its busy mark, though an older save answered first`, async () => {
+		await ready(mode, 'shared');
+		await press('[data-flip="a"]', () => looks('a', 'b'), ['on+p', 'off']);
+		click('[data-leave]');
+		await answerSave('leave');
+		await frames(3);
+		await press('[data-flip="b"]', () => looks('a', 'b'), ['on+p', 'on+p']);
+		const later = document.querySelector('[data-flip="b"]')!;
+		expect(later.getAttribute('aria-busy')).toBe('true');
+		await answerSave('flip a');
+		await frames(3);
+		await answerSave('flip b');
+		await answerReads();
+		await expect.poll(() => later.getAttribute('aria-busy'), poll).toBe(null);
+		await expect.poll(() => looks('a', 'b'), poll).toEqual(['on', 'on']);
+	});
+
+	// A value created by the arm itself cannot be built here yet (MARKLESS_PRERENDER_BRANCH_MISSING); graph-paint-hold covers its first read.
+	test(`${mode}: an async value keyed on a held state, shown by an arm that opens during the hold, loads once with the new value`, async () => {
+		await ready(mode, 'detail', '[data-pick]');
+		await press('[data-pick]', () => text('[data-picked]'), 'saving');
+		// A client-rendered page loads the value at mount and again for the handler's own write; only later requests count.
+		await frames(3);
+		const before = server.details.length;
+		await answerSave('flip a');
+		await expect.poll(() => server.details.length, poll).toBeGreaterThan(before);
+		await frames(5);
+		expect(text('[data-picked]')).toBe('saving');
+		for (let round = 0; round < 3; round++) {
+			for (const read of server.reads.splice(0)) read.answer();
+			await frames(5);
+		}
+		await expect.poll(() => [text('[data-picked]'), text('[data-detail]')], poll).toEqual(['b', 'b']);
+		expect(server.details.slice(before)).toEqual(['b']);
+	});
+
+	test(`${mode}: one failure among three overlapping saves releases at once, and the other two hold until the reload`, async () => {
+		await ready(mode, 'rowState');
+		const stop = watch(() => looks('a', 'b', 'c'));
+		await press('[data-flip="a"]', () => looks('a', 'b', 'c'), ['on+p', 'off', 'off']);
+		await press('[data-flip="b"]', () => looks('a', 'b', 'c'), ['on+p', 'on+p', 'off']);
+		await press('[data-flip="c"]', () => looks('a', 'b', 'c'), ['on+p', 'on+p', 'on+p']);
+		await answerSave('flip a');
+		await answerSave('flip b', false);
+		await expect.poll(() => looks('a', 'b', 'c'), poll).toEqual(['on+p', 'off', 'on+p']);
+		await answerSave('flip c');
+		await expect.poll(() => server.reads.length, poll).toBeGreaterThan(0);
+		await frames(5);
+		expect(looks('a', 'b', 'c')).toEqual(['on+p', 'off', 'on+p']);
+		await answerReads();
+		await expect.poll(() => looks('a', 'b', 'c'), poll).toEqual(['on', 'off', 'on']);
+		const rows = seen((await stop()).changes);
+		expect([column(rows, 0), column(rows, 2)]).toEqual([
+			['off', 'on+p', 'on'],
+			['off', 'on+p', 'on'],
+		]);
+	});
+
+	test(`${mode}: a save that has not answered keeps the others held, with no reload, until it answers`, async () => {
+		await ready(mode, 'rowState');
+		await press('[data-flip="a"]', () => looks('a', 'b'), ['on+p', 'off']);
+		await press('[data-flip="b"]', () => looks('a', 'b'), ['on+p', 'on+p']);
+		const reads = server.readsSent;
+		await answerSave('flip b');
+		await frames(10);
+		expect([looks('a', 'b'), server.readsSent]).toEqual([['on+p', 'on+p'], reads]);
+		await answerSave('flip a');
+		await answerReads();
+		await expect.poll(() => looks('a', 'b'), poll).toEqual(['on', 'on']);
+	});
+
+	async function tagDuringHold(mode: Mode) {
+		await ready(mode, 'edges', '[data-tag]');
+		await press('[data-add-tag]', () => text('[data-label]'), 'saving');
+		await answerSave('flip a');
+		await expect.poll(() => texts('[data-tag]').length, poll).toBe(2);
+		await answerReads();
+		await expect.poll(() => text('[data-label]'), poll).toBe('saved');
+		await frames(3);
+	}
+	test(`${mode}: a row created while a state is held leaves the state's written value alone`, async () => {
+		await tagDuringHold(mode);
+		expect(text('[data-label]')).toBe('saved');
+	});
+	// Client-rendered only: the row is built while the page paints, so a state it seeds from a held prop starts from the shown value.
+	(mode === 'CSR' ? test.fails : test)(`${mode}: a row created while a state is held seeds its own state from the new value`, async () => {
+		await tagDuringHold(mode);
+		expect(texts('[data-tag]')).toEqual(['ready', 'saved']);
 	});
 
 	test(`${mode}: a state written after the save, read beside the held one, does not show the held one early`, async () => {
