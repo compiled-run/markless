@@ -1,0 +1,72 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 157,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 28,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 157,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 32,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 157,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost (measured on PR CI run 43379986641 against merge group run 43373448910)",
+			"date": "2026-11-13"
+		}
+	]
+}

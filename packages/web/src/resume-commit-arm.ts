@@ -273,9 +273,10 @@ export async function registerArmRecordSet(
 }
 
 function installArmEventTypes(
-	records: ResumeArmRecordSet,
+	records: ResumeArmRecordSet | null,
 	installEventType: (eventType: string) => void,
 ): void {
+	if (!records) return;
 	for (const event of records.events) installEventType(event.eventName);
 	for (const branch of records.branches ?? []) {
 		for (const arm of branch.armRecords ?? [])
@@ -285,6 +286,8 @@ function installArmEventTypes(
 	}
 	for (const repeat of records.keyedRepeats ?? [])
 		for (const event of repeat.rowEvents) installEventType(event.eventName);
+	for (const nested of records.asyncBoundaries ?? [])
+		installArmEventTypes(boundaryArmRecordSet(nested.armRecords), installEventType);
 }
 
 function assertNativeArmRecordHosts(update: ArmCommitUpdate): void {
