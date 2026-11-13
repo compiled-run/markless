@@ -1788,11 +1788,11 @@ test('emitSymbolModules emits static call assignment values for event handler mo
 		kind: 'event-handler',
 		exportName: 'symbol_clamp',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.update({');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'return Math.max(value, context.graph.read("state:profile", ["step"]))',
+		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -1858,11 +1858,11 @@ test('emitSymbolModules re-emits imported helper calls for event handler modules
 		exportName: 'symbol_clamp',
 	});
 	expect(artifact.modules[0].source).toContain('import { clamp } from "./math";');
-	expect(artifact.modules[0].source).toContain('context.graph.update({');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'return clamp(value, context.graph.read("state:profile", ["step"]))',
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -2374,9 +2374,9 @@ test('emitSymbolModules preserves bare local helper call assignment values in au
 		kind: 'event-handler',
 		exportName: 'symbol_localClamp',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.update({');
+	expect(artifact.modules[0].source).toContain('context.graph.write({');
 	expect(artifact.modules[0].source).toContain(
-		'return clamp(value, context.graph.read("state:profile", ["step"]))',
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 	expect(artifact.modules[0].source).not.toContain('void context;');
 });
@@ -2443,7 +2443,7 @@ test('emitSymbolModules re-emits namespace imported helper calls for event handl
 	});
 	expect(artifact.modules[0].source).toContain('import * as math from "./math";');
 	expect(artifact.modules[0].source).toContain(
-		'return math.clamp(value, context.graph.read("state:profile", ["step"]))',
+		'value: math.clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 });
 

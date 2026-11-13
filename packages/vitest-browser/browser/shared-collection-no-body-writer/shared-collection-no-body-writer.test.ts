@@ -134,10 +134,10 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(fieldValues()).toEqual([]);
 		click('add');
 
-		// The refusal names the read, not the instance, and the handler ran and
+		// The refusal names the update's value, not the instance, and the handler ran and
 		// caught it - so nothing reached the collection and nothing escaped.
 		await expect.poll(() => ran()).toBe('1');
-		expect(refused()).toContain('is not iterable');
+		expect(refused()).toBe('value is not iterable');
 		expect(fieldValues()).toEqual([]);
 		expect(count()).toBe('0');
 		expect(el('field').getAttribute('ui-seen')).toBe('');

@@ -94,8 +94,7 @@ test('a template-literal receiver lowers the reads interpolated into it', async 
 	`);
 
 	expect(result.symbolModules.diagnostics).toEqual([]);
-	// The value replaces the field it reads, so the updater's value stands in for that read.
-	expect(handlerSource(result)).toContain('return `${value}${key}`.toLowerCase()');
+	expect(handlerSource(result)).toContain(`context.graph.read("${SHARED_ID}", ["typeahead"])`);
 });
 
 test('nested parentheses around the receiver do not hide the read', async () => {

@@ -42,9 +42,8 @@ export function App() @{
 			expect.stringContaining('value: makeItems(context.graph.read("state:nextId"), 10)'),
 			expect.stringContaining('value: null'),
 			expect.stringContaining('import { appendItems } from "./items";'),
-			// `items = appendItems(items, …)` reads what it replaces, so the updater's value stands in for that read.
 			expect.stringContaining(
-				'return appendItems(value, context.graph.read("state:nextId"), 10)',
+				'value: appendItems(context.graph.read("state:items"), context.graph.read("state:nextId"), 10)',
 			),
 		]),
 	);

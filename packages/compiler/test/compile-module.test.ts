@@ -5608,21 +5608,21 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const callValueModule = eventModuleSource('total = Math.max(total, profile.step)');
 
-	expect(callValueModule).toContain('context.graph.update({');
+	expect(callValueModule).toContain('context.graph.write({');
 	expect(callValueModule).toContain('graphNodeId: "state:total"');
 	expect(callValueModule).toContain('path: []');
 	expect(callValueModule).toContain(
-		'return Math.max(value, context.graph.read("state:profile", ["step"]))',
+		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 
 	const importedCallValueModule = eventModuleSource('total = clamp(total, profile.step)');
 
 	expect(importedCallValueModule).toContain('import { clamp } from "./math";');
-	expect(importedCallValueModule).toContain('context.graph.update({');
+	expect(importedCallValueModule).toContain('context.graph.write({');
 	expect(importedCallValueModule).toContain('graphNodeId: "state:total"');
 	expect(importedCallValueModule).toContain('path: []');
 	expect(importedCallValueModule).toContain(
-		'return clamp(value, context.graph.read("state:profile", ["step"]))',
+		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
 	);
 
 	const arrayLiteralModule = eventModuleSource('items = [nextItem');
