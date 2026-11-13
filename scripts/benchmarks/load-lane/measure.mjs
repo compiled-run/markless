@@ -31,7 +31,8 @@ const port = await new Promise((done) => {
 });
 const server = spawn(process.execPath, [resolve(app, '.output/server/index.mjs')], {
 	env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' },
-	stdio: ['ignore', 'pipe', 'pipe'],
+	cwd: app,
+	stdio: ['ignore', 'ignore', 'inherit'],
 });
 const origin = `http://127.0.0.1:${port}`;
 const url = `${origin}${process.env.PATHNAME ?? '/'}`;
