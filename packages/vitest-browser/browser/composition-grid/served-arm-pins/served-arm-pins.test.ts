@@ -18,9 +18,7 @@ test('SSR: an @if shows the else arm with its own constant prop', async () => {
 	await expect.poll(shown).toBe('tag even');
 });
 
-// Known defect: the server render of a @switch (true) whose case reads an async value gives the default arm's
-// component the constant prop written on the first case's.
-test.fails('SSR: a @switch (true) shows the default arm with its own constant prop', async () => {
+test('SSR: a @switch (true) shows the default arm with its own constant prop', async () => {
 	await renderSSR(AsyncCaseConst);
 	await expect.poll(shown).toBe('tag even');
 });

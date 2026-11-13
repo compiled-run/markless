@@ -163,6 +163,11 @@ function collectBoundaryGateReads(
 		if (!scope) scopes.set(componentName, (scope = scopeOf(componentName)));
 		return scope;
 	};
+	const branchTestIds = new Set(
+		semanticGraph.branchSites.flatMap((site) =>
+			site.testComputedGraphNodeId ? [site.testComputedGraphNodeId] : [],
+		),
+	);
 	const boundaryComponent = new Map(
 		semanticGraph.asyncBoundaries.map((boundary) => [boundary.id, boundary.componentName]),
 	);
@@ -198,6 +203,18 @@ function collectBoundaryGateReads(
 				? { graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath }
 				: {}),
 		})),
+		// A branch test the compiler minted as its own computed (a `@switch (true)` arm index) picks the arm the boundary shows.
+		...semanticGraph.branchSites.flatMap((site) =>
+			site.testComputedGraphNodeId
+				? [
+						{
+							source: site.testSource,
+							asyncBoundaryId: site.asyncBoundaryId,
+							computedGraphNodeId: site.testComputedGraphNodeId,
+						},
+					]
+				: [],
+		),
 		...semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				prop.kind === 'graph-reference'
@@ -250,6 +267,7 @@ function collectBoundaryGateReads(
 					resolved.binding.id.startsWith(TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX) &&
 					asyncInputs.length > 0 &&
 					(resolved.binding.joinsText === true ||
+						branchTestIds.has(resolved.binding.id) ||
 						asyncInputs.length < (resolved.binding.dependencies ?? []).length);
 				if (derived) derivedGraphNodeIds.add(resolved.binding.id);
 				const gates = derived
