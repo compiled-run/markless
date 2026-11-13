@@ -83,27 +83,20 @@ describe('chooseReference', () => {
 		{ sha: 'p2', value: 100, marked: false },
 	];
 
-	test('a tree that records a change for the page is judged against its base', () => {
-		expect(chooseReference({ headValue: 160, headMarked: true }, chain, () => true)).toEqual({
-			index: 0,
-		});
+	test('a page is judged against the last commit that recorded a change to its download', () => {
+		expect(chooseReference({ headValue: 160 }, chain, () => true)).toEqual({ index: 1 });
+		expect(chooseReference({ headValue: 110 }, chain, () => true)).toEqual({ index: 1 });
 	});
 
-	test('a tree that records none is judged against the last commit that did', () => {
-		expect(chooseReference({ headValue: 110, headMarked: false }, chain, () => true)).toEqual({
-			index: 1,
-		});
-	});
-
-	test('an unmeasured reference is crossed to the nearest older measured commit', () => {
-		expect(
-			chooseReference({ headValue: 110, headMarked: false }, chain, (i) => i === 2),
-		).toEqual({ index: 2 });
+	test('an unmeasured reference is not crossed: the page keeps the anchor rule', () => {
+		expect(chooseReference({ headValue: 110 }, chain, (i) => i === 2)).toHaveProperty(
+			'fallback',
+		);
 	});
 
 	test('with no change entry in reach, the page keeps its anchor', () => {
 		const pick = chooseReference(
-			{ headValue: 100, headMarked: false },
+			{ headValue: 100 },
 			[{ sha: 'p0', value: 100, marked: false }],
 			() => true,
 		);
@@ -160,20 +153,17 @@ describe('G16 downloads against a CI baseline', () => {
 		expect(second.failures).toHaveLength(1);
 	});
 
+	test('a recorded change does not get its own allowance on top of growth hidden ahead of it', () => {
+		// H hid +30 since A; B records +50 and grows +50 +20: 50 B unrecorded since A in all.
+		const hiderA = { sha: 'h', anchor: 1100, marked: false, measured: 1052 + 30 };
+		const { baseline, failures } = verdict(1150, true, 1052 + 30 + 70, [hiderA, landedA, main]);
+		expect(baseline.subjects[PAGE].commit).toBe('a');
+		expect(failures).toHaveLength(1);
+	});
+
 	test('growth within the allowance since the last recorded change passes', () => {
 		const { failures } = verdict(1100, false, 1052 + ALLOWED, [landedA, main]);
 		expect(failures).toEqual([]);
-	});
-
-	test('the queue entry ahead, still unmeasured, counts against this one', () => {
-		const ahead = { sha: 'q', anchor: 1150, marked: true };
-		const { baseline, failures } = verdict(1150, false, 1052 + 50 + 60, [
-			ahead,
-			landedA,
-			main,
-		]);
-		expect(baseline.subjects[PAGE].commit).toBe('a');
-		expect(failures).toHaveLength(1);
 	});
 
 	test('executed characters stay on the anchor, whatever the baseline', () => {
@@ -203,6 +193,59 @@ describe('G16 downloads against a CI baseline', () => {
 		expect(anchors.loadWeight[PLATFORM][PAGE].executedChars).toBe(25_000);
 		expect(anchors.loadWeight[PLATFORM][PAGE].jsGzipBytes).toBe(1052);
 	});
+});
+
+describe('when the reference measurement is out of reach', () => {
+	// The reference A drifted 80 B above its anchor; an older commit O drifted 70 B above its own.
+	const older = { sha: 'o', anchor: 1000, marked: true, measured: 1070 };
+	const reference = { sha: 'a', anchor: 1100, marked: true };
+	const absolute = (headAnchor: number, headBytes: number) =>
+		evaluate(
+			measurement(headBytes),
+			anchorsWith({ executedChars: 25_000, jsGzipBytes: headAnchor }),
+		).failures.filter((finding) => finding.guard === 'G16');
+
+	for (const [name, measurementAt] of [
+		['unmeasured', () => undefined],
+		[
+			'the lookup throws',
+			() => {
+				throw new Error('gh: HTTP 403: API rate limit exceeded');
+			},
+		],
+	] as const)
+		test(`${name}: the page is judged by the anchor rule exactly, never a looser one`, () => {
+			const history = {
+				head: {
+					sha: 'head',
+					load: anchorsWith({ executedChars: 25_000, jsGzipBytes: 1100 }).loadWeight,
+					marked: new Set<string>(),
+				},
+				chain: [reference, older].map((commit) => ({
+					sha: commit.sha,
+					load: anchorsWith({ executedChars: 25_000, jsGzipBytes: commit.anchor })
+						.loadWeight,
+					marked: new Set([`${PLATFORM} ${PAGE}`]),
+				})),
+			};
+			const baseline = buildBaseline({
+				history,
+				platform: PLATFORM,
+				measurementAt: (i: number) =>
+					i === 1 ? { ...measurement(older.measured), run: 1 } : measurementAt(),
+			});
+			expect(baseline.subjects).toEqual({});
+			expect(baseline.fallbacks[PAGE]).toMatch(/measurement of a, its last recorded change/);
+			const anchors = anchorsWith({ executedChars: 25_000, jsGzipBytes: 1100 });
+			expect(rebaseLoadAnchors(anchors, baseline)).toEqual(anchors);
+			// Crossing to O would allow 1070 + 100 + 48; the anchor rule allows 1100 + 48.
+			for (const bytes of [1100 + ALLOWED, 1100 + ALLOWED + 1, 1170 + ALLOWED]) {
+				const { failures } = evaluate(measurement(bytes), rebaseLoadAnchors(anchors, baseline));
+				expect(failures.filter((finding) => finding.guard === 'G16')).toEqual(
+					absolute(1100, bytes),
+				);
+			}
+		});
 });
 
 describe('ledgerHistory', () => {
@@ -242,6 +285,134 @@ describe('ledgerHistory', () => {
 		git('init', '-q', '-b', 'main');
 		return { root, git };
 	};
+
+	/**
+	 * A fixture repository whose commits each add one change file, measured at the given bytes, judged in order the
+	 * way CI judges each one: against the history before it.
+	 */
+	const judgeSeries = (
+		steps: { name: string; changes: object[]; bytes: number }[],
+		anchor = 1000,
+	) => {
+		const { root, git } = fixtureRepo();
+		const changes = join(root, 'scripts/benchmarks/anchor-changes');
+		mkdirSync(changes, { recursive: true });
+		mkdirSync(join(root, 'scripts/benchmarks/perf-guards'), { recursive: true });
+		writeFileSync(
+			join(root, 'scripts/benchmarks/perf-guards/anchors.json'),
+			JSON.stringify(anchorsWith({ executedChars: 25_000, jsGzipBytes: anchor })),
+		);
+		git('add', '-A');
+		git('commit', '-q', '-m', 'anchors');
+		const measured = new Map<string, number>();
+		return steps.map((step) => {
+			writeFileSync(join(changes, `${step.name}.json`), JSON.stringify({ changes: step.changes }));
+			git('add', '-A');
+			git('commit', '-q', '-m', step.name);
+			const sha = git('rev-parse', 'HEAD');
+			const history = ledgerHistory({ root, depth: 50 });
+			const baseline = buildBaseline({
+				history,
+				platform: PLATFORM,
+				measurementAt: (i: number) => {
+					const bytes = measured.get(history.chain[i].sha);
+					return bytes === undefined ? undefined : { ...measurement(bytes), run: 1 };
+				},
+			});
+			measured.set(sha, step.bytes);
+			const anchors = rebaseLoadAnchors({ loadWeight: history.head.load }, baseline);
+			const failures = evaluate(measurement(step.bytes), anchors).failures.filter(
+				(finding) => finding.guard === 'G16',
+			);
+			return {
+				name: step.name,
+				sha,
+				failures: failures.length,
+				reference: baseline.subjects[PAGE],
+			};
+		});
+	};
+	const change = (field: string, delta: number) => ({
+		surface: 'perf-guards',
+		path: ['loadWeight', PLATFORM, PAGE, field],
+		delta,
+		reason: 'test',
+	});
+	const recorded = { name: 'r', changes: [change('jsGzipBytes', 100)], bytes: 1100 };
+
+	test('a 0 B entry is no record: three changes each growing 47 B share one allowance', () => {
+		const verdicts = judgeSeries([
+			recorded,
+			{ name: 'a', changes: [change('jsGzipBytes', 0)], bytes: 1147 },
+			{ name: 'b', changes: [change('jsGzipBytes', 0)], bytes: 1194 },
+			{ name: 'c', changes: [change('jsGzipBytes', 0)], bytes: 1241 },
+		]);
+		expect(verdicts.map((v) => [v.name, v.failures])).toEqual([
+			['r', 0],
+			['a', 0],
+			['b', 1],
+			['c', 1],
+		]);
+		expect(verdicts.at(-1)!.reference.commit).toBe(verdicts[0].sha);
+	});
+
+	test('an entry that changes only executed chars is no record of a download change', () => {
+		const verdicts = judgeSeries([
+			recorded,
+			{ name: 'a', changes: [change('executedChars', 400)], bytes: 1147 },
+			{ name: 'b', changes: [change('executedChars', 400)], bytes: 1194 },
+		]);
+		expect(verdicts.map((v) => [v.name, v.failures])).toEqual([
+			['r', 0],
+			['a', 0],
+			['b', 1],
+		]);
+	});
+
+	test('a platform-wide entry is no record of a download change for each page', () => {
+		const platform = (name: string) => ({
+			surface: 'perf-guards',
+			path: ['loadWeight', 'darwin-arm64'],
+			set: { [PAGE]: { executedChars: 1, jsGzipBytes: name.length } },
+			reason: 'test',
+		});
+		const verdicts = judgeSeries([
+			recorded,
+			{ name: 'a', changes: [platform('a')], bytes: 1147 },
+			{
+				name: 'b',
+				changes: [
+					{
+						surface: 'perf-guards',
+						path: ['loadWeight', PLATFORM],
+						set: { [PAGE]: { executedChars: 25_000, jsGzipBytes: 1000 } },
+						reason: 'test',
+					},
+				],
+				bytes: 1194,
+			},
+		]);
+		expect(verdicts.map((v) => [v.name, v.failures])).toEqual([
+			['r', 0],
+			['a', 0],
+			['b', 1],
+		]);
+	});
+
+	test('a recorded change of N lets the page move by N, from the last real record', () => {
+		const verdicts = judgeSeries([
+			recorded,
+			{ name: 'a', changes: [change('jsGzipBytes', 0)], bytes: 1130 },
+			{ name: 'b', changes: [change('jsGzipBytes', 200)], bytes: 1130 + 200 + 18 },
+			{ name: 'c', changes: [change('jsGzipBytes', 200)], bytes: 1130 + 200 + 19 + 200 },
+		]);
+		expect(verdicts.map((v) => [v.name, v.failures])).toEqual([
+			['r', 0],
+			['a', 0],
+			['b', 0],
+			['c', 0],
+		]);
+	});
 
 	test('reads the repository it is given, not one a git hook names', () => {
 		const outer = fixtureRepo();

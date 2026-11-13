@@ -1169,7 +1169,8 @@ jobs:
         needs: [typecheck, lanes]
         if: needs.lanes.outputs.run_perf_guards == 'true'
         runs-on: ubuntu-26.04
-        timeout-minutes: 30
+        # Slowest of 165 jobs took 14.3 min; the G16 baseline adds up to 10 min of waiting and ~1 min of downloads: 25.3, so 40 leaves 14.7.
+        timeout-minutes: 40
         permissions:
             contents: read
             # Reads the CI measurements of the commits G16 judges each page's download against.

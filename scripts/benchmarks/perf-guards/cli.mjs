@@ -23,9 +23,9 @@ const USAGE = `usage:
   node scripts/benchmarks/perf-guards/cli.mjs accept <${GUARDS.join('|')}> <subject|*> --reason "<why>" [--from-last | --from <file>] [--base <file>] [--no-build]
     accept records this tree's measurement minus its merge-base's; without --base it measures the merge-base in a throwaway checkout.
     A load change for Linux comes from two CI artifacts (gh run download <run> -n perf-guards-measurement): --from this pull
-    request's run, --base the merge-queue run of its merge-base. Each recorded change is judged on its own: CI compares a
-    page's download with its base's measurement plus the change, so changes queued together do not count against each other.
-    Record every page your change grows, even by a few bytes: growth nobody records adds up across pull requests.`;
+    request's run, --base the merge-queue run of its merge-base. CI judges a page's download against its measurement of the
+    last commit that recorded a nonzero change to it, plus the changes recorded since, so recorded changes compose in the queue.
+    Record every page your change grows, even by a few bytes: growth nobody records shares one 48 B allowance across pull requests.`;
 
 /** anchors.json with every pending change file applied, and G16 downloads moved onto CI's baseline when one is named. */
 export function readAnchors() {

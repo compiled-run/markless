@@ -29,26 +29,25 @@ function gitIn(root, args, options = {}) {
 
 /**
  * The commit whose measurement a page's download is judged against, as an index into `chain` (HEAD^1 first, then
- * its first parents; each entry has the page's applied anchor `value` and `marked`, whether that commit added a
- * change entry for the page). A tree that adds an entry for the page is judged against its base, so changes queued
- * ahead of it compose. A tree that adds none is judged against the last commit that did, so growth nobody recorded
- * adds up across changes. `measured(i)` says whether CI measured `chain[i]`; an unmeasured commit is crossed, and
- * whatever it changed counts against this tree.
+ * its first parents; each entry has the page's applied anchor `value` and `marked`, whether that commit recorded a
+ * nonzero change to the page's download). It is the last commit that did, whatever this tree records: changes
+ * recorded since move the limit by exactly what they record, and every byte nobody recorded since shares one
+ * allowance. `measured(i)` says whether CI's measurement of `chain[i]` is in hand; without the reference's own
+ * measurement the page keeps the anchor rule, since an older one could sit further above its anchor.
  */
-export function chooseReference({ headValue, headMarked }, chain, measured) {
+export function chooseReference({ headValue }, chain, measured) {
 	if (headValue === undefined) return { fallback: 'the page has no anchor at this commit' };
-	if (chain.length === 0) return { fallback: 'no history before this commit' };
-	const from = headMarked ? 0 : chain.findIndex((entry) => entry.marked);
+	const from = chain.findIndex((entry) => entry.marked);
 	if (from < 0)
 		return {
-			fallback: `no change entry for the page in the last ${chain.length} commits, so the commit its growth is counted from is out of reach`,
+			fallback: `no recorded change to its download in the last ${chain.length} commits`,
 		};
-	for (let i = from; i < chain.length; i++) {
-		if (chain[i].value === undefined)
-			return { fallback: `${chain[i].sha.slice(0, 10)} has no anchor for the page` };
-		if (measured(i)) return { index: i };
-	}
-	return { fallback: 'CI measured no commit at or before the one its growth is counted from' };
+	const sha = chain[from].sha.slice(0, 10);
+	if (chain[from].value === undefined) return { fallback: `${sha} has no anchor for the page` };
+	const reason = measured(from);
+	if (reason !== true)
+		return { fallback: `CI's measurement of ${sha}, its last recorded change, ${reason}` };
+	return { index: from };
 }
 
 /** Replaces each referenced page's download anchor with its reference measurement plus the change recorded since. */
@@ -90,12 +89,12 @@ export function applyBaseline(
 	const sha = head();
 	if (baseline.head !== sha) {
 		log(
-			`[perf-guard] ${file} was written for ${baseline.head}, not ${sha}; G16 downloads use the anchors alone`,
+			`[perf-guard] ${baseline.reason ? `no G16 baseline (${baseline.reason})` : `${file} was written for ${baseline.head}, not ${sha}`}; G16 downloads are judged by the anchor rule`,
 		);
 		return anchors;
 	}
 	for (const [subject, reason] of Object.entries(baseline.fallbacks ?? {}))
-		log(`[perf-guard] G16 ${subject}: judged against its anchor alone: ${reason}`);
+		log(`[perf-guard] G16 ${subject}: judged by the anchor rule: ${reason}`);
 	return rebaseLoadAnchors(anchors, baseline);
 }
 
@@ -150,24 +149,42 @@ export function ledgerAt(sha, options) {
 	return applyChanges(anchors, files, 'perf-guards');
 }
 
-/** Every load-anchor change entry in a ledger, keyed by the page it names (`<platform> <page>`). */
+/** The page (`<platform> <page>`) whose download an entry changes by a nonzero amount, or undefined. */
+function downloadPage(entry) {
+	const { path } = entry;
+	if (entry.surface !== 'perf-guards' || path[0] !== 'loadWeight' || path.length < 3) return undefined;
+	if (path.length > 3 && path[3] !== 'jsGzipBytes') return undefined;
+	if ('delta' in entry && entry.delta === 0) return undefined;
+	return `${path[1]} ${path[2]}`;
+}
+
+/** Every entry in a ledger that changes one page's download, keyed by that page. */
 function loadEntries({ files }) {
 	const keys = new Map();
 	for (const file of files)
 		for (const entry of file.changes) {
-			if (entry.surface !== 'perf-guards' || entry.path[0] !== 'loadWeight') continue;
-			const page = entry.path.length > 2 ? `${entry.path[1]} ${entry.path[2]}` : `${entry.path[1]} *`;
+			const page = downloadPage(entry);
+			if (!page) continue;
 			const key = `${file.name}\u0000${JSON.stringify(entry)}`;
 			keys.set(page, (keys.get(page) ?? new Set()).add(key));
 		}
 	return keys;
 }
 
-/** The pages (`<platform> <page>`, or `<platform> *`) whose change entries at `after` include one `before` lacks. */
+const downloadOf = (load, page) => {
+	const space = page.indexOf(' ');
+	return load[page.slice(0, space)]?.[page.slice(space + 1)]?.jsGzipBytes;
+};
+
+/** The pages that gained an entry for their download from `before` to `after` and whose applied download moved. */
 function markedPages(before, after) {
 	const marked = new Set();
-	for (const [page, keys] of after)
-		for (const key of keys) if (!before.get(page)?.has(key)) marked.add(page);
+	for (const [page, keys] of after.entries)
+		if (
+			[...keys].some((key) => !before.entries.get(page)?.has(key)) &&
+			downloadOf(before.load, page) !== downloadOf(after.load, page)
+		)
+			marked.add(page);
 	return marked;
 }
 
@@ -196,27 +213,21 @@ export function ledgerHistory({ root = ROOT_DIR, depth = 300, rev = 'HEAD' } = {
 			.filter(Boolean),
 	);
 	const entries = Array.from({ length: chain.length });
-	let ledger = ledgerFilesAt(chain.at(-1), { root });
-	let load = loadOf(headOf(ledger));
-	let previous = loadEntries(ledger);
-	entries[chain.length - 1] = { sha: chain.at(-1), load, marked: new Set() };
+	const stateOf = (ledger) => ({ load: loadOf(headOf(ledger)), entries: loadEntries(ledger) });
+	let previous = stateOf(ledgerFilesAt(chain.at(-1), { root }));
+	entries[chain.length - 1] = { sha: chain.at(-1), load: previous.load, marked: new Set() };
 	for (let i = chain.length - 2; i >= 0; i--) {
 		let marked = new Set();
 		if (touched.has(chain[i])) {
-			ledger = ledgerFilesAt(chain[i], { root });
-			load = loadOf(headOf(ledger));
-			const current = loadEntries(ledger);
+			const current = stateOf(ledgerFilesAt(chain[i], { root }));
 			marked = markedPages(previous, current);
 			previous = current;
 		}
-		entries[i] = { sha: chain[i], load, marked };
+		entries[i] = { sha: chain[i], load: previous.load, marked };
 	}
+	const current = stateOf(headLedger);
 	return {
-		head: {
-			sha: head,
-			load: loadOf(headOf(headLedger)),
-			marked: markedPages(previous, loadEntries(headLedger)),
-		},
+		head: { sha: head, load: current.load, marked: markedPages(previous, current) },
 		chain: entries,
 	};
 }
@@ -228,12 +239,9 @@ export function measuredDownload(measurement, subject) {
 		?.jsGzipBytes;
 }
 
-const marks = (marked, platform, subject) =>
-	marked.has(`${platform} ${subject}`) || marked.has(`${platform} *`);
-
 /**
  * Picks every page's reference from the history. `measurementAt(i)` returns CI's measurement of `chain[i]`
- * or undefined; it is called lazily and should cache.
+ * or undefined, and may throw (an API error); it is called lazily and should cache.
  */
 export function buildBaseline({ history, platform, measurementAt }) {
 	const subjects = {};
@@ -243,24 +251,22 @@ export function buildBaseline({ history, platform, measurementAt }) {
 		const chain = history.chain.map((entry) => ({
 			sha: entry.sha,
 			value: entry.load[platform]?.[subject]?.jsGzipBytes,
-			marked: marks(entry.marked, platform, subject),
+			marked: entry.marked.has(`${platform} ${subject}`),
 		}));
 		const usable = (i) => {
-			const measurement = measurementAt(i);
-			return (
-				measurement !== undefined &&
-				(measurement.platform ?? platform) === platform &&
-				measuredDownload(measurement, subject) !== undefined
-			);
+			let measurement;
+			try {
+				measurement = measurementAt(i);
+			} catch (error) {
+				return `could not be read (${String(error.message ?? error).split('\n')[0]})`;
+			}
+			if (measurement === undefined) return 'is not available';
+			if ((measurement.platform ?? platform) !== platform)
+				return `was taken on ${measurement.platform}`;
+			if (measuredDownload(measurement, subject) === undefined) return 'has no such page';
+			return true;
 		};
-		const pick = chooseReference(
-			{
-				headValue: headPages[subject].jsGzipBytes,
-				headMarked: marks(history.head.marked, platform, subject),
-			},
-			chain,
-			usable,
-		);
+		const pick = chooseReference({ headValue: headPages[subject].jsGzipBytes }, chain, usable);
 		if ('fallback' in pick) {
 			fallbacks[subject] = pick.fallback;
 			continue;

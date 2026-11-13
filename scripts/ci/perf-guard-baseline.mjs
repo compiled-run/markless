@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Writes the G16 baseline for HEAD: per page, the CI measurement it is judged against. Any failure writes no references, which leaves the guard on its anchors.
+// Writes the G16 baseline for HEAD: per page, the CI measurement it is judged against. A page whose measurement cannot be read keeps the anchor rule.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -98,14 +98,19 @@ function main(argv) {
 			if (!measurements.has(i)) {
 				const commitRuns = runs.get(history.chain[i].sha) ?? [];
 				const reachable = commitRuns.length > 0 && lookups++ < MAX_LOOKUPS;
-				measurements.set(
-					i,
-					reachable
-						? measurementOf(repo, commitRuns, scratch, deadline, console.log)
-						: undefined,
-				);
+				try {
+					measurements.set(i, {
+						value: reachable
+							? measurementOf(repo, commitRuns, scratch, deadline, console.log)
+							: undefined,
+					});
+				} catch (error) {
+					measurements.set(i, { error });
+				}
 			}
-			return measurements.get(i);
+			const { value, error } = measurements.get(i);
+			if (error) throw error;
+			return value;
 		};
 		baseline = buildBaseline({ history, platform, measurementAt });
 	} catch (error) {
@@ -116,14 +121,14 @@ function main(argv) {
 	writeFileSync(out, `${JSON.stringify(baseline, null, '\t')}\n`);
 	if (baseline.reason)
 		console.log(
-			`no G16 baseline (${baseline.reason}); the guard judges downloads against the anchors`,
+			`no G16 baseline (${baseline.reason}); every page's download is judged by the anchor rule`,
 		);
 	for (const [subject, reference] of Object.entries(baseline.subjects))
 		console.log(
 			`G16 ${subject}: ${reference.measured} B measured on ${reference.commit.slice(0, 10)} (run ${reference.run}), anchor there ${reference.anchored} B`,
 		);
 	for (const [subject, reason] of Object.entries(baseline.fallbacks))
-		console.log(`G16 ${subject}: judged against its anchor alone: ${reason}`);
+		console.log(`G16 ${subject}: judged by the anchor rule: ${reason}`);
 	return 0;
 }
 

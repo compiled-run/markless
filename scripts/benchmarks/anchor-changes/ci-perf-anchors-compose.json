@@ -5,47 +5,11 @@
 			"path": [
 				"loadWeight",
 				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"delta": 162,
+			"reason": "#686 (e858f5682) grew this page by 162 B gzip downloaded and recorded no change for it; its merge-queue run 43493299771 measured it 162 B above run 43480651776 of its base 73cb34fdc. The anchor spare room let it land; recorded so the growth is counted from a real record",
 			"date": "2026-11-13"
 		},
 		{
@@ -56,20 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 0,
-			"reason": "Download growth on this page is counted from CI's measurement of this commit; what main downloaded before it was already accepted by the absolute anchors",
+			"delta": 163,
+			"reason": "#686 (e858f5682) grew this page by 163 B gzip downloaded and recorded no change for it; its merge-queue run 43493299771 measured it 163 B above run 43480651776 of its base 73cb34fdc. The anchor spare room let it land; recorded so the growth is counted from a real record",
 			"date": "2026-11-13"
 		}
 	]

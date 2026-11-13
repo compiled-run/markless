@@ -9,7 +9,7 @@ export default defineConfig({
 		environment: 'node',
 		fileParallelism: false,
 		testTimeout: 60_000,
-		// Measuring takes about 6 min on the runner; in the merge queue the baseline then waits up to 10 for the entry ahead to measure.
-		hookTimeout: 1_200_000,
+		// Measuring took 7.6 min (run 43455257900), then up to 10 min waiting for the queue entry ahead and ~1 min of downloads: 18.6, so 25 leaves 6.4.
+		hookTimeout: 1_500_000,
 	},
 });
