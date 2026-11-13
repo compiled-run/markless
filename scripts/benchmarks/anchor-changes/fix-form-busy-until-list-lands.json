@@ -108,7 +108,7 @@
 				"docs /",
 				"executedChars"
 			],
-			"delta": 32,
+			"delta": 34,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
 		},
@@ -120,7 +120,7 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 40,
+			"delta": 63,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
 		},
@@ -132,7 +132,7 @@
 				"docs /concepts/state",
 				"executedChars"
 			],
-			"delta": -1,
+			"delta": 1,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
 		},
@@ -144,7 +144,7 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 40,
+			"delta": 63,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
 		}
