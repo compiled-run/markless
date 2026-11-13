@@ -2,6 +2,7 @@ import type { AsyncComputedPlane, RuntimeGraph } from '@markless/runtime';
 import type { RuntimeAsyncComputedNode } from '@markless/runtime/graph-async-load';
 import { currentDispatch, dispatchSpans, holdBusy, type DispatchSpan } from './event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from './fns/in-place-headers.ts';
+import { createPaintHold } from './paint-hold.ts';
 
 // Re-asks the async values a container shows: on a back-forward cache restore, and after a handler's save succeeds.
 
@@ -400,8 +401,8 @@ export function registerWriteRefresh(graph: Container[0], boundaries: Container[
 	const container: Container = [graph, boundaries];
 	patchFetch();
 	containers.add(container);
-	const release = graph.holdPaint?.(holdPaint(graph));
-	if (release) releases.set(graph, release);
+	const plane = graph.holdPaint?.((internals) => createPaintHold(internals, holdPaint(graph)));
+	if (plane) releases.set(graph, plane.release);
 	return () => {
 		graph.holdPaint?.(undefined);
 		releases.delete(graph);

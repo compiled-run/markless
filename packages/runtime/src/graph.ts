@@ -1,6 +1,5 @@
 import type { ProtocolStatePayload } from '@markless/serializer';
 import {
-	copyAlong,
 	deletePath,
 	dirtyPathForGraphWrite,
 	pathsIntersect,
@@ -414,21 +413,10 @@ export type RuntimeGraph = {
 	readonly holdFlush?: () => () => void;
 	/** The pass that will paint pending writes, without starting it, so a hold still applies; `undefined` when nothing is pending. */
 	readonly pendingFlush?: () => Promise<void> | undefined;
-	/** Whether a hold keeps any state on its earlier value. */
-	readonly showing?: () => boolean;
-	/** Whether the page paints another value of `graphNodeId` than code reads. */
-	readonly shows?: (graphNodeId: string) => boolean;
-	/** Reads as the page paints: a held state answers the value it shows. */
-	readonly readShown?: RuntimeGraphRead;
-	/** A value derived from shown states paints `shown` until it is derived again without one; no `shown` ends that. */
-	readonly showDerived?: (graphNodeId: string, shown?: { readonly value: unknown }) => void;
-	/**
-	 * A state write `hold` answers true for is read at once by code, computeds and async values, while the page keeps
-	 * painting the state's earlier value until the returned release runs for that state.
-	 */
-	readonly holdPaint?: (
-		hold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined,
-	) => (graphNodeId: string) => void;
+	/** Installs the paint hold the write watch builds from these internals, or ends it; answers the installed hold. */
+	readonly holdPaint?: (install: ((internals: PaintHoldInternals) => PaintHoldPlane) | undefined) => PaintHoldPlane | undefined;
+	/** The installed paint hold, if any. */
+	readonly paintHold?: () => PaintHoldPlane | undefined;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -471,6 +459,51 @@ function assertFlushMove(from: FlushPhase, to: FlushPhase): void {
 	if (!allowed) throw new Error(`Illegal flush phase move ${from} -> ${to}`);
 }
 
+/** What a paint hold needs from its graph. */
+export type PaintHoldInternals = {
+	readonly cells: Map<string, unknown>;
+	readonly computedNodes: ReadonlyMap<string, unknown>;
+	readonly dependents: () => RuntimeDependents;
+	readonly markDirtyPath: (graphNodeId: string, path: ReadonlyArray<string>) => void;
+	readonly paint: <T>(run: () => T) => T;
+	readonly read: RuntimeGraphRead;
+};
+
+/**
+ * Keeps a held state's earlier value on screen while code, computeds and async values read the written one:
+ * painting reads `shown`, and every write passes through `before` and, when not held, `after`.
+ */
+export type PaintHoldPlane = {
+	readonly shown: (graphNodeId: string) => { readonly value: unknown } | undefined;
+	readonly fresh: (graphNodeId: string) => boolean;
+	readonly before: (graphNodeId: string, path: ReadonlyArray<string>, leaf?: boolean) => boolean;
+	readonly after: (
+		graphNodeId: string,
+		path: ReadonlyArray<string>,
+		apply?: (copy: unknown) => unknown,
+		whole?: boolean,
+	) => void;
+	readonly release: (graphNodeId: string) => void;
+	readonly end: () => void;
+	/** Whether any state is held. */
+	readonly showing: () => boolean;
+	/** Whether the page paints another value of `graphNodeId` than code reads. */
+	readonly shows: (graphNodeId: string) => boolean;
+	/** Reads as the page paints. */
+	readonly readShown: RuntimeGraphRead;
+	/**
+	 * Writes a derived `value`; while a state is shown, `run` also derives, through the read it is handed, what the
+	 * page paints, landing both in one turn. `skip` is the answer that keeps the last painted value.
+	 */
+	readonly derived: (
+		graph: { readonly write: RuntimeGraph['write'] },
+		graphNodeId: string,
+		value: unknown,
+		run: (painted: (read: RuntimeGraphRead) => RuntimeGraphRead) => unknown,
+		skip: unknown,
+	) => void | Promise<void>;
+};
+
 export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const cells = new Map<string, unknown>();
 	const readInitializers = new Map<string, () => unknown>();
@@ -502,28 +535,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
-	// The earlier value of each state a hold keeps on screen; the cell holds the written one.
-	const shownCells = new Map<string, unknown>();
-	// What values derived while a state is shown paint, until no state is shown.
-	const shownDerived = new Map<string, unknown>();
+	let paintPlane: PaintHoldPlane | undefined;
 	// Above zero while the flush paints, so its reads see what is shown.
 	let painting = 0;
-	let shownReaders: Set<string> | undefined;
-	// Computeds deriving from a shown state: code reads them afresh from the written values, paints from the cache.
-	const readsShown = (graphNodeId: string): boolean => {
-		if (!shownReaders) {
-			const readers = (shownReaders = new Set());
-			const visit = (id: string): void => {
-				for (const [node, , isAsync] of dependents.get(id) ?? [])
-					if (!isAsync && !readers.has(node.graphNodeId)) {
-						readers.add(node.graphNodeId);
-						visit(node.graphNodeId);
-					}
-			};
-			for (const id of shownCells.keys()) visit(id);
-		}
-		return shownReaders.has(graphNodeId);
-	};
 	const paint = <T,>(run: () => T): T => {
 		painting++;
 		try {
@@ -536,8 +550,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			if (shownCells.size > 0 && !painting && readsShown(graphNodeId))
-				return readPath(computed.compute(readGraph), path);
+			if (!painting && paintPlane?.fresh(graphNodeId)) return readPath(computed.compute(readGraph), path);
 			return readComputedNode(
 				computed,
 				readGraph,
@@ -569,9 +582,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			} catch {}
 		}
 
-		if (painting && shownCells.has(graphNodeId)) return readPath(shownCells.get(graphNodeId), path);
-		if (painting && shownDerived.has(graphNodeId)) return readPath(shownDerived.get(graphNodeId), path);
-		return readPath(cells.get(graphNodeId), path);
+		const shown = painting ? paintPlane?.shown(graphNodeId) : undefined;
+		return readPath(shown ? shown.value : cells.get(graphNodeId), path);
 	};
 
 	const markDirtyPath = (graphNodeId: string, path: ReadonlyArray<string>): void => {
@@ -592,51 +604,17 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush();
 	};
 
-	let paintHold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined;
-	// Whether this write's paint is held; the first held write keeps the state's earlier value as shown.
-	const holdsPaint = (graphNodeId: string, path: ReadonlyArray<string>): boolean => {
-		if (!paintHold || computedNodes.has(graphNodeId) || !paintHold(graphNodeId, path)) return false;
-		if (!shownCells.has(graphNodeId)) {
-			shownCells.set(graphNodeId, cells.get(graphNodeId));
-			shownReaders = undefined;
-		}
-		return true;
-	};
-	// While a state is shown, writes go through copies, so the shown value never changes under them.
-	const ownCopy = (graphNodeId: string, path: ReadonlyArray<string>, leaf?: boolean): void => {
-		if (shownCells.has(graphNodeId)) cells.set(graphNodeId, copyAlong(cells.get(graphNodeId), path, leaf));
-	};
-	// Ends showing a state's earlier value; once none is shown, derived values paint what code reads again.
-	const unshow = (graphNodeId: string): boolean => {
-		if (!shownCells.delete(graphNodeId)) return false;
-		shownReaders = undefined;
-		if (shownCells.size === 0)
-			for (const id of shownDerived.keys()) {
-				shownDerived.delete(id);
-				markDirtyPath(id, []);
-			}
-		return true;
-	};
-	// A write that is not held shows at once: one at a path, or an update, lands on the shown value too; a whole value ends the showing.
-	const showWrite = (graphNodeId: string, path: ReadonlyArray<string>, onShown?: (shown: unknown) => unknown, whole?: boolean): void => {
-		if (path.length === 0) shownDerived.delete(graphNodeId);
-		if (!shownCells.has(graphNodeId)) return;
-		if (onShown && (whole || path.length > 0)) shownCells.set(graphNodeId, onShown(shownCells.get(graphNodeId)));
-		else unshow(graphNodeId);
-	};
-
 	const commitCell = (
 		graphNodeId: string,
 		path: ReadonlyArray<string>,
 		value: unknown,
-		held = holdsPaint(graphNodeId, path),
+		held = paintPlane?.before(graphNodeId, path) ?? false,
 		replay?: (shown: unknown) => unknown,
 	): void => {
 		const dirty = dirtyPathForGraphWrite(cells.get(graphNodeId), path);
-		ownCopy(graphNodeId, path);
 		cells.set(graphNodeId, writePath(cells.get(graphNodeId), path, value));
 		if (!held)
-			showWrite(graphNodeId, path, (shown) => writePath(copyAlong(shown, path), path, replay ? replay(readPath(shown, path)) : value), !!replay);
+			paintPlane?.after(graphNodeId, path, (copy) => writePath(copy, path, replay ? replay(readPath(copy, path)) : value), !!replay);
 		markDirtyPath(graphNodeId, dirty);
 	};
 
@@ -918,43 +896,29 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		call(call) {
 			const path = call.path ?? [];
-			const held = holdsPaint(call.graphNodeId, path);
-			ownCopy(call.graphNodeId, path, true);
+			const held = paintPlane?.before(call.graphNodeId, path, true) ?? false;
 			const target = readPath(cells.get(call.graphNodeId), path);
 			const beforeMutation = collectionMutationSnapshot(target, call.method, call.args ?? []);
 			const result = applyCollectionCall(target, call.method, call.args ?? []);
 
 			if (collectionCallMutated(call.method, result, beforeMutation)) {
-				if (!held) showWrite(call.graphNodeId, []);
+				if (!held) paintPlane?.after(call.graphNodeId, []);
 				markDirtyPath(call.graphNodeId, path);
 			}
 
 			return result;
 		},
 		delete(deletion) {
-			const held = holdsPaint(deletion.graphNodeId, deletion.path);
-			ownCopy(deletion.graphNodeId, deletion.path);
+			const held = paintPlane?.before(deletion.graphNodeId, deletion.path) ?? false;
 			const outcome = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (outcome.mutated) {
-				if (!held)
-					showWrite(deletion.graphNodeId, deletion.path, (shown) => {
-						const copy = copyAlong(shown, deletion.path);
-						deletePath(copy, deletion.path);
-						return copy;
-					});
+				if (!held) paintPlane?.after(deletion.graphNodeId, deletion.path, (copy) => (deletePath(copy, deletion.path), copy));
 				markDirtyPath(deletion.graphNodeId, deletion.path);
 			}
 
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
-		showing: () => shownCells.size > 0,
-		shows: (graphNodeId) => shownCells.has(graphNodeId) || shownDerived.has(graphNodeId),
-		readShown: (graphNodeId, path) => paint(() => readGraph(graphNodeId, path)),
-		showDerived(graphNodeId, shown) {
-			if (shown && shownCells.size > 0) shownDerived.set(graphNodeId, shown.value);
-			else if (shownDerived.delete(graphNodeId)) markDirtyPath(graphNodeId, []);
-		},
 		asyncPlane() {
 			return asyncPlane;
 		},
@@ -1006,14 +970,19 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		},
 		hasPendingFlush,
 		pendingFlush,
-		holdPaint(hold) {
-			paintHold = hold;
-			const release = (graphNodeId: string): void => {
-				if (unshow(graphNodeId)) markDirtyPath(graphNodeId, []);
-			};
-			if (!hold) for (const graphNodeId of shownCells.keys()) release(graphNodeId);
-			return release;
+		holdPaint(install) {
+			paintPlane?.end();
+			paintPlane = install?.({
+				cells,
+				computedNodes,
+				dependents: () => dependents,
+				markDirtyPath,
+				paint,
+				read: readGraph,
+			});
+			return paintPlane;
 		},
+		paintHold: () => paintPlane,
 		holdFlush() {
 			flushHolds++;
 			let held = true;

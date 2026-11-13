@@ -82,17 +82,17 @@ type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 
 const HELD = Symbol('held');
 
-// `painted` derives from what the page shows, where a held state still shows its earlier value.
-function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined, painted?: boolean) {
+// `painted` turns the read into one that answers what the page shows.
+function derive(
+	input: RefreshInput,
+	symbol: ResumeSymbol,
+	roster: RosterResumeModule | undefined,
+	painted?: (read: RuntimeGraph['read']) => RuntimeGraph['read'],
+) {
 	const shown = input.graph.asyncPlane?.()?.shownRead(input.computed.dependencies ?? []);
 	if (shown === false) return HELD;
-	const { shows, readShown } = input.graph;
-	const read = shown || input.graph.read;
-	const source: RuntimeGraph['read'] | undefined =
-		painted && shows && readShown
-			? (graphNodeId, path) => (shows(graphNodeId) ? readShown(graphNodeId, path) : read(graphNodeId, path))
-			: shown || undefined;
-	const graph = seedSourceGraph(source ? { ...input.graph, read: source } : input.graph, input.computed);
+	const read = painted ? painted(shown || input.graph.read) : shown;
+	const graph = seedSourceGraph(read ? { ...input.graph, read } : input.graph, input.computed);
 	return symbol({
 		graph,
 		read: graph.read,
@@ -103,7 +103,7 @@ function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeM
 	});
 }
 
-// Writes what code reads; while a state is shown at its earlier value, also what the page paints, in the same turn.
+// A paint hold also derives what the page paints, written in the same turn.
 function writeDerived(
 	input: RefreshInput,
 	symbol: ResumeSymbol,
@@ -111,13 +111,9 @@ function writeDerived(
 	value: unknown,
 ): void | Promise<void> {
 	const { graph, computed } = input;
-	const land = (painted: unknown) => {
-		graph.write({ graphNodeId: computed.graphNodeId, value });
-		if (painted !== HELD) graph.showDerived?.(computed.graphNodeId, graph.showing?.() ? { value: painted } : undefined);
-	};
-	const painted = graph.showing?.() ? derive(input, symbol, roster, true) : undefined;
-	if (typeof (painted as PromiseLike<unknown> | null)?.then === 'function') return Promise.resolve(painted).then(land);
-	land(painted);
+	const hold = graph.paintHold?.();
+	if (!hold) return void graph.write({ graphNodeId: computed.graphNodeId, value });
+	return hold.derived(graph, computed.graphNodeId, value, (painted) => derive(input, symbol, roster, painted), HELD);
 }
 
 /**
