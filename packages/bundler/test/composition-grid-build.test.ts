@@ -3,7 +3,7 @@ import { mkdir, rm, symlink } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import type { Browser, Page, Route } from '@playwright/test';
 import { resolve } from 'pathe';
-import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer, type BuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import {
@@ -52,6 +52,11 @@ const cleanOutput = (dir: string) =>
 
 let server: BuiltServer;
 let browser: Browser;
+const opened: Page[] = [];
+// Every open page keeps its renderer's memory, which the unit budget counts against the shard's peak.
+afterEach(async () => {
+	await Promise.all(opened.splice(0).map((page) => page.close()));
+});
 
 beforeAll(async () => {
 	await linkPackages();
@@ -129,6 +134,7 @@ type Visit = { readonly page: Page; readonly api: Api; readonly errors: string[]
 
 async function visit(path: string): Promise<Visit> {
 	const page = await browser.newPage();
+	opened.push(page);
 	const api = new Api();
 	const errors: string[] = [];
 	await page.route('**/grid/**', api.handle);
