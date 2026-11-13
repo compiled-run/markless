@@ -177,5 +177,9 @@ try {
 	);
 } finally {
 	await browser.close();
+	// A server that shuts down gracefully can outlive this script and hold its ports; wait for it, then force it.
+	const exited = new Promise((done) => server.once('exit', done));
 	server.kill();
+	await Promise.race([exited, new Promise((done) => setTimeout(done, 8000))]);
+	server.kill('SIGKILL');
 }
