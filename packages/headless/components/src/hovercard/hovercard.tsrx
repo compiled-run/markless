@@ -8,10 +8,6 @@ import type {
 
 // The card is placed by CSS anchoring alone: the trigger declares the anchor, the
 // card points at it, and the geometry is the consumer's stylesheet.
-// The scope class these <style> blocks compile against is per MODULE, so each
-// block's subject must be structurally unique across all three parts: the trigger
-// is this module's only anchor element, the card is its only element carrying
-// `overlay`, and the root is the div that is left.
 // Nothing here writes `aria-describedby` or `role="tooltip"`: a card holding links
 // and buttons flattened into a description is one unreachable run-on string.
 

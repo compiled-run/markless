@@ -2619,12 +2619,15 @@ function Card({ value }) @{
 	});
 
 	expect(result.publicRenderPlan.diagnostics).toEqual([]);
-	expect(result.publicRenderPlan.styleScopes).toHaveLength(1);
-	const scope = result.publicRenderPlan.styleScopes[0]!.scopeId;
-	expect(result.publicRenderPlan.styleScopes[0]!.cssText).toBe(
-		[`.page.${scope} { display: grid; }`, `.card.${scope} { color: rebeccapurple; }`].join(
-			'\n',
-		),
+	// Each component's blocks get their own hash class, so App's rules never reach Card.
+	const [page, card] = result.publicRenderPlan.styleScopes;
+	expect(page!.scopeId).not.toBe(card!.scopeId);
+	expect(page!.cssText).toBe(`.page.${page!.scopeId} { display: grid; }`);
+	expect(card!.cssText).toBe(`.card.${card!.scopeId} { color: rebeccapurple; }`);
+
+	const ssrOutput = (await renderTestSsr(result)) as { readonly html: string };
+	expect(ssrOutput.html).toBe(
+		`<main class="page ${page!.scopeId}"><article class="card ${card!.scopeId}"><strong class="${card!.scopeId}">7</strong></article></main>`,
 	);
 });
 

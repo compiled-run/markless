@@ -462,7 +462,7 @@ function emitNode(
 		});
 	}
 
-	const moduleScopeClass = context.styleScopeClass;
+	const componentScopeClass = context.styleScopeClass;
 	if (!takesStyleScopeClass(tagName)) context.styleScopeClass = null;
 	append(builder, `<${tagName}`);
 	let classSeen = false;
@@ -639,7 +639,7 @@ function emitNode(
 			append(builder, '"');
 		} else append(builder, ` class="${context.styleScopeClass}"`);
 	}
-	context.styleScopeClass = moduleScopeClass;
+	context.styleScopeClass = componentScopeClass;
 	append(builder, '>');
 	if (textareaValue) emitTextareaValue(textareaValue, path, builder, context, repeat);
 	else if (tagName === 'script') emitScriptBody(node, path, builder, context, repeat);

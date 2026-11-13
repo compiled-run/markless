@@ -235,6 +235,6 @@ them on a new or rewritten page; the pages that still import them move off them 
 
 An `.mdx` page cannot wrap a component in another, so a figure that composes parts is its own
 `.tsrx` file that the page renders as a top-level block. Each part carries its own `<style>`,
-because the compiler stamps a module's scope class only on components that declare one. Option
+because a block's rules never reach another component, even one in the same file. Option
 lists are fixed slots, not `@for`: an item built by a repeat loses its value or its handler when
 the page resumes.

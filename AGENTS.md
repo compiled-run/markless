@@ -87,7 +87,7 @@ Family CSS defaults (anchor positioning, hidden-until-open, stacking) live in a 
 
 ## Website CSS lives with its component
 
-A rule whose subject element is rendered by exactly one component belongs in a `<style>` block inside that component's `.tsrx` (the compiler scopes it with a per-module hash class), not in `website/styles/global.css` or `brand.css`. The global stylesheets keep only what one component cannot own: tokens on `:root`/`html`, typography for MDX prose, markup emitted by tooling or generated playground modules, and classes several components share. Before adding a global rule, name the file that renders its subject; if there is one, put the rule there.
+A rule whose subject element is rendered by exactly one component belongs in a `<style>` block inside that component's `.tsrx` (its rules reach only that component's elements, never another component's, even in the same file), not in `website/styles/global.css` or `brand.css`. The global stylesheets keep only what one component cannot own: tokens on `:root`/`html`, typography for MDX prose, markup emitted by tooling or generated playground modules, and classes several components share. Before adding a global rule, name the file that renders its subject; if there is one, put the rule there.
 
 ## @markless/ui timing
 

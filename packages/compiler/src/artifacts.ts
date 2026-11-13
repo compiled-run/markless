@@ -1440,7 +1440,7 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				// Prop names the component signature already took out of the rest
 				// binding, so they never reach this spread at all.
 				readonly destructuredNames?: ReadonlyArray<string>;
-				// The module's scope class, when the element writes it ahead of the
+				// The component's hash class, when the element writes it ahead of the
 				// spread's `class` in one attribute (which is why `class` is excluded).
 				readonly leadingClass?: string;
 		  }

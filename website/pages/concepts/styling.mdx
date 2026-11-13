@@ -12,29 +12,31 @@ import Sidebar from '../../components/docs/sidebar.tsrx';
 
 <PageMeta time="2 min" assumes="state" />
 
-<Subtitle text="A style block inside a component styles that file's elements and nothing else." terms="elements" />
+<Subtitle text="A style block styles the elements beside it and below it, and nothing else." terms="elements" />
 
 ```tsrx title="profile-card.tsrx"
 export default function ProfileCard() @{
-	<article class="card">
+	<>
 		<style>
 			.card {
 				background: peachpuff;
 			}
 		</style>
-		<p>Ada Lovelace</p>
-	</article>
+		<article class="card">
+			<p>Ada Lovelace</p>
+		</article>
+	</>
 }
 ```
 
-The **`<style>` block** sits inside the component. Its **`.card`** rule reaches this file's `<article>`, and no other file's.
+The **`<style>` block** sits beside the `<article>` in a fragment. Its **`.card`** rule reaches that `<article>`, and no other component's.
 
 ## The same class name never collides
 
-A *scoped* rule is one that reaches only its own file's elements. Markless adds a class made from the file's path, starting `mk-`, to the file's selectors and elements.
+A *scoped* rule is one that reaches only the elements its block styles. Markless adds an extra class, starting `mk-`, to every selector in the block and to every element the block reaches.
 
-- Two files can both style `.card`.
-- Each rule paints only its own file's card.
+- Two components can both style `.card`.
+- Each rule paints only its own component's card.
 - A rule in an imported stylesheet, like `global.css`, reaches every card.
 
 Change either file's colour, and hover a card to see its classes.
@@ -56,7 +58,7 @@ export default function TwoCards() @{
 
 ```tsrx title="paper-card.tsrx"
 export default function PaperCard() @{
-	<article class="card">
+	<>
 		<style>
 			.card {
 				padding: 0.6em 0.9em;
@@ -65,8 +67,10 @@ export default function PaperCard() @{
 				color: black;
 			}
 		</style>
-		<p>Paper card</p>
-	</article>
+		<article class="card">
+			<p>Paper card</p>
+		</article>
+	</>
 }
 ```
 
@@ -76,7 +80,7 @@ import { state } from '@markless/core';
 export default function ChalkCard() @{
 	let lit = state(false);
 
-	<article class={lit ? 'card lit' : 'card'}>
+	<>
 		<style>
 			.card {
 				padding: 0.6em 0.9em;
@@ -89,23 +93,32 @@ export default function ChalkCard() @{
 				color: black;
 			}
 		</style>
-		<p>Chalk card</p>
-		<button onClick={() => (lit = !lit)}>
-			Light it up
-		</button>
-	</article>
+		<article class={lit ? 'card lit' : 'card'}>
+			<p>Chalk card</p>
+			<button onClick={() => (lit = !lit)}>
+				Light it up
+			</button>
+		</article>
+	</>
 }
 ```
 </Code>
 
-## The extra class belongs to the file
+## What a block reaches
 
-Two components in one `.tsrx` file share one class, so give a component its own file to give it its own styles. For rules that cover the whole site, import an ordinary stylesheet.
+A `<style>` block sits in a list of children: the children of an element, or of a fragment. It styles the other children in that list and everything inside them.
+
+- It never styles the element that contains it. To style an element, put the block and the element side by side in a fragment, as the cards above do.
+- Two blocks in the same list share one extra class.
+- A block inside a nested element gets an extra class of its own. Rules from the outer block reach into the nested element; rules from the inner block never reach out.
+- A rule never reaches a child component, even one written in the same `.tsrx` file. The child styles itself with its own block.
+
+For rules that cover the whole site, import an ordinary stylesheet.
 
 <Collapsible sprite="thought-bubble" summary="How do existing tools handle this?">
 
 Scoped styles in single-file components work much the same way. You write the plain class name,
-and the build adds one class per file to selectors and elements. In the inspector you see your
+and the build adds one class per component to selectors and elements. In the inspector you see your
 own class name next to the added one.
 
 </Collapsible>

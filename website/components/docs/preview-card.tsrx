@@ -83,6 +83,10 @@ export function Controls({ title, children }: { readonly title?: string; readonl
 			{children}
 		</div>
 		<style>
+			.pg .pg-controls {
+				padding-inline-start: var(--pg-inset);
+			}
+
 			.pg-controls {
 				display: grid;
 				gap: 1em;
@@ -312,6 +316,11 @@ export function Hint({ title, text }: { readonly title: string; readonly text: s
 					margin-block: 0.35em;
 				}
 			}
+
+			.pg-dot:focus-visible {
+				outline: 2px solid var(--ink);
+				outline-offset: 4px;
+			}
 		</style>
 	</tooltip.root>
 }
@@ -523,6 +532,25 @@ export function Choice({
 			<Hint title={label} text={hint} />
 		}
 		<style>
+			.pg-cell {
+				display: flex;
+				gap: 0.3em;
+				align-items: center;
+			}
+
+			.pg-ctl {
+				display: flex;
+				gap: 0.65em;
+				align-items: center;
+			}
+
+			.pg-name {
+				font-family: var(--pg-font);
+				font-size: inherit;
+				line-height: 1.3;
+				color: var(--ink);
+			}
+
 			.pv-choice {
 				flex-wrap: wrap;
 			}
@@ -618,6 +646,10 @@ export function Action({
 	<button type="button" class={end ? 'pv-action pv-push' : 'pv-action'} disabled={disabled} onClick={() => onClick?.()}>
 		{children}
 		<style>
+			.pv-push {
+				margin-inline-start: auto;
+			}
+
 			.pv-action {
 				display: inline-flex;
 				gap: 0.4em;

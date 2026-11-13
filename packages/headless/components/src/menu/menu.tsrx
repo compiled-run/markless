@@ -40,11 +40,6 @@ const KEYBOARD_GRACE = 300;
 /** How long a press that closed the surface keeps the click behind it from re-opening, in milliseconds. */
 const CLICK_GRACE = 300;
 
-// The scope class these <style> blocks compile against is per MODULE, so each
-// block's subject must be structurally unique across every part: the trigger is
-// the module's only plain button, an item the only element carrying a
-// `menuitem*` role, a surface the only kind carrying `role="menu"` - a submenu
-// told apart by sitting inside an item - and the root the div that is left.
 // `@layer markless` is what keeps these defaults losing to a
 // consumer's own unlayered rules without a specificity fight.
 
@@ -823,7 +818,13 @@ export function MenuItemContent({
 	>
 		<style>
 			@layer markless {
-				/* A submenu is the module's only `role="menu"` inside an item, which is what tells it apart from the top surface. */
+				[role="menu"] {
+					position: fixed;
+					position-anchor: --ui-menu;
+					left: var(--x);
+					top: var(--y);
+					position-area: block-end span-inline-end;
+				}
 				[role^="menuitem"] [role="menu"] { position-area: inline-end span-block-end; }
 			}
 		</style>
