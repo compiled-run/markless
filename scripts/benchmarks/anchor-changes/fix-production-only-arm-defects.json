@@ -21,6 +21,16 @@
 			"delta": 334,
 			"reason": "SSR composition carries an @if's served-arm records and prop routes through a second component level, so a child in an arm open at load keeps working handlers and rows",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": 334,
+			"reason": "SSR composition carries an @if's served-arm records and prop routes through a second component level, so a child in an arm open at load keeps working handlers and rows",
+			"date": "2026-11-13"
 		}
 	]
 }
