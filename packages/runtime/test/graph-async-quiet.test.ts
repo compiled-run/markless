@@ -225,3 +225,19 @@ test('a @try gate waiting on a loud refresh is quiet while the value it joins st
 	expect(graph.read('computed:first', []) as object).not.toHaveProperty('quiet');
 	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'pending', quiet: true });
 });
+
+test('a @try gate held by a save stays loud, so the whole block is marked with the reload', async () => {
+	const first = scriptedRuns();
+	const gate = scriptedRuns();
+	const graph = gateGraph(first.run, gate.run);
+	graph.read('computed:gate', ['status']);
+	first.settles[0]!.resolve({ rows: [] });
+	await tick();
+	await graph.flush();
+	gate.settles[0]!.resolve([]);
+	await tick();
+
+	graph.asyncPlane!()!.markEntry('computed:gate', true);
+	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'pending' });
+	expect(graph.read('computed:gate', []) as object).not.toHaveProperty('quiet');
+});
