@@ -216,6 +216,8 @@ export type SsrDataStructure = {
 		readonly elementStart: number;
 		readonly elementEnd: number;
 		readonly html: string;
+		/** The arm a branch painted: a served @try arm's branch is wired to it, since its test reads nothing until the browser derives it. */
+		readonly arm?: number;
 	}>;
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
@@ -311,6 +313,7 @@ export type StructureToken =
 			readonly anchorId: string;
 			readonly edge: 'start' | 'end';
 			readonly anchorHtml?: string;
+			readonly arm?: number;
 	  };
 
 type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
@@ -838,7 +841,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 							return {
 								html: `<!--markless:${marker}:${id}-->${body.html}<!--/markless:${marker}:${id}-->`,
 								tokens: [
-									commentToken(marker, id, 'start', body.html),
+									commentToken(marker, id, 'start', body.html, arm),
 									...body.tokens,
 									commentToken(marker, id, 'end'),
 								],
@@ -1066,6 +1069,7 @@ function commentToken(
 	anchorId: string,
 	edge: 'start' | 'end',
 	anchorHtml?: string,
+	arm?: number,
 ): StructureToken {
 	return {
 		kind: 'comment',
@@ -1073,6 +1077,7 @@ function commentToken(
 		anchorId,
 		edge,
 		...(anchorHtml === undefined ? {} : { anchorHtml }),
+		arm,
 	};
 }
 
@@ -1093,7 +1098,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 	let elementCount = 0;
 	const starts = new Map<
 		string,
-		{ readonly comment: number; readonly element: number; readonly html: string }
+		{ readonly comment: number; readonly element: number; readonly html: string; readonly arm?: number }
 	>();
 	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
 	let commentIndex = 0;
@@ -1115,6 +1120,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				comment: commentIndex,
 				element: elementCount,
 				html: token.anchorHtml ?? '',
+				arm: token.arm,
 			});
 		else {
 			const start = starts.get(token.anchorId);
@@ -1128,6 +1134,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				elementStart: start.element,
 				elementEnd: elementCount,
 				html: start.html,
+				arm: start.arm,
 			});
 		}
 		if (token.anchorKind !== 'arm-branch') commentIndex++;

@@ -230,3 +230,48 @@ test('registration-only boot uses the shared arm core for keyed repeats', async 
 	expect(registered).toEqual([repeat]);
 	expect(elementsByHostId.get('h-list')).toBe(list);
 });
+
+test('SSR armization names the arm each branch in the served @try arm painted', () => {
+	const branch = (id: string) => ({
+		id,
+		symbolId: 'symbol:1',
+		testReads: [{ graphNodeId: `computed:test-${id}`, path: [] }],
+		startAnchor: { strategy: 'arm-branch-comment', index: 0 },
+		endAnchor: { strategy: 'arm-branch-comment', index: 1 },
+	});
+	const anchor = (id: string, arm: number) => ({
+		kind: 'arm-branch' as const,
+		id,
+		startIndex: 1,
+		endIndex: 1,
+		elementStart: 0,
+		elementEnd: 1,
+		html: '<p>shown</p>',
+		arm,
+	});
+	const [armized] = marklessSsrArmizeBoundaries(
+		{
+			locators: [],
+			anchors: [
+				{ kind: 'async', id: 'c1:boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 2, html: '' },
+				anchor('c1:branch-site:0', 0),
+				anchor('c1:branch-site:1', 1),
+			],
+			elementCount: 2,
+		},
+		[
+			{
+				id: 'boundary:0',
+				runnerGraphNodeId: 'computed:order',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				armRecords: [{ branches: [branch('branch-site:0'), branch('branch-site:1')] }, {}, {}],
+			},
+		],
+		{ locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [] },
+		[{ graphNodeId: 'computed:order', snapshot: { status: 'fulfilled' } }],
+		'c1:',
+	);
+
+	expect(armized.armRecords.branches.map((record: { readonly takenArm?: number }) => record.takenArm)).toEqual([0, 1]);
+});

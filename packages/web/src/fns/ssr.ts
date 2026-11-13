@@ -1248,6 +1248,9 @@ export function marklessSsrArmizeBoundaries(
 			.filter((anchor) => anchor.kind === 'async')
 			.map((anchor) => [anchor.id, anchor]),
 	);
+	const armByBranchId = new Map(
+		structure.anchors.flatMap((anchor) => (anchor.kind === 'arm-branch' ? [[anchor.id, anchor.arm] as const] : [])),
+	);
 	// Keyed by the possibly-null runner id so a boundary without a runner looks
 	// up (and misses) exactly as it did untyped.
 	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
@@ -1258,6 +1261,10 @@ export function marklessSsrArmizeBoundaries(
 		[...boundaries].reverse().map((boundary) => [boundary, armizeBoundary(boundary)]),
 	);
 	return boundaries.map((boundary) => armized.get(boundary)!);
+	function paintedArm(branch: SsrBranchRecord): SsrBranchRecord {
+		const arm = armByBranchId.get(idPrefix + branch.id);
+		return arm === undefined ? branch : { ...branch, takenArm: arm };
+	}
 	function armizeBoundary(boundary: SsrBoundaryRecord): SsrBoundaryRecord {
 		// Child-composed boundaries already carry a single armized record set;
 		// arm-relative coordinates survive composition untouched.
@@ -1351,7 +1358,7 @@ export function marklessSsrArmizeBoundaries(
 				...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
 				// Arm-scoped branch records (flips + escalations) ride the taken
 				// arm's planned set; resume resolves their anchors arm-locally.
-				branches: planned.branches ?? [],
+				branches: (planned.branches ?? []).map(paintedArm),
 			},
 		};
 	}
