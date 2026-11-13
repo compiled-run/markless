@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 589,
-			"reason": "style scope per component (PR #685): each component's <style> blocks get their own hash class instead of one per file, so templates of files with several styled components carry several mk- class strings and compress less, and the docs playground's compile worker carries the per-component scope pass; only the page component chunks and the compile worker changed; measured on CI run 43476881638 against main's merge-queue run 43467848078",
+			"delta": 428,
+			"reason": "style scope per component (PR #685): measured on CI run 43496595402; per chunk against main 73cb34fdc: the navbar chunk +152 B and other component chunks +5 to +35 B each carry one mk- class per component instead of one per file (same template bytes, worse compression), the playground compile worker +51 B for the compiler change, and on /concepts/state the styling page's rewritten examples +255 B",
 			"date": "2026-11-13"
 		},
 		{
@@ -20,20 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 1423,
-			"reason": "style scope per component (PR #685): each component's <style> blocks get their own hash class instead of one per file, so templates of files with several styled components carry several mk- class strings and compress less, and the docs playground's compile worker carries the per-component scope pass; only the page component chunks and the compile worker changed; measured on CI run 43476881638 against main's merge-queue run 43467848078",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 547,
-			"reason": "style scope per component (PR #685): each component's <style> blocks get their own hash class instead of one per file, so templates of files with several styled components carry several mk- class strings and compress less, and the docs playground's compile worker carries the per-component scope pass; only the page component chunks and the compile worker changed; measured on CI run 43476881638 against main's merge-queue run 43467848078",
+			"delta": 941,
+			"reason": "style scope per component (PR #685): measured on CI run 43496595402; per chunk against main 73cb34fdc: the navbar chunk +152 B and other component chunks +5 to +35 B each carry one mk- class per component instead of one per file (same template bytes, worse compression), the playground compile worker +51 B for the compiler change, and on /concepts/state the styling page's rewritten examples +255 B",
 			"date": "2026-11-13"
 		}
 	]
