@@ -182,12 +182,10 @@ styles, under `@layer markless`, keyed off `ui-*` attributes:
 The popup is placed by CSS anchoring alone — tooltip's shipped idiom — so nothing
 measures a box and a surface served already showing is placed on its first layout.
 
-Only the surface leaves the page flow. Until 2026-11-13 the content's `[ui-popup]`
-rule also matched the root (which carries `ui-popup` too), because every part's
-block shared one class per file; the root was then `position: absolute` and the
-page content after a popup picker slid up under its trigger. Each part's block now
-reaches only its own elements, so the root is `static` and takes the trigger's
-line. `colorpicker.browser.ts` pins it ("the root stays in the page flow").
+In popup mode the root leaves the page flow too (`[ui-picker][ui-popup] { position: absolute }`),
+so the content after a popup picker keeps the place it had without it. The root's
+block sits beside the root `div` in a fragment, the place where a block may style an
+element. `colorpicker.browser.ts` pins it ("content after a popup picker does not move").
 
 `forced-color-adjust: none` is on the plane, the rails and the thumbs on purpose:
 without it Windows High Contrast repaints every gradient and every swatch with the

@@ -702,20 +702,20 @@ test('CSR: the popup surface is anchored to its trigger by CSS alone', async () 
 	expect(window.getComputedStyle(el(Content)).position).toBe('absolute');
 });
 
-// Only the surface leaves the flow: the root keeps its line, so what follows the picker sits below the trigger.
-test('CSR: in popup mode the root stays in the page flow and the surface opens against the trigger', async () => {
+// A popup picker leaves the page flow: what follows it keeps the place it had without the picker.
+test('CSR: content after a popup picker does not move, and the surface opens against the trigger', async () => {
 	const screen = await render(Popup);
 	const after = document.createElement('p');
 	after.textContent = 'after the picker';
 	(screen.container as HTMLElement).append(after);
-	expect(window.getComputedStyle(el(Root)).position).toBe('static');
+	expect(window.getComputedStyle(el(Root)).position).toBe('absolute');
+	const trigger = el(Trigger).getBoundingClientRect();
+	expect(Math.round(after.getBoundingClientRect().top)).toBe(Math.round(trigger.top));
 
 	await userEvent.click(Trigger);
 	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(false);
-	const trigger = el(Trigger).getBoundingClientRect();
-	const content = el(Content).getBoundingClientRect();
-	expect(Math.round(content.top)).toBe(Math.round(trigger.bottom));
-	expect(after.getBoundingClientRect().top).toBeGreaterThanOrEqual(trigger.bottom);
+	expect(Math.round(el(Content).getBoundingClientRect().top)).toBe(Math.round(el(Trigger).getBoundingClientRect().bottom));
+	expect(Math.round(after.getBoundingClientRect().top)).toBe(Math.round(trigger.top));
 });
 
 // An inline picker names no anchor and is placed by the page, which is the whole
