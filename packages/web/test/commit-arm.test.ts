@@ -453,3 +453,46 @@ test('commitArm restores the document scroll position when the commit moved it',
 
 	expect(scrollCalls).toEqual([[0, 120]]);
 });
+
+test('a registration that fails leaves the arm taking no events and tells a waiting press it failed', async () => {
+	const { root, start, end, outside } = fixture();
+	const newButton = element('button');
+	const newSection = element('section', [newButton]);
+	const elementsByHostId = new Map<string, ResumeDomElement>([['h-out', asElement(outside)]]);
+	const disposed: Array<[string, unknown]> = [];
+	const commitArm = createArmCommitter(
+		{
+			root: asElement(root),
+			renderHtml: () => [asElement(newSection) as ResumeDomNode],
+			elementsByHostId,
+			disposedHosts: new Set<string>(),
+			disposeHost(hostNodeId, options) {
+				disposed.push([hostNodeId, options]);
+			},
+			addEventRecord() {},
+			registerElementHandle() {},
+			registerComputedRefreshes: () => Promise.reject(new Error('derive code failed to load')),
+		},
+		() => {},
+	);
+	const registering = (root as unknown as {
+		__marklessArmRegistering?: Set<{ settled: Promise<boolean>; holds: (node: unknown) => boolean }>;
+	});
+
+	const committed = commitArm(boundaryFor(start, end), {
+		html: '<section><button></button></section>',
+		armRecords: emptyArmRecords({
+			locators: [{ hostNodeId: 'h-new', index: 1, tagName: 'button' }],
+			events: [{ hostNodeId: 'h-new', eventName: 'click', symbolIds: ['sym:click'] }],
+		}),
+		computed: [{ graphNodeId: 'computed:total', async: false, deriveSymbolId: 'sym:derive' }] as never,
+	});
+	const [entry] = registering.__marklessArmRegistering!;
+	expect(entry!.holds(newButton)).toBe(true);
+	expect(entry!.holds(outside)).toBe(false);
+
+	await expect(committed).rejects.toThrow('derive code failed to load');
+	expect(await entry!.settled).toBe(false);
+	expect(disposed).toEqual([['h-new', { ignoreFutureEvents: true }]]);
+	expect(registering.__marklessArmRegistering!.size).toBe(0);
+});

@@ -32,6 +32,7 @@ import {
 } from './event-current-target.ts';
 import type { OverlayFocusOriginHost } from './overlay-handoff.ts';
 import type {
+	ResumeArmRegistration,
 	ElementHandleRegistry,
 	ResumeAsyncBoundaryRecord,
 	ResumeDispatchOptions,
@@ -567,13 +568,16 @@ export function createEventWiring(input: {
 		const collect = () =>
 			collectDispatchPath(pressAnchor ?? target, event.type, eventRecords, rowEventRecords, bubbles);
 		let path = collect();
-		// Arm content lands before it is wired: a press waits for the whole registration, not just the event records it registers first.
-		for (
-			let registering = (input.root as ArmRegisteringRoot).__marklessArmRegistering;
-			registering?.size;
-			path = collect()
-		)
-			await Promise.all(registering);
+		// Arm content lands before it is wired: a press inside it waits for the whole registration, and one that failed runs nothing.
+		const registeringAt = () =>
+			[...((input.root as ArmRegisteringRoot).__marklessArmRegistering ?? [])].filter((entry) =>
+				entry.holds(pressAnchor ?? target),
+			);
+		for (let waits = registeringAt(); waits.length; waits = registeringAt()) {
+			queueRelease?.();
+			if ((await Promise.all(waits.map((entry) => entry.settled))).includes(false)) return;
+			path = collect();
+		}
 		// A broad forward of markup no record owns may find it already removed by a script (a copy fallback's textarea).
 		if (
 			!attached &&
@@ -1032,7 +1036,7 @@ async function marklessLogInteraction(input: {
 	}
 }
 
-type ArmRegisteringRoot = { readonly __marklessArmRegistering?: ReadonlySet<Promise<unknown>> };
+type ArmRegisteringRoot = { readonly __marklessArmRegistering?: ReadonlySet<ResumeArmRegistration> };
 
 type ResumeDispatchMatch =
 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }

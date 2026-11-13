@@ -42,6 +42,7 @@ import {
 } from '../../../serializer/src/protocol-constants.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX as PROP } from '../../../serializer/src/protocol-prop-prefix.ts';
 import type {
+	ResumeArmRegistration,
 	ResumeArmBranchRecord,
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
@@ -76,7 +77,7 @@ import type {
 export type RowComponentMintHost = {
 	readonly runtimeInput: {
 		readonly loadSymbol: (symbolId: string) => unknown;
-		readonly root?: ResumeDomElement & { __marklessArmRegistering?: Set<Promise<unknown>> };
+		readonly root?: ResumeDomElement & { __marklessArmRegistering?: Set<ResumeArmRegistration> };
 	};
 	readonly armRegistrationDeps: (records: ResumeArmRecordSet) => Promise<ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
@@ -150,17 +151,28 @@ export function marklessRowComponentMint(
 	// first batch's registration on the floor.
 	let awaitingCommit: MintedRow[] = [];
 	// A placed row is clickable before commit registers its events; the container's listener waits on this set.
-	let releaseRegistering: (() => void) | undefined;
-	const holdRegistering = (): void => {
+	let releaseRegistering: ((committed: boolean) => void) | undefined;
+	let heldNodes = new Set<unknown>();
+	const holdRegistering = (rows: Iterable<MintedRow>): void => {
 		const root = host?.runtimeInput.root;
-		if (!root || releaseRegistering) return;
+		if (!root) return;
+		for (const row of rows) for (const node of row.nodes) heldNodes.add(node);
+		if (releaseRegistering) return;
 		const registering = (root.__marklessArmRegistering ??= new Set());
-		let resolve!: () => void;
-		const held = new Promise<void>((settle) => (resolve = settle));
+		const nodes = heldNodes;
+		let resolve!: (committed: boolean) => void;
+		const held: ResumeArmRegistration = {
+			settled: new Promise<boolean>((settle) => (resolve = settle)),
+			holds: (node) => {
+				for (let at = node as { readonly parentNode?: unknown } | null | undefined; at; at = at.parentNode as typeof at)
+					if (nodes.has(at)) return true;
+				return false;
+			},
+		};
 		registering.add(held);
-		releaseRegistering = () => {
+		releaseRegistering = (committed) => {
 			registering.delete(held);
-			resolve();
+			resolve(committed);
 		};
 	};
 	// Stale rows swap in from the commit, so they land with the flush's other writes.
@@ -310,18 +322,21 @@ export function marklessRowComponentMint(
 						: undefined;
 				return marklessThen(built, () => {
 					awaitingCommit = [...awaitingCommit, ...preparedRows.values()];
-					if (preparedRows.size > 0) holdRegistering();
+					if (preparedRows.size > 0) holdRegistering(preparedRows.values());
 					return async () => {
 						prepared.delete(repeat.id);
 						const settling = awaitingCommit;
 						const release = releaseRegistering;
 						awaitingCommit = [];
 						releaseRegistering = undefined;
+						heldNodes = new Set();
+						let committed = false;
 						try {
 							for (const place of awaitingPlacement.splice(0)) place();
 							for (const row of settling) await row.commit();
+							committed = true;
 						} finally {
-							release?.();
+							release?.(committed);
 						}
 					};
 				});

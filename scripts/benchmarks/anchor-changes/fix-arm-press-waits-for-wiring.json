@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 87,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 350,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 192,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 116,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 87,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 350,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 192,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 39,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 109,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
+			"date": "2026-11-13"
+		}
+	]
+}

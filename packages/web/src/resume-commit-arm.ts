@@ -10,6 +10,7 @@ import {
 } from './resume-locators.ts';
 import type {
 	ResumeArmBranchRecord,
+	ResumeArmRegistration,
 	ResumeArmRecordSet,
 	ResumeArmRange,
 	ResumeAsyncBoundaryRecord,
@@ -95,7 +96,7 @@ export function createArmCommitter(
 		readonly renderHtml?: (html: string, parent?: ResumeDomNode | null) => ReadonlyArray<ResumeDomNode>;
 		readonly elementsByHostId: Map<string, ResumeDomElement>;
 		readonly disposedHosts: Set<string>;
-		readonly disposeHost: (hostNodeId: string) => void;
+		readonly disposeHost: (hostNodeId: string, options?: { readonly ignoreFutureEvents?: boolean }) => void;
 		readonly addEventRecord: (element: ResumeDomElement, record: ResumeEventRecord) => void;
 		readonly registerElementHandle: (
 			hostNodeId: string,
@@ -157,13 +158,26 @@ export function createArmCommitter(
 		}
 		replaceAnchorRange(boundary, fresh);
 		spliceDomOrderCensus(deps.root, outgoing, fresh);
-		// Arm content is in the DOM before its records; the container's listener waits on this set.
-		const pending = ((deps.root as { __marklessArmRegistering?: Set<Promise<unknown>> })
+		// Arm content is in the DOM before its records; a press inside this range waits on this entry.
+		const pending = ((deps.root as { __marklessArmRegistering?: Set<ResumeArmRegistration> })
 			.__marklessArmRegistering ??= new Set());
 		const registering = registerArmRecordSet(deps, installEventType, boundary, update, true);
-		const settled = registering.catch(() => undefined);
-		pending.add(settled);
-		const materialized = await registering.finally(() => pending.delete(settled));
+		const inRange = () => elementsBetweenAnchors(deps.root, boundary.startAnchor, boundary.endAnchor);
+		const entry: ResumeArmRegistration = {
+			// A half-registered arm runs no handler: its hosts take no further events.
+			settled: registering.then(
+				() => true,
+				() => {
+					for (const hostNodeId of hostIdsInsideRemovedElements(deps.elementsByHostId, inRange()))
+						deps.disposeHost(hostNodeId, { ignoreFutureEvents: true });
+					return false;
+				},
+			),
+			holds: (node) => inRange().has(node as ResumeDomElement),
+		};
+		pending.add(entry);
+		void entry.settled.then(() => pending.delete(entry));
+		const materialized = await registering;
 		if (update.arm !== undefined && !update.after) announceArm(deps.root, boundary, update.arm);
 		restoreFocusScroll(deps, boundary, captured, materialized.elementsByHostId);
 	};
