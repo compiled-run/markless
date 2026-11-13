@@ -292,6 +292,7 @@ The second time in `transition` is the delay. When the new answer lands, the mar
 
 - Busy marks go on text, attributes, a list built from the value, a value passed to a child component, and values computed from it.
 - An element in the same block that shows only plain state, such as a picker, is never marked.
+- A form is never marked by a reload, because a form's `aria-busy` means it is sending. Elements inside it are marked as usual; text written straight inside the form is not, so wrap it in an element to mark it.
 - If a block shows two async values, each one marks its own elements, and each mark goes away when its own answer is on the page.
 
 When two requests are in flight, the latest one wins. An older answer that lands late is dropped, so the page never shows the wrong city.
