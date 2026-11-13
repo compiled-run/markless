@@ -110,7 +110,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			key,
 			value: (node.snapshot as { readonly value?: unknown }).value,
 			...(kept && { valueKey: kept.valueKey }),
-			...(node.quiet && { quiet: true }),
+			// A boundary's gate fetches nothing: the values it joins mark what is busy.
+			...((node.quiet || node.boundaryGate) && { quiet: true }),
 		};
 	};
 
