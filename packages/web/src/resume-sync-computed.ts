@@ -179,7 +179,8 @@ export async function refreshSyncComputed(
 	const roster = await loadRosterResume();
 	const symbol = input.derive ?? (await loadDerive(input.loadSymbol, input.computed));
 	const result = await derive(input, symbol, roster);
-	if (result !== HELD) await writeDerived(input, symbol, roster, result);
+	const written = result === HELD ? undefined : writeDerived(input, symbol, roster, result);
+	if (written) await written;
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to
