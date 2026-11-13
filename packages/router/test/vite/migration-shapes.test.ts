@@ -128,3 +128,18 @@ test('client output spells no path of the machine that built it', async () => {
 	}
 	expect(leaks).toEqual([]);
 });
+
+test('a Link with params in a row component builds, and each row links to its own key, new rows too', async () => {
+	const html = await (await fetch(`${server!.origin}/todo-links`)).text();
+	expect(html).toMatch(/<a [^>]*href="\/todos\/a"[^>]*>Todo a<\/a>/);
+	expect(html).toMatch(/<a [^>]*href="\/todos\/b"[^>]*>Todo b<\/a>/);
+	const { page, errors } = await open('/todo-links');
+	await page.click('[data-more-todos]');
+	await expect
+		.poll(() => page.locator('[data-todo-link]').evaluateAll((links) => links.map((link) => link.getAttribute('href'))))
+		.toEqual(['/todos/a', '/todos/b', '/todos/c']);
+	await page.click('[data-todo-link]:has-text("Todo c")');
+	await expect.poll(() => page.locator('[data-todo-page]').textContent()).toBe('c');
+	expect(errors).toEqual([]);
+	await page.close();
+});

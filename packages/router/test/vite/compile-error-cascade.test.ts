@@ -16,7 +16,10 @@ afterAll(async () => {
 	for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 
-async function buildErrors(component: string): Promise<ReadonlyArray<string>> {
+async function buildErrors(
+	component: string,
+	extraFiles: Readonly<Record<string, string>> = {},
+): Promise<ReadonlyArray<string>> {
 	const root = await mkdtemp(join(tmpdir(), 'markless-router-error-cascade-'));
 	roots.push(root);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
@@ -43,6 +46,7 @@ async function buildErrors(component: string): Promise<ReadonlyArray<string>> {
 			'\t<section><Broken /></section>',
 			'}',
 		].join('\n'),
+		...extraFiles,
 	};
 	for (const [file, source] of Object.entries(files)) {
 		await mkdir(dirname(join(root, file)), { recursive: true });
@@ -89,3 +93,26 @@ for (const [primary, component] of Object.entries(brokenComponents)) {
 		}
 	}, 120_000);
 }
+
+test('a row component whose route params read a value that changes names the file, line and column', async () => {
+	const errors = await buildErrors(
+		[
+			"import { computed } from '@markless/core';",
+			"import { Link } from '@markless/router';",
+			'function Item({ slug }: { slug: string }) @{',
+			'\t<Link href="/todos/[id]" params={{ id: slug }}>{slug}</Link>',
+			'}',
+			'export function Broken() @{',
+			"\tconst rows = computed(async () => [{ id: 'a', slug: 'first' }]);",
+			'\t@try {',
+			'\t\t<ul>@for (const row of rows; key row.id) { <li><Item slug={row.slug} /></li> }</ul>',
+			'\t} @pending { <p>loading</p> }',
+			'}',
+		].join('\n'),
+		{ 'pages/todos/[id].tsrx': 'export default function Todo() @{\n\t<p>todo</p>\n}' },
+	);
+	expect(errors).toHaveLength(1);
+	expect(errors[0]).toMatch(
+		/^MARKLESS_TEMPLATE_EXPRESSION_STATIC: \S*components\/Broken\.tsrx:4:\d+: <Item>: .*passes it `row\.slug`, which changes\./,
+	);
+}, 120_000);

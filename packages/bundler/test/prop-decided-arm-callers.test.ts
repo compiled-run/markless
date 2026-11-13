@@ -84,7 +84,7 @@ export default function Page() @{
 `,
 		}),
 	).rejects.toThrow(
-		/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: .*panel\.tsrx: <Panel>: .*Its test reads the prop `open`, and <Page> in .*page\.tsrx passes it `shown`, which changes\./,
+		/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: .*panel\.tsrx:\d+:\d+: <Panel>: .*Its test reads the prop `open`, and <Page> in .*page\.tsrx passes it `shown`, which changes\./,
 	);
 });
 

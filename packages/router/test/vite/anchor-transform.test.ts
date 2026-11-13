@@ -199,6 +199,17 @@ export default () => {
 		expect(transformed).not.toContain('params=');
 	});
 
+	it('keeps every line where it was written, so the build reports the line the author wrote', () => {
+		const source = `import { Link } from "@markless/router";
+
+export default () => <Link href="/blog/[slug]" params={{ slug: "a" + "b" }}>Blog</Link>;
+`;
+		const transformed = transform(source);
+		expect(transformed).toContain('__marklessRouteHref("/blog/[slug]"');
+		expect(transformed.split('\n')).toHaveLength(source.split('\n').length);
+		expect(transformed.split('\n')[2]).toContain('<Link href={__marklessRouteHref(');
+	});
+
 	it('lowers imported Link route patterns from the public markless/router entry', () => {
 		const source = `import { Link } from "@markless/core/router";
 
