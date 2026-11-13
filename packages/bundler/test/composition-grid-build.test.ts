@@ -331,11 +331,12 @@ describe('composition grid, production build', () => {
 		await new Run(closedArm, await visit(closedArm.path)).firstRender();
 	});
 
-	test("a @try in a module's second export: first render, reload, save held", async () => {
+	test("a @try in a module's second export: first render, reload, save held, handler rejects", async () => {
 		const run = new Run(secondExport, await visit(secondExport.path));
 		await run.firstRender();
 		await run.reload();
 		await run.saveHeld();
+		await run.handlerRejects();
 	});
 
 	// Known defect: in the build, a reload while the arm is open removes the arm's rows until the value answers.
@@ -370,15 +371,6 @@ describe('composition grid, production build', () => {
 			const run = new Run(closedArm, await visit(closedArm.path));
 			await run.firstRender();
 			await run.openArm();
-		}),
-	);
-
-	// Known defect: in the build, a @try inside a module's second export never shows its @catch for a rejected handler.
-	test.fails("a @try in a module's second export: a rejected handler reaches @catch", () =>
-		pinned(async () => {
-			const run = new Run(secondExport, await visit(secondExport.path));
-			await run.firstRender();
-			await run.handlerRejects();
 		}),
 	);
 
