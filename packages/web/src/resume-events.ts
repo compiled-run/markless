@@ -798,7 +798,13 @@ export function createEventWiring(input: {
 				const { graph } = context;
 				let quiet = false;
 				try {
-					const symbol = await input.loadSymbol(symbolId);
+					// A submission's hold loads beside its handler, so a handler that returns a promise marks the form from the press.
+					const [symbol] = await Promise.all([
+						input.loadSymbol(symbolId),
+						form && !held && !submitHold
+							? import('./submit-hold.ts').then((module) => (submitHold = module), () => undefined)
+							: undefined,
+					]);
 					quiet = context.quietTurn === true;
 					if (quiet) graph.markQuietStart?.();
 					marklessControlEditsRead(event);

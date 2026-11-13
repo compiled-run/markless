@@ -16,6 +16,7 @@ import { NoteForm } from './note-form.tsrx';
 import { OwnersForm } from './owners-form.tsrx';
 import { PropForm } from './prop-form.tsrx';
 import { RemovedForm } from './removed-form.tsrx';
+import { ShelfCountForm } from './shelf-count-form.tsrx';
 import { SyncForm } from './sync-form.tsrx';
 
 // While a form's async submit handler runs, and the reload its save caused, the form is busy and an identical repeat is not sent.
@@ -162,13 +163,7 @@ test('the form stays busy while the old list is on screen, and an identical re-p
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
 
-// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": on a slow page the form clears before the reloaded list commits.
-const quarantined = Date.now() < Date.parse('2026-11-27');
-test.runIf(!quarantined)('the quarantine is still in date', () => {
-	expect.fail('Quarantine expired on 2026-11-27: clear the form in the commit that lands the reloaded list and drop the quarantine.');
-});
-
-test.skipIf(quarantined)('the reloaded list and the cleared form land in one frame', async () => {
+test('the reloaded list and the cleared form land in one frame', async () => {
 	const container = (await render(NoteForm)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');
 	const { form, submitter } = parts(container);
@@ -199,6 +194,30 @@ test.skipIf(quarantined)('the reloaded list and the cleared form land in one fra
 	counting = false;
 	expect(at.landed).toBeDefined();
 	expect(at.cleared).toBe(at.landed);
+});
+
+// The reload's pass first loads the @if's code, so it spans tasks; a check at the end of every task sees the form and the list together.
+test('the form stays busy until the reloaded list lands, even when that pass waits for code', async () => {
+	const container = (await render(ShelfCountForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	const { form, submitter } = parts(container);
+	const reloaded = deferred<void>();
+	server.holdReads = reloaded.promise;
+	submitter.click();
+	await expect.poll(() => reads(), poll).toBe(2);
+	expect(busy(form)).toBe('true');
+	const seen: string[] = [];
+	const channel = new MessageChannel();
+	channel.port1.onmessage = () => seen.push(`${busy(form)}|${text(container, '[data-names]')}|${!!container.querySelector('[data-several]')}`);
+	const observer = new MutationObserver(() => channel.port2.postMessage(0));
+	observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true });
+	server.holdReads = undefined;
+	reloaded.resolve();
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	await new Promise((resolve) => setTimeout(resolve, 20));
+	observer.disconnect();
+	expect(seen.filter((sample) => sample !== 'true|Ada|false' && sample !== 'null|Ada, Grace|true')).toEqual([]);
+	expect(seen.at(-1)).toBe('null|Ada, Grace|true');
 });
 
 test('a reload that fails still clears the form', async () => {

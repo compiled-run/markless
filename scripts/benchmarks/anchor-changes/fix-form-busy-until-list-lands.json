@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 151,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 17,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 151,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 21,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 24,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		}
+	]
+}

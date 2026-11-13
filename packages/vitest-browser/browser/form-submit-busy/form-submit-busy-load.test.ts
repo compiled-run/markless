@@ -19,40 +19,45 @@ installServer();
 beforeEach(() => resetServer());
 afterEach(() => cleanup());
 
-// Known gap: a press is held only once its handler has returned a promise and the hold has loaded, so a repeat before that is sent.
-test.fails('a repeat pressed while the hold is still loading is not sent (known gap: the hold starts after its module arrives)', async () => {
+// A press loads the hold beside its handler, so the form is busy before its save is sent, however slow the hold's code is.
+test('nothing is sent until the hold has arrived, and the form is busy while its save is out', async () => {
+	const container = (await render(NoteForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	const form = container.querySelector<HTMLFormElement>('[data-form]')!;
+	const submitter = container.querySelector<HTMLButtonElement>('[data-submit]')!;
+	const answer = deferred<void>();
+	server.nextPost = [{ wait: answer.promise }];
+	try {
+		submitter.click();
+		await new Promise((resolve) => setTimeout(resolve, 50));
+		expect(server.posts).toEqual([]);
+		expect(form.hasAttribute('aria-busy')).toBe(false);
+		arrival.open();
+		await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace']);
+		expect(form.getAttribute('aria-busy')).toBe('true');
+		expect(submitter.getAttribute('aria-disabled')).toBe('true');
+	} finally {
+		answer.resolve();
+	}
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	await shows(container, '[data-names]', 'Ada, Grace');
+});
+
+// Known gap: both presses reach the page before the hold exists, so the repeat is sent too.
+test.fails('a repeat pressed while the hold is still loading is not sent (known gap: the guard starts with the hold)', async () => {
 	const container = (await render(NoteForm)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');
 	const submitter = container.querySelector<HTMLButtonElement>('[data-submit]')!;
 	const answer = deferred<void>();
 	server.nextPost = [{ wait: answer.promise }, { wait: answer.promise }];
 	submitter.click();
-	await expect.poll(() => server.posts.length, poll).toBe(1);
 	submitter.click();
 	try {
-		await expect.poll(() => server.posts.length, { timeout: 300, interval: 10 }).toBe(2);
+		arrival.open();
+		await expect.poll(() => server.posts.length, poll).toBe(1);
+		await new Promise((resolve) => setTimeout(resolve, 100));
 		expect(server.posts).toHaveLength(1);
 	} finally {
 		answer.resolve();
 	}
-});
-
-test('an edit made while the hold is still loading is sent when submitted after it arrives', async () => {
-	const container = (await render(NoteForm)).container as HTMLElement;
-	await shows(container, '[data-names]', 'Ada');
-	const form = container.querySelector<HTMLFormElement>('[data-form]')!;
-	const field = container.querySelector<HTMLInputElement>('[data-field]')!;
-	const submitter = container.querySelector<HTMLButtonElement>('[data-submit]')!;
-	const answer = deferred<void>();
-	server.nextPost = [{ wait: answer.promise }, { wait: answer.promise }];
-	submitter.click();
-	await expect.poll(() => server.posts.length, poll).toBe(1);
-	field.value = 'Hopper';
-	expect(form.hasAttribute('aria-busy')).toBe(false);
-	arrival.open();
-	await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
-	submitter.click();
-	await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
-	answer.resolve();
-	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
