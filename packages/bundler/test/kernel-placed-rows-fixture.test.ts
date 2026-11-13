@@ -1,0 +1,236 @@
+import { execFile } from 'node:child_process';
+import { readFile, rm } from 'node:fs/promises';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { pathToFileURL } from 'node:url';
+import { promisify } from 'node:util';
+import { chromium, type Page } from '@playwright/test';
+import { resolve } from 'pathe';
+import { afterEach, describe, expect, test } from 'vitest';
+
+// Lists placed in a child's keyed rows, the TanStack playground's shape, answered in the browser of a
+// production build. Which renderer filled them is read from V8 coverage mapped through the build's own
+// source maps: the settle kernel, or the whole-module prerender evaluator.
+
+const exec = promisify(execFile);
+const root = resolve(import.meta.dirname, '../../..');
+const fixture = resolve(import.meta.dirname, 'fixtures/kernel-placed-rows');
+const dist = resolve(fixture, 'dist');
+const EVALUATOR = 'packages/web/src/prerender/evaluator.ts';
+const KERNEL = 'packages/web/src/settle-kernel.ts';
+let server: Server | undefined;
+
+afterEach(async () => {
+	await new Promise<void>((done) => (server ? server.close(() => done()) : done()));
+	server = undefined;
+});
+
+type Shape = 'lists' | 'evaluated';
+
+let built: Shape | undefined;
+async function buildAndServe(shape: Shape): Promise<string> {
+	if (built !== shape) {
+		await rm(dist, { force: true, recursive: true });
+		await exec(resolve(root, 'node_modules/.bin/vp'), ['build', '--app'], {
+			cwd: fixture,
+			env: { ...process.env, KERNEL_ROWS_SHAPE: shape },
+		});
+		built = shape;
+	}
+	const entry = (await import(
+		`${pathToFileURL(resolve(dist, 'server-render/server.js')).href}?shape=${shape}&t=${Date.now()}`
+	)) as { render(): Promise<string> };
+	const head = (await readFile(resolve(dist, 'index.html'), 'utf8')).replace('<div id="app"></div>', '');
+	const html = `<!doctype html><html><head>${head}</head><body>${await entry.render()}</body></html>`;
+	server = createServer(async (request, response) => {
+		const path = new URL(request.url ?? '/', 'http://fixture.local').pathname;
+		if (path === '/') {
+			response.setHeader('Content-Type', 'text/html;charset=utf-8');
+			response.end(html);
+			return;
+		}
+		try {
+			response.setHeader('Content-Type', 'text/javascript');
+			response.end(await readFile(resolve(dist, `.${path}`)));
+		} catch {
+			response.statusCode = 404;
+			response.end();
+		}
+	});
+	await new Promise<void>((done) => server!.listen(0, '127.0.0.1', done));
+	return `http://127.0.0.1:${(server!.address() as AddressInfo).port}/`;
+}
+
+const BASE64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+// Source map v3: per generated line, segments of [column, source, line, column] deltas in base64 VLQ.
+function decodeMappings(mappings: string) {
+	const lines: Array<Array<readonly [column: number, source: number]>> = [];
+	let source = 0;
+	let originalLine = 0;
+	let originalColumn = 0;
+	for (const line of mappings.split(';')) {
+		const segments: Array<readonly [number, number]> = [];
+		let column = 0;
+		for (const segment of line.split(',')) {
+			if (!segment) continue;
+			const fields: number[] = [];
+			let value = 0;
+			let shift = 0;
+			for (const char of segment) {
+				const digit = BASE64.indexOf(char);
+				value += (digit & 31) << shift;
+				if (digit & 32) shift += 5;
+				else {
+					fields.push(value & 1 ? -(value >>> 1) : value >>> 1);
+					value = 0;
+					shift = 0;
+				}
+			}
+			column += fields[0]!;
+			if (fields.length >= 4) {
+				source += fields[1]!;
+				originalLine += fields[2]!;
+				originalColumn += fields[3]!;
+				segments.push([column, source]);
+			}
+		}
+		lines.push(segments);
+	}
+	return lines;
+}
+
+// The source module each executed function of the served chunks was built from.
+async function executedSources(coverage: ReadonlyArray<{ url: string; functions: ReadonlyArray<{ ranges: ReadonlyArray<{ startOffset: number; count: number }> }> }>) {
+	const sources = new Set<string>();
+	for (const script of coverage) {
+		if (!script.url.startsWith('http')) continue;
+		const path = new URL(script.url).pathname;
+		if (!path.endsWith('.js')) continue;
+		const code = await readFile(resolve(dist, `.${path}`), 'utf8').catch(() => undefined);
+		const map = await readFile(resolve(dist, `.${path}.map`), 'utf8').catch(() => undefined);
+		if (!code || !map) continue;
+		const parsed = JSON.parse(map) as { sources: string[]; mappings: string };
+		const lines = decodeMappings(parsed.mappings);
+		const lineStarts = [0];
+		for (let index = 0; index < code.length; index++) if (code[index] === '\n') lineStarts.push(index + 1);
+		for (const fn of script.functions) {
+			const range = fn.ranges[0];
+			if (!range || range.count === 0) continue;
+			let line = lineStarts.length - 1;
+			while (lineStarts[line]! > range.startOffset) line--;
+			const column = range.startOffset - lineStarts[line]!;
+			const segment = (lines[line] ?? []).filter(([at]) => at <= column).at(-1);
+			if (!segment) continue;
+			const file = parsed.sources[segment[1]];
+			if (file) sources.add(resolve(dist, 'build', file).slice(root.length + 1));
+		}
+	}
+	return sources;
+}
+
+const rowsOf = (page: Page, view: number, list = '.list') =>
+	page.locator(`[data-view="${view}"] ${list} [data-row]`);
+
+// Every answer waits until the page has resumed and gone quiet, so the fill is its own measured window.
+async function fill(page: Page, url: string) {
+	await page.addInitScript(() => {
+		const held = globalThis as typeof globalThis & { __answers?: Promise<void>; __release?: () => void };
+		held.__answers = new Promise<void>((release) => (held.__release = release));
+	});
+	const cdp = await page.context().newCDPSession(page);
+	const urls = new Map<string, string>();
+	cdp.on('Debugger.scriptParsed', (script) => urls.set(script.scriptId, script.url));
+	await cdp.send('Debugger.enable');
+	await cdp.send('Profiler.enable');
+	await cdp.send('Profiler.startPreciseCoverage', { callCount: true, detailed: false });
+	await page.goto(url, { waitUntil: 'networkidle' });
+	// Counts reset on each take: what follows is the fill alone.
+	await cdp.send('Profiler.takePreciseCoverage');
+	await page.evaluate(() => (globalThis as typeof globalThis & { __release?: () => void }).__release?.());
+	await expect.poll(() => page.locator('[data-row]').count()).toBeGreaterThan(0);
+	await page.waitForLoadState('networkidle');
+	const { result } = (await cdp.send('Profiler.takePreciseCoverage')) as {
+		result: ReadonlyArray<Parameters<typeof executedSources>[0][number] & { scriptId: string }>;
+	};
+	await cdp.detach();
+	return executedSources(result.map((script) => ({ ...script, url: script.url || (urls.get(script.scriptId) ?? '') })));
+}
+
+// A row handler writes the owner's state, a write to the owner's state reaches every row, and a refetch keeps
+// the nodes of the rows whose keys it keeps.
+async function exerciseRows(page: Page, list: string, reloads: number) {
+	for (const view of [0, 1]) {
+		const owner = page.locator(`[data-view="${view}"] ${list}`);
+		await expect.poll(() => rowsOf(page, view, list).count()).toBe(view === 0 ? 3 : 2);
+		await rowsOf(page, view, list).first().locator('[data-pick]').click();
+		await expect.poll(() => owner.locator('[data-picked]').textContent()).toBe('Dune');
+		await owner.locator('[data-mark]').click();
+		await expect
+			.poll(() => owner.locator('[data-mark-text]').allTextContents())
+			.toEqual(view === 0 ? ['-+', '-+', '-+'] : ['-+', '-+']);
+	}
+	await page.evaluate((selector) => {
+		for (const row of document.querySelectorAll(`${selector} [data-row]`))
+			(row as HTMLElement & { __kept?: string }).__kept = row.getAttribute('data-row')!;
+	}, list);
+	await page.locator('[data-reload]').click();
+	await expect.poll(() => rowsOf(page, 0, list).locator('[data-pick]').allTextContents()).toEqual(['Dune', 'Emma', `Ubik ${reloads}`]);
+	const kept = await page.evaluate(
+		(selector) =>
+			[...document.querySelectorAll(`[data-view="0"] ${selector} [data-row]`)].map(
+				(row) => (row as HTMLElement & { __kept?: string }).__kept ?? 'new',
+			),
+		list,
+	);
+	// Rows 1 and 2 come back unchanged; row 3's text changed, so it may be redrawn.
+	expect(kept.slice(0, 2)).toEqual(['1', '2']);
+}
+
+describe('lists placed in component rows, answered in the browser of a production build', () => {
+	test('the kernel fills them without the evaluator running, and their rows stay live', async () => {
+		const url = await buildAndServe('lists');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			const ran = await fill(page, url);
+			expect(ran.has(KERNEL)).toBe(true);
+			expect(ran.has(EVALUATOR)).toBe(false);
+			await exerciseRows(page, '.list', 1);
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	test('component rows the kernel refuses fill through the evaluator, and their rows stay live', async () => {
+		const url = await buildAndServe('evaluated');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			const ran = await fill(page, url);
+			expect(ran.has(EVALUATOR)).toBe(true);
+			await exerciseRows(page, '.carded', 1);
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	// Ships on main: an expression in a placed arm's rows over the owner's state renders once and never follows a write.
+	test.fails('rows whose expression reads the owner state follow its writes through the evaluator', async () => {
+		const url = await buildAndServe('evaluated');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			await fill(page, url);
+			await exerciseRows(page, '.joined', 1);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+});

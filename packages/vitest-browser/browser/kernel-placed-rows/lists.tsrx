@@ -26,7 +26,7 @@ function Todos({ initialFilter, reload }: { initialFilter: string; reload: numbe
 		@try {
 			<ul>
 				@for (const todo of data; key todo.id) {
-					<li><button data-pick onClick={() => (picked = todo.name)}>{todo.name}</button></li>
+					<li><button data-pick onClick={() => (picked = todo.name)}>{todo.name}</button><span>{picked}</span></li>
 				}
 			</ul>
 		} @pending {

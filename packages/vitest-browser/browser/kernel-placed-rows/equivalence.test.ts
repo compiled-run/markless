@@ -13,6 +13,7 @@ import './lists.tsrx';
 import './twins.tsrx';
 import './deep.tsrx';
 import './arm.tsrx';
+import './still.tsrx';
 
 // The kernel and the evaluator settle the same arm of a component placed below the module root; through
 // the qualifier that re-spells both in page space, they must commit the same markup and records.
@@ -144,6 +145,17 @@ const fixtures: ReadonlyArray<Fixture> = [
 		}),
 		shows: ['Dune 0', 'Emma 0'],
 	},
+	{
+		// No prop the parent routes: the repeat names its rows without prop routes.
+		file: 'still.tsrx',
+		chain: ['Still', 'Shelf'],
+		values: ({ symbols }) => ({
+			[`${MODULE_ROOT}state:note`]: 'n',
+			[`${symbols}state:seen`]: 'du',
+			[`${symbols}computed:books`]: answered(rows),
+		}),
+		shows: ['Dune 0'],
+	},
 ];
 
 beforeAll(() => installMarklessComposedArmRecords());
@@ -179,6 +191,7 @@ function committed(update: Rendered, ownerPath: string) {
 			parentHostNodeId: repeat.parentHostNodeId,
 			collectionGraphNodeId: repeat.collectionGraphNodeId,
 			collectionPath: repeat.collectionPath,
+			instancePath: repeat.instancePath,
 			rowEventSymbolIds: (repeat.rowEvents as ReadonlyArray<{ readonly symbolIds: ReadonlyArray<string> }>).map(
 				(event) => event.symbolIds,
 			),
