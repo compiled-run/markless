@@ -208,8 +208,7 @@ for (const mode of MODES) {
 	test(`${mode}: a save started while an earlier save's reload loads shows at once, and the earlier row keeps its look`, async () => {
 		expect(await startDuringReload(mode, 'rowState')).toEqual({ a: ['off', 'on+p', 'on'], b: ['off', 'on+p', 'on'] });
 	});
-	// A newer press that replaces a whole shared list shows what code holds now, which no longer lists the earlier row.
-	test.fails(`${mode}: today: a shared list replaced whole by a press during an earlier save's reload drops the earlier row's look`, async () => {
+	test(`${mode}: a shared list replaced whole by a press during an earlier save's reload keeps the earlier row's look`, async () => {
 		expect(await startDuringReload(mode, 'rowCallback')).toEqual({ a: ['off', 'on+p', 'on'], b: ['off', 'on+p', 'on'] });
 	});
 
