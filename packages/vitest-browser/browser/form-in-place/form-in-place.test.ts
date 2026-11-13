@@ -7,6 +7,7 @@ import { keptSubmission } from '../../../web/src/event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER } from '../../../web/src/fns/in-place-headers.ts';
 import { PlainForm } from './plain-form.tsrx';
 import { RowForms } from './row-form.tsrx';
+import { DeepForms } from './deep-form.tsrx';
 
 // A form with no handler that posts to this origin is sent from its dispatch: busy until the reload lands, failures in @catch.
 installServer();
@@ -146,4 +147,33 @@ test('SSR: the same on a resumed page, and its failure reaches the @catch around
 	server.nextPost = [{ status: 422, body: 'Name taken' }];
 	await userEvent.click((container as HTMLElement).querySelector<HTMLButtonElement>('[data-row-submit]')!);
 	await shows(container as HTMLElement, '[data-failed]', 'Name taken');
+});
+
+async function failsIntoCatch(container: HTMLElement) {
+	server.nextPost = [{ status: 422, body: 'Name taken' }];
+	await userEvent.click(container.querySelector<HTMLButtonElement>('[data-row-submit]')!);
+	await shows(container, '[data-failed]', 'Name taken');
+	expect(server.posts).toEqual(['POST /mut/items name=Ada']);
+}
+
+test('CSR: a failed send from a form another component draws shows in the @catch around it', async () => {
+	const container = (await render(RowForms)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	await failsIntoCatch(container);
+});
+
+test('CSR: a form two components down from the @try is sent from the page, and its failure shows in @catch', async () => {
+	const container = (await render(DeepForms)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	await rowFormSendsInPlace(container);
+	server.posts = [];
+	await failsIntoCatch(container);
+});
+
+test('SSR: the same two components down, on a resumed page', async () => {
+	const { container } = await renderSSR(DeepForms);
+	expect(text(container as HTMLElement, '[data-names]')).toBe('Ada');
+	await rowFormSendsInPlace(container as HTMLElement);
+	server.posts = [];
+	await failsIntoCatch(container as HTMLElement);
 });

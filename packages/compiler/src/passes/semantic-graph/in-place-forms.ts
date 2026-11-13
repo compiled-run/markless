@@ -73,16 +73,22 @@ function componentsRenderedOnlyInCatches(
 	handledAround: (hostNodeId: string | undefined) => boolean,
 ): ReadonlySet<string> {
 	const semantic = facts.semantic();
+	const edgesOf = (name: string) =>
+		graph.componentEdges.filter((edge) => !edge.importSource && edge.childComponentName === name);
 	const tagOnly = new Set<string>();
 	for (const component of graph.components) {
 		if (component.exportName) continue;
 		const binding = semantic.bindings.find(
 			(candidate) => candidate.scope === semantic.rootScope && candidate.name === component.name,
 		);
+		if (!binding) continue;
+		const parents = binding.references.map((reference) => semantic.parentOf(reference.node)?.type);
+		const opened = parents.filter((type) => type === 'JSXOpeningElement').length;
+		// Every opening tag must be a component edge: a tag outside any component body records none.
 		if (
-			binding &&
-			binding.references.length > 0 &&
-			binding.references.every((reference) => reference.node.type === 'JSXIdentifier')
+			opened > 0 &&
+			opened === edgesOf(component.name).length &&
+			parents.every((type) => type === 'JSXOpeningElement' || type === 'JSXClosingElement')
 		)
 			tagOnly.add(component.name);
 	}
@@ -91,9 +97,7 @@ function componentsRenderedOnlyInCatches(
 		grew = false;
 		for (const name of tagOnly) {
 			if (caught.has(name)) continue;
-			const edges = graph.componentEdges.filter(
-				(edge) => !edge.importSource && edge.childComponentName === name,
-			);
+			const edges = edgesOf(name);
 			if (
 				edges.length > 0 &&
 				edges.every(

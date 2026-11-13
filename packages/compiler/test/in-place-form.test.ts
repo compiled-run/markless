@@ -175,3 +175,21 @@ test('a form in another component stays the browser’s when that component can 
 	expect(await submitRecords(rowsPage(rowForm, '', 'export '))).toEqual([]);
 	expect(await submitRecords(rowsPage(rowForm, 'const Alias = RowForm;'))).toEqual([]);
 });
+
+// The full compile refuses a tag outside a component body as a syntax error; the pass itself must still not fail open.
+test('a tag the pass sees outside any component body counts as a place the component renders, so its form stays the browser’s', () => {
+	const inPlace = (source: string) =>
+		buildSemanticGraphSync({ filename: 'shelf.tsrx', source }).events.filter((event) => event.inPlaceSubmit);
+	const plain = `import { computed } from '@markless/core';
+function RowForm() @{
+	<form method="post" action="/api/todos"><button>Done</button></form>
+}
+export default function Shelf() @{
+	const todos = computed(async () => [1]);
+	@try { <section><RowForm /></section> } @pending { <p>Loading</p> } @catch (error) { <p>{error.message}</p> }
+}
+`;
+	expect(inPlace(plain)).toHaveLength(1);
+	expect(inPlace(plain.replace('export default', 'const loose = <RowForm />;\nexport default'))).toEqual([]);
+	expect(inPlace(plain.replace('export default', 'function loose() { return <RowForm />; }\nexport default'))).toEqual([]);
+});
