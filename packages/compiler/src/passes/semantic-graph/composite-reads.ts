@@ -5,6 +5,7 @@ import type {
 	SemanticGraphAlias,
 	SemanticGraphBinding,
 	SemanticGraphDependency,
+	SemanticGraphReadLocal,
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
@@ -120,6 +121,40 @@ export function memberReadPath(node: AnyNode | undefined): string | null {
 	return null;
 }
 
+/** The name a static read starts from and the member names it reads on it: `a?.b['c'][0]` is `a` with `b`, `c`, `0`. */
+export function readLocal(node: AnyNode | undefined): SemanticGraphReadLocal | null {
+	const members: string[] = [];
+	let cursor = node;
+	while (cursor) {
+		if (
+			cursor.type === 'ChainExpression' ||
+			cursor.type === 'TSNonNullExpression' ||
+			cursor.type === 'ParenthesizedExpression'
+		) {
+			cursor = cursor.expression as AnyNode | undefined;
+			continue;
+		}
+		if (cursor.type === 'MemberExpression') {
+			const member = staticMemberName(cursor);
+			if (member === null) return null;
+			members.unshift(member);
+			cursor = cursor.object as AnyNode | undefined;
+			continue;
+		}
+		const name = cursor.type === 'Identifier' ? getIdentifierName(cursor) : null;
+		return name ? { name, members } : null;
+	}
+	return null;
+}
+
+function staticMemberName(node: AnyNode): string | null {
+	const property = node.property as AnyNode | undefined;
+	if (node.computed !== true)
+		return property?.type === 'Identifier' ? getIdentifierName(property) : null;
+	const value = property?.value;
+	return typeof value === 'string' || typeof value === 'number' ? String(value) : null;
+}
+
 // A call belongs to a read only when it is a method ON a read value, the way
 // `ticked.includes(value)` is. A bare `format(value)` names a function whose body
 // this pass cannot see, so nothing says what would move its result.
@@ -139,7 +174,7 @@ export function pureCompositeReadSources(
 	node: AnyNode | undefined,
 	state: WalkState,
 	options: CompositeReadOptions = {},
-): ReadonlyArray<string> | null {
+): ReadonlyArray<GraphReadSource> | null {
 	if (!node) return [];
 	if (node.type === 'ChainExpression' || node.type === 'ParenthesizedExpression') {
 		return pureCompositeReadSources(node.expression as AnyNode | undefined, state, options);
@@ -149,7 +184,9 @@ export function pureCompositeReadSources(
 		// `undefined` is an Identifier to the parser but a value here, like false
 		// or null; reporting it as a read source kills the computed mint.
 		const source = expressionSource(node, state.source);
-		return source === 'undefined' || readsModuleValue(node, source, state) ? [] : [source];
+		return source === 'undefined' || readsModuleValue(node, source, state)
+			? []
+			: [graphReadSource(node, source)];
 	}
 	if (node.type === 'MemberExpression') return memberReadSources(node, state, options);
 	if (node.type === 'CallExpression') {
@@ -186,7 +223,7 @@ function methodCallReadSources(
 	node: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions,
-): ReadonlyArray<string> | null {
+): ReadonlyArray<GraphReadSource> | null {
 	const callee = node.callee as AnyNode;
 	// A function this file imports or declares at module scope sees only its arguments,
 	// exactly as `ns.fn(arg)` does; a body-local one can close over state, and a
@@ -233,7 +270,7 @@ function memberReadSources(
 	node: AnyNode,
 	state: WalkState,
 	options: CompositeReadOptions,
-): ReadonlyArray<string> | null {
+): ReadonlyArray<GraphReadSource> | null {
 	const object = node.object as AnyNode | undefined;
 	// An optional link can short-circuit, so the read stops at the value before it, as a computed() body's does.
 	if (hasOptionalLink(node)) {
@@ -256,7 +293,7 @@ function memberReadSources(
 	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 	const source = expressionSource(node, state.source);
 	if (!source) return null;
-	return readsModuleValue(node, source, state) ? [] : [source];
+	return readsModuleValue(node, source, state) ? [] : [graphReadSource(node, source)];
 }
 
 // A module binding or a global is the same value for every render: the derive
@@ -283,14 +320,24 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 }
 
 export function joinReadSources(
-	parts: ReadonlyArray<ReadonlyArray<string> | null>,
-): ReadonlyArray<string> | null {
-	const joined: string[] = [];
+	parts: ReadonlyArray<ReadonlyArray<GraphReadSource> | null>,
+): ReadonlyArray<GraphReadSource> | null {
+	const joined = new Map<string, GraphReadSource>();
 	for (const part of parts) {
 		if (!part) return null;
-		joined.push(...part);
+		for (const read of part) if (!joined.has(read.source)) joined.set(read.source, read);
 	}
-	return [...new Set(joined)];
+	return [...joined.values()];
+}
+
+/** A graph read's source, and the name and members its syntax reads; `local` is null when the read is not a static member chain. */
+export type GraphReadSource = {
+	readonly source: string;
+	readonly local: SemanticGraphReadLocal | null;
+};
+
+export function graphReadSource(node: AnyNode, source: string): GraphReadSource {
+	return { source, local: readLocal(node) };
 }
 
 function isLiteralExpression(node: AnyNode | undefined): boolean {
@@ -365,7 +412,7 @@ export function liftArmModuleValue(
  */
 export function mintTemplateExpressionComputed(
 	functionSource: string,
-	readSources: ReadonlyArray<string>,
+	readSources: ReadonlyArray<GraphReadSource>,
 	state: WalkState,
 	scope?: GraphReadScope,
 	// A collection lifted for its row handlers is a graph node even when nothing moves it.
@@ -380,11 +427,11 @@ export function mintTemplateExpressionComputed(
 	const aliases =
 		scope?.aliases ?? semanticAliasMap(state.graph, state.currentSharedDefinitionId, component);
 	const dependencies: SemanticGraphDependency[] = [];
-	for (const source of readSources) {
+	for (const { source, local } of readSources) {
 		// Component scope first: a factory local and the instance local routinely collide.
 		// An enclosing row binding outranks both - it is the name's real declaration.
 		// ...and only THIS component's instance locals; a sibling component's
-		// same-named local is not in scope here (defect 46).
+		// same-named local is not in scope here.
 		const resolved = repeatRowBindsName(source, state)
 			? null
 			: (resolveGraphPath(source, bindings, aliases) ??
@@ -397,7 +444,11 @@ export function mintTemplateExpressionComputed(
 		) {
 			return null;
 		}
-		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path });
+		if (!local)
+			throw new Error(
+				`A graph read of ${source} resolved to ${resolved.binding.id} without a static name and members.`,
+			);
+		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path, local });
 	}
 	if (dependencies.length === 0 && !allowConstant) return null;
 	if (
@@ -477,7 +528,12 @@ export function readsUnroutedGraphCell(
 	identifiers = false,
 ): boolean {
 	const readSources = pureCompositeReadSources(expression, state, options);
-	if (readSources) return readsWritableGraphCell(readSources, state, scope);
+	if (readSources)
+		return readsWritableGraphCell(
+			readSources.map(({ source }) => source),
+			state,
+			scope,
+		);
 	return readsWritableGraphCell(freeReadSources(expression, state, identifiers), state, scope);
 }
 

@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/compile-module.ts';
-import { marklessSsrRemapGraphOutput, marklessSsrSeedPropCells } from '../../web/src/fns/ssr.ts';
+import { marklessSsrComposeState, marklessSsrSeedPropCells } from '../../web/src/fns/ssr.ts';
 
 function componentSsrSource(source: string, functionName: string) {
 	const start = source.indexOf(`async function ${functionName}(`);
@@ -236,29 +236,28 @@ test('composition drops a seeded derive key the composer routes live, keeps a st
 			{ graphNodeId: 'prop:props', keys: [], deriveKeys: ['updates', 'weight', 'label'] },
 		]);
 
-	const routed = { state: seed() as { cells: ReadonlyArray<{ graphNodeId: string }> } };
-	marklessSsrRemapGraphOutput(
-		routed,
-		[
-			{ name: 'updates', graphNodeId: 'computed:feed', path: ['updates'] },
-			{ name: 'weight', graphNodeId: 'state:weight', path: [] },
-			{ name: 'label', graphNodeId: 'state:label', path: [] },
-		],
-		'c0:',
-	);
-	expect(routed.state.cells.map((cell) => cell.graphNodeId)).not.toContain('c0:prop:props');
+	const composed = (graphProps: ReadonlyArray<Record<string, unknown>>) =>
+		marklessSsrComposeState({ cells: [] }, [
+			{
+				hostPrefix: 'c0:',
+				symbolPrefix: 'c0:',
+				graphProps: graphProps as never,
+				output: { state: seed() } as never,
+			},
+		]) as { cells: ReadonlyArray<{ graphNodeId: string }> };
+	const routed = composed([
+		{ name: 'updates', graphNodeId: 'computed:feed', path: ['updates'] },
+		{ name: 'weight', graphNodeId: 'state:weight', path: [] },
+		{ name: 'label', graphNodeId: 'state:label', path: [] },
+	]);
+	expect(routed.cells.map((cell) => cell.graphNodeId)).not.toContain('c0:prop:props');
 
-	const mixed = { state: seed() as { cells: ReadonlyArray<{ graphNodeId: string }> } };
-	marklessSsrRemapGraphOutput(
-		mixed,
-		[
-			{ name: 'updates', graphNodeId: 'computed:feed', path: ['updates'] },
-			{ name: 'weight', graphNodeId: 'state:weight', path: [] },
-			{ name: 'label', kind: 'compiler-known-constant' },
-		],
-		'c0:',
-	);
-	const carried = mixed.state.cells.find((cell) => cell.graphNodeId === 'c0:prop:props');
+	const mixed = composed([
+		{ name: 'updates', graphNodeId: 'computed:feed', path: ['updates'] },
+		{ name: 'weight', graphNodeId: 'state:weight', path: [] },
+		{ name: 'label', kind: 'compiler-known-constant' },
+	]);
+	const carried = mixed.cells.find((cell) => cell.graphNodeId === 'c0:prop:props');
 	expect(JSON.stringify(carried)).toContain('label');
 	expect(JSON.stringify(carried)).not.toContain('weight');
 });

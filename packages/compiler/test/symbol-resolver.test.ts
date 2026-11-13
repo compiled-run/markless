@@ -316,7 +316,7 @@ export function App() @{
 				name: 'doubled',
 				source: '() => count * 2',
 				dependencies: [
-					{ source: 'count', graphNodeId: 'state:count', path: [], local: { name: 'count', members: 0 } },
+					{ source: 'count', graphNodeId: 'state:count', path: [], local: { name: 'count', members: [] } },
 				],
 			}),
 		]),

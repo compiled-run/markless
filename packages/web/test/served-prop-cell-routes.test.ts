@@ -1,6 +1,6 @@
 import { createProtocolStatePayload } from '@markless/serializer';
 import { expect, test } from 'vitest';
-import { marklessSsrRemapGraphOutput, marklessSsrSeedPropCells } from '../src/fns/ssr.ts';
+import { marklessSsrComposeState, marklessSsrSeedPropCells } from '../src/fns/ssr.ts';
 
 // A served child keeps in its own prop cell only the props its composer does not route live: every
 // browser read of a routed prop, an arm's text included, follows the route to the composer's node.
@@ -11,10 +11,17 @@ const propCells = (graphProps: ReadonlyArray<Record<string, unknown>>) => {
 			createProtocolStatePayload({ cells: [] }),
 			{ slug: 'abc', place: { search: '?tab=info', pathname: '/n/abc' }, label: 'Notes' },
 			[{ graphNodeId: 'prop:props', keys: ['slug', 'label'], deriveKeys: ['place'], derivePaths: { place: [['search']] } }],
-		) as { cells: ReadonlyArray<{ graphNodeId: string; value?: unknown }> },
+		),
 	};
-	marklessSsrRemapGraphOutput(output as never, graphProps as never, 'c0:');
-	return output.state.cells.filter((cell) => cell.graphNodeId.endsWith('prop:props'));
+	const composed = marklessSsrComposeState(createProtocolStatePayload({ cells: [] }), [
+		{
+			hostPrefix: 'c0:',
+			symbolPrefix: 'c0:',
+			graphProps: graphProps as never,
+			output: output as never,
+		},
+	]) as { cells: ReadonlyArray<{ graphNodeId: string; value?: unknown }> };
+	return composed.cells.filter((cell) => cell.graphNodeId.endsWith('prop:props'));
 };
 
 test('a routed arm key and a routed derive key both leave the child cell; an unrouted one stays', () => {

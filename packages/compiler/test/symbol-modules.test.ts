@@ -623,7 +623,7 @@ test('emitSymbolModules emits async computed runner modules from planned sources
 							source: 'query',
 							graphNodeId: 'state:query',
 							path: [],
-							local: { name: 'query', members: 0 },
+							local: { name: 'query', members: [] },
 						},
 					],
 				},

@@ -23,6 +23,7 @@ import { collectExpressionReads, resolvedSymbolAt } from './collect-expressions.
 import {
 	isCompositeTemplateExpression,
 	mintTemplateExpressionComputed,
+	joinReadSources,
 	pureCompositeReadSources,
 	type CompositeReadOptions,
 } from './composite-reads.ts';
@@ -455,15 +456,13 @@ export function liftRenderLocalComposite(
 		inlined.definitions.some((definition) => writesOutside(definition, state))
 	)
 		return null;
-	const sources = new Set(
-		(
-			readSources ?? collectGraphDependencies(expression, state).map(({ source }) => source)
-		).filter((source) => readsGraphRoot(source, state)),
-	);
-	for (const definition of inlined.definitions)
-		for (const dependency of collectGraphDependencies(definition, state))
-			sources.add(dependency.source);
-	const lifted = mintTemplateExpressionComputed(`() => ${inlined.source}`, [...sources], state);
+	const sources = joinReadSources([
+		(readSources ?? collectGraphDependencies(expression, state)).filter((read) =>
+			readsGraphRoot(read.source, state),
+		),
+		...inlined.definitions.map((definition) => collectGraphDependencies(definition, state)),
+	])!;
+	const lifted = mintTemplateExpressionComputed(`() => ${inlined.source}`, sources, state);
 	if (lifted)
 		for (const definition of new Set(inlined.definitions))
 			collectDefinitionReads(definition, state);
@@ -593,7 +592,7 @@ export function liftArmRenderLocalValue(
 		guard.source === null
 			? `() => ${inlined.source}`
 			: `() => (${guard.source}) ? ${inlined.source} : undefined`,
-		[...new Set(dependencies.map((dependency) => dependency.source))],
+		joinReadSources([dependencies])!,
 		state,
 		undefined,
 		true,

@@ -244,8 +244,8 @@ export function Detail({ place }: { readonly place: { readonly search: string; r
 	expect(
 		result.semanticGraph.graphBindings.find((binding) => binding.name === 'note')?.dependencies?.map((dependency) => dependency.local),
 	).toEqual([
-		{ name: 'place', members: 1 },
-		{ name: 'place', members: 1 },
+		{ name: 'place', members: ['search'] },
+		{ name: 'place', members: ['pathname'] },
 	]);
 	expect(JSON.stringify([result.protocolState, result.protocolView])).not.toContain('"local"');
 });
@@ -318,8 +318,8 @@ export function Pair() @{
 	});
 	const gate = result.semanticGraph.graphBindings.find((binding) => binding.name.startsWith('marklessAsyncGate'));
 	expect(gate?.dependencies?.map((dependency) => dependency.local)).toEqual([
-		{ name: 'left', members: 0 },
-		{ name: 'right', members: 0 },
+		{ name: 'left', members: [] },
+		{ name: 'right', members: [] },
 	]);
 	const runners = result.symbolModules.modules.filter((module) => module.kind === 'async-computed-runner');
 	const gateRunner = runners.find((module) => module.source.includes('[left, right]'));
@@ -327,3 +327,76 @@ export function Pair() @{
 	expect(gateRunner?.source).toContain('const right = read("computed:right"');
 });
 
+// A component that hands a prop on keeps no copy of it, so its own handler reads the prop through the graph, where the route answers.
+test('a handler in a forwarding component reads its routed prop from the graph, and a defaulted one is refused at build', async () => {
+	const badge = await compile(
+		'src/ui/badge.tsrx',
+		`import { computed, state } from '@markless/core';
+export function Badge({ tone }: { readonly tone: string }) @{
+	const seen = state({ n: 0 });
+	const caption = computed(() => tone + ':' + seen.n);
+	<i onClick={() => { seen.n++; }}>{caption}</i>
+}`,
+	);
+	const relay = (signature: string) =>
+		compileTsrxModule({
+			filename: 'src/ui/relay.tsrx',
+			source: `import { Badge } from './badge.tsrx';
+export function Relay(${signature}) @{
+	<div><Badge tone={shade} /><button onClick={() => console.log(shade)}>log</button></div>
+}`,
+			symbols: [],
+			importedModuleInterfaces: { './badge.tsrx': badge },
+		});
+	const errors = (result: Awaited<ReturnType<typeof relay>>) =>
+		collectTsrxModuleDiagnostics(result)
+			.filter((diagnostic) => diagnostic.severity === 'error')
+			.map((diagnostic) => diagnostic.code);
+	const handler = (result: Awaited<ReturnType<typeof relay>>) =>
+		result.symbolModules.modules.find((module) => module.kind === 'event-handler')?.source;
+
+	const plain = await relay('{ shade }: { readonly shade: string }');
+	expect(errors(plain)).toEqual([]);
+	expect(derivedProps(plain.moduleGraphInterface, 'Relay')).toEqual(['shade']);
+	expect(handler(plain)).toContain('context.graph.read("prop:props", ["shade"])');
+
+	const defaulted = await relay("{ shade = 'grey' }: { readonly shade?: string }");
+	expect(errors(defaulted)).toEqual(['MARKLESS_STATE_DESTRUCTURE_DEFAULT_UNSUPPORTED']);
+});
+
+// Every read a runner makes is declared from its syntax: a shared instance's member resolves to that member's own node, and a quoted member is a member too.
+test('a runner declares a shared instance member and a quoted prop member it reads', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/panel.tsrx',
+		source: `import { computed, shared, state } from '@markless/core';
+async function load(n: number, t: string) { return n + t; }
+export const tally = shared(() => {
+	const count = state({ n: 1 });
+	const doubled = computed(() => count.n * 2);
+	return { count, doubled };
+}, { scope: 'subtree' });
+export function Panel({ info }: { readonly info: { readonly 'tag-name': string } }) @{
+	const t = tally();
+	const answer = computed(async () => load(t.doubled, info['tag-name']));
+	<section>@try {<p>{answer}</p>} @pending {<p>loading</p>}<button onClick={() => t.count.n++}>more</button></section>
+}`,
+		symbols: [],
+	});
+	expect(
+		collectTsrxModuleDiagnostics(result).filter(
+			(diagnostic) => diagnostic.severity === 'error',
+		),
+	).toEqual([]);
+	const runner = result.symbolModules.modules.find(
+		(module) => module.kind === 'async-computed-runner',
+	);
+	expect(runner?.source).toContain(
+		'const t = { "doubled": read("shared:src/panel.tsrx#tally/computed:doubled") };',
+	);
+	expect(runner?.source).toContain(
+		'const info = { "tag-name": read("prop:props", ["info", "tag-name"]) };',
+	);
+	expect(result.publicRenderModule.ssrModuleSource).toContain(
+		'const t={"doubled":marklessSsrReadPublicPath(marklessSsrRenderStateValues.get("shared:src/panel.tsrx#tally/computed:doubled"),[])};',
+	);
+});

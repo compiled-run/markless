@@ -1102,7 +1102,7 @@ test('buildSemanticGraph records graph bindings inside shared factories', async 
 						source: 'data.user',
 						graphNodeId: 'shared:src/session.tsrx#session/state:data',
 						path: ['user'],
-						local: { name: 'data', members: 1 },
+						local: { name: 'data', members: ['user'] },
 					},
 				],
 			}),

@@ -11,7 +11,6 @@ import {
 	marklessCsrRemapChildDomUpdate,
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
-	marklessRoutedPropCells,
 	marklessWithWidgetRegistry,
 } from './composition.ts';
 import type {
@@ -21,6 +20,7 @@ import type {
 	ComposeGraphRead,
 	ComposeRowTemplate,
 	ComposeStateDraft,
+	ComposeStateNode,
 	MarklessWidgetSite,
 } from './composition.ts';
 import {
@@ -259,6 +259,26 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 };
 
 export { marklessComposeState };
+
+// What a served prop bag keeps once its composer's routes carry its keys: only a server render body seeds one and composes it here.
+const marklessRoutedPropCells = new WeakMap<
+	object,
+	(graphProps: ComposeGraphProps) => ReadonlyArray<ComposeStateNode>
+>();
+
+export function marklessSsrComposeState<T extends ComposeStateDraft>(
+	state: T,
+	children: ReadonlyArray<ComposeChild>,
+) {
+	for (const child of children) {
+		const childState = child.output?.state;
+		if (childState?.cells)
+			childState.cells = childState.cells.flatMap(
+				(cell) => marklessRoutedPropCells.get(cell)?.(child.graphProps) ?? [cell],
+			);
+	}
+	return marklessComposeState(state, children);
+}
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 // A prop with no live route was seeded into this instance's own prop cell, so the read follows the instance.
 function marklessSsrRemapBehaviorRead<T extends ComposeGraphRead>(

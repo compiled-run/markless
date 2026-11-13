@@ -5,6 +5,7 @@ import {
 	collectCompositeTemplateExpression,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
+	type GraphReadSource,
 } from './composite-reads.ts';
 import { readsShadowingRowItem } from './collect-repeat.ts';
 import { ifChainOf, isElseIfLink } from './if-chain.ts';
@@ -218,7 +219,7 @@ function armIndexTest(
 	state: WalkState,
 ): { readonly testComputedGraphNodeId?: string; readonly testReadsRowItem?: true } {
 	if (reads.some((read) => readsShadowingRowItem(read, state))) return { testReadsRowItem: true };
-	const readSources: string[] = [];
+	const readSources: GraphReadSource[] = [];
 	for (const read of reads) {
 		const sources = pureCompositeReadSources(read, state, BRANCH_CONDITION_READ_OPTIONS);
 		if (!sources) return {};

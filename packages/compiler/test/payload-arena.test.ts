@@ -135,7 +135,7 @@ test('planPayloadArena separates graph state from view wiring metadata', async (
 					source: 'menu.title',
 					graphNodeId: 'state:menu',
 					path: ['title'],
-					local: { name: 'menu', members: 1 },
+					local: { name: 'menu', members: ['title'] },
 				},
 			],
 		},

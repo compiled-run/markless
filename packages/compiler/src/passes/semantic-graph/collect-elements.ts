@@ -456,15 +456,14 @@ function joinTextParts(
 			const sources = pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS);
 			return shared
 				? sources
-				: (sources?.filter((source) => !readsRenderDefinition(source, state, caught?.scope)) ??
-						null);
+				: (sources?.filter(
+						(read) => !readsRenderDefinition(read.source, state, caught?.scope),
+					) ?? null);
 		}),
-		...definitions.map((definition) =>
-			collectGraphDependencies(definition, state).map((dependency) => dependency.source),
-		),
+		...definitions.map((definition) => collectGraphDependencies(definition, state)),
 	]);
 	if (!readSources) return null;
-	const asyncReads = readSources.filter((source) => readsAsyncComputed(source, state));
+	const asyncReads = readSources.filter((read) => readsAsyncComputed(read.source, state));
 	// Joined in one text node, an async value is gated by the @try block it renders in.
 	if (asyncReads.length > 0 && !state.currentAsyncBoundaryId) return null;
 	const parts = children.map((child) =>
@@ -1628,21 +1627,13 @@ function mintStyleObjectComputed(
 	);
 	if (!readSources) return null;
 	// An inlined const's definition reads stand in for the const itself.
-	const sources = new Set(
-		readSources.filter(
-			(source) => !inlinedNames.has(/^[A-Za-z_$][\w$]*/.exec(source)?.[0] ?? ''),
-		),
-	);
-	for (const definition of definitions)
-		for (const dependency of collectGraphDependencies(definition, state))
-			sources.add(dependency.source);
-	if (sources.size === 0) return null;
+	const sources = joinReadSources([
+		readSources.filter((read) => !inlinedNames.has(read.local?.name ?? '')),
+		...definitions.map((definition) => collectGraphDependencies(definition, state)),
+	])!;
+	if (sources.length === 0) return null;
 
-	return mintTemplateExpressionComputed(
-		`() => ${lowering.expressionSource}`,
-		[...sources],
-		state,
-	);
+	return mintTemplateExpressionComputed(`() => ${lowering.expressionSource}`, sources, state);
 }
 
 function collectDuplicateAttributeDiagnostics(

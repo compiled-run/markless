@@ -4418,14 +4418,13 @@ function asyncRunnerDependencyStatements(
 	const byName = new Map<
 		string,
 		Array<{
-			readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+			readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
 			readonly dependency: SemanticGraphDependency;
 			readonly slot: CaptureSlot | undefined;
 		}>
 	>();
 	for (const dependency of dependencies) {
 		const binding = asyncRunnerDependencyBinding(dependency);
-		if (!binding) continue;
 		const slot = captureSlots.find((candidate) =>
 			captureSlotMatchesRead(candidate, dependency),
 		);
@@ -4440,7 +4439,10 @@ function asyncRunnerDependencyStatements(
 		const answered = reads.some(
 			(read) =>
 				read.binding.memberPath.length > 0 &&
-				(read.slot || read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)),
+				(read.slot ||
+					read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX) ||
+					// A shared instance's member resolves to that member's own node, not the instance's.
+					read.binding.memberPath.length > read.dependency.path.length),
 		);
 		if (whole || !answered) return constDeclarationNode(name, asyncRunnerRootRead(whole ?? reads[0]!));
 		return constDeclarationNode(
@@ -4462,7 +4464,7 @@ function asyncRunnerDependencyStatements(
 }
 
 function asyncRunnerRootRead(read: {
-	readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+	readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
 	readonly slot: CaptureSlot | undefined;
 }): EmissionNode {
 	return read.slot && read.binding.memberPath.length === 0
@@ -4495,31 +4497,19 @@ function memberReadsObjectNode(
 	);
 }
 
-/** Matches `isIdentifierObjectKey`, which sits inside the scanner band. */
-const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
-
-/**
- * The local name a dependency binds, the member reads on it and the graph path the
- * name itself stands for, from the analyzer's record of where that name's path ends;
- * `null` when a part is not a plain identifier.
- */
+/** The local name a dependency binds, the member reads on it, and the graph path the name itself stands for. */
 function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly name: string;
 	readonly memberPath: ReadonlyArray<string>;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
-} | null {
-	const local = dependency.local;
-	if (!local) return null;
-	const end = dependency.path.length - local.members;
-	const memberPath = dependency.path.slice(end);
-	if (![local.name, ...memberPath].every((part) => ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
-
+} {
+	const { name, members } = dependency.local;
 	return {
-		name: local.name,
-		memberPath,
+		name,
+		memberPath: members,
 		graphNodeId: dependency.graphNodeId,
-		path: dependency.path.slice(0, end),
+		path: dependency.path.slice(0, Math.max(0, dependency.path.length - members.length)),
 	};
 }
 

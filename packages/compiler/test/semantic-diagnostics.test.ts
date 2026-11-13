@@ -1326,7 +1326,7 @@ test('buildSemanticGraph reports sync computed reads that transitively depend on
 						source: 'user.name',
 						graphNodeId: 'computed:user',
 						path: ['name'],
-						local: { name: 'user', members: 1 },
+						local: { name: 'user', members: ['name'] },
 					},
 				],
 			}),

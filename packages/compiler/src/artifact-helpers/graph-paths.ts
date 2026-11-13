@@ -23,15 +23,6 @@ export function resolveGraphPath(
 	return resolveGraphSegments(segments, bindings, aliases, new Set(), undefined);
 }
 
-/** Where a dependency's own name ends in the path it resolved to: its last segments are member reads on that name. */
-export function dependencyLocal(
-	source: string,
-	path: ReadonlyArray<string>,
-): { readonly local?: { readonly name: string; readonly members: number } } {
-	const [name, ...members] = splitStaticGraphPath(source);
-	return name !== undefined && members.length <= path.length ? { local: { name, members: members.length } } : {};
-}
-
 export type ResolvedGraphPath = {
 	readonly binding: SemanticGraphBinding;
 	readonly path: ReadonlyArray<string>;

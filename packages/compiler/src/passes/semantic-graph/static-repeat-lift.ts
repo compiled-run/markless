@@ -11,7 +11,12 @@ import {
 	isHostTagName,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
-import { mintTemplateExpressionComputed, pureCompositeReadSources } from './composite-reads.ts';
+import {
+	joinReadSources,
+	mintTemplateExpressionComputed,
+	pureCompositeReadSources,
+	type GraphReadSource,
+} from './composite-reads.ts';
 import { collectGraphDependencies } from './collect-async.ts';
 import { inlineRenderLocals } from './render-local-inline.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
@@ -132,14 +137,11 @@ export function liftStaticCollection(
 		: { kind: 'unliftable', reason: { kind: 'opaque' } };
 }
 
-function dependencySources(nodes: ReadonlyArray<AnyNode>, state: WalkState): ReadonlyArray<string> {
-	return [
-		...new Set(
-			nodes.flatMap((node) =>
-				collectGraphDependencies(node, state).map((read) => read.source),
-			),
-		),
-	];
+function dependencySources(
+	nodes: ReadonlyArray<AnyNode>,
+	state: WalkState,
+): ReadonlyArray<GraphReadSource> {
+	return joinReadSources(nodes.map((node) => collectGraphDependencies(node, state)))!;
 }
 
 function firstRowHandlerName(node: AnyNode | undefined): string | null {

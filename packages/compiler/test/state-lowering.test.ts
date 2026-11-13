@@ -1163,8 +1163,18 @@ export function App() @{
 			async: false,
 			functionSource: "() => flag ? user.name : 'guest'",
 			dependencies: [
-				{ source: 'flag', graphNodeId: 'state:flag', path: [] },
-				{ source: 'user.name', graphNodeId: 'state:user', path: ['name'] },
+				{
+					source: 'flag',
+					graphNodeId: 'state:flag',
+					path: [],
+					local: { name: 'flag', members: [] },
+				},
+				{
+					source: 'user.name',
+					graphNodeId: 'state:user',
+					path: ['name'],
+					local: { name: 'user', members: ['name'] },
+				},
 			],
 		}),
 	]);
