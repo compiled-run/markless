@@ -469,10 +469,16 @@ export async function settleAsyncBoundaryRange(
 		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
 			if (claim?.() === false) return;
-			const { computed, cells, renderedBoundaryId } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'> & {
+			const { computed, cells, renderedBoundaryId, moduleRootPath } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'> & {
 				readonly renderedBoundaryId?: string;
+				readonly moduleRootPath?: string;
 			};
-			const own = { ...(computed && { computed }), ...(cells && { cells }), armRecords };
+			const own = {
+				...(computed && { computed }),
+				...(cells && { cells }),
+				...(moduleRootPath !== undefined && { moduleRootPath }),
+				armRecords,
+			};
 			await commit(
 				{
 					...(composedArmRecordQualifier()?.boundaryUpdate?.(boundary, own, input.graph, renderedBoundaryId) ?? own),

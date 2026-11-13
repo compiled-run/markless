@@ -15,6 +15,7 @@ import { wakeNoopResume } from '../payload-resume-registry.ts';
 import { serializeRuntimeAsyncSnapshots } from '@markless/serializer';
 import { adoptFilledArms } from '../prerender/adopt-filled-arms.ts';
 import { isSettleKernelUnsupported, renderSettledArm } from '../settle-kernel.ts';
+import { branchOwnerPlacement } from '../prerender/owner-placement.ts';
 
 // The full prerender evaluator re-evaluates the ENTIRE render-data surface to
 // obtain one boundary arm, and a static import of it here is what drags that
@@ -69,11 +70,16 @@ export async function renderPrerenderBoundary(
 				status,
 				read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
 				serializeComputed: serializeRuntimeAsyncSnapshots as never,
+				// Only the boundary's own update symbol re-spells a placed owner's computeds and bound ids.
+				...(pageBoundaryId && {
+					placement: (owner: string) => branchOwnerPlacement(page as never, owner, graph as never),
+				}),
 			});
 			return {
 				html: kernel.html,
 				armRecords: kernel.armRecords as never,
 				computed: kernel.computed as never,
+				...(kernel.moduleRootPath !== undefined && { moduleRootPath: kernel.moduleRootPath }),
 			};
 		} catch (error) {
 			// Fail closed: anything the kernel cannot express exactly falls back to

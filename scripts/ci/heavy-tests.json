@@ -57,6 +57,7 @@
 		"packages/bundler/test/failed-build-compile-store.test.ts",
 		"packages/bundler/test/fixture-builds.test.ts",
 		"packages/bundler/test/interaction-closures-build.test.ts",
+		"packages/bundler/test/kernel-placed-rows-fixture.test.ts",
 		"packages/bundler/test/music-player-csr-budget.test.ts",
 		"packages/bundler/test/music-player-ssr-budget.test.ts",
 		"packages/bundler/test/mutual-recursion-build.test.ts",

@@ -84,6 +84,10 @@ type ComponentLike = {
 		};
 	}>;
 	readonly propCellId?: string | null;
+	readonly readResidue?: (
+		residue: Extract<SsrDataResidue, { readonly kind: 'authored-expression' }>,
+		context: { readonly read: SettleKernelRead },
+	) => unknown;
 };
 
 type SurfaceLike = {
@@ -139,6 +143,10 @@ export type SettleKernelInput = {
 	 * only places the result.
 	 */
 	readonly fillHole?: (hole: MaterializedHole, read: SettleKernelRead) => unknown;
+	/** Where a non-root owner stands; the caller reads it off the graph the kernel never imports. */
+	readonly placement?: (
+		componentName: string,
+	) => { readonly moduleRootPath: string; readonly ownerPath: string } | undefined;
 };
 
 export type SettleKernelOutput = {
@@ -151,6 +159,8 @@ export type SettleKernelOutput = {
 		readonly tagName: string;
 		readonly index: number;
 	}>;
+	/** Set for a non-root owner: bound symbol ids are spelled from this module root. */
+	readonly moduleRootPath?: string;
 };
 
 const SUPPORTED_SLOT_KINDS = new Set(['text', 'attribute', 'repeat', 'child-component']);
@@ -159,16 +169,21 @@ const INERT_HOST = { hostNodeId: '', tagName: '' } as const;
 
 export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	const surface = input.surface;
-	const componentName = surface.rootComponentName;
-	if (!componentName) throw new SettleKernelUnsupportedError('surface has no root component');
+	const rootName = surface.rootComponentName;
+	if (!rootName) throw new SettleKernelUnsupportedError('surface has no root component');
+	const componentName = boundaryOwnerName(surface, rootName, input.boundaryId);
 	const definition = surface.components?.[componentName];
 	if (!definition) throw new SettleKernelUnsupportedError(`component missing: ${componentName}`);
-	if (definition.propCellId) throw new SettleKernelUnsupportedError('root component takes props');
-	for (const initial of definition.initialValues ?? [])
-		if (initial.value?.kind !== 'constant')
-			throw new SettleKernelUnsupportedError(
-				`initial value needs a symbol loader: ${initial.graphNodeId}`,
-			);
+	const placed = componentName !== rootName;
+	if (definition.propCellId && !placed)
+		throw new SettleKernelUnsupportedError('root component takes props');
+	// A placed owner reads its own ids, so the graph must stand at that instance.
+	const placement = placed ? input.placement?.(componentName) : undefined;
+	if (placed && !placement?.ownerPath)
+		throw new SettleKernelUnsupportedError(`owner not placed: ${componentName}`);
+	// A placed instance's caught error lands in a cell only the evaluator creates.
+	if (placed && input.status === 'rejected')
+		throw new SettleKernelUnsupportedError(`placed @catch arm: ${input.boundaryId}`);
 
 	const boundary = (definition.boundaries ?? []).find(
 		(candidate) => candidate.boundaryId === input.boundaryId,
@@ -181,14 +196,26 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	const chunks = new Map(surface.renderData.chunks.map((chunk) => [chunk.id, chunk]));
 	// A state cell answers from the live graph: a redrawn arm shows what handlers wrote, not its initial value.
 	const liveCellIds = new Set((definition.state.cells ?? []).map((cell) => String(cell.graphNodeId)));
+	// The owner's own nodes are live in the graph its settle runs against.
+	const ownedIds = new Set(placed ? (definition.stateGraphNodeIds ?? []) : []);
 	const constants = new Map<string, unknown>();
-	for (const initial of definition.initialValues ?? [])
-		if (!liveCellIds.has(initial.graphNodeId))
-			constants.set(initial.graphNodeId, initial.value.value);
-	const read: SettleKernelRead = (graphNodeId, path = []) =>
-		constants.has(graphNodeId)
-			? readPath(constants.get(graphNodeId), path)
-			: input.read(graphNodeId, path);
+	const derived = new Set<string>();
+	for (const initial of definition.initialValues ?? []) {
+		const constant = initial.value?.kind === 'constant';
+		if (!constant && !placed)
+			throw new SettleKernelUnsupportedError(
+				`initial value needs a symbol loader: ${initial.graphNodeId}`,
+			);
+		if (liveCellIds.has(initial.graphNodeId) || ownedIds.has(initial.graphNodeId)) continue;
+		if (constant) constants.set(initial.graphNodeId, initial.value.value);
+		else derived.add(initial.graphNodeId);
+	}
+	const read: SettleKernelRead = (graphNodeId, path = []) => {
+		if (constants.has(graphNodeId)) return readPath(constants.get(graphNodeId), path);
+		if (derived.has(graphNodeId))
+			throw new SettleKernelUnsupportedError(`initial value needs a symbol loader: ${graphNodeId}`);
+		return input.read(graphNodeId, path);
+	};
 
 	const asyncComputedIds = new Set(
 		(definition.state.computed ?? []).flatMap((computed) =>
@@ -196,7 +223,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		),
 	);
 	// Render data carries authored paths; an async computed's graph node is its snapshot.
-	const readAuthored = (graphNodeId: string, path: ReadonlyArray<string>): unknown =>
+	const readAuthored = (graphNodeId: string, path: ReadonlyArray<string> = []): unknown =>
 		read(graphNodeId, asyncComputedIds.has(graphNodeId) ? ['value', ...path] : path);
 
 	const hosts: Array<{ readonly hostNodeId: string; readonly tagName: string }> = [];
@@ -255,7 +282,10 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			(record) =>
 				localHostIds.has(record.hostNodeId) && completeArmHostIds.has(record.hostNodeId),
 		);
-	for (const record of [...(view.events ?? []), ...(view.domUpdates ?? [])])
+	for (const record of [
+		...(placed ? moveHosted(view.events) : (view.events ?? [])),
+		...(placed ? moveHosted(view.domUpdates) : (view.domUpdates ?? [])),
+	])
 		assertUnbound(record);
 
 	const movedKeyedRepeats = (view.keyedRepeats ?? []).filter(
@@ -295,6 +325,7 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 		armRecords,
 		computed: settledComputed(definition, read, input.serializeComputed),
 		nodes: renderedHosts,
+		...(placement && { moduleRootPath: placement.moduleRootPath }),
 	};
 
 	function renderChunk(chunkId: string, item: { readonly value: unknown } | undefined): string {
@@ -431,8 +462,24 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 			return readPath(item.value, residue.path);
 		}
 		if (residue.kind === 'graph-read') return readAuthored(residue.graphNodeId, residue.path);
+		// The compiler's own reader answers a settled arm's authored expression outside rows; the kernel never evaluates source.
+		if (residue.kind === 'authored-expression' && !item && input.status === 'fulfilled' && definition.readResidue)
+			try {
+				return definition.readResidue(residue, { read: readAuthored });
+			} catch (error) {
+				if (isSettleKernelUnsupported(error)) throw error;
+				throw new SettleKernelUnsupportedError(`authored residue: ${residue.source}`);
+			}
 		throw new SettleKernelUnsupportedError(`${residue.kind} residue`);
 	}
+}
+
+// The root answers first; otherwise the one component whose boundaries name the id.
+function boundaryOwnerName(surface: SurfaceLike, rootName: string, boundaryId: string): string {
+	const holds = (name: string) =>
+		!!surface.components?.[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId);
+	if (holds(rootName)) return rootName;
+	return Object.keys(surface.components ?? {}).find(holds) ?? rootName;
 }
 
 // Data reaches the markup through escaped text and attribute values only —

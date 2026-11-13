@@ -1,0 +1,60 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { defineConfig, type Plugin } from 'vite';
+import { markless } from '../../../../core/src/vite.ts';
+
+// Not a workspace package, so it builds with no install: @markless/core resolves through its own exports map.
+// Which placed-list page this build serves: the kernel's shapes or the evaluator's.
+const shape = process.env.KERNEL_ROWS_SHAPE === 'evaluated' ? 'evaluated' : 'lists';
+const core = new URL('../../../../core/', import.meta.url);
+const coreExports = JSON.parse(readFileSync(new URL('package.json', core), 'utf8'))
+	.exports as Record<string, unknown>;
+const coreFromSource: Plugin = {
+	name: 'fixture-markless-core-source',
+	enforce: 'pre',
+	resolveId(id) {
+		const match = /^@markless\/core(\/.*)?$/.exec(id);
+		const target = match ? coreExports[`.${match[1] ?? ''}`] : undefined;
+		// A client build takes a conditional export's browser target, as package resolution would.
+		const file =
+			typeof target === 'string'
+				? target
+				: (target as { readonly browser?: string; readonly default?: string } | undefined)?.[
+						this.environment?.config.consumer === 'client' ? 'browser' : 'default'
+					];
+		return file ? fileURLToPath(new URL(file, core)) : undefined;
+	},
+};
+
+export default defineConfig(({ command }) => ({
+	build:
+		command === 'build'
+			? {
+					// Hidden maps leave the chunks as built; the test maps executed code back to its module.
+					sourcemap: 'hidden',
+					rolldownOptions: {
+						input: ['index.html'],
+						preserveEntrySignatures: 'exports-only',
+					},
+				}
+			: undefined,
+	environments: {
+		ssr: {
+			build: {
+				rolldownOptions: {
+					input: fileURLToPath(new URL(`./src/${shape}-page.tsrx`, import.meta.url)),
+				},
+			},
+		},
+		ssrRender: {
+			consumer: 'server',
+			build: {
+				outDir: 'dist/server-render',
+				rolldownOptions: {
+					input: { server: fileURLToPath(new URL(`./src/${shape}-server.ts`, import.meta.url)) },
+				},
+			},
+		},
+	},
+	plugins: [coreFromSource, markless()],
+}));

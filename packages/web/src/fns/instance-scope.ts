@@ -1341,10 +1341,11 @@ function composedBoundaryUpdate<U extends ComposedUpdate>(
 ): U {
 	const prefixes = composedBoundaryPrefixes(boundary, undefined, renderedBoundaryId);
 	if (!prefixes) return update;
-	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, {
-		...update,
-		armRecords: composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId),
-	});
+	const rooted = update.moduleRootPath;
+	const armRecords = composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId, rooted);
+	// A kernel-drawn arm names its rows from the module root, as the evaluator's render does.
+	if (rooted !== undefined) for (const repeat of armRecords.keyedRepeats ?? []) Object.assign(repeat, { instancePath: rooted });
+	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, { ...update, armRecords });
 }
 
 function composedUpdateNodes<U extends ComposedUpdate>(
