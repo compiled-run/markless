@@ -1,130 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/arm-gate"
-			],
-			"set": 1972,
-			"reason": "New module: the arm gate, loaded by a branch whose arms hold components that own a computed; a page without one never runs it (1972 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"runtime/graph"
-			],
-			"delta": 208,
-			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-branches"
-			],
-			"delta": 217,
-			"reason": "Branch wiring loads the arm gate when a branch names the components its arms hold (+217 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-sync-computed"
-			],
-			"delta": 80,
-			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 393,
-			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (+393 B gzip, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/arm-gate"
-			],
-			"set": 1972,
-			"reason": "New module: the arm gate, loaded by a branch whose arms hold components that own a computed; a page without one never runs it (1972 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph"
-			],
-			"delta": 208,
-			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-branches"
-			],
-			"delta": 217,
-			"reason": "Branch wiring loads the arm gate when a branch names the components its arms hold (+217 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-sync-computed"
-			],
-			"delta": 80,
-			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": -3,
-			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (-3 B gzip, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 41,
-			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (+41 B gzip, measured by this fixture build)",
-			"date": "2026-11-13"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"loadWeight",
@@ -224,6 +100,152 @@
 			],
 			"set": 1984,
 			"reason": "new module: the arm gate, run only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/arm-gate"
+			],
+			"set": 1807,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 208,
+			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 276,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 75,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 80,
+			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 49,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/arm-gate"
+			],
+			"set": 1807,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 208,
+			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 276,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 75,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 80,
+			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 30,
+			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
 			"date": "2026-11-13"
 		}
 	]

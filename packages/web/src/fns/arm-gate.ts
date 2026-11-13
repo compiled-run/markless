@@ -3,12 +3,7 @@ import type { ResumeBranchRecord } from '../resume-types.ts';
 import { marklessInstancePath } from './instance-scope.ts';
 
 // Loaded by a branch whose arms hold components that own values: those run only while their arm shows.
-type Registration = {
-	readonly branch: ResumeBranchRecord;
-	painted: number;
-	// Let go once replaced or released, so nothing the registration held stays reachable.
-	shows?: (arm: number) => boolean;
-};
+type Registration = { readonly branch: ResumeBranchRecord; readonly shows: (arm: number) => boolean };
 const registrations = new WeakMap<RuntimeGraph, Map<string, Registration>>();
 
 // Whether a node belongs to a component arm `arm` holds: its instance path runs through one of the arm's segments, past any rows.
@@ -26,19 +21,19 @@ function armOwns(branch: ResumeBranchRecord, arm: number, graphNodeId: string): 
 function armShown(byBranch: Map<string, Registration>, graphNodeId: string): boolean | undefined {
 	let owned: boolean | undefined;
 	for (const { branch, shows } of byBranch.values())
-		if (shows)
-			for (let arm = 0; arm < (branch.armComponents?.length ?? 0); arm++)
-				if (armOwns(branch, arm, graphNodeId)) {
-					if (!shows(arm)) return false;
-					owned = true;
-				}
+		for (let arm = 0; arm < (branch.armComponents?.length ?? 0); arm++)
+			if (armOwns(branch, arm, graphNodeId)) {
+				if (!shows(arm)) return false;
+				owned = true;
+			}
 	return owned;
 }
 
-/** Called each time the branch paints an arm: gates its arms once, and drops what the arm it left owned. */
+/** Called each time the branch paints an arm: gates its arms once, and drops what the arm it `left` owned. */
 export function gateBranchArms(
 	graph: RuntimeGraph,
 	branch: ResumeBranchRecord,
+	left: number | undefined,
 	paintedArms: ReadonlyMap<string, number>,
 	wired: () => boolean,
 	pickedArm: (graph: RuntimeGraph, branch: ResumeBranchRecord) => number,
@@ -50,20 +45,15 @@ export function gateBranchArms(
 		registrations.set(graph, held);
 		graph.gateArms?.((graphNodeId) => armShown(held, graphNodeId));
 	}
-	const painted = paintedArms.get(branch.id)!;
-	const known = byBranch.get(branch.id);
-	if (known?.branch === branch) {
+	if (byBranch.get(branch.id)?.branch === branch) {
 		// The leaving arm's components are gone: a run still in flight lands nothing, and a reopen starts fresh.
-		if (known.painted !== painted)
-			graph.asyncPlane?.()?.drop((id) => armOwns(branch, known.painted, id));
-		known.painted = painted;
+		if (left !== undefined && left !== paintedArms.get(branch.id))
+			graph.asyncPlane?.()?.drop((id) => armOwns(branch, left, id));
 		return;
 	}
-	if (known) known.shows = undefined;
 	const test = branch.testReads[0];
 	const registration: Registration = {
 		branch,
-		painted,
 		// Painted and still picked; a branch with no test never flips, and a test nothing has derived since the
 		// served render only has the painted arm to go by.
 		shows: (arm) =>
@@ -75,7 +65,6 @@ export function gateBranchArms(
 	};
 	byBranch.set(branch.id, registration);
 	release(() => {
-		registration.shows = undefined;
 		if (byBranch.get(branch.id) === registration) byBranch.delete(branch.id);
 	});
 }
