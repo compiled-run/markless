@@ -3,13 +3,59 @@
 		{
 			"surface": "perf-guards",
 			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 192,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench / 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /records 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 34,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /settings 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
 				"loadWeight",
 				"linux-x64",
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 402,
-			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs / 1693770 -> 1694172 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"delta": 443,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs / 1693841 -> 1694284 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
 			"date": "2026-11-13"
 		},
 		{
@@ -20,8 +66,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 401,
-			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs /concepts/state 2237488 -> 2237889 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"delta": 443,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /concepts/state 2237559 -> 2238002 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
 			"date": "2026-11-13"
 		},
 		{
@@ -32,8 +78,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 367,
-			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs /ui/accordion 498450 -> 498817 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"delta": 409,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /ui/accordion 498499 -> 498908 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
 			"date": "2026-11-13"
 		}
 	]
