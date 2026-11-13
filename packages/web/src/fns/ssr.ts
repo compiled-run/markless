@@ -230,6 +230,8 @@ type SsrAsyncRunEntry = {
 type SsrAsyncRuns = Pick<Map<string, SsrAsyncRunEntry>, 'get' | 'set'>;
 type SsrRenderContext = SsrRecord & {
 	readonly idPrefix?: string;
+	// The composed graph's name for this instance, which can differ from its host prefix.
+	readonly instancePath?: string;
 	readonly prerender?: boolean;
 	readonly prerenderSettle?: {
 		readonly graph?: {
@@ -575,7 +577,7 @@ export async function marklessSsrRunAsyncComputed(
 	const definitions: ReadonlyMap<string, SsrAsyncRunnerDefinition> =
 		runnerDefinitions ?? new Map([[graphNodeId, { run, dependencies: [] }]]);
 	const runs: SsrAsyncRuns = streaming?.runs
-		? marklessSsrInstanceRuns(streaming.runs, renderContext?.idPrefix ?? '')
+		? marklessSsrInstanceRuns(streaming.runs, renderContext?.instancePath ?? '')
 		: (requestRuns ?? new Map());
 	const entry = marklessSsrEnsureAsyncComputedRun(
 		graphNodeId,
@@ -626,7 +628,15 @@ export async function marklessSsrRunAsyncComputed(
 	return snapshot;
 }
 
-// The request registry is shared by every component instance, so a child's runs live under its instance prefix.
+/** The instance path a placed child's own graph nodes compose under, which is where its request runs are filed. */
+export function marklessSsrChildInstancePath(
+	renderContext: SsrRenderContext | undefined,
+	placed: { readonly symbolPrefix?: string },
+): string {
+	return (renderContext?.instancePath ?? '') + marklessComposedInstancePath(placed);
+}
+
+// The request registry is shared by every component instance, so a child's runs live under its instance path.
 function marklessSsrInstanceRuns(runs: SsrAsyncRuns, prefix: string): SsrAsyncRuns {
 	if (!prefix) return runs;
 	const scoped: SsrAsyncRuns = {
