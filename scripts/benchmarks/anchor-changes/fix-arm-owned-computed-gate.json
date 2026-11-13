@@ -123,6 +123,108 @@
 			"delta": 41,
 			"reason": "The emitted runtime gains the arm gate module and its hooks in the runtime graph, branch wiring and sync derives (+41 B gzip, measured by this fixture build)",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 485,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 485,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 485,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 885,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 884,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 464,
+			"reason": "the arm gate module ships inside a packed runtime chunk downloaded at load, though it runs only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 309,
+			"reason": "a load an @if or @switch arm owns starts once the pass has flipped the arm, and only while it shows (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 326,
+			"reason": "branch wiring loads the arm gate when a branch names the components its arms hold (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/arm-gate"
+			],
+			"set": 1984,
+			"reason": "new module: the arm gate, run only where an arm holds a component that owns a computed (PR run 43493560772 against merge-group run 43480651776 at 73cb34fdc)",
+			"date": "2026-11-13"
 		}
 	]
 }
