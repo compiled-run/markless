@@ -57,6 +57,52 @@
 			"delta": -13,
 			"reason": "Arms painted inside an arm settled in the browser register in two phases at any depth: events and handles at once, the rest after the outer arm's computeds (+162 B rendered, measured by this fixture build)",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 162,
+			"reason": "arms painted inside a browser-settled @try register in two phases at any depth (PR run 43462468386 against merge-group run 43455254324)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 9,
+			"reason": "arms painted inside a browser-settled @try register in two phases at any depth (PR run 43462468386 against merge-group run 43455254324)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 9,
+			"reason": "arms painted inside a browser-settled @try register in two phases at any depth (PR run 43462468386 against merge-group run 43455254324)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 9,
+			"reason": "arms painted inside a browser-settled @try register in two phases at any depth (PR run 43462468386 against merge-group run 43455254324)",
+			"date": "2026-11-13"
 		}
 	]
 }
