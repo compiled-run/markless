@@ -55,6 +55,26 @@ test('CSR: a computed over an async prop re-derives after a state write', async 
 	await keepsDeriving();
 });
 
+// The list is on the page a few tasks before the rest of its arm is wired; a press in that window must still land.
+test('CSR: an add pressed the moment the list appears re-derives', async () => {
+	await render(Page);
+	await expect.poll(items).toBe('x y');
+	await cleanup();
+	const pressed = new Promise<void>((resolve) => {
+		const observer = new MutationObserver(() => {
+			if (items() !== 'x y') return;
+			observer.disconnect();
+			press('[data-add]');
+			resolve();
+		});
+		observer.observe(document.body, { childList: true, subtree: true });
+	});
+	await render(Page);
+	await pressed;
+	await expect.poll(items).toBe('x y z0');
+	expect(pageErrors).toEqual([]);
+});
+
 test('SSR: a computed over an async prop re-derives after a state write', async () => {
 	await renderSSR(Page);
 	await keepsDeriving();

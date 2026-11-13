@@ -567,10 +567,10 @@ export function createEventWiring(input: {
 		const collect = () =>
 			collectDispatchPath(pressAnchor ?? target, event.type, eventRecords, rowEventRecords, bubbles);
 		let path = collect();
-		// Arm content lands before its records: a press on it waits for them instead of matching nothing.
+		// Arm content lands before it is wired: a press waits for the whole registration, not just the event records it registers first.
 		for (
 			let registering = (input.root as ArmRegisteringRoot).__marklessArmRegistering;
-			path.length === 0 && registering?.size;
+			registering?.size;
 			path = collect()
 		)
 			await Promise.all(registering);

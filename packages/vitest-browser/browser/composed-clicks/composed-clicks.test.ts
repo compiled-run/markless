@@ -80,3 +80,31 @@ test('client-rendered inside another component: row handlers without an @if resp
 		.toBe('5');
 	expect(row(page, 'b').querySelector('[data-taps]')?.textContent).toBe('0');
 });
+
+// The rows are on the page a few tasks before the rest of their arm is wired; a press in that window must still reach its row's item.
+test('client-rendered: a like pressed the moment the rows appear reaches its own row', async () => {
+	const warm = (await render(Board)).container as HTMLElement;
+	await expect.poll(() => warm.querySelectorAll('[data-note]').length, poll).toBe(2);
+	await cleanup();
+	resetNotes();
+	const pressed = pressOnArrival(document.body, '[data-note="b"] [data-like]');
+	const container = (await render(Board)).container as HTMLElement;
+	await pressed;
+	await expect
+		.poll(() => row(container, 'b').querySelector('[data-likes]')?.textContent, poll)
+		.toBe('5');
+});
+
+// Presses the element in the observer callback that first sees it, before any later task runs.
+function pressOnArrival(root: Node, selector: string): Promise<void> {
+	return new Promise((resolve) => {
+		const observer = new MutationObserver(() => {
+			const element = (root as ParentNode).querySelector<HTMLElement>(selector);
+			if (!element) return;
+			observer.disconnect();
+			element.click();
+			resolve();
+		});
+		observer.observe(root, { childList: true, subtree: true });
+	});
+}
