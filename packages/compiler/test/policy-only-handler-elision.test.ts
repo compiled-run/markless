@@ -75,7 +75,7 @@ export function MultiBinding() @{
 		(module) => module.kind === 'event-handler',
 	);
 	expect(handlers).toHaveLength(1);
-	expect(handlers[0]?.source).toContain('context.graph.write');
+	expect(handlers[0]?.source).toContain('context.graph.update');
 });
 
 test('a handler with work left over keeps its symbol and loses only the lifted calls', async () => {
@@ -121,5 +121,5 @@ export function GuardedElse() @{
 	expect(result.symbolModules.modules[0]?.source).toContain(
 		`if (event.submitter === 'publish') ; else`,
 	);
-	expect(result.symbolModules.modules[0]?.source).toContain('context.graph.write');
+	expect(result.symbolModules.modules[0]?.source).toContain('context.graph.update');
 });

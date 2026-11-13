@@ -151,8 +151,9 @@ export function Cards() @{
 		);
 	};
 
-	expect(moduleFor('cards.filter')).toContain('context.graph.read("state:cards").filter(');
-	expect(moduleFor('cards.slice')).toContain('context.graph.read("state:cards").slice(0, 1)');
+	// Each replaces the list it reads, so the updater's value stands in for that read.
+	expect(moduleFor('cards.filter')).toContain('return value.filter(');
+	expect(moduleFor('cards.slice')).toContain('return value.slice(0, 1)');
 	// A computed cell holds the derive's result, so its members are the value's too.
 	expect(moduleFor('titles.join')).toContain(`context.graph.read("computed:titles").join('|')`);
 });
@@ -254,8 +255,9 @@ export function Groceries() @{
 	});
 	const sources = result.symbolModules.modules.map((module) => module.source).join('\n');
 
-	expect(sources).toContain('context.graph.read("state:items").slice(1)');
-	expect(sources).toContain('context.graph.read("state:label").toUpperCase()');
+	// Each replaces what it reads, so the updater's value is the receiver.
+	expect(sources).toContain('return value.slice(1)');
+	expect(sources).toContain('return value.toUpperCase()');
 	expect(sources).not.toContain('["slice"]');
 	expect(sources).not.toContain('["toUpperCase"]');
 });

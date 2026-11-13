@@ -5517,6 +5517,8 @@ export type ValueExpressionEmissionInput = {
 	 * `undefined`.
 	 */
 	readonly elementHandleReads?: ReadonlyArray<LoweredElementHandleRead>;
+	/** The read an update's parameter stands in for: the state and path the assignment replaces. */
+	readonly updaterRead?: { readonly graphNodeId: string; readonly path: ReadonlyArray<string>; readonly name: string };
 	/** A handler's value captures: a prop read one of them routes is read through it, not the graph. */
 	readonly captureSlots?: ReadonlyArray<CaptureSlot>;
 	/** The authored file the value came from; names the map at the print site. */
@@ -5654,7 +5656,7 @@ function valueExpressionNode(
 	if (handle) return handle.kind === 'lowered' ? handle.node : null;
 
 	const leaf =
-		graphReadValueNode(text, input.graphReads, input.captureSlots) ??
+		graphReadValueNode(text, input.graphReads, input.captureSlots, input.updaterRead) ??
 		localValueNode(text, input.localNames);
 	if (leaf) return leaf;
 
@@ -5720,11 +5722,13 @@ function graphReadValueNode(
 	text: string,
 	graphReads: ReadonlyArray<LoweredStateRead>,
 	captureSlots: ReadonlyArray<CaptureSlot> = [],
+	updaterRead?: ValueExpressionEmissionInput['updaterRead'],
 ): EmissionNode | null {
 	const graphRead = graphReads.find((read) => read.source === text);
 	if (!graphRead) return null;
 	const slot = captureSlots.find((candidate) => captureSlotMatchesRead(candidate, graphRead));
 	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+	if (updaterRead && readsUpdated(graphRead, updaterRead)) return identifierNode(updaterRead.name);
 
 	return graphReadCall({
 		callee: 'context.graph.read',
@@ -6040,6 +6044,8 @@ function rewriteGraphReadsAndLocals(
 		: undefined;
 	if (graphSlot)
 		return callNode(memberChainNode('context.capture.read'), [literalNode(graphSlot.id)]);
+	if (graphRead && input.updaterRead && readsUpdated(graphRead, input.updaterRead))
+		return identifierNode(input.updaterRead.name);
 	if (graphRead) {
 		return graphReadCall({
 			callee: 'context.graph.read',
@@ -7547,12 +7553,114 @@ function eventReadNode(
 
 	const slot = rewrite.valueSlots.find((candidate) => captureSlotMatchesRead(candidate, read));
 	if (slot) return callNode(memberChainNode('context.capture.read'), [literalNode(slot.id)]);
+	const updaterRead = rewrite.writeValueInput.updaterRead;
+	if (updaterRead && readsUpdated(read, updaterRead)) return identifierNode(updaterRead.name);
 
 	return graphReadCall({
 		callee: 'context.graph.read',
 		graphNodeId: read.graphNodeId,
 		path: read.path,
 	});
+}
+
+const readsUpdated = (
+	read: LoweredStateRead,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+): boolean =>
+	read.graphNodeId === target.graphNodeId &&
+	read.path.length === target.path.length &&
+	read.path.every((segment, index) => segment === target.path[index]);
+
+// An `await` or `yield` in the value itself, not in a function inside it: the read before it runs earlier than the write.
+function pausesOutsideFunctions(node: AnyNode): boolean {
+	if (node.type === 'AwaitExpression' || node.type === 'YieldExpression') return true;
+	if (isFunctionLikeNode(node)) return false;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && pausesOutsideFunctions(item))) return true;
+		} else if (isNode(child) && pausesOutsideFunctions(child)) return true;
+	}
+	return false;
+}
+
+// Whether a node is, by the state lowering's own reads, exactly the state and path an assignment replaces.
+function isAssignedStateRead(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	const text = valueNodeText(node, rewrite.source);
+	if (!text) return false;
+	const read =
+		rewrite.reads.find((candidate) => candidate.source === text) ??
+		rewrite.writeValueInput.graphReads.find((candidate) => candidate.source === text);
+	return (
+		!!read &&
+		readsUpdated(read, target) &&
+		!rewrite.valueSlots.some((candidate) => captureSlotMatchesRead(candidate, read))
+	);
+}
+
+// `pending.filter(...)`, `pending.filter(...).map(...)`: a method on the assigned state's own value.
+function callsAssignedStateMethod(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	const callee = node.callee as AnyNode | undefined;
+	if (node.optional === true || callee?.type !== 'MemberExpression' || callee.computed === true) return false;
+	const receiver = callee.object as AnyNode | undefined;
+	if (!receiver) return false;
+	return receiver.type === 'CallExpression'
+		? callsAssignedStateMethod(receiver, target, rewrite)
+		: isAssignedStateRead(receiver, target, rewrite);
+}
+
+// An update runs again on the value a page still shows, so its value may repeat only reads: no call or `new` but a
+// method on the assigned state's own value, and no read of that state inside a function, which would keep a snapshot.
+function replaysOnShownValue(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+	insideFunction = false,
+): boolean {
+	if (isAssignedStateRead(node, target, rewrite)) return !insideFunction;
+	if (
+		node.type === 'NewExpression' ||
+		node.type === 'TaggedTemplateExpression' ||
+		node.type === 'ImportExpression' ||
+		(node.type === 'UnaryExpression' && node.operator === 'delete') ||
+		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite))
+	)
+		return false;
+	const inside = insideFunction || isFunctionLikeNode(node);
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && !replaysOnShownValue(item, target, rewrite, inside))) return false;
+		} else if (isNode(child) && !replaysOnShownValue(child, target, rewrite, inside)) return false;
+	}
+	return true;
+}
+
+// Whether a value reads the assigned state outside any function inside it.
+function readsAssignedState(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	if (isAssignedStateRead(node, target, rewrite)) return true;
+	if (isFunctionLikeNode(node)) return false;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && readsAssignedState(item, target, rewrite))) return true;
+		} else if (isNode(child) && readsAssignedState(child, target, rewrite)) return true;
+	}
+	return false;
 }
 
 /**
@@ -7701,9 +7809,36 @@ function loweredEventWriteNode(
 			? memberNode(writeThroughCall(authored.through, authored.graphNodeId), method)
 			: undefined;
 	if (write.operation === 'assign') {
-		const value = isNode(node.right) ? eventWriteValueNode(node.right, rewrite) : null;
+		// A plain assignment whose value reads exactly what it replaces is an update, so a page still showing an earlier value applies it there too.
+		const updaterRead =
+			!write.assignmentOperator &&
+			!write.row &&
+			!write.through &&
+			isNode(node.right) &&
+			!containsWriteExpression(node.right) &&
+			!pausesOutsideFunctions(node.right) &&
+			readsAssignedState(node.right, write, rewrite) &&
+			replaysOnShownValue(node.right, write, rewrite)
+				? { graphNodeId: write.graphNodeId, path: write.path, name: freshUpdaterParameter(node.right as unknown as EmissionNode) }
+				: undefined;
+		const value = isNode(node.right)
+			? eventWriteValueNode(
+					node.right,
+					updaterRead ? { ...rewrite, writeValueInput: { ...rewrite.writeValueInput, updaterRead } } : rewrite,
+				)
+			: null;
 		if (!value) return null;
 
+		if (updaterRead)
+			return graphUpdateCall({
+				calleeNode: throughCallee('update'),
+				graphNodeId: write.graphNodeId,
+				path: write.path,
+				pathNode,
+				returnValue: 'next',
+				parameterName: updaterRead.name,
+				updateExpression: value,
+			});
 		if (!write.assignmentOperator) {
 			return graphWriteCall({
 				calleeNode: throughCallee('write'),

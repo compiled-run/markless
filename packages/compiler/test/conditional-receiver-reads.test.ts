@@ -103,7 +103,7 @@ test('nested parentheses around the receiver do not hide the read', async () => 
 	`);
 
 	expect(result.symbolModules.diagnostics).toEqual([]);
-	expect(handlerSource(result)).toContain(`context.graph.read("${SHARED_ID}", ["typeahead"])`);
+	expect(handlerSource(result)).toContain('return value.toLowerCase()');
 });
 
 test('a member on a conditional with no call reads through the conditional', async () => {

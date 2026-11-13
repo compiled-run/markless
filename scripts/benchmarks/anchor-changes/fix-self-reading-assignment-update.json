@@ -1,0 +1,74 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"constructGlue",
+				"event handler"
+			],
+			"delta": 47,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: the minimal fixture's handler (count = count + 1) emits 3184 -> 3231 B of glue, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64); only handlers with such an assignment pay it, and code executed at load does not change",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 317,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 1697578 -> 1697895 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 1697578 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 180,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 2241729 -> 2241909 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 2241729 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 51,
+			"reason": "an assignment that reads the state it replaces compiles to graph.update with the updater value standing in for that read, as x += 1 already does, so a page still showing a held value can apply it there too: 500099 -> 500150 B gzip downloaded at load, measured on PR #684 CI run 43481533014 (head 30909c300, linux-x64) against the main anchor 500099 B; executed chars at load unchanged; not split between the docs site's own handlers that now emit updates and the async.mdx text this branch changes (the docs search chunk loads that page text on every docs page)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 338,
+			"reason": "the update rule is narrowed (a call other than a method on the assigned state's own value, a row or write-through target, or a read of that state inside a nested function keeps a plain write, whose value repeats the graph read instead of the updater parameter): 1698039 -> 1698377 B gzip downloaded at load on PR #684 CI run 43502556150 (head fc2e9133d merged with main b6e8da883, linux-x64); measured on darwin-arm64 at base 5a20b0806, the narrowed rule alone is +168 B (1698118 -> 1698286) and the staged-graph call fix is 0 B; the remaining 170 B is the CI merge with main against the composed anchor and is not attributed; executed chars at load +1",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 387,
+			"reason": "the update rule is narrowed (a call other than a method on the assigned state's own value, a row or write-through target, or a read of that state inside a nested function keeps a plain write, whose value repeats the graph read instead of the updater parameter): 2242370 -> 2242757 B gzip downloaded at load on PR #684 CI run 43502556150 (head fc2e9133d merged with main b6e8da883, linux-x64); measured on darwin-arm64 at base 5a20b0806, the narrowed rule alone is +222 B (2242077 -> 2242299) and the staged-graph call fix is 0 B; the remaining 165 B is the CI merge with main against the composed anchor and is not attributed; executed chars at load unchanged within the swing",
+			"date": "2026-11-13"
+		}
+	]
+}

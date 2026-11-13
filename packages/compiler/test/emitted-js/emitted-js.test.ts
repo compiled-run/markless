@@ -144,7 +144,9 @@ export function Root() @{
 	expect(errors(compiled)).toEqual([]);
 	expect(moduleOfKind(compiled, 'event-handler')).toBe(
 		`export function symbol_0(context) {
-  context.graph.write({ graphNodeId: "state:count", path: [], value: context.graph.read("state:count") + 1 });
+  context.graph.update({ graphNodeId: "state:count", path: [], returnValue: "next", update(value) {
+    return value + 1;
+  } });
 }`,
 	);
 });

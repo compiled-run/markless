@@ -143,9 +143,8 @@ test('a second statement in the same factory method also lowers its reads', asyn
 		(candidate) => candidate.symbolId === handler?.id,
 	);
 
-	expect(module?.source).toContain(
-		'value: context.graph.read("shared:src/spike.tsrx#spike/state:s", ["changes"]) + 1',
-	);
+	expect(module?.source).toContain('context.graph.update({ graphNodeId: "shared:src/spike.tsrx#spike/state:s"');
+	expect(module?.source).toContain('return value + 1');
 });
 
 // Alternate shape: a method whose local feeds a callback the factory holds.
