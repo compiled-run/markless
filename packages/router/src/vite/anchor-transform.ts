@@ -433,7 +433,8 @@ function attributeRemovalRange(code: string, attribute: Node) {
 	const range = rangeOf(attribute);
 	let start = range.start;
 
-	while (start > 0 && /\s/.test(code[start - 1] ?? '')) {
+	// Spaces and tabs only: a removed line break would move every later line the build reports.
+	while (start > 0 && (code[start - 1] === ' ' || code[start - 1] === '\t')) {
 		start--;
 	}
 
