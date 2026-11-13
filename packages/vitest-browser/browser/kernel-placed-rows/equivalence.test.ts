@@ -15,8 +15,9 @@ import './deep.tsrx';
 import './arm.tsrx';
 import './still.tsrx';
 
-// The kernel and the evaluator settle the same arm of a component placed below the module root; through
-// the qualifier that re-spells both in page space, they must commit the same markup and records.
+// The kernel, on the whole render data and on the served subset, and the evaluator settle the same arm of a
+// component placed below the module root; through the qualifier that re-spells them in page space, they must
+// commit the same markup and records.
 
 type Edge = {
 	readonly childComponentName: string;
@@ -49,8 +50,9 @@ const rows = [
 ];
 const answered = (value: unknown) => ({ status: 'fulfilled', version: 2, key: null, value });
 
-async function renderData(file: string): Promise<Surface> {
-	const id = `/@id/__x00__virtual:markless:render-data:${encodeURIComponent(`browser/kernel-placed-rows/${file}`)}`;
+// `served` is the subset a component-row build evaluates and a boundary update hands the kernel.
+async function renderData(file: string, kind: 'render-data' | 'render-data-served' = 'render-data'): Promise<Surface> {
+	const id = `/@id/__x00__virtual:markless:${kind}:${encodeURIComponent(`browser/kernel-placed-rows/${file}`)}`;
 	return ((await import(/* @vite-ignore */ id)) as { marklessPrerenderData: Surface }).marklessPrerenderData;
 }
 
@@ -228,13 +230,16 @@ for (const fixture of fixtures)
 		};
 		const qualify = composedArmRecordQualifier()!.boundaryUpdate!;
 
-		const kernel = renderSettledArm({
-			surface: surface as never,
-			boundaryId,
-			status: 'fulfilled',
-			read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
-			placement: (name) => branchOwnerPlacement(surface as never, name, graph as never),
-		});
+		const kernelOn = (drawn: Surface) =>
+			renderSettledArm({
+				surface: drawn as never,
+				boundaryId,
+				status: 'fulfilled',
+				read: (graphNodeId, path = []) => graph.read(graphNodeId, path),
+				placement: (name) => branchOwnerPlacement(drawn as never, name, graph as never),
+			});
+		const kernel = kernelOn(surface);
+		const served = kernelOn(await renderData(fixture.file, 'render-data-served'));
 		const evaluated = await renderThroughEvaluator(
 			surface as never,
 			boundaryId,
@@ -256,9 +261,19 @@ for (const fixture of fixtures)
 			...qualify(boundary as never, evaluated as never, graph as never, evaluated.renderedBoundaryId),
 		} as unknown as Rendered;
 
+		const viaServed = {
+			html: served.html,
+			...qualify(
+				boundary as never,
+				{ armRecords: served.armRecords, computed: served.computed, moduleRootPath: served.moduleRootPath } as never,
+				graph as never,
+			),
+		} as unknown as Rendered;
+
 		for (const text of fixture.shows) expect(viaKernel.html).toContain(text);
 		expect(kernel.moduleRootPath).toBe(MODULE_ROOT);
 		expect(committed(viaKernel, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
+		expect(committed(viaServed, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
 	});
 
 // An arm that writes the renamed prop into its own markup binds it to the @if; the kernel refuses and the evaluator draws it.

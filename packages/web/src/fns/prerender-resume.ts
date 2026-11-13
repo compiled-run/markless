@@ -61,6 +61,8 @@ export async function renderPrerenderBoundary(
 	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
 	propsOrLoadSymbol?: unknown,
 	pageBoundaryId?: string,
+	// The whole render data, when `page` is the served subset only the kernel reads.
+	wholePage?: () => Promise<unknown>,
 ) {
 	if (isPrerenderDataSurface(page)) {
 		try {
@@ -89,7 +91,7 @@ export async function renderPrerenderBoundary(
 	}
 	const evaluator = await loadPrerenderEvaluator();
 	return evaluator.renderPrerenderBoundary(
-		page as never,
+		(wholePage ? await wholePage() : page) as never,
 		boundaryId,
 		status,
 		graph as never,
