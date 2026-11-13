@@ -373,7 +373,7 @@ export async function renderPrerenderBoundary(
 			servedPageProps(moduleGraph),
 			{
 				cellIds: freshCellIds,
-				...(rootName && { rootName }),
+				rootName,
 				...(status === 'rejected' && { keepsShown: true as const }),
 				...(pageBoundaryId && {
 					settling: {
@@ -662,7 +662,7 @@ async function evaluatePrerenderDataSurface(
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
 	fresh?: {
-		readonly rootName?: string;
+		readonly rootName?: string | undefined;
 		readonly branchSiteId?: string;
 		readonly owner?: BranchOwnerPlacement;
 		readonly cellIds: Set<string>;
@@ -721,7 +721,7 @@ function boundaryModuleRoot(
 	surface: PrerenderDataSurface,
 	boundaryId: string,
 	graph: RuntimeGraph,
-): { readonly graph: RuntimeGraph; readonly rootName?: string } {
+): { readonly graph: RuntimeGraph; readonly rootName?: string | undefined } {
 	const ownerName = Object.keys(surface.components).find(
 		(name) =>
 			!!surface.components[name]?.boundaries?.some(
@@ -729,9 +729,7 @@ function boundaryModuleRoot(
 			),
 	);
 	const placement = branchOwnerPlacement(surface, ownerName, graph);
-	if (!placement) return { graph };
-	if (placement.ownerPath === '')
-		return ownerName === surface.rootComponentName ? { graph } : { graph, rootName: ownerName };
+	if (!placement || placement.ownerPath === '') return { graph, rootName: placement && ownerName };
 	return {
 		graph: marklessInstanceScopedGraph(
 			(graph as MarklessScopedGraph).marklessPageGraph ?? graph,
