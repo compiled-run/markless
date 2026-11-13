@@ -82,10 +82,17 @@ type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 
 const HELD = Symbol('held');
 
-function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined) {
+// `painted` derives from what the page shows, where a held state still shows its earlier value.
+function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeModule | undefined, painted?: boolean) {
 	const shown = input.graph.asyncPlane?.()?.shownRead(input.computed.dependencies ?? []);
 	if (shown === false) return HELD;
-	const graph = seedSourceGraph(shown ? { ...input.graph, read: shown } : input.graph, input.computed);
+	const { shows, readShown } = input.graph;
+	const read = shown || input.graph.read;
+	const source: RuntimeGraph['read'] | undefined =
+		painted && shows && readShown
+			? (graphNodeId, path) => (shows(graphNodeId) ? readShown(graphNodeId, path) : read(graphNodeId, path))
+			: shown || undefined;
+	const graph = seedSourceGraph(source ? { ...input.graph, read: source } : input.graph, input.computed);
 	return symbol({
 		graph,
 		read: graph.read,
@@ -94,6 +101,23 @@ function derive(input: RefreshInput, symbol: ResumeSymbol, roster: RosterResumeM
 		rosterPosition: roster?.createRosterPositionReader(input),
 		rosterCount: roster?.createRosterCountReader(input),
 	});
+}
+
+// Writes what code reads; while a state is shown at its earlier value, also what the page paints, in the same turn.
+function writeDerived(
+	input: RefreshInput,
+	symbol: ResumeSymbol,
+	roster: RosterResumeModule | undefined,
+	value: unknown,
+): void | Promise<void> {
+	const { graph, computed } = input;
+	const land = (painted: unknown) => {
+		graph.write({ graphNodeId: computed.graphNodeId, value });
+		if (painted !== HELD) graph.showDerived?.(computed.graphNodeId, graph.showing?.() ? { value: painted } : undefined);
+	};
+	const painted = graph.showing?.() ? derive(input, symbol, roster, true) : undefined;
+	if (typeof (painted as PromiseLike<unknown> | null)?.then === 'function') return Promise.resolve(painted).then(land);
+	land(painted);
 }
 
 /**
@@ -112,13 +136,12 @@ export function deriveSyncComputedNow(
 		(input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph))
 	)
 		return false;
-	const write = (value: unknown) =>
-		value === HELD || input.graph.write({ graphNodeId: input.computed.graphNodeId, value });
+	const write = (value: unknown): boolean | Promise<unknown> =>
+		value === HELD || (writeDerived(input, symbol, roster || undefined, value) ?? true);
 	const value = derive(input, symbol, roster || undefined);
 	if (typeof (value as PromiseLike<unknown> | null)?.then === 'function')
-		return Promise.resolve(value).then(write);
-	write(value);
-	return true;
+		return Promise.resolve(value as unknown).then(write);
+	return write(value);
 }
 
 export async function refreshSyncComputed(
@@ -154,12 +177,9 @@ export async function refreshSyncComputed(
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
 	if (input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph)) return;
 	const roster = await loadRosterResume();
-	const result = await derive(
-		input,
-		input.derive ?? (await loadDerive(input.loadSymbol, input.computed)),
-		roster,
-	);
-	if (result !== HELD) input.graph.write({ graphNodeId: input.computed.graphNodeId, value: result });
+	const symbol = input.derive ?? (await loadDerive(input.loadSymbol, input.computed));
+	const result = await derive(input, symbol, roster);
+	if (result !== HELD) await writeDerived(input, symbol, roster, result);
 }
 
 // A shared seed re-runs its own authored expression, so its prop reads have to

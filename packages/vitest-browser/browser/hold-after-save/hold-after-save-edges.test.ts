@@ -176,18 +176,19 @@ for (const mode of MODES) {
 		await expect.poll(() => text('[data-status]'), poll).toBe('Cancelled');
 	});
 
-	test(`${mode}: a handler reading the held state gets the new value, and a computed over it the old one`, async () => {
+	test(`${mode}: a handler reading the held state, and a computed over it, gets the new value`, async () => {
 		await ready(mode, 'after');
 		const { reload } = await saveThenKeepWorking();
 		click('[data-read]');
-		await expect.poll(() => text('[data-seen]'), poll).toBe('Saved/SAVING');
+		await expect.poll(() => text('[data-seen]'), poll).toBe('Saved/SAVED');
+		expect(text('[data-status]')).toBe('Saving');
 		reload.resolve();
 		await expect.poll(() => text('[data-status]'), poll).toBe('Saved');
 		click('[data-read]');
 		await expect.poll(() => text('[data-seen]'), poll).toBe('Saved/SAVED');
 	});
 
-	test.fails(`${mode}: today: a reader of the held state and of a state changed meanwhile shows the new held value early`, async () => {
+	test(`${mode}: a reader of the held state and of a state changed meanwhile keeps the held state's earlier value`, async () => {
 		await ready(mode, 'after');
 		const { reload } = await saveThenKeepWorking();
 		const field = document.querySelector<HTMLInputElement>('[data-draft]')!;
@@ -197,6 +198,7 @@ for (const mode of MODES) {
 		const both = text('[data-both]');
 		reload.resolve();
 		expect(both).toBe('Saving x');
+		await expect.poll(() => text('[data-both]'), poll).toBe('Saved x');
 	});
 
 	test(`${mode}: an arm closed while its reload loads still releases the held state when the reload lands`, async () => {

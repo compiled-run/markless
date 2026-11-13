@@ -109,6 +109,24 @@ function isPrefix(prefix: ReadonlyArray<string>, value: ReadonlyArray<string>): 
 	return prefix.every((segment, index) => value[index] === segment);
 }
 
+/** `value` with fresh containers along `path` (and the value at `path` when `leaf`), so writing through them leaves `value` as it was. */
+export function copyAlong(value: unknown, path: ReadonlyArray<string>, leaf = false): unknown {
+	const end = leaf ? path.length : path.length - 1;
+	if (end < 0) return value;
+	const root = shallowCopy(value);
+	let current = root;
+	for (let at = 0; at < end && isObject(current); at++)
+		current = current[path[at]!] = shallowCopy(current[path[at]!]);
+	return root;
+}
+
+function shallowCopy(value: unknown): unknown {
+	if (Array.isArray(value)) return value.slice();
+	if (value instanceof Map) return new Map(value);
+	if (value instanceof Set) return new Set(value);
+	return isObject(value) ? Object.assign(Object.create(Object.getPrototypeOf(value)), value) : value;
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null;
 }

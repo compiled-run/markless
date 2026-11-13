@@ -1,0 +1,116 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 3271,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph-core"
+			],
+			"delta": 597,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 1070,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 728,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 3271,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-core"
+			],
+			"delta": 597,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 1070,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 728,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "overlapping saves hold: the graph paints a held state's earlier value while code, computeds and async values read the written one, and the write watch keeps each sender's round open until its own reload lands; measured locally by packages/bundler/test/fixture-builds.test.ts on fix/overlapping-saves-hold against main 59f6416c2",
+			"date": "2026-11-13"
+		}
+	]
+}
