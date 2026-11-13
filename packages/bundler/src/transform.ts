@@ -947,7 +947,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		moduleImports: compiled.semanticGraph.moduleImports,
 		stylesheetImports,
 		artifactChildren: artifactChildCandidates(compiled),
-		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled)),
+		propFlow: modulePropFlow(compiled, moduleDiagnostics(compiled), input.source),
 		importedConstantRequests: compiled.semanticGraph.componentEdges.flatMap((edge) =>
 			edge.props.flatMap((prop) =>
 				'importedConstants' in prop ? (prop.importedConstants ?? []) : [],

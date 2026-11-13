@@ -112,7 +112,7 @@ export default function Page() @{
 `,
 		}),
 	).rejects.toThrow(
-		/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: .*list\.tsrx: <List>: .*The list comes from the prop `marks`, and <Page> in .*page\.tsrx passes it `marks`, which changes\./,
+		/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: .*list\.tsrx:\d+:\d+: <List>: .*The list comes from the prop `marks`, and <Page> in .*page\.tsrx passes it `marks`, which changes\./,
 	);
 });
 
@@ -171,7 +171,7 @@ export default function Page() @{
 `,
 		}),
 	).rejects.toThrow(
-		/MARKLESS_TEMPLATE_EXPRESSION_STATIC: .*tag\.tsrx: <Tag>: .*It holds only while the prop `item` never changes, and <Page> in .*page\.tsrx passes it `item`, which changes\./,
+		/MARKLESS_TEMPLATE_EXPRESSION_STATIC: .*tag\.tsrx:\d+:\d+: <Tag>: .*It holds only while the prop `item` never changes, and <Page> in .*page\.tsrx passes it `item`, which changes\./,
 	);
 });
 
@@ -215,6 +215,6 @@ export default function Page() @{
 `,
 		}),
 	).rejects.toThrow(
-		/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: .*runs\.tsrx: <Runs>: .*passes it `list`, which changes\./,
+		/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: .*runs\.tsrx:\d+:\d+: <Runs>: .*passes it `list`, which changes\./,
 	);
 });

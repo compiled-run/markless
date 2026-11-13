@@ -27,6 +27,7 @@ import { collectExpressionReads } from './collect-expressions.ts';
 import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
+import { rowItemRead } from './row-item-read.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -523,11 +524,13 @@ function componentPropBindings(
 			});
 			continue;
 		}
+		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
 		props.push({
 			name,
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
+			...(rowRead ? { rowRead } : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }

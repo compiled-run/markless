@@ -164,6 +164,8 @@ export type SemanticComponentPropBinding =
 			// An opaque prop that is plain constant data: the render still runs the
 			// expression, and browser code reads this value instead.
 			readonly buildTimeValue?: { readonly value: unknown };
+			// The value is a plain member read of an enclosing `@for` row's item.
+			readonly rowRead?: SemanticComponentRowRead;
 			// A body local named as a handler whose function the browser cannot rebuild, and the rewrite that it can.
 			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 			// Imported `const` values an opaque prop reads that this compile was not
@@ -213,6 +215,13 @@ export type SemanticComponentPropBinding =
 			readonly excludeNames: ReadonlyArray<string>;
 			readonly sourceSpan?: SourceSpan;
 	  };
+
+/** A row item read: the `@for` it belongs to and the path on its item, or its index. */
+export type SemanticComponentRowRead = {
+	readonly repeatId: string;
+	readonly path: ReadonlyArray<string>;
+	readonly index?: true;
+};
 
 export type SemanticComponentEdge = SemanticAsyncArmPlacement & {
 	readonly id: string;

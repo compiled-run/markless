@@ -25,6 +25,8 @@ export type ModulePropFlow = {
 		readonly componentName: string;
 		readonly props: ReadonlyArray<string>;
 		readonly message: string;
+		/** Where the read is written, in the source this module compiled. */
+		readonly position?: { readonly line: number; readonly column: number };
 	}>;
 	readonly edges: ReadonlyArray<{
 		readonly id: string;
@@ -62,6 +64,7 @@ export type LiteralComponentInstance = {
 export function modulePropFlow(
 	compiled: CompileTsrxModuleResult,
 	diagnostics: ReadonlyArray<CompilerDiagnostic>,
+	source?: string,
 ): ModulePropFlow {
 	const graph = compiled.semanticGraph;
 	const liveChildren = new Map(
@@ -92,6 +95,9 @@ export function modulePropFlow(
 							componentName: diagnostic.decidedByProps.componentName,
 							props: diagnostic.decidedByProps.props,
 							message: diagnostic.message,
+							...(source !== undefined && diagnostic.primarySpan
+								? { position: sourcePosition(source, diagnostic.primarySpan.start) }
+								: {}),
 						},
 					]
 				: [],
@@ -171,21 +177,25 @@ function passedProp(
 	}
 }
 
-// A value read off a @for row changes only when the list it comes from does.
+// A value read off a @for row changes only when the list it comes from does; its key never does, since another key is another row.
 function rowValue(
 	prop: SemanticComponentPropBinding,
 	graph: CompileTsrxModuleResult['semanticGraph'],
 	repeatIds: ReadonlyArray<string>,
 ): ReadonlyArray<string> | null | undefined {
-	if (prop.kind !== 'opaque' || prop.buildTimeValue) return undefined;
-	const root = /^[A-Za-z_$][\w$]*/.exec(prop.source)?.[0];
-	if (!root || !/^[A-Za-z_$][\w$]*(?:(?:\?\.|\.)[A-Za-z_$][\w$]*)*$/.test(prop.source)) return undefined;
-	for (const id of [...repeatIds].reverse()) {
-		const repeat = graph.keyedRepeats.find((candidate) => candidate.id === id);
-		if (repeat && (repeat.itemName === root || repeat.indexName === root))
-			return rowsDecidedBy(repeat, graph);
-	}
-	return undefined;
+	if (prop.kind !== 'opaque' || prop.buildTimeValue || !prop.rowRead) return undefined;
+	const { repeatId, path, index } = prop.rowRead;
+	if (!repeatIds.includes(repeatId)) return undefined;
+	const repeat = graph.keyedRepeats.find((candidate) => candidate.id === repeatId);
+	if (!repeat) return undefined;
+	if (
+		!index &&
+		!repeat.indexKey &&
+		path.length === repeat.keyPath.length &&
+		path.every((segment, at) => segment === repeat.keyPath[at])
+	)
+		return [];
+	return rowsDecidedBy(repeat, graph);
 }
 
 type FlowEdge = ModulePropFlow['edges'][number];
@@ -538,13 +548,19 @@ function passedValue(edge: ModulePropFlow['edges'][number], path: ReadonlyArray<
 	return { known: true, value };
 }
 
+function sourcePosition(source: string, offset: number): { readonly line: number; readonly column: number } {
+	const before = source.slice(0, offset);
+	return { line: before.split('\n').length, column: offset - before.lastIndexOf('\n') };
+}
+
 function refusalMessage(
 	decided: ModulePropFlow['decided'][number],
 	source: string,
 	prop: string,
 	reason: string,
 ): string {
-	const at = `${source}: <${decided.componentName}>: ${decided.message}`;
+	const where = decided.position ? `${source}:${decided.position.line}:${decided.position.column}` : source;
+	const at = `${where}: <${decided.componentName}>: ${decided.message}`;
 	switch (decided.code) {
 		case 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED':
 			return `MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: ${at} Its test reads the prop \`${prop}\`, and ${reason} Pass \`${prop}\` a value that does not change, or show the content outside the @if and hide it with an attribute.`;

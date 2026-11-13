@@ -384,7 +384,8 @@ function objectLiteralKeys(expression: Node) {
 }
 
 function helperImport() {
-	return `import { __marklessRouteHref } from "${ROUTE_HREF_HELPER_ID}";\n`;
+	// No line break, so every line the build reports in this file is the line written.
+	return `import { __marklessRouteHref } from "${ROUTE_HREF_HELPER_ID}";`;
 }
 
 function missingParamsMessage(pattern: string, routeParams: readonly RouteParam[]) {
