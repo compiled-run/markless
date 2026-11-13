@@ -42,7 +42,8 @@ test.fails('SSR: no child derives with the other arm\'s value', () =>
 test.fails('renamed: CSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(kindView, 'CSR', () => render(KindPage), true), 'reload while open'));
 
-// Known defect: the server render gives the @default arm's component the constant prop written on the first @case's,
-// so the renamed page cannot run its timeline server-rendered.
-test.fails('renamed: SSR: the served @default arm shows its own constant prop', () =>
+test('renamed: SSR: the served @default arm shows its own constant prop', () =>
 	oneStep(run(kindView, 'SSR', () => renderSSR(KindPage)), 'first render'));
+test('renamed: SSR', () => fullTimeline(run(kindView, 'SSR', () => renderSSR(KindPage))));
+test.fails('renamed: SSR: no child derives with the other arm\'s value', () =>
+	oneStep(run(kindView, 'SSR', () => renderSSR(KindPage), true), 'reload while open'));
