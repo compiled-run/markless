@@ -323,12 +323,23 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
-	test(`${armed[0]![0]}: first render`, async () => {
-		await new Run(openArm, await visit(openArm.path)).firstRender();
+	test(`${armed[0]![0]}: first render, reload, close and reopen, save held, handler rejects`, async () => {
+		const run = new Run(openArm, await visit(openArm.path));
+		await run.firstRender();
+		await run.reload();
+		await run.closeAndReopen();
+		await run.saveHeld();
+		await run.handlerRejects();
 	});
 
-	test(`${armed[1]![0]}: first render`, async () => {
-		await new Run(closedArm, await visit(closedArm.path)).firstRender();
+	test(`${armed[1]![0]}: first render, open, reload, close and reopen, save held, handler rejects`, async () => {
+		const run = new Run(closedArm, await visit(closedArm.path));
+		await run.firstRender();
+		await run.openArm();
+		await run.reload();
+		await run.closeAndReopen();
+		await run.saveHeld();
+		await run.handlerRejects();
 	});
 
 	test("a @try in a module's second export: first render, reload, save held, handler rejects", async () => {
@@ -338,41 +349,6 @@ describe('composition grid, production build', () => {
 		await run.saveHeld();
 		await run.handlerRejects();
 	});
-
-	// Known defect: in the build, a reload while the arm is open removes the arm's rows until the value answers.
-	test.fails(`${armed[0]![0]}: a reload keeps the rows while it loads`, () =>
-		pinned(async () => {
-			const run = new Run(openArm, await visit(openArm.path));
-			await run.firstRender();
-			await run.reload();
-		}),
-	);
-
-	// Known defect: in the build, the handlers and the reopening of an arm served open ask for async symbols the page
-	// never registered, and throw.
-	test.fails(`${armed[0]![0]}: the arm closes and reopens`, () =>
-		pinned(async () => {
-			const run = new Run(openArm, await visit(openArm.path));
-			await run.firstRender();
-			await run.closeAndReopen();
-		}),
-	);
-	test.fails(`${armed[0]![0]}: a save from the arm's child is sent`, () =>
-		pinned(async () => {
-			const run = new Run(openArm, await visit(openArm.path));
-			await run.firstRender();
-			await run.saveHeld();
-		}),
-	);
-
-	// Known defect: in the build, opening the arm runs the child's computed before its prop arrives, and it throws.
-	test.fails(`${armed[1]![0]}: opening the arm shows its rows`, () =>
-		pinned(async () => {
-			const run = new Run(closedArm, await visit(closedArm.path));
-			await run.firstRender();
-			await run.openArm();
-		}),
-	);
 
 	// Known defect: in the build, each row's own async value stays on its @pending after the server render.
 	test.fails('i. row component with its own async value: first render shows every row\'s value', () =>

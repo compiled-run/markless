@@ -3,6 +3,8 @@ import { render, renderSSR } from '../../src/index.ts';
 import SwitcherPage from './f-switcher-page.tsrx';
 import TabsPage from './f-tabs-page.tsrx';
 import OpenSwitcherPage from './f-open-switcher-page.tsrx';
+import SwitcherShell from './f-switcher-nested-page.tsrx';
+import TabsShell from './f-tabs-nested-page.tsrx';
 import { installServer, resetServer, type Board } from './grid-server.ts';
 import { fullTimeline, type Shape } from './timeline.ts';
 
@@ -30,6 +32,9 @@ test('open at load: CSR', () => fullTimeline(tabs('CSR', () => render(TabsPage))
 test('open at load: SSR', () => fullTimeline(tabs('SSR', () => renderSSR(TabsPage))));
 test('closed at load: CSR', () => fullTimeline(switcher('CSR', () => render(SwitcherPage))));
 test('closed at load: SSR', () => fullTimeline(switcher('SSR', () => renderSSR(SwitcherPage))));
+// One component deeper, as a router page places it: the arm's records cross two levels of composition.
+test('open at load, one component deeper: SSR', () => fullTimeline(tabs('SSR', () => renderSSR(TabsShell))));
+test('closed at load, one component deeper: SSR', () => fullTimeline(switcher('SSR', () => renderSSR(SwitcherShell))));
 
 test('renamed, open at load: CSR', () =>
 	fullTimeline({ ...switcher('CSR', () => render(OpenSwitcherPage)), openAtLoad: true }));

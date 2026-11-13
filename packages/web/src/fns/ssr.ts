@@ -1822,7 +1822,10 @@ export function marklessSsrAppendChildView(context: {
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,
 // symbol ids, and behavior graph reads need the child prefixes/remaps.
-export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child: SsrPrefixChild) {
+export function marklessSsrPrefixBoundaryArmRecords(
+	set: SsrArmRecordSet,
+	child: SsrPrefixChild,
+): SsrArmRecordSet {
 	const instancePath = marklessComposedInstancePath(child);
 	const exhaustive = {
 		locators: true,
@@ -1952,9 +1955,20 @@ export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child:
 						);
 						if ((branch.testReads ?? []).length > 0 && liveTestReads.length === 0)
 							return [];
+						const {
+							composedInstancePath: _unroutedInstancePath,
+							composedGraphProps: _unroutedGraphProps,
+							servedArmRecords,
+							...unrouted
+						} = branch;
 						return [
 							{
-								...branch,
+								...unrouted,
+								...(branch.symbolId &&
+									marklessSsrComposedRoutes(branch, child, instancePath)),
+								...(servedArmRecords && {
+									servedArmRecords: marklessSsrPrefixBoundaryArmRecords(servedArmRecords, child),
+								}),
 								id: child.hostPrefix + branch.id,
 								testReads: marklessSsrRemapChildReads(
 									liveTestReads,
