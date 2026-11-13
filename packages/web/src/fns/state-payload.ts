@@ -62,6 +62,7 @@ export function marklessSsrCatchError(
 	error: unknown,
 	context: {
 		readonly idPrefix?: string;
+		readonly instancePath?: string;
 		readonly streaming?: { readonly caughtErrors?: Map<string, string> };
 	} | undefined,
 	boundaryId: string,
@@ -69,6 +70,8 @@ export function marklessSsrCatchError(
 	const durable = durableError(error);
 	values.set(graphNodeId, durable);
 	marklessSetStatePayloadValue(state, graphNodeId, durable);
-	const prefix = context?.idPrefix ?? '';
-	context?.streaming?.caughtErrors?.set(prefix + boundaryId, prefix + graphNodeId);
+	context?.streaming?.caughtErrors?.set(
+		(context.idPrefix ?? '') + boundaryId,
+		(context.instancePath ?? '') + graphNodeId,
+	);
 }

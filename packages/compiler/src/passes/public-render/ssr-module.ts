@@ -447,6 +447,7 @@ export function emitPublicSsrRenderModule(
 					'marklessSsrWidgetRoots',
 					'marklessSsrPlacedWidgetRoots',
 					'marklessSsrChildrenWidgetRoot',
+					'marklessSsrChildInstancePath',
 					'marklessSsrWidgetBoundary',
 					// Keep the emitted SSR helper distinct from authored bindings.
 					'marklessComposeState as marklessSsrComposeState',
@@ -930,7 +931,7 @@ function emitSsrDataLines(
 			]
 				.map(
 					(graphNodeId) =>
-						`{const marklessSsrInput=marklessSsrAsyncRuns.get((marklessSsrRenderContext?.streaming?.runs?marklessSsrIdPrefix:'')+${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
+						`{const marklessSsrInput=marklessSsrAsyncRuns.get((marklessSsrRenderContext?.streaming?.runs?(marklessSsrRenderContext?.instancePath??''):'')+${JSON.stringify(graphNodeId)})?.settled;if(marklessSsrInput?.status==='fulfilled')marklessSsrRenderStateValues.set(${JSON.stringify(graphNodeId)},marklessSsrInput.value);}`,
 				)
 				.join('')}`;
 			const showsError = boundary.errorGraphNodeId
@@ -1248,7 +1249,7 @@ function emitSsrDataLines(
 			? `if(marklessSsrRowSegment(marklessSsrDataContext)===undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`
 			: `if(marklessSsrDataContext.repeatItem!==undefined){marklessAssertPresentationalRowChild(marklessSsrChildOutput,${JSON.stringify(edge.childComponentName)});return marklessSsrChildOutput;}`;
 		return [
-			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix${
+			`case ${JSON.stringify(edge.id)}:{const marklessSsrPlacedChild=${placement};const marklessSsrChildProps={${props.join(',')}};const marklessSsrChildOutput=await ${childSurface}?.renderSsr?.(marklessSsrChildProps,{...marklessSsrRenderContext,idPrefix:marklessSsrIdPrefix+marklessSsrPlacedChild.hostPrefix,instancePath:marklessSsrChildInstancePath(marklessSsrRenderContext,marklessSsrPlacedChild)${
 					// A widget ROOT reads its own instance's seeds too: the parts placed
 					// inside it wrote them before it rendered, and its consume line
 					// merges them over its statics. Not the child THIS component
