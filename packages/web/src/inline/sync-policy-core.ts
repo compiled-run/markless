@@ -63,8 +63,13 @@ function syncPolicyBranches(policy: ProtocolSyncPolicy): ReadonlyArray<ProtocolS
 
 type Submitter = HTMLButtonElement | HTMLInputElement;
 
-/** A submit kept from the browser to be sent in place: where it goes, how it is encoded, and the browser's own submit to fall back to. */
-export type KeptSubmission = { readonly action: string; readonly enctype: string; readonly native: () => void };
+/** A submit kept from the browser to be sent in place: where it goes, how it is encoded, what it carried at the press, and the browser's own submit to fall back to. */
+export type KeptSubmission = {
+	readonly action: string;
+	readonly enctype: string;
+	readonly data: FormData;
+	readonly native: () => void;
+};
 
 /**
  * What the browser would send for this submit when it is a same-origin POST in this tab; otherwise undefined.
@@ -120,6 +125,7 @@ export function inPlaceSubmission(event: SubmitEvent, later?: boolean): KeptSubm
 	return {
 		action,
 		enctype: chosen('enctype', 'formEnctype'),
+		data: new FormData(form, by),
 		native() {
 			form.__mNative = 1;
 			try {

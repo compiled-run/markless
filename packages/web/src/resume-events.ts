@@ -897,6 +897,8 @@ export function createEventWiring(input: {
 							runAsDispatchOwn(userActionToken, () =>
 								module.sendInPlace(event as unknown as SubmitEvent, kept, record, (end) => {
 									hold = Promise.resolve(end);
+									// Waiting on the answer is this dispatch's own await, so the next gesture starts now.
+									options.releaseQueue?.();
 									marklessEventHandled(input.root, event);
 								}),
 							),

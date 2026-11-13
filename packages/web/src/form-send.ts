@@ -10,8 +10,7 @@ import { holdSubmit } from './submit-hold.ts';
 const crlf = (value: string) => value.replace(/\r\n|\r|\n/g, '\r\n');
 
 // The body the browser would send for this enctype, so the route reads the same request with JavaScript on or off.
-function body(form: HTMLFormElement, by: HTMLElement | null, enctype: string): FormData | string {
-	const data = new FormData(form, by);
+function body(data: FormData, enctype: string): FormData | string {
 	if (enctype === 'multipart/form-data') return data;
 	const pairs = [...data].map(([name, value]) => [
 		crlf(name),
@@ -81,7 +80,7 @@ export async function sendInPlace(
 	)!.get!.call(form) as DOMTokenList;
 	const response = await fetch(kept.action, {
 		method: 'POST',
-		body: body(form, by, kept.enctype),
+		body: body(kept.data, kept.enctype),
 		headers: {
 			[IN_PLACE_REQUEST_HEADER]: '1',
 			// FormData sets its own multipart type and boundary; a string body says what it is.
@@ -109,5 +108,22 @@ export async function sendInPlace(
 		throw new Error('The save answered with a redirect that is not a web address.');
 	if (landed && landed.origin !== location.origin) return location.assign(landed.href);
 	if (landed && pageKey(landed) !== pageKey(new URL(location.href))) return follow(landed);
-	if (record.inPlaceSubmit === 'reset') HTMLFormElement.prototype.reset.call(form);
+	// Fields changed since the press hold what the person typed next, so they are kept.
+	if (record.inPlaceSubmit === 'reset' && unchanged(form, by, kept.data))
+		HTMLFormElement.prototype.reset.call(form);
+}
+
+const carried = (data: FormData) =>
+	JSON.stringify(
+		[...data].map(([name, value]) =>
+			typeof value === 'string' ? [name, value] : [name, value.name, value.size, value.lastModified],
+		),
+	);
+
+function unchanged(form: HTMLFormElement, by: HTMLElement | null, sent: FormData): boolean {
+	try {
+		return carried(new FormData(form, by)) === carried(sent);
+	} catch {
+		return false;
+	}
 }

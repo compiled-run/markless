@@ -3,6 +3,7 @@ import type { ResumeArmRange } from './resume-types.ts';
 
 export type BusyNode = {
 	readonly nodeType?: number;
+	readonly tagName?: string;
 	readonly isConnected?: boolean;
 	readonly textContent?: string | null;
 	readonly parentNode?: BusyParent | null;
@@ -10,6 +11,8 @@ export type BusyNode = {
 	removeAttribute?: (name: string) => void;
 };
 type BusyParent = BusyNode & { readonly childNodes: ArrayLike<BusyNode> };
+
+export const isForm = (node: BusyNode) => node.tagName === 'FORM';
 
 // Decided at runtime because a component whose root is the block cannot see its parent at build time.
 export function boundaryBusyHosts(boundary: Pick<ResumeArmRange, 'startAnchor' | 'endAnchor'>): BusyNode[] {
@@ -23,8 +26,8 @@ export function boundaryBusyHosts(boundary: Pick<ResumeArmRange, 'startAnchor' |
 	const shown = (node: BusyNode) =>
 		node.nodeType === 1 || (node.nodeType === 3 && (node.textContent ?? '').trim() !== '');
 	const outside = siblings.some((node, at) => (at < from || at > to) && shown(node));
-	if (!outside && parent.nodeType === 1) return [parent];
-	return siblings.slice(from + 1, to).filter((node) => node.nodeType === 1);
+	if (!outside && parent.nodeType === 1 && !isForm(parent)) return [parent];
+	return siblings.slice(from + 1, to).filter((node) => node.nodeType === 1 && !isForm(node));
 }
 
 export function setBoundaryBusy(

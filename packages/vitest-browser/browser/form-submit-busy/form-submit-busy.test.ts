@@ -447,18 +447,27 @@ test('a handler promise that does not settle keeps the form busy; a changed subm
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
 
-test('the form keeps aria-busy while either its submission or a reload of the value it shows is running', async () => {
+test('a form is aria-busy for its own submission only; a reload of the value it shows marks the value, not the form', async () => {
 	const container = (await render(OwnersForm)).container as HTMLElement;
 	await shows(container, '[data-count]', '1');
 	const { form, submitter } = parts(container);
 	const count = container.querySelector('[data-count]')!;
 	const page = container.querySelector<HTMLButtonElement>('[data-page]')!;
-	const cleared: number[] = [];
-	const observer = new MutationObserver(() => !form.hasAttribute('aria-busy') && cleared.push(1));
+	const marked: Array<string | null> = [];
+	const observer = new MutationObserver(() => marked.push(busy(form)));
 	observer.observe(form, { attributeFilter: ['aria-busy'] });
 	const handler = deferred<void>();
 	server.handlerWait = handler.promise;
 	try {
+		const idle = deferred<void>();
+		server.holdReads = idle.promise;
+		page.click();
+		await expect.poll(() => count.getAttribute('aria-busy'), poll).toBe('true');
+		expect(busy(form)).toBeNull();
+		server.holdReads = undefined;
+		idle.resolve();
+		await expect.poll(() => count.hasAttribute('aria-busy'), poll).toBe(false);
+		expect(marked).toEqual([]);
 		submitter.click();
 		await expect.poll(() => busy(form), poll).toBe('true');
 		const first = deferred<void>();
@@ -469,18 +478,18 @@ test('the form keeps aria-busy while either its submission or a reload of the va
 		first.resolve();
 		await expect.poll(() => count.hasAttribute('aria-busy'), poll).toBe(false);
 		expect(busy(form)).toBe('true');
-		expect(cleared).toEqual([]);
 		const second = deferred<void>();
 		server.holdReads = second.promise;
 		page.click();
 		await expect.poll(() => count.getAttribute('aria-busy'), poll).toBe('true');
 		handler.resolve();
 		await expect.poll(() => submitter.hasAttribute('aria-disabled'), poll).toBe(false);
-		expect(busy(form)).toBe('true');
-		expect(cleared).toEqual([]);
+		expect(busy(form)).toBeNull();
+		expect(count.getAttribute('aria-busy')).toBe('true');
 		server.holdReads = undefined;
 		second.resolve();
-		await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+		await expect.poll(() => count.hasAttribute('aria-busy'), poll).toBe(false);
+		expect(marked).toEqual(['true', null]);
 	} finally {
 		handler.resolve();
 		observer.disconnect();

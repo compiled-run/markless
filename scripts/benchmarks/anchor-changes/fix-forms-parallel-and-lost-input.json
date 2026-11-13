@@ -1,0 +1,249 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/form-send"
+			],
+			"delta": 322,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 32,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 30,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-refresh-busy"
+			],
+			"delta": 94,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 14,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/form-send"
+			],
+			"delta": 322,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 32,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 30,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-refresh-busy"
+			],
+			"delta": 94,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 8,
+			"reason": "Plain in-place forms: the press snapshots what the form carries (sync-policy-core +32 B) and form-send resets the form only when its fields still hold what was sent, so nothing typed after a press is lost (form-send +322 B, loaded only on the first in-place submit); the send releases the dispatch queue so different forms go out in parallel (resume-events +30 B); refresh marks skip forms and the handler-catch gate (resume-refresh-busy +94 B). Measured on this Mac against merge-base 59f6416c2 by the fixture-builds accept run",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"counter",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"tab",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"execution",
+				"dialog",
+				"executedChars"
+			],
+			"delta": 3,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/form-send"
+			],
+			"delta": 322,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/inline/sync-policy-core"
+			],
+			"delta": 32,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 30,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-refresh-busy"
+			],
+			"delta": 94,
+			"reason": "Plain in-place forms keep what was typed (press-time FormData in the inline check, reset only when unchanged in form-send, loaded on the first in-place submit), send in parallel (the send releases the dispatch queue), and reload marks skip forms and the handler-catch gate. First seen on PR #660 CI run 43370334602 (web/form-send 2734 -> 3057 B rendered; bench pages +93 B gzip downloaded, docs / +215 B, docs /concepts/state +402 B); recorded as this tree minus its merge-base 1bc23f146, both measured on one machine",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 74,
+			"reason": "Plain in-place forms keep what was typed, send in parallel, and only the sending form is marked busy; the docs pages also carry the new events/async text. Measured on linux-x64 as PR #660 CI run 43370334602 (bench 93181 B, docs / 1694017 B, docs /concepts/state 2237922 B) against PR #655 CI run 43358256805 on the same main line (93107 B, 1693821 B, 2237539 B); no main run at merge-base 1bc23f146 ran perf-guards",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 74,
+			"reason": "Plain in-place forms keep what was typed, send in parallel, and only the sending form is marked busy; the docs pages also carry the new events/async text. Measured on linux-x64 as PR #660 CI run 43370334602 (bench 93181 B, docs / 1694017 B, docs /concepts/state 2237922 B) against PR #655 CI run 43358256805 on the same main line (93107 B, 1693821 B, 2237539 B); no main run at merge-base 1bc23f146 ran perf-guards",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 74,
+			"reason": "Plain in-place forms keep what was typed, send in parallel, and only the sending form is marked busy; the docs pages also carry the new events/async text. Measured on linux-x64 as PR #660 CI run 43370334602 (bench 93181 B, docs / 1694017 B, docs /concepts/state 2237922 B) against PR #655 CI run 43358256805 on the same main line (93107 B, 1693821 B, 2237539 B); no main run at merge-base 1bc23f146 ran perf-guards",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 196,
+			"reason": "Plain in-place forms keep what was typed, send in parallel, and only the sending form is marked busy; the docs pages also carry the new events/async text. Measured on linux-x64 as PR #660 CI run 43370334602 (bench 93181 B, docs / 1694017 B, docs /concepts/state 2237922 B) against PR #655 CI run 43358256805 on the same main line (93107 B, 1693821 B, 2237539 B); no main run at merge-base 1bc23f146 ran perf-guards",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 383,
+			"reason": "Plain in-place forms keep what was typed, send in parallel, and only the sending form is marked busy; the docs pages also carry the new events/async text. Measured on linux-x64 as PR #660 CI run 43370334602 (bench 93181 B, docs / 1694017 B, docs /concepts/state 2237922 B) against PR #655 CI run 43358256805 on the same main line (93107 B, 1693821 B, 2237539 B); no main run at merge-base 1bc23f146 ran perf-guards",
+			"date": "2026-11-13"
+		}
+	]
+}

@@ -1,6 +1,6 @@
 import type { ArmRowsAnchor } from '../resume-repeat-branch-arm.ts';
 import { holdBusy } from '../event-current-target.ts';
-import { boundaryBusyHosts, type BusyNode } from '../resume-refresh-busy.ts';
+import { boundaryBusyHosts, isForm, type BusyNode } from '../resume-refresh-busy.ts';
 import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
@@ -14,7 +14,8 @@ type ArmRecords = {
 	readonly domUpdates: NonNullable<ResumeArmRecordSet['domUpdates']>;
 	readonly keyedRepeats: NonNullable<ResumeArmRecordSet['keyedRepeats']>;
 };
-type BusyBoundary = Pick<ResumeAsyncBoundaryRecord, 'startAnchor' | 'endAnchor' | 'asyncSources'>;
+type BusyBoundary = Pick<ResumeAsyncBoundaryRecord, 'startAnchor' | 'endAnchor' | 'asyncSources'> &
+	Partial<Pick<ResumeAsyncBoundaryRecord, 'runnerGraphNodeId' | 'catchesHandlers'>>;
 type BoundaryBusy = {
 	boundary?: BusyBoundary;
 	readonly pending: Set<string>;
@@ -97,6 +98,8 @@ function apply(boundary: BusyBoundary): void {
 	const bindings = armBindings(boundary.startAnchor);
 	let unbound = false;
 	for (const graphNodeId of busy.pending) {
+		// The gate a handler's failure lands on shows nothing itself; the values it gates mark their own elements.
+		if (boundary.catchesHandlers && graphNodeId === boundary.runnerGraphNodeId) continue;
 		let bound = false;
 		for (const [host, read] of bindings)
 			if (
@@ -116,6 +119,8 @@ function apply(boundary: BusyBoundary): void {
 		for (const host of boundaryBusyHosts(range)) hosts.add(host);
 	}
 	const owner = (boundary.startAnchor as object | undefined) ?? boundary;
+	// A form's aria-busy says it is sending; a reload of what it shows never marks it.
+	for (const host of hosts) if (isForm(host)) hosts.delete(host);
 	for (const host of busy.marked) if (!hosts.has(host)) holdBusy(host, owner, false);
 	for (const host of hosts) holdBusy(host, owner, true);
 	if (hosts.size > 0 !== busy.marked.size > 0) announce(busy, hosts.size > 0 ? hosts : busy.marked);
