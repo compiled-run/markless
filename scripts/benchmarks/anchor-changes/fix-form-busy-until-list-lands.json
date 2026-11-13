@@ -79,6 +79,74 @@
 			"delta": 24,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 179,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-return-reask"
+			],
+			"delta": 151,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 32,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 40,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"executedChars"
+			],
+			"delta": -1,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 40,
+			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"date": "2026-11-13"
 		}
 	]
 }

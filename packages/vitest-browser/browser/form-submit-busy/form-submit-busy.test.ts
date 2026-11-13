@@ -196,7 +196,7 @@ test('the reloaded list and the cleared form land in one frame', async () => {
 	expect(at.cleared).toBe(at.landed);
 });
 
-// The reload's pass first loads the @if's code, so it spans tasks; a check at the end of every task sees the form and the list together.
+// The reload's pass first loads the @if's code, so it spans tasks; at the end of every task the form, the list's mark and the list agree.
 test('the form stays busy until the reloaded list lands, even when that pass waits for code', async () => {
 	const container = (await render(ShelfCountForm)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');
@@ -208,7 +208,8 @@ test('the form stays busy until the reloaded list lands, even when that pass wai
 	expect(busy(form)).toBe('true');
 	const seen: string[] = [];
 	const channel = new MessageChannel();
-	channel.port1.onmessage = () => seen.push(`${busy(form)}|${text(container, '[data-names]')}|${!!container.querySelector('[data-several]')}`);
+	const list = container.querySelector('[data-names]')!;
+	channel.port1.onmessage = () => seen.push(`${busy(form)}|${busy(list)}|${text(container, '[data-names]')}|${!!container.querySelector('[data-several]')}`);
 	const observer = new MutationObserver(() => channel.port2.postMessage(0));
 	observer.observe(container, { subtree: true, childList: true, characterData: true, attributes: true });
 	server.holdReads = undefined;
@@ -216,8 +217,8 @@ test('the form stays busy until the reloaded list lands, even when that pass wai
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 	await new Promise((resolve) => setTimeout(resolve, 20));
 	observer.disconnect();
-	expect(seen.filter((sample) => sample !== 'true|Ada|false' && sample !== 'null|Ada, Grace|true')).toEqual([]);
-	expect(seen.at(-1)).toBe('null|Ada, Grace|true');
+	expect(seen.filter((sample) => sample !== 'true|true|Ada|false' && sample !== 'null|null|Ada, Grace|true')).toEqual([]);
+	expect(seen.at(-1)).toBe('null|null|Ada, Grace|true');
 });
 
 test('a reload that fails still clears the form', async () => {

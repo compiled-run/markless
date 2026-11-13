@@ -24,6 +24,8 @@ export function ShelfCountForm() @{
 			</section>
 		} @pending {
 			<p data-pending>Loading</p>
+		} @catch (error) {
+			<p data-failed>{error.message}</p>
 		}
 	</main>
 }

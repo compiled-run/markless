@@ -74,8 +74,12 @@ function note(
 		busy.pending.add(graphNodeId);
 	} else if (status !== 'fulfilled' && status !== 'rejected') return;
 	else if (status === 'rejected' && quiet === true && !wasPending) return announceQuietFailure(boundary);
-	// The last read to settle clears with the settle commit that shows it, not before.
-	else if (!busy.pending.delete(graphNodeId) || busy.pending.size === 0) return;
+	// The last read that marks anything clears with the settle commit that shows it, not before; a handler gate marks nothing.
+	else if (
+		!busy.pending.delete(graphNodeId) ||
+		![...busy.pending].some((id) => !(boundary.catchesHandlers && id === boundary.runnerGraphNodeId))
+	)
+		return;
 	apply(boundary);
 }
 
