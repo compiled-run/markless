@@ -24,7 +24,7 @@ test('a write landing while a flush is active reaches the DOM with no explicit f
 		landed = true;
 		// The second entry of a handler list writes here: the first entry's flush
 		// is past its drain loop (flushing === false) but not yet settled
-		// (activeFlush still set) - the window defect 88 stranded writes in.
+		// (its pass still open) - the window writes were once stranded in.
 		graph.write({ graphNodeId: 'state:trail', value: 'first|second' });
 	});
 

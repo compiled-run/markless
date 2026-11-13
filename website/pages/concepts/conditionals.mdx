@@ -175,7 +175,7 @@ Write `true` as the value, and each `@case` becomes a condition. It reads like t
 
 ## Keep a value by declaring it above
 
-Where you declare a value decides how long it lives. The field under the paused video had nothing behind it, so its text went with it. Declared above the `@if`, `note` lasts as long as the component, and the field comes back with the note still in it. A `state()` written inside a side belongs to that side, and starts over each time the side opens.
+Where you declare a value decides how long it lives. The field under the paused video had nothing behind it, so its text went with it. Declared above the `@if`, `note` lasts as long as the component, and the field comes back with the note still in it. A `state()` written inside a side belongs to that side, and starts over each time the side opens. A component inside a side works the same way: once the `@if` closes, an answer to the component's async load is never shown, and when the `@if` opens again the component starts a fresh load, showing its `@pending` until that new answer arrives.
 
 <Code steps={[{ label: 'Type `Great shot`, then press Play or pause. The field goes; the line stays.', shows: 'Great shot' }, { label: 'Add `<p>{note.length} letters</p>` under the line.', source: '{note.length}' }]}>
 ```tsrx title="note-kept.tsrx"
