@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 402,
+			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs / 1693770 -> 1694172 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 401,
+			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs /concepts/state 2237488 -> 2237889 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 367,
+			"reason": "the settle kernel fills lists placed in component rows, and the owner lookup it needs ships beside it on every page that loads the kernel: docs /ui/accordion 498450 -> 498817 B gzip at load; linux CI run 43349959708 (PR #648, f93b90f20) vs merge-queue run 43344585225 (main 0bc92b471)",
+			"date": "2026-11-13"
+		}
+	]
+}
