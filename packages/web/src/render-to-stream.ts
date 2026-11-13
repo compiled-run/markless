@@ -145,8 +145,11 @@ export async function renderToStream(
 		]);
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
-	const shell = await assembleSsrContainer(component, output, options);
 	const pendingArms = pendingStreamArms(output, renderContext);
+	const shell = await assembleSsrContainer(component, output, {
+		...options,
+		streamedBoundaryIds: new Set(pendingArms.map((arm) => arm.boundaryId)),
+	});
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	return {
 		shell,

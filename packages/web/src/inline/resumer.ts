@@ -147,6 +147,7 @@ export type InlineWakeSources = {
 	readonly selfWake: string;
 	readonly returnWake: string;
 	readonly storageWake: string;
+	readonly streamedWake: string;
 	readonly moduleLoader: string;
 };
 
@@ -155,6 +156,7 @@ export function authoredInlineWakeSources(): InlineWakeSources {
 		selfWake: runInlineResumerSelfWake.toString(),
 		returnWake: runInlineResumerReturnWake.toString(),
 		storageWake: runInlineResumerStorageWake.toString(),
+		streamedWake: runInlineResumerStreamedWake.toString(),
 		moduleLoader: INLINE_MODULE_LOADER_SOURCE,
 	};
 }
@@ -311,6 +313,15 @@ export function createInlineResumerSelfWakeSource(
 	wakes: InlineWakeSources = authoredInlineWakeSources(),
 ): string {
 	return `;${selfWakeCall(resumeModuleUrl, wakes)};`;
+}
+
+// Appended to a page whose async answers the server streams instead of a self-wake: the runtime wakes at load only if one never arrived.
+export function createInlineResumerStreamedWakeSource(
+	resumeModuleUrl: string | undefined,
+	boundaryIds: ReadonlyArray<string>,
+	wakes: InlineWakeSources = authoredInlineWakeSources(),
+): string {
+	return `;(${wakes.streamedWake})(${JSON.stringify(boundaryIds)},${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()});`;
 }
 
 // Appended to a page whose async values the browser can re-ask: shown again as it was left, it wakes at idle and re-asks them.
@@ -868,6 +879,38 @@ function runInlineResumerSelfWake(
 		}));
 		if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 	});
+}
+
+function runInlineResumerStreamedWake(
+	boundaryIds: ReadonlyArray<string>,
+	fallbackResumeModuleUrl: string | undefined,
+	loadModule: (url: string) => Promise<InlineResumeModule>,
+	defer: MarklessDefer,
+): void {
+	const currentScript = document.currentScript as HTMLScriptElement | null;
+	const root = currentScript?.closest<InlineRoot>('[data-async-container]');
+	const resumeModuleUrl =
+		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
+	if (!root || !resumeModuleUrl) return;
+	const life = (root.__mL ||= {});
+	// Once the response has ended and every queued arm has shown, an arm that never came still needs the runtime.
+	const check = () =>
+		defer.idle(root, async () => {
+			if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
+			if (
+				boundaryIds.every((id) =>
+					document.querySelector(`script[type="markless/arm"][data-boundary="${CSS.escape(id)}"]`),
+				)
+			)
+				return;
+			root.__marklessDelegatedDispatch = true;
+			const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+				throw ((root.__mResume = undefined), error);
+			}));
+			if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
+		});
+	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', check, { once: true });
+	else check();
 }
 
 // Shown again as it was left: the router marks the page before this runs; a back-forward cache restore or an HTTP cache replay arrives as `pageshow`.
