@@ -191,9 +191,13 @@ export function materializeArmRecords(input: ArmMaterializeInput) {
 	void exhaustive;
 	const byHostId = new Map<string, ResumeDomElement>(input.elementsByHostId);
 	if (input.armRecords.locators.length) {
-		const { elements, offset } = elementsAndAnchorOffset(input.root, input.startAnchor);
+		const elements = elementsAfterAnchor(
+			input.root,
+			input.startAnchor,
+			Math.max(...input.armRecords.locators.map((locator) => locator.index)) + 1,
+		);
 		for (const locator of input.armRecords.locators) {
-			const element = elements[offset + locator.index];
+			const element = elements[locator.index];
 			if (!element) throw missingElementLocatorError(locator);
 			const expected = locator.tagName.toLowerCase();
 			const actual = element.tagName.toLowerCase();
@@ -313,21 +317,24 @@ function missingComposedArmBranchAnchorError(id: string): Error {
 	);
 }
 
-// Pre-order element walk (root included, matching dom-order locators) that
-// also reports how many elements precede the anchor — the arm's offset.
-function elementsAndAnchorOffset(
+// The elements after the anchor in document order, as far as the arm's locators reach: cost follows the arm, not the page.
+function elementsAfterAnchor(
 	root: ResumeDomElement,
 	anchor: ResumeDomComment,
-): { readonly elements: ReadonlyArray<ResumeDomElement>; readonly offset: number } {
+	count: number,
+): ReadonlyArray<ResumeDomElement> {
 	const elements: ResumeDomElement[] = [];
-	let offset = -1;
+	let found = false;
 	(function visit(node: ResumeDomNode): void {
-		if (node === anchor && offset === -1) offset = elements.length;
-		if (node.nodeType === 1) elements.push(node as ResumeDomElement);
-		for (const child of node.childNodes ?? []) visit(child);
+		for (const child of node.childNodes ?? []) {
+			if (elements.length >= count) return;
+			if (found && child.nodeType === 1) elements.push(child as ResumeDomElement);
+			if (child === (anchor as unknown)) found = true;
+			// Only the subtree that holds the anchor is walked before it is found.
+			if (found || (child as { contains?: (other: unknown) => boolean }).contains?.(anchor) !== false) visit(child);
+		}
 	})(root);
-	// Missing anchor: past-the-end offset makes locator lookups fail loud.
-	return { elements, offset: offset === -1 ? elements.length : offset };
+	return elements;
 }
 
 /**
