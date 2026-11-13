@@ -784,6 +784,47 @@ test('an event inside an async boundary arm is a planner action owned by its bou
 	}
 });
 
+test('the submit hold is demanded by an async submit handler and the in-place sender by a form sent in place, and by nothing else', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const result = await compileTsrxModule({
+		filename: '/workspace/src/Desk.tsrx',
+		symbols: [],
+		source: `import { state } from '@markless/core';
+		export default function Desk() @{
+			let note = state('');
+			let count = state(0);
+			<section>
+				<form data-save onSubmit={async (event) => { event.preventDefault(); await fetch('/save'); note = 'saved'; }}>
+					<button>Save</button>
+				</form>
+				<form data-count onSubmit={(event) => { event.preventDefault(); count++; }}>
+					<button>Count {count}</button>
+				</form>
+				<button onClick={async () => { await fetch('/ask'); note = 'asked'; }}>Ask {note}</button>
+				@try {
+					<form method="post" action="/notes"><input name="note" /></form>
+				} @catch (error) {
+					<p>{error.message}</p>
+				}
+			</section>
+		}`,
+	});
+	const hold = 'web/submit-hold';
+	const sender = 'web/form-send';
+	for (const map of Object.values(result.runtimeDemandMaps)) {
+		expect(map.unknownRecordModuleIds).toEqual(expect.arrayContaining([hold, sender]));
+		const handlers = map.symbols.filter((symbol) => symbol.runtimeModuleIds.includes(hold));
+		expect(handlers).toHaveLength(1);
+		const submits = [...map.actions, ...(map.armActions ?? [])].filter((action) => action.eventName === 'submit');
+		expect(submits.filter((action) => action.runtimeModuleIds.includes(hold))).toHaveLength(2);
+		expect(submits.filter((action) => action.runtimeModuleIds.includes(sender))).toHaveLength(1);
+		for (const action of map.actions.filter((entry) => entry.eventName === 'click')) {
+			expect(action.runtimeModuleIds).not.toContain(hold);
+			expect(action.runtimeModuleIds).not.toContain(sender);
+		}
+	}
+});
+
 test('busy marks, the refresh announcement and the async refresh half are demanded only by a control whose writes reach an async value', async () => {
 	const { compileTsrxModule } = await import('../src/index.ts');
 	const result = await compileTsrxModule({

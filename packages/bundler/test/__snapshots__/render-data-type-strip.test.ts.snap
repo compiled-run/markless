@@ -134,6 +134,7 @@ export const runtimeDemandMap = {
 		"web/fns/refresh-announcer",
 		"web/fns/served-row-ranges",
 		"web/fns/shared-instances",
+		"web/form-send",
 		"web/inline/sync-policy-core",
 		"web/kept-swap",
 		"web/payload-full-storage-free",
@@ -155,7 +156,8 @@ export const runtimeDemandMap = {
 		"web/resume-runtime-start",
 		"web/resume-stream-patches",
 		"web/runtime-error-reporting",
-		"web/shared-swap"
+		"web/shared-swap",
+		"web/submit-hold"
 	]
 };
 export const view = {

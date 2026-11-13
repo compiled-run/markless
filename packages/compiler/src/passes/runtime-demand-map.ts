@@ -20,6 +20,7 @@ import type {
 	SemanticComponent,
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
+	SemanticEvent,
 	SemanticGraphBinding,
 	SemanticKeyedRepeat,
 	SemanticSharedCallbackBinding,
@@ -98,6 +99,9 @@ const HELD_INPUTS = ['web/fns/held-inputs-plane'];
 const BEHAVIOR = ['web/resume-behaviors'];
 // A shared() instance that outlives the page: its binding at wake.
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
+// A form's busy mark and repeat guard, for a submit whose handler may return a promise; a form sent in place also needs its sender.
+const SUBMIT_HOLD = ['web/submit-hold'];
+const IN_PLACE_SUBMIT = ['web/form-send', ...SUBMIT_HOLD];
 // The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
 const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
 // Capabilities whose demand `capabilityModuleIds` enumerates for the whole module, arms and rows included.
@@ -198,6 +202,7 @@ export function createRuntimeDemandMap(
 		readonly components?: ReadonlyArray<SemanticComponent>;
 		readonly sharedCallbackBindings?: ReadonlyArray<SemanticSharedCallbackBinding>;
 		readonly keyedRepeats?: ReadonlyArray<SemanticKeyedRepeat>;
+		readonly events?: ReadonlyArray<SemanticEvent>;
 	},
 	demandClass: RuntimeDemandClass,
 ): RuntimeDemandMapArtifact {
@@ -218,10 +223,20 @@ export function createRuntimeDemandMap(
 		input.publicRenderModule.moduleSource,
 		input.publicRenderModule.ssrModuleSource,
 	]);
+	const heldSubmits = new Set(
+		(input.events ?? [])
+			.filter((event) => event.eventName === 'submit' && (event.handlerReturnsPromise || event.handlerMayReject))
+			.map((event) => eventKey(event.hostNodeId, event.eventName)),
+	);
 	const symbols = input.symbolResolver.symbols.map((symbol) => ({
 		symbolId: symbol.id,
 		kind: symbol.kind,
-		runtimeModuleIds: runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
+		runtimeModuleIds: unique([
+			...runtimeModuleIdsForSymbol(symbol, emittedModules.get(symbol.id)),
+			...(symbol.kind === 'event-handler' && heldSubmits.has(eventKey(symbol.hostNodeId, symbol.eventName))
+				? SUBMIT_HOLD
+				: []),
+		]),
 	}));
 	const symbolDemand = new Map(
 		symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]),
@@ -321,6 +336,7 @@ export function createRuntimeDemandMap(
 			...SHARED_INSTANCES,
 			...SHARED_SWAP,
 			...REFRESH_MARKS,
+			...IN_PLACE_SUBMIT,
 			// Conditional, unlike the kinds above: the overlay behaviour is only
 			// reachable in an app that compiled a mark, so listing it unconditionally
 			// would let the execution oracle excuse it everywhere.
@@ -997,6 +1013,7 @@ function payloadDemandRecords(
 									? CLOSURE_DISPATCH_CORE
 									: dispatchCore),
 							...(event.syncPolicy ? SYNC_POLICY : []),
+							...(event.inPlaceSubmit ? IN_PLACE_SUBMIT : []),
 							// The resume runtime installs the visibility observer at startup.
 							...(event.eventName === PROTOCOL_VISIBLE_EVENT_NAME ? BEHAVIOR : []),
 							...symbolIdsDemand(event.symbolIds ?? [], symbolDemand),
@@ -1218,7 +1235,11 @@ function armActionDemandRecords(
 		containerId: string,
 		containerKind: RuntimeDemandMapRecordKind,
 		hostNodeId: string,
-		event: { readonly eventName: string; readonly symbolIds?: ReadonlyArray<string> },
+		event: {
+			readonly eventName: string;
+			readonly symbolIds?: ReadonlyArray<string>;
+			readonly inPlaceSubmit?: unknown;
+		},
 		recordKind: RuntimeDemandMapAction['recordKind'],
 	) => {
 		const symbolIds = event.symbolIds ?? [];
@@ -1235,6 +1256,7 @@ function armActionDemandRecords(
 				...dispatchCore,
 				...recordModules(records, containerId),
 				...symbolIdsDemand(symbolIds, symbolDemand),
+				...(event.inPlaceSubmit ? IN_PLACE_SUBMIT : []),
 				// A handler in a @try's arm can reset it or reject into its @catch, which both load the refresh half.
 				...(containerKind === 'async-boundary' || refreshesAsync(scope, symbolIds) ? REFRESH_MARKS : []),
 			]),

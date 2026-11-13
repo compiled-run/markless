@@ -273,7 +273,8 @@ function closeRound(sender: DispatchSpan, round: OpenRound, landed?: Promise<voi
 		round.done();
 		if (sender.control) holdBusy(sender.control, sender, false);
 	};
-	if (landed) void landed.then(unmark);
+	// A pass that throws still ends the marks; its failure reaches whoever flushed it.
+	if (landed) void landed.then(unmark, unmark);
 	else unmark();
 }
 
