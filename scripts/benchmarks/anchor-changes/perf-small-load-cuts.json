@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -1207,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -1207,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -1207,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -6581,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -11743,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -5115,
+			"reason": "pack loaders share one cache helper per chunk, so every page with lazy packs downloads less JS (runs 43339291379 vs 43293364927)",
+			"date": "2026-11-13"
+		}
+	]
+}
