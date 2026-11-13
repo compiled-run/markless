@@ -13,33 +13,20 @@ import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
 import { applyDirectJournalEntries, isDirectJournalEntry } from './dom-journal-direct.ts';
 import {
+	BOOTING,
+	GO_LIVE,
+	nextBoot,
+	SETTLE,
+	WAKE,
 	CONTAINER_RETIRE_PROPERTY,
 	type RetirableContainer,
 	deleteResumedPayload,
 	getAlreadyResumedPayload,
 	getRetiredResumedPayload,
-	setResumedPayload,
+	readBoot,
 	wakeNoopResume,
 } from './payload-resume-registry.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
-
-// Every wake site drops the promise `resumeContainerEvent` returns. A container
-// torn down mid-boot refuses against DOM that is gone and that refusal names
-// nothing, so it resolves as a no-op; a root still in the document keeps its
-// rejection, the one channel a live page can see the refusal on. The generated
-// handoff marks the root before it calls in; an explicit
-// `resumeFromPayloadDocument` carries no mark and always stays loud.
-function containWakeBoot(
-	root: ResumePayloadScriptsInput['root'],
-	boot: Promise<ResumePayloadScriptsResult>,
-): Promise<ResumePayloadScriptsResult> {
-	if (!(root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted)
-		return boot;
-	return boot.catch((error) => {
-		if ((root as { readonly isConnected?: boolean }).isConnected !== false) throw error;
-		return wakeNoopResume;
-	});
-}
 
 // Streamed settles (T107) leave records + snapshot patches in the document.
 // Only pages that actually streamed pay for the adoption module: the check
@@ -66,44 +53,52 @@ async function adoptStreamedPatchesIfPresent(
 	return adoptStreamedArmPatches(decoded, root, life);
 }
 
+// A wake joins the boot already starting for this page lifetime; a newer lifetime starts its own.
+// Every wake site drops the promise `resumeContainerEvent` returns. A container
+// torn down mid-boot refuses against DOM that is gone and that refusal names
+// nothing, so it resolves as a no-op; a root still in the document keeps its
+// rejection, the one channel a live page can see the refusal on. The generated
+// handoff marks the root before it calls in; an explicit
+// `resumeFromPayloadDocument` carries no mark and always stays loud.
+function bootOnce(
+	root: ResumePayloadScriptsInput['root'],
+	life: unknown,
+	begin: () => Promise<ResumePayloadScriptsResult>,
+): Promise<ResumePayloadScriptsResult> {
+	const boot = readBoot(root);
+	if (boot.p !== BOOTING || boot.l !== life) {
+		const start = begin().finally(() => nextBoot(boot, SETTLE, pageLifetime(root), start));
+		nextBoot(boot, WAKE, life, start);
+	}
+	const start = boot.s!;
+	if (!(root as { readonly __asyncResumeRuntimeStarted?: boolean }).__asyncResumeRuntimeStarted)
+		return start;
+	return start.catch((error) => {
+		if ((root as { readonly isConnected?: boolean }).isConnected !== false) throw error;
+		return wakeNoopResume;
+	});
+}
+
 export async function resumeFromPayloadScriptsImpl(
 	input: ResumePayloadScriptsInput,
 	decode: typeof decodePayloadScripts,
 	life: unknown,
 ): Promise<ResumePayloadScriptsResult> {
 	if (pageLifetime(input.root) !== life) return wakeNoopResume;
-	const resumed = getAlreadyResumedPayload(input.root);
-	if (resumed) return resumed;
-	const retired = getRetiredResumedPayload(input.root);
-	if (retired) return retired;
-	const root = input.root as typeof input.root & {
-		__mStart?: Promise<ResumePayloadScriptsResult>;
-	};
-	return containWakeBoot(
-		root,
-		(root.__mStart ??= startPayloadResume(input, decode, life).finally(() => {
-			if (pageLifetime(root) === life) delete root.__mStart;
-		})),
+	return (
+		getAlreadyResumedPayload(input.root) ??
+		getRetiredResumedPayload(input.root) ??
+		bootOnce(input.root, life, () => startPayloadResume(input, decode, life))
 	);
 }
 
 export async function resumeFromPrerenderRecordsImpl(
 	input: Omit<ResumePayloadScriptsInput, 'stateScript' | 'viewScript'> & DecodedPayloadScripts,
 ): Promise<ResumePayloadScriptsResult> {
-	const resumed = getAlreadyResumedPayload(input.root);
+	const resumed = getAlreadyResumedPayload(input.root) ?? getRetiredResumedPayload(input.root);
 	if (resumed) return resumed;
-	const retired = getRetiredResumedPayload(input.root);
-	if (retired) return retired;
-	const root = input.root as typeof input.root & {
-		__mStart?: Promise<ResumePayloadScriptsResult>;
-	};
-	const life = pageLifetime(root);
-	return containWakeBoot(
-		root,
-		(root.__mStart ??= startDecodedResume(input, input, life).finally(() => {
-			if (pageLifetime(root) === life) delete root.__mStart;
-		})),
-	);
+	const life = pageLifetime(input.root);
+	return bootOnce(input.root, life, () => startDecodedResume(input, input, life));
 }
 
 // The inline resumer keeps dispatch for the page's life and reads its key policies
@@ -278,6 +273,6 @@ async function startDecodedResume(
 	).__asyncResumeRuntimeStarted = true;
 
 	const result = { decoded, graph, runtime };
-	setResumedPayload(input.root, result);
+	nextBoot(readBoot(input.root), GO_LIVE, life, result);
 	return result;
 }
