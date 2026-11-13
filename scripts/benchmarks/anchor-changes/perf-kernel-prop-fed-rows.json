@@ -7,7 +7,7 @@
 				"web/fns/instance-scope"
 			],
 			"delta": 192,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -18,8 +18,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 34,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench / 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench / 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -30,8 +30,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 34,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /records 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /records 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -42,8 +42,8 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 34,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /settings 93107 -> 93141 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 28,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: bench /settings 93273 -> 93301 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -54,8 +54,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 443,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs / 1693841 -> 1694284 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 446,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs / 1694547 -> 1694993 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -66,8 +66,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 443,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /concepts/state 2237559 -> 2238002 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 446,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /concepts/state 2238665 -> 2239111 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		},
 		{
@@ -78,8 +78,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 409,
-			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /ui/accordion 498499 -> 498908 B gzip at load; linux CI run 43371524153 (PR #648, 833e9cb8b) vs merge-queue run 43360928232 (main 74c4bc886, same runtime source as 1bc23f146)",
+			"delta": 411,
+			"reason": "the settle kernel fills lists placed in component rows and ships the owner lookup and module-root row naming beside it: docs /ui/accordion 498709 -> 499120 B gzip at load; linux CI run 43383046934 (PR #648, b03e295c0) vs merge-queue run 43378494721 (main 8dc4ed8e6)",
 			"date": "2026-11-13"
 		}
 	]
