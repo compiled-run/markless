@@ -479,10 +479,13 @@ export function collapseLazyModuleFacades(
 		reserved.push(name);
 		return name;
 	};
-	const namespaces = new Map<string, string>();
+	const namespaces = new Map<string, { readonly namespace: string; readonly once: string }>();
 	for (const facade of pending) {
 		if (!namespaces.has(facade.target.fileName))
-			namespaces.set(facade.target.fileName, reserve(facade.target, '__marklessNamespace'));
+			namespaces.set(facade.target.fileName, {
+				namespace: reserve(facade.target, '__marklessNamespace'),
+				once: reserve(facade.target, `${PACK_LOADER_PREFIX}Once`),
+			});
 		const loader = reserve(facade.target, `${PACK_LOADER_PREFIX}${shortHash(facade.identity)}`);
 		const imports: Facade['imports'] = [];
 		const local = ({ from, name }: Binding) => {
@@ -516,9 +519,11 @@ export function collapseLazyModuleFacades(
 		}
 	}
 	for (const [fileName, facade] of facades) {
-		const namespace = namespaces.get(facade.target.fileName)!;
+		const { namespace, once } = namespaces.get(facade.target.fileName)!;
 		const declarations = additions.get(facade.target.fileName) ?? [
 			`const ${namespace}=(${createPackedNamespace.toString()});`,
+			// Loader state lives on the function, so an unevaluated loader adds no top-level statement.
+			`function ${once}(loader,build){const state=loader.state;if(state){if(state.failed)throw state.error;return state.value}try{return(loader.state={value:${namespace}(build())}).value}catch(error){throw(loader.state={failed:true,error}).error}}`,
 		];
 		const { loader } = facade;
 		for (const { from, name, alias } of facade.imports) {
@@ -528,8 +533,7 @@ export function collapseLazyModuleFacades(
 			);
 		}
 		declarations.push(
-			// Loader state lives on the function, so an unevaluated loader adds no top-level statement.
-			`export function ${loader}(){const state=${loader}.state;if(state){if(state.failed)throw state.error;return state.value}try{${facade.calls.map((name) => `${name}();`).join('')}return(${loader}.state={value:${namespace}({__proto__:null,${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}})}).value}catch(error){throw(${loader}.state={failed:true,error}).error}}`,
+			`export function ${loader}(){return ${once}(${loader},()=>(${facade.calls.map((name) => `${name}(),`).join('')}{${facade.exports.map(([name, local]) => `get ${JSON.stringify(name)}(){return ${local}}`).join(',')}}))}`,
 		);
 		additions.set(facade.target.fileName, declarations);
 		facade.target.exports.push(loader);
@@ -955,7 +959,7 @@ function createPackedNamespace(bindings: Record<string, unknown>): object {
 	Object.preventExtensions(target);
 	return new Proxy(target, {
 		get(target, key) {
-			return key in bindings ? Reflect.get(bindings, key) : Reflect.get(target, key);
+			return Object.hasOwn(bindings, key) ? Reflect.get(bindings, key) : Reflect.get(target, key);
 		},
 		getOwnPropertyDescriptor(target, key) {
 			const descriptor = Reflect.getOwnPropertyDescriptor(target, key);
@@ -964,7 +968,7 @@ function createPackedNamespace(bindings: Record<string, unknown>): object {
 			return descriptor;
 		},
 		defineProperty(target, key, descriptor) {
-			if (!(key in bindings)) return Reflect.defineProperty(target, key, descriptor);
+			if (!Object.hasOwn(bindings, key)) return Reflect.defineProperty(target, key, descriptor);
 			return (
 				descriptor.configurable !== true &&
 				descriptor.enumerable !== false &&
