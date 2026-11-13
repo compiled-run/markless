@@ -48,6 +48,41 @@ test('SSR: the same, on the first submit of a resumed page', async () => {
 	await sendsInPlace(container as HTMLElement);
 });
 
+// A real pointer and real keys, then a second save on the same form once the first has landed.
+async function sendsByRealInput(container: HTMLElement) {
+	const form = container.querySelector<HTMLFormElement>('[data-form]')!;
+	const field = container.querySelector<HTMLInputElement>('[data-field]')!;
+	const submitter = container.querySelector<HTMLButtonElement>('[data-submit]')!;
+	const answer = deferred<void>();
+	server.nextPost = [{ wait: answer.promise }];
+	await userEvent.fill(field, 'Hopper');
+	await userEvent.click(submitter);
+	await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
+	answer.resolve();
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	await shows(container, '[data-names]', 'Ada, name=Hopper&via=button');
+	await userEvent.fill(field, 'Turing');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(() => server.posts, poll).toEqual([
+		'POST /mut/items name=Hopper&via=button',
+		'POST /mut/items name=Turing&via=button',
+	]);
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	await shows(container, '[data-names]', 'Ada, name=Hopper&via=button, name=Turing&via=button');
+}
+
+test('CSR: a real click and then Enter in the field each send once, held busy until the reload lands', async () => {
+	const container = (await render(PlainForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	await sendsByRealInput(container);
+});
+
+test('SSR: the same with real input on a resumed page', async () => {
+	const { container } = await renderSSR(PlainForm);
+	expect(text(container as HTMLElement, '[data-names]')).toBe('Ada');
+	await sendsByRealInput(container as HTMLElement);
+});
+
 test('SSR: a failed answer reaches @catch with its text, and the typed value stays', async () => {
 	const { container } = await renderSSR(PlainForm);
 	const field = (container as HTMLElement).querySelector<HTMLInputElement>('[data-field]')!;

@@ -607,7 +607,7 @@ type EventLists = {
 };
 
 // A form the runtime sends in place, anywhere in the page's records: its page carries the check the boot runs on submit.
-function sendsFormInPlace(lists: EventLists): boolean {
+export function sendsFormInPlace(lists: EventLists): boolean {
 	const sets = (records: EventLists | ReadonlyArray<EventLists> | undefined) =>
 		records === undefined
 			? []
