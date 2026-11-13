@@ -46,3 +46,25 @@ test('anything that computes from the row is not a plain row read', () => {
 	);
 	expect(reads).toEqual({ a: null, b: null, c: null });
 });
+
+test('a local in the row body that shadows the row item is not a row read', () => {
+	const source = `import { computed } from '@markless/core';
+function Cell(props: Record<string, unknown>) @{
+	<span>{String(props.a)}</span>
+}
+export default function Grid() @{
+	const rows = computed(async () => [{ id: 'a' }]);
+	@try {
+		<ul>@for (const row of rows; key row.id) {
+			{
+				const row = { id: 'shadow' };
+				<li><Cell a={row.id} /></li>
+			}
+		}</ul>
+	} @pending { <p>Loading</p> }
+}
+`;
+	const graph = buildSemanticGraphSync({ filename: 'grid.tsrx', source });
+	const prop = graph.componentEdges.find((edge) => edge.childComponentName === 'Cell')!.props[0]!;
+	expect('rowRead' in prop ? prop.rowRead : undefined).toBeUndefined();
+});

@@ -116,3 +116,32 @@ test('a row component whose route params read a value that changes names the fil
 		/^MARKLESS_TEMPLATE_EXPRESSION_STATIC: \S*components\/Broken\.tsrx:4:\d+: <Item>: .*passes it `row\.slug`, which changes\./,
 	);
 }, 120_000);
+
+test('an error written after a Link over several lines names its own line', async () => {
+	const errors = await buildErrors(
+		[
+			"import { computed } from '@markless/core';",
+			"import { Link } from '@markless/router';",
+			'function Item({ id }: { id: string }) @{',
+			'\t<Link',
+			'\t\thref="/todos/[id]"',
+			'\t\tparams={{ id }}',
+			'\t>',
+			'\t\t{id}',
+			'\t</Link>',
+			'}',
+			'function Other({ slug }: { slug: string }) @{',
+			'\t<Link href="/todos/[id]" params={{ id: slug }}>{slug}</Link>',
+			'}',
+			'export function Broken() @{',
+			"\tconst rows = computed(async () => [{ id: 'a', slug: 'first' }]);",
+			'\t@try {',
+			'\t\t<ul>@for (const row of rows; key row.id) { <li><Item id={row.id} /><Other slug={row.slug} /></li> }</ul>',
+			'\t} @pending { <p>loading</p> }',
+			'}',
+		].join('\n'),
+		{ 'pages/todos/[id].tsrx': 'export default function Todo() @{\n\t<p>todo</p>\n}' },
+	);
+	expect(errors).toHaveLength(1);
+	expect(errors[0]).toMatch(/^MARKLESS_TEMPLATE_EXPRESSION_STATIC: \S*components\/Broken\.tsrx:12:\d+: <Other>: /);
+}, 120_000);
