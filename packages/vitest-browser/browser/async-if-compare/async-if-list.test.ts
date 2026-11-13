@@ -49,9 +49,8 @@ for (const { shape, csr, ssr, csrEmpty, ssrEmpty } of shapes) {
 		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 1));
 	});
 
-	// Not yet: a bare truthy test never opens on a client-rendered page, and a list in an arm that opened late misses the next re-fetch.
-	const refetch = shape.endsWith('Length') || shape.endsWith('Truthy') ? test.fails : test;
-	const servedRefetch = shape.endsWith('Length') ? test.fails : test;
+	// Not yet: a list in an arm that opened late misses the next re-fetch.
+	const refetch = shape.endsWith('Length') ? test.fails : test;
 
 	refetch(`CSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
 		await csrEmpty();
@@ -63,7 +62,7 @@ for (const { shape, csr, ssr, csrEmpty, ssrEmpty } of shapes) {
 		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 2));
 	});
 
-	servedRefetch(`SSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
+	refetch(`SSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
 		await ssrEmpty();
 		expect(document.querySelector('[data-shown]')).toBe(null);
 		await press('[data-more]');

@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "bare @if test reads the async value in the browser (fix/if-refetch-truthy): the docs playground ships the compiler, which grows by the browser read-path helper; measured on CI run 43461812415 (1695139 and 2239257 B) against main's merge-queue run 43455254324 at 5287c7bde (1695049 and 2239167 B)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "bare @if test reads the async value in the browser (fix/if-refetch-truthy): the docs playground ships the compiler, which grows by the browser read-path helper; measured on CI run 43461812415 (1695139 and 2239257 B) against main's merge-queue run 43455254324 at 5287c7bde (1695049 and 2239167 B)",
+			"date": "2026-11-13"
+		}
+	]
+}
