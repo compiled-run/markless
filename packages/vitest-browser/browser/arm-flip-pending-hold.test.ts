@@ -14,13 +14,7 @@ import TelescopePanel from './fixtures/arm-flip-pending-hold.tsrx';
 // by a MutationObserver — no real-wait duration assertions (gate-1 rule).
 afterEach(() => cleanup());
 
-// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": with its code not yet loaded, the flip commits a frame after the text.
-const quarantined = Date.now() < Date.parse('2026-11-27');
-test.runIf(!quarantined)('the quarantine is still in date', () => {
-	expect.fail('Quarantine expired on 2026-11-27: make a settle commit its branch flip in the task that commits its text and drop the quarantine.');
-});
-
-test.skipIf(quarantined)('a branch reading through a pending async re-run holds its prior arm until settle', async () => {
+test('a branch reading through a pending async re-run holds its prior arm until settle', async () => {
 	const screen = await render(TelescopePanel);
 	const container = screen.container as HTMLElement;
 
