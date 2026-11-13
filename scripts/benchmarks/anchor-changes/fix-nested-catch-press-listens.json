@@ -57,6 +57,16 @@
 			"delta": 32,
 			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 157,
+			"reason": "a nested @catch that lands inside its parent's content listens for its own events before its records register, so a press on it is not lost (measured on PR CI run 43379986641 against merge group run 43373448910)",
+			"date": "2026-11-13"
 		}
 	]
 }
