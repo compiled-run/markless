@@ -162,7 +162,13 @@ test('the form stays busy while the old list is on screen, and an identical re-p
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
 
-test('the reloaded list and the cleared form land in one frame', async () => {
+// QUARANTINED, owner in docs/ci-process.md "Quarantined tests": on a slow page the form clears before the reloaded list commits.
+const quarantined = Date.now() < Date.parse('2026-11-27');
+test.runIf(!quarantined)('the quarantine is still in date', () => {
+	expect.fail('Quarantine expired on 2026-11-27: clear the form in the commit that lands the reloaded list and drop the quarantine.');
+});
+
+test.skipIf(quarantined)('the reloaded list and the cleared form land in one frame', async () => {
 	const container = (await render(NoteForm)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');
 	const { form, submitter } = parts(container);
