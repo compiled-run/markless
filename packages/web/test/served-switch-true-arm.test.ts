@@ -60,3 +60,21 @@ export function Shelf() @{
 	expect(html).toContain('>low<');
 	expect(html).not.toMatch(/>empty<|>plenty</);
 });
+
+test('an @if whose test is a comparison over the async value renders the arm the value picks', async () => {
+	const html = await serverRender(`import { computed } from '@markless/core';
+function Even({ entry }) @{
+	<b data-even>{entry.name}</b>
+}
+function Odd({ entry }) @{
+	<u data-odd>{entry.name}</u>
+}
+export function Ledger() @{
+	const entry = computed(async () => { await new Promise((r) => setTimeout(r, 5)); return { kind: 'even', name: 'north' }; });
+	<div>@try {
+		@if (entry.kind === 'even') { <Even entry={entry} /> } @else { <Odd entry={entry} /> }
+	} @pending { <i>wait</i> }</div>
+}`);
+	expect(html).toContain('data-even');
+	expect(html).not.toContain('data-odd');
+});
