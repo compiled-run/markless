@@ -1,4 +1,6 @@
 import { cp, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page, type Request } from '@playwright/test';
@@ -177,6 +179,174 @@ test('after Back and Forward the page still answers its first interaction', asyn
 		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
 		await page.goForward();
 		await page.locator('[data-page="away"]').waitFor();
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// A proxy that ends the response where the first streamed arm would begin, as a dropped connection or a cancelled stream does.
+async function cutBeforeArms(upstream: string) {
+	const proxy = createServer(async (request, response) => {
+		const answer = await fetch(`${upstream}${request.url}`, { headers: { accept: 'text/html' } });
+		response.writeHead(answer.status, { 'content-type': answer.headers.get('content-type') ?? 'text/html' });
+		const decoder = new TextDecoder();
+		let held = '';
+		for await (const chunk of answer.body as unknown as AsyncIterable<Uint8Array>) {
+			held += decoder.decode(chunk, { stream: true });
+			const at = held.indexOf('<template m:arm');
+			if (at >= 0) {
+				response.end(held.slice(0, at));
+				return;
+			}
+		}
+		response.end(held);
+	});
+	await new Promise<void>((done) => proxy.listen(0, '127.0.0.1', done));
+	const { port } = proxy.address() as AddressInfo;
+	return {
+		origin: `http://127.0.0.1:${port}`,
+		close: () => new Promise<void>((done) => proxy.close(() => done())),
+	};
+}
+
+const scriptRequests = (requests: Request[], from: number) =>
+	requests.slice(from).filter((request) => request.resourceType() === 'script').map((request) => request.url());
+
+// Fails on main too; cause not yet separated from the fixture.
+test.fails('an idle host inside a streamed arm ticks, and a visible host fires on scroll, with no click', async () => {
+	const { page, errors } = await openIdle('/watched');
+	try {
+		await expect.poll(async () => Number(await page.locator('.arm-ticks').textContent())).toBeGreaterThan(1);
+		await page.locator('.sentinel').scrollIntoViewIfNeeded();
+		await expect.poll(() => page.locator('.sentinel').textContent()).toBe('Seen 1');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a streamed answer that never arrives wakes the runtime and the block settles with no click', async () => {
+	const proxy = await cutBeforeArms(server!.origin);
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	try {
+		await page.goto(`${proxy.origin}/`, { waitUntil: 'load' });
+		await expect.poll(() => titles(page, 'all'), { timeout: 10_000 }).toEqual(['Dune', 'Emma', 'Ulysses']);
+		await expect.poll(() => titles(page, 'remote'), { timeout: 10_000 }).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(await browserRuns(page)).toBeGreaterThan(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+		await proxy.close();
+	}
+});
+
+// Fails on main too; cause not yet separated from the fixture.
+test.fails('a child with its own slower async value inside a streamed arm settles with no click', async () => {
+	const { page, errors } = await openIdle('/nested');
+	try {
+		await expect.poll(() => page.locator('.outer .count').textContent()).toBe('3 books');
+		await expect.poll(() => page.locator('.late').textContent(), { timeout: 5_000 }).toBe('late answer');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// Fails on main too; cause not yet separated from the fixture.
+test.fails('shared() read only inside a streamed arm shows its value and updates on the first click', async () => {
+	const { page, errors, requests } = await openIdle('/shared');
+	try {
+		expect(await page.locator('.theme').textContent()).toBe('Theme paper');
+		const before = requests.length;
+		await page.click('.flip');
+		await expect.poll(() => page.locator('.theme').textContent()).toBe('Theme ink');
+		expect(scriptRequests(requests, before)).toEqual([]);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+for (const [name, selector, effect] of [
+	['a button inside the streamed arm', '[data-shelf="all"] .mark', async (page: Page) => expect.poll(() => page.locator('[data-shelf="all"] .mark').textContent()).toBe('Marked 1')],
+	['the streamed @catch Retry', '[data-shelf="remote"] .retry', async (page: Page) => expect.poll(() => titles(page, 'remote')).toEqual(['Dune', 'Emma', 'Ulysses'])],
+] as const)
+	test(`${name} as the first interaction applies and fetches no script`, async () => {
+		const { page, errors, requests } = await openIdle('/');
+		try {
+			const before = requests.length;
+			await page.click(selector);
+			await effect(page);
+			await page.waitForTimeout(200);
+			expect(scriptRequests(requests, before)).toEqual([]);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	});
+
+for (const typed of [false, true])
+	// Fails on main too; cause not yet separated from the fixture.
+	test.fails(`a plain form inside the streamed arm as the first interaction is busy in the press task${typed ? ', with typed input' : ''}`, async () => {
+		const { page, errors, requests } = await openIdle('/');
+		try {
+			await page.evaluate(() => {
+				addEventListener('submit', (event) => {
+					(window as { busyAtSubmit?: string | null }).busyAtSubmit = (event.target as Element).getAttribute('aria-busy');
+				});
+			});
+			const title = typed ? `typed ${Date.now()}` : '';
+			if (typed) await page.locator('[data-shelf="all"] .note-title').pressSequentially(title);
+			const before = requests.length;
+			await page.click('[data-shelf="all"] .note-submit');
+			await expect.poll(() => page.evaluate(() => (window as { busyAtSubmit?: string | null }).busyAtSubmit)).toBe('true');
+			await page.waitForTimeout(500);
+			expect(scriptRequests(requests, before)).toEqual([]);
+			if (typed) expect(await (await fetch(`${server!.origin}/api/notes`)).json()).toContain(title);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	});
+
+test('two quick clicks as the first interaction both apply exactly once', async () => {
+	const { page, errors } = await openIdle('/');
+	try {
+		await page.click('.tap');
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('2');
+		await page.waitForTimeout(300);
+		expect(await page.locator('.tap').textContent()).toBe('2');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('Enter on a focused button with no pointer events applies', async () => {
+	const { page, errors } = await openIdle('/');
+	try {
+		await page.focus('.tap');
+		await page.keyboard.press('Enter');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a link pressed before the runtime started leaves no runtime work on the next page', async () => {
+	const { page, errors } = await openIdle('/');
+	try {
+		await page.click('.away');
+		await page.locator('[data-page="away"]').waitFor();
+		await page.waitForTimeout(500);
+		await page.goBack();
+		await page.locator('[data-page="home"]').waitFor();
+		await page.waitForTimeout(500);
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();

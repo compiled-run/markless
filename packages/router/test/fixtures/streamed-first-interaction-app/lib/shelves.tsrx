@@ -4,6 +4,7 @@ import { listBooks, saveBook } from './shelf.ts';
 function Shelf({ initialFilter }: { readonly initialFilter: string }) @{
 	let filter = state(initialFilter);
 	let version = state(0);
+	let marks = state(0);
 	const books = computed(async () => listBooks(filter, version));
 
 	<section data-shelf={initialFilter}>
@@ -18,11 +19,18 @@ function Shelf({ initialFilter }: { readonly initialFilter: string }) @{
 			Save
 		</button>
 		@try {
-			<ul class="books">
-				@for (const book of books; key book.id) {
-					<li>{book.title}</li>
-				}
-			</ul>
+			<div class="arm">
+				<button class="mark" onClick={() => marks++}>Marked {marks}</button>
+				<ul class="books">
+					@for (const book of books; key book.id) {
+						<li>{book.title}</li>
+					}
+				</ul>
+				<form method="post" action="/api/notes" class="note-form">
+					<input name="title" class="note-title" aria-label="Note" />
+					<button type="submit" class="note-submit">Add note</button>
+				</form>
+			</div>
 		} @pending {
 			<p class="loading">Loading</p>
 		} @catch (error, reset) {
