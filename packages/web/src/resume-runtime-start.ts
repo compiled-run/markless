@@ -136,6 +136,7 @@ export async function startResumeRuntime(input: {
 						prepared.asyncBoundariesById,
 					);
 				}
+				if (input.rowComponentHost.disposed?.()) return;
 				await runtimeInput.applyDomJournal!(entries);
 				await input
 					.branchRuntime()
