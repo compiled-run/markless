@@ -6,22 +6,10 @@
 				"loadWeight",
 				"linux-x64",
 				"docs /",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "second-component in-place forms (PR #650): the docs playground ships the compiler, which grows by the pass that finds components rendered only inside a @try with a @catch; the docs home's +33 executed characters also appear on PR #654, an unrelated change, so they are not from this one; measured on CI run 43354036580 against main's merge-queue run 43344585225",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
 				"jsGzipBytes"
 			],
 			"delta": 289,
-			"reason": "second-component in-place forms (PR #650): the docs playground ships the compiler, which grows by the pass that finds components rendered only inside a @try with a @catch; the docs home's +33 executed characters also appear on PR #654, an unrelated change, so they are not from this one; measured on CI run 43354036580 against main's merge-queue run 43344585225",
+			"reason": "second-component in-place forms (PR #650): the docs playground ships the compiler, which grows by the pass that finds components rendered only inside a @try with a @catch; measured on CI run 43354036580 against main's merge-queue run 43344585225",
 			"date": "2026-11-13"
 		},
 		{
@@ -33,7 +21,7 @@
 				"jsGzipBytes"
 			],
 			"delta": 289,
-			"reason": "second-component in-place forms (PR #650): the docs playground ships the compiler, which grows by the pass that finds components rendered only inside a @try with a @catch; the docs home's +33 executed characters also appear on PR #654, an unrelated change, so they are not from this one; measured on CI run 43354036580 against main's merge-queue run 43344585225",
+			"reason": "second-component in-place forms (PR #650): the docs playground ships the compiler, which grows by the pass that finds components rendered only inside a @try with a @catch; measured on CI run 43354036580 against main's merge-queue run 43344585225",
 			"date": "2026-11-13"
 		}
 	]
