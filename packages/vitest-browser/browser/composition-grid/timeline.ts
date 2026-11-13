@@ -33,8 +33,10 @@ export type Shape = {
 	readonly ownsLoad?: boolean;
 	/** The place is not in an arm: nothing opens or closes it, so the close steps do not apply. */
 	readonly noArm?: boolean;
-	/** The rejecting handler is a form submit: the page must not navigate. */
-	readonly submits?: boolean;
+	/** Nothing on the page reloads the value or changes its subject, so those steps do not apply. */
+	readonly fixed?: boolean;
+	/** A fixture-specific claim checked after every step. */
+	readonly invariant?: () => void;
 };
 
 const ARM_STEPS: ReadonlyArray<Step> = [
@@ -44,8 +46,16 @@ const ARM_STEPS: ReadonlyArray<Step> = [
 	'close while loading',
 ];
 
+const RELOAD_STEPS: ReadonlyArray<Step> = [
+	'reload while open',
+	'reload while closed, then open',
+	'reload twice while closed, then open',
+	'switch subject while open',
+	'close while loading',
+];
+
 export function applies(shape: Shape, step: Step): boolean {
-	return !(shape.noArm && ARM_STEPS.includes(step));
+	return !(shape.noArm && ARM_STEPS.includes(step)) && !(shape.fixed && RELOAD_STEPS.includes(step));
 }
 
 export type Run = {
@@ -53,8 +63,11 @@ export type Run = {
 	readonly mount: () => Promise<unknown>;
 	readonly mode: 'CSR' | 'SSR';
 	readonly openAtLoad: boolean;
+	/** How long each wait may take; a pinned failure waits less, since it is expected to time out. */
+	readonly patience?: number;
 };
 
+// One timeline runs at a time, so the run in progress sets how long every wait may take.
 const poll = { timeout: 4_000, interval: 10 };
 const norm = (text: string | null) => (text ?? '').replace(/\s+/g, ' ').trim();
 
@@ -113,6 +126,7 @@ export class Timeline {
 	private readonly listeners: Array<() => void> = [];
 
 	constructor(private readonly run: Run) {
+		poll.timeout = run.patience ?? 4_000;
 		this.model = { open: run.openAtLoad, subject: 'a', round: 0, loadedRound: undefined, pageErrors: [] };
 		const onError = (event: ErrorEvent) => this.model.pageErrors.push(String(event.error ?? event.message));
 		const onRejection = (event: PromiseRejectionEvent) => this.model.pageErrors.push(String(event.reason));
@@ -156,6 +170,7 @@ export class Timeline {
 		expect(waitingRequests(), 'requests left waiting').toEqual([]);
 		expect(busy(), 'busy marks with nothing loading').toEqual([]);
 		expect(this.model.pageErrors, 'page errors').toEqual([]);
+		this.run.shape.invariant?.();
 		this.logFrom = server.log.length;
 	}
 
@@ -324,7 +339,7 @@ export function fullTimeline(run: Run, skip: ReadonlyArray<Step> = []) {
 
 /** The first render and then one step: the reduced repro a pinned cell runs. */
 export function oneStep(run: Run, step: Step) {
-	return new Timeline(run).runSteps(step === 'first render' ? [step] : ['first render', step]);
+	return new Timeline({ patience: 1_500, ...run }).runSteps(step === 'first render' ? [step] : ['first render', step]);
 }
 
 // A stream append is parsed after the shell, so its inline scripts run as it lands.
@@ -344,6 +359,7 @@ function appendStreamed(container: HTMLElement, html: string): void {
 /** Plays a whole streamed response into the page: the shell, then each append. */
 export async function playStream(stream: Promise<{ readonly shell: string; readonly appends: ReadonlyArray<string> }>) {
 	const { shell, appends } = await stream;
+	expect(appends.length, 'chunks streamed after the shell').toBeGreaterThan(0);
 	const { container } = renderServerHTML(shell);
 	for (const chunk of appends) appendStreamed(container, chunk);
 }

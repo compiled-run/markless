@@ -96,7 +96,7 @@ export function installServer(): void {
 export async function loadBoard(subject: string, round: number): Promise<Board> {
 	// The server render answers at once, after a turn, so a streamed render sends it in a later chunk.
 	if (typeof window === 'undefined') {
-		await new Promise((resolve) => setTimeout(resolve, 5));
+		await new Promise((resolve) => setTimeout(resolve, 30));
 		return boardFor(subject, round);
 	}
 	const response = await fetch(`/grid/board?subject=${subject}&round=${round}`);
