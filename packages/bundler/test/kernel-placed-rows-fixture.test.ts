@@ -129,11 +129,9 @@ async function executedSources(coverage: ReadonlyArray<{ url: string; functions:
 	return sources;
 }
 
-const rowsOf = (page: Page, view: number, list = '.list') =>
-	page.locator(`[data-view="${view}"] ${list} [data-row]`);
-
-// Every answer waits until the page has resumed and gone quiet, so the fill is its own measured window.
-async function fill(page: Page, url: string) {
+// The page's own lists stream from the server. A list added in the browser asks there; its answer is held
+// until the new row stands, so the measured window is that answer landing and nothing else.
+async function addedListFill(page: Page, url: string, rowStandsFirst: boolean) {
 	await page.addInitScript(() => {
 		const held = globalThis as typeof globalThis & { __answers?: Promise<void>; __release?: () => void };
 		held.__answers = new Promise<void>((release) => (held.__release = release));
@@ -145,10 +143,19 @@ async function fill(page: Page, url: string) {
 	await cdp.send('Profiler.enable');
 	await cdp.send('Profiler.startPreciseCoverage', { callCount: true, detailed: false });
 	await page.goto(url, { waitUntil: 'networkidle' });
-	// Counts reset on each take: what follows is the fill alone.
-	await cdp.send('Profiler.takePreciseCoverage');
+	await expect.poll(() => page.locator('[data-view="1"] [data-row]').count()).toBeGreaterThan(0);
+	// Counts reset on each take. A row whose components the evaluator renders stands only once their answers land.
+	if (rowStandsFirst) {
+		await page.locator('[data-add]').click();
+		await expect.poll(() => page.locator('[data-view="2"]').count()).toBe(1);
+		await page.waitForLoadState('networkidle');
+		await cdp.send('Profiler.takePreciseCoverage');
+	} else {
+		await cdp.send('Profiler.takePreciseCoverage');
+		await page.locator('[data-add]').click();
+	}
 	await page.evaluate(() => (globalThis as typeof globalThis & { __release?: () => void }).__release?.());
-	await expect.poll(() => page.locator('[data-row]').count()).toBeGreaterThan(0);
+	await expect.poll(() => page.locator('[data-view="2"] [data-row]').count()).toBeGreaterThan(0);
 	await page.waitForLoadState('networkidle');
 	const { result } = (await cdp.send('Profiler.takePreciseCoverage')) as {
 		result: ReadonlyArray<Parameters<typeof executedSources>[0][number] & { scriptId: string }>;
@@ -157,37 +164,45 @@ async function fill(page: Page, url: string) {
 	return executedSources(result.map((script) => ({ ...script, url: script.url || (urls.get(script.scriptId) ?? '') })));
 }
 
+const rowsOf = (page: Page, view: number, list: string) => page.locator(`[data-view="${view}"] ${list} [data-row]`);
+// Per list: the rows its filter keeps, '' -> all, 'u' -> Dune and Ubik, 'e' (the added list) -> Dune and Emma.
+const SHOWN = [3, 2, 2];
+
 // A row handler writes the owner's state, a write to the owner's state reaches every row, and a refetch keeps
-// the nodes of the rows whose keys it keeps.
+// the nodes of the rows it brings back unchanged.
 async function exerciseRows(page: Page, list: string, reloads: number) {
-	for (const view of [0, 1]) {
+	for (const [view, count] of SHOWN.entries()) {
 		const owner = page.locator(`[data-view="${view}"] ${list}`);
-		await expect.poll(() => rowsOf(page, view, list).count()).toBe(view === 0 ? 3 : 2);
+		await expect.poll(() => rowsOf(page, view, list).count()).toBe(count);
 		await rowsOf(page, view, list).first().locator('[data-pick]').click();
 		await expect.poll(() => owner.locator('[data-picked]').textContent()).toBe('Dune');
 		await owner.locator('[data-mark]').click();
 		await expect
-			.poll(() => owner.locator('[data-mark-text]').allTextContents())
-			.toEqual(view === 0 ? ['-+', '-+', '-+'] : ['-+', '-+']);
+			.poll(() => owner.locator('[data-mark-text]').allTextContents(), { message: `${list} list ${view}` })
+			.toEqual(Array(count).fill('-+'));
 	}
 	await page.evaluate((selector) => {
 		for (const row of document.querySelectorAll(`${selector} [data-row]`))
 			(row as HTMLElement & { __kept?: string }).__kept = row.getAttribute('data-row')!;
 	}, list);
 	await page.locator('[data-reload]').click();
-	await expect.poll(() => rowsOf(page, 0, list).locator('[data-pick]').allTextContents()).toEqual(['Dune', 'Emma', `Ubik ${reloads}`]);
+	await expect
+		.poll(() => rowsOf(page, 0, list).locator('[data-pick]').allTextContents())
+		.toEqual(['Dune', 'Emma', `Ubik ${reloads}`]);
 	const kept = await page.evaluate(
 		(selector) =>
-			[...document.querySelectorAll(`[data-view="0"] ${selector} [data-row]`)].map(
-				(row) => (row as HTMLElement & { __kept?: string }).__kept ?? 'new',
+			[0, 2].map((view) =>
+				[...document.querySelectorAll(`[data-view="${view}"] ${selector} [data-row]`)].map(
+					(row) => (row as HTMLElement & { __kept?: string }).__kept ?? 'new',
+				),
 			),
 		list,
 	);
-	// Rows 1 and 2 come back unchanged; row 3's text changed, so it may be redrawn.
-	expect(kept.slice(0, 2)).toEqual(['1', '2']);
+	// Ubik's text changed with the refetch, so only the rows that came back unchanged must keep their nodes.
+	expect(kept).toEqual([['1', '2', kept[0]![2]], ['1', '2']]);
 }
 
-describe('lists placed in component rows, answered in the browser of a production build', () => {
+describe('a list added in component rows, answered in the browser of a production build', () => {
 	test('the kernel fills them without the evaluator running, and their rows stay live', async () => {
 		const url = await buildAndServe('lists');
 		const browser = await chromium.launch();
@@ -195,7 +210,7 @@ describe('lists placed in component rows, answered in the browser of a productio
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
-			const ran = await fill(page, url);
+			const ran = await addedListFill(page, url, true);
 			expect(ran.has(KERNEL)).toBe(true);
 			expect(ran.has(EVALUATOR)).toBe(false);
 			await exerciseRows(page, '.list', 1);
@@ -212,7 +227,7 @@ describe('lists placed in component rows, answered in the browser of a productio
 			const page = await browser.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
-			const ran = await fill(page, url);
+			const ran = await addedListFill(page, url, false);
 			expect(ran.has(EVALUATOR)).toBe(true);
 			await exerciseRows(page, '.carded', 1);
 			expect(errors).toEqual([]);
@@ -221,13 +236,13 @@ describe('lists placed in component rows, answered in the browser of a productio
 		}
 	}, 180_000);
 
-	// Ships on main: an expression in a placed arm's rows over the owner's state renders once and never follows a write.
+	// Ships on main: rows the evaluator draws in a placed arm render an expression over the owner's state once and never follow its writes.
 	test.fails('rows whose expression reads the owner state follow its writes through the evaluator', async () => {
 		const url = await buildAndServe('evaluated');
 		const browser = await chromium.launch();
 		try {
 			const page = await browser.newPage();
-			await fill(page, url);
+			await addedListFill(page, url, false);
 			await exerciseRows(page, '.joined', 1);
 		} finally {
 			await browser.close();

@@ -3,7 +3,7 @@ import Page from './evaluated-page.tsrx';
 
 export { Page as default };
 
-// Streamed as a host would: the shell, then whatever arms the server settles; lists in component rows stay to the browser.
+// Streamed as a host would: the shell, then the arms the server settles.
 export async function render() {
 	const stream = await renderToStream(Page);
 	let html = stream.shell;

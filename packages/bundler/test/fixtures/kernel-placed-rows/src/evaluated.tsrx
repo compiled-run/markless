@@ -16,13 +16,18 @@ function App() @{
 	]);
 	<section>
 		<button data-reload onClick={() => reload++}>Reload</button>
+		<button data-add onClick={() => (views = [...views, { id: views.length, filter: 'e' }])}>Add list</button>
 		@for (const view of views; key view.id) {
-			<div data-view={view.id}>
-				<Joined initialFilter={view.filter} reload={reload} />
-				<Carded initialFilter={view.filter} reload={reload} />
-			</div>
+			<div data-view={view.id}><Both initialFilter={view.filter} reload={reload} /></div>
 		}
 	</section>
+}
+
+function Both({ initialFilter, reload }: { initialFilter: string; reload: number }) @{
+	<div>
+		<Joined initialFilter={initialFilter} reload={reload} />
+		<Carded initialFilter={initialFilter} reload={reload} />
+	</div>
 }
 
 function Joined({ initialFilter, reload }: { initialFilter: string; reload: number }) @{

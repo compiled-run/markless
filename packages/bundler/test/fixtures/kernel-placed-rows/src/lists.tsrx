@@ -14,6 +14,7 @@ function App() @{
 	]);
 	<section>
 		<button data-reload onClick={() => reload++}>Reload</button>
+		<button data-add onClick={() => (views = [...views, { id: views.length, filter: 'e' }])}>Add list</button>
 		@for (const view of views; key view.id) {
 			<div data-view={view.id}><Todos initialFilter={view.filter} reload={reload} /></div>
 		}
