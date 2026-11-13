@@ -406,6 +406,7 @@ test('a handler rejection publishes rejected over a run in flight, aborts it, an
 		error,
 		value: 'a',
 		valueKey: 1,
+		quiet: true,
 	});
 	runner.runs[1]!.resolve('late');
 	await tick();
@@ -424,6 +425,7 @@ test('a handler rejection on an idle value settles it without a run', async () =
 		version: 1,
 		key: undefined,
 		error,
+		quiet: true,
 	});
 	graph.read('computed:user', ['status']);
 	expect(runner.runs).toHaveLength(0);

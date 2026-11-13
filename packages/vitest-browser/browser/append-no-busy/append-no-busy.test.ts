@@ -1,11 +1,15 @@
-import { afterEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { AppendNewLoad } from './append-new-load.tsrx';
 import { AppendWithCatch } from './append-with-catch.tsrx';
 import { AppendWithoutCatch } from './append-without-catch.tsrx';
 import { FailingAppend } from './failing-append.tsrx';
+import { FailingSave } from './failing-save.tsrx';
+import { installServer, resetServer, server } from '../mutations-refresh/server.ts';
 
 // A handler marks and announces only content whose async value its write re-runs; appending to local state re-runs none.
+installServer();
+beforeEach(() => resetServer());
 afterEach(() => cleanup());
 
 const poll = { timeout: 5_000, interval: 5 };
@@ -46,7 +50,15 @@ function watchBusy(container: HTMLElement) {
 	};
 }
 
-// Every text the shared region holds, in order.
+const name = (element: Element) =>
+	element.getAttributeNames().find((attribute) => attribute.startsWith('data-'))?.slice(5) ?? element.tagName.toLowerCase();
+
+const listening: MutationObserver[] = [];
+afterEach(() => {
+	for (const observer of listening.splice(0)) observer.disconnect();
+});
+
+// Every text the shared region holds, in order, until the test ends.
 function listen() {
 	const said: string[] = [];
 	let last = document.querySelector(REGION)?.textContent ?? '';
@@ -56,10 +68,8 @@ function listen() {
 		last = now;
 	});
 	observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-	return () => {
-		observer.disconnect();
-		return said;
-	};
+	listening.push(observer);
+	return () => [...said];
 }
 
 // Past the busy-line deadline and the settled-line cadence, so a late announcement would have been said.
@@ -100,6 +110,8 @@ for (const mode of ['CSR', 'SSR'] as const) {
 	test(`${mode}: with a @catch, a handler whose write re-runs the shown value still marks it and announces`, async () => {
 		const container = await mounted(mode === 'CSR' ? await render(AppendWithCatch) : await renderSSR(AppendWithCatch));
 		await expect.poll(() => text(container, '[data-items]'), poll).toBe('item 0.0item 1.0');
+		await announceWindow();
+		const stopBusy = watchBusy(container);
 		const said = listen();
 		click(container, '[data-reload]');
 		await expect
@@ -114,6 +126,10 @@ for (const mode of ['CSR', 'SSR'] as const) {
 			.not.toBe('true');
 		await expect.poll(() => document.querySelector(REGION)?.textContent, poll).toBe('Updated');
 		expect(said()).toEqual(['Updating…', 'Updated']);
+		expect(
+			[...stopBusy()].map(name).sort(),
+			'only the elements that read the reloading value are marked, never the block around them',
+		).toEqual(['items', 'more']);
 	});
 
 	test(`${mode}: appending a cursor marks only the value it re-runs, and the new row loads on its own`, async () => {
@@ -135,7 +151,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		).toEqual(['latest']);
 	});
 
-	test(`${mode}: a failed append still reaches the @catch, and reset brings the block back`, async () => {
+	test(`${mode}: a failed append reaches the @catch, announces Update failed once and marks nothing, and reset announces nothing`, async () => {
 		const reasons: unknown[] = [];
 		const onRejection = (event: PromiseRejectionEvent) => {
 			reasons.push(event.reason);
@@ -145,13 +161,44 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		try {
 			const container = await mounted(mode === 'CSR' ? await render(FailingAppend) : await renderSSR(FailingAppend));
 			await expect.poll(() => text(container, '[data-items]'), poll).toBe('item 0.0, item 1.0');
+			await announceWindow();
+			const stopBusy = watchBusy(container);
+			const said = listen();
 			click(container, '[data-more]');
 			await expect.poll(() => text(container, '[data-failed]'), poll).toBe('page is down');
+			await announceWindow();
+			expect(said(), 'the error is announced once, with no busy line before it').toEqual(['Update failed']);
+			expect([...stopBusy()].map(name)).toEqual([]);
+
+			const afterReset = listen();
 			click(container, '[data-retry]');
 			await expect.poll(() => text(container, '[data-items]'), poll).toBe('item 0.0, item 1.0');
 			await expect.poll(() => container.querySelector('[data-failed]'), poll).toBeNull();
+			await announceWindow();
+			expect(afterReset()).toEqual([]);
 		} finally {
 			window.removeEventListener('unhandledrejection', onRejection);
 		}
+	});
+
+	test(`${mode}: a failed save reaches the @catch and announces Update failed, never Updated, and reset announces nothing`, async () => {
+		const container = await mounted(mode === 'CSR' ? await render(FailingSave) : await renderSSR(FailingSave));
+		await expect.poll(() => text(container, '[data-names]'), poll).toBe('Ada');
+		await announceWindow();
+		const said = listen();
+		server.nextPost = [{ status: 500, body: 'Taken' }];
+		click(container, '[data-save]');
+		await expect.poll(() => text(container, '[data-failed]'), poll).toBe('Taken');
+		await expect.poll(() => said().at(-1) ?? null, poll).toBe('Update failed');
+		await announceWindow();
+		const lines = said();
+		expect(lines).not.toContain('Updated');
+		expect(lines.filter((line) => line === 'Update failed')).toHaveLength(1);
+
+		const afterReset = listen();
+		click(container, '[data-retry]');
+		await expect.poll(() => container.querySelector('[data-failed]'), poll).toBeNull();
+		await announceWindow();
+		expect(afterReset()).toEqual([]);
 	});
 }

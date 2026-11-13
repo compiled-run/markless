@@ -384,7 +384,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			if (node.phase === NODE_IDLE || node.phase >= NODE_RUNNING) move(node, NODE_SETTLED);
 			const version = ++node.version;
 			const key = (node.snapshot as { readonly key?: unknown }).key;
-			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
+			// A handler's rejection rode no refresh of its own, so it speaks on its own; a save in flight still closes through its hold.
+			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot), quiet: true });
 		},
 	};
 }
