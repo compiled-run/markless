@@ -16,6 +16,5 @@ async function numbersFollow(page: Parameters<typeof render>[0], start: number) 
 
 test('an inline row follows its index', () => numbersFollow(SyncInline, 1));
 
-// Known defect: a row component given the loop index as a prop keeps the index it was built with after the rows shift.
-test.fails('a row component follows an index prop', () => numbersFollow(SyncComponent, 1));
-test.fails('a row component follows the bare index', () => numbersFollow(SyncBareIndex, 0));
+test('a row component follows an index prop', () => numbersFollow(SyncComponent, 1));
+test('a row component follows the bare index', () => numbersFollow(SyncBareIndex, 0));

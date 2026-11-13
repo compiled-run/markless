@@ -91,6 +91,7 @@ export type MintedRow = {
 	readonly rowRoot: ResumeRowRoot;
 	readonly nodes: ReadonlyArray<ResumeDomNode>;
 	readonly commit: () => Promise<void>;
+	readonly rowIndex: number;
 	/** The nodes of the row this one replaced under the same key. */
 	replaced?: ReadonlyArray<ResumeDomNode>;
 };
@@ -139,8 +140,8 @@ export function marklessRowComponentMint(
 	// asked to build in the same tick and hold the same key, and one shared map
 	// hands the second repeat's row to the first.
 	const prepared = new Map<string, Map<unknown, MintedRow>>();
-	// The item each live row was last rendered from, per repeat.
-	const renderedItems = new Map<string, Map<unknown, unknown>>();
+	// The item and index each live row was last rendered from, per repeat.
+	const renderedItems = new Map<string, Map<unknown, readonly [unknown, number]>>();
 	const renderedFor = (repeat: ResumeKeyedRepeatRecord) => {
 		let items = renderedItems.get(repeat.id);
 		if (!items) renderedItems.set(repeat.id, (items = new Map()));
@@ -217,7 +218,7 @@ export function marklessRowComponentMint(
 				return mintTemplateRow(parent, repeat, item, rowMintGraph ?? graph, values, wrapRange);
 			const rowKey = rowKeyOf(item, repeat),
 				row = prepared.get(repeat.id)?.get(rowKey);
-			if (row) renderedFor(repeat).set(rowKey, itemCopy(item));
+			if (row) renderedFor(repeat).set(rowKey, [itemCopy(item), row.rowIndex]);
 			return row?.rowRoot;
 		},
 		slotReader: (repeat, rowGraph) => marklessRowSlotReader(renderData, repeat, rowGraph),
@@ -233,17 +234,22 @@ export function marklessRowComponentMint(
 				// A container with no page refuses even when nothing is due yet.
 				if (repeat.rowComponent && rowGraph && rowHost && !renderData) pageSurface(repeat);
 				let wrapperRead: RowSlotReader | undefined;
-				const renderedFrom = (rowKey: unknown) =>
-					rendered.has(rowKey) ? rendered.get(rowKey) : servedItems?.get(rowKey)?.[0];
-				const current = (item: unknown) => {
-					const rowKey = rowKeyOf(item, repeat);
-					return live.has(rowKey) && sameItem(renderedFrom(rowKey), item, 0);
+				const renderedFrom = (rowKey: unknown) => rendered.get(rowKey) ?? servedItems?.get(rowKey);
+				// A row whose child reads the loop index is stale once it moves, even under the same item.
+				const current = (item: unknown, rowIndex: number) => {
+					const rowKey = rowKeyOf(item, repeat),
+						from = renderedFrom(rowKey);
+					return (
+						live.has(rowKey) &&
+						sameItem(from?.[0], item, 0) &&
+						(!repeat.indexName || from?.[1] === rowIndex)
+					);
 				};
 				const built =
 					repeat.rowComponent &&
 					rowGraph &&
 					rowHost &&
-					!readKeyedRepeatCollection(rowGraph, repeat).every(current)
+					!readKeyedRepeatCollection(rowGraph, repeat).every((item, at) => current(item, at))
 						? marklessThen(pageSurface(repeat), (pageSurfaceValue) =>
 								marklessThen(
 									marklessThen(
@@ -265,7 +271,7 @@ export function marklessRowComponentMint(
 										return marklessWalk(items.length, (rowIndex) => {
 											const item = items[rowIndex];
 											const rowKey = rowKeyOf(item, repeat);
-											if (preparedRows.has(rowKey) || current(item)) return undefined;
+											if (preparedRows.has(rowKey) || current(item, rowIndex)) return undefined;
 											const rowInput = {
 												surface: pageSurfaceValue,
 												parent,
@@ -291,11 +297,20 @@ export function marklessRowComponentMint(
 													preparedRows.set(rowKey, placeMintedRow(rowInput, after));
 													return undefined;
 												}
+												const from = renderedFrom(rowKey);
+												// A row that only moved changes only the props that read its index: a child with state follows them and keeps it.
+												const moved = sameItem(from?.[0], item, 0) && keepsState(after);
 												return marklessThen(
-													renderedIfRenderable({ ...rowInput, item: renderedFrom(rowKey) }),
+													moved
+														? after
+														: renderedIfRenderable({
+																...rowInput,
+																item: from?.[0],
+																rowIndex: from?.[1] ?? rowIndex,
+															}),
 													(before) => {
-														rendered.set(rowKey, itemCopy(item));
-														if (before && !rowIsStale(parent, repeat, before, after, liveRow))
+														rendered.set(rowKey, [itemCopy(item), rowIndex]);
+														if (before && (moved || !rowIsStale(parent, repeat, before, after, liveRow)))
 															return followRowItem(rowGraph, after);
 														// A wrapped child is built again inside the row it stands in, so the row's own elements and focus stay.
 														const swap =
@@ -573,15 +588,8 @@ function followRowItem(
 	graph: RuntimeGraph,
 	render: RenderedComponentRow,
 ): Awaitable<void> {
-	let cell: ProtocolStatePayload['cells'][number] | undefined;
-	for (const candidate of render.rendered.state.cells)
-		if (
-			candidate.graphNodeId.startsWith(render.rowSegment) &&
-			candidate.graphNodeId.endsWith(PROPS) &&
-			(cell === undefined || candidate.graphNodeId.length < cell.graphNodeId.length)
-		)
-			cell = candidate;
-	if (cell === undefined || graph.read(cell.graphNodeId, []) === undefined) return;
+	const cell = rowPropCell(graph, render);
+	if (cell === undefined) return;
 	const cellId = cell.graphNodeId;
 	const direct = (cell as { readonly directValue?: unknown }).directValue;
 	const write = (props: unknown): void => {
@@ -592,6 +600,29 @@ function followRowItem(
 	};
 	if (direct !== undefined || cell.value === undefined) return write(direct);
 	return marklessThen(deserializeGraphValue(cell.value as SerializedGraphPayload), write);
+}
+
+// A stateless row child is served presentational, with no live sites to follow its props.
+function keepsState(render: RenderedComponentRow): boolean {
+	return render.rendered.state.cells.some(
+		(cell) => cell.graphNodeId.startsWith(render.rowSegment) && !cell.graphNodeId.endsWith(PROPS),
+	);
+}
+
+// The live row child's own prop cell, which its sites read; absent for a child that keeps none.
+function rowPropCell(
+	graph: RuntimeGraph,
+	render: RenderedComponentRow,
+): ProtocolStatePayload['cells'][number] | undefined {
+	let cell: ProtocolStatePayload['cells'][number] | undefined;
+	for (const candidate of render.rendered.state.cells)
+		if (
+			candidate.graphNodeId.startsWith(render.rowSegment) &&
+			candidate.graphNodeId.endsWith(PROPS) &&
+			(cell === undefined || candidate.graphNodeId.length < cell.graphNodeId.length)
+		)
+			cell = candidate;
+	return cell && graph.read(cell.graphNodeId, []) !== undefined ? cell : undefined;
 }
 
 // A render of the item a live row was built from, or nothing when that item no longer renders.
@@ -1003,6 +1034,7 @@ function placeMintedRow(input: ComponentRowInput, render: RenderedComponentRow):
 	const row: MintedRow = {
 		rowRoot,
 		nodes: placed.nodes,
+		rowIndex: input.rowIndex,
 		commit: () =>
 			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
 				branches,
@@ -1038,6 +1070,7 @@ function placeMintedChild(
 	const row: MintedRow = {
 		rowRoot: liveRow,
 		nodes: [liveRow],
+		rowIndex: input.rowIndex,
 		commit: () =>
 			commitMintedRow(input.registration, rendered, elementsByHostId, input.repeat, {
 				branches,

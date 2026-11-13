@@ -16,7 +16,10 @@ import {
 	type ConstructReachInput,
 } from './construct-reach.ts';
 import { TEMPLATE_EXPRESSION_GRAPH_NODE_PREFIX } from './public-render/html.ts';
-import { createResidueDependencyReader } from './public-render/residue-dependencies.ts';
+import {
+	createResidueDependencyReader,
+	residueReferences,
+} from './public-render/residue-dependencies.ts';
 import { childRootIsOneElement } from './row-range.ts';
 import { rowBoundNames } from './semantic-graph/repeat-item-binding.ts';
 
@@ -114,6 +117,20 @@ export function resolveRowComponentMint(
 		...(itemProps.length === 1 ? { itemPropName: itemProps[0]!.name } : {}),
 		...(wraps ? { slotPath: slot.coordinate.path } : {}),
 	};
+}
+
+/** A component row's props read the loop index: a moved row renders differently, and a callback is handed the index. */
+export function rowComponentReadsIndex(
+	componentEdges: ReadonlyArray<SemanticComponentEdge>,
+	rowComponent: RowComponentMint,
+	indexName: string,
+): boolean {
+	const edge = componentEdges.find((candidate) => candidate.id === rowComponent.componentEdgeId);
+	return (edge?.props ?? []).some(
+		(prop) =>
+			prop.source !== undefined &&
+			residueReferences(readResidueNames(prop.source, 'expression'), indexName),
+	);
 }
 
 /**

@@ -2300,15 +2300,17 @@ function rowLocalNamesBySymbol(
 			}
 		}
 	}
-	// A callback a row passes its child closes over the row's item, which the child's dispatch supplies.
+	// A callback a row passes its child closes over the row's item and index, which the child's dispatch supplies.
 	for (const symbol of symbolResolver?.symbols ?? []) {
 		if (symbol.kind !== 'callback-prop') continue;
 		const edge = semanticGraph?.componentEdges.find(
 			(candidate) => candidate.id === symbol.componentEdgeId,
 		);
 		for (const repeat of semanticGraph?.keyedRepeats ?? [])
-			if (edge?.keyedRepeatScopeIds.includes(repeat.id))
+			if (edge?.keyedRepeatScopeIds.includes(repeat.id)) {
 				addLocal(symbol.id, repeat.itemName, repeat.itemAliases);
+				if (repeat.indexName) addLocal(symbol.id, repeat.indexName);
+			}
 	}
 	return localNamesBySymbol;
 }

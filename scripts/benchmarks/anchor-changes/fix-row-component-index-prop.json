@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 205,
+			"reason": "a row component reading the loop index: the row mint keeps each row index, and a moved row with its own state follows its props (PR run 43499479938 measured +205 B gzip on 99edc327a over merge-group run 43493507326 on 99edc327a alone)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 205,
+			"reason": "a row component reading the loop index: the row mint keeps each row index, and a moved row with its own state follows its props (PR run 43499479938 measured +205 B gzip on 99edc327a over merge-group run 43493507326 on 99edc327a alone)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 136,
+			"reason": "a row component reading the loop index: the row mint keeps each row index (merge-queue run 43471545043 measured 500161 B gzip on 5a20b0806 plus this change; merge-group run 43467848078 measured 500025 B on 5a20b0806 alone)",
+			"date": "2026-11-13"
+		}
+	]
+}
