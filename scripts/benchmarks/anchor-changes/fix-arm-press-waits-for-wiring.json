@@ -101,6 +101,120 @@
 			"delta": 109,
 			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662)",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 507,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 192,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render-csr"
+			],
+			"delta": 87,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 224,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 109,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 109,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 109,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 158,
+			"reason": "a press waits only for an arm registration whose range holds it, and an arm whose registration failed takes no events (review of #662; measured on PR CI run 43453200814 against main run 43393680953)",
+			"date": "2026-11-13"
 		}
 	]
 }
