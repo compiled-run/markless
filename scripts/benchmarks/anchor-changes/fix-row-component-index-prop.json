@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 196,
+			"reason": "a row component reading the loop index: the row mint keeps each row index, and a moved row with its own state follows its props (PR run 43452384566 measured +196 B gzip over the anchor; its base commit 536cb35ab has no CI measurement)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 196,
+			"reason": "a row component reading the loop index: the row mint keeps each row index, and a moved row with its own state follows its props (PR run 43452384566 measured +196 B gzip over the anchor; its base commit 536cb35ab has no CI measurement)",
+			"date": "2026-11-13"
+		}
+	]
+}
