@@ -43,6 +43,7 @@ import {
 	createInlineResumerSource,
 	createInlineResumerReturnWakeSource,
 	createInlineResumerStorageWakeSource,
+	createInlineResumerStreamedWakeSource,
 	createInlineResumerSharedWakeSource,
 	createInlineInPlaceCheckSource,
 	renderPrerenderInlineResumerSource,
@@ -137,6 +138,8 @@ export type RenderToStringOptions = {
 	// Build-computed settled-arm templates plus their fill plan. Inert markup:
 	// it sits after the rendered page so no page element or comment index moves.
 	readonly armEmission?: string;
+	/** Boundaries whose settled arm the server streams after the shell; the page takes them in at its first interaction. */
+	readonly streamedBoundaryIds?: ReadonlySet<string>;
 };
 
 export type ModulePreloadInput =
@@ -208,7 +211,8 @@ export async function assembleSsrContainer(
 	const hasPayload = !!output.state || !!output.view;
 	const { state, view } = await prepareSsrResumeRecords(output);
 	const browserTriggers = hasBrowserTriggers(view, state);
-	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state);
+	const streamed = options.streamedBoundaryIds;
+	const selfWake = hasUnsettledAsyncBoundaryRunner(view, state, streamed);
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	const prerenderWakeModuleUrl =
 		options.prerenderWakeModuleUrl ?? artifactPrerenderWakeModuleUrl(component);
@@ -311,7 +315,8 @@ export async function assembleSsrContainer(
 					deferredTriggerSource(view) +
 						(selfWake
 							? ''
-							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
+							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes) +
+								streamedWakeSource(view, streamed, selectedResumeModuleUrl, artifactSources?.wakes)) +
 						sharedWakeSource(state) +
 						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes) +
 						(sendsFormInPlace(view) ? createInlineInPlaceCheckSource() : ''),
@@ -651,6 +656,16 @@ function returnWakeSource(
 }
 
 // Each storage cell's slot key and the value this render gave it.
+function streamedWakeSource(
+	view: ProtocolViewPayload,
+	streamed: ReadonlySet<string> | undefined,
+	resumeModuleUrl: string | undefined,
+	wakes: InlineWakeSources | undefined,
+): string {
+	const ids = view.asyncBoundaries.flatMap((boundary) => (streamed?.has(boundary.id) ? [boundary.id] : []));
+	return ids.length > 0 ? createInlineResumerStreamedWakeSource(resumeModuleUrl, ids, wakes) : '';
+}
+
 function storageWakeSource(
 	state: ProtocolStatePayload,
 	resumeModuleUrl: string | undefined,
@@ -759,10 +774,13 @@ function hasBrowserTriggers(view: ProtocolViewPayload, state: ProtocolStatePaylo
 function hasUnsettledAsyncBoundaryRunner(
 	view: ProtocolViewPayload,
 	state: ProtocolStatePayload,
+	streamed?: ReadonlySet<string>,
 ): boolean {
 	const runners = { ...view.asyncRunners };
 	const reachable = new Set<string>();
 	for (const boundary of view.asyncBoundaries) {
+		// The server streams this arm and the inline executor shows it; nothing needs the runtime before an interaction.
+		if (streamed?.has(boundary.id)) continue;
 		for (const read of boundary.asyncReads) {
 			reachable.add(read.graphNodeId);
 			if (read.runnerSymbolId) runners[read.graphNodeId] ??= read.runnerSymbolId;
