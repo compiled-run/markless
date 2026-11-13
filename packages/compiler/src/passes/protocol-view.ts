@@ -26,6 +26,7 @@ import {
 	payloadRecordHosts,
 	resolveRowChunkMint,
 	resolveRowComponentMint,
+	rowComponentReadsIndex,
 	stepsAfterNestedRows,
 	type RowComponentMint,
 } from './row-mint.ts';
@@ -568,7 +569,15 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 				...(render.rowEndOffset !== undefined ? { rowEndOffset: render.rowEndOffset } : {}),
 				...(render.rowRange ? { rowRange: true as const } : {}),
 				...built,
-				...(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName))
+				...(indexName &&
+				(rowEvents.some((event) => handlersRead(input, event.symbolIds, indexName)) ||
+					('rowComponent' in built &&
+						built.rowComponent &&
+						rowComponentReadsIndex(
+							input.semanticGraph?.componentEdges ?? [],
+							built.rowComponent,
+							indexName,
+						)))
 					? { indexName }
 					: {}),
 				rowEvents,

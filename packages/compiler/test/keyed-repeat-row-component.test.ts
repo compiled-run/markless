@@ -836,3 +836,24 @@ export function Row({ item }) @{
 	expect(view.keyedRepeats?.[0]?.rowComponent?.componentName).toBe('App');
 	expect(view.keyedRepeats?.[0]?.rowRange).toBe(true);
 });
+
+const indexedRow = (prop: string) => `import { state } from '@markless/core';
+function Line({ label, at }) @{
+	<li>{at}. {label}</li>
+}
+export function App() @{
+	let rows = state(['a']);
+	<ul>@for (const row of rows; index n; key row) { <Line label={row} at={${prop}} /> }</ul>
+}
+`;
+
+test('a component row whose props read the loop index names the index, so a shifted row is built again', async () => {
+	expect((await viewOf(indexedRow('n + 1'))).keyedRepeats?.[0]?.indexName).toBe('n');
+	expect((await viewOf(indexedRow('n'))).keyedRepeats?.[0]?.indexName).toBe('n');
+});
+
+test('a component row whose props do not read the loop index names no index', async () => {
+	const repeat = (await viewOf(indexedRow('row.length'))).keyedRepeats?.[0];
+	expect(repeat?.rowComponent).toBeDefined();
+	expect(repeat).not.toHaveProperty('indexName');
+});
