@@ -178,11 +178,14 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
 	if (isHostElement && hostNodeId) collectAuthoredAriaMarks(node, tagName, hostNodeId, state);
+	const formSpan = tagName === 'form' ? sourceSpan(node, state.filename) : undefined;
 	if (tagName === 'form' && hostNodeId && formMayPost(node))
 		state.postForms.push({
 			hostNodeId,
 			...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+			...(formSpan ? { sourceSpan: formSpan } : {}),
+			...(formLeavesByDesign(node) ? { leavesByDesign: true as const } : {}),
 		});
 	const moduleScopeClass = state.currentStyleScopeClass;
 	if (tagName && !takesStyleScopeClass(tagName)) state.currentStyleScopeClass = null;
@@ -1709,6 +1712,22 @@ function formMayPost(node: AnyNode): boolean {
 				: literal !== undefined && literal !== null;
 	}
 	return posts;
+}
+
+// The form's own attributes send it elsewhere: a target, rel="external", or an action on another site.
+function formLeavesByDesign(node: AnyNode): boolean {
+	for (const attribute of getElementAttributes(node)) {
+		if (isSpreadAttribute(attribute)) continue;
+		const name = getIdentifierName(attribute.name as AnyNode | undefined);
+		if (name === 'target') return true;
+		if (name !== 'rel' && name !== 'action') continue;
+		const value = attribute.value as AnyNode | undefined;
+		const literal = value?.type === 'Literal' ? value : unwrapExpressionContainer(value);
+		if (literal?.type !== 'Literal' || typeof literal.value !== 'string') continue;
+		if (name === 'rel' && literal.value.split(/\s+/).includes('external')) return true;
+		if (name === 'action' && (URL.canParse(literal.value) || literal.value.startsWith('//'))) return true;
+	}
+	return false;
 }
 
 // Only a control whose written attributes make it submit its enclosing form: a static submit type, no form= and no spread.

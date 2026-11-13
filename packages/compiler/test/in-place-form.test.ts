@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { compileTsrxModule } from '../src/index.ts';
+import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
 import { buildSemanticGraphSync } from '../src/passes/semantic-graph/index.ts';
 
 // A plain form that may post, inside a @try with a @catch and with no submit handler, is one the runtime sends in place.
@@ -192,4 +192,66 @@ export default function Shelf() @{
 	expect(inPlace(plain)).toHaveLength(1);
 	expect(inPlace(plain.replace('export default', 'const loose = <RowForm />;\nexport default'))).toEqual([]);
 	expect(inPlace(plain.replace('export default', 'function loose() { return <RowForm />; }\nexport default'))).toEqual([]);
+});
+
+const leavesPage = (source: string) =>
+	buildSemanticGraphSync({ filename: 'shelf.tsrx', source }).diagnostics.filter(
+		(diagnostic) => diagnostic.code === 'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+	);
+
+test('a form left to the browser though it renders in a @try with a @catch warns, naming why: exported', () => {
+	const [warning, ...rest] = leavesPage(rowsPage(rowForm, '', 'export '));
+	expect(rest).toEqual([]);
+	expect(warning).toMatchObject({ severity: 'warning', primarySpan: expect.objectContaining({ start: expect.any(Number) }) });
+	expect(warning!.message).toBe(
+		'This form posts and has no submit handler, so the browser sends it and leaves the page to show the answer, even though it renders inside a @try with a @catch: <RowForm> is exported, so another file could render it where no @catch shows a failed send.',
+	);
+	expect(warning!.suggestions[0]!.message).toContain('Stop exporting <RowForm> and use it only in this file');
+});
+
+test('the warning reaches the build’s diagnostics as a warning', async () => {
+	const compiled = await compile(rowsPage(rowForm, '', 'export '));
+	expect(
+		collectTsrxModuleDiagnostics(compiled)
+			.filter((diagnostic) => diagnostic.code === 'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE')
+			.map((diagnostic) => diagnostic.severity),
+	).toEqual(['warning']);
+});
+
+test('the same, used as a value', () => {
+	const [warning, ...rest] = leavesPage(rowsPage(rowForm, 'const Alias = RowForm;'));
+	expect(rest).toEqual([]);
+	expect(warning!.message).toContain('<RowForm> is also used as a value, not only as a tag');
+	expect(warning!.suggestions[0]!.message).toContain('Use <RowForm> only as a tag');
+});
+
+test('the same, also rendered outside the @try, naming where', () => {
+	const [warning, ...rest] = leavesPage(`import { computed } from '@markless/core';
+function RowForm({ id }: { id: string }) @{
+	${rowForm}
+}
+export default function Shelf() @{
+	const todos = computed(async () => [{ id: 'a' }]);
+	<main>
+		<RowForm id="bare" />
+		@try {
+			<ul>@for (const todo of todos; key todo.id) { <li><RowForm id={todo.id} /></li> }</ul>
+		} @pending { <p>Loading</p> } @catch (error) { <p>{error.message}</p> }
+	</main>
+}
+`);
+	expect(rest).toEqual([]);
+	expect(warning!.message).toContain('<RowForm> is also rendered in <Shelf>, where this file cannot show a @try with a @catch around it');
+	expect(warning!.suggestions[0]!.message).toContain('Render <RowForm> only inside a @try with a @catch');
+});
+
+test('no warning for a form sent in place, one outside any @try, or one that asks for the browser', async () => {
+	expect(leavesPage(rowsPage(rowForm, ''))).toEqual([]);
+	expect(leavesPage(page(`<form method="post" action="/api/todos">${fields}</form>`))).toEqual([]);
+	expect(leavesPage(page('', (inside) => `<main><form method="post" action="/api/todos">${fields}</form>${inside}</main>`))).toEqual([]);
+	for (const attribute of ['rel="external"', 'target="_blank"', 'action="https://pay.example/checkout"'])
+		expect(
+			leavesPage(rowsPage(`<form method="post" ${attribute}><button>Pay</button></form>`, '', 'export ')),
+		).toEqual([]);
+	expect(leavesPage(rowsPage(`<form method="post" action="/api/todos" onSubmit={() => {}}><button>Go</button></form>`, '', 'export '))).toEqual([]);
 });

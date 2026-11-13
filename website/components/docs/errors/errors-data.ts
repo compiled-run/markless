@@ -1440,6 +1440,45 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+		title: 'This form leaves the page when it is sent',
+		area: 'async',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'warning',
+		description: 'This form leaves the page when it is sent: a Markless build warning.',
+		printed: [
+			'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE: This form posts and has no submit handler, so the browser sends it and leaves the page to show the answer, even though it renders inside a @try with a @catch: <reason>.',
+			'Markless sends a form from the page only when every place its component renders has a @catch to show a failed send. Each file is compiled on its own, so all of those places must be visible in this file.',
+			'<fix>, or write the form in the component that holds the @try. To keep the browser\'s own submit, add rel="external" to the form.',
+			'https://markless.dev/errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+		],
+		structured: true,
+		why: 'Markless sends a form from the page only when every place its component renders has a @catch to show a failed send. Each file is compiled on its own, so all of those places must be visible in this file.',
+		suggestion:
+			'<fix>, or write the form in the component that holds the @try. To keep the browser\'s own submit, add rel="external" to the form.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ASYNC_SETTLE_RECORDS_MISSING',
 		title: 'A settled @try has no records',
 		area: 'internal',

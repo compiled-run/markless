@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 314,
+	total: 315,
 	guided: 51,
 	groups: [
 		{
@@ -922,6 +922,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'this computed value cannot be worked out on the server markless_server_derive_unreachable this computed value cannot be worked out on the server: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+					title: 'This form leaves the page when it is sent',
+					chip: 'warning',
+					kind: 'compile warning',
+					guided: false,
+					words: 'this form leaves the page when it is sent markless_async_post_form_leaves_page this form leaves the page when it is sent: a markless build warning.',
 				},
 			],
 		},

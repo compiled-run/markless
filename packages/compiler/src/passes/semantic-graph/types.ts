@@ -122,6 +122,9 @@ export type PostFormCandidate = {
 	readonly hostNodeId: string;
 	readonly catchBoundaryId?: string;
 	readonly componentName?: string;
+	readonly sourceSpan?: SourceSpan;
+	/** A `target`, `rel="external"` or another site's `action` asks for the browser's own submit. */
+	readonly leavesByDesign?: true;
 };
 
 export type WalkState = {
