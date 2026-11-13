@@ -3,15 +3,18 @@ import { flip, loadBoard, type Flag } from './server.ts';
 
 function FlagRow({ flag }: { flag: Flag }) @{
 	let saving = state(false);
+	let failed = state(false);
 	const on = computed(() => ((saving ? !flag.on : flag.on) ? 'on' : 'off'));
 	const look = computed(() => (saving ? 'yes' : 'no'));
-	<li data-flag={flag.id} data-on={on} data-pending={look}>
+	<li data-flag={flag.id} data-on={on} data-pending={look} data-failed={failed ? 'yes' : 'no'}>
 		<button
 			data-flip={flag.id}
 			onClick={async () => {
 				saving = true;
 				try {
 					await flip(flag.id);
+				} catch {
+					failed = true;
 				} finally {
 					saving = false;
 				}
