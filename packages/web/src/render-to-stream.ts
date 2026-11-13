@@ -145,8 +145,11 @@ export async function renderToStream(
 		]);
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
-	const shell = await assembleSsrContainer(component, output, options);
 	const pendingArms = pendingStreamArms(output, renderContext);
+	const shell = await assembleSsrContainer(component, output, {
+		...options,
+		streamedBoundaryIds: new Set(pendingArms.map((arm) => arm.boundaryId)),
+	});
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	return {
 		shell,
@@ -716,6 +719,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
 					throw ((r.__mResume = undefined), error);
 				}));
+				// A navigation that kept the container started another page while the module loaded.
+				if (r.__mL !== life) return;
 				await mod.resumeContainerEvent(input);
 			};
 			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
