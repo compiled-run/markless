@@ -810,6 +810,8 @@ export function createEventWiring(input: {
 							invokeSymbol,
 						}),
 					);
+					// The hold covers the callee's synchronous run; its writes after an await land when they happen.
+					releaseFlush?.();
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
 						const start = (module: SubmitHoldModule) =>
