@@ -48,8 +48,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 704,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93088 -> 93792 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 93088 B; executed chars at load unchanged",
+			"delta": 755,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93308 -> 94063 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 93308 B; executed chars at load unchanged",
 			"date": "2026-11-13"
 		},
 		{
@@ -60,8 +60,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 704,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93088 -> 93792 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 93088 B; executed chars at load unchanged",
+			"delta": 755,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93308 -> 94063 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 93308 B; executed chars at load unchanged",
 			"date": "2026-11-13"
 		},
 		{
@@ -72,8 +72,8 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 704,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93088 -> 93792 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 93088 B; executed chars at load unchanged",
+			"delta": 755,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 93308 -> 94063 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 93308 B; executed chars at load unchanged",
 			"date": "2026-11-13"
 		},
 		{
@@ -84,8 +84,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 929,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 1693802 -> 1694731 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 1693802 B; executed chars at load unchanged; not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
+			"delta": 996,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 1695903 -> 1696899 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 1695903 B; executed chars at load unchanged; not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
 			"date": "2026-11-13"
 		},
 		{
@@ -96,8 +96,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 898,
-			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 2237520 -> 2238418 B gzip downloaded at load, measured on PR #663 CI run 43375186368 (head 978c4cb2f, linux-x64) against the main anchor 2237520 B; executed chars at load unchanged; not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
+			"delta": 962,
+			"reason": "overlapping saves hold: each sender keeps its own round until its own reload lands, and a held state is written for code at once while only painting reads its earlier value: 2240088 -> 2241050 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 2240088 B; executed chars at load unchanged; not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
 			"date": "2026-11-13"
 		},
 		{
@@ -108,8 +108,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 451,
-			"reason": "overlapping saves hold: 499018 -> 499469 B gzip downloaded at load, measured on PR #663 CI run 43445571063 (head 1a507dd8c, linux-x64) against the main anchor 499018 B; executed chars at load unchanged (24664); not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
+			"delta": 512,
+			"reason": "overlapping saves hold: 499018 -> 499530 B gzip downloaded at load, measured on merge-queue CI run 43453172526 (this branch on main 176d2daa7, linux-x64) against the main anchor 499018 B; executed chars at load unchanged (24664); not split between runtime code and the async.mdx text this branch also changes (the docs search chunk loads that page text on every docs page), and this page grows less than the bench pages (+704 B) for a reason not measured per file",
 			"date": "2026-11-13"
 		},
 		{
