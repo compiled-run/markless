@@ -9,7 +9,6 @@ import type {
 // The tip is placed by CSS anchoring alone: the trigger declares the anchor, the
 // tip points at it, and the geometry is the consumer's stylesheet. Nothing here
 // measures a box, so a tip served already showing is placed on its first layout.
-// Each part's <style> block reaches only that part's own elements, never another part's.
 
 export const tooltipState = shared(
 	() => {

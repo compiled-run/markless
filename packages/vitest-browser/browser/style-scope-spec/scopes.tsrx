@@ -29,6 +29,7 @@ export function Scopes() @{
 		</section>
 		<Plain />
 		<Styled />
+		<Bare />
 		<OtherFile />
 	</main>
 }
@@ -43,5 +44,12 @@ function Styled() @{
 			.own { background-color: rgb(1, 2, 3); }
 		</style>
 		<p class="styled own" data-styled>styled</p>
+	</>
+}
+
+function Bare() @{
+	<>
+		<style />
+		<p class="bare" data-bare>bare</p>
 	</>
 }

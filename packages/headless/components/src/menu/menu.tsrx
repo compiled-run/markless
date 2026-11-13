@@ -40,7 +40,6 @@ const KEYBOARD_GRACE = 300;
 /** How long a press that closed the surface keeps the click behind it from re-opening, in milliseconds. */
 const CLICK_GRACE = 300;
 
-// Each part's <style> block reaches only that part's own elements, never another part's.
 // `@layer markless` is what keeps these defaults losing to a
 // consumer's own unlayered rules without a specificity fight.
 

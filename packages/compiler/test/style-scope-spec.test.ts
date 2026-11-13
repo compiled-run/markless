@@ -208,6 +208,29 @@ export function App() @{
 		expect(sheet!.rules.flatMap((rule) => rule.classes)).not.toContain('unused');
 	});
 
+	test('a component whose only block is self-closing adds no stylesheet and no hash class', async () => {
+		const result = await compile(`
+export function App() @{
+	<>
+		<style>.page { color: red; }</style>
+		<p class="page">page</p>
+		<Bare />
+	</>
+}
+
+function Bare() @{
+	<>
+		<style />
+		<p class="bare">bare</p>
+	</>
+}
+`);
+		expect(result.publicRenderPlan.diagnostics).toEqual([]);
+		const sheets = result.publicRenderPlan.styleScopes.map((scope) => readSheet(scope.scopeId, scope.cssText));
+		expect(sheets).toHaveLength(1);
+		expect(sheets[0]!.rules.flatMap((rule) => rule.classes)).toEqual(['page', sheets[0]!.scopeId]);
+	});
+
 	test.fails('a scope whose blocks are all self-closing has no hash class of its own', async () => {
 		const result = await compile(`
 const base = <style>.b { color: red; }</style>;

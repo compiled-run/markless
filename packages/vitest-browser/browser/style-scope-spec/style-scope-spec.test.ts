@@ -85,6 +85,11 @@ for (const [mode, mount] of scopes) {
 		expect(getComputedStyle(styled).color).not.toBe('rgb(10, 20, 33)');
 	});
 
+	test(`${mode}: a component whose only block is self-closing gets no hash class`, async () => {
+		const { container } = await mount();
+		expect(hashClasses(element(container, 'bare'), ['bare'])).toEqual([]);
+	});
+
 	test(`${mode}: a component from another file gets none of the importer's rules`, async () => {
 		const { container } = await mount();
 		const other = element(container, 'other');

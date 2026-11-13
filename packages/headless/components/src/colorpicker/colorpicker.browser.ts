@@ -702,6 +702,22 @@ test('CSR: the popup surface is anchored to its trigger by CSS alone', async () 
 	expect(window.getComputedStyle(el(Content)).position).toBe('absolute');
 });
 
+// Only the surface leaves the flow: the root keeps its line, so what follows the picker sits below the trigger.
+test('CSR: in popup mode the root stays in the page flow and the surface opens against the trigger', async () => {
+	const screen = await render(Popup);
+	const after = document.createElement('p');
+	after.textContent = 'after the picker';
+	(screen.container as HTMLElement).append(after);
+	expect(window.getComputedStyle(el(Root)).position).toBe('static');
+
+	await userEvent.click(Trigger);
+	await expect.poll(() => el(Content).hasAttribute('hidden')).toBe(false);
+	const trigger = el(Trigger).getBoundingClientRect();
+	const content = el(Content).getBoundingClientRect();
+	expect(Math.round(content.top)).toBe(Math.round(trigger.bottom));
+	expect(after.getBoundingClientRect().top).toBeGreaterThanOrEqual(trigger.bottom);
+});
+
 // An inline picker names no anchor and is placed by the page, which is the whole
 // difference between the two shapes in CSS.
 test('CSR: an inline surface is not anchored and stays in flow', async () => {

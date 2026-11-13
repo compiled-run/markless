@@ -8,7 +8,6 @@ import type {
 
 // The card is placed by CSS anchoring alone: the trigger declares the anchor, the
 // card points at it, and the geometry is the consumer's stylesheet.
-// Each part's <style> block reaches only that part's own elements, never another part's.
 // Nothing here writes `aria-describedby` or `role="tooltip"`: a card holding links
 // and buttons flattened into a description is one unreachable run-on string.
 

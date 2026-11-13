@@ -49,7 +49,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 	const homepage = pathname === '/';
 
 	<div class="nav-shade">
-		<navbar.root class="nav-pill navbar-edge" aria-label="Main">
+		<navbar.root class="nav-pill navbar-edge surface-grain" aria-label="Main">
 			<div class="nav-tools">
 				<navbar.itemlink prefetch={false} class="brand-link" href="/" current={homepage} aria-label="Markless home">
 					<Brand />
@@ -63,7 +63,7 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 					<NavDropdown panel={panel} pathname={pathname} />
 				}
 			</div>
-			<div class="nav-box" aria-hidden="true">
+			<div class="nav-box surface-grain" aria-hidden="true">
 				<InkEdge name="panel" />
 			</div>
 			<div class="nav-tools">
@@ -73,39 +73,6 @@ function DesktopNav({ pathname }: { readonly pathname: string }) @{
 		</navbar.root>
 
 		<style>
-			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				z-index: 1;
-				border-radius: inherit;
-				pointer-events: none;
-			}
-
-			.nav-pill::before,
-			.nav-pill::after {
-				inset: -2px;
-			}
-
-			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
-			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
-				visibility: hidden;
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
-				background-image: var(--grain-fiber);
-				mix-blend-mode: var(--grain-fiber-blend);
-				opacity: var(--grain-fiber-opacity);
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				background-image: var(--grain-speck);
-				mix-blend-mode: var(--grain-speck-blend);
-				opacity: var(--grain-speck-opacity);
-			}
-
 			.nav-shade {
 				display: none;
 			}
@@ -377,7 +344,7 @@ function NavDropdown({ panel, pathname }: { readonly panel: NavPanel; readonly p
 }
 
 function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly pathname: string }) @{
-	<navbar.itemlink class={'card card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
+	<navbar.itemlink class={'card surface-grain card-' + card.size} href={card.href} current={isCurrent(pathname, card.href)}>
 		<CardArt card={card} class="card-art" />
 		<span class="card-scrim" aria-hidden="true"></span>
 		<span class="card-text">
@@ -392,29 +359,6 @@ function NavCardLink({ card, pathname }: { readonly card: NavCard; readonly path
 		<InkEdge name={card.size === 'tall' ? 'tall' : 'card'} />
 
 		<style>
-			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				z-index: 1;
-				border-radius: inherit;
-				pointer-events: none;
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
-				background-image: var(--grain-fiber);
-				mix-blend-mode: var(--grain-fiber-blend);
-				opacity: var(--grain-fiber-opacity);
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				background-image: var(--grain-speck);
-				mix-blend-mode: var(--grain-speck-blend);
-				opacity: var(--grain-speck-opacity);
-			}
-
 			@media (prefers-reduced-motion: no-preference) {
 				.nav-panel > .card {
 					transition: translate var(--spring-slide-ms) var(--spring-slide);
@@ -614,58 +558,6 @@ function SearchButton() @{
 				}
 			}
 
-			/* The wash spreads after the ink lands, like paint soaking into the paper. */
-			.theme-toggle-wash {
-				fill: var(--yellow);
-				opacity: 0.75;
-				mix-blend-mode: multiply;
-				transform-origin: center;
-				transform-box: fill-box;
-
-				html[data-theme-switching] & {
-					transition:
-						scale 520ms 160ms ease-out,
-						opacity 520ms 160ms ease-out;
-
-					@starting-style {
-						scale: 0.3;
-						opacity: 0;
-					}
-				}
-
-				html.dark & {
-					fill: color-mix(in srgb, var(--yellow) 60%, var(--cream));
-					opacity: 1;
-					mix-blend-mode: normal;
-				}
-			}
-
-			.theme-toggle-hatch {
-				fill: none;
-				stroke: currentColor;
-				stroke-width: 0.6;
-				stroke-linecap: round;
-				opacity: 0.75;
-			}
-
-			.theme-toggle-ink {
-				fill: currentColor;
-			}
-
-			.theme-toggle-over-wash {
-				display: none;
-
-				html.dark & {
-					display: inline;
-					color: var(--on-accent);
-				}
-			}
-
-			@media (prefers-reduced-motion: reduce) {
-				html[data-theme-switching] .theme-toggle-wash {
-					transition: none;
-				}
-			}
 		</style>
 	</navbar.trigger>
 }
@@ -725,7 +617,7 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 				menu.open = next;
 			}}
 		>
-			<div class="mobile-bar navbar-edge">
+			<div class="mobile-bar navbar-edge surface-grain">
 				<button
 					type="button"
 					class="bar-button sidebar-button"
@@ -822,34 +714,6 @@ function MobileMenu({ pathname }: { readonly pathname: string }) @{
 		</modal.root>
 
 		<style>
-			/* The page grain is drawn on the scrolling document, so each fixed surface sits above it with the same grain pinned to itself. */
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before,
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				content: '';
-				position: absolute;
-				inset: 0;
-				z-index: 1;
-				border-radius: inherit;
-				pointer-events: none;
-			}
-
-			/* A code block expanded without the Fullscreen API covers the page below the grain, so the bars above it step aside. */
-			html:has([data-expanded]) :is(.nav-pill, .mobile-bar) {
-				visibility: hidden;
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::before {
-				background-image: var(--grain-fiber);
-				mix-blend-mode: var(--grain-fiber-blend);
-				opacity: var(--grain-fiber-opacity);
-			}
-
-			:is(.nav-pill, .nav-box, .card, .mobile-menu > .mobile-bar)::after {
-				background-image: var(--grain-speck);
-				mix-blend-mode: var(--grain-speck-blend);
-				opacity: var(--grain-speck-opacity);
-			}
-
 			.mobile-nav {
 				display: block;
 			}
@@ -1238,58 +1102,6 @@ function ThemeDrawing({ to }: { readonly to: 'dark' | 'light' }) @{
 				}
 			}
 
-			/* The wash spreads after the ink lands, like paint soaking into the paper. */
-			.theme-toggle-wash {
-				fill: var(--yellow);
-				opacity: 0.75;
-				mix-blend-mode: multiply;
-				transform-origin: center;
-				transform-box: fill-box;
-
-				html[data-theme-switching] & {
-					transition:
-						scale 520ms 160ms ease-out,
-						opacity 520ms 160ms ease-out;
-
-					@starting-style {
-						scale: 0.3;
-						opacity: 0;
-					}
-				}
-
-				html.dark & {
-					fill: color-mix(in srgb, var(--yellow) 60%, var(--cream));
-					opacity: 1;
-					mix-blend-mode: normal;
-				}
-			}
-
-			.theme-toggle-hatch {
-				fill: none;
-				stroke: currentColor;
-				stroke-width: 0.6;
-				stroke-linecap: round;
-				opacity: 0.75;
-			}
-
-			.theme-toggle-ink {
-				fill: currentColor;
-			}
-
-			.theme-toggle-over-wash {
-				display: none;
-
-				html.dark & {
-					display: inline;
-					color: var(--on-accent);
-				}
-			}
-
-			@media (prefers-reduced-motion: reduce) {
-				html[data-theme-switching] .theme-toggle-wash {
-					transition: none;
-				}
-			}
 		</style>
 	</svg>
 }

@@ -13,7 +13,6 @@ import type {
 // the surface points at it, and the geometry beyond one default `position-area`
 // is the consumer's stylesheet. Nothing here measures a box, so a surface served
 // already showing is placed on its first layout.
-// Each part's <style> block reaches only that part's own elements, never another part's.
 // `@layer markless` is what keeps these defaults losing to a consumer's own
 // unlayered rules without a specificity fight.
 
