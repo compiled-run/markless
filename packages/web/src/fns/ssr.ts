@@ -1689,82 +1689,8 @@ export function marklessSsrAppendChildView(context: {
 			handleId: marklessWidgetHandleId(handle.handleId as string, childInstancePath),
 		});
 	for (const branch of childView.branches ?? []) {
-		const liveTestReads = (branch.testReads ?? []).filter(
-			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
-		);
-		const armRecords = branch.armRecords?.map((arm) =>
-			marklessSsrPrefixArmRecord(arm, context.child),
-		);
-		// An arm that renders text with no element of its own has no dom update to
-		// carry; its content read refreshes the arm range through the branch
-		// symbol, so it needs the same prop routing every other read gets.
-		const liveContentReads = (branch.contentReads ?? []).filter(
-			(read) => !marklessCsrChildReadIsStatic(read, context.child.graphProps),
-		);
-		// A branch decided only by an explicitly constant/absent prop has no live
-		// parent route to re-decide it, but the arm it painted still owns records
-		// that have to follow their values; it stays as a decide-less record.
-		const decided = liveTestReads.length === 0;
-		const {
-			symbolId: childSymbolId,
-			contentReads: _unmappedContentReads,
-			composedInstancePath: _unroutedInstancePath,
-			composedGraphProps: _unroutedGraphProps,
-			...unwired
-		} = branch;
-		// Only the branch symbol can rebuild an arm, so a content read without one
-		// has nothing to drive and never justifies keeping the record.
-		const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
-		// An IDREF outside the arms is answered from the record, so a branch that
-		// carries one is kept even when a constant decided its arm: the attribute is
-		// gained at resume, and dropping the record is what leaves it null.
-		const namesIdrefs = Boolean(branch.idrefSites?.length);
-		if (
-			decided &&
-			!contentDriven &&
-			!namesIdrefs &&
-			!marklessSsrArmRecordSetIsLive(branch.servedArmRecords) &&
-			!marklessSsrDecidedArmIsLive(branch, armRecords)
-		)
-			continue;
-		const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
-		const mappedBranch = {
-			...unwired,
-			id: context.child.hostPrefix + branch.id,
-			testReads: decided
-				? []
-				: marklessSsrRemapChildReads(
-						liveTestReads,
-						context.child.graphProps,
-						context.child.hostPrefix + branch.id,
-						childInstancePath,
-					),
-			...(keepSymbol && liveContentReads.length > 0
-				? {
-						contentReads: marklessSsrRemapChildReads(
-							liveContentReads,
-							context.child.graphProps,
-							context.child.hostPrefix + branch.id,
-							childInstancePath,
-						),
-					}
-				: {}),
-			...(keepSymbol
-				? { symbolId: marklessBoundSymbolId(context.child, childSymbolId!) }
-				: {}),
-			...(armRecords ? { armRecords } : {}),
-			...(keepSymbol && marklessSsrComposedRoutes(branch, context.child, childInstancePath)),
-			// The arm this child already served keeps its arm-relative
-			// coordinates; only ids and symbols take the child's prefixes.
-			...(branch.servedArmRecords
-				? {
-						servedArmRecords: marklessSsrPrefixBoundaryArmRecords(
-							branch.servedArmRecords,
-							context.child,
-						),
-					}
-				: {}),
-		};
+		const mappedBranch = marklessSsrLiftBranch(branch, context.child, childInstancePath);
+		if (!mappedBranch) continue;
 		if (context.child.asyncBoundaryId) {
 			const arms =
 				context.boundaryArmBranches.get(context.child.asyncBoundaryId) ??
@@ -1819,10 +1745,75 @@ export function marklessSsrAppendChildView(context: {
 				: {}),
 		});
 }
+// One branch record lifted one composition level, for the page's own branches and a boundary arm's alike.
+function marklessSsrLiftBranch(
+	branch: SsrBranchRecord,
+	child: SsrPrefixChild,
+	instancePath: string,
+): SsrBranchRecord | undefined {
+	const liveTestReads = (branch.testReads ?? []).filter(
+		(read) => !marklessCsrChildReadIsStatic(read, child.graphProps),
+	);
+	const armRecords = branch.armRecords?.map((arm) => marklessSsrPrefixArmRecord(arm, child));
+	// A fragment arm has no element to update; its content read refreshes the arm through the branch symbol.
+	const liveContentReads = (branch.contentReads ?? []).filter(
+		(read) => !marklessCsrChildReadIsStatic(read, child.graphProps),
+	);
+	// Decided by constant props alone, it is kept only while its painted arm has records to follow.
+	const decided = liveTestReads.length === 0;
+	const {
+		symbolId: childSymbolId,
+		contentReads: _unmappedContentReads,
+		composedInstancePath: _unroutedInstancePath,
+		composedGraphProps: _unroutedGraphProps,
+		servedArmRecords,
+		...unwired
+	} = branch;
+	const contentDriven = liveContentReads.length > 0 && Boolean(childSymbolId);
+	// An IDREF outside the arms is answered from the record, so a branch that names one stays.
+	const namesIdrefs = Boolean(branch.idrefSites?.length);
+	if (
+		decided &&
+		!contentDriven &&
+		!namesIdrefs &&
+		!marklessSsrArmRecordSetIsLive(servedArmRecords) &&
+		!marklessSsrDecidedArmIsLive(branch, armRecords)
+	)
+		return undefined;
+	const keepSymbol = Boolean(childSymbolId) && (!decided || contentDriven);
+	const id = child.hostPrefix + branch.id;
+	return {
+		...unwired,
+		id,
+		testReads: decided
+			? []
+			: marklessSsrRemapChildReads(liveTestReads, child.graphProps, id, instancePath),
+		...(keepSymbol && liveContentReads.length > 0
+			? {
+					contentReads: marklessSsrRemapChildReads(
+						liveContentReads,
+						child.graphProps,
+						id,
+						instancePath,
+					),
+				}
+			: {}),
+		...(keepSymbol ? { symbolId: marklessBoundSymbolId(child, childSymbolId!) } : {}),
+		...(armRecords ? { armRecords } : {}),
+		...(keepSymbol && marklessSsrComposedRoutes(branch, child, instancePath)),
+		// The served arm keeps its arm-relative coordinates; only ids and symbols take the prefixes.
+		...(servedArmRecords && {
+			servedArmRecords: marklessSsrPrefixBoundaryArmRecords(servedArmRecords, child),
+		}),
+	};
+}
 // A child boundary's armized record set keeps its arm-relative coordinates
 // through composition (the anchor is located live at resume); only host ids,
 // symbol ids, and behavior graph reads need the child prefixes/remaps.
-export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child: SsrPrefixChild) {
+export function marklessSsrPrefixBoundaryArmRecords(
+	set: SsrArmRecordSet,
+	child: SsrPrefixChild,
+): SsrArmRecordSet {
 	const instancePath = marklessComposedInstancePath(child);
 	const exhaustive = {
 		locators: true,
@@ -1940,40 +1931,11 @@ export function marklessSsrPrefixBoundaryArmRecords(set: SsrArmRecordSet, child:
 					]
 				: [];
 		}),
-		// Arm-scoped branch records: anchors stay arm-local (resolved by
-		// position, not text); ids/symbols/test reads take the child prefixes.
 		...(set.branches
 			? {
-					// A branch decided only by a constant or never-passed prop has no
-					// live route to wire; it rendered its final arm with the child.
 					branches: set.branches.flatMap((branch) => {
-						const liveTestReads = (branch.testReads ?? []).filter(
-							(read) => !marklessCsrChildReadIsStatic(read, child.graphProps),
-						);
-						if ((branch.testReads ?? []).length > 0 && liveTestReads.length === 0)
-							return [];
-						return [
-							{
-								...branch,
-								id: child.hostPrefix + branch.id,
-								testReads: marklessSsrRemapChildReads(
-									liveTestReads,
-									child.graphProps,
-									child.hostPrefix + branch.id,
-									instancePath,
-								),
-								...(branch.symbolId
-									? { symbolId: marklessBoundSymbolId(child, branch.symbolId) }
-									: {}),
-								...(branch.armRecords
-									? {
-											armRecords: branch.armRecords.map((arm) =>
-												marklessSsrPrefixArmRecord(arm, child),
-											),
-										}
-									: {}),
-							},
-						];
+						const lifted = marklessSsrLiftBranch(branch, child, instancePath);
+						return lifted ? [lifted] : [];
 					}),
 				}
 			: {}),
