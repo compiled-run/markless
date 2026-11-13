@@ -86,6 +86,7 @@ export function compileInlineWakeSources(): InlineWakeSources {
 		selfWake: compileExpressionSource('markless-self-wake.js', authored.selfWake),
 		returnWake: compileExpressionSource('markless-return-wake.js', authored.returnWake),
 		storageWake: compileExpressionSource('markless-storage-wake.js', authored.storageWake),
+		streamedWake: compileExpressionSource('markless-streamed-wake.js', authored.streamedWake),
 		moduleLoader: compileExpressionSource('markless-module-loader.js', authored.moduleLoader),
 	};
 }
