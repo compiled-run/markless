@@ -19,6 +19,7 @@ type Boundaries = ReadonlyMap<string, Boundary>;
 /** A wired container: its graph, and the @try blocks whose async values it shows. */
 type Container = readonly [Graph, Boundaries];
 type Reask = () => void;
+type Release = (graphNodeId: string) => void;
 type Host = { [CONTAINER_REASK_PROPERTY]?: true | Reask };
 
 function shownIds(boundaries: Boundaries): Set<string> {
@@ -100,9 +101,30 @@ const writerRuns = new WeakSet<RuntimeAsyncComputedNode>();
 const refreshed = new Map<Container, Map<RuntimeAsyncComputedNode, number>>();
 let state: WriteState = { phase: WRITE_IDLE };
 const reloads = new Set<Reload>();
-/** A sending dispatch's open round: `done` settles its `refreshed`; `parked` paints, at its end, the writes it kept off screen. */
-type OpenRound = { readonly done: () => void; readonly parked: Array<() => void> };
+export const ROUND_SENDING = 0;
+export const ROUND_SENDING_SAVED = 1;
+// Every save the dispatch sent has answered and one succeeded; the state it set keeps its earlier look until its reload lands.
+export const ROUND_HOLDING = 2;
+export type RoundPhase = typeof ROUND_SENDING | typeof ROUND_SENDING_SAVED | typeof ROUND_HOLDING;
+/** A sending dispatch's open round: `out` saves still unanswered, `done` settles its `refreshed`, `held` the states it keeps on their earlier look. */
+type OpenRound = { phase: RoundPhase; out: number; readonly done: () => void; readonly held: Map<Graph, Set<string>> };
 const rounds = new Map<DispatchSpan, OpenRound>();
+const releases = new Map<Graph, Release>();
+
+/** Throws when a round could not move from `from` to `to`; holding means no save of its own is out. */
+export function assertRoundMove(from: RoundPhase, to: RoundPhase, out: number): void {
+	const allowed =
+		to === ROUND_HOLDING
+			? from !== ROUND_HOLDING && out === 0
+			: out > 0 && (to === ROUND_SENDING_SAVED || from === ROUND_SENDING);
+	if (!allowed) throw new Error(`Markless write refresh: no round move from ${from} to ${to} with ${out} out`);
+}
+
+function moveRound(round: OpenRound, phase: RoundPhase, out: number): void {
+	if (typeof __MARKLESS_DEV_ENABLED__ === 'undefined' || __MARKLESS_DEV_ENABLED__) assertRoundMove(round.phase, phase, out);
+	round.phase = phase;
+	round.out = out;
+}
 let reloadCount = 0;
 let recipe: RuntimeAsyncComputedNode | undefined;
 
@@ -126,35 +148,40 @@ function reloadOwed(sender: DispatchSpan): boolean {
 	return false;
 }
 
-// Ends each sender's round: the writes it kept off screen, its control's mark, and the `refreshed` a form's hold waits on.
-function roundDone(senders: Iterable<DispatchSpan>): void {
+// Ends a round: the states it held show what was written unless another open round still holds them, then its mark and `refreshed`.
+function closeRound(sender: DispatchSpan, round: OpenRound): void {
+	rounds.delete(sender);
+	for (const [graph, ids] of round.held)
+		for (const id of ids) if (![...rounds.values()].some((other) => other.held.get(graph)?.has(id))) releases.get(graph)?.(id);
+	round.done();
+	if (sender.control) holdBusy(sender.control, sender, false);
+}
+
+// Ends each holding sender's round once no reload it is owed is still to land; a page left behind ends them all.
+function roundDone(senders: Iterable<DispatchSpan>, left = false): void {
 	for (const sender of senders) {
 		const round = rounds.get(sender);
-		if (!round || reloadOwed(sender)) continue;
-		for (const paint of round.parked) paint();
-		rounds.delete(sender);
-		round.done();
-		if (sender.control) holdBusy(sender.control, sender, false);
+		if (round && (left || (round.phase === ROUND_HOLDING && !reloadOwed(sender)))) closeRound(sender, round);
 	}
 }
 
-// A later write to state an open round's sender set in its own run waits for that round; a newer dispatch's own write lifts that.
+// A write outside any dispatch's own run, to state a holding round's sender set in its own run, keeps its earlier look until that round ends.
 function holdPaint(graph: Graph) {
-	return (graphNodeId: string, path: ReadonlyArray<string>): boolean => {
+	return (graphNodeId: string): boolean => {
 		const current = currentDispatch();
 		if (current) {
 			const wrote = (current.wrote ??= new Map());
 			wrote.set(graph, (wrote.get(graph) ?? new Set()).add(graphNodeId));
-			for (const sender of rounds.keys()) if (sender !== current) sender.wrote?.get(graph)?.delete(graphNodeId);
 			return false;
 		}
+		let held = false;
 		for (const [sender, round] of rounds)
-			if (sender.wrote?.get(graph)?.has(graphNodeId) && reloadOwed(sender)) {
-				round.parked.push(() => graph.changed?.({ graphNodeId, path }));
+			if (round.phase === ROUND_HOLDING && sender.wrote?.get(graph)?.has(graphNodeId)) {
+				round.held.set(graph, (round.held.get(graph) ?? new Set()).add(graphNodeId));
 				if (state.phase === WRITE_OWED) queueMicrotask(() => refreshIfOwed(sender));
-				return true;
+				held = true;
 			}
-		return false;
+		return held;
 	};
 }
 
@@ -216,13 +243,17 @@ function refreshIfOwed(wentOn?: DispatchSpan): void {
 }
 
 // A write sent in a dispatch's own synchronous run is that dispatch's; one sent after an await is no one's the browser can name.
-function begin(open: ReadonlySet<DispatchSpan>): void {
+function begin(open: ReadonlySet<DispatchSpan>): DispatchSpan | undefined {
 	const current = currentDispatch();
 	const senders = current && open.has(current) ? [current] : [];
 	for (const span of senders) {
 		span.closed = refreshIfOwed;
-		if (!rounds.has(span)) {
-			span.refreshed = new Promise((done) => rounds.set(span, { done, parked: [] }));
+		const round = rounds.get(span);
+		if (round) moveRound(round, round.phase === ROUND_SENDING ? ROUND_SENDING : ROUND_SENDING_SAVED, round.out + 1);
+		else {
+			span.refreshed = new Promise(
+				(done) => void rounds.set(span, { phase: ROUND_SENDING, out: 1, done, held: new Map() }),
+			);
 			if (span.control) holdBusy(span.control, span, true);
 		}
 	}
@@ -234,20 +265,40 @@ function begin(open: ReadonlySet<DispatchSpan>): void {
 				held.set(node, container[0]);
 				container[0].asyncPlane?.()?.markEntry(node.graphNodeId, true);
 			}
-	if (now.phase === WRITE_IDLE) return move({ phase: WRITE_WRITING, inFlight: 1, senders: new Set(senders), held });
-	const round = { senders: new Set([...now.senders, ...senders]), held };
-	if (now.phase === WRITE_OWED) return move({ phase: WRITE_WRITING_SUCCEEDED, inFlight: 1, ...round });
-	move({ phase: now.phase, inFlight: now.inFlight + 1, ...round });
+	if (now.phase === WRITE_IDLE) move({ phase: WRITE_WRITING, inFlight: 1, senders: new Set(senders), held });
+	else {
+		const round = { senders: new Set([...now.senders, ...senders]), held };
+		if (now.phase === WRITE_OWED) move({ phase: WRITE_WRITING_SUCCEEDED, inFlight: 1, ...round });
+		else move({ phase: now.phase, inFlight: now.inFlight + 1, ...round });
+	}
+	return senders[0];
 }
 
-/** One write in flight ended; a page left behind ends the whole round at once, silently. */
-export function end(outcome: WriteOutcome): void {
+// The sender's own part: holding once all its saves answered and one succeeded, ended at once when every one failed.
+function senderEnded(sender: DispatchSpan | undefined, saved: boolean): void {
+	const round = sender && rounds.get(sender);
+	if (!round || round.phase === ROUND_HOLDING) return;
+	const out = round.out - 1;
+	const phase = saved || round.phase === ROUND_SENDING_SAVED ? ROUND_SENDING_SAVED : ROUND_SENDING;
+	if (out > 0) moveRound(round, phase, out);
+	else if (phase === ROUND_SENDING_SAVED) {
+		moveRound(round, ROUND_HOLDING, 0);
+		// No round still collecting this sender means no reload is coming for it.
+		if (state.phase === WRITE_IDLE || !state.senders.has(sender)) roundDone([sender]);
+	} else closeRound(sender, round);
+}
+
+/** One write in flight ended, sent by `sender` when one was named; a page left behind ends the whole round at once, silently. */
+export function end(outcome: WriteOutcome, sender?: DispatchSpan): void {
+	// A save whose round a page left already ended counts toward no later round.
+	if (sender && !rounds.has(sender)) return;
+	if (outcome !== 'left') senderEnded(sender, outcome === 'saved');
 	if (state.phase !== WRITE_WRITING && state.phase !== WRITE_WRITING_SUCCEEDED) return;
 	const { senders, held } = state;
 	if (outcome === 'left') {
 		move({ phase: WRITE_IDLE });
 		endHolds(held, 'left');
-		return roundDone(senders);
+		return roundDone(rounds.keys(), true);
 	}
 	const phase = outcome === 'saved' ? WRITE_WRITING_SUCCEEDED : state.phase;
 	const inFlight = state.inFlight - 1;
@@ -322,11 +373,11 @@ function patchFetch(): void {
 				warnIfResent(method, url);
 			return response;
 		}
-		begin(open);
+		const sender = begin(open);
 		const inPlace = new Headers(init?.headers ?? request?.headers).has(IN_PLACE_REQUEST_HEADER);
 		response.then(
-			(answer) => end(leavesPage(answer, inPlace) ? 'left' : answer.ok ? 'saved' : 'failed'),
-			() => end('failed'),
+			(answer) => end(leavesPage(answer, inPlace) ? 'left' : answer.ok ? 'saved' : 'failed', sender),
+			() => end('failed', sender),
 		);
 		return response;
 	};
@@ -349,9 +400,11 @@ export function registerWriteRefresh(graph: Container[0], boundaries: Container[
 	const container: Container = [graph, boundaries];
 	patchFetch();
 	containers.add(container);
-	graph.holdPaint?.(holdPaint(graph));
+	const release = graph.holdPaint?.(holdPaint(graph));
+	if (release) releases.set(graph, release);
 	return () => {
 		graph.holdPaint?.(undefined);
+		releases.delete(graph);
 		containers.delete(container);
 		refreshed.delete(container);
 		if (state.phase !== WRITE_IDLE) endHolds(state.held, 'saved', graph);

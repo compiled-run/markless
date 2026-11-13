@@ -62,13 +62,12 @@ test('SSR: one press holds its look until the reload brings the saved value', as
 	await oneSave();
 });
 
-// Not yet: a write in a save's `finally` paints at once while another press's save is still being sent, so the old value shows until the reload.
-test.fails('CSR: three quick presses never show the old look again after the last one', async () => {
+test('CSR: three quick presses never show the old look again after the last one', async () => {
 	await render(StarList);
 	await threeSaves();
 });
 
-test.fails('SSR: three quick presses never show the old look again after the last one', async () => {
+test('SSR: three quick presses never show the old look again after the last one', async () => {
 	await renderSSR(StarList);
 	await threeSaves();
 });

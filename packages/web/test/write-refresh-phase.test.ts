@@ -1,12 +1,20 @@
 import { expect, test } from 'vitest';
 import {
+	assertRoundMove,
 	assertWriteMove,
+	ROUND_HOLDING,
+	ROUND_SENDING,
+	ROUND_SENDING_SAVED,
+	registerWriteRefresh,
+	type RoundPhase,
 	WRITE_IDLE,
 	WRITE_OWED,
 	WRITE_WRITING,
 	WRITE_WRITING_SUCCEEDED,
 	type WritePhase,
 } from '../src/resume-return-reask.ts';
+import { dispatchSpans, runAsDispatchOwn, type DispatchSpan } from '../src/event-current-target.ts';
+import { IN_PLACE_LOCATION_HEADER } from '../src/fns/in-place-headers.ts';
 
 const phases = [
 	WRITE_IDLE,
@@ -35,3 +43,69 @@ for (const from of phases)
 			else expect(() => assertWriteMove(from, to)).toThrow(/no move/);
 		});
 	}
+
+const roundPhases = [ROUND_SENDING, ROUND_SENDING_SAVED, ROUND_HOLDING] as const;
+// A dispatch's own round, with how many of its saves are still out after the move.
+const roundMoves: ReadonlyArray<readonly [RoundPhase, RoundPhase, 'out' | 'none']> = [
+	[ROUND_SENDING, ROUND_SENDING, 'out'], // it sends another save, or one fails while another is out
+	[ROUND_SENDING, ROUND_SENDING_SAVED, 'out'], // one save succeeds while another is out
+	[ROUND_SENDING, ROUND_HOLDING, 'none'], // its last save succeeds
+	[ROUND_SENDING_SAVED, ROUND_SENDING_SAVED, 'out'], // more saves are sent or settle
+	[ROUND_SENDING_SAVED, ROUND_HOLDING, 'none'], // its last save settles after one succeeded
+	[ROUND_HOLDING, ROUND_SENDING_SAVED, 'out'], // a later run of the same dispatch sends a save
+];
+
+for (const from of roundPhases)
+	for (const to of roundPhases)
+		for (const out of ['out', 'none'] as const) {
+			const ok = roundMoves.some(([a, b, c]) => a === from && b === to && c === out);
+			test(`a round ${ok ? 'moves' : 'never moves'} from ${from} to ${to} with ${out === 'out' ? 'a save' : 'no save'} out`, () => {
+				const run = () => assertRoundMove(from, to, out === 'out' ? 1 : 0);
+				if (ok) expect(run).not.toThrow();
+				else expect(run).toThrow(/no round move/);
+			});
+		}
+
+// A fetch whose answers the test hands out one by one, and a control that records its aria-busy.
+function saveRig() {
+	const answers: Array<(answer: Response) => void> = [];
+	globalThis.location ??= new URL('http://write-watch.test/page') as unknown as Location;
+	globalThis.fetch = ((() => new Promise<Response>((answer) => answers.push(answer))) as unknown) as typeof fetch;
+	const control = () => {
+		const attributes = new Map<string, string>();
+		return {
+			attributes,
+			setAttribute: (name: string, value: string) => void attributes.set(name, value),
+			removeAttribute: (name: string) => void attributes.delete(name),
+		};
+	};
+	const send = (span: DispatchSpan) => {
+		dispatchSpans().add(span);
+		void runAsDispatchOwn(span, () => fetch('/save', { method: 'POST' }));
+		span.open = false;
+		dispatchSpans().delete(span);
+		span.closed?.();
+	};
+	return { answers, control, send };
+}
+const turns = async () => {
+	for (let turn = 0; turn < 10; turn++) await Promise.resolve();
+};
+
+test('a save sent after another save left the page ends its busy mark once it answers, though an older save answered first', async () => {
+	const { answers, control, send } = saveRig();
+	const release = registerWriteRefresh({}, new Map());
+	const [older, leaving, later] = [control(), control(), control()];
+	send({ open: true, control: older as unknown as Element });
+	send({ open: true, control: leaving as unknown as Element });
+	answers[1]!(new Response('{}', { headers: { [IN_PLACE_LOCATION_HEADER]: '/elsewhere' } }));
+	await turns();
+	send({ open: true, control: later as unknown as Element });
+	expect(later.attributes.get('aria-busy')).toBe('true');
+	answers[0]!(new Response('{}'));
+	await turns();
+	answers[2]!(new Response('{}'));
+	await turns();
+	expect([older.attributes.has('aria-busy'), leaving.attributes.has('aria-busy'), later.attributes.has('aria-busy')]).toEqual([false, false, false]);
+	release();
+});

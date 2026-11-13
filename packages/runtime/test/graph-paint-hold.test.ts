@@ -1,71 +1,143 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '../src/index.ts';
+import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createHeldInputsPlane } from '../src/graph-held.ts';
 
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
-function heldGraph() {
-	const painted: unknown[] = [];
+function heldGraph(computed: Parameters<typeof createRuntimeGraph>[0]['computed'] = []) {
+	const painted = new Map<string, unknown>();
 	const graph = createRuntimeGraph({
 		cells: [
 			{ graphNodeId: 'state:label', value: 'Saving' },
 			{ graphNodeId: 'state:rows', value: ['a'] },
 			{ graphNodeId: 'state:open', value: true },
+			{ graphNodeId: 'state:marks', value: { a: true } },
+			{ graphNodeId: 'state:draft', value: '' },
 		],
+		computed,
 	});
-	for (const graphNodeId of ['state:label', 'state:rows', 'state:open'])
-		graph.subscribe({
-			id: `paint:${graphNodeId}`,
-			graphNodeId,
-			run: (value) => void painted.push([graphNodeId, value]),
-		});
-	const parked: Array<[string, ReadonlyArray<string>]> = [];
-	graph.holdPaint!(
-		(graphNodeId, path) => graphNodeId !== 'state:open' && !!parked.push([graphNodeId, path]),
-	);
-	const release = () => {
-		for (const [graphNodeId, path] of parked.splice(0)) graph.changed({ graphNodeId, path });
-	};
-	return { graph, painted, parked, release };
+	const paint = (graphNodeId: string) =>
+		graph.subscribe({ id: `paint:${graphNodeId}`, graphNodeId, run: (value) => void painted.set(graphNodeId, value) });
+	for (const graphNodeId of ['state:label', 'state:rows', 'state:open', 'state:marks']) paint(graphNodeId);
+	const held = new Set(['state:label', 'state:rows', 'state:marks']);
+	let holding = true;
+	const release = graph.holdPaint!((graphNodeId) => holding && held.has(graphNodeId));
+	const stopHolding = () => (holding = false);
+	return { graph, painted, paint, release, stopHolding };
 }
 
-test('a held write is read back at once and painted only when replayed', async () => {
+test('a held write is read back at once and painted only once released', async () => {
 	const { graph, painted, release } = heldGraph();
 	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
 	await macrotask();
 	expect(graph.read('state:label')).toBe('Saved');
-	expect(painted).toEqual([]);
-	release();
+	expect(painted.get('state:label') ?? 'Saving').toBe('Saving');
+	release('state:label');
 	await macrotask();
-	expect(painted).toEqual([['state:label', 'Saved']]);
+	expect(painted.get('state:label')).toBe('Saved');
 });
 
-test('updates, collection calls and deletions are held the same way', async () => {
-	const { graph, painted, parked, release } = heldGraph();
+test('updates, collection calls and deletions are held, and never change the shown value in place', async () => {
+	const { graph, painted, release } = heldGraph();
 	graph.update({ graphNodeId: 'state:label', update: () => 'Saved' });
 	graph.call({ graphNodeId: 'state:rows', method: 'push', args: ['b'] });
-	graph.delete({ graphNodeId: 'state:rows', path: ['0'] });
+	graph.delete({ graphNodeId: 'state:marks', path: ['a'] });
 	await macrotask();
-	expect(parked.map(([graphNodeId]) => graphNodeId)).toEqual([
-		'state:label',
-		'state:rows',
-		'state:rows',
+	expect([graph.read('state:label'), graph.read('state:rows'), graph.read('state:marks')]).toEqual(['Saved', ['a', 'b'], {}]);
+	expect([painted.get('state:label') ?? 'Saving', painted.get('state:rows') ?? ['a'], painted.get('state:marks') ?? { a: true }]).toEqual([
+		'Saving',
+		['a'],
+		{ a: true },
 	]);
-	expect(painted).toEqual([]);
-	release();
+	for (const graphNodeId of ['state:label', 'state:rows', 'state:marks']) release(graphNodeId);
 	await macrotask();
-	expect(painted.map(([graphNodeId]) => graphNodeId)).toEqual(['state:label', 'state:rows']);
+	expect([painted.get('state:label'), painted.get('state:rows'), painted.get('state:marks')]).toEqual(['Saved', ['a', 'b'], {}]);
 });
 
-test('a write the hold declines paints at once, and clearing the hold paints every later write', async () => {
+test('a write the hold declines paints at once, and clearing the hold paints every held state', async () => {
 	const { graph, painted } = heldGraph();
 	graph.write({ graphNodeId: 'state:open', value: false });
-	await macrotask();
-	expect(painted).toEqual([['state:open', false]]);
-	graph.holdPaint!(undefined);
 	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
 	await macrotask();
-	expect(painted).toEqual([
-		['state:open', false],
-		['state:label', 'Saved'],
+	expect([painted.get('state:open'), painted.get('state:label') ?? 'Saving']).toEqual([false, 'Saving']);
+	graph.holdPaint!(undefined);
+	await macrotask();
+	expect(painted.get('state:label')).toBe('Saved');
+});
+
+test('a computed over a held state answers code from the written value and paints from the shown one', async () => {
+	const { graph, painted, paint, release } = heldGraph([
+		{
+			graphNodeId: 'computed:both',
+			dependencies: [{ graphNodeId: 'state:label' }, { graphNodeId: 'state:draft' }],
+			compute: (read) => `${read('state:label') as string} ${read('state:draft') as string}`,
+		},
 	]);
+	paint('computed:both');
+	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
+	await macrotask();
+	expect(graph.read('computed:both')).toBe('Saved ');
+	graph.write({ graphNodeId: 'state:draft', value: 'x' });
+	await macrotask();
+	// The other state shows at once; the held one keeps its earlier value beside it.
+	expect(painted.get('computed:both')).toBe('Saving x');
+	expect(graph.read('computed:both')).toBe('Saved x');
+	release('state:label');
+	await macrotask();
+	expect(painted.get('computed:both')).toBe('Saved x');
+});
+
+test('a write the hold declines lands on the shown value at its path, and a whole value ends the showing', async () => {
+	const { graph, painted, release, stopHolding } = heldGraph();
+	graph.delete({ graphNodeId: 'state:marks', path: ['a'] });
+	stopHolding();
+	graph.write({ graphNodeId: 'state:marks', path: ['b'], value: true });
+	await macrotask();
+	expect(painted.get('state:marks')).toEqual({ a: true, b: true });
+	expect(graph.read('state:marks')).toEqual({ b: true });
+	graph.write({ graphNodeId: 'state:marks', value: { c: true } });
+	await macrotask();
+	expect(painted.get('state:marks')).toEqual({ c: true });
+	release('state:marks');
+	await macrotask();
+	expect(painted.get('state:marks')).toEqual({ c: true });
+});
+
+test('values derived while a state is shown paint what they were derived from, until nothing is shown', async () => {
+	const { graph, painted, paint, release } = heldGraph();
+	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
+	expect(graph.showing!()).toBe(true);
+	paint('state:open');
+	graph.write({ graphNodeId: 'state:open', value: false });
+	graph.showDerived!('state:open', { value: 'shown' });
+	await macrotask();
+	expect([graph.read('state:open'), painted.get('state:open'), graph.readShown!('state:open')]).toEqual([false, 'shown', 'shown']);
+	release('state:label');
+	await macrotask();
+	expect([graph.showing!(), painted.get('state:open')]).toEqual([false, false]);
+});
+
+test('an async value first read while painting a held state loads once, with the written value', async () => {
+	const keys: unknown[] = [];
+	const graph = createRuntimeGraph({
+		async: createAsyncComputedPlane,
+		held: createHeldInputsPlane,
+		cells: [{ graphNodeId: 'state:picked', value: 'none' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:detail',
+				dependencies: [{ graphNodeId: 'state:picked', path: [] }],
+				key: (read) => read('state:picked'),
+				run: ({ key }: { key: unknown }) => (keys.push(key), Promise.resolve({ key })),
+			},
+		],
+	} as never);
+	const release = graph.holdPaint!((graphNodeId) => graphNodeId === 'state:picked');
+	graph.write({ graphNodeId: 'state:picked', value: 'b' });
+	graph.readShown!('computed:detail', ['status']);
+	await macrotask();
+	release('state:picked');
+	await macrotask();
+	expect(keys).toEqual(['b']);
 });

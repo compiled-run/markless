@@ -1,5 +1,6 @@
 import type { ProtocolStatePayload } from '@markless/serializer';
 import {
+	copyAlong,
 	deletePath,
 	dirtyPathForGraphWrite,
 	pathsIntersect,
@@ -413,8 +414,21 @@ export type RuntimeGraph = {
 	readonly holdFlush?: () => () => void;
 	/** The pass that will paint pending writes, without starting it, so a hold still applies; `undefined` when nothing is pending. */
 	readonly pendingFlush?: () => Promise<void> | undefined;
-	/** A state write `hold` answers true for keeps its value but paints only once replayed through `changed`. */
-	readonly holdPaint?: (hold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined) => void;
+	/** Whether a hold keeps any state on its earlier value. */
+	readonly showing?: () => boolean;
+	/** Whether the page paints another value of `graphNodeId` than code reads. */
+	readonly shows?: (graphNodeId: string) => boolean;
+	/** Reads as the page paints: a held state answers the value it shows. */
+	readonly readShown?: RuntimeGraphRead;
+	/** A value derived from shown states paints `shown` until it is derived again without one; no `shown` ends that. */
+	readonly showDerived?: (graphNodeId: string, shown?: { readonly value: unknown }) => void;
+	/**
+	 * A state write `hold` answers true for is read at once by code, computeds and async values, while the page keeps
+	 * painting the state's earlier value until the returned release runs for that state.
+	 */
+	readonly holdPaint?: (
+		hold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined,
+	) => (graphNodeId: string) => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
 	readonly flush: () => Promise<void>;
 	readonly takeJournal: () => DomJournalEntry[];
@@ -488,9 +502,42 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		if (cell.readInitializer) readInitializers.set(cell.graphNodeId, cell.readInitializer);
 	}
 
+	// The earlier value of each state a hold keeps on screen; the cell holds the written one.
+	const shownCells = new Map<string, unknown>();
+	// What values derived while a state is shown paint, until no state is shown.
+	const shownDerived = new Map<string, unknown>();
+	// Above zero while the flush paints, so its reads see what is shown.
+	let painting = 0;
+	let shownReaders: Set<string> | undefined;
+	// Computeds deriving from a shown state: code reads them afresh from the written values, paints from the cache.
+	const readsShown = (graphNodeId: string): boolean => {
+		if (!shownReaders) {
+			const readers = (shownReaders = new Set());
+			const visit = (id: string): void => {
+				for (const [node, , isAsync] of dependents.get(id) ?? [])
+					if (!isAsync && !readers.has(node.graphNodeId)) {
+						readers.add(node.graphNodeId);
+						visit(node.graphNodeId);
+					}
+			};
+			for (const id of shownCells.keys()) visit(id);
+		}
+		return shownReaders.has(graphNodeId);
+	};
+	const paint = <T,>(run: () => T): T => {
+		painting++;
+		try {
+			return run();
+		} finally {
+			painting--;
+		}
+	};
+
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
+			if (shownCells.size > 0 && !painting && readsShown(graphNodeId))
+				return readPath(computed.compute(readGraph), path);
 			return readComputedNode(
 				computed,
 				readGraph,
@@ -501,7 +548,16 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		}
 
 		const asyncComputed = asyncPlane?.nodes.get(graphNodeId);
-		if (asyncComputed) return asyncPlane!.read(asyncComputed, path);
+		if (asyncComputed) {
+			// A run this read starts asks with what code holds, not what is still painted.
+			const was = painting;
+			painting = 0;
+			try {
+				return asyncPlane!.read(asyncComputed, path);
+			} finally {
+				painting = was;
+			}
+		}
 
 		const initialize = readInitializers.get(graphNodeId);
 		if (initialize) {
@@ -509,10 +565,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const current = cells.get(graphNodeId);
 			try {
 				const value = initialize();
-				if (!Object.is(current, value)) commitCell(graphNodeId, [], value, markDirtyPath);
+				if (!Object.is(current, value)) commitCell(graphNodeId, [], value, false);
 			} catch {}
 		}
 
+		if (painting && shownCells.has(graphNodeId)) return readPath(shownCells.get(graphNodeId), path);
+		if (painting && shownDerived.has(graphNodeId)) return readPath(shownDerived.get(graphNodeId), path);
 		return readPath(cells.get(graphNodeId), path);
 	};
 
@@ -535,14 +593,51 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	};
 
 	let paintHold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined;
-	const markWritten = (graphNodeId: string, path: ReadonlyArray<string>): void => {
-		if (!paintHold || computedNodes.has(graphNodeId) || !paintHold(graphNodeId, path)) markDirtyPath(graphNodeId, path);
+	// Whether this write's paint is held; the first held write keeps the state's earlier value as shown.
+	const holdsPaint = (graphNodeId: string, path: ReadonlyArray<string>): boolean => {
+		if (!paintHold || computedNodes.has(graphNodeId) || !paintHold(graphNodeId, path)) return false;
+		if (!shownCells.has(graphNodeId)) {
+			shownCells.set(graphNodeId, cells.get(graphNodeId));
+			shownReaders = undefined;
+		}
+		return true;
+	};
+	// While a state is shown, writes go through copies, so the shown value never changes under them.
+	const ownCopy = (graphNodeId: string, path: ReadonlyArray<string>, leaf?: boolean): void => {
+		if (shownCells.has(graphNodeId)) cells.set(graphNodeId, copyAlong(cells.get(graphNodeId), path, leaf));
+	};
+	// Ends showing a state's earlier value; once none is shown, derived values paint what code reads again.
+	const unshow = (graphNodeId: string): boolean => {
+		if (!shownCells.delete(graphNodeId)) return false;
+		shownReaders = undefined;
+		if (shownCells.size === 0)
+			for (const id of shownDerived.keys()) {
+				shownDerived.delete(id);
+				markDirtyPath(id, []);
+			}
+		return true;
+	};
+	// A write that is not held shows at once: one at a path, or an update, lands on the shown value too; a whole value ends the showing.
+	const showWrite = (graphNodeId: string, path: ReadonlyArray<string>, onShown?: (shown: unknown) => unknown, whole?: boolean): void => {
+		if (path.length === 0) shownDerived.delete(graphNodeId);
+		if (!shownCells.has(graphNodeId)) return;
+		if (onShown && (whole || path.length > 0)) shownCells.set(graphNodeId, onShown(shownCells.get(graphNodeId)));
+		else unshow(graphNodeId);
 	};
 
-	const commitCell = (graphNodeId: string, path: ReadonlyArray<string>, value: unknown, mark = markWritten): void => {
-		const current = cells.get(graphNodeId);
-		cells.set(graphNodeId, writePath(current, path, value));
-		mark(graphNodeId, dirtyPathForGraphWrite(current, path));
+	const commitCell = (
+		graphNodeId: string,
+		path: ReadonlyArray<string>,
+		value: unknown,
+		held = holdsPaint(graphNodeId, path),
+		replay?: (shown: unknown) => unknown,
+	): void => {
+		const dirty = dirtyPathForGraphWrite(cells.get(graphNodeId), path);
+		ownCopy(graphNodeId, path);
+		cells.set(graphNodeId, writePath(cells.get(graphNodeId), path, value));
+		if (!held)
+			showWrite(graphNodeId, path, (shown) => writePath(copyAlong(shown, path), path, replay ? replay(readPath(shown, path)) : value), !!replay);
+		markDirtyPath(graphNodeId, dirty);
 	};
 
 	/**
@@ -586,7 +681,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					observer.graphNodeId === graphNodeId
 						? pathsIntersect(path, observer.path ?? [])
 						: derivesFromWrite(observer.graphNodeId, write, new Set());
-				if (reaches) observer.run();
+				if (reaches) paint(() => observer.run());
 			}
 		} finally {
 			notifyingWrite = false;
@@ -700,7 +795,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			try {
 				while (dirtyPaths.length > 0) {
 					asyncPlane?.startWritten?.();
-					plane?.recomputeSubscribed();
+					if (plane) paint(() => plane.recomputeSubscribed());
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
 					const commits: RuntimeGraphCommit[] = [];
@@ -717,8 +812,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							)
 								continue;
 							ranSubscriptions.add(subscription.id);
-							const ran = subscription.run(
-								readGraph(subscription.graphNodeId, subscription.path ?? []),
+							const ran = paint(() =>
+								subscription.run(readGraph(subscription.graphNodeId, subscription.path ?? [])),
 							);
 							const entries =
 								typeof (ran as PromiseLike<unknown>)?.then === 'function'
@@ -731,7 +826,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 						// The next round's code loads first, so its journal paints in the task these commits do.
 						const waits = codeThePassWaitsOn();
 						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
-						const landing = commits.map((commit) => commit());
+						const landing = paint(() => commits.map((commit) => commit()));
 						await notifyJournalListeners();
 						await Promise.all(landing);
 					}
@@ -815,32 +910,51 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			const path = update.path ?? [];
 			const currentValue = readPath(cells.get(update.graphNodeId), path);
 			const nextValue = update.update(currentValue);
+			// Applied again to a value the page still shows, reading as the page paints.
 			if (!Object.is(currentValue, nextValue))
-				commitCell(update.graphNodeId, path, nextValue);
+				commitCell(update.graphNodeId, path, nextValue, undefined, (shown) => paint(() => update.update(shown)));
 			if (update.returnValue === 'previous') return currentValue;
 			if (update.returnValue === 'next') return nextValue;
 		},
 		call(call) {
 			const path = call.path ?? [];
+			const held = holdsPaint(call.graphNodeId, path);
+			ownCopy(call.graphNodeId, path, true);
 			const target = readPath(cells.get(call.graphNodeId), path);
 			const beforeMutation = collectionMutationSnapshot(target, call.method, call.args ?? []);
 			const result = applyCollectionCall(target, call.method, call.args ?? []);
 
 			if (collectionCallMutated(call.method, result, beforeMutation)) {
-				markWritten(call.graphNodeId, path);
+				if (!held) showWrite(call.graphNodeId, []);
+				markDirtyPath(call.graphNodeId, path);
 			}
 
 			return result;
 		},
 		delete(deletion) {
+			const held = holdsPaint(deletion.graphNodeId, deletion.path);
+			ownCopy(deletion.graphNodeId, deletion.path);
 			const outcome = deletePath(cells.get(deletion.graphNodeId), deletion.path);
 			if (outcome.mutated) {
-				markWritten(deletion.graphNodeId, deletion.path);
+				if (!held)
+					showWrite(deletion.graphNodeId, deletion.path, (shown) => {
+						const copy = copyAlong(shown, deletion.path);
+						deletePath(copy, deletion.path);
+						return copy;
+					});
+				markDirtyPath(deletion.graphNodeId, deletion.path);
 			}
 
 			return outcome.result;
 		},
 		changed: ({ graphNodeId, path }) => markDirtyPath(graphNodeId, path),
+		showing: () => shownCells.size > 0,
+		shows: (graphNodeId) => shownCells.has(graphNodeId) || shownDerived.has(graphNodeId),
+		readShown: (graphNodeId, path) => paint(() => readGraph(graphNodeId, path)),
+		showDerived(graphNodeId, shown) {
+			if (shown && shownCells.size > 0) shownDerived.set(graphNodeId, shown.value);
+			else if (shownDerived.delete(graphNodeId)) markDirtyPath(graphNodeId, []);
+		},
 		asyncPlane() {
 			return asyncPlane;
 		},
@@ -894,6 +1008,11 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		pendingFlush,
 		holdPaint(hold) {
 			paintHold = hold;
+			const release = (graphNodeId: string): void => {
+				if (unshow(graphNodeId)) markDirtyPath(graphNodeId, []);
+			};
+			if (!hold) for (const graphNodeId of shownCells.keys()) release(graphNodeId);
+			return release;
 		},
 		holdFlush() {
 			flushHolds++;
