@@ -186,3 +186,54 @@ export function Holder({ kind, data }: { readonly kind: string; readonly data: {
 	expect(derivedProps(holder, 'Holder')).toEqual(['kind', 'data']);
 	expect(derivedPropPaths(holder, 'Holder')).toEqual({ data: [['id']] });
 });
+
+// A child's browser reads of a live-routed prop go to the composer's node, so the composer carries
+// every prop the child reads back: what an arm shows as well as what a derive reads.
+test('a prop an arm shows and a runner reads is published, and the composer carries it on its own path', async () => {
+	const detail = await compile(
+		'src/detail.tsrx',
+		`import { computed, state } from '@markless/core';
+async function fetchNote(slug: string, tab: string, round: number) { return slug + tab + round; }
+export function Detail({ slug, place }: { readonly slug: string; readonly place: { readonly search: string } }) @{
+	let round = state(1);
+	const note = computed(async () => fetchNote(slug, place.search, round));
+	<section>
+		@try {<p>{note}</p>} @pending {<p>loading {slug}</p>}
+		<button onClick={() => round++}>again</button>
+	</section>
+}`,
+	);
+	const component = detail.render.components.find((entry) => entry.componentName === 'Detail');
+	expect(component?.derivedProps).toEqual(['slug', 'place']);
+	expect(component?.derivedPropPaths).toEqual({ place: [['search']] });
+
+	const page = await compileTsrxModule({
+		filename: 'src/page.tsrx',
+		source: `import { Detail } from './detail.tsrx';
+export default function Page({ params, url }: { readonly params: { readonly id: string }; readonly url: { readonly search: string; readonly pathname: string } }) @{
+	<main><Detail slug={params.id} place={url} /></main>
+}`,
+		symbols: [],
+		importedModuleInterfaces: { './detail.tsrx': detail },
+	});
+	expect(page.publicRenderModule.ssrModuleSource).toContain(
+		'"deriveKeys":["params","url"],"derivePaths":{"params":[["id"]],"url":[["search"]]}',
+	);
+});
+
+test('an async runner reads a prop it reads only through members along those member paths', async () => {
+	const result = await compileTsrxModule({
+		filename: 'src/detail.tsrx',
+		source: `import { computed } from '@markless/core';
+async function fetchNote(tab: string, at: string) { return tab + at; }
+export function Detail({ place }: { readonly place: { readonly search: string; readonly pathname: string } }) @{
+	const note = computed(async () => fetchNote(new URLSearchParams(place.search).get('tab') ?? '', place.pathname.slice(1)));
+	@try {<p>{note}</p>} @pending {<p>loading</p>}
+}`,
+		symbols: [],
+	});
+	const runner = result.symbolModules.modules.find((module) => module.kind === 'async-computed-runner');
+	expect(runner?.source).toContain('read("prop:props", ["place", "search"])');
+	expect(runner?.source).toContain('read("prop:props", ["place", "pathname"])');
+	expect(runner?.source).not.toContain('read("prop:props", ["place"])');
+});

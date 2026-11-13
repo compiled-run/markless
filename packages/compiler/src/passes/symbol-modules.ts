@@ -4408,7 +4408,7 @@ function asyncRunnerReadBindingStatement(): EmissionNode {
 	);
 }
 
-// A slot answers the member read it was made for (`account.name`), so a name read only through slotted members is rebuilt from them.
+// A prop or slotted name read only through members (`account.name`) is rebuilt from those reads, so a bound row's slot answers each one.
 function asyncRunnerDependencyStatements(
 	dependencies: ReadonlyArray<SemanticGraphDependency>,
 	captureSlots: ReadonlyArray<CaptureSlot>,
@@ -4434,10 +4434,13 @@ function asyncRunnerDependencyStatements(
 	}
 
 	return [...byName].map(([name, reads]) => {
-		const [first] = reads;
 		const whole = reads.find((read) => read.binding.memberPath.length === 0);
-		if (!reads.some((read) => read.slot && read.binding.memberPath.length > 0) || whole)
-			return constDeclarationNode(name, asyncRunnerRootRead(whole ?? first!));
+		const answered = reads.some(
+			(read) =>
+				read.binding.memberPath.length > 0 &&
+				(read.slot || read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)),
+		);
+		if (whole || !answered) return constDeclarationNode(name, asyncRunnerRootRead(whole ?? reads[0]!));
 		return constDeclarationNode(
 			name,
 			memberReadsObjectNode(

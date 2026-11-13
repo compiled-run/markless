@@ -1,4 +1,8 @@
-import { ASYNC_BOUNDARY_ARM } from '../../../serializer/src/index.ts';
+import {
+	ASYNC_BOUNDARY_ARM,
+	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
+} from '../../../serializer/src/index.ts';
 import { decodePayloadScriptsFromDocument } from '@markless/web/payload';
 import { afterEach, expect, test } from 'vitest';
 import { decodeProtocolPayloadLists } from '../../../serializer/src/protocol-record-templates.ts';
@@ -39,11 +43,11 @@ function pendingBoundaries(shell: string) {
 function streamedArms(appends: ReadonlyArray<string>) {
 	return appends.flatMap((chunk) => {
 		const document = parse(chunk);
-		const patches = [...document.querySelectorAll('script[type="markless/state-patch"]')].map(
+		const patches = [...document.querySelectorAll(`script[type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}"]`)].map(
 			(script) =>
 				decodeProtocolPayloadLists('markless/state', JSON.parse(script.textContent ?? '{}')) as StateDelta,
 		);
-		return [...document.querySelectorAll('script[type="markless/arm"]')].map((script, index) => ({
+		return [...document.querySelectorAll(`script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"]`)].map((script, index) => ({
 			boundaryId: script.getAttribute('data-boundary'),
 			arm: (JSON.parse(script.textContent ?? '[]') as [number])[0],
 			patch: patches[index]!,

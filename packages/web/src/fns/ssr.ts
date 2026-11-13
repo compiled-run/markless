@@ -20,6 +20,7 @@ import type {
 	ComposeGraphRead,
 	ComposeRowTemplate,
 	ComposeStateDraft,
+	ComposeStateNode,
 	MarklessWidgetSite,
 } from './composition.ts';
 import {
@@ -257,7 +258,23 @@ export type MarklessSsrHostLocators = Array<MarklessSsrHostLocator> & {
 	marklessSsrExtraElements?: number;
 };
 
-export { marklessComposeState };
+// Every browser read of a live-routed prop follows the route to the composer's node, which carries it.
+const marklessSsrServedPropCells = new WeakMap<
+	object,
+	(graphProps: ComposeGraphProps) => ComposeStateNode[]
+>();
+function marklessSsrComposeState<T extends ComposeStateDraft>(
+	state: T,
+	children: ReadonlyArray<ComposeChild>,
+) {
+	for (const { output, graphProps } of children)
+		if (output?.state?.cells)
+			output.state.cells = output.state.cells.flatMap(
+				(cell) => marklessSsrServedPropCells.get(cell)?.(graphProps) ?? cell,
+			);
+	return marklessComposeState(state, children);
+}
+export { marklessSsrComposeState as marklessComposeState };
 export const marklessSsrRemapChildGraph = marklessCsrRemapChildGraph;
 // A prop with no live route was seeded into this instance's own prop cell, so the read follows the instance.
 function marklessSsrRemapBehaviorRead<T extends ComposeGraphRead>(
@@ -273,20 +290,7 @@ function marklessSsrRemapBehaviorRead<T extends ComposeGraphRead>(
 		path: mapped?.path ?? read.path,
 	};
 }
-export function marklessSsrRemapGraphOutput(
-	output: Parameters<typeof marklessCsrRemapGraphOutput>[0],
-	graphProps: ComposeGraphProps,
-	instancePath = '',
-) {
-	output.state.cells = output.state.cells.flatMap(
-		(cell) => marklessSsrRoutedPropCell.get(cell)?.(graphProps) ?? [cell],
-	);
-	marklessCsrRemapGraphOutput(output, graphProps, instancePath);
-}
-
-// The composer's bound derive reads a live-routed prop off its own node, so the
-// child's seeded copy of that key is never read after resume.
-const marklessSsrRoutedPropCell = new WeakMap<object, (graphProps: ComposeGraphProps) => never[]>();
+export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 
 // The compiled module a composed child was imported from may serve several
 // components. The child names the one it declared, so its own SSR entry
@@ -875,7 +879,7 @@ export function marklessSsrCallbackSymbol(
 // the bag, null means a lone prop. A `deriveKeys` property is one only a derive
 // reads, carried when the serializer encodes it, with only the `derivePaths` its
 // derives read; `scalarKeys` is projected children, whose markup the served HTML
-// already holds. Either is dropped when the composer routes it from its own
+// already holds. Any key is dropped when the composer routes it from its own
 // graph, so a copy never ships it twice.
 export function marklessSsrSeedPropCells(
 	state: ComposeStateDraft,
@@ -926,31 +930,24 @@ export function marklessSsrSeedPropCells(
 			valueKind: marklessSsrValueKind(value),
 			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
-		if (
-			cell.keys &&
-			(cell.scalarKeys || cell.deriveKeys || cell.rowKeys) &&
-			cell.graphNodeId === 'prop:props'
-		)
-			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
+		if (cell.keys && cell.graphNodeId === 'prop:props')
+			marklessSsrServedPropCells.set(seededCell, (graphProps) => {
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
-						cell.keys?.includes(key) ||
-						!marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
-							? [[key, valueOf(key)]]
-							: [],
+						marklessLiveBoundGraphRoute(graphProps?.find((prop) => prop.name === key))
+							? []
+							: [[key, valueOf(key)]],
 					),
 				);
-				return (
-					Object.keys(kept).length
-						? [
-								{
-									...seededCell,
-									valueKind: marklessSsrValueKind(kept),
-									value: marklessSerializeGraphValue(kept, seededCell),
-								},
-							]
-						: []
-				) as never[];
+				return Object.keys(kept).length
+					? [
+							{
+								...seededCell,
+								valueKind: marklessSsrValueKind(kept),
+								value: marklessSerializeGraphValue(kept, seededCell),
+							},
+						]
+					: [];
 			});
 		return [seededCell];
 	});

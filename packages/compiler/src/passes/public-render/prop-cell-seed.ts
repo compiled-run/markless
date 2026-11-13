@@ -16,8 +16,8 @@ import { componentPropCellId } from './shared.ts';
  * `derivePaths` when the derives read only some of it; `scalarKeys`
  * is projected children a derive reads, carried only as a scalar, since markup
  * is already in the served HTML. `rowKeys` names properties a minted row's slots
- * or a behavior's inputs read, carried whatever their value. A derive or row key
- * is dropped when the composer routes it to its own node.
+ * or a behavior's inputs read, carried whatever their value. An arm or derive key
+ * is dropped when the composer routes it to its own node, which then carries it.
  */
 export type SsrPropCellSeed = {
 	readonly graphNodeId: string;
@@ -104,7 +104,7 @@ function derivePropReads(
 	);
 }
 
-// Forwarding a prop to a child whose tree re-derives from it: the child drops its copy once
+// Forwarding a prop to a child whose tree reads it back: the child drops its copy once
 // this component routes the prop live, so this component's own bag has to carry it.
 function forwardedDerivePropReads(
 	input: PublicRenderModuleInput,
@@ -190,10 +190,11 @@ function reachesComponent(input: PublicRenderModuleInput, from: string, to: stri
 }
 
 /**
- * The props a component's served bag carries only for a resume-time derive, in
- * its own tree or one it forwards them into, each with the paths below it those
- * derives read. Published on the module interface so a module forwarding its own
- * prop into this component carries it in turn, narrowed the same way.
+ * The props a browser read takes back out of a component's bag after resume (an
+ * arm rebuild or a derive, in its own tree or one it forwards them into), each
+ * with the paths below it those reads take. Published on the module interface so
+ * a module routing its own prop into this component carries it, narrowed the
+ * same way; the component then drops its own copy.
  */
 export function derivedProps(input: PublicRenderModuleInput, componentName: string): DerivedProps {
 	return moduleDerivedProps(input).get(componentName) ?? new Map();
@@ -213,14 +214,12 @@ function moduleDerivedProps(input: PublicRenderModuleInput): ReadonlyMap<string,
 		...input.semanticGraph.componentEdges.map((edge) => edge.parentComponentName),
 	]);
 	const derived = new Map<string, Map<string, Array<ReadonlyArray<string>>>>();
-	const armKeys = new Map<string, ReadonlySet<string>>();
 	const add = (componentName: string, reads: ReadonlyArray<PropRead>): boolean => {
 		const props = derived.get(componentName)!;
 		let grew = false;
 		for (const { graphNodeId, path } of reads) {
 			const [key, ...rest] = path;
 			if (graphNodeId !== PROTOCOL_PROPS_GRAPH_NODE_ID || !key) continue;
-			if (armKeys.get(componentName)?.has(key)) continue;
 			const paths = props.get(key) ?? [];
 			if (!props.has(key)) props.set(key, paths);
 			if (readsWhole(paths) || paths.some((known) => samePath(known, rest))) continue;
@@ -231,15 +230,10 @@ function moduleDerivedProps(input: PublicRenderModuleInput): ReadonlyMap<string,
 	};
 	for (const componentName of names) {
 		derived.set(componentName, new Map());
-		armKeys.set(
-			componentName,
-			new Set(
-				armRebuildPropReads(input, componentName).flatMap(({ graphNodeId, path }) =>
-					graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID && path[0] ? [path[0]] : [],
-				),
-			),
-		);
-		add(componentName, derivePropReads(input, componentName));
+		add(componentName, [
+			...armRebuildPropReads(input, componentName),
+			...derivePropReads(input, componentName),
+		]);
 	}
 	for (let grew = true; grew;) {
 		grew = false;
