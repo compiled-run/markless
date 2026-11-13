@@ -2270,3 +2270,45 @@ export function repeatRowHandlersUnwiredDiagnostic(input: {
 		docsUrl: 'https://markless.dev/errors/MARKLESS_REPEAT_ROW_HANDLERS_UNWIRED',
 	});
 }
+
+/** Why a post form inside a @try with a @catch is still sent by the browser: what this file cannot see about its component. */
+export type NativeFormReason =
+	| { readonly kind: 'exported' }
+	| { readonly kind: 'value' }
+	| { readonly kind: 'outside'; readonly parentComponentName?: string };
+
+export function formLeavesPageDiagnostic(
+	componentName: string,
+	cause: NativeFormReason,
+	span: SourceSpan | undefined,
+): SemanticGraphDiagnostic {
+	const reason =
+		cause.kind === 'exported'
+			? `<${componentName}> is exported, so another file could render it where no @catch shows a failed send`
+			: cause.kind === 'value'
+				? `<${componentName}> is also used as a value, not only as a tag, so the build cannot see every place it renders`
+				: `<${componentName}> is also rendered ${cause.parentComponentName ? `in <${cause.parentComponentName}>` : 'by code outside a component'}, where this file cannot show a @try with a @catch around it`;
+	const fix =
+		cause.kind === 'exported'
+			? `Stop exporting <${componentName}> and use it only in this file`
+			: cause.kind === 'value'
+				? `Use <${componentName}> only as a tag`
+				: `Render <${componentName}> only inside a @try with a @catch`;
+	return {
+		code: 'MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+		severity: 'warning',
+		phase: 'semantic-graph',
+		title: 'This form leaves the page when it is sent',
+		message: `This form posts and has no submit handler, so the browser sends it and leaves the page to show the answer, even though it renders inside a @try with a @catch: ${reason}.`,
+		why: 'Markless sends a form from the page only when every place its component renders has a @catch to show a failed send. Each file is compiled on its own, so all of those places must be visible in this file.',
+		primarySpan: span,
+		passId: 'tsrx-semantic-graph',
+		artifactKeys: ['semanticGraph'],
+		suggestions: [
+			{
+				message: `${fix}, or write the form in the component that holds the @try. To keep the browser's own submit, add rel="external" to the form.`,
+			},
+		],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
+	};
+}

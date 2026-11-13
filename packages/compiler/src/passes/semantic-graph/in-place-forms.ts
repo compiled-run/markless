@@ -1,10 +1,12 @@
 import { IN_PLACE_SUBMIT_POLICY } from '@markless/serializer';
 import type { SemanticGraphArtifact } from '../../artifacts.ts';
+import { formLeavesPageDiagnostic, type NativeFormReason } from './diagnostics.ts';
 import type { ModuleSemantics } from './shared-ast.ts';
 import type { PostFormCandidate } from './types.ts';
 
 type FormGraph = Pick<SemanticGraphArtifact, 'templateReads' | 'componentEdges' | 'components'> & {
 	events: SemanticGraphArtifact['events'][number][];
+	diagnostics: SemanticGraphArtifact['diagnostics'][number][];
 };
 
 type FormFacts = {
@@ -41,12 +43,17 @@ export function collectInPlaceForms(
 			if (host === formId) return true;
 		return false;
 	};
-	let caught: ReadonlySet<string> | undefined;
+	let placed: ComponentPlacement | undefined;
 	for (const form of forms) {
 		if (handledAround(form.hostNodeId)) continue;
 		if (!form.catchBoundaryId) {
-			caught ??= componentsRenderedOnlyInCatches(graph, facts, handledAround);
-			if (!form.componentName || !caught.has(form.componentName)) continue;
+			placed ??= componentPlacement(graph, facts, handledAround);
+			if (!form.componentName || !placed.caught.has(form.componentName)) {
+				const reason = form.componentName ? placed.native.get(form.componentName) : undefined;
+				if (reason && !form.leavesByDesign)
+					graph.diagnostics.push(formLeavesPageDiagnostic(form.componentName!, reason, form.sourceSpan));
+				continue;
+			}
 		}
 		// A field whose value or checked state is bound shows state, which a reset would leave out of step.
 		const bound = graph.templateReads.some(
@@ -66,50 +73,77 @@ export function collectInPlaceForms(
 	}
 }
 
-// Components this file alone renders, only as tags, each inside a `@try` with a `@catch` and no submit handler around it.
-function componentsRenderedOnlyInCatches(
+type ComponentPlacement = {
+	/** Components this file alone renders, only as tags, each inside a `@try` with a `@catch` and no submit handler around it. */
+	readonly caught: ReadonlySet<string>;
+	/** Components that render inside a `@try` with a `@catch` here but are not caught, and why. */
+	readonly native: ReadonlyMap<string, NativeFormReason>;
+};
+
+function componentPlacement(
 	graph: FormGraph,
 	facts: FormFacts,
 	handledAround: (hostNodeId: string | undefined) => boolean,
-): ReadonlySet<string> {
+): ComponentPlacement {
 	const semantic = facts.semantic();
 	const edgesOf = (name: string) =>
 		graph.componentEdges.filter((edge) => !edge.importSource && edge.childComponentName === name);
-	const tagOnly = new Set<string>();
+	const usedOtherwise = new Map<string, NativeFormReason>();
 	for (const component of graph.components) {
-		if (component.exportName) continue;
+		if (component.exportName) {
+			usedOtherwise.set(component.name, { kind: 'exported' });
+			continue;
+		}
 		const binding = semantic.bindings.find(
 			(candidate) => candidate.scope === semantic.rootScope && candidate.name === component.name,
 		);
 		if (!binding) continue;
 		const parents = binding.references.map((reference) => semantic.parentOf(reference.node)?.type);
 		const opened = parents.filter((type) => type === 'JSXOpeningElement').length;
+		if (!parents.every((type) => type === 'JSXOpeningElement' || type === 'JSXClosingElement'))
+			usedOtherwise.set(component.name, { kind: 'value' });
 		// Every opening tag must be a component edge: a tag outside any component body records none.
-		if (
-			opened > 0 &&
-			opened === edgesOf(component.name).length &&
-			parents.every((type) => type === 'JSXOpeningElement' || type === 'JSXClosingElement')
-		)
-			tagOnly.add(component.name);
+		else if (opened !== edgesOf(component.name).length)
+			usedOtherwise.set(component.name, { kind: 'outside' });
 	}
-	const caught = new Set<string>();
-	for (let grew = true; grew; ) {
-		grew = false;
-		for (const name of tagOnly) {
-			if (caught.has(name)) continue;
-			const edges = edgesOf(name);
-			if (
-				edges.length > 0 &&
-				edges.every(
-					(edge) =>
-						(edge.catchBoundaryId || caught.has(edge.parentComponentName)) &&
-						!handledAround(facts.edgeHosts.get(edge.id)),
-				)
-			) {
-				caught.add(name);
-				grew = true;
+	// A submit handler around a tag makes that form the handler's: neither sent in place nor warned about.
+	const handled = new Set(
+		graph.components
+			.map((component) => component.name)
+			.filter((name) => edgesOf(name).some((edge) => handledAround(facts.edgeHosts.get(edge.id)))),
+	);
+	const fixedPoint = (counts: (name: string) => boolean, enters: (edges: ReturnType<typeof edgesOf>, set: ReadonlySet<string>) => boolean) => {
+		const set = new Set<string>();
+		for (let grew = true; grew; ) {
+			grew = false;
+			for (const { name } of graph.components) {
+				if (set.has(name) || !counts(name)) continue;
+				if (enters(edgesOf(name), set)) {
+					set.add(name);
+					grew = true;
+				}
 			}
 		}
+		return set;
+	};
+	const inCatch = (edge: ReturnType<typeof edgesOf>[number], set: ReadonlySet<string>) =>
+		Boolean(edge.catchBoundaryId) || set.has(edge.parentComponentName);
+	const caught = fixedPoint(
+		(name) => !usedOtherwise.has(name) && !handled.has(name),
+		(edges, set) => edges.length > 0 && edges.every((edge) => inCatch(edge, set)),
+	);
+	const somewhereInCatch = fixedPoint(
+		(name) => !handled.has(name),
+		(edges, set) => edges.some((edge) => inCatch(edge, set)),
+	);
+	const native = new Map<string, NativeFormReason>();
+	for (const name of somewhereInCatch) {
+		if (caught.has(name)) continue;
+		const outside = edgesOf(name).find((edge) => !inCatch(edge, caught));
+		const reason =
+			usedOtherwise.get(name) ??
+			(outside ? { kind: 'outside' as const, parentComponentName: outside.parentComponentName } : undefined);
+		if (reason) native.set(name, reason);
 	}
-	return caught;
+	return { caught, native };
 }
