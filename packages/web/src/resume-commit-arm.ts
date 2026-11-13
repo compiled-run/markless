@@ -195,6 +195,47 @@ export async function registerArmRecordSet(
 	},
 	eventTypesInstalled?: boolean,
 ) {
+	const deferred: DeferredArmWiring = { repeats: [], steps: [], computed: update.computed };
+	const materialized = registerArmNow(deps, installEventType, boundary, update, deferred, eventTypesInstalled);
+	// Before any refresh subscribes: a derive that runs first would read nothing.
+	for (const cell of update.cells ?? []) {
+		if (!deps.graph) throw new Error('Markless arm state registration is unavailable.');
+		deps.graph.write({ graphNodeId: cell.graphNodeId, value: cell.value });
+		deps.graphNodeIds?.add?.(cell.graphNodeId);
+	}
+	const computedRefreshes = (update.computed ?? []).filter(
+		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
+	);
+	if (computedRefreshes.length) {
+		if (!deps.registerComputedRefreshes)
+			throw new Error('Markless async arm computed-refresh registration is unavailable.');
+		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
+		await deps.registerComputedRefreshes(update.computed!);
+	}
+	if (deferred.repeats.length)
+		await deps.registerKeyedRepeats?.(deferred.repeats, update.moved, update.computed);
+	for (const step of deferred.steps) await step();
+	return materialized;
+}
+
+// What the arms painted inside a registering arm wire once its state and computeds exist, at any depth.
+type DeferredArmWiring = {
+	readonly repeats: ResumeKeyedRepeatRecord[];
+	readonly steps: Array<() => Promise<void> | void>;
+	readonly computed: ArmCommitUpdate['computed'];
+};
+
+// Events and handles register now, so a press in this task finds its handler; the rest waits in `deferred`.
+function registerArmNow(
+	deps: ArmRegistrationDeps,
+	installEventType: (eventType: string) => void,
+	boundary: ResumeArmRange,
+	update: Pick<ArmCommitUpdate, 'armRecords' | 'elementsByHostId'> & {
+		readonly comments?: ReadonlyArray<ResumeDomComment>;
+	},
+	deferred: DeferredArmWiring,
+	eventTypesInstalled?: boolean,
+) {
 	const exhaustive = {
 		locators: true,
 		events: true,
@@ -227,62 +268,39 @@ export async function registerArmRecordSet(
 		if (!element) throw armRecordHostMissingError(record.hostNodeId, 'event');
 		deps.addEventRecord(element, record);
 	}
-	// A painted branch arm registers now for a press in this task; its lists wire below, with this arm's computeds.
-	const servedRepeats: ResumeKeyedRepeatRecord[] = [];
-	const served = materialized.branches.flatMap((branch) => {
-		const set = branch.servedArmRecords;
-		if (!set || !branch.startAnchor || !('nodeType' in branch.startAnchor)) return [];
-		servedRepeats.push(...(set.keyedRepeats ?? []));
-		return [registerArmRecordSet(deps, installEventType, branch as ResumeArmRange, { armRecords: { ...set, keyedRepeats: [] } })];
-	});
+	deferred.repeats.push(...materialized.keyedRepeats);
+	for (const branch of materialized.branches)
+		if (branch.servedArmRecords && branch.startAnchor && 'nodeType' in branch.startAnchor)
+			registerArmNow(deps, installEventType, branch as ResumeArmRange, { armRecords: branch.servedArmRecords }, deferred, true);
 	for (const handle of materialized.elementHandles) {
 		const element = materialized.elementsByHostId.get(handle.hostNodeId);
 		if (!element) throw armRecordHostMissingError(handle.hostNodeId, 'element handle');
 		deps.registerElementHandle(handle.hostNodeId, handle, element);
 	}
-	// Before any refresh subscribes: a derive that runs first would read nothing.
-	for (const cell of update.cells ?? []) {
-		if (!deps.graph) throw new Error('Markless arm state registration is unavailable.');
-		deps.graph.write({ graphNodeId: cell.graphNodeId, value: cell.value });
-		deps.graphNodeIds?.add?.(cell.graphNodeId);
-	}
-	const computedRefreshes = (update.computed ?? []).filter(
-		(computed) => computed.async === false && typeof computed.deriveSymbolId === 'string',
-	);
-	if (computedRefreshes.length) {
-		if (!deps.registerComputedRefreshes)
-			throw new Error('Markless async arm computed-refresh registration is unavailable.');
-		// The async records ride along: a derive over an unsettled async value waits for it instead of running.
-		await deps.registerComputedRefreshes(update.computed!);
-	}
-	const keyedRepeats = [
-		...materialized.keyedRepeats,
-		...servedRepeats.filter((repeat) => deps.elementsByHostId.has(repeat.parentHostNodeId)),
-	];
-	if (keyedRepeats.length) await deps.registerKeyedRepeats?.(keyedRepeats, update.moved, update.computed);
-	if (deps.addBehaviors && materialized.behaviors.length) {
-		const byHost = new Map<string, ResumeBehaviorRecord[]>();
-		for (const behavior of materialized.behaviors) {
-			const records = byHost.get(behavior.hostNodeId) ?? [];
-			records.push(behavior);
-			byHost.set(behavior.hostNodeId, records);
+	deferred.steps.push(async () => {
+		if (deps.addBehaviors && materialized.behaviors.length) {
+			const byHost = new Map<string, ResumeBehaviorRecord[]>();
+			for (const behavior of materialized.behaviors) {
+				const records = byHost.get(behavior.hostNodeId) ?? [];
+				records.push(behavior);
+				byHost.set(behavior.hostNodeId, records);
+			}
+			for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
 		}
-		for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
-	}
-	await Promise.all(served);
-	if (materialized.branches.length)
-		await deps.registerArmBranches?.(boundary.id, materialized.branches);
-	if (update.armRecords.asyncBoundaries?.length)
-		await registerNestedAsyncBoundaries(
-			deps,
-			installEventType,
-			update.comments ?? commentsBetween(boundary.startAnchor, boundary.endAnchor),
-			update.armRecords.asyncBoundaries,
-			update.computed,
-			!update.comments,
-		);
-	// Last: text this arm writes outside a nested @try reads the async values that registration defined.
-	registerArmDomUpdates(deps, materialized.domUpdates);
+		if (materialized.branches.length)
+			await deps.registerArmBranches?.(boundary.id, materialized.branches);
+		if (update.armRecords.asyncBoundaries?.length)
+			await registerNestedAsyncBoundaries(
+				deps,
+				installEventType,
+				update.comments ?? commentsBetween(boundary.startAnchor, boundary.endAnchor),
+				update.armRecords.asyncBoundaries,
+				deferred.computed,
+				!update.comments,
+			);
+		// Last: text this arm writes outside a nested @try reads the async values that registration defined.
+		registerArmDomUpdates(deps, materialized.domUpdates);
+	});
 	return materialized;
 }
 
