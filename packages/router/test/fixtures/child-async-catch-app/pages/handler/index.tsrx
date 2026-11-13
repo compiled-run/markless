@@ -13,6 +13,7 @@ const pages = [
 	'inside-static-same',
 	'inside-static-other',
 	'inside-static-deep',
+	'inside-static-prop',
 	'none-page',
 	'none-same',
 	'none-other',

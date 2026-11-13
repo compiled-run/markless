@@ -12,6 +12,7 @@ import { NonePage } from './none-page.tsrx';
 import { NoneSame } from './none-same.tsrx';
 import { NoneOther } from './none-other.tsrx';
 import { NoneDeep } from './none-deep.tsrx';
+import { InsideProp } from './inside-prop.tsrx';
 
 // A save that fails in a form's onSubmit or a button's onClick: the handler sits in the page, a child in the same
 // file, a child in another file, or a grandchild; the @catch sits around the child, inside it, or nowhere.
@@ -122,9 +123,13 @@ for (const mode of ['CSR', 'SSR'] as const)
 					await expect.poll(async () => said().at(-1)).toBe('Update failed');
 					expect(said()).not.toContain('Updated');
 					expect(text(container, '[data-caught]')).toBe(`caught: ${message}`);
+					const loadsBefore = api.loads;
 					at(container, '[data-reset]').click();
 					await expect.poll(() => container.querySelector('[data-caught]')).toBeNull();
 					expect(text(container, '[data-note]')).toBe('sending');
+					// Pins main: reset after a handler failure loads nothing again here (async.mdx says so; catch-reset.ts re-runs the failed gate).
+					await new Promise((resolve) => setTimeout(resolve, 50));
+					expect(api.loads).toBe(loadsBefore);
 					expect(reasons).toEqual([]);
 				});
 			for (const [name, page] of Object.entries(uncaught))
@@ -145,3 +150,17 @@ for (const mode of ['CSR', 'SSR'] as const)
 					expect(said()).not.toContain('Updated');
 				});
 		}
+
+// A later export fed a state from the page, renamed before the save fails: its @catch reads the prop as it stands now.
+const prop = { CSR: () => render(InsideProp), SSR: () => renderSSR(InsideProp) };
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: a prop-fed later export's @catch shows the prop's current value`, async () => {
+		const container = await mount(mode, prop, 'http');
+		at(container, '[data-rename]').click();
+		await expect.poll(() => text(container, '[data-label]')).toBe('Invoice 8');
+		at(container, '[data-submit]').click();
+		await expect
+			.poll(() => text(container, '[data-caught]'))
+			.toBe('caught: Saving failed (500) for Invoice 8');
+		expect(reasons).toEqual([]);
+	});

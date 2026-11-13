@@ -63,3 +63,23 @@ export function StaticCaughtSaver() @{
 		<p class="caught">caught: {error.message}</p>
 	}
 }
+
+export function LabelledCaughtSaver({ label }: { readonly label: string }) @{
+	let note = state('');
+	@try {
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				note = 'sending';
+				await save();
+				note = 'saved';
+			}}
+		>
+			<p class="note">{note}</p>
+			<p class="label">{label}</p>
+			<button type="submit" data-submit>Save</button>
+		</form>
+	} @catch (error) {
+		<p class="caught">caught: {error.message} for {label}</p>
+	}
+}

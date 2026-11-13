@@ -168,9 +168,21 @@ for (const [arrival, failing] of arrivals)
 							`caught: ${message}`,
 						);
 						if (!name.includes('static')) {
+							const runs = () =>
+								page.evaluate(
+									() => (globalThis as { __thingRuns?: number }).__thingRuns ?? 0,
+								);
+							const shown = await page.locator('.loads').textContent();
+							const ranBefore = await runs();
 							await page.locator('[data-reset]').click();
 							await expect.poll(() => page.locator('.caught').count()).toBe(0);
 							expect(await page.locator('.note').textContent()).toBe('sending');
+							// Pins main: reset after a handler failure loads nothing again here (async.mdx says so; catch-reset.ts re-runs the failed gate).
+							await page.waitForLoadState('networkidle');
+							expect([
+								await runs(),
+								await page.locator('.loads').textContent(),
+							]).toEqual([ranBefore, shown]);
 						}
 						expect(errors).toEqual([]);
 						await page.close();
@@ -191,3 +203,19 @@ for (const [arrival, failing] of arrivals)
 						await page.close();
 					});
 	});
+
+// A later export fed a state from the page, renamed before the save fails: its @catch reads the prop as it stands now.
+describe('a failing save in a prop-fed later export', () => {
+	for (const arrival of ['loaded as a document', 'reached through a link'])
+		test(`${arrival}: the @catch shows the prop's current value`, async () => {
+			const { page, errors } = await openSaver('inside-static-prop', arrival, 'an HTTP 500');
+			await page.locator('[data-rename]').click();
+			await expect.poll(() => page.locator('.label').textContent()).toBe('Invoice 8');
+			await page.locator('[data-submit]').click();
+			await expect
+				.poll(() => page.locator('.caught').textContent())
+				.toBe('caught: Saving failed (500) for Invoice 8');
+			expect(errors).toEqual([]);
+			await page.close();
+		});
+});

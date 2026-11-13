@@ -59,3 +59,23 @@ export function CaughtSaver() @{
 		</>
 	}
 }
+
+export function LabelledCaughtSaver({ label }: { readonly label: string }) @{
+	let note = state('');
+	@try {
+		<form
+			onSubmit={async (event) => {
+				event.preventDefault();
+				note = 'sending';
+				await save();
+				note = 'saved';
+			}}
+		>
+			<p data-note>{note}</p>
+			<p data-label>{label}</p>
+			<button type="submit" data-submit>Save</button>
+		</form>
+	} @catch (error) {
+		<p data-caught>caught: {error.message} for {label}</p>
+	}
+}

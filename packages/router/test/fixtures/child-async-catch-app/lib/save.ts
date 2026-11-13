@@ -5,6 +5,8 @@ export async function save(): Promise<void> {
 
 let loads = 0;
 export async function loadThing(): Promise<{ loads: number }> {
+	const counted = globalThis as { __thingRuns?: number };
+	counted.__thingRuns = (counted.__thingRuns ?? 0) + 1;
 	await new Promise((resolve) => setTimeout(resolve, 5));
 	return { loads: ++loads };
 }
