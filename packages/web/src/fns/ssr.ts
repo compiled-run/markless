@@ -1248,6 +1248,9 @@ export function marklessSsrArmizeBoundaries(
 			.filter((anchor) => anchor.kind === 'async')
 			.map((anchor) => [anchor.id, anchor]),
 	);
+	const armByBranchId = new Map(
+		structure.anchors.flatMap((anchor) => (anchor.kind === 'arm-branch' ? [[anchor.id, anchor.arm] as const] : [])),
+	);
 	// Keyed by the possibly-null runner id so a boundary without a runner looks
 	// up (and misses) exactly as it did untyped.
 	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
@@ -1259,7 +1262,7 @@ export function marklessSsrArmizeBoundaries(
 	);
 	return boundaries.map((boundary) => armized.get(boundary)!);
 	function paintedArm(branch: SsrBranchRecord): SsrBranchRecord {
-		const arm = structure.anchors.find((anchor) => anchor.id === idPrefix + branch.id)?.arm;
+		const arm = armByBranchId.get(idPrefix + branch.id);
 		return arm === undefined ? branch : { ...branch, takenArm: arm };
 	}
 	function armizeBoundary(boundary: SsrBoundaryRecord): SsrBoundaryRecord {
