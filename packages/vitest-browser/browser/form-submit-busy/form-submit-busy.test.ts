@@ -93,6 +93,39 @@ test('SSR resume: the served form is busy through its save and reload, and a rep
 	await shows(container as HTMLElement, '[data-names]', 'Ada, Hopper, Grace');
 });
 
+// A person's own pointer and keys, which reach the page as trusted events and let promise jobs run between listeners.
+async function realPresses(container: HTMLElement) {
+	const { form, field, submitter } = parts(container);
+	const answer = deferred<void>();
+	server.nextPost = [{ wait: answer.promise }];
+	await userEvent.click(submitter);
+	await expect.poll(() => busy(form), poll).toBe('true');
+	expect(submitter.getAttribute('aria-disabled')).toBe('true');
+	await userEvent.click(field);
+	await userEvent.keyboard('{Enter}');
+	answer.resolve();
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	expect(posts()).toEqual(['Grace']);
+	await shows(container, '[data-names]', 'Ada, Grace');
+	await userEvent.fill(field, 'Hopper');
+	await userEvent.keyboard('{Enter}');
+	await expect.poll(posts, poll).toEqual(['Grace', 'Hopper']);
+	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
+	await shows(container, '[data-names]', 'Ada, Grace, Hopper');
+}
+
+test('CSR: a real click holds the form through its save; Enter in the field repeats nothing, then sends a changed value', async () => {
+	const container = (await render(NoteForm)).container as HTMLElement;
+	await shows(container, '[data-names]', 'Ada');
+	await realPresses(container);
+});
+
+test('SSR resume: the same with a real click and real keys on the served form', async () => {
+	const { container } = await renderSSR(NoteForm);
+	expect(text(container as HTMLElement, '[data-names]')).toBe('Ada');
+	await realPresses(container as HTMLElement);
+});
+
 test('CSR: a rejected save clears the marks at once, with no reload, and reaches the nearest @catch', async () => {
 	const container = (await render(NoteForm)).container as HTMLElement;
 	await shows(container, '[data-names]', 'Ada');

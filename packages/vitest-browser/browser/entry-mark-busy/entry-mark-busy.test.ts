@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'vitest';
-import { commands } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { ChildCallsProp } from './child-calls-prop.tsrx';
 import { EarlyReturn } from './early-return.tsrx';
@@ -69,12 +69,12 @@ function assertNoGap(samples: ReadonlyArray<boolean>): void {
 	).toBe(true);
 }
 
-async function submitMarkScenario(screen: Screen) {
+async function submitMarkScenario(screen: Screen, press: (container: HTMLElement) => unknown = (container) => click(container, '[data-save]')) {
 	const container = await mounted(screen);
 	await expect.poll(() => text(container, '[data-balance]'), poll).toBe('100');
 
 	const stop = sampleBusy(container, '[data-balance]');
-	click(container, '[data-save]');
+	await press(container);
 	// Marked before the 40ms save settles: the value on screen has not moved yet.
 	await expect.poll(() => busy(container, '[data-balance]'), poll).toBe(true);
 	expect(text(container, '[data-balance]')).toBe('100');
@@ -89,6 +89,16 @@ test('CSR: a save marks the balance from the click, through the POST, until the 
 
 test('SSR: a save marks the balance from the click, through the POST, until the refresh lands', async () => {
 	await submitMarkScenario(await renderSSR(SubmitMark));
+});
+
+const realClick = (container: HTMLElement) => userEvent.click(container.querySelector<HTMLElement>('[data-save]')!);
+
+test('CSR: a real click marks the balance through the POST until the refresh lands', async () => {
+	await submitMarkScenario(await render(SubmitMark), realClick);
+});
+
+test('SSR: a real click marks the balance through the POST until the refresh lands', async () => {
+	await submitMarkScenario(await renderSSR(SubmitMark), realClick);
 });
 
 async function earlyReturnScenario(screen: Screen) {

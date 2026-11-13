@@ -19,10 +19,12 @@ import {
 	MARKLESS_PENDING_MIN_VISIBLE_MS,
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
 } from './pending-timing.ts';
+import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
 	renderSsrOutput,
+	sendsFormInPlace,
 	storageRenderContext,
 	type RenderToStringOptions,
 	type SsrRenderable,
@@ -438,7 +440,7 @@ function renderArmAppend(
 		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
 		`<script type="markless/arm" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 		`<script type="markless/state-patch" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
-		`<script${nonceAttribute}>__mArm(${escapeScriptJson(revealArguments)})</script>`
+		`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`
 	);
 }
 
@@ -508,7 +510,14 @@ function applyStreamedArmSyncPolicy(
 	policy: ProtocolSyncPolicy,
 	event: Event,
 	root: Element,
+	inPlaceCheck: ((event: Event, later: true) => unknown) | undefined,
 ): boolean {
+	// Run here, before the dispatch below: a trusted press lets that dispatch read the kept submit before any later listener.
+	if (!('branches' in policy) && policy.when.type === 'submits-in-place') {
+		if (!inPlaceCheck) return false;
+		inPlaceCheck(event, true);
+		return true;
+	}
 	const branches = 'branches' in policy ? policy.branches : [policy];
 	const readsGraph = (condition: ProtocolSyncPolicyCondition): boolean =>
 		condition.type === 'graph-truthy' ||
@@ -617,7 +626,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					for (const entry of (el.getAttribute(${JSON.stringify(PROTOCOL_EVENT_HOST_ATTRIBUTE)}) || '').split(';')) {
 						const [name, ref] = entry.split('!')[0].split(':');
 						const x = name === t && ref && (records.events || [])[ref];
-						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r)) applied = true;
+						if (x && x.syncPolicy && applyPolicy(x.syncPolicy, e, r, self[${JSON.stringify(IN_PLACE_CHECK)}])) applied = true;
 					}
 				}
 				const input = { root: r, event: e, element: e.target, eventRecord: null, propagationStopped: e.cancelBubble, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
@@ -625,7 +634,10 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;
 				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
-				const mod = await import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)});
+				// Shared with the boot, so a kept submit falls back to the browser if this load fails.
+				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
+					throw ((r.__mResume = undefined), error);
+				}));
 				await mod.resumeContainerEvent(input);
 			};
 			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
