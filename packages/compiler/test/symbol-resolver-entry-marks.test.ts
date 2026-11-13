@@ -198,3 +198,76 @@ export function App() @{
 `);
 	expect(symbols).toEqual([{ eventName: 'click', entryMarks: ['computed:balance'] }]);
 });
+
+// A `@catch` makes the block's own gate async so a handler's rejection can fail it; the gate fetches nothing, so it is never marked.
+function pagedList(handler: string, withCatch: boolean) {
+	return `
+import { state, computed } from '@markless/core';
+async function getPage(cursor) { return { items: [cursor], next: cursor + 1 }; }
+export function App() @{
+	let version = state(0);
+	const first = computed(async () => getPage(version));
+	let more = state([]);
+	const items = computed(() => [first, ...more].flatMap((page) => page.items));
+	const next = computed(() => (more.at(-1) ?? first).next);
+	<div>
+		@try {
+			<section>
+				@for (const item of items; key item) {
+					<p>{item}</p>
+				}
+				<button onClick={${handler}}>More</button>
+				<span>{next}</span>
+			</section>
+		} @pending {
+			<p>Loading</p>
+		}${withCatch ? ' @catch (error) {\n\t\t\t<p>{error.message}</p>\n\t\t}' : ''}
+	</div>
+}
+`;
+}
+
+const appendPage = 'async () => { more = [...more, await getPage(next)]; }';
+const reloadFirst = 'async () => { await getPage(0); version++; }';
+
+test('with a @catch, a handler that appends to state only sync computeds read gets no entry mark', async () => {
+	expect(await entryMarksOf(pagedList(appendPage, true))).toEqual([
+		{ eventName: 'click', entryMarks: undefined },
+	]);
+});
+
+test('without a @catch, the same append handler gets no entry mark', async () => {
+	expect(await entryMarksOf(pagedList(appendPage, false))).toEqual([
+		{ eventName: 'click', entryMarks: undefined },
+	]);
+});
+
+test('with a @catch, a handler that writes the shown async value\'s key marks that value and not the gate', async () => {
+	expect(await entryMarksOf(pagedList(reloadFirst, true))).toEqual([
+		{ eventName: 'click', entryMarks: ['computed:first'] },
+	]);
+});
+
+test('with a @catch, an append that keys an async value marks only that value', async () => {
+	const symbols = await entryMarksOf(`
+import { state, computed } from '@markless/core';
+async function getPage(cursor) { return [cursor]; }
+export function App() @{
+	const first = computed(async () => getPage(0));
+	let cursors = state([]);
+	const latest = computed(async () => getPage(cursors.at(-1) ?? 0));
+	<div>
+		@try {
+			<section>
+				<p>{first}</p>
+				<p>{latest}</p>
+				<button onClick={async () => { await getPage(1); cursors = [...cursors, 2]; }}>More</button>
+			</section>
+		} @catch (error) {
+			<p>{error.message}</p>
+		}
+	</div>
+}
+`);
+	expect(symbols).toEqual([{ eventName: 'click', entryMarks: ['computed:latest'] }]);
+});

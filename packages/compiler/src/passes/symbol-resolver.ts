@@ -78,7 +78,7 @@ export function planSymbolResolver(input: SymbolResolverInput): SymbolResolverPl
 
 	const handleReadsOf = (reads: ReadonlyArray<LoweredStateRead> | undefined) =>
 		elementHandleReads(reads, handlesByGraphNodeId);
-	const entryMarksOf = entryMarksResolver(input.semanticGraph.graphBindings);
+	const entryMarksOf = entryMarksResolver(input.semanticGraph);
 
 	// `onClick={[a, b]}` is several records on one host and event name. Their
 	// authored order is the order they run, and `order` is where the view payload
@@ -1126,12 +1126,15 @@ function resetOrder(
 
 // Async values whose key reads, directly or through sync computeds, a symbol the handler writes.
 function entryMarksResolver(
-	bindings: SymbolResolverInput['semanticGraph']['graphBindings'],
+	semanticGraph: Pick<SymbolResolverInput['semanticGraph'], 'graphBindings' | 'asyncBoundaries'>,
 ): (writes: ReadonlyArray<LoweredStateWrite>) => ReadonlyArray<string> | undefined {
+	const bindings = semanticGraph.graphBindings;
 	const bindingMap = new Map(bindings.map((binding) => [binding.id, binding]));
 	const keyInputsOf = asyncKeyInputs(bindingMap);
+	// A boundary's own gate fetches nothing: a write re-runs only the async values it joins, and those carry their own marks.
+	const gates = new Set(semanticGraph.asyncBoundaries.flatMap((boundary) => boundary.gateGraphNodeId ?? []));
 	const asyncIds = bindings
-		.filter((binding) => binding.kind === 'computed' && binding.async === true)
+		.filter((binding) => binding.kind === 'computed' && binding.async === true && !gates.has(binding.id))
 		.map((binding) => binding.id);
 	return (writes) => {
 		if (writes.length === 0) return undefined;

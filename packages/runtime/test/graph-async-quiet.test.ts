@@ -162,3 +162,97 @@ test('a loud answer landing inside a quiet turn still refreshes the values readi
 	expect(graph.read('computed:route', []) as { quiet?: boolean }).not.toHaveProperty('quiet');
 	expect(graph.read('computed:route', ['status'])).toBe('pending');
 });
+
+// A @try gate joins the block's values and fetches nothing, so its own pending never marks content busy.
+function gateGraph(first: () => unknown, gate: () => unknown) {
+	return createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:version', value: 0 },
+			{ graphNodeId: 'state:more', value: 0 },
+		],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:first',
+				dependencies: [{ graphNodeId: 'state:version', path: [] }],
+				key: (read) => read('state:version'),
+				run: first,
+			},
+			{
+				graphNodeId: 'computed:gate',
+				boundaryGate: true,
+				dependencies: [
+					{ graphNodeId: 'computed:first', path: ['value'] },
+					{ graphNodeId: 'state:more', path: [] },
+				],
+				key: (read) => [read('computed:first', ['value']), read('state:more')],
+				run: gate,
+			},
+		],
+	} as never);
+}
+
+test('a @try gate re-run by a write to a sync input is quiet', async () => {
+	const first = scriptedRuns();
+	const gate = scriptedRuns();
+	const graph = gateGraph(first.run, gate.run);
+	graph.read('computed:gate', ['status']);
+	first.settles[0]!.resolve({ rows: [] });
+	await tick();
+	await graph.flush();
+	gate.settles[0]!.resolve([]);
+	await tick();
+	expect(graph.read('computed:gate', ['status'])).toBe('fulfilled');
+
+	graph.write({ graphNodeId: 'state:more', value: 1 });
+	await graph.flush();
+	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'pending', quiet: true });
+});
+
+test('a @try gate waiting on a loud refresh is quiet while the value it joins stays loud', async () => {
+	const first = scriptedRuns();
+	const gate = scriptedRuns();
+	const graph = gateGraph(first.run, gate.run);
+	graph.read('computed:gate', ['status']);
+	first.settles[0]!.resolve({ rows: [] });
+	await tick();
+	await graph.flush();
+	gate.settles[0]!.resolve([]);
+	await tick();
+
+	graph.write({ graphNodeId: 'state:version', value: 1 });
+	await graph.flush();
+	expect(graph.read('computed:first', []) as object).toMatchObject({ status: 'pending' });
+	expect(graph.read('computed:first', []) as object).not.toHaveProperty('quiet');
+	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'pending', quiet: true });
+});
+
+test('a @try gate held by a save stays loud, so the whole block is marked with the reload', async () => {
+	const first = scriptedRuns();
+	const gate = scriptedRuns();
+	const graph = gateGraph(first.run, gate.run);
+	graph.read('computed:gate', ['status']);
+	first.settles[0]!.resolve({ rows: [] });
+	await tick();
+	await graph.flush();
+	gate.settles[0]!.resolve([]);
+	await tick();
+
+	graph.asyncPlane!()!.markEntry('computed:gate', true);
+	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'pending' });
+	expect(graph.read('computed:gate', []) as object).not.toHaveProperty('quiet');
+});
+
+test('a handler failure shown in a @catch speaks on its own, since it rode no refresh', async () => {
+	const first = scriptedRuns();
+	const gate = scriptedRuns();
+	const graph = gateGraph(first.run, gate.run);
+	graph.read('computed:gate', ['status']);
+	first.settles[0]!.resolve({ rows: [] });
+	await tick();
+	await graph.flush();
+	gate.settles[0]!.resolve([]);
+	await tick();
+
+	graph.asyncPlane!()!.failHandler('computed:gate', new Error('down'));
+	expect(graph.read('computed:gate', []) as object).toMatchObject({ status: 'rejected', quiet: true });
+});

@@ -110,7 +110,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			key,
 			value: (node.snapshot as { readonly value?: unknown }).value,
 			...(kept && { valueKey: kept.valueKey }),
-			...(node.quiet && { quiet: true }),
+			// A boundary's gate fetches nothing: the values it joins mark what is busy, unless a save holds the whole block.
+			...((node.quiet || (node.boundaryGate && !node.entryHold)) && { quiet: true }),
 		};
 	};
 
@@ -383,7 +384,8 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			if (node.phase === NODE_IDLE || node.phase >= NODE_RUNNING) move(node, NODE_SETTLED);
 			const version = ++node.version;
 			const key = (node.snapshot as { readonly key?: unknown }).key;
-			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot) });
+			// A handler's rejection rode no refresh of its own, so it speaks on its own; a save in flight still closes through its hold.
+			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot), quiet: true });
 		},
 	};
 }
