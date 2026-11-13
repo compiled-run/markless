@@ -474,6 +474,12 @@ export function renderSettledArm(input: SettleKernelInput): SettleKernelOutput {
 	}
 }
 
+/** Whether a component other than the module root owns the boundary, so the kernel needs its placement. */
+export function settlesPlacedOwner(surface: SurfaceLike, boundaryId: string): boolean {
+	const rootName = surface.rootComponentName;
+	return !!rootName && boundaryOwnerName(surface, rootName, boundaryId) !== rootName;
+}
+
 // The root answers first; otherwise the one component whose boundaries name the id.
 function boundaryOwnerName(surface: SurfaceLike, rootName: string, boundaryId: string): string {
 	const holds = (name: string) =>
