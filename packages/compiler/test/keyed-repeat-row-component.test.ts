@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import {
 	buildSemanticGraph,
+	compileTsrxModule,
 	createProtocolViewPayload,
 	createRenderData,
 	linkBarrelComponents,
@@ -856,4 +857,24 @@ test('a component row whose props do not read the loop index names no index', as
 	const repeat = (await viewOf(indexedRow('row.length'))).keyedRepeats?.[0];
 	expect(repeat?.rowComponent).toBeDefined();
 	expect(repeat).not.toHaveProperty('indexName');
+});
+
+test('a callback prop on a component row reads the loop index from the row it is dispatched in', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/App.tsrx',
+		source: `import { state } from '@markless/core';
+function Pick({ label, onPick }) @{
+	<li><button onClick={() => onPick()}>{label}</button></li>
+}
+export function App() @{
+	let rows = state(['a']);
+	let picked = state(-1);
+	<ul>@for (const row of rows; index n; key row) { <Pick label={row} onPick={() => (picked = n)} /> }</ul>
+}
+`,
+		symbols: [],
+	});
+	const callback = compiled.symbolModules.modules.find((module) => module.kind === 'callback-prop');
+	expect(callback?.source).toContain('context.locals?.n');
+	expect(compiled.protocolView.keyedRepeats?.[0]?.indexName).toBe('n');
 });

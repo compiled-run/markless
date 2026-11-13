@@ -72,14 +72,12 @@ async function callbackIndex() {
 	await expect.poll(picked).toBe('2');
 }
 
-// Known defect: a callback prop that captures the loop index throws when called, because only the row item is routed
-// into a callback's captures; capturing the item works.
-test.fails('CSR: a callback prop capturing the index reads the moved row\'s index', async () => {
+test('CSR: a callback prop capturing the index reads the moved row\'s index', async () => {
 	await render(Picked);
 	await callbackIndex();
 });
 
-test.fails('SSR: a callback prop capturing the index reads the moved row\'s index', async () => {
+test('SSR: a callback prop capturing the index reads the moved row\'s index', async () => {
 	await renderSSR(Picked);
 	await callbackIndex();
 });

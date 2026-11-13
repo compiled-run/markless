@@ -119,7 +119,7 @@ export function resolveRowComponentMint(
 	};
 }
 
-/** A component row passes the loop index into its child's props, so a row that only moved renders differently. */
+/** A component row's props read the loop index: a moved row renders differently, and a callback is handed the index. */
 export function rowComponentReadsIndex(
 	componentEdges: ReadonlyArray<SemanticComponentEdge>,
 	rowComponent: RowComponentMint,
@@ -128,7 +128,6 @@ export function rowComponentReadsIndex(
 	const edge = componentEdges.find((candidate) => candidate.id === rowComponent.componentEdgeId);
 	return (edge?.props ?? []).some(
 		(prop) =>
-			prop.kind !== 'callback' &&
 			prop.source !== undefined &&
 			residueReferences(readResidueNames(prop.source, 'expression'), indexName),
 	);
