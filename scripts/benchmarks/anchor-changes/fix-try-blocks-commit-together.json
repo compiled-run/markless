@@ -89,6 +89,50 @@
 			"delta": 4,
 			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 562,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 151,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 84,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
 		}
 	]
 }
