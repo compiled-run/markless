@@ -5,21 +5,10 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"web/paint-hold"
-			],
-			"set": 3729,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"runtime/graph"
 			],
 			"delta": -2231,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -30,7 +19,7 @@
 				"runtime/graph-core"
 			],
 			"delta": -597,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -40,8 +29,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-return-reask"
 			],
-			"delta": 82,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"delta": 3637,
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -52,7 +41,7 @@
 				"web/resume-sync-computed"
 			],
 			"delta": -355,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -63,19 +52,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 3,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/paint-hold"
-			],
-			"set": 3729,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"delta": -5,
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -86,7 +64,7 @@
 				"runtime/graph"
 			],
 			"delta": -2231,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -97,7 +75,7 @@
 				"runtime/graph-core"
 			],
 			"delta": -597,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -107,8 +85,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-return-reask"
 			],
-			"delta": 82,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"delta": 3637,
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -119,7 +97,7 @@
 				"web/resume-sync-computed"
 			],
 			"delta": -355,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		},
 		{
@@ -130,20 +108,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -3,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": -3,
-			"reason": "save hold moved out of the always-loaded graph: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive move to web/paint-hold, which only the write watch loads; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
+			"delta": 2,
+			"reason": "save hold moved out of the always-loaded graph into the write watch's own module: the graph keeps the painting counter, the painted read and a before/after hook per write; shown values, copies, release and the painted derive live in web/resume-return-reask, which only pages with an async value load; measured locally by packages/bundler/test/fixture-builds.test.ts on perf/hold-out-of-graph against main 5a20b0806",
 			"date": "2026-11-13"
 		}
 	]

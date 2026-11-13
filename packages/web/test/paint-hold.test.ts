@@ -2,7 +2,7 @@ import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
 import { createHeldInputsPlane } from '@markless/runtime/graph-held';
-import { createPaintHold } from '../src/paint-hold.ts';
+import { createPaintHold } from '../src/resume-return-reask.ts';
 
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
