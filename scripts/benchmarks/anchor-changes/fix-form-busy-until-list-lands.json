@@ -84,43 +84,9 @@
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
 				"web/resume-return-reask"
 			],
 			"delta": 151,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": 34,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 63,
 			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
 			"date": "2026-11-13"
 		},
@@ -139,13 +105,47 @@
 		{
 			"surface": "perf-guards",
 			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 253,
+			"reason": "a press asks for the submit hold and records what the form carried when the runtime hears it; the hold and in-place sender preload only on pages whose forms need them. CI run 43517700994 against merge-group run 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"executedChars"
+			],
+			"delta": 33,
+			"reason": "a press asks for the submit hold and records what the form carried when the runtime hears it; the hold and in-place sender preload only on pages whose forms need them. CI run 43517700994 against merge-group run 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
 				"loadWeight",
 				"linux-x64",
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 63,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
+			"delta": 233,
+			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
 			"date": "2026-11-13"
 		}
 	]
