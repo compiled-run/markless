@@ -92,6 +92,8 @@ export type SsrRenderOutput = {
 			readonly html: string;
 			/** How many page elements precede the anchor. */
 			readonly elementStart: number;
+			/** How many page elements precede the anchor's end. */
+			readonly elementEnd: number;
 		}>;
 	};
 };

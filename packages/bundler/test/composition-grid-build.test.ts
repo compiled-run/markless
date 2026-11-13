@@ -22,16 +22,7 @@ const root = resolve(import.meta.dirname, '../../..');
 const app = resolve(import.meta.dirname, 'fixtures/composition-grid');
 const rowsApp = resolve(app, 'rows-app');
 const vp = resolve(root, 'node_modules/.bin/vp');
-// A pinned failure waits less, since it is expected to time out.
 const poll = { timeout: 5_000, interval: 20 };
-async function pinned(run: () => Promise<void>) {
-	poll.timeout = 1_500;
-	try {
-		await run();
-	} finally {
-		poll.timeout = 5_000;
-	}
-}
 // Each page runs several steps against a real server and browser.
 vi.setConfig({ testTimeout: 60_000 });
 
@@ -350,12 +341,13 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
-	// Known defect: in the build, each row's own async value stays on its @pending after the server render.
-	test.fails('i. row component with its own async value: first render shows every row\'s value', () =>
-		pinned(async () => {
-			await new Run(rowDetail, await visit(rowDetail.path)).firstRender();
-		}),
-	);
+	test('i. row component with its own async value: first render, reload, save held, handler rejects', async () => {
+		const run = new Run(rowDetail, await visit(rowDetail.path));
+		await run.firstRender();
+		await run.reload();
+		await run.saveHeld();
+		await run.handlerRejects();
+	});
 
 	test('g. forms in a child file in a streamed @try: a pointer click and Enter both save, a refused submit reaches @catch', async () => {
 		const response = await fetch(`${server.origin}/g-editor`);

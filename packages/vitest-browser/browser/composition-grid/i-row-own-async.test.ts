@@ -1,9 +1,10 @@
 import { beforeEach, expect, test } from 'vitest';
-import { render, renderSSR } from '../../src/index.ts';
+import { render, renderSSR, renderStream } from '../../src/index.ts';
 import EntryNotePage from './i-entry-note-page.tsrx';
 import RowDetailPage from './i-row-detail-page.tsrx';
+import SingleDetailPage from './i-single-detail-page.tsrx';
 import { installServer, resetServer, server, type Board } from './grid-server.ts';
-import { fullTimeline, type Shape } from './timeline.ts';
+import { fullTimeline, oneStep, playStream, type Shape } from './timeline.ts';
 
 // An other-file row component with its own async value keyed on its row, over rows from the page's answer, in a @try.
 installServer();
@@ -34,5 +35,16 @@ const run = (view: (board: Board) => string[], mode: 'CSR' | 'SSR', mount: () =>
 
 test('CSR', () => fullTimeline(run((board) => [title(board), ...rows(board)], 'CSR', () => render(RowDetailPage))));
 test('SSR', () => fullTimeline(run((board) => [title(board), ...rows(board)], 'SSR', () => renderSSR(RowDetailPage))));
+// Streamed as a router page is: each row's own @try first renders inside the streamed arm.
+test('SSR streamed', () => fullTimeline(run((board) => [title(board), ...rows(board)], 'SSR', () => playStream(renderStream(RowDetailPage)))));
+// One child from another file, not a row, with its own async value inside the streamed @try.
+const single = (mode: 'CSR' | 'SSR', mount: () => Promise<unknown>) =>
+	run((board) => [title(board), ...rows({ ...board, items: board.items.slice(0, 1) })], mode, mount);
+test('single child: SSR streamed', () =>
+	fullTimeline(single('SSR', () => playStream(renderStream(SingleDetailPage))), ['switch subject while open']));
+// Known gap: the nested @try streams settled with its arm, but its own records never reach the browser,
+// so a prop that changes in place leaves its text as served. Streaming it as its own piece fixes it.
+test.fails('single child: SSR streamed: a new subject reaches the nested @try', () =>
+	oneStep(single('SSR', () => playStream(renderStream(SingleDetailPage))), 'switch subject while open'));
 test('renamed: CSR', () => fullTimeline(run((board) => [...rows(board), title(board)], 'CSR', () => render(EntryNotePage))));
 test('renamed: SSR', () => fullTimeline(run((board) => [...rows(board), title(board)], 'SSR', () => renderSSR(EntryNotePage))));

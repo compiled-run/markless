@@ -218,6 +218,8 @@ async function* streamArmAppends(input: {
 	readonly shellState: ProtocolStatePayload | undefined;
 }): AsyncGenerator<string, void, void> {
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
+	const streamed = new Set(remaining.keys());
+	const runs = input.renderContext.streaming.runs;
 	const signal = input.renderContext.streaming.signal;
 	if (signal.aborted) return;
 	let cancelAppends!: () => void;
@@ -227,22 +229,22 @@ async function* streamArmAppends(input: {
 	const onCancel = () => cancelAppends();
 	signal.addEventListener('abort', onCancel, { once: true });
 	let executorEmitted = false;
-	const settledRuns = new Set<PendingArm>();
-	for (const arm of remaining.values())
-		arm.entry.promise.then(
-			() => settledRuns.add(arm),
-			() => settledRuns.add(arm),
-		);
+	// An arm whose nested @try can never settle is set aside; the stream fails once every other arm has gone out.
+	const failures: Error[] = [];
+	// The nested values a settled arm still waits on before it streams.
+	const holds = new Map<PendingArm, ReadonlyArray<StreamRunEntry>>();
 	// A wave that starts after an arm's value settled must stream it, or every later wave re-renders forever.
 	const missedWaves = new Map<PendingArm, number>();
 	try {
 		while (remaining.size > 0) {
 			await Promise.race([
-				...[...remaining.values()].map((arm) => arm.entry.promise),
+				...[...remaining.values()].flatMap((arm) =>
+					(holds.get(arm) ?? [arm.entry]).map((entry) => entry.promise),
+				),
 				cancelled,
 			]);
 			if (signal.aborted) return;
-			const settledBeforeWave = [...remaining.values()].filter((arm) => settledRuns.has(arm));
+			const settledBeforeWave = new Set([...runs.values()].filter((entry) => entry.settled));
 			// One re-render pass per settle wave: settled runners resolve from the
 			// per-request registry (no run() re-execution), so the pass renders the
 			// settled arm html + armized records for every boundary that just
@@ -273,14 +275,30 @@ async function* streamArmAppends(input: {
 						: [],
 				),
 			);
+			holds.clear();
 			const parts: string[] = [];
-			// Deleting the visited entry during Map iteration is safe in JS.
 			for (const arm of remaining.values()) {
-				if (
-					!settledInWave.has(arm.graphNodeId) &&
-					!(arm.entry.async === false && armTakenInWave.has(arm.boundaryId))
-				)
+				const ready =
+					settledInWave.has(arm.graphNodeId) ||
+					(arm.entry.async === false && armTakenInWave.has(arm.boundaryId));
+				if (!ready) {
+					if (!settledBeforeWave.has(arm.entry)) continue;
+					const missed = (missedWaves.get(arm) ?? 0) + 1;
+					if (missed > 1)
+						throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
+					missedWaves.set(arm, missed);
 					continue;
+				}
+				const nested = nestedHolds(output, arm, runs, streamed, settledBeforeWave);
+				if ('stuck' in nested) {
+					remaining.delete(arm.boundaryId);
+					failures.push(nested.stuck);
+					continue;
+				}
+				if (nested.waits.length > 0) {
+					holds.set(arm, nested.waits);
+					continue;
+				}
 				remaining.delete(arm.boundaryId);
 				if (!executorEmitted) {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
@@ -296,18 +314,77 @@ async function* streamArmAppends(input: {
 					),
 				);
 			}
-			for (const arm of settledBeforeWave) {
-				if (!remaining.has(arm.boundaryId)) continue;
-				const missed = (missedWaves.get(arm) ?? 0) + 1;
-				if (missed > 1)
-					throw streamArmError(arm.boundaryId, '@try or @catch arm', 'boundary record');
-				missedWaves.set(arm, missed);
-			}
 			if (parts.length > 0) yield parts.join('');
 		}
+		if (failures[0]) throw failures[0];
 	} finally {
 		signal.removeEventListener('abort', onCancel);
 	}
+}
+
+// Only the shell's boundaries stream their own arm, so a @try first rendered inside a settled arm settles with it.
+function nestedHolds(
+	output: SsrRenderOutput,
+	arm: PendingArm,
+	runs: ReadonlyMap<string, StreamRunEntry>,
+	streamed: ReadonlySet<string>,
+	settledBeforeWave: ReadonlySet<StreamRunEntry>,
+): { readonly waits: ReadonlyArray<StreamRunEntry> } | { readonly stuck: Error } {
+	const anchors = (output.structure?.anchors ?? []).filter((anchor) => anchor.kind === 'async');
+	const range = anchors.find((anchor) => anchor.id === arm.boundaryId);
+	const waits = new Set<StreamRunEntry>();
+	for (const boundary of output.view?.asyncBoundaries ?? []) {
+		const anchor = anchors.find((candidate) => candidate.id === boundary.id);
+		if (
+			!range ||
+			!anchor ||
+			streamed.has(boundary.id) ||
+			boundary.initiallyServedArm !== ASYNC_BOUNDARY_ARM.pending ||
+			anchor.elementStart < range.elementStart ||
+			anchor.elementEnd > range.elementEnd
+		)
+			continue;
+		const behind = runsBehind(output, boundary, runs);
+		// Nothing the server is loading can settle it, or everything it reads had settled before this render.
+		if (behind.every((entry) => settledBeforeWave.has(entry)))
+			return { stuck: nestedArmError(boundary.id, arm.boundaryId) };
+		for (const entry of behind) if (!entry.settled) waits.add(entry);
+		// Settled during this render: the next wave renders it settled.
+		if (behind.every((entry) => entry.settled)) for (const entry of behind) waits.add(entry);
+	}
+	return { waits: [...waits] };
+}
+
+// Every request run a boundary's reads stand on, through the sync derives between them.
+function runsBehind(
+	output: SsrRenderOutput,
+	boundary: StreamedBoundary,
+	runs: ReadonlyMap<string, StreamRunEntry>,
+): StreamRunEntry[] {
+	const definitions = new Map(
+		(output.state?.computed ?? []).map((definition) => [definition.graphNodeId, definition]),
+	);
+	const reads = new Set(
+		[boundary.runnerGraphNodeId, ...boundary.asyncReads.map((read) => read.graphNodeId)].filter(
+			(id): id is string => typeof id === 'string' && id !== '',
+		),
+	);
+	const entries = new Set<StreamRunEntry>();
+	for (const id of reads) {
+		const entry = runs.get(id);
+		if (entry) entries.add(entry);
+		const definition = definitions.get(id) as
+			| { readonly dependencies?: ReadonlyArray<{ readonly graphNodeId: string }> }
+			| undefined;
+		for (const dependency of definition?.dependencies ?? []) reads.add(dependency.graphNodeId);
+	}
+	return [...entries];
+}
+
+function nestedArmError(boundaryId: string, armId: string): Error {
+	const error = streamArmError(armId, '@try or @catch arm', `nested boundary ${boundaryId}`);
+	(error as Error & Record<string, unknown>).nestedBoundaryId = boundaryId;
+	return error;
 }
 
 // Settled content that cannot render fails its own boundary: it takes @catch, so the page never stays on @pending.
