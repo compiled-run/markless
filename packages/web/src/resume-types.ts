@@ -5,6 +5,11 @@ export type ResumeDomNode = {
 	readonly nodeType: number;
 	readonly childNodes?: ReadonlyArray<ResumeDomNode>;
 };
+/** Content on the page whose records are still registering: `settled` answers whether they all did; `holds` says whether a node is that content. */
+export type ResumeArmRegistration = {
+	readonly settled: Promise<boolean>;
+	readonly holds: (node: unknown) => boolean;
+};
 // `element<T[]>()` answers every live element it is bound to, in document
 // order; every other handle answers the one element or undefined.
 export type ResumeElementHandleValue =

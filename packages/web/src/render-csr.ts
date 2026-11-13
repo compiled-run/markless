@@ -21,6 +21,7 @@ import {
 } from './inline/sync-policy-core.ts';
 import { registerServedArmEventRecords } from './resume-arm-records.ts';
 import type {
+	ResumeArmRegistration,
 	ResumeAsyncBoundaryPayload,
 	ResumeDispatchOptions,
 	ResumeDomElement,
@@ -460,11 +461,12 @@ function installDelegatedTriggers(
 			if (!actionKind && rowEventNames.has(event.type))
 				actionKind = PROTOCOL_EVENT_ACTION_KIND.event;
 			if (!actionKind) {
-				const pending = (
-					output.root as { __marklessArmRegistering?: Set<Promise<unknown>> }
-				).__marklessArmRegistering;
-				return !retried && pending?.size
-					? Promise.all(pending).then(() => route(event, true))
+				const pending = [
+					...((output.root as { __marklessArmRegistering?: Set<ResumeArmRegistration> })
+						.__marklessArmRegistering ?? []),
+				].filter((entry) => entry.holds(event.target));
+				return !retried && pending.length
+					? Promise.all(pending.map((entry) => entry.settled)).then(() => route(event, true))
 					: undefined;
 			}
 			const action = routes[actionKind];
