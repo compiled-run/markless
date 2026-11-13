@@ -425,14 +425,13 @@ async function prepareBoundarySettle(
 		!(kept && input.root.__marklessBranchArms?.get(boundary.id)?.listeners.size)
 	) {
 		if (claim?.() === false) return;
-		shownArms.set(boundary, ASYNC_BOUNDARY_ARM.try);
 		const after = kept && asyncPlanes.busy?.afterRange(boundary, false);
-		if (!after) return void input.settleTracker?.markSettled(boundary.id);
+		if (!after) {
+			shownArms.set(boundary, ASYNC_BOUNDARY_ARM.try);
+			return void input.settleTracker?.markSettled(boundary.id);
+		}
 		const land = await prepareArm(input, after as ResumeAsyncBoundaryRecord, { nodes: [], armRecords: noRecords(), after: true });
-		return async () => {
-			await land();
-			input.settleTracker?.markSettled(boundary.id);
-		};
+		return landShown(input, boundary, ASYNC_BOUNDARY_ARM.try, land);
 	}
 	const source = resolveBoundarySettleSource(input, boundary);
 	const arm = status === 'rejected' ? ASYNC_BOUNDARY_ARM.catch : ASYNC_BOUNDARY_ARM.try;
@@ -450,20 +449,18 @@ async function prepareBoundarySettle(
 			arm === ASYNC_BOUNDARY_ARM.catch && showsTry(boundary)
 				? asyncPlanes.busy?.afterRange(boundary, true)
 				: undefined;
-		// Set before the commit lands, so another read of this boundary in the same pass refreshes in place.
-		if (after) shownArms.set(boundary, SHOWN_TRY_KEPT);
-		else if (ownRecords || arm !== ASYNC_BOUNDARY_ARM.try) shownArms.set(boundary, arm);
-		else shownArms.delete(boundary);
 		const land = await prepareArm(input, (after ?? boundary) as ResumeAsyncBoundaryRecord, {
 			...update,
 			...(moved && { moved }),
 			arm,
 			...(after && { after: true }),
 		});
-		return async () => {
-			await land();
-			input.settleTracker?.markSettled(boundary.id);
-		};
+		return landShown(
+			input,
+			boundary,
+			after ? SHOWN_TRY_KEPT : ownRecords || arm !== ASYNC_BOUNDARY_ARM.try ? arm : undefined,
+			land,
+		);
 	};
 	// A composed child's arm records are minted in the child's own id space; the
 	// qualifier that re-spells them in page space is installed only by pages the
@@ -530,6 +527,28 @@ async function prepareBoundarySettle(
 	else shownArms.set(boundary, arm);
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
+}
+
+// Recorded once the commit is prepared, so another read of this boundary in the same pass refreshes in place; a landing that fails puts the record back.
+function landShown(
+	input: SettleInput,
+	boundary: ResumeAsyncBoundaryRecord,
+	shown: number | undefined,
+	land: () => Promise<void>,
+): RuntimeGraphCommit {
+	const before = shownArms.get(boundary);
+	const record = (arm: number | undefined) =>
+		arm === undefined ? shownArms.delete(boundary) : shownArms.set(boundary, arm);
+	record(shown);
+	return async () => {
+		try {
+			await land();
+		} catch (error) {
+			if (shownArms.get(boundary) === shown) record(before);
+			throw error;
+		}
+		input.settleTracker?.markSettled(boundary.id);
+	};
 }
 
 async function prepareArm(

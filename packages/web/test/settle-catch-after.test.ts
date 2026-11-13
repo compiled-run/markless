@@ -126,7 +126,7 @@ test('a rejection after a refresh held for a minute keeps the content and commit
 			version++;
 			const landing = [];
 			for (const subscriber of subscribers) landing.push(await subscriber.run({ status, version }));
-			for (const commit of landing) if (typeof commit === 'function') await commit();
+			await Promise.all(landing.map((commit) => (typeof commit === 'function' ? commit() : undefined)));
 		};
 		await publish('fulfilled');
 		await publish('pending');

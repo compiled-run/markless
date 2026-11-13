@@ -194,3 +194,25 @@ test('an async answer leaves rows to the pass instead of a write observer', asyn
 
 	expect(landed).toEqual(['rows by the pass']);
 });
+
+test('a subscription that rejects leaves every other commit in its pass landing, then the pass rejects with its error', async () => {
+	const landed: string[] = [];
+	const graph = createRuntimeGraph({ cells: [{ graphNodeId: 'state:customer', value: 0 }] });
+	for (const name of ['first', 'failing', 'last'])
+		graph.subscribe({
+			id: `block:${name}`,
+			graphNodeId: 'state:customer',
+			run: async () => {
+				await macrotask();
+				if (name === 'failing') throw new Error('chunk failed');
+				return () => {
+					if (name === 'first') throw new Error('first commit failed');
+					landed.push(name);
+				};
+			},
+		});
+
+	graph.write({ graphNodeId: 'state:customer', value: 1 });
+	await expect(graph.flush()).rejects.toThrow('chunk failed');
+	expect(landed).toEqual(['last']);
+});

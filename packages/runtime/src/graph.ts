@@ -766,6 +766,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const pendingFlush = (): Promise<void> | undefined =>
 		flushPhase === FLUSH_REARMED ? pass!.landed.then(pendingFlush) : pass?.landed;
 
+	// A commit that throws before its first await rejects instead of stopping the commits after it.
+	const landCommit = async (commit: RuntimeGraphCommit): Promise<void> => commit();
+
 	const runFlush = async (): Promise<void> => {
 		moveFlush(FLUSH_RUNNING);
 
@@ -777,6 +780,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 					const pending = dirtyPaths.splice(0);
 					const ranSubscriptions = new Set<string>();
 					const commits: RuntimeGraphCommit[] = [];
+					const failures: unknown[] = [];
 					// A subscription added mid-pass runs after every older one, as an appended entry would.
 					for (
 						let floor = 0, ceiling;
@@ -790,24 +794,32 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							)
 								continue;
 							ranSubscriptions.add(subscription.id);
-							const ran = paint(() =>
-								subscription.run(readGraph(subscription.graphNodeId, subscription.path ?? [])),
-							);
-							const entries =
-								typeof (ran as PromiseLike<unknown>)?.then === 'function'
-									? await ran
-									: ran;
+							// One subscription failing still lets every other one in the round run and land.
+							let entries: DomJournalResult | RuntimeGraphCommit | void;
+							try {
+								const ran = paint(() =>
+									subscription.run(readGraph(subscription.graphNodeId, subscription.path ?? [])),
+								);
+								entries = (
+									typeof (ran as PromiseLike<unknown>)?.then === 'function' ? await ran : ran
+								) as DomJournalResult | RuntimeGraphCommit | void;
+							} catch (error) {
+								failures.push(error);
+								continue;
+							}
 							if (typeof entries === 'function') commits.push(entries);
-							else appendJournalResult(journal, entries as DomJournalResult | void);
+							else appendJournalResult(journal, entries);
 						}
 					if (commits.length > 0) {
 						// The next round's code loads first, so its journal paints in the task these commits do.
 						const waits = codeThePassWaitsOn();
 						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
-						const landing = paint(() => commits.map((commit) => commit()));
+						const landing = paint(() => commits.map((commit) => landCommit(commit)));
 						await notifyJournalListeners();
-						await Promise.all(landing);
+						for (const landed of await Promise.allSettled(landing))
+							if (landed.status === 'rejected') failures.push(landed.reason);
 					}
+					if (failures.length > 0) throw failures[0];
 				}
 			} finally {
 				try {

@@ -53,6 +53,41 @@ test('CSR: two blocks settling on one value land in one task when their code arr
 	expect(samples.at(-1)).toBe('customer 1|tier 1');
 });
 
+test('CSR: a block whose code fails to load leaves the other block on the same value updated', async () => {
+	type Card = {
+		readonly loadSymbol: (symbolId: string) => unknown;
+		readonly renderData: { readonly components: Record<string, { readonly view: { readonly asyncBoundaries: ReadonlyArray<{ readonly updateSymbolId: string }> } }> };
+	};
+	const base = CustomerCard as unknown as Card;
+	const failing = Object.values(base.renderData.components)[0]!.view.asyncBoundaries[1]!.updateSymbolId;
+	let fail = true;
+	const errors: unknown[] = [];
+	const caught = (event: PromiseRejectionEvent) => {
+		if ((event.reason as Error)?.message !== 'chunk failed') return;
+		errors.push(event.reason);
+		event.preventDefault();
+	};
+	window.addEventListener('unhandledrejection', caught);
+	try {
+		await render({
+			...base,
+			loadSymbol: (symbolId: string) =>
+				symbolId === failing && fail ? Promise.reject(new Error('chunk failed')) : base.loadSymbol(symbolId),
+		} as unknown as typeof CustomerCard);
+		await expect.poll(() => text('[data-optional]')).toBe('customer 1');
+		expect(text('[data-asserted-loading]')).toBe('Loading');
+		await expect.poll(() => errors.length).toBeGreaterThan(0);
+
+		fail = false;
+		click('[data-next]');
+		await expect.poll(() => text('[data-optional]')).toBe('customer 2');
+		await expect.poll(() => text('[data-asserted]')).toBe('tier 2');
+		expect(document.querySelectorAll('[data-optional-loading], [data-asserted-loading]')).toHaveLength(0);
+	} finally {
+		window.removeEventListener('unhandledrejection', caught);
+	}
+});
+
 test('SSR: a @try reading an async value through ?. or ! follows it', async () => {
 	await renderSSR(CustomerCard);
 	await followsEachCustomer();

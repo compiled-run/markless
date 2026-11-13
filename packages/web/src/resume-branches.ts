@@ -41,12 +41,7 @@ export function wireBranches(input: any) {
 		if (record.armBoundaryId && !record.symbolId) wireEscalatedRecord(record);
 	for (const branch of branchesById.values()) {
 		const arm = currentArmByBranchId.get(branch.id);
-		if (
-			arm === undefined ||
-			input.skipStartupBranchIds?.has(branch.id) ||
-			!branch.armRecords?.[arm]
-		)
-			continue;
+		if (arm === undefined || !branch.armRecords?.[arm]) continue;
 		startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
 	}
 	async function materializeFlippedBranchArms(

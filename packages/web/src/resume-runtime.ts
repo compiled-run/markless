@@ -138,8 +138,19 @@ export function createResumeRuntime(
 		});
 	};
 	onRegisterComputedRefreshes?.(registerComputedRefreshes);
-	async function getEvents(): Promise<EventWiring> {
-		if (events) return events;
+	let eventsLoad: Promise<EventWiring> | undefined,
+		behaviorLoad: Promise<BehaviorRuntime> | undefined,
+		branchLoad: Promise<BranchRuntime> | undefined;
+	// Concurrent first calls share one build; a failed load is asked again.
+	const loadOnce = <T,>(build: () => Promise<T>, clear: () => void): Promise<T> =>
+		build().catch((error: unknown) => {
+			clear();
+			throw error;
+		});
+	function getEvents(): Promise<EventWiring> {
+		return (eventsLoad ??= loadOnce(buildEvents, () => (eventsLoad = undefined)));
+	}
+	async function buildEvents(): Promise<EventWiring> {
 		const { createEventWiring } = await import('./resume-events.ts');
 		events = createEventWiring({
 			root: input.root,
@@ -215,8 +226,10 @@ export function createResumeRuntime(
 		);
 	}
 
-	async function loadBehaviorRuntime(): Promise<BehaviorRuntime> {
-		if (behaviorRuntime) return behaviorRuntime;
+	function loadBehaviorRuntime(): Promise<BehaviorRuntime> {
+		return (behaviorLoad ??= loadOnce(buildBehaviorRuntime, () => (behaviorLoad = undefined)));
+	}
+	async function buildBehaviorRuntime(): Promise<BehaviorRuntime> {
 		const eventState = await getEvents();
 		const { createBehaviorRuntime } = await import('./resume-behaviors.ts');
 		behaviorRuntime = createBehaviorRuntime({
@@ -241,18 +254,16 @@ export function createResumeRuntime(
 		resettleBoundary?: (boundaryId: string) => Promise<DomJournalResult | void>;
 		holdPendingFlip?: (graphNodeId: string) => boolean;
 	} = {};
-	async function loadBranchRuntime(
-		options: { readonly skipStartupBranchIds?: ReadonlySet<string> } = {},
-	): Promise<BranchRuntime> {
-		if (branchRuntime) return branchRuntime;
+	function loadBranchRuntime(): Promise<BranchRuntime> {
+		return (branchLoad ??= loadOnce(buildBranchRuntime, () => (branchLoad = undefined)));
+	}
+	async function buildBranchRuntime(): Promise<BranchRuntime> {
 		const eventTypesBefore = new Set(eventTypes),
 			behaviors =
 				behaviorRuntime ??
 				(viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined);
 		const { wireBranches } = await import('./resume-branches.ts');
 		const eventWiring = await getEvents();
-		// Arms registering at once share the runtime the first of them wired.
-		if (branchRuntime) return branchRuntime;
 		branchRuntime = wireBranches(
 			Object.assign(branchWiring, {
 				root: input.root,
@@ -271,10 +282,9 @@ export function createResumeRuntime(
 				commitArm: commitBoundaryArm,
 				prepareArmCommit: prepareBoundaryArmCommit,
 				registerServedArmRecords: registerServedBranchArmRecords,
-				skipStartupBranchIds: options.skipStartupBranchIds,
 			}),
 		);
-		const listener = input.root.__marklessDelegatedDispatch ? events!.applySyncPolicy : dispatchCaptured;
+		const listener = input.root.__marklessDelegatedDispatch ? eventWiring.applySyncPolicy : dispatchCaptured;
 		for (const eventType of eventTypes) {
 			if (eventTypesBefore.has(eventType)) continue;
 			input.root.addEventListener?.(eventType, listener, { capture: true });
