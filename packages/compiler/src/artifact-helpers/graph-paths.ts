@@ -71,6 +71,26 @@ export function asyncComputedReadPath(path: ReadonlyArray<string>): ReadonlyArra
 	return path.length === 0 || asyncSnapshotKeys.has(path[0]) ? ['value', ...path] : path;
 }
 
+export function asyncComputedGraphNodeIds(
+	graph: Pick<SemanticGraphArtifact, 'graphBindings'> | undefined,
+): ReadonlySet<string> {
+	return new Set(
+		(graph?.graphBindings ?? []).flatMap((binding) =>
+			binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
+		),
+	);
+}
+
+// Render data keeps a test's authored path; the browser reads an async computed's snapshot value.
+export function browserGraphReads<Read extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(
+	reads: ReadonlyArray<Read>,
+	asyncComputedIds: ReadonlySet<string>,
+): ReadonlyArray<Read> {
+	return reads.map((read) =>
+		asyncComputedIds.has(read.graphNodeId) ? { ...read, path: asyncComputedReadPath(read.path) } : read,
+	);
+}
+
 // A computed runner needs the upstream resolved object before its authored
 // member access runs; reading the snapshot root would make `upstream.member`
 // inspect metadata instead.

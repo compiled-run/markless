@@ -5,6 +5,7 @@ import {
 	type ProtocolSubmitEventFacts,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
+import { asyncComputedGraphNodeIds, browserGraphReads } from '../artifact-helpers/graph-paths.ts';
 import { repeatRowSiblingElements } from './render-data/row-position.ts';
 import { elementAddress } from './semantic-graph/projection-placement.ts';
 import type {
@@ -382,7 +383,7 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
 				index: emittedPairRank(input, site.id) * 2 + 1,
 			},
 			symbolId: branchSymbols.get(site.id)?.id,
-			testReads: branchSymbols.get(site.id)?.testReads ?? [],
+			testReads: browserTestReads(input, branchSymbols.get(site.id)?.testReads),
 			...branchContentReadsField(input, site.id),
 			...branchArmSeedsField(input, site.id),
 			...(escalatingIds.has(site.id)
@@ -399,6 +400,13 @@ function supportedBranchRecords(input: ProtocolViewPayloadInput) {
  * markers. These reads refresh the arm's own marker range instead, through the
  * branch's existing update symbol, so nothing outside the served arm moves.
  */
+function browserTestReads<Read extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(
+	input: ProtocolViewPayloadInput,
+	reads: ReadonlyArray<Read> | undefined,
+): ReadonlyArray<Read> {
+	return browserGraphReads(reads ?? [], asyncComputedGraphNodeIds(input.semanticGraph));
+}
+
 function branchContentReadsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
 	const reads = (input.payloadArena.view.branchContentReads ?? []).filter(
 		(read) => read.branchSiteId === branchSiteId,
@@ -954,7 +962,7 @@ function rowBranchSlot(
 		branch.testReads.length === 1
 			? {
 					graphNodeId: branch.testReads[0]!.graphNodeId,
-					graphPath: branch.testReads[0]!.path,
+					graphPath: browserTestReads(input, branch.testReads)[0]!.path,
 				}
 			: slotValue({
 					kind: 'text',
@@ -1464,7 +1472,7 @@ function armScopedBranchRecords(
 		branch.update === 'boundary'
 			? {
 					id: branch.branchSiteId,
-					testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+					testReads: browserTestReads(input, branchSymbols.get(branch.branchSiteId)?.testReads),
 					// A component in the arm runs, so the flip renders its own range from the page.
 					...(escalating.has(branch.branchSiteId) && {
 						symbolId: branchSymbols.get(branch.branchSiteId)?.id,
@@ -1476,7 +1484,7 @@ function armScopedBranchRecords(
 			: {
 					id: branch.branchSiteId,
 					symbolId: branchSymbols.get(branch.branchSiteId)?.id,
-					testReads: branchSymbols.get(branch.branchSiteId)?.testReads ?? [],
+					testReads: browserTestReads(input, branchSymbols.get(branch.branchSiteId)?.testReads),
 					startAnchor: { strategy: 'arm-branch-comment', index: rank * 2 },
 					endAnchor: { strategy: 'arm-branch-comment', index: rank * 2 + 1 },
 					...branchContentReadsField(input, branch.branchSiteId),

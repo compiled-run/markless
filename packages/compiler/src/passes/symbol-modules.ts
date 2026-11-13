@@ -46,7 +46,11 @@ import {
 } from './arm-child-content.ts';
 import { asNodes, getIdentifierName, isNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
-import { asyncComputedReadPath } from '../artifact-helpers/graph-paths.ts';
+import {
+	asyncComputedGraphNodeIds,
+	asyncComputedReadPath,
+	browserGraphReads,
+} from '../artifact-helpers/graph-paths.ts';
 import { moduleIdOf } from '../module-id.ts';
 import {
 	bindingOrigins,
@@ -1344,26 +1348,12 @@ function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] 
 	}
 }
 
-function asyncComputedGraphNodeIds(
-	semanticGraph: SymbolModulesInput['semanticGraph'],
-): ReadonlySet<string> {
-	return new Set(
-		(semanticGraph?.graphBindings ?? []).flatMap((binding) =>
-			binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
-		),
-	);
-}
-
 // A handler sees an async value as the template does: the resolved value, never its snapshot.
 function asyncValueReads<Read extends LoweredStateRead>(
 	reads: ReadonlyArray<Read> | undefined,
 	asyncComputedNodeIds: ReadonlySet<string>,
 ): ReadonlyArray<Read> {
-	return (reads ?? []).map((read) =>
-		asyncComputedNodeIds.has(read.graphNodeId)
-			? { ...read, path: asyncComputedReadPath(read.path) }
-			: read,
-	);
+	return browserGraphReads(reads ?? [], asyncComputedNodeIds);
 }
 
 function withAsyncValueReads<Symbol extends { readonly reads?: ReadonlyArray<LoweredStateRead> }>(
@@ -1570,7 +1560,7 @@ function renderBranchArms(
 		}
 		armsBySite.set(branch.branchSiteId, {
 			branchSiteId: branch.branchSiteId,
-			testRead: branch.testReads[0] ?? null,
+			testRead: browserGraphReads(branch.testReads, asyncComputedNodeIds)[0] ?? null,
 			arms: arms as PublicRenderPlanBranchArms['arms'],
 			...(branch.armTests ? { armTests: branch.armTests } : {}),
 			...(branch.declaredEmptyArms ? { declaredEmptyArms: branch.declaredEmptyArms } : {}),

@@ -41,6 +41,11 @@ export default function TaskPane() @{
 				@if (task?.id !== undefined) {
 					<p data-member>{task?.title}</p>
 				}
+				@if (task) {
+					<p data-truthy>{task?.title}</p>
+				} @else {
+					<p data-falsy>none</p>
+				}
 			</section>
 		} @pending {
 			<p data-loading>Loading</p>
