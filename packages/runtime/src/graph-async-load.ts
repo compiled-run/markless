@@ -303,7 +303,11 @@ export function createAsyncPlane(
 			forward(graphNodeId, (loaded, node) => loaded.endEntry(node, save));
 		},
 		failHandler(graphNodeId, error) {
-			forward(graphNodeId, (loaded, node) => loaded.fail(node, error));
+			// The failure ends a re-run its inputs asked for and has not started, as it aborts one already running.
+			forward(graphNodeId, (loaded, node) => {
+				written?.delete(node);
+				loaded.fail(node, error);
+			});
 		},
 		define(asyncComputed) {
 			const node = createNode(asyncComputed);

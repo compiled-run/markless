@@ -364,7 +364,7 @@ export async function renderPrerenderBoundary(
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const freshCellIds = new Set<string>();
-		const moduleGraph = boundaryModuleRootGraph(page, boundaryId, graph);
+		const { graph: moduleGraph, rootName } = boundaryModuleRoot(page, boundaryId, graph);
 		const output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
@@ -373,6 +373,7 @@ export async function renderPrerenderBoundary(
 			servedPageProps(moduleGraph),
 			{
 				cellIds: freshCellIds,
+				rootName,
 				...(status === 'rejected' && { keepsShown: true as const }),
 				...(pageBoundaryId && {
 					settling: {
@@ -661,6 +662,7 @@ async function evaluatePrerenderDataSurface(
 	requireHtml: boolean,
 	props: Readonly<Record<string, unknown>> = {},
 	fresh?: {
+		readonly rootName?: string | undefined;
 		readonly branchSiteId?: string;
 		readonly owner?: BranchOwnerPlacement;
 		readonly cellIds: Set<string>;
@@ -669,7 +671,8 @@ async function evaluatePrerenderDataSurface(
 		readonly keepsShown?: true;
 	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
-	const rootName = branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
+	const rootName =
+		fresh?.rootName ?? branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const ownerPath = fresh?.owner?.ownerPath;
 	const sharedSeeds = marklessRosterPositionSeeds();
@@ -713,12 +716,12 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
-// The settle symbol runs scoped to the boundary's owner; the render starts at the module root, so it reads from where that root stands.
-function boundaryModuleRootGraph(
+// The settle symbol runs scoped to the boundary's owner; the render starts where the module root stands, or at the owner when another module composed it directly.
+function boundaryModuleRoot(
 	surface: PrerenderDataSurface,
 	boundaryId: string,
 	graph: RuntimeGraph,
-): RuntimeGraph {
+): { readonly graph: RuntimeGraph; readonly rootName?: string | undefined } {
 	const ownerName = Object.keys(surface.components).find(
 		(name) =>
 			!!surface.components[name]?.boundaries?.some(
@@ -726,11 +729,13 @@ function boundaryModuleRootGraph(
 			),
 	);
 	const placement = branchOwnerPlacement(surface, ownerName, graph);
-	if (!placement || placement.ownerPath === '') return graph;
-	return marklessInstanceScopedGraph(
-		(graph as MarklessScopedGraph).marklessPageGraph ?? graph,
-		placement.moduleRootPath,
-	);
+	if (!placement || placement.ownerPath === '') return { graph, rootName: placement && ownerName };
+	return {
+		graph: marklessInstanceScopedGraph(
+			(graph as MarklessScopedGraph).marklessPageGraph ?? graph,
+			placement.moduleRootPath,
+		),
+	};
 }
 
 type BranchOwnerPlacement = {
