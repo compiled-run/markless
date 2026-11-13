@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-journal-direct"
+			],
+			"delta": 131,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": 66,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 51,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 38,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-journal-direct"
+			],
+			"delta": 131,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": 66,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 51,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 28,
+			"reason": "a client-rendered write loads the journal code before applying any entry, so a text and the branch beside it land in one task; isDirectJournalEntry now ships",
+			"date": "2026-11-13"
+		}
+	]
+}

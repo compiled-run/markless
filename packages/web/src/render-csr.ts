@@ -11,7 +11,7 @@ import {
 } from '@markless/serializer/protocol';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
-import { applyDirectJournalEntries } from './dom-journal-direct.ts';
+import { applyDirectJournalEntries, isDirectJournalEntry } from './dom-journal-direct.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import {
@@ -130,7 +130,7 @@ export async function renderCsrRuntime(input: {
 				const applyDomJournal =
 					options.applyDomJournal ??
 					((entries: ReadonlyArray<DomJournalEntry>) =>
-						applyDefaultCsrDomJournal(entries, runtime!));
+						applyDefaultCsrDomJournal(entries, runtime!, () => disposed));
 				runtime = createResumeRuntime({
 					root: output.root,
 					graph,
@@ -651,11 +651,14 @@ function delegatedTargetTag(target: { readonly tagName?: unknown } | null | unde
 async function applyDefaultCsrDomJournal(
 	entries: ReadonlyArray<DomJournalEntry>,
 	runtime: ResumeRuntime,
+	disposed: () => boolean,
 ): Promise<void> {
+	// Loaded before any entry applies, so a text and the branch beside it land in one task.
+	if (!entries.every(isDirectJournalEntry)) journal ??= await import('./dom-journal.ts');
+	if (disposed()) return;
 	const deferred = applyDirectJournalEntries(entries, (locator) => runtime.getElement(locator));
 	if (deferred.length === 0) return;
-	const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
-	applyDomJournalEntries(deferred, {
+	journal!.applyDomJournalEntries(deferred, {
 		resolveTarget(locator) {
 			const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(String(locator));
 			if (rangeAnchor) {
