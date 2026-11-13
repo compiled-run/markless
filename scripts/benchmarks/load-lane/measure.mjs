@@ -87,7 +87,7 @@ const traceTasks = (buffer, from) => {
 };
 const TRACE_CATEGORIES = ['devtools.timeline', 'disabled-by-default-devtools.timeline'];
 try {
-	for (let run = 0; run < runs; run++) {
+	for (let run = 0; run < Number(process.env.LOAD_RUNS ?? runs); run++) {
 		const page = await openPage(browser, { coverage: true });
 		await page.page.context().addCookies(cookies);
 		await page.page.addInitScript(() => (Math.random = () => 0.5));
@@ -168,6 +168,11 @@ try {
 			}).observe(target, { subtree: true, characterData: true, childList: true });
 		}, [clickSelector, effectSelector]);
 		// Main-thread tasks from the press until the page is quiet again, from Chromium's own trace.
+		// HOVER_MS: the pointer rests on the control this long before the press, as a mouse user's does.
+		if (process.env.HOVER_MS) {
+			await page.page.hover(clickSelector);
+			await page.page.waitForTimeout(Number(process.env.HOVER_MS));
+		}
 		await browser.startTracing(page.page, { categories: TRACE_CATEGORIES });
 		await page.page.click(clickSelector);
 		await page.page.waitForFunction(() => window.__click.updated !== undefined, null, { timeout: 10000 }).catch(() => {});

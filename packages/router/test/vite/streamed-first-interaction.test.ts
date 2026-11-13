@@ -346,17 +346,35 @@ test('Enter on a focused button with no pointer events applies', async () => {
 	}
 });
 
-test('a link pressed before the runtime started leaves no runtime work on the next page', async () => {
-	const { page, errors } = await openIdle('/');
+test('a press forwarded while the resume module loads stays with the page it was pressed on', async () => {
+	// Hold the page's resume module until the link's navigation has swapped the next page in.
+	const probe = await browser!.newPage();
+	await probe.goto(`${server!.origin}/`, { waitUntil: 'commit' });
+	const resumeModule = await probe
+		.locator('[data-markless-resume-module]')
+		.first()
+		.getAttribute('data-markless-resume-module');
+	await probe.close();
+	expect(resumeModule).toBeTruthy();
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	let release = () => {};
+	const released = new Promise<void>((done) => (release = done));
+	await page.route(`${server!.origin}${resumeModule}`, async (route) => {
+		await released;
+		await route.continue();
+	});
 	try {
+		await page.goto(`${server!.origin}/`, { waitUntil: 'commit' });
+		await page.locator('.away').waitFor();
 		await page.click('.away');
 		await page.locator('[data-page="away"]').waitFor();
-		await page.waitForTimeout(500);
-		await page.goBack();
-		await page.locator('[data-page="home"]').waitFor();
-		await page.waitForTimeout(500);
+		release();
+		await page.waitForTimeout(800);
 		expect(errors).toEqual([]);
 	} finally {
+		release();
 		await page.close();
 	}
 });

@@ -7,6 +7,7 @@ import {
 	type ProtocolStatePayload,
 	type ProtocolStreamedArmPatch,
 	type ProtocolSyncPolicy,
+	type ProtocolViewPayload,
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
@@ -24,6 +25,7 @@ import {
 	MARKLESS_REVEAL_TRAIN_CADENCE_MS,
 } from './pending-timing.ts';
 import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
+import { resumesAtLoad, servedRowCount } from './fns/served-rows.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
@@ -148,9 +150,13 @@ export async function renderToStream(
 		output = await renderSsrOutput(component, options.props, renderContext);
 	}
 	const pendingArms = pendingStreamArms(output, renderContext);
+	const shellRows = servedRowCount(pageRepeats(output), output.state);
 	const shell = await assembleSsrContainer(component, output, {
 		...options,
-		streamedBoundaryIds: new Set(pendingArms.map((arm) => arm.boundaryId)),
+		// A page whose rows would make the first press pay for adopting them resumes after load instead.
+		...(resumesAtLoad(shellRows)
+			? {}
+			: { streamedBoundaryIds: new Set(pendingArms.map((arm) => arm.boundaryId)) }),
 	});
 	const resumeModuleUrl = options.resumeModuleUrl ?? artifactResumeModuleUrl(component);
 	return {
@@ -164,6 +170,7 @@ export async function renderToStream(
 				pendingArms,
 				resumeModuleUrl,
 				shellState: output.state,
+				shellRows,
 			}),
 		cancel: (reason) => settleController.abort(reason),
 	};
@@ -221,7 +228,9 @@ async function* streamArmAppends(input: {
 	readonly pendingArms: ReadonlyArray<PendingArm>;
 	readonly resumeModuleUrl: string | undefined;
 	readonly shellState: ProtocolStatePayload | undefined;
+	readonly shellRows: number;
 }): AsyncGenerator<string, void, void> {
+	let rows = input.shellRows;
 	const remaining = new Map(input.pendingArms.map((arm) => [arm.boundaryId, arm]));
 	const signal = input.renderContext.streaming.signal;
 	if (signal.aborted) return;
@@ -291,15 +300,16 @@ async function* streamArmAppends(input: {
 					parts.push(armExecutorScript(input.resumeModuleUrl, input.options.nonce));
 					executorEmitted = true;
 				}
-				parts.push(
-					renderArmAppend(
-						output,
-						arm,
-						input.options.nonce,
-						input.shellState,
-						input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
-					),
+				const append = renderArmAppend(
+					output,
+					arm,
+					input.options.nonce,
+					input.shellState,
+					input.renderContext.streaming.caughtErrors?.get(arm.boundaryId),
+					rows,
 				);
+				rows = append.rows;
+				parts.push(append.html);
 			}
 			for (const arm of settledBeforeWave) {
 				if (!remaining.has(arm.boundaryId)) continue;
@@ -380,7 +390,8 @@ function renderArmAppend(
 	nonce: string | undefined,
 	shellState: ProtocolStatePayload | undefined,
 	caughtError: string | undefined,
-): string {
+	rowsBefore: number,
+): { readonly html: string; readonly rows: number } {
 	const renderedAnchor = output.structure?.anchors.find(
 		(candidate) => candidate.kind === 'async' && candidate.id === arm.boundaryId,
 	);
@@ -438,18 +449,21 @@ function renderArmAppend(
 	];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
-	const starts = armRunsWithoutInteraction(servedArmRecords);
+	const rows = rowsBefore + servedRowCount(servedArmRecords.keyedRepeats ?? [], output.state);
+	const starts = armRunsWithoutInteraction(servedArmRecords) || resumesAtLoad(rows);
 	const revealArguments =
 		arm.revealDependencyIds.length || starts
 			? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}${starts ? ',1' : ''}`
 			: JSON.stringify(arm.boundaryId);
 
-	return (
-		`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
-		`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
-		`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
-		`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`
-	);
+	return {
+		rows,
+		html:
+			`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
+			`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
+			`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
+			`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`,
+	};
 }
 
 type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
@@ -743,14 +757,44 @@ const UNPROMPTED_EVENT_NAMES: ReadonlySet<string> = new Set([
 function armRunsWithoutInteraction(records: ProtocolArmRecordSet): boolean {
 	const named = (set: {
 		readonly events?: ReadonlyArray<{ readonly eventName: string }>;
-		readonly keyedRepeats?: ReadonlyArray<{ readonly rowEvents?: ReadonlyArray<{ readonly eventName: string }> }>;
+		readonly keyedRepeats?: ReadonlyArray<{
+			readonly rowEvents?: ReadonlyArray<{ readonly eventName: string }>;
+		}>;
 	}) =>
 		(set.events ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)) ||
 		(set.keyedRepeats ?? []).some((repeat) =>
 			(repeat.rowEvents ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)),
 		);
-	const branches = (records as { readonly branches?: ReadonlyArray<{ readonly servedArmRecords?: Parameters<typeof named>[0] }> }).branches ?? [];
-	return named(records) || branches.some((branch) => !!branch.servedArmRecords && named(branch.servedArmRecords));
+	const branches =
+		(
+			records as {
+				readonly branches?: ReadonlyArray<{
+					readonly servedArmRecords?: Parameters<typeof named>[0];
+				}>;
+			}
+		).branches ?? [];
+	return (
+		named(records) ||
+		branches.some((branch) => !!branch.servedArmRecords && named(branch.servedArmRecords))
+	);
+}
+
+// Every keyed repeat the shell served: the page's own and those in @try arms it rendered settled.
+function pageRepeats(
+	output: SsrRenderOutput,
+): ReadonlyArray<{
+	readonly collectionGraphNodeId?: string;
+	readonly collectionPath?: ReadonlyArray<string>;
+}> {
+	const view = output.view as ProtocolViewPayload | undefined;
+	return [
+		...(view?.keyedRepeats ?? []),
+		...(view?.asyncBoundaries ?? []).flatMap((boundary) =>
+			boundary.armRecords && !Array.isArray(boundary.armRecords)
+				? ((boundary.armRecords as ProtocolArmRecordSet).keyedRepeats ?? [])
+				: [],
+		),
+	];
 }
 
 function streamArmError(boundaryId: string, expected: string, where: string): Error {
