@@ -213,14 +213,22 @@ async function cutBeforeArms(upstream: string) {
 const scriptRequests = (requests: Request[], from: number) =>
 	requests.slice(from).filter((request) => request.resourceType() === 'script').map((request) => request.url());
 
-// Fails on main too; cause not yet separated from the fixture.
-test.fails('an idle host inside a streamed arm ticks, and a visible host fires on scroll, with no click', async () => {
+test('a visible host inside a streamed arm fires on scroll with no click', async () => {
 	const { page, errors } = await openIdle('/watched');
 	try {
-		await expect.poll(async () => Number(await page.locator('.arm-ticks').textContent())).toBeGreaterThan(1);
 		await page.locator('.sentinel').scrollIntoViewIfNeeded();
 		await expect.poll(() => page.locator('.sentinel').textContent()).toBe('Seen 1');
 		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// Existing defect, same on main: an onIdle host inside a streamed arm never runs, even once the runtime has started.
+test.fails('an idle host inside a streamed arm ticks with no click', async () => {
+	const { page } = await openIdle('/watched');
+	try {
+		await expect.poll(async () => Number(await page.locator('.arm-ticks').textContent()), { timeout: 3_000 }).toBeGreaterThan(1);
 	} finally {
 		await page.close();
 	}
@@ -243,7 +251,7 @@ test('a streamed answer that never arrives wakes the runtime and the block settl
 	}
 });
 
-// Fails on main too; cause not yet separated from the fixture.
+// Existing defect, same on main: a child's own slower @try inside a streamed arm stays on @pending.
 test.fails('a child with its own slower async value inside a streamed arm settles with no click', async () => {
 	const { page, errors } = await openIdle('/nested');
 	try {
@@ -255,7 +263,7 @@ test.fails('a child with its own slower async value inside a streamed arm settle
 	}
 });
 
-// Fails on main too; cause not yet separated from the fixture.
+// Existing defect, same on main: a shared() value read only inside a streamed arm does not repaint on a write.
 test.fails('shared() read only inside a streamed arm shows its value and updates on the first click', async () => {
 	const { page, errors, requests } = await openIdle('/shared');
 	try {
@@ -289,7 +297,7 @@ for (const [name, selector, effect] of [
 	});
 
 for (const typed of [false, true])
-	// Fails on main too; cause not yet separated from the fixture.
+	// Same on main: the form is sent in place but never marked aria-busy.
 	test.fails(`a plain form inside the streamed arm as the first interaction is busy in the press task${typed ? ', with typed input' : ''}`, async () => {
 		const { page, errors, requests } = await openIdle('/');
 		try {

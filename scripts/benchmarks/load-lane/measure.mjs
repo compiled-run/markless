@@ -64,6 +64,28 @@ const total = (map) => [...map.values()].reduce((sum, mask) => sum + countSet(ma
 
 const browser = await chromium.launch();
 const loads = [];
+// The longest main-thread task and the busy time in a Chromium trace, from `from` (an event to start at) onwards.
+const traceTasks = (buffer, from) => {
+	const trace = JSON.parse(buffer.toString()).traceEvents;
+	const main = new Set(
+		trace
+			.filter((event) => event.name === 'thread_name' && event.args?.name === 'CrRendererMain')
+			.map((event) => `${event.pid}:${event.tid}`),
+	);
+	const start = from ? trace.find(from) : undefined;
+	const tasks = trace.filter(
+		(event) =>
+			event.name === 'RunTask' &&
+			event.ph === 'X' &&
+			main.has(`${event.pid}:${event.tid}`) &&
+			(!start || (event.pid === start.pid && event.ts + event.dur >= start.ts)),
+	);
+	return {
+		longestTask: Math.max(0, ...tasks.map((task) => task.dur / 1000)),
+		busy: tasks.reduce((sum, task) => sum + task.dur / 1000, 0),
+	};
+};
+const TRACE_CATEGORIES = ['devtools.timeline', 'disabled-by-default-devtools.timeline'];
 try {
 	for (let run = 0; run < runs; run++) {
 		const page = await openPage(browser, { coverage: true });
@@ -75,8 +97,14 @@ try {
 			const body = await response.body().catch(() => null);
 			if (body) bodies.set(response.url(), body);
 		});
+		// The load's own main-thread tasks, at the same 6x CPU the press is timed at.
+		const loadCdp = process.env.LOAD_TASKS ? await page.page.context().newCDPSession(page.page) : undefined;
+		await loadCdp?.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+		if (loadCdp) await browser.startTracing(page.page, { categories: TRACE_CATEGORIES });
 		await page.goto(url);
 		await page.idle();
+		const loadTasks = loadCdp ? traceTasks(await browser.stopTracing()) : undefined;
+		await loadCdp?.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 		const idle = masks(await page.coverage.take());
 		const idleChars = total(idle);
 		const loadJs = [...page.state.js.load];
@@ -100,6 +128,7 @@ try {
 			filledChars,
 			gestureChars,
 			gestureScripts,
+			loadTasks,
 			filled,
 			loadScripts: loadJs.length,
 			jsGzip: gzip,
@@ -139,29 +168,18 @@ try {
 			}).observe(target, { subtree: true, characterData: true, childList: true });
 		}, [clickSelector, effectSelector]);
 		// Main-thread tasks from the press until the page is quiet again, from Chromium's own trace.
-		await browser.startTracing(page.page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+		await browser.startTracing(page.page, { categories: TRACE_CATEGORIES });
 		await page.page.click(clickSelector);
 		await page.page.waitForFunction(() => window.__click.updated !== undefined, null, { timeout: 10000 }).catch(() => {});
 		await page.settle();
-		const trace = JSON.parse((await browser.stopTracing()).toString()).traceEvents;
-		const main = new Set(
-			trace
-				.filter((event) => event.name === 'thread_name' && event.args?.name === 'CrRendererMain')
-				.map((event) => `${event.pid}:${event.tid}`),
-		);
-		const dispatch = trace.find((event) => event.name === 'EventDispatch' && event.args?.data?.type === 'click');
-		const tasks = trace.filter(
-			(event) =>
-				event.name === 'RunTask' &&
-				event.ph === 'X' &&
-				main.has(`${event.pid}:${event.tid}`) &&
-				(!dispatch || (event.pid === dispatch.pid && event.ts + event.dur >= dispatch.ts)),
+		const pressTasks = traceTasks(
+			await browser.stopTracing(),
+			(event) => event.name === 'EventDispatch' && event.args?.data?.type === 'click',
 		);
 		const result = await page.page.evaluate(() => window.__click);
 		clicks.push({
 			...result,
-			longestTask: Math.max(0, ...tasks.map((task) => task.dur / 1000)),
-			busy: tasks.reduce((sum, task) => sum + task.dur / 1000, 0),
+			...pressTasks,
 			inputScriptsFetched: page.state.fetched.input.length,
 			errors: page.state.errors,
 		});
@@ -177,6 +195,8 @@ try {
 				idleChars: lowest('idleChars'),
 				filledChars: lowest('filledChars'),
 				firstGestureChars: lowest('gestureChars'),
+				loadLongestTaskMsMedian: loads[0].loadTasks ? median(loads.map((l) => l.loadTasks.longestTask)) : undefined,
+				loadBusyMsMedian: loads[0].loadTasks ? median(loads.map((l) => l.loadTasks.busy)) : undefined,
 				scriptsRequestedAtFirstGesture: Math.max(...loads.map((l) => l.gestureScripts)),
 				idleRange: [lowest('idleChars'), Math.max(...loads.map((l) => l.idleChars))],
 				filledAll: loads.every((l) => l.filled),
