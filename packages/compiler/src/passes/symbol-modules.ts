@@ -7579,6 +7579,19 @@ const readsUpdated = (
 	read.path.length === target.path.length &&
 	read.path.every((segment, index) => segment === target.path[index]);
 
+// An `await` or `yield` in the value itself, not in a function inside it: the read before it runs earlier than the write.
+function pausesOutsideFunctions(node: AnyNode): boolean {
+	if (node.type === 'AwaitExpression' || node.type === 'YieldExpression') return true;
+	if (isFunctionLikeNode(node)) return false;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (Array.isArray(child)) {
+			if (child.some((item) => isNode(item) && pausesOutsideFunctions(item))) return true;
+		} else if (isNode(child) && pausesOutsideFunctions(child)) return true;
+	}
+	return false;
+}
+
 // Whether an authored value reads, by the state lowering's own reads, exactly the state and path an assignment replaces.
 function readsAssignedState(
 	node: AnyNode,
@@ -7753,6 +7766,7 @@ function loweredEventWriteNode(
 			!write.assignmentOperator &&
 			isNode(node.right) &&
 			!containsWriteExpression(node.right) &&
+			!pausesOutsideFunctions(node.right) &&
 			readsAssignedState(node.right, write, rewrite)
 				? { graphNodeId: write.graphNodeId, path: write.path, name: freshUpdaterParameter(node.right as unknown as EmissionNode) }
 				: undefined;

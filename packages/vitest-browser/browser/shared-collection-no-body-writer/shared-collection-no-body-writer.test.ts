@@ -112,8 +112,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 	// Still unresolved, and pinned so it stays visible. This page renders a part
 	// of a family whose cells only its SEEDING root owns, and that root is
 	// nowhere - so the handler's `[...box.items, 'gamma']` spreads undefined and
-	// V8 spells that "context.graph.read is not a function or its return value is
-	// not iterable". Refusing it by name needs a signal composition does not have:
+	// V8 reports the spread as "not iterable". Refusing it by name needs a signal composition does not have:
 	// a part of a family declared in its own module whose cells went to a
 	// component the page never rendered, and a part ADOPTING a family declared in
 	// another module - which is page-wide on purpose and green today in
@@ -138,7 +137,7 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		// The refusal names the read, not the instance, and the handler ran and
 		// caught it - so nothing reached the collection and nothing escaped.
 		await expect.poll(() => ran()).toBe('1');
-		expect(refused()).toContain('is not a function or its return value is not iterable');
+		expect(refused()).toContain('is not iterable');
 		expect(fieldValues()).toEqual([]);
 		expect(count()).toBe('0');
 		expect(el('field').getAttribute('ui-seen')).toBe('');

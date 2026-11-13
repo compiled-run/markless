@@ -11,7 +11,7 @@ async function handlerSource(body: string, handler: string) {
 		source: `import { state } from '@markless/core';
 export default function Panel() @{
 	${body}
-	<div><button onClick={(event) => { ${handler} }}>go</button></div>
+	<div><button onClick={async (event) => { ${handler} }}>go</button></div>
 }`,
 	});
 	expect(compiled.symbolModules.diagnostics).toEqual([]);
@@ -48,7 +48,7 @@ async function run(source: string, cells: Record<string, unknown>) {
 	const resolved = source.replace(/"@markless\/web\/fns\/([\w-]+)"/g, (_, name: string) => JSON.stringify(`${webFns}${name}.ts`));
 	const loaded = await import('data:text/javascript;base64,' + Buffer.from(resolved).toString('base64'));
 	const handler = Object.values(loaded).find((value) => typeof value === 'function') as (context: unknown) => unknown;
-	handler({ graph, event: {} });
+	await handler({ graph, event: {} });
 	return Object.fromEntries([...values].map(([id, value]) => [id.slice('state:'.length), value]));
 }
 
@@ -75,6 +75,7 @@ const writes: Array<[string, string, string, Record<string, unknown>, Record<str
 	['a field from the whole state', 'let t = state({ count: 0, other: 5 });', 't.count = Object.keys(t).length;', { t: { count: 0, other: 5 } }, { t: { count: 2, other: 5 } }],
 	['a whole state from one field', 'let t = state({ count: 0, other: 5 });', 't = { count: t.other, other: 0 };', { t: { count: 0, other: 5 } }, { t: { count: 5, other: 0 } }],
 	['a literal', 'let taps = state(0);', 'taps = 0;', { taps: 4 }, { taps: 0 }],
+	['a value that awaits', "let items = state<string[]>([]);", "items = [...items, await Promise.resolve('b')];", { items: ['a'] }, { items: ['a', 'b'] }],
 ];
 for (const [label, body, handler, before, after] of writes)
 	test(`${label} stays a plain write`, async () => {
