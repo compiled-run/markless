@@ -121,6 +121,42 @@
 			"delta": 3637,
 			"reason": "save hold moved out of the always-loaded graph into the write watch's module: 9926 -> 13563 B rendered, measured on PR #686 CI run 43481529247 (head 15799e7f2, linux-x64) against the main anchor 9926 B; the same run measures bench pages (no @try) at 93773 B gzip downloaded against an anchor of 94200, executed chars unchanged",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -427,
+			"reason": "save hold moved out of the always-loaded graph, so a page with no @try no longer downloads it: 94200 -> 93773 B gzip downloaded at load, measured on PR #686 CI runs 43477442614 and 43481529247 (linux-x64) against the main anchor 94200 B; executed chars at load unchanged",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -427,
+			"reason": "save hold moved out of the always-loaded graph, so a page with no @try no longer downloads it: 94200 -> 93773 B gzip downloaded at load, measured on PR #686 CI runs 43477442614 and 43481529247 (linux-x64) against the main anchor 94200 B; executed chars at load unchanged",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -427,
+			"reason": "save hold moved out of the always-loaded graph, so a page with no @try no longer downloads it: 94200 -> 93773 B gzip downloaded at load, measured on PR #686 CI runs 43477442614 and 43481529247 (linux-x64) against the main anchor 94200 B; executed chars at load unchanged",
+			"date": "2026-11-13"
 		}
 	]
 }
