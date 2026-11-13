@@ -57,6 +57,52 @@
 			"delta": 73,
 			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "an @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds so they adopt its painted rows (PR run 43381232832 against merge-group run 43378494721)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "an @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds so they adopt its painted rows (PR run 43381232832 against merge-group run 43378494721)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 54,
+			"reason": "an @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds so they adopt its painted rows (PR run 43381232832 against merge-group run 43378494721)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-commit-arm"
+			],
+			"delta": 256,
+			"reason": "an @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds so they adopt its painted rows (PR run 43381232832 against merge-group run 43378494721)",
+			"date": "2026-11-13"
 		}
 	]
 }
