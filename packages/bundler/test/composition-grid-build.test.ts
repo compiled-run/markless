@@ -220,10 +220,35 @@ class Run {
 		await this.settled([request]);
 	}
 
-	async closeAndReopen() {
+	async close() {
 		await this.click('[data-grid-close]');
 		this.open = false;
 		await this.settled([]);
+	}
+
+	async closeAndReopen() {
+		await this.close();
+		await this.openArm();
+	}
+
+	/** Reloads with the arm closed: an arm-owned value asks nothing until the arm opens again. */
+	async reloadClosed() {
+		await this.click('[data-grid-reload]');
+		this.round++;
+		await this.settled(this.shape.ownsLoad ? [] : [boardRequest(this.subject, this.round)]);
+	}
+
+	/** Closes the arm while its value loads: the answer never shows, and reopening asks again. */
+	async closeWhileLoading() {
+		await this.click('[data-grid-reload]');
+		this.round++;
+		const request = boardRequest(this.subject, this.round);
+		await expect.poll(this.visit.api.waitingRequests, poll).toContain(request);
+		await this.click('[data-grid-close]');
+		this.open = false;
+		await this.shows(this.expected());
+		await this.visit.api.release(request);
+		await this.settled([request]);
 		await this.openArm();
 	}
 
@@ -328,6 +353,29 @@ describe('composition grid, production build', () => {
 			await run.saveHeld();
 			await run.handlerRejects();
 		});
+
+	const ownOpen: Shape = { ...ownArm, path: '/h-own-arm-open', openAtLoad: true };
+	test('h. own async value in an @if arm, open at load: a closed arm loads nothing, and one closed while loading asks again when it reopens', async () => {
+		const run = new Run(ownOpen, await visit(ownOpen.path));
+		await run.firstRender();
+		await run.closeAndReopen();
+		await run.closeWhileLoading();
+		await run.close();
+		await run.reloadClosed();
+		await run.openArm();
+	});
+
+	test("c. child in a @switch arm: a reload that moves the @switch never derives the leaving arm's child with the new value", async () => {
+		const run = new Run(shapes[2]![1], await visit('/c-switch'));
+		await run.firstRender();
+		await run.reload();
+		await run.reload();
+		const derives = await run.visit.page.evaluate(
+			() => (globalThis as { __gridServer?: { derives: string[] } }).__gridServer?.derives ?? [],
+		);
+		expect(derives.length, 'the cards derived in the browser').toBeGreaterThan(0);
+		expect(derives.filter((entry) => entry.split(':')[0] !== entry.split(':')[1])).toEqual([]);
+	});
 
 	test(`${armed[0]![0]}: first render, reload, close and reopen, save held, handler rejects`, async () => {
 		const run = new Run(openArm, await visit(openArm.path));

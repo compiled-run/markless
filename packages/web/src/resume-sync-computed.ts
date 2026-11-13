@@ -89,6 +89,8 @@ function derive(
 	roster: RosterResumeModule | undefined,
 	painted?: (read: RuntimeGraph['read']) => RuntimeGraph['read'],
 ) {
+	// A closing arm's value never derives with the value that closed it.
+	if (input.graph.armShown?.(input.computed.graphNodeId) === false) return HELD;
 	const shown = input.graph.asyncPlane?.()?.shownRead(input.computed.dependencies ?? []);
 	if (shown === false) return HELD;
 	const read = painted ? painted(shown || input.graph.read) : shown;

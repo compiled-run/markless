@@ -1,0 +1,106 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 208,
+			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 302,
+			"reason": "Branch wiring hands each arm's components to the arm gate and drops a leaving arm's async values (+302 B rendered, measured by this fixture build); the gate itself ships only to composing pages",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 80,
+			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 67,
+			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 208,
+			"reason": "A value an @if or @switch arm owns starts its write-started run once the pass has flipped the arm, and only while the arm shows (+208 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 302,
+			"reason": "Branch wiring hands each arm's components to the arm gate and drops a leaving arm's async values (+302 B rendered, measured by this fixture build); the gate itself ships only to composing pages",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 80,
+			"reason": "A sync derive of a value an arm owns holds while that arm does not show (+80 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 63,
+			"reason": "The arm gate's hooks in the runtime graph, branch wiring and sync derives (+590 B rendered across three modules, measured by this fixture build)",
+			"date": "2026-11-13"
+		}
+	]
+}

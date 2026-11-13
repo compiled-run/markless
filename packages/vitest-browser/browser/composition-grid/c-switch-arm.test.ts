@@ -33,17 +33,16 @@ test('CSR', () => fullTimeline(run(switchView, 'CSR', () => render(SwitchPage)))
 test('SSR', () => fullTimeline(run(switchView, 'SSR', () => renderSSR(SwitchPage))));
 test('renamed: CSR', () => fullTimeline(run(kindView, 'CSR', () => render(KindPage))));
 
-// Known defect: when a reload moves the @switch to another arm, the leaving arm's child derives once more with the
-// value that chose the new arm.
-test.fails('CSR: no child derives with the other arm\'s value', () =>
+// When a reload moves the @switch to another arm, the leaving arm's child never derives with the value that chose the new arm.
+test('CSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(switchView, 'CSR', () => render(SwitchPage), true), 'reload while open'));
-test.fails('SSR: no child derives with the other arm\'s value', () =>
+test('SSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(switchView, 'SSR', () => renderSSR(SwitchPage), true), 'reload while open'));
-test.fails('renamed: CSR: no child derives with the other arm\'s value', () =>
+test('renamed: CSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(kindView, 'CSR', () => render(KindPage), true), 'reload while open'));
 
 test('renamed: SSR: the served @default arm shows its own constant prop', () =>
 	oneStep(run(kindView, 'SSR', () => renderSSR(KindPage)), 'first render'));
 test('renamed: SSR', () => fullTimeline(run(kindView, 'SSR', () => renderSSR(KindPage))));
-test.fails('renamed: SSR: no child derives with the other arm\'s value', () =>
+test('renamed: SSR: no child derives with the other arm\'s value', () =>
 	oneStep(run(kindView, 'SSR', () => renderSSR(KindPage), true), 'reload while open'));

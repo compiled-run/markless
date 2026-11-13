@@ -204,6 +204,7 @@ export type ResumeBranchRecord = {
 		readonly graphNodeId: string;
 		readonly value: unknown;
 	}>;
+	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 	// A branch whose arm holds a component that has to run: flips commit a range.
@@ -264,6 +265,7 @@ export type ResumeArmBranchRecord = {
 	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch keeps the `dom-order-comment` anchors its own
 	// module counted; they resolve by anchor text inside the arm, not by index.
@@ -314,6 +316,14 @@ export type ComposedArmRecordQualifier = ((
 		graph: RuntimeGraph | undefined,
 		renderedBoundaryId?: string,
 	) => U;
+	/** Runs the values of the components each arm of `branch` holds only while that arm shows; answers what to call when an arm leaves. */
+	readonly gateBranchArms?: (
+		graph: RuntimeGraph,
+		branch: ResumeBranchRecord,
+		live: () => number | undefined,
+		picked: () => number,
+		release: (release: () => void) => void,
+	) => (arm: number) => void;
 };
 
 export type ResumeArmRecordSet = {

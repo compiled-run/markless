@@ -205,7 +205,7 @@ export function createAsyncPlane(
 	// Inputs written in one synchronous turn start one run per value, on the final inputs; a read in between starts them first.
 	let written: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
 	const invalidate = (node: RuntimeAsyncComputedNode): void => {
-		if (node.phase === NODE_IDLE) return;
+		if (node.phase === NODE_IDLE || nodes.get(node.graphNodeId) !== node) return;
 		if (!written) {
 			written = new Map();
 			queueMicrotask(startWritten);
@@ -268,10 +268,14 @@ export function createAsyncPlane(
 		}
 	};
 	for (const each of asyncComputed ?? []) add(createNode(each));
-	function startWritten(): void {
+	function startWritten(passEnd?: boolean): void {
 		const batch = written;
 		written = undefined;
-		batch?.forEach((quiet, node) =>
+		batch?.forEach((quiet, node) => {
+			// A gate fetches nothing; a load its arm may be closing on runs once the pass has flipped the arm, if it still shows.
+			const shown = node.boundaryGate ? undefined : internals.armShown?.(node.graphNodeId);
+			if (shown !== undefined && !passEnd) return void (written ??= new Map()).set(node, quiet);
+			if (shown === false || nodes.get(node.graphNodeId) !== node) return;
 			withRefresh((loaded) => {
 				replaying = quiet;
 				try {
@@ -279,8 +283,8 @@ export function createAsyncPlane(
 				} finally {
 					replaying = undefined;
 				}
-			}),
-		);
+			});
+		});
 	}
 	const forward = (graphNodeId: string, call: (bound: AsyncRefresh, node: RuntimeAsyncComputedNode) => void): void => {
 		const node = nodes.get(graphNodeId);
@@ -296,6 +300,15 @@ export function createAsyncPlane(
 		},
 		invalidate,
 		startWritten,
+		drop(owns) {
+			for (const [graphNodeId, node] of nodes)
+				if (owns(graphNodeId)) {
+					node.controller?.abort();
+					node.version++;
+					nodes.delete(graphNodeId);
+					written?.delete(node);
+				}
+		},
 		markEntry(graphNodeId, save) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node, save));
 		},
