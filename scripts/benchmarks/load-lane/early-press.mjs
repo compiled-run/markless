@@ -87,6 +87,7 @@ try {
 			const navigated = page.goto(target, { waitUntil: 'commit', timeout: 120000 });
 			await navigated;
 			await page.waitForSelector(press, { timeout: 120000 });
+			const shownAt = await page.evaluate(() => performance.now());
 			if (process.env.PRESS_AT)
 				await page.waitForFunction((at) => performance.now() >= at, Number(process.env.PRESS_AT), { timeout: 120000, polling: 5 });
 			const scriptsAtPress = scripts.length;
@@ -100,7 +101,7 @@ try {
 					.filter((entry) => entry.initiatorType !== 'fetch' && entry.name.endsWith('.js') && entry.responseEnd > (window.__press?.at ?? 0)).length,
 			}));
 			const loadDone = await page.evaluate(() => performance.getEntriesByType('navigation')[0]?.loadEventEnd ?? 0);
-			samples.push({ effectMs: record?.effect ?? null, pressAt: record?.at, scriptsUnfinishedAtPress: record?.scriptsUnfinishedAtPress, scriptsRequestedBeforePress: scriptsAtPress, scriptsTotal: scripts.length, loadDone, errors });
+			samples.push({ effectMs: record?.effect ?? null, shownAt, pressAt: record?.at, effectAt: record?.effect === undefined ? null : record.at + record.effect, scriptsUnfinishedAtPress: record?.scriptsUnfinishedAtPress, scriptsRequestedBeforePress: scriptsAtPress, scriptsTotal: scripts.length, loadDone, errors });
 			await context.close();
 		}
 		await throttle?.close();

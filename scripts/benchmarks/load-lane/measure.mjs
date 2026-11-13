@@ -138,11 +138,33 @@ try {
 					window.__click.updated = performance.now() - window.__click.start;
 			}).observe(target, { subtree: true, characterData: true, childList: true });
 		}, [clickSelector, effectSelector]);
+		// Main-thread tasks from the press until the page is quiet again, from Chromium's own trace.
+		await browser.startTracing(page.page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
 		await page.page.click(clickSelector);
 		await page.page.waitForFunction(() => window.__click.updated !== undefined, null, { timeout: 10000 }).catch(() => {});
 		await page.settle();
+		const trace = JSON.parse((await browser.stopTracing()).toString()).traceEvents;
+		const main = new Set(
+			trace
+				.filter((event) => event.name === 'thread_name' && event.args?.name === 'CrRendererMain')
+				.map((event) => `${event.pid}:${event.tid}`),
+		);
+		const dispatch = trace.find((event) => event.name === 'EventDispatch' && event.args?.data?.type === 'click');
+		const tasks = trace.filter(
+			(event) =>
+				event.name === 'RunTask' &&
+				event.ph === 'X' &&
+				main.has(`${event.pid}:${event.tid}`) &&
+				(!dispatch || (event.pid === dispatch.pid && event.ts + event.dur >= dispatch.ts)),
+		);
 		const result = await page.page.evaluate(() => window.__click);
-		clicks.push({ ...result, inputScriptsFetched: page.state.fetched.input.length, errors: page.state.errors });
+		clicks.push({
+			...result,
+			longestTask: Math.max(0, ...tasks.map((task) => task.dur / 1000)),
+			busy: tasks.reduce((sum, task) => sum + task.dur / 1000, 0),
+			inputScriptsFetched: page.state.fetched.input.length,
+			errors: page.state.errors,
+		});
 		await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
 		await page.close();
 	}
@@ -165,9 +187,10 @@ try {
 				click: {
 					clickToUpdateMsMedian: median(clicks.map((c) => c.updated ?? Infinity)),
 					eventToPaintMsMedian: median(clicks.map((c) => c.eventToPaint ?? 0)),
-					longestTaskMsMedian: median(clicks.map((c) => c.longest ?? 0)),
+					longestTaskMsMedian: median(clicks.map((c) => c.longestTask)),
+					busyMsMedian: median(clicks.map((c) => c.busy)),
 					scriptsFetchedAtClick: Math.max(...clicks.map((c) => c.inputScriptsFetched)),
-					runs: clicks.map(({ updated, eventToPaint, longest, inputScriptsFetched }) => ({ updated, eventToPaint, longest, inputScriptsFetched })),
+					runs: clicks.map(({ updated, eventToPaint, longestTask, busy, inputScriptsFetched }) => ({ updated, eventToPaint, longestTask, busy, inputScriptsFetched })),
 				},
 				errors: [...new Set([...loads, ...clicks].flatMap((l) => l.errors))],
 			},
