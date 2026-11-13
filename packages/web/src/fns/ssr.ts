@@ -1258,6 +1258,10 @@ export function marklessSsrArmizeBoundaries(
 		[...boundaries].reverse().map((boundary) => [boundary, armizeBoundary(boundary)]),
 	);
 	return boundaries.map((boundary) => armized.get(boundary)!);
+	function paintedArm(branch: SsrBranchRecord): SsrBranchRecord {
+		const arm = structure.anchors.find((anchor) => anchor.id === idPrefix + branch.id)?.arm;
+		return arm === undefined ? branch : { ...branch, takenArm: arm };
+	}
 	function armizeBoundary(boundary: SsrBoundaryRecord): SsrBoundaryRecord {
 		// Child-composed boundaries already carry a single armized record set;
 		// arm-relative coordinates survive composition untouched.
@@ -1351,7 +1355,7 @@ export function marklessSsrArmizeBoundaries(
 				...(keyedRepeats.length > 0 ? { keyedRepeats } : {}),
 				// Arm-scoped branch records (flips + escalations) ride the taken
 				// arm's planned set; resume resolves their anchors arm-locally.
-				branches: planned.branches ?? [],
+				branches: (planned.branches ?? []).map(paintedArm),
 			},
 		};
 	}

@@ -1,0 +1,60 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 216,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 56,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 216,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 56,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a served @try arm's @if records the arm the render painted (fix/served-arm-branch-painted-arm): the structure anchor carries the arm and the armized branch record takes it; measured locally by fixture-builds",
+			"date": "2026-11-13"
+		}
+	]
+}
