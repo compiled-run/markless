@@ -519,7 +519,7 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 			for (const segment of owners(write.graphNodeId)) segment.graph.write(write);
 			return write.value;
 		},
-		update: (update) => broadcastUpdate(staged, owners(update.graphNodeId), update),
+		update: (update) => broadcastUpdate(staged, () => owners(update.graphNodeId), update),
 		call: (call) => {
 			let result: unknown;
 			for (const [index, segment] of owners(call.graphNodeId).entries()) {
@@ -590,14 +590,15 @@ function registerStagedComputedClosure(
 	for (const graphNodeId of graphNodeIds) local.graphNodeIds.add(graphNodeId);
 }
 
+// Read before the owners are named: naming a node born after resume adds a segment that does not hold it yet.
 function broadcastUpdate(
 	graph: RuntimeGraph,
-	segments: ReadonlyArray<GraphSegment>,
+	segments: () => ReadonlyArray<GraphSegment>,
 	update: RuntimeGraphUpdate,
 ): unknown {
 	const previous = graph.read(update.graphNodeId, update.path);
 	const next = update.update(previous);
-	for (const segment of segments)
+	for (const segment of segments())
 		segment.graph.write({ graphNodeId: update.graphNodeId, path: update.path, value: next });
 	if (update.returnValue === 'previous') return previous;
 	if (update.returnValue === 'next') return next;

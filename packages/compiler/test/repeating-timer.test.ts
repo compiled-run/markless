@@ -29,13 +29,13 @@ export function Poll() @{
 }
 `);
 	const holding = (text: string) => sources.find((source) => source.includes(text))!;
-	const click = holding('+ 1 })');
-	const attach = holding('+ 2 })');
-	const global = holding('+ 3 })');
-	const debounced = holding('+ 4 })');
-	expect(click).toContain(`setInterval(${WRAP}() => context.graph.write(`);
+	const click = holding('+ 1;');
+	const attach = holding('+ 2;');
+	const global = holding('+ 3;');
+	const debounced = holding('+ 4;');
+	expect(click).toContain(`setInterval(${WRAP}() => context.graph.update(`);
 	expect(attach).toContain(`window.setInterval(${WRAP}() => {`);
-	expect(global).toContain(`globalThis.setInterval(${WRAP}() => context.graph.write(`);
+	expect(global).toContain(`globalThis.setInterval(${WRAP}() => context.graph.update(`);
 	for (const wrapped of [click, attach, global]) expect(wrapped).toContain(IMPORT);
 	expect(debounced).not.toContain('marklessRepeatingTimer');
 });

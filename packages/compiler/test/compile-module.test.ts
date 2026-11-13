@@ -5567,10 +5567,10 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const toggleModule = eventModuleSource('menu.open = !menu.open');
 
-	expect(toggleModule).toContain('context.graph.write({');
+	expect(toggleModule).toContain('context.graph.update({');
 	expect(toggleModule).toContain('graphNodeId: "state:menu"');
 	expect(toggleModule).toContain('path: ["open"]');
-	expect(toggleModule).toContain('value: !context.graph.read("state:menu", ["open"])');
+	expect(toggleModule).toContain('return !value');
 
 	const addModule = eventModuleSource('total += profile.step');
 
@@ -5581,48 +5581,48 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const binaryAddModule = eventModuleSource('total = total + profile.step');
 
-	expect(binaryAddModule).toContain('context.graph.write({');
+	expect(binaryAddModule).toContain('context.graph.update({');
 	expect(binaryAddModule).toContain('graphNodeId: "state:total"');
 	expect(binaryAddModule).toContain('path: []');
 	expect(binaryAddModule).toContain(
-		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
+		'return value + context.graph.read("state:profile", ["step"])',
 	);
 
 	const nestedAddModule = eventModuleSource('total = (total + profile.step) * profile.scale');
 
-	expect(nestedAddModule).toContain('context.graph.write({');
+	expect(nestedAddModule).toContain('context.graph.update({');
 	expect(nestedAddModule).toContain('graphNodeId: "state:total"');
 	expect(nestedAddModule).toContain('path: []');
 	expect(nestedAddModule).toContain(
-		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'return (value + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 
 	const conditionalModule = eventModuleSource('total = menu.open ? profile.step : total');
 
-	expect(conditionalModule).toContain('context.graph.write({');
+	expect(conditionalModule).toContain('context.graph.update({');
 	expect(conditionalModule).toContain('graphNodeId: "state:total"');
 	expect(conditionalModule).toContain('path: []');
 	expect(conditionalModule).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
+		'return context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : value',
 	);
 
 	const callValueModule = eventModuleSource('total = Math.max(total, profile.step)');
 
-	expect(callValueModule).toContain('context.graph.write({');
+	expect(callValueModule).toContain('context.graph.update({');
 	expect(callValueModule).toContain('graphNodeId: "state:total"');
 	expect(callValueModule).toContain('path: []');
 	expect(callValueModule).toContain(
-		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return Math.max(value, context.graph.read("state:profile", ["step"]))',
 	);
 
 	const importedCallValueModule = eventModuleSource('total = clamp(total, profile.step)');
 
 	expect(importedCallValueModule).toContain('import { clamp } from "./math";');
-	expect(importedCallValueModule).toContain('context.graph.write({');
+	expect(importedCallValueModule).toContain('context.graph.update({');
 	expect(importedCallValueModule).toContain('graphNodeId: "state:total"');
 	expect(importedCallValueModule).toContain('path: []');
 	expect(importedCallValueModule).toContain(
-		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return clamp(value, context.graph.read("state:profile", ["step"]))',
 	);
 
 	const arrayLiteralModule = eventModuleSource('items = [nextItem');
@@ -5654,11 +5654,11 @@ test('compileTsrxModule emits generated event modules for supported graph write 
 
 	const objectSpreadModule = eventModuleSource('settings = { ...settings, title: menu.title');
 
-	expect(objectSpreadModule).toContain('context.graph.write({');
+	expect(objectSpreadModule).toContain('context.graph.update({');
 	expect(objectSpreadModule).toContain('graphNodeId: "state:settings"');
 	expect(objectSpreadModule).toContain('path: []');
 	expect(objectSpreadModule).toContain(
-		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
+		'return { ...value, title: context.graph.read("state:menu", ["title"]) }',
 	);
 
 	const computedKeyModule = eventModuleSource('settings = { [menu.title]: profile.step');

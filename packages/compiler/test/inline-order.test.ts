@@ -72,7 +72,7 @@ test('a module-level function above the component inlines the same as one below 
 
 	// The inline really happened in both — an un-inlined handler would still
 	// spell `box.bump(1)` and the two orderings would agree on being broken.
-	expect(above).toContain('context.graph.write(');
+	expect(above).toContain('context.graph.update(');
 	expect(above).toContain('shared:src/m.tsrx#counterState/state:s');
 	expect(above).not.toContain('box.bump');
 	// The byte-identical checkpoint: order changed nothing.
@@ -90,7 +90,7 @@ export default function Inside() @{
 	const above = await fingerprint('src/m.tsrx', SHARED_FAMILY + HELPER + inside);
 	const below = await fingerprint('src/m.tsrx', SHARED_FAMILY + inside + HELPER);
 
-	expect(above).toContain('context.graph.write(');
+	expect(above).toContain('context.graph.update(');
 	expect(above).not.toContain('box.bump');
 	expect(above).toBe(below);
 });

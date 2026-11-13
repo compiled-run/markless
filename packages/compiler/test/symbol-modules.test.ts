@@ -1241,11 +1241,11 @@ test('emitSymbolModules emits binary graph-read assignment values for event hand
 		kind: 'event-handler',
 		exportName: 'symbol_add',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:total") + context.graph.read("state:profile", ["step"])',
+		'return value + context.graph.read("state:profile", ["step"])',
 	);
 });
 
@@ -1307,11 +1307,11 @@ test('emitSymbolModules emits nested parenthesized graph-read assignment values 
 		kind: 'event-handler',
 		exportName: 'symbol_scale',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: (context.graph.read("state:total") + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
+		'return (value + context.graph.read("state:profile", ["step"])) * context.graph.read("state:profile", ["scale"])',
 	);
 });
 
@@ -1373,11 +1373,11 @@ test('emitSymbolModules emits conditional graph-read assignment values for event
 		kind: 'event-handler',
 		exportName: 'symbol_choose',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : context.graph.read("state:total")',
+		'return context.graph.read("state:menu", ["open"]) ? context.graph.read("state:profile", ["step"]) : value',
 	);
 });
 
@@ -1666,11 +1666,11 @@ test('emitSymbolModules emits object spread assignment values for event handler 
 		kind: 'event-handler',
 		exportName: 'symbol_replace',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:settings"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: { ...context.graph.read("state:settings"), title: context.graph.read("state:menu", ["title"]) }',
+		'return { ...value, title: context.graph.read("state:menu", ["title"]) }',
 	);
 });
 
@@ -1788,11 +1788,11 @@ test('emitSymbolModules emits static call assignment values for event handler mo
 		kind: 'event-handler',
 		exportName: 'symbol_clamp',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: Math.max(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return Math.max(value, context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -1858,11 +1858,11 @@ test('emitSymbolModules re-emits imported helper calls for event handler modules
 		exportName: 'symbol_clamp',
 	});
 	expect(artifact.modules[0].source).toContain('import { clamp } from "./math";');
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:total"');
 	expect(artifact.modules[0].source).toContain('path: []');
 	expect(artifact.modules[0].source).toContain(
-		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return clamp(value, context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -2374,9 +2374,9 @@ test('emitSymbolModules preserves bare local helper call assignment values in au
 		kind: 'event-handler',
 		exportName: 'symbol_localClamp',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain(
-		'value: clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return clamp(value, context.graph.read("state:profile", ["step"]))',
 	);
 	expect(artifact.modules[0].source).not.toContain('void context;');
 });
@@ -2443,7 +2443,7 @@ test('emitSymbolModules re-emits namespace imported helper calls for event handl
 	});
 	expect(artifact.modules[0].source).toContain('import * as math from "./math";');
 	expect(artifact.modules[0].source).toContain(
-		'value: math.clamp(context.graph.read("state:total"), context.graph.read("state:profile", ["step"]))',
+		'return math.clamp(value, context.graph.read("state:profile", ["step"]))',
 	);
 });
 
@@ -2500,11 +2500,11 @@ test('emitSymbolModules emits logical graph-read assignment values for event han
 		kind: 'event-handler',
 		exportName: 'symbol_enable',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:menu"');
 	expect(artifact.modules[0].source).toContain('path: ["open"]');
 	expect(artifact.modules[0].source).toContain(
-		'value: context.graph.read("state:menu", ["open"]) && context.graph.read("state:profile", ["enabled"])',
+		'return value && context.graph.read("state:profile", ["enabled"])',
 	);
 });
 
@@ -2556,11 +2556,11 @@ test('emitSymbolModules emits unary graph-read assignment values for event handl
 		kind: 'event-handler',
 		exportName: 'symbol_toggle',
 	});
-	expect(artifact.modules[0].source).toContain('context.graph.write({');
+	expect(artifact.modules[0].source).toContain('context.graph.update({');
 	expect(artifact.modules[0].source).toContain('graphNodeId: "state:menu"');
 	expect(artifact.modules[0].source).toContain('path: ["open"]');
 	expect(artifact.modules[0].source).toContain(
-		'value: !context.graph.read("state:menu", ["open"])',
+		'return !value',
 	);
 });
 
