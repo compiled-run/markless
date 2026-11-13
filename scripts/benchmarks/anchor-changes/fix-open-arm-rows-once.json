@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-commit-arm"
+			],
+			"delta": 256,
+			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 64,
+			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-commit-arm"
+			],
+			"delta": 256,
+			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 73,
+			"reason": "An @if arm painted inside a browser-settled @try arm wires its lists with the @try arm's computeds, so they adopt its painted rows (+256 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		}
+	]
+}
