@@ -23,6 +23,8 @@ export async function primeKeyedRepeatCollections(input: {
 	readonly root: ResumeDomElement;
 	readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 	readonly elementHandles: ElementHandleRegistry;
+	// An arm's own computeds derive again: a closed instance may have left its value at the node.
+	readonly arm?: ReadonlySet<string>;
 }): Promise<void> {
 	const backing = new Set(
 		input.repeats.flatMap((repeat) =>
@@ -34,7 +36,7 @@ export async function primeKeyedRepeatCollections(input: {
 		if (!backing.has(record.graphNodeId)) continue;
 		const { deriveSymbolId } = record;
 		if (record.async !== false || typeof deriveSymbolId !== 'string') continue;
-		if (input.graph.read(record.graphNodeId, []) !== undefined) continue;
+		if (!input.arm?.has(record.graphNodeId) && input.graph.read(record.graphNodeId, []) !== undefined) continue;
 		await (
 			await import('./resume-sync-computed.ts')
 		).refreshSyncComputed({
