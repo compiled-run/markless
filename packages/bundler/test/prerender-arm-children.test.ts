@@ -138,6 +138,25 @@ for (const { page, again } of refetchPages) {
 	}, 120_000);
 }
 
+test('arm-children/ListInArmChild.tsrx: a list method call in a child an arm opens acts on the child\'s own list', async () => {
+	await withBuiltPage('arm-children/ListInArmChild.tsrx', {}, async (tab) => {
+		const chip = tab.locator('[data-chip]');
+		const open = tab.locator('[data-open]');
+		await open.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 0');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 1');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 2');
+		await open.click();
+		await expect.poll(() => chip.count()).toBe(0);
+		await open.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 0');
+		await chip.click();
+		await expect.poll(() => chip.textContent()).toBe('marks 1');
+	});
+}, 120_000);
+
 for (const page of ['arm-children/TemplateHole.tsrx', 'arm-children/NamedComputed.tsrx']) {
 	test(`${page}: computed text in an arm closed at render shows its value on first open`, async () => {
 		await withBuiltPage(page, {}, async (tab) => {

@@ -521,9 +521,24 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 		},
 		update: (update) => broadcastUpdate(staged, () => owners(update.graphNodeId), update),
 		call: (call) => {
+			const { graphNodeId } = call;
+			const path = call.path ?? [];
+			const joining = !local.graphNodeIds.has(graphNodeId);
+			const held = staged.read(graphNodeId);
+			const segments = owners(graphNodeId);
+			// The page's own segment, joining a node born after resume, holds what the node's segment holds.
+			if (joining && local.graphNodeIds.has(graphNodeId) && held !== undefined)
+				local.graph.write({ graphNodeId, value: held });
+			// Segments holding the same object take the call once; the others hear it changed.
+			const called = new Set<unknown>();
 			let result: unknown;
-			for (const [index, segment] of owners(call.graphNodeId).entries()) {
+			for (const [index, segment] of segments.entries()) {
+				if (called.has(segment.graph.read(graphNodeId, path))) {
+					segment.graph.changed({ graphNodeId, path });
+					continue;
+				}
 				const next = segment.graph.call(call);
+				called.add(segment.graph.read(graphNodeId, path));
 				if (index === 0) result = next;
 			}
 			return result;
