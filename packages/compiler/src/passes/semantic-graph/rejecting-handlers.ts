@@ -12,7 +12,7 @@ export function componentsWithRejectingHandlers(
 	for (const event of graph.events)
 		if (
 			event.componentName &&
-			((event.handlerReturnsPromise && !event.handlerCatchBoundaryId) ||
+			(((event.handlerReturnsPromise || event.inPlaceSubmit) && !event.handlerCatchBoundaryId) ||
 				(event.handlerMayReject && !event.dispatchCatchBoundaryId))
 		)
 			rejecting.add(event.componentName);

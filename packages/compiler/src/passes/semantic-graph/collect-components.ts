@@ -175,6 +175,7 @@ export function collectComponentEdge(
 		importSource: importSource.importSource,
 	});
 	const edgeId = `component-edge:${state.nextComponentEdgeId++}`;
+	if (state.currentHostNodeId) state.edgeHosts.set(edgeId, state.currentHostNodeId);
 	state.graph.componentEdges.push({
 		id: edgeId,
 		parentComponentName: state.currentComponentName,

@@ -140,3 +140,38 @@ test('a page whose forms do not post compiles to the same output as before', asy
 	expect(boundary).not.toHaveProperty('catchesHandlers');
 	expect(compiled.semanticGraph.events).toEqual([]);
 });
+
+const rowsPage = (child: string, uses: string, exported = '') => `import { computed } from '@markless/core';
+
+${exported}function RowForm({ id }: { id: string }) @{
+	${child}
+}
+
+export default function Shelf() @{
+	const todos = computed(async () => [{ id: 'a' }, { id: 'b' }]);
+
+	${uses}
+	@try {
+		<section>
+			<ul>@for (const todo of todos; key todo.id) { <li><RowForm id={todo.id} /></li> }</ul>
+			<RowForm id="outside" />
+		</section>
+	} @pending { <p>Loading</p> } @catch (error) { <p>{error.message}</p> }
+}
+`;
+const rowForm = `<form method="post" action="/api/todos"><button name="todoId" value={id}>Done</button></form>`;
+
+test('a form in another component of the file, rendered only inside a @try with a @catch, is sent in place too', async () => {
+	const source = rowsPage(rowForm, '');
+	expect((await submitRecords(source)).map((record) => record.inPlaceSubmit)).toEqual(['keep']);
+	expect((await compile(source)).protocolView.asyncBoundaries[0]).toMatchObject({
+		catchesHandlers: true,
+		runnerGraphNodeId: expect.stringMatching(/asyncGate/),
+	});
+});
+
+test('a form in another component stays the browser’s when that component can render outside a @try with a @catch', async () => {
+	expect(await submitRecords(rowsPage(rowForm, '<RowForm id="bare" />'))).toEqual([]);
+	expect(await submitRecords(rowsPage(rowForm, '', 'export '))).toEqual([]);
+	expect(await submitRecords(rowsPage(rowForm, 'const Alias = RowForm;'))).toEqual([]);
+});
