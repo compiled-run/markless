@@ -178,10 +178,10 @@ export function collectElement(node: AnyNode, state: WalkState, walk: SemanticGr
 
 	collectDuplicateAttributeDiagnostics(node, state, tagName, isHostElement);
 	if (isHostElement && hostNodeId) collectAuthoredAriaMarks(node, tagName, hostNodeId, state);
-	if (tagName === 'form' && hostNodeId && state.currentCatchBoundaryId && formMayPost(node))
+	if (tagName === 'form' && hostNodeId && formMayPost(node))
 		state.postForms.push({
 			hostNodeId,
-			catchBoundaryId: state.currentCatchBoundaryId,
+			...(state.currentCatchBoundaryId ? { catchBoundaryId: state.currentCatchBoundaryId } : {}),
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 		});
 	const moduleScopeClass = state.currentStyleScopeClass;

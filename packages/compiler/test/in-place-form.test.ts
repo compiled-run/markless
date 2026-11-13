@@ -140,3 +140,56 @@ test('a page whose forms do not post compiles to the same output as before', asy
 	expect(boundary).not.toHaveProperty('catchesHandlers');
 	expect(compiled.semanticGraph.events).toEqual([]);
 });
+
+const rowsPage = (child: string, uses: string, exported = '') => `import { computed } from '@markless/core';
+
+${exported}function RowForm({ id }: { id: string }) @{
+	${child}
+}
+
+export default function Shelf() @{
+	const todos = computed(async () => [{ id: 'a' }, { id: 'b' }]);
+
+	${uses}
+	@try {
+		<section>
+			<ul>@for (const todo of todos; key todo.id) { <li><RowForm id={todo.id} /></li> }</ul>
+			<RowForm id="outside" />
+		</section>
+	} @pending { <p>Loading</p> } @catch (error) { <p>{error.message}</p> }
+}
+`;
+const rowForm = `<form method="post" action="/api/todos"><button name="todoId" value={id}>Done</button></form>`;
+
+test('a form in another component of the file, rendered only inside a @try with a @catch, is sent in place too', async () => {
+	const source = rowsPage(rowForm, '');
+	expect((await submitRecords(source)).map((record) => record.inPlaceSubmit)).toEqual(['keep']);
+	expect((await compile(source)).protocolView.asyncBoundaries[0]).toMatchObject({
+		catchesHandlers: true,
+		runnerGraphNodeId: expect.stringMatching(/asyncGate/),
+	});
+});
+
+test('a form in another component stays the browser’s when that component can render outside a @try with a @catch', async () => {
+	expect(await submitRecords(rowsPage(rowForm, '<RowForm id="bare" />'))).toEqual([]);
+	expect(await submitRecords(rowsPage(rowForm, '', 'export '))).toEqual([]);
+	expect(await submitRecords(rowsPage(rowForm, 'const Alias = RowForm;'))).toEqual([]);
+});
+
+// The full compile refuses a tag outside a component body as a syntax error; the pass itself must still not fail open.
+test('a tag the pass sees outside any component body counts as a place the component renders, so its form stays the browser’s', () => {
+	const inPlace = (source: string) =>
+		buildSemanticGraphSync({ filename: 'shelf.tsrx', source }).events.filter((event) => event.inPlaceSubmit);
+	const plain = `import { computed } from '@markless/core';
+function RowForm() @{
+	<form method="post" action="/api/todos"><button>Done</button></form>
+}
+export default function Shelf() @{
+	const todos = computed(async () => [1]);
+	@try { <section><RowForm /></section> } @pending { <p>Loading</p> } @catch (error) { <p>{error.message}</p> }
+}
+`;
+	expect(inPlace(plain)).toHaveLength(1);
+	expect(inPlace(plain.replace('export default', 'const loose = <RowForm />;\nexport default'))).toEqual([]);
+	expect(inPlace(plain.replace('export default', 'function loose() { return <RowForm />; }\nexport default'))).toEqual([]);
+});

@@ -125,7 +125,7 @@ This happens for a form inside a `@try` that has a `@catch`, whose `method` is `
 - An `action`, or a button's `formaction`, on another site goes there.
 - A button with `formmethod="get"` loads the page it names.
 - `rel="external"` on the form loads the answer as a page, the same way it makes a link do a full page load.
-- A form inside a component whose `@try` is in another component file stays the browser's, because the build decides which `@catch` would show its failure from the file it compiles, one file at a time.
+- A form inside another component counts only when that component is not exported, is used only as a tag in its own file, and every one of those tags sits inside a `@try` with a `@catch`. Otherwise it stays the browser's, because the build decides from the file it compiles, one file at a time, whether a `@catch` will be there to show a failure.
 - A redirect that does not come from an endpoint, such as one from middleware, is followed by the request itself; one to another site then fails and shows in `@catch`, so give such a form `rel="external"`.
 
 The check that decides this is about 700 bytes compressed, and only pages with such a form carry it.

@@ -208,7 +208,12 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectComputedWriteDiagnostics(state);
 	finalizeComputedDependencies(state);
 	propagateAsyncComputedCapability(graph);
-	collectInPlaceForms(graph, state.hostParents, state.postForms, () => state.nextEventId++);
+	collectInPlaceForms(
+		graph,
+		{ hostParents: state.hostParents, edgeHosts: state.edgeHosts, semantic: state.semantic },
+		state.postForms,
+		() => state.nextEventId++,
+	);
 	keepRejectingChildCatches(graph, input.importedModuleInterfaces);
 	mintAsyncBoundaryGates(graph);
 	collectComputedDependencyCycleDiagnostics(graph);
