@@ -814,8 +814,8 @@ export function createEventWiring(input: {
 					releaseFlush?.();
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
-						// The marks paint with the pass that paints the handler's writes before its first await.
-						const painted = graph.hasPendingFlush?.() ? graph.flush() : undefined;
+						// The marks paint with the pass that paints the handler's writes before its first await, held as they are.
+						const painted = graph.pendingFlush?.();
 						const start = (module: SubmitHoldModule) =>
 							module.holdSubmit(
 								form,

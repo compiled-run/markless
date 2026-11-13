@@ -1,86 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 83,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/submit-hold"
-			],
-			"delta": 149,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 8,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 83,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/submit-hold"
-			],
-			"delta": 149,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 14,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 22,
-			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
-			"date": "2026-11-12"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -209,6 +129,108 @@
 			"delta": 248,
 			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled lands with the form's aria-busy (resume-events and submit-hold grow); measured on CI run 43322883917 against merge-queue run 43293364927; this page also carries the events and conditionals docs text change, because its search chunk imports the compiled concept pages",
 			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 231,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 55,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/submit-hold"
+			],
+			"delta": 149,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 231,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 55,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/submit-hold"
+			],
+			"delta": 149,
+			"reason": "a submit hold's busy marks wait for the flush that paints the handler's writes before its first await, so an author-written aria-disabled and the form's aria-busy land in the same task; measured locally on macOS by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-12"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 9,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 13,
+			"reason": "the graph's flush pass is one value from its scheduling until it lands (openPass, replacing activeFlush) and pendingFlush returns it without starting it, so a submit's busy marks wait for a held pass instead of forcing one; resume-events reads it in place of hasPendingFlush and flush; measured locally by packages/bundler/test/fixture-builds.test.ts",
+			"date": "2026-11-13"
 		}
 	]
 }

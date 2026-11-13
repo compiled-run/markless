@@ -411,6 +411,8 @@ export type RuntimeGraph = {
 	readonly hasPendingFlush?: () => boolean;
 	/** Keeps the scheduled flush back until each returned release has run once; `flush()` itself still runs. */
 	readonly holdFlush?: () => () => void;
+	/** The pass that will paint pending writes, without starting it, so a hold still applies; `undefined` when nothing is pending. */
+	readonly pendingFlush?: () => Promise<void> | undefined;
 	/** A state write `hold` answers true for keeps its value but paints only once replayed through `changed`. */
 	readonly holdPaint?: (hold: ((graphNodeId: string, path: ReadonlyArray<string>) => boolean) | undefined) => void;
 	readonly subscribeJournal: (listener: DomJournalListener) => () => void;
@@ -472,8 +474,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	let flushPhase: FlushPhase = FLUSH_IDLE;
 	let quietDepth = 0;
 	let notifyingWrite = false;
-	// The awaitable for the pass the phase says is active; never read to decide anything.
-	let activeFlush: Promise<void> | undefined;
+	// The pass from its scheduling until it lands.
+	let pass: { readonly landed: Promise<void>; readonly start: () => void } | undefined;
 	let flushHolds = 0;
 	const moveFlush = (to: FlushPhase): void => {
 		if (import.meta.env?.DEV) assertFlushMove(flushPhase, to);
@@ -601,8 +603,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}),
 		);
 
+	const openPass = (): void => {
+		let start!: () => void;
+		moveFlush(FLUSH_SCHEDULED);
+		pass = { landed: new Promise<void>((resolve) => (start = () => resolve(runFlush()))), start };
+	};
+
 	const scheduleFlush = (): void => {
-		if (flushPhase === FLUSH_IDLE) moveFlush(FLUSH_SCHEDULED);
+		if (flushPhase === FLUSH_IDLE) openPass();
 		else if (flushPhase === FLUSH_TAIL) moveFlush(FLUSH_REARMED);
 		else return;
 		queueMicrotask(runScheduledFlush);
@@ -672,15 +680,18 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush,
 	});
 
+	// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
 	const flush = (): Promise<void> => {
-		if (flushPhase > FLUSH_SCHEDULED) return activeFlush!;
-
-		// Published before the pass runs: synchronous subscriptions reach the journal before runFlush returns.
-		let settle!: (pass: Promise<void>) => void;
-		const pass = (activeFlush = new Promise<void>((resolve) => (settle = resolve)));
-		settle(runFlush());
-		return pass;
+		if (flushPhase === FLUSH_IDLE) openPass();
+		// A pass that throws before its first await has already cleared `pass` when start returns.
+		const current = pass!;
+		if (flushPhase === FLUSH_SCHEDULED) current.start();
+		return current.landed;
 	};
+
+	// A rearmed write lands in the pass its tail pass opens on ending.
+	const pendingFlush = (): Promise<void> | undefined =>
+		flushPhase === FLUSH_REARMED ? pass!.landed.then(pendingFlush) : pass?.landed;
 
 	const runFlush = async (): Promise<void> => {
 		moveFlush(FLUSH_RUNNING);
@@ -735,7 +746,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 			await notifyJournalListeners();
 		} finally {
-			activeFlush = undefined;
+			pass = undefined;
 			// A tail write's own microtask found this pass still active, so the pass end wakes it.
 			moveFlush(FLUSH_IDLE);
 			if (dirtyPaths.length > 0) scheduleFlush();
@@ -880,6 +891,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			};
 		},
 		hasPendingFlush,
+		pendingFlush,
 		holdPaint(hold) {
 			paintHold = hold;
 		},
