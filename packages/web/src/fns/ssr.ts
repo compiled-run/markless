@@ -11,6 +11,7 @@ import {
 	marklessCsrRemapChildDomUpdate,
 	marklessCsrRemapChildKeyedRepeat,
 	marklessCsrRemapGraphOutput,
+	marklessRoutedPropCells,
 	marklessWithWidgetRegistry,
 } from './composition.ts';
 import type {
@@ -273,20 +274,7 @@ function marklessSsrRemapBehaviorRead<T extends ComposeGraphRead>(
 		path: mapped?.path ?? read.path,
 	};
 }
-export function marklessSsrRemapGraphOutput(
-	output: Parameters<typeof marklessCsrRemapGraphOutput>[0],
-	graphProps: ComposeGraphProps,
-	instancePath = '',
-) {
-	output.state.cells = output.state.cells.flatMap(
-		(cell) => marklessSsrRoutedPropCell.get(cell)?.(graphProps) ?? [cell],
-	);
-	marklessCsrRemapGraphOutput(output, graphProps, instancePath);
-}
-
-// Every browser read of a live-routed prop follows the route to the composer's
-// node, which carries it, so the child's seeded copy is never read after resume.
-const marklessSsrRoutedPropCell = new WeakMap<object, (graphProps: ComposeGraphProps) => never[]>();
+export const marklessSsrRemapGraphOutput = marklessCsrRemapGraphOutput;
 
 // The compiled module a composed child was imported from may serve several
 // components. The child names the one it declared, so its own SSR entry
@@ -927,7 +915,8 @@ export function marklessSsrSeedPropCells(
 			value: marklessSerializeGraphValue(value, { graphNodeId: cell.graphNodeId, name }),
 		};
 		if (cell.keys && cell.graphNodeId === 'prop:props')
-			marklessSsrRoutedPropCell.set(seededCell, (graphProps) => {
+			// Every browser read of a live-routed prop follows the route to the composer's node, so that key leaves this copy.
+			marklessRoutedPropCells.set(seededCell, (graphProps) => {
 				// A row reads its key back from this cell whatever routes it, so only other keys leave.
 				const kept = Object.fromEntries(
 					present.flatMap((key) =>
@@ -947,7 +936,7 @@ export function marklessSsrSeedPropCells(
 								},
 							]
 						: []
-				) as never[];
+				);
 			});
 		return [seededCell];
 	});

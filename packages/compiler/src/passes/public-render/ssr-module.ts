@@ -68,7 +68,7 @@ import {
 	emitComponentImport,
 	emitValueImport,
 	hasComponentImportSource,
-	remapsGraphProps as remapsGraphPropsOf,
+	hasPropDependentComputed,
 	isComponentRoot,
 	edgeDeclaredComponentName,
 	publicRenderValueImports,
@@ -83,7 +83,7 @@ import {
 	projectsElementsIntoRows,
 	spreadsAttributes,
 } from './shared.ts';
-import { ssrComposeStateExpression, ssrPropCellSeeds } from './prop-cell-seed.ts';
+import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 import {
 	armBoundHandleReadSource,
 	armBoundIdrefHandles,
@@ -277,12 +277,7 @@ export function emitPublicSsrRenderModule(
 				.some((chunk) => chunk.hosts.some((host) => host.hostNodeId === event.hostNodeId)),
 		),
 	);
-	const remapsGraphProps = remapsGraphPropsOf(
-		input,
-		ssrPropCellSeeds(input, rootInfo.component, rootInfo.componentName).some(
-			(cell) => cell.keys !== null,
-		),
-	);
+	const remapsGraphProps = hasPropDependentComputed(input);
 	const rootDataLines = emitSsrDataLines(input, rootInfo.componentName, references);
 	const dataRenderLines = rootDataLines.render;
 	const sameModuleComponents = emitSameModuleSsrComponents(

@@ -1,0 +1,60 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/composition"
+			],
+			"delta": 161,
+			"reason": "Composition leaves a served child's routed prop keys out of its bag for every child, so a component that only forwards props is served no copy of them (+161 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": -263,
+			"reason": "The routed-key drop moves from the server remap hook into composition, which every child goes through (-263 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "The routed-key drop moves into composition (+2 B gzip emitted, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/composition"
+			],
+			"delta": 161,
+			"reason": "Composition leaves a served child's routed prop keys out of its bag for every child, so a component that only forwards props is served no copy of them (+161 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": -263,
+			"reason": "The routed-key drop moves from the server remap hook into composition, which every child goes through (-263 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		}
+	]
+}

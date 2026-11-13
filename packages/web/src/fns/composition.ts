@@ -242,6 +242,9 @@ function marklessRegisterWidgetProjections(entries: Iterable<readonly [string, s
 	for (const [id, rootPath] of entries) marklessRegisterWidgetRoot(id, rootPath);
 }
 
+// What a served prop bag keeps once its composer's routes carry their keys.
+export const marklessRoutedPropCells = new WeakMap<object, (graphProps: ComposeGraphProps) => ReadonlyArray<ComposeStateNode>>();
+
 // Rewrites a child state draft from child-local ids into page-space ids: prop
 // reads with a live parent route become that route, everything else takes the
 // instance path.
@@ -252,7 +255,7 @@ export function marklessQualifyChildState(
 ) {
 	// An instance an escalated arm placed reads its props off its own cell, which the arm keeps fed while it shows.
 	const fed = state.cells?.some((cell) => cell.graphNodeId === PROPS && cell.follows);
-	state.cells = (state.cells ?? []).map((cell) => ({
+	state.cells = (state.cells ?? []).flatMap((cell) => marklessRoutedPropCells.get(cell)?.(graphProps) ?? [cell]).map((cell) => ({
 		...cell,
 		graphNodeId: marklessComposedGraphNodeId(cell.graphNodeId, instancePath),
 		...(cell.follows && {

@@ -30,13 +30,13 @@ import {
 	componentPropNames,
 	destructureProps,
 	stateEntries,
-	remapsGraphProps as remapsGraphPropsOf,
+	hasPropDependentComputed,
 	sameModuleComponentMap,
 	type ComponentReference,
 	ssrComposedPayloadView,
 } from './shared.ts';
 import { componentSeedCellIndexes } from './derive-set.ts';
-import { ssrComposeStateExpression, ssrPropCellSeeds } from './prop-cell-seed.ts';
+import { ssrComposeStateExpression } from './prop-cell-seed.ts';
 
 // A boundary case runs its runner through the registry only when the boundary has one.
 function settlesAsyncBoundary(input: PublicRenderModuleInput, componentName: string): boolean {
@@ -95,6 +95,7 @@ export function emitSameModuleSsrComponents(
 	rootComponentName: string,
 	componentDataLines: (componentName: string) => SsrDataLines,
 ): string[] {
+	const remapsGraphProps = hasPropDependentComputed(input);
 	const ast = parseModule(input.source.source, input.source.filename) as unknown as AnyNode;
 	const componentMap = sameModuleComponentMap(ast);
 	const localNames = new Map(
@@ -113,10 +114,6 @@ export function emitSameModuleSsrComponents(
 			propNames: componentPropNames(component),
 		};
 		const functionName = ssrComponentFunctionName(componentName);
-		const remapsGraphProps = remapsGraphPropsOf(
-			input,
-			ssrPropCellSeeds(input, component, componentName).some((cell) => cell.keys !== null),
-		);
 		const owned = componentOwnedStateNodes(input, componentName, rootComponentName);
 		const valuesName = `marklessSsrStateValues${componentName}`;
 		const localName = localNames.get(componentName);
