@@ -588,8 +588,10 @@ export type ProtocolViewPayload = {
 		readonly branchArm?: { readonly branchId: string; readonly arm: number };
 		readonly itemName: string;
 		/**
-		 * The `index` name of the `@for`, which a row handler reading it is handed
-		 * beside the item. Pay-per-use: present only when a row handler reads it.
+		 * The `index` name of the `@for`. A row handler reading it is handed it
+		 * beside the item, and a component row whose props read it is built again
+		 * when its row moves. Pay-per-use: present only when a row handler or a row
+		 * component's props read it.
 		 */
 		readonly indexName?: string;
 		readonly rowElementCount: number;

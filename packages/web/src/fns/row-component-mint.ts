@@ -298,15 +298,19 @@ export function marklessRowComponentMint(
 													return undefined;
 												}
 												const from = renderedFrom(rowKey);
+												// A row that only moved changes only the props that read its index: a child with state follows them and keeps it.
+												const moved = sameItem(from?.[0], item, 0) && keepsState(after);
 												return marklessThen(
-													renderedIfRenderable({
-														...rowInput,
-														item: from?.[0],
-														rowIndex: from?.[1] ?? rowIndex,
-													}),
+													moved
+														? after
+														: renderedIfRenderable({
+																...rowInput,
+																item: from?.[0],
+																rowIndex: from?.[1] ?? rowIndex,
+															}),
 													(before) => {
 														rendered.set(rowKey, [itemCopy(item), rowIndex]);
-														if (before && !rowIsStale(parent, repeat, before, after, liveRow))
+														if (before && (moved || !rowIsStale(parent, repeat, before, after, liveRow)))
 															return followRowItem(rowGraph, after);
 														// A wrapped child is built again inside the row it stands in, so the row's own elements and focus stay.
 														const swap =
@@ -584,15 +588,8 @@ function followRowItem(
 	graph: RuntimeGraph,
 	render: RenderedComponentRow,
 ): Awaitable<void> {
-	let cell: ProtocolStatePayload['cells'][number] | undefined;
-	for (const candidate of render.rendered.state.cells)
-		if (
-			candidate.graphNodeId.startsWith(render.rowSegment) &&
-			candidate.graphNodeId.endsWith(PROPS) &&
-			(cell === undefined || candidate.graphNodeId.length < cell.graphNodeId.length)
-		)
-			cell = candidate;
-	if (cell === undefined || graph.read(cell.graphNodeId, []) === undefined) return;
+	const cell = rowPropCell(graph, render);
+	if (cell === undefined) return;
 	const cellId = cell.graphNodeId;
 	const direct = (cell as { readonly directValue?: unknown }).directValue;
 	const write = (props: unknown): void => {
@@ -603,6 +600,29 @@ function followRowItem(
 	};
 	if (direct !== undefined || cell.value === undefined) return write(direct);
 	return marklessThen(deserializeGraphValue(cell.value as SerializedGraphPayload), write);
+}
+
+// A stateless row child is served presentational, with no live sites to follow its props.
+function keepsState(render: RenderedComponentRow): boolean {
+	return render.rendered.state.cells.some(
+		(cell) => cell.graphNodeId.startsWith(render.rowSegment) && !cell.graphNodeId.endsWith(PROPS),
+	);
+}
+
+// The live row child's own prop cell, which its sites read; absent for a child that keeps none.
+function rowPropCell(
+	graph: RuntimeGraph,
+	render: RenderedComponentRow,
+): ProtocolStatePayload['cells'][number] | undefined {
+	let cell: ProtocolStatePayload['cells'][number] | undefined;
+	for (const candidate of render.rendered.state.cells)
+		if (
+			candidate.graphNodeId.startsWith(render.rowSegment) &&
+			candidate.graphNodeId.endsWith(PROPS) &&
+			(cell === undefined || candidate.graphNodeId.length < cell.graphNodeId.length)
+		)
+			cell = candidate;
+	return cell && graph.read(cell.graphNodeId, []) !== undefined ? cell : undefined;
 }
 
 // A render of the item a live row was built from, or nothing when that item no longer renders.
