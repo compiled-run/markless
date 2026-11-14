@@ -910,8 +910,8 @@ function runInlineResumerStreamedWake(
 				)
 			) {
 				// Every answer arrived: evaluate the start's modules, one idle period each, and leave the runtime asleep for the first interaction.
-				const whenIdle = (run: () => void) =>
-					(globalThis.requestIdleCallback || setTimeout)(() => asleep() && run());
+				const whenIdle = (run: () => void, next = () => asleep() && run()) =>
+					typeof requestIdleCallback === 'function' ? requestIdleCallback(next, { timeout: 2000 }) : setTimeout(next, 200);
 				whenIdle(async () => {
 					const entry = await load().catch(() => undefined);
 					if (entry) whenIdle(() => void entry.routeModule?.(root)?.catch(() => {}));
