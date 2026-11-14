@@ -9,7 +9,11 @@ export const aborted: string[] = [];
 /** Every derive of an outside value, as its result. */
 export const derives: number[] = [];
 
+/** What the stand-in server holds: each save that lands raises it, and a load answers with the revision it read. */
+export const server = { revision: 0 };
+
 export function resetLoads(): void {
+	server.revision = 0;
 	waiting.length = 0;
 	loads.length = 0;
 	aborted.length = 0;
@@ -31,7 +35,14 @@ export function loadItem(tag: string, id: number, signal?: AbortSignal): Promise
 	if (typeof document === 'undefined') return Promise.resolve({ name: `${tag} ${id}` });
 	loads.push(`${tag}:${id}`);
 	signal?.addEventListener('abort', () => aborted.push(`${tag}:${id}`));
-	return new Promise((resolve) => waiting.push({ tag, id, signal, settle: () => resolve({ name: `${tag} ${id}` }) }));
+	return new Promise((resolve) =>
+		waiting.push({
+			tag,
+			id,
+			signal,
+			settle: () => resolve({ name: `${tag} ${id}${server.revision ? ` r${server.revision}` : ''}` }),
+		}),
+	);
 }
 
 export function double(count: number): number {
@@ -42,5 +53,6 @@ export function double(count: number): number {
 
 /** A save the page's own route answers when the test does. */
 export async function saveNote(note: string): Promise<void> {
-	await fetch('/api/arm-notes', { method: 'POST', body: JSON.stringify({ note }) });
+	const response = await fetch('/api/arm-notes', { method: 'POST', body: JSON.stringify({ note }) });
+	if (!response.ok) throw new Error(`Saving failed (${response.status})`);
 }
