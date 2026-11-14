@@ -1,10 +1,13 @@
 import { afterEach, expect, test } from 'vitest';
 import { userEvent } from 'vitest/browser';
-import { cleanup, render, renderSSR } from '../../src/index.ts';
+import { cleanup, render, renderServerHTML, renderSSR, renderStream } from '../../src/index.ts';
 import Outer from './outer.tsrx';
 import Page from './page.tsrx';
 import Pair from './pair.tsrx';
+import HelperOwned from './helper-owned.tsrx';
 import Rows from './rows.tsrx';
+import Streamed from './streamed.tsrx';
+import Top from './top.tsrx';
 import { releaseAnswers, resetAnswers } from './answers.ts';
 
 // A child's @try arm holds another child with its own @try and @if before the outer @if; both @ifs have the same local id.
@@ -81,4 +84,77 @@ test('CSR: one instance in each row of a list, each flips only its own', async (
 test('SSR: one instance in each row of a list, each flips only its own', async () => {
 	await renderSSR(Rows);
 	await eachIfFlipsInItsOwnRange(2);
+});
+
+// A same-module helper owns the @try; the child its arm places afresh after @catch starts from its own state.
+test("SSR: a child placed afresh in a same-module helper's @try starts from its own state", async () => {
+	await renderSSR(HelperOwned);
+	await expect.poll(texts('[data-card]'), poll).toEqual(['refusedRetry']);
+	await press('[data-card-more]');
+	await press('[data-card-retry]');
+	await expect.poll(texts('[data-card]'), poll).toEqual(['card 2']);
+	expect(texts('[data-tally]')()).toEqual(['5']);
+	await press('[data-tally]');
+	await expect.poll(texts('[data-tally]'), poll).toEqual(['6']);
+});
+
+// Three levels: the page's own @try holds the child whose @try holds the grandchild's; all three @ifs share a local id.
+async function everyLevelFlipsInItsOwnRange() {
+	await expect
+		.poll(
+			answered(() => document.querySelector('[data-loading]')),
+			poll,
+		)
+		.toBe(null);
+	const shows = async (top: string, outer: string, inner: string) => {
+		await expect.poll(texts('[data-top]'), poll).toEqual([top]);
+		await expect.poll(texts('[data-outer]'), poll).toEqual([outer]);
+		await expect.poll(texts('[data-inner]'), poll).toEqual([inner]);
+	};
+	await shows('top 1', 'outer 1', 'inner 1');
+	await press('[data-top-more]');
+	await shows('none', 'outer 1', 'inner 1');
+	await press('[data-inner-more]');
+	await shows('none', 'outer 1', 'none');
+	await press('[data-outer-more]');
+	await shows('none', 'none', 'none');
+	await press('[data-top-more]');
+	await shows('top 3', 'none', 'none');
+	await press('[data-inner-more]');
+	await shows('top 3', 'none', 'inner 3');
+}
+
+test('CSR: three levels deep, each @if flips only its own range', async () => {
+	await render(Top);
+	await everyLevelFlipsInItsOwnRange();
+});
+
+test('SSR: three levels deep, each @if flips only its own range', async () => {
+	await renderSSR(Top);
+	await everyLevelFlipsInItsOwnRange();
+});
+
+function appendStreamed(container: HTMLElement, html: string): void {
+	const holder = document.createElement('template');
+	holder.innerHTML = html;
+	for (const node of Array.from(holder.content.childNodes)) {
+		if (node.nodeName !== 'SCRIPT') {
+			container.appendChild(node);
+			continue;
+		}
+		const script = document.createElement('script');
+		for (const attribute of Array.from((node as Element).attributes))
+			script.setAttribute(attribute.name, attribute.value);
+		script.text = node.textContent ?? '';
+		container.appendChild(script);
+	}
+}
+
+test('SSR: the @try holding the child streams after the first flush, and each @if flips only its own range', async () => {
+	const { shell, appends } = await renderStream(Streamed);
+	expect(appends).toHaveLength(1);
+	const { container } = renderServerHTML(shell);
+	expect(document.querySelector('[data-shelf-loading]')).not.toBe(null);
+	for (const chunk of appends) appendStreamed(container, chunk);
+	await eachIfFlipsInItsOwnRange(1);
 });

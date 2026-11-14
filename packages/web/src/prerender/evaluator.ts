@@ -364,6 +364,7 @@ export async function renderPrerenderBoundary(
 			(name) => !!page.components[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId),
 		);
 		const owner = branchOwnerPlacement(page, ownerName, graph);
+		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBoundaryId ?? boundaryId);
 		const output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
@@ -385,6 +386,11 @@ export async function renderPrerenderBoundary(
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	return settledBoundaryResult(output, pageBoundaryId ?? boundaryId, pageBoundaryId ?? boundaryId);
+}
+
+// With no placement the render starts at the module root, which draws a helper's ids, and the child state it places, from the wrong instance.
+function unplacedOwnerError(pageId: string): Error {
+	return new Error(`MARKLESS_PRERENDER_OWNER_UNPLACED: ${pageId} has no owner instance to render from`);
 }
 
 // Where the render root stands on the page: the page id of what it renders, less its own id.
@@ -417,12 +423,15 @@ export async function renderPrerenderBranch(
 	let owner: BranchOwnerPlacement | undefined;
 	const freshCellIds = new Set<string>();
 	const drawnAt = isPrerenderDataSurface(page) ? pagePrefix(pageBranchId, branchSiteId) : '';
+	// A whole-page render spells every id from the page root, as the boundary render reads it.
+	const siteId = isPrerenderDataSurface(page) ? branchSiteId : (pageBranchId ?? branchSiteId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const ownerName = branchOwnerName(page, branchSiteId);
 		owner = branchOwnerPlacement(page, ownerName, graph);
+		if (!owner && ownerName && ownerName !== page.rootComponentName) throw unplacedOwnerError(pageBranchId ?? branchSiteId);
 		output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
@@ -435,7 +444,7 @@ export async function renderPrerenderBranch(
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
-	const inArm = armBranchRange(output, records.view, branchSiteId, drawnAt);
+	const inArm = armBranchRange(output, records.view, siteId, drawnAt);
 	const placed = owner ? { moduleRootPath: owner.moduleRootPath } : {};
 	if (inArm)
 		return {
@@ -446,7 +455,7 @@ export async function renderPrerenderBranch(
 		};
 	const arm = prerenderBranchArm({
 		structure: output.structure,
-		branchSiteId: drawnAt + branchSiteId,
+		branchSiteId: drawnAt + siteId,
 		// The structure's element ranges count the render's own elements; the
 		// prepared view has already shifted for the container root, so the range
 		// has to be read off the render's own locators.
@@ -458,8 +467,8 @@ export async function renderPrerenderBranch(
 		output.view?.branches as
 			| ReadonlyArray<{ readonly id: string; readonly servedArmRecords?: ResumeArmRecordSet }>
 			| undefined
-	)?.find((branch) => branch.id === branchSiteId)?.servedArmRecords;
-	const range = records.view.branches?.find((candidate) => candidate.id === branchSiteId);
+	)?.find((branch) => branch.id === siteId)?.servedArmRecords;
+	const range = records.view.branches?.find((candidate) => candidate.id === siteId);
 	const nested = range ? boundariesInside(records.view, range) : [];
 	const flips = range ? branchesInside(records.view, range) : [];
 	const armRecords = served ?? arm.armRecords;
