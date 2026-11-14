@@ -64,15 +64,16 @@ async function openIdle(path: string) {
 	const requests: Request[] = [];
 	page.on('request', (request) => requests.push(request));
 	await page.goto(`${server!.origin}${path}`, { waitUntil: 'load' });
+	// The stream executor's reveal train, then one idle period; a headless page can go long without one, so it is bounded as the page's own idle work is.
 	await page.evaluate(
 		() =>
-			new Promise<void>((done) =>
-				(globalThis as unknown as { __mArm?: { idle: (run: () => void) => void } }).__mArm
-					? (globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }).__mArm.idle(
-							() => requestIdleCallback(() => done()),
-						)
-					: requestIdleCallback(() => done()),
-			),
+			new Promise<void>((done, fail) => {
+				const arm = (globalThis as unknown as { __mArm?: { idle: (run: () => void) => void } }).__mArm;
+				const stalled = setTimeout(() => fail(new Error('the stream executor never finished its reveal train')), 10_000);
+				const idle = () => (clearTimeout(stalled), requestIdleCallback(() => done(), { timeout: 2000 }));
+				if (arm) arm.idle(idle);
+				else idle();
+			}),
 	);
 	// Idle-time link prefetches are the page's own, not the interaction's: wait until the network is quiet.
 	for (let seen = -1, round = 0; seen !== requests.length; round++) {
