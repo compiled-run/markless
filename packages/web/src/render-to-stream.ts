@@ -690,11 +690,10 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			else m.push(x);
 		root.__marklessComments = m;
 		if (root.__marklessCensus) return;
-		const paths = x === me && root.getAttribute?.(${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)});
-		const order = paths && paths.split('|')[3];
-		let sig = 0;
-		if (order) for (const el of c.slice(1)) { const n = el.localName || ''; sig = (sig * 31 + n.length * 32 + (n.charCodeAt(0) | 32)) | 0; }
-		if (paths && (parseInt(paths) !== c.length || (order && order !== (sig >>> 0).toString(36)))) root.__marklessShifted = 1;
+		const p = x === me && root.getAttribute?.(${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}), o = p && p.split('|')[3];
+		let g = 0;
+		if (o) for (const el of c.slice(1)) { const n = el.localName || ''; g = (g * 31 + n.length * 32 + (n.charCodeAt(0) | 32)) | 0; }
+		if (p && (parseInt(p) !== c.length || (o && o !== (g >>> 0).toString(36)))) root.__marklessShifted = 1;
 		root.__marklessCensus = c;
 	};
 	const own = me && me.closest && me.closest('[data-async-container]');
