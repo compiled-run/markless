@@ -53,6 +53,7 @@ function queuePressAt([step, selector]) {
 			const root = document.querySelector('[data-async-container]');
 			window.__press.routeAtUp = window.__routeEvaluated === true;
 			window.__press.startedAtUp = !!root?.__asyncResumeRuntimeStarted;
+			window.__watch();
 			document.querySelector(selector).click();
 		});
 	};
@@ -116,13 +117,16 @@ try {
 				await page.addInitScript(queuePressAt, [mode, control]);
 				await page.addInitScript(([selector]) => {
 					window.__press = {};
-					addEventListener('DOMContentLoaded', () => {
+					// A control inside a streamed answer exists only once its arm lands, so the watch starts at the latest when the press is queued.
+					window.__watch = () => {
 						const target = document.querySelector(selector);
+						if (!target || window.__press.before !== undefined) return;
 						window.__press.before = target.textContent;
 						new MutationObserver(() => {
 							if (window.__press.effect === undefined && target.textContent !== window.__press.before) window.__press.effect = performance.now();
 						}).observe(target, { subtree: true, characterData: true, childList: true });
-					});
+					};
+					addEventListener('DOMContentLoaded', () => window.__watch());
 				}, [effect]);
 			}
 			await page.goto(url, { waitUntil: 'load' });

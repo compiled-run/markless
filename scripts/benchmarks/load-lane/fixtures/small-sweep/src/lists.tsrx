@@ -54,3 +54,26 @@ export function ComponentList({ rows }: { readonly rows: number }) @{
 		}
 	</section>
 }
+
+// Rows with no handler; the only press, outside the list, refreshes it.
+export function QuietList({ rows }: { readonly rows: number }) @{
+	const full = state(rows);
+	let size = state(rows);
+	const items = computed(async () => loadItems(size));
+
+	<section class="list">
+		<button class="shrink" onClick={() => (size = size === full ? (full === 10 ? 5 : 10) : full)}>Rows {size}</button>
+		@try {
+			<ul data-list>
+				@for (const item of items; key item.id) {
+					<li class="row">
+						<span class="label">{item.label}</span>
+						<em>{item.size}</em>
+					</li>
+				}
+			</ul>
+		} @pending {
+			<p>Loading</p>
+		}
+	</section>
+}
