@@ -86,6 +86,8 @@ const ARM_COMMIT = ['web/resume-commit-arm'];
 const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
 // Stops what an arm's components own once the arm closes; only a branch naming such components loads it.
 const ARM_GATE = ['web/fns/arm-gate'];
+// Stands in for what is above an owner its own file places, when the browser draws that owner's arm.
+const OWNER_PLACEMENT = ['web/prerender/owner-rooted'];
 // Settle tracking and streamed-arm adoption load only for async boundaries.
 const ASYNC_BOUNDARY = [
 	'web/resume-async-boundaries',
@@ -113,6 +115,7 @@ export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...HELD_INPUTS,
 	...SHARED_INSTANCES,
 	...ARM_GATE,
+	...OWNER_PLACEMENT,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -313,11 +316,12 @@ export function createRuntimeDemandMap(
 			closurePlans,
 		),
 		armActions: armActionDemandRecords(scope, dispatchCore),
-		capabilityModuleIds: capabilityModuleIds(
-			input.symbolResolver,
-			input.protocolView,
-			input.protocolState,
-		),
+		capabilityModuleIds: [
+			...capabilityModuleIds(input.symbolResolver, input.protocolView, input.protocolState),
+			...((input.publicRenderModule.componentDefinitions ?? []).some((definition) => definition.placements)
+				? OWNER_PLACEMENT
+				: []),
+		],
 		...nestedRecordDemand(
 			input.protocolView,
 			closedSymbolDemand,
@@ -339,6 +343,7 @@ export function createRuntimeDemandMap(
 			...ARM_LISTS,
 			...BRANCH,
 			...ARM_GATE,
+			...OWNER_PLACEMENT,
 			...ASYNC_BOUNDARY,
 			...HELD_INPUTS,
 			...BEHAVIOR,

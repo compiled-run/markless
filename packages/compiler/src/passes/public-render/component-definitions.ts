@@ -35,6 +35,8 @@ import {
 } from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
+import { componentPlacementChains } from '../../component-edge-instance.ts';
+import { armEscalationCandidateSiteIds } from '../symbol-modules.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -71,6 +73,13 @@ export function collectPublicRenderComponentDefinitions(
 	);
 
 	const addressedHosts = renderAddressedHostNodeIds(input);
+	const escalatingBranchIds = armEscalationCandidateSiteIds({
+		source: input.source,
+		semanticGraph: input.semanticGraph,
+		symbolResolver: input.symbolResolver,
+		captureAnalysis: input.captureAnalysis,
+		renderData: input.renderData,
+	});
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;
@@ -322,6 +331,9 @@ export function collectPublicRenderComponentDefinitions(
 					boundaryIds.has(boundary.boundaryId),
 				),
 				edges,
+				// A flip or settle the browser renders draws only the instance holding it, which rebinds through the edges that placed it.
+				...((boundaryIds.size > 0 || [...branchIds].some((id) => escalatingBranchIds.has(id))) &&
+					ownerPlacements(componentName)),
 				propCellId:
 					input.semanticGraph.components.find(
 						(component) => component.name === componentName,
@@ -364,6 +376,20 @@ export function collectPublicRenderComponentDefinitions(
 			},
 		];
 
+		function ownerPlacements(name: string) {
+			const chains = componentPlacementChains(name, input.semanticGraph.componentEdges);
+			return (
+				chains.length > 0 && {
+					placements: chains.map((chain) =>
+						chain.map((edge) => ({
+							edgeId: edge.id,
+							prefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
+							...(edge.keyedRepeatScopeIds.length > 0 && { rows: edge.keyedRepeatScopeIds.length }),
+						})),
+					),
+				}
+			);
+		}
 		function cellLessWidgetRoots(name: string): string[] {
 			return widgetRootDefinitionIds(input, name).filter(
 				(definitionId) =>

@@ -5,18 +5,12 @@ import {
 	type MarklessScopedGraph,
 } from '../fns/instance-scope.ts';
 
+// One edge of a chain the compiler found from a component nothing in the module places down to the owner.
+export type OwnerPlacementStep = { readonly edgeId: string; readonly prefix: string; readonly rows?: number };
+
 type PlacementSurface = {
-	readonly rootComponentName: string | null;
 	readonly components: Readonly<
-		Record<
-			string,
-			{
-				readonly edges?: ReadonlyArray<{
-					readonly childComponentName: string;
-					readonly symbolPrefix: string;
-				}>;
-			}
-		>
+		Record<string, { readonly placements?: ReadonlyArray<ReadonlyArray<OwnerPlacementStep>> }>
 	>;
 };
 
@@ -25,9 +19,11 @@ export type BranchOwnerPlacement = {
 	readonly moduleRootPath: string;
 	// The owner's path from that module root, rows included.
 	readonly ownerPath: string;
+	// The same-file edges from the module root down to the owner, when the owner's own file placed it.
+	readonly chain?: ReadonlyArray<OwnerPlacementStep>;
 };
 
-// The flip's graph stands at the owner's page path; the module's own edges say which tail of it is the module's.
+// The flip's graph stands at the owner's page path; the chains that place the owner in its file say which tail of it is the file's.
 export function branchOwnerPlacement(
 	surface: PlacementSurface,
 	ownerName: string | undefined,
@@ -36,26 +32,21 @@ export function branchOwnerPlacement(
 	const pagePath = (graph as MarklessScopedGraph).marklessInstancePath;
 	if (!ownerName || !pagePath) return undefined;
 	const segments = marklessInstanceSegments(pagePath);
-	const reaches = new Set<string>();
-	let frontier: ReadonlyArray<readonly [string, string]> = surface.rootComponentName
-		? [[surface.rootComponentName, '']]
-		: [];
-	for (let depth = 0; depth < segments.length && frontier.length > 0; depth++) {
-		frontier = frontier.flatMap(([name, path]) =>
-			(surface.components[name]?.edges ?? []).flatMap((edge) =>
-				surface.components[edge.childComponentName]
-					? [[edge.childComponentName, path + edge.symbolPrefix] as const]
-					: [],
-			),
-		);
-		for (const [name, path] of frontier) if (name === ownerName) reaches.add(path);
+	for (const chain of surface.components[ownerName]?.placements ?? []) {
+		let at = segments.length;
+		// Each edge spells its own segments, after the rows of the @for it sits in.
+		for (let step = chain.length; step-- > 0 && at >= 0; ) {
+			const { prefix, rows = 0 } = chain[step]!;
+			const own = marklessInstanceSegments(prefix).length;
+			at = at >= own && segments.slice(at - own, at).join('') === prefix ? at - own : -1;
+			for (let row = 0; row < rows && at >= 0; row++) {
+				const segment = segments[--at];
+				if (segment === undefined || marklessRowFreeSymbolId(segment, segment) !== '') at = -1;
+			}
+		}
+		if (at >= 0)
+			return { moduleRootPath: segments.slice(0, at).join(''), ownerPath: segments.slice(at).join(''), chain };
 	}
-	// An owner no edge of its own module reaches was composed from another module, at that module's root.
-	reaches.add('');
-	for (let start = 0; start <= segments.length; start++) {
-		const ownerPath = segments.slice(start).join('');
-		if (reaches.has(marklessRowFreeSymbolId(ownerPath, ownerPath)))
-			return { moduleRootPath: segments.slice(0, start).join(''), ownerPath };
-	}
-	return undefined;
+	// An owner no chain of its file spells was composed from another module, at that module's root.
+	return { moduleRootPath: pagePath, ownerPath: '' };
 }

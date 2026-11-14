@@ -39,7 +39,8 @@ import {
 	type MarklessScopedGraph,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
-import { branchOwnerPlacement, type BranchOwnerPlacement } from './owner-placement.ts';
+import { branchOwnerPlacement, type BranchOwnerPlacement, type OwnerPlacementStep } from './owner-placement.ts';
+import type { OwnerRootedRender } from './owner-rooted.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 import {
@@ -126,6 +127,8 @@ export type PrerenderDataDefinition = {
 			readonly structureTokens?: ReadonlyArray<StructureToken>;
 		};
 	}>;
+	// The same-module edge chains that place this component, from a component nothing in the module places.
+	readonly placements?: ReadonlyArray<ReadonlyArray<OwnerPlacementStep>>;
 	readonly propCellId?: string | null;
 	// The shared() element() handles a rendered instance of this component binds,
 	// published by the compiler so a widget's seed phase can file them before any
@@ -670,6 +673,14 @@ async function evaluatePrerenderDataSurface(
 		fresh?.rootName ?? branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const ownerPath = fresh?.owner?.ownerPath;
+	const ownerModule: PrerenderBoundModule | undefined = ownerPath
+		? { rootPrefix: '', instanceReads: new Map(), ownerPath }
+		: undefined;
+	const placed =
+		ownerModule &&
+		graph &&
+		fresh?.owner?.chain &&
+		(await import('./owner-rooted.ts')).ownerRootedRender(surface, fresh.owner, ownerModule, graph);
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
@@ -679,7 +690,8 @@ async function evaluatePrerenderDataSurface(
 		idPrefix: fresh?.drawnAt ?? '',
 		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
-		...(ownerPath ? { module: { rootPrefix: '', instanceReads: new Map(), ownerPath } } : {}),
+		...(ownerModule && { module: ownerModule }),
+		...placed,
 		loadSymbol,
 		graph,
 		requireHtml,
@@ -717,11 +729,9 @@ function branchOwnerName(
 	branchSiteId: string | undefined,
 ): string | undefined {
 	if (!branchSiteId) return undefined;
-	const holds = (name: string | null | undefined) =>
-		!!name &&
-		!!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId);
-	if (holds(surface.rootComponentName)) return undefined;
-	return Object.keys(surface.components).find(holds);
+	return Object.keys(surface.components).find(
+		(name) => !!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId),
+	);
 }
 
 type RosterResumeHost = {
@@ -827,9 +837,7 @@ function marklessPlacedInstanceRead(
 	module: PrerenderBoundModule,
 	placed: string,
 ): PrerenderRead | undefined {
-	const owner = module.ownerPath;
-	const local = owner && placed.startsWith(owner) ? placed.slice(owner.length) : placed;
-	return module.instanceReads.get(module.rootPrefix + local);
+	return module.instanceReads.get(module.rootPrefix + placed);
 }
 
 // Per live graph, the component instances its last re-render placed on the page.
@@ -930,8 +938,8 @@ function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayl
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
-// A module as one render placed it: its root's prefix and each evaluated instance's reader.
-type PrerenderBoundModule = {
+// A module as one render placed it: its root's prefix and each instance's reader, keyed by that prefix and its path from the module root.
+export type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
 	// Where this render's root stands on the page when it is not the module root: a flip renders only the branch's owner.
@@ -988,6 +996,8 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshBranchSiteId?: string;
 	// Set through the whole render when it brings in an escalated arm, whose commit feeds the props of what it places.
 	readonly placingBranchSiteId?: string;
+	// Set on a render rooted at a flip's owner its own file places.
+	readonly placedAbove?: OwnerRootedRender['placedAbove'];
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1088,7 +1098,10 @@ export function evaluatePrerenderDataComponent(input: {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, symbolRead);
+	ownModule.instanceReads.set(
+		ownModule.rootPrefix + (ownModule.ownerPath ?? '') + input.symbolPrefix.slice(ownModule.rootPrefix.length),
+		symbolRead,
+	);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -1453,6 +1466,7 @@ export function evaluatePrerenderDataComponent(input: {
 								throw new Error(
 									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
 								);
+							const boundSymbols = input.placedAbove ? input.placedAbove(edge.boundSymbols) : edge.boundSymbols;
 							// One compile-time edge inside a keyed `@for` is many instances at render time.
 							const rowSegment = marklessRowPath(context) ?? '';
 							const hostPrefix = rowSegment + edge.hostPrefix;
@@ -1468,7 +1482,7 @@ export function evaluatePrerenderDataComponent(input: {
 									symbolPrefix,
 									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									...asyncArmPlacement(edge),
-									boundSymbols: edge.boundSymbols ?? {},
+									boundSymbols: boundSymbols ?? {},
 									callbackProps: {},
 								});
 								return materialized;
@@ -1609,7 +1623,7 @@ export function evaluatePrerenderDataComponent(input: {
 										symbolPrefix,
 										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 										...asyncArmPlacement(edge),
-										boundSymbols: edge.boundSymbols ?? {},
+										boundSymbols: boundSymbols ?? {},
 										callbackProps: callbacks,
 										// Where this child's own composition puts the children written into it,
 										// so composition can register the widget a projected part sits beside.
