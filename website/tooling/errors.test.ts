@@ -57,6 +57,32 @@ describe('scanCodes', () => {
 		});
 	});
 
+	it.fails('prints every arm of a message chosen by a ternary, each with its own why and suggestion', () => {
+		const [entry] = scanCodes([
+			file(
+				'packages/compiler/src/passes/reads.ts',
+				`export function stale(member: string | undefined, place: string) {
+	return {
+		code: 'MARKLESS_READ_STALE',
+		severity: 'warning',
+		message: member ? \`\${place} reads into \${member}.\` : \`\${place} reads a value.\`,
+		why: member ? 'Props hold plain values.' : 'Composites are not lowered.',
+		suggestions: [{ message: member ? 'Call a function.' : 'Use a computed.' }],
+		docsUrl: 'https://markless.dev/errors/MARKLESS_READ_STALE',
+	};
+}`,
+			),
+		]);
+		expect(entry).toMatchObject({
+			message: '<place> reads into <member>.',
+			why: 'Props hold plain values.',
+			suggestion: 'Call a function.',
+			variants: [
+				{ message: '<place> reads a value.', why: 'Composites are not lowered.', suggestion: 'Use a computed.' },
+			],
+		});
+	});
+
 	it('resolves a code held in a constant and a code expanded from a template', () => {
 		const codes = scanCodes([
 			file(

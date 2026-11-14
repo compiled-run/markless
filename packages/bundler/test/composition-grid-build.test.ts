@@ -64,6 +64,7 @@ afterAll(async () => {
 	await Promise.all([
 		cleanOutput(app),
 		cleanOutput(rowsApp),
+		cleanOutput(resolve(app, 'before-app')),
 		rm(resolve(app, 'node_modules'), { force: true, recursive: true }),
 	]);
 });
@@ -410,6 +411,10 @@ describe('a row component from another file in rows fed by a prop', () => {
 	// Known defect: the build refuses it, saying the row's markup cannot be seen, while dev builds it and adds rows.
 	test.fails('builds for production', async () => {
 		await exec(vp, ['build'], { cwd: rowsApp, env: process.env });
+	}, 120_000);
+	// The pages #697 adds to the grid (prop-fed rows, row parts and pairs, row edits, barrel and renamed imports, the tree): the build refuses them here.
+	test.fails('the grid pages #697 adds build for production', async () => {
+		await exec(vp, ['build'], { cwd: resolve(app, 'before-app'), env: process.env });
 	}, 120_000);
 });
 
