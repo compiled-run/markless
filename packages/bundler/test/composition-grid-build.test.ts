@@ -461,6 +461,17 @@ describe('composition grid, production build', () => {
 		expect(errors).toEqual([]);
 	});
 
+	test('port. a child from another file reads an optional object prop behind a guard, with and without it', async () => {
+		const { page, errors } = await visit('/k-optional-prop');
+		const said = () => page.locator('[data-g="said"]').allTextContents();
+		await expect.poll(said, poll).toEqual(['', '']);
+		await page.locator('[data-g="left-out"] button').click();
+		await expect.poll(said, poll).toEqual(['none', '']);
+		await page.locator('[data-g="passed"] button').click();
+		await expect.poll(said, poll).toEqual(['none', 'Ada']);
+		expect(errors).toEqual([]);
+	});
+
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
 		const { page, errors } = await visit('/append-only');
 		await expect.poll(() => lines(page), poll).toEqual(['title.even: a round 0']);

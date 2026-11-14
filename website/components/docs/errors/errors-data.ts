@@ -2931,18 +2931,18 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'An event handler uses a prop whose value the browser cannot get back.',
 		printed: [
-			'MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "<symbolId>" on component edge "<componentEdgeId>" because prop "<propName>" is not passed by the parent that renders "<componentName>", and this call site invokes it unconditionally.',
-			'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.',
-			'Call it optionally as <propName>?.(…), guard it with if (<propName>), or pass <propName> where "<componentName>" is rendered.',
+			'MARKLESS_CAPTURE_OPAQUE_PROP: "<componentName>" <absentAction> its prop "<propName>" in `<absentSource>` without checking that it was passed, and this <<componentName>> passes no "<propName>", so that code would throw when it runs in the browser.',
+			'A prop the caller leaves out is undefined. Reading it, or checking it, works; calling it or reading a field of it throws unless the code checks first that it is there.',
+			'Read it optionally as <propName>?.…, guard it with if (<propName>) or <propName> ? … : …, or pass <propName> where "<componentName>" is rendered.',
 			'MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "<symbolId>" on component edge "<componentEdgeId>" because prop "<propName>" for "<componentName>" is the runtime expression "<expression>". "<componentName>" reads it as `<source>` in <lazySymbolRole>, which runs in the browser after resume, and this value has no route there.',
 			'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
-			'Pass <propName> an arrow written inline (<propName>={() => …}) or the name of a const arrow or function declared in the component body (<propName>={add}).',
+			'Call it optionally as <propName>?.(…), guard it with if (<propName>), or pass <propName> where "<componentName>" is rendered.',
 			'https://markless.dev/errors/MARKLESS_CAPTURE_OPAQUE_PROP',
 		],
 		structured: true,
-		why: 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.',
+		why: 'A prop the caller leaves out is undefined. Reading it, or checking it, works; calling it or reading a field of it throws unless the code checks first that it is there.',
 		suggestion:
-			'Call it optionally as <propName>?.(…), guard it with if (<propName>), or pass <propName> where "<componentName>" is rendered.',
+			'Read it optionally as <propName>?.…, guard it with if (<propName>) or <propName> ? … : …, or pass <propName> where "<componentName>" is rendered.',
 		guide: {
 			summary: 'An event handler uses a prop whose value the browser cannot get back.',
 			what: [

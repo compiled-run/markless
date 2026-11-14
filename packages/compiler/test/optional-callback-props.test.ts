@@ -12,7 +12,10 @@ const handlerSlots = (
 	result: Awaited<ReturnType<typeof compile>>,
 	predicate: (symbol: { readonly kind: string }) => boolean = (symbol) =>
 		symbol.kind === 'event-handler',
-) => result.captureAnalysis.extractedSymbols.filter(predicate).flatMap((symbol) => symbol.captureSlots);
+) =>
+	result.captureAnalysis.extractedSymbols
+		.filter(predicate)
+		.flatMap((symbol) => symbol.captureSlots);
 
 test('an absent callback prop invoked optionally resolves to a compiler-known undefined', async () => {
 	const result = await compile(
@@ -83,7 +86,7 @@ export function App() @{
 		(item) => item.code === 'MARKLESS_CAPTURE_OPAQUE_PROP',
 	);
 	expect(diagnostic?.propName).toBe('onChange');
-	expect(diagnostic?.message).toContain('is not passed by');
+	expect(diagnostic?.message).toContain('passes no "onChange"');
 	expect(diagnostic?.suggestions.map((suggestion) => suggestion.message).join(' ')).toContain(
 		'onChange?.(',
 	);
@@ -266,3 +269,90 @@ for (const [name, body] of safeGuards)
 		]);
 		expect(result.captureAnalysis.diagnostics).toEqual([]);
 	});
+
+const optionalObject = `
+import { state } from '@markless/core';
+export default function OptionalObject({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={() => (said = item ? item.name : 'none')}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+`;
+
+test('an absent object prop a handler reads behind a guard is undefined there, not refused', async () => {
+	const result = await compile(
+		'src/OptionalObjectPage.tsrx',
+		`${optionalObject.replace('export default function', 'function')}
+export function Page() @{
+	<OptionalObject />
+}
+`,
+	);
+	const slots = handlerSlots(result).filter((candidate) => candidate.propName === 'item');
+
+	expect(slots.map((slot) => [slot.source, slot.routes])).toEqual([
+		['item', [expect.objectContaining({ kind: 'compiler-known-constant', value: undefined })]],
+		[
+			'item.name',
+			[expect.objectContaining({ kind: 'compiler-known-constant', value: undefined })],
+		],
+	]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('a child from another file reading an absent object prop behind a guard builds in the page that leaves it out', async () => {
+	const child = await compile('src/optional-object.tsrx', optionalObject);
+	const handler = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const page = await compile(
+		'src/page.tsrx',
+		`
+import OptionalObject from './optional-object.tsrx';
+export default function Page() @{
+	<OptionalObject />
+}
+`,
+		[
+			{
+				id: 'imported:OptionalObject:symbol:say',
+				chunk: 'virtual:markless:symbol:OptionalObject:say',
+				exportName: 'say',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: handler,
+			},
+		],
+	);
+
+	expect(page.captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('an absent object prop a handler reads a field of with no guard stays refused, naming the read', async () => {
+	const result = await compile(
+		'src/UnguardedRead.tsrx',
+		`
+import { state } from '@markless/core';
+function Card({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={() => (said = item.name.toUpperCase())}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+export function Page() @{
+	<Card />
+}
+`,
+	);
+	const diagnostic = result.captureAnalysis.diagnostics.find(
+		(item) => item.code === 'MARKLESS_CAPTURE_OPAQUE_PROP',
+	);
+
+	expect(diagnostic?.message).toBe(
+		'"Card" reads into its prop "item" in `item.name.toUpperCase` without checking that it was passed, and this <Card> passes no "item", so that code would throw when it runs in the browser.',
+	);
+	expect(diagnostic?.primarySpan).toBeDefined();
+	expect(diagnostic?.suggestions[0]?.message).toContain('item?.');
+});

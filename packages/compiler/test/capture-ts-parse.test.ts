@@ -46,9 +46,9 @@ export function App() @{
 	);
 
 	expect(opaquePropDiagnostics(result)).toEqual([]);
-	expect(
-		handlerSlots(result).find((slot) => slot.propName === 'onChange')?.routes,
-	).toEqual([expect.objectContaining({ kind: 'compiler-known-constant', value: undefined })]);
+	expect(handlerSlots(result).find((slot) => slot.propName === 'onChange')?.routes).toEqual([
+		expect.objectContaining({ kind: 'compiler-known-constant', value: undefined }),
+	]);
 });
 
 test('an optional absent-prop call beside an `as` cast is not reported opaque', async () => {
@@ -111,5 +111,7 @@ export function App() @{
 
 	const diagnostic = opaquePropDiagnostics(result)[0];
 	expect(diagnostic?.propName).toBe('onChange');
-	expect(diagnostic?.message).toContain('invokes it unconditionally');
+	expect(diagnostic?.message).toContain(
+		'calls its prop "onChange" in `onChange((event.target as HTMLInputElement).value)` without checking',
+	);
 });

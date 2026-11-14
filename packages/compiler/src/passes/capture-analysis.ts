@@ -120,7 +120,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
 	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
-		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol)),
+		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol, input)),
 		...localSymbols.flatMap((symbol, index) =>
 			unreducedPropReadDiagnostics(
 				symbol,
@@ -233,11 +233,12 @@ function importedCaptureSymbols(
 		const republished = captureSymbol.innerInstancePath !== undefined;
 		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
 		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges);
-		// Absent callback props fold to undefined only at optional/guarded call sites.
-		const absentPropIsUndefined = (slot: CaptureSlot) =>
+		// An absent prop reads as undefined unless a handler calls it, or reads into it, with no guard.
+		const absentUse = (slot: CaptureSlot) =>
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
-				? true
-				: referenceInvocationIsAbsentSafe(captureSymbol.source, slot.source);
+				? null
+				: unguardedAbsentUse(captureSymbol.source, slot.source);
+		const absentPropIsUndefined = (slot: CaptureSlot) => absentUse(slot) === null;
 		// A widget-callback claim binds one thing: the slot the enclosing root
 		// answers. The child's own graph reads keep resolving in the child's
 		// module, so rebinding them here would take the part's records with them.
@@ -295,13 +296,16 @@ function importedCaptureSymbols(
 										const ownRead = captureSlotReadInContext(slot)
 											? ownPropRead(captureSymbol.kind, slot)
 											: undefined;
-										const route = propCaptureRoute(
-											path,
-											slot.propName as string,
-											slot.path,
-											input,
-											absentPropIsUndefined(slot),
-											ownRead,
+										const route = withAbsentUse(
+											propCaptureRoute(
+												path,
+												slot.propName as string,
+												slot.path,
+												input,
+												absentPropIsUndefined(slot),
+												ownRead,
+											),
+											absentUse(slot),
 										);
 										// The child's symbol reads this slot, so a value worked out from the row comes from the instance's own props too.
 										return ownRead &&
@@ -963,12 +967,16 @@ function captureSlot(
 	const componentName = declaration?.componentName ?? read.componentName;
 	const propName = read.graphNodeId.startsWith('prop:') ? read.path[0] : undefined;
 	const routePath = propName ? read.path.slice(1) : read.path;
-	// Absent callback props fold to undefined only at optional/guarded call sites; a derive
-	// reads an absent prop as undefined, as an imported claim's derive already does.
+	// An absent prop reads as undefined unless a handler calls it, or reads into it, with no guard;
+	// a derive reads an absent prop as undefined, as an imported claim's derive already does.
+	const absentUse =
+		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
+			? unguardedAbsentUse(symbolSource(symbol), read.source)
+			: null;
 	const absentPropIsUndefined =
 		symbol.kind === 'sync-computed-derive' ||
-		((symbol.kind === 'event-handler' || symbol.kind === 'callback-prop') &&
-			referenceInvocationIsAbsentSafe(symbolSource(symbol), read.source));
+		(absentUse === null &&
+			(symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'));
 	let routes = propName
 		? propCaptureRoutes(
 				componentName,
@@ -979,7 +987,7 @@ function captureSlot(
 				symbol.kind === 'sync-computed-derive' || symbol.kind === 'async-computed-runner'
 					? read
 					: undefined,
-			)
+			).map((route) => withAbsentUse(route, absentUse))
 		: [
 				{
 					kind: 'graph-reference' as const,
@@ -1341,6 +1349,12 @@ function readsOnlyRowLocals(
 
 const rowLocalReaders = new WeakMap<CaptureAnalysisInput, SymbolSourceSemanticsReader>();
 
+function withAbsentUse(route: CaptureSlotRoute, use: AbsentUse | null): CaptureSlotRoute {
+	return route.kind === 'unsupported-opaque' && route.absentProp && use !== null
+		? { ...route, absentUse: use }
+		: route;
+}
+
 export function createCompilerKnownConstantCaptureRoute(
 	componentEdgeId: string,
 	componentEdgePath: ReadonlyArray<string>,
@@ -1487,16 +1501,16 @@ function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}, value);
 }
 
-const absentSafeMemo = createSourceMemo<boolean>(2048);
+type AbsentUse = { readonly kind: 'call' | 'member'; readonly source: string };
 
-// True when every call of `reference` in source already no-ops on a missing value (?.(), if/&&/?: guards).
-function referenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
-	return absentSafeMemo(reference, source, () =>
-		computeReferenceInvocationIsAbsentSafe(source, reference),
-	);
+const absentUseMemo = createSourceMemo<AbsentUse | null>(2048);
+
+// Where source calls `reference`, or reads a member of it, with no ?. or if/&&/?: guard: what would throw if it is missing.
+function unguardedAbsentUse(source: string, reference: string): AbsentUse | null {
+	return absentUseMemo(reference, source, () => computeUnguardedAbsentUse(source, reference));
 }
 
-function computeReferenceInvocationIsAbsentSafe(source: string, reference: string): boolean {
+function computeUnguardedAbsentUse(source: string, reference: string): AbsentUse | null {
 	const moduleSource = `const __marklessCaptureSource = ${source};`;
 	let ast: AnyNode;
 	try {
@@ -1504,7 +1518,7 @@ function computeReferenceInvocationIsAbsentSafe(source: string, reference: strin
 		// first annotation or cast, and the catch would read that as unconditional.
 		ast = parseJavaScriptModule(moduleSource, CAPTURE_SOURCE_PARSE_FILENAME);
 	} catch {
-		return false;
+		return { kind: 'call', source: reference };
 	}
 	const isReference = (node: AnyNode | undefined): boolean =>
 		node !== undefined &&
@@ -1584,12 +1598,21 @@ function computeReferenceInvocationIsAbsentSafe(source: string, reference: strin
 		return false;
 	};
 
-	let invoked = false;
-	let unguarded = false;
+	let unguarded: AbsentUse | null = null;
 	const visit = (node: AnyNode, guarded: boolean): void => {
-		if (node.type === 'CallExpression' && isReference(asNode(node.callee))) {
-			invoked = true;
-			if (node.optional !== true && !guarded) unguarded = true;
+		if (unguarded !== null) return;
+		const dereferenced =
+			node.type === 'CallExpression'
+				? asNode(node.callee)
+				: node.type === 'MemberExpression'
+					? asNode(node.object)
+					: undefined;
+		if (!guarded && node.optional !== true && isReference(dereferenced)) {
+			unguarded = {
+				kind: node.type === 'CallExpression' ? 'call' : 'member',
+				source: moduleSource.slice(node.start as number, node.end as number),
+			};
+			return;
 		}
 		if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
 			const test = asNode(node.test);
@@ -1625,7 +1648,7 @@ function computeReferenceInvocationIsAbsentSafe(source: string, reference: strin
 	};
 	visit(ast, false);
 
-	return invoked && !unguarded;
+	return unguarded;
 }
 
 function lazySymbolRole(kind: string | undefined): string {
@@ -1643,11 +1666,14 @@ function asNode(value: unknown): AnyNode | undefined {
 		: undefined;
 }
 
-function opaqueSlotDiagnostics(symbol: {
-	readonly symbolId: string;
-	readonly kind?: string;
-	readonly captureSlots: ReadonlyArray<CaptureSlot>;
-}): ReadonlyArray<CaptureAnalysisDiagnostic> {
+function opaqueSlotDiagnostics(
+	symbol: {
+		readonly symbolId: string;
+		readonly kind?: string;
+		readonly captureSlots: ReadonlyArray<CaptureSlot>;
+	},
+	input: CaptureAnalysisInput,
+): ReadonlyArray<CaptureAnalysisDiagnostic> {
 	const reportedRoutes = new Set<string>();
 	return symbol.captureSlots.flatMap((slot) =>
 		slot.routes.flatMap((route) => {
@@ -1657,6 +1683,14 @@ function opaqueSlotDiagnostics(symbol: {
 			const routeKey = `${route.componentEdgeId}:${propName}`;
 			if (reportedRoutes.has(routeKey)) return [];
 			reportedRoutes.add(routeKey);
+			const absentUse = route.absentProp ? route.absentUse : undefined;
+			const readsIntoAbsent = absentUse?.kind === 'member';
+			const absentAction = readsIntoAbsent ? 'reads into' : 'calls';
+			const absentSource = absentUse?.source ?? propName;
+			const edgeSpan = input.semanticGraph.componentEdges.find(
+				(edge) => edge.id === route.componentEdgeId,
+			)?.sourceSpan;
+			const primarySpan = route.sourceSpan ?? (route.absentProp ? edgeSpan : undefined);
 			return [
 				{
 					code: CAPTURE_OPAQUE_PROP_CODE,
@@ -1664,14 +1698,14 @@ function opaqueSlotDiagnostics(symbol: {
 					phase: CAPTURE_ANALYSIS_PHASE,
 					title: 'Lazy handler prop capture is not resumable',
 					message: route.absentProp
-						? `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" is not passed by the parent that renders "${componentName}", and this call site invokes it unconditionally.`
+						? `"${componentName}" ${absentAction} its prop "${propName}" in \`${absentSource}\` without checking that it was passed, and this <${componentName}> passes no "${propName}", so that code would throw when it runs in the browser.`
 						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
 					why: route.unroutableHandler
 						? route.unroutableHandler.why
 						: route.absentProp
-							? 'An absent prop has no value to route at this component edge. An optional or guarded call folds to undefined; an unconditional call would throw after resume, so it stays a build error.'
+							? 'A prop the caller leaves out is undefined. Reading it, or checking it, works; calling it or reading a field of it throws unless the code checks first that it is there.'
 							: 'A demanded capture slot must route to a graph node, a compiler-known constant, or a callback symbol. Constant data reaches the browser as its build-time value: literals, object and array literals, and static member or index reads of a module `const` in this file or of a plain-data `const` export of an imported module that no statement there writes through. This expression is none of those - a function call, a `let`, a class instance, a namespace import, or a constant its module mutates - so its value exists only when the render runs.',
-					...(route.sourceSpan ? { primarySpan: route.sourceSpan } : {}),
+					...(primarySpan ? { primarySpan } : {}),
 					passId: CAPTURE_ANALYSIS_PASS_ID,
 					artifactKeys: ['semanticGraph', 'symbolResolver', 'captureAnalysis'],
 					symbolId: symbol.symbolId,
@@ -1684,7 +1718,9 @@ function opaqueSlotDiagnostics(symbol: {
 							message: route.unroutableHandler
 								? route.unroutableHandler.rewrite
 								: route.absentProp
-									? `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
+									? readsIntoAbsent
+										? `Read it optionally as ${propName}?.…, guard it with if (${propName}) or ${propName} ? … : …, or pass ${propName} where "${componentName}" is rendered.`
+										: `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
 									: isEventAttribute(propName)
 										? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
 										: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
