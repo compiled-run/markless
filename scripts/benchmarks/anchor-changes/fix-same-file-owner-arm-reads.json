@@ -5,9 +5,43 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
+				"web/prerender/owner-rooted"
+			],
+			"set": 1533,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 1123,
+			"delta": 345,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 10,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/owner-rooted"
+			],
+			"set": 1533,
 			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
 			"date": "2026-11-14"
 		},
@@ -18,7 +52,19 @@
 				"@fixtures/vite-plus",
 				"web/prerender/evaluator"
 			],
-			"delta": 1123,
+			"delta": 345,
+			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 4,
 			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
 			"date": "2026-11-14"
 		},
@@ -30,7 +76,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 3,
+			"delta": 16,
 			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
 			"date": "2026-11-14"
 		}

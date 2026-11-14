@@ -33,14 +33,14 @@ import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
-	marklessInstanceScopedGraph,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowPath,
 	type MarklessScopedGraph,
 } from '../fns/instance-scope.ts';
 import { prerenderBranchArm } from './branch-arm.ts';
-import { branchOwnerPlacement, type BranchOwnerPlacement } from './owner-placement.ts';
+import { branchOwnerPlacement, type BranchOwnerPlacement, type OwnerPlacementStep } from './owner-placement.ts';
+import type { OwnerRootedRender } from './owner-rooted.ts';
 import { registerPrerenderStagedComputeds } from './staged-graph.ts';
 import { marklessThen, marklessWalk, type Awaitable } from '../ssr-data/awaitable.ts';
 import {
@@ -128,7 +128,7 @@ export type PrerenderDataDefinition = {
 		};
 	}>;
 	// The same-module edge chains that place this component, from a component nothing in the module places.
-	readonly placements?: ReadonlyArray<ReadonlyArray<{ readonly edgeId: string; readonly rows?: number }>>;
+	readonly placements?: ReadonlyArray<ReadonlyArray<OwnerPlacementStep>>;
 	readonly propCellId?: string | null;
 	// The shared() element() handles a rendered instance of this component binds,
 	// published by the compiler so a widget's seed phase can file them before any
@@ -676,7 +676,11 @@ async function evaluatePrerenderDataSurface(
 	const ownerModule: PrerenderBoundModule | undefined = ownerPath
 		? { rootPrefix: '', instanceReads: new Map(), ownerPath }
 		: undefined;
-	const placed = ownerModule && graph && fresh?.owner && composersAbove(fresh.owner, ownerModule, graph);
+	const placed =
+		ownerModule &&
+		graph &&
+		fresh?.owner?.chain &&
+		(await import('./owner-rooted.ts')).ownerRootedRender(surface, fresh.owner, ownerModule, graph);
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
@@ -716,49 +720,6 @@ async function evaluatePrerenderDataSurface(
 	// the counts that were printed as they stood.
 	return roster.marklessResolveRosterCounts(
 		roster.marklessResolveDeferredCounts(rendered, positions.deferred ?? []),
-	);
-}
-
-// A render rooted at a flip's owner stands in for the components above it, each read where it stands, so bound ids rebind through their edges as in a whole render.
-function composersAbove(
-	owner: BranchOwnerPlacement,
-	module: PrerenderBoundModule,
-	graph: RuntimeGraph,
-):
-	| {
-			readonly composer: PrerenderBoundComposer;
-			readonly boundSymbols: Readonly<Record<string, string>>;
-			readonly placedAbove: ReadonlyArray<Readonly<Record<string, string>>>;
-	  }
-	| undefined {
-	const page = pageGraphOf(graph);
-	let composer: PrerenderBoundComposer | undefined;
-	let boundSymbols: Readonly<Record<string, string>> | undefined;
-	const placedAbove: Array<Readonly<Record<string, string>>> = [];
-	let path = '';
-	for (const step of owner.above ?? []) {
-		const at = marklessInstanceScopedGraph(page, owner.moduleRootPath + path);
-		const read: PrerenderRead = (graphNodeId, readPath) => at.read(graphNodeId, readPath);
-		module.instanceReads.set(path, read);
-		composer = { symbolPrefix: '', read, module, ...(composer && boundSymbols && { bound: { boundSymbols, composer } }) };
-		boundSymbols = step.edge.boundSymbols ?? {};
-		placedAbove.unshift(boundSymbols);
-		path = step.path;
-	}
-	return composer && boundSymbols && { composer, boundSymbols, placedAbove };
-}
-
-// What an edge of the owner binds, carried on through the edges above the owner, as a whole render's composition would.
-function boundThroughAbove(
-	boundSymbols: Readonly<Record<string, string>> | undefined,
-	above: ReadonlyArray<Readonly<Record<string, string>>> | undefined,
-): Readonly<Record<string, string>> | undefined {
-	if (!boundSymbols || !above) return boundSymbols;
-	return Object.fromEntries(
-		Object.entries(boundSymbols).map(([symbolId, bound]) => [
-			symbolId,
-			above.reduce((id, edge) => marklessReboundSymbolId(edge, id) ?? id, bound),
-		]),
 	);
 }
 
@@ -978,7 +939,7 @@ function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayl
 }
 
 // A module as one render placed it: its root's prefix and each instance's reader, keyed by that prefix and its path from the module root.
-type PrerenderBoundModule = {
+export type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
 	// Where this render's root stands on the page when it is not the module root: a flip renders only the branch's owner.
@@ -1035,8 +996,8 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshBranchSiteId?: string;
 	// Set through the whole render when it brings in an escalated arm, whose commit feeds the props of what it places.
 	readonly placingBranchSiteId?: string;
-	// Set on a render rooted at a flip's owner: what each edge above it binds, the owner's own edge first.
-	readonly placedAbove?: ReadonlyArray<Readonly<Record<string, string>>>;
+	// Set on a render rooted at a flip's owner its own file places.
+	readonly placedAbove?: OwnerRootedRender['placedAbove'];
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1505,7 +1466,7 @@ export function evaluatePrerenderDataComponent(input: {
 								throw new Error(
 									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
 								);
-							const boundSymbols = boundThroughAbove(edge.boundSymbols, input.placedAbove);
+							const boundSymbols = input.placedAbove ? input.placedAbove(edge.boundSymbols) : edge.boundSymbols;
 							// One compile-time edge inside a keyed `@for` is many instances at render time.
 							const rowSegment = marklessRowPath(context) ?? '';
 							const hostPrefix = rowSegment + edge.hostPrefix;

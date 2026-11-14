@@ -36,6 +36,7 @@ import {
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
 import { componentPlacementChains } from '../../component-edge-instance.ts';
+import { armEscalationCandidateSiteIds } from '../symbol-modules.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -72,6 +73,13 @@ export function collectPublicRenderComponentDefinitions(
 	);
 
 	const addressedHosts = renderAddressedHostNodeIds(input);
+	const escalatingBranchIds = armEscalationCandidateSiteIds({
+		source: input.source,
+		semanticGraph: input.semanticGraph,
+		symbolResolver: input.symbolResolver,
+		captureAnalysis: input.captureAnalysis,
+		renderData: input.renderData,
+	});
 	return [...componentNames].flatMap((componentName) => {
 		const componentNode = componentMap.get(componentName);
 		const componentRoot = componentNode ? firstComponentRoot(componentNode) : null;
@@ -323,8 +331,9 @@ export function collectPublicRenderComponentDefinitions(
 					boundaryIds.has(boundary.boundaryId),
 				),
 				edges,
-				// A flip or settle renders only the instance holding it, so it rebinds through the edges that placed it.
-				...((branchIds.size > 0 || boundaryIds.size > 0) && ownerPlacements(componentName)),
+				// A flip or settle the browser renders draws only the instance holding it, which rebinds through the edges that placed it.
+				...((boundaryIds.size > 0 || [...branchIds].some((id) => escalatingBranchIds.has(id))) &&
+					ownerPlacements(componentName)),
 				propCellId:
 					input.semanticGraph.components.find(
 						(component) => component.name === componentName,
@@ -374,6 +383,7 @@ export function collectPublicRenderComponentDefinitions(
 					placements: chains.map((chain) =>
 						chain.map((edge) => ({
 							edgeId: edge.id,
+							prefix: componentEdgeInstanceSegment(edge, input.semanticGraph.componentEdges),
 							...(edge.keyedRepeatScopeIds.length > 0 && { rows: edge.keyedRepeatScopeIds.length }),
 						})),
 					),

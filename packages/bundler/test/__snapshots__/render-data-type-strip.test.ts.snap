@@ -141,6 +141,7 @@ export const runtimeDemandMap = {
 		"web/payload-full-storage-free",
 		"web/payload-graph-construct",
 		"web/payload-resume",
+		"web/prerender/owner-rooted",
 		"web/repeat-runtime",
 		"web/resume-arm-lists",
 		"web/resume-async-boundaries",

@@ -1,20 +1,20 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 
-// A flip or settle in the browser renders only the component holding it, so its definition names the same-file edge
+// A flip or settle the browser renders draws only the component holding it, so its definition names the same-file edge
 // chains that can place it, each from a component nothing else in the file places, with the rows each edge sits in.
 
 const SOURCE = `
-import { state } from '@markless/core';
+import { computed, state } from '@markless/core';
 
 export function Owner({ value }) @{
-	let open = state(false);
+	const doubled = computed(async () => await Promise.resolve(value * 2));
 
-	<div onClick={() => (open = !open)}>
-		@if (open) {
-			<b>{value}</b>
-		}
-	</div>
+	@try {
+		<b>{doubled}</b>
+	} @pending {
+		<i>loading</i>
+	}
 }
 
 function Middle({ value }) @{
@@ -40,8 +40,8 @@ export function Rows() @{
 
 type Definition = {
 	readonly name: string;
-	readonly edges?: ReadonlyArray<{ readonly id: string; readonly childComponentName: string }>;
-	readonly placements?: ReadonlyArray<ReadonlyArray<{ readonly edgeId: string; readonly rows?: number }>>;
+	readonly edges?: ReadonlyArray<{ readonly id: string; readonly childComponentName: string; readonly symbolPrefix: string }>;
+	readonly placements?: ReadonlyArray<ReadonlyArray<{ readonly edgeId: string; readonly prefix: string; readonly rows?: number }>>;
 };
 
 async function definitions(source: string): Promise<ReadonlyMap<string, Definition>> {
@@ -52,16 +52,39 @@ async function definitions(source: string): Promise<ReadonlyMap<string, Definiti
 
 test('an owner its file places names every chain from a component nothing in the file places, rows included', async () => {
 	const byName = await definitions(SOURCE);
-	const edge = (parent: string, child: string) =>
-		byName.get(parent)!.edges!.find((candidate) => candidate.childComponentName === child)!.id;
+	const edge = (parent: string, child: string) => {
+		const found = byName.get(parent)!.edges!.find((candidate) => candidate.childComponentName === child)!;
+		return { edgeId: found.id, prefix: found.symbolPrefix };
+	};
 
 	expect(byName.get('Owner')!.placements).toEqual([
-		[{ edgeId: edge('First', 'Middle') }, { edgeId: edge('Middle', 'Owner') }],
-		[{ edgeId: edge('Rows', 'Owner'), rows: 1 }],
+		[edge('First', 'Middle'), edge('Middle', 'Owner')],
+		[{ ...edge('Rows', 'Owner'), rows: 1 }],
 	]);
 	// Neither holds a branch or a boundary, so nothing renders rooted at it.
 	expect(byName.get('Middle')!.placements).toBeUndefined();
 	expect(byName.get('First')!.placements).toBeUndefined();
+});
+
+test('an owner whose @if the browser flips without drawing it names no placement', async () => {
+	const byName = await definitions(`
+import { state } from '@markless/core';
+
+function Toggle({ label }) @{
+	let open = state(false);
+
+	<div onClick={() => (open = !open)}>
+		@if (open) {
+			<b>{label}</b>
+		}
+	</div>
+}
+
+export default function Page() @{
+	<main><Toggle label="more" /></main>
+}
+`);
+	expect(byName.get('Toggle')!.placements).toBeUndefined();
 });
 
 test('a component nothing in its file places names no placement', async () => {
