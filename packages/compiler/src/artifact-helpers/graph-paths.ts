@@ -81,14 +81,21 @@ export function asyncComputedGraphNodeIds(
 	);
 }
 
+// The one path browser code reads a graph node under: an async computed's is its snapshot's value.
+export function browserReadPath(
+	graphNodeId: string,
+	path: ReadonlyArray<string>,
+	asyncComputedIds: ReadonlySet<string>,
+): ReadonlyArray<string> {
+	return asyncComputedIds.has(graphNodeId) ? asyncComputedReadPath(path) : path;
+}
+
 // Render data keeps a test's authored path; the browser reads an async computed's snapshot value.
 export function browserGraphReads<Read extends { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>(
 	reads: ReadonlyArray<Read>,
 	asyncComputedIds: ReadonlySet<string>,
 ): ReadonlyArray<Read> {
-	return reads.map((read) =>
-		asyncComputedIds.has(read.graphNodeId) ? { ...read, path: asyncComputedReadPath(read.path) } : read,
-	);
+	return reads.map((read) => ({ ...read, path: browserReadPath(read.graphNodeId, read.path, asyncComputedIds) }));
 }
 
 // A computed runner needs the upstream resolved object before its authored
