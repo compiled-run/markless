@@ -13,59 +13,11 @@
 		{
 			"surface": "perf-guards",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
 				"runtimeModules",
 				"web/resume-events"
 			],
 			"delta": 253,
 			"reason": "a press asks for the submit hold and records what the form carried when the runtime hears it; the hold and in-place sender preload only on pages whose forms need them. CI run 43517700994 against merge-group run 43505090454",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": 33,
-			"reason": "a press asks for the submit hold and records what the form carried when the runtime hears it; the hold and in-place sender preload only on pages whose forms need them. CI run 43517700994 against merge-group run 43505090454",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 233,
-			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 233,
-			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
 			"date": "2026-11-13"
 		},
 		{
@@ -168,6 +120,78 @@
 			],
 			"delta": 32,
 			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 19,
+			"reason": "the hold and in-place sender leave the preload of pages with no such form and ride the deferred pack the code playground prefetches; the compile worker carries the compiler's submit demand fact. CI run 43532060341 against merge-group run 43523020482 (cb5ad8faa)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 19,
+			"reason": "the hold and in-place sender leave the preload of pages with no such form and ride the deferred pack the code playground prefetches; the compile worker carries the compiler's submit demand fact. CI run 43532060341 against merge-group run 43523020482 (cb5ad8faa)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 19,
+			"reason": "the hold and in-place sender leave the preload of pages with no such form and ride the deferred pack the code playground prefetches; the compile worker carries the compiler's submit demand fact. CI run 43532060341 against merge-group run 43523020482 (cb5ad8faa)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 233,
+			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -1019,
+			"reason": "the hold and in-place sender leave the preload of pages with no such form and ride the deferred pack the code playground prefetches; the compile worker carries the compiler's submit demand fact. CI run 43532060341 against merge-group run 43523020482 (cb5ad8faa)",
 			"date": "2026-11-14"
 		}
 	]
