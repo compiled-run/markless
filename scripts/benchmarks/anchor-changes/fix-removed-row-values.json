@@ -68,6 +68,88 @@
 			"delta": 23,
 			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 301,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 69,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 69,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 69,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 206,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 206,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 120,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
+			"date": "2026-11-14"
 		}
 	]
 }
