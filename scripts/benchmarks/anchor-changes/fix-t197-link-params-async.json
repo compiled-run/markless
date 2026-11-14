@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "the docs playground's in-browser compile worker reads object and array literals in composite reads; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 90,
+			"reason": "the docs playground's in-browser compile worker reads object and array literals in composite reads; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		}
+	]
+}
