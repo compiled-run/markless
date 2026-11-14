@@ -1,6 +1,46 @@
 {
 	"changes": [
 		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 166,
+			"reason": "a scoped read of a prop an arm owner's routes name goes to the route, replacing the feed that copied it into the owner's cell (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/composition"
+			],
+			"delta": -745,
+			"reason": "a component an arm placed no longer reads its props off a fed cell of its own (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": -288,
+			"reason": "an arm render no longer marks the components it places as fed (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": -960,
+			"reason": "a branch no longer copies its arm's props into the arm's components while the arm shows (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
 			"surface": "fixture-runtime",
 			"path": [
 				"modules",
