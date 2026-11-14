@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { createRuntimeGraph } from '@markless/runtime';
 import { createAsyncComputedPlane } from '@markless/runtime/graph-async';
 import { createHeldInputsPlane } from '@markless/runtime/graph-held';
+import { runAsDispatchOwn } from '../src/event-current-target.ts';
 import { createPaintHold } from '../src/resume-return-reask.ts';
 
 const macrotask = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
@@ -113,7 +114,7 @@ test('values derived while a state is shown paint what they were derived from, u
 	// The painted pass reads the held label's shown value through the read it is handed.
 	hold.derived(graph, 'state:open', false, (painted) => (painted(graph.read)('state:label') === 'Saving' ? 'shown' : 'live'), 'skip');
 	await macrotask();
-	expect([graph.read('state:open'), painted.get('state:open'), hold.readShown('state:open')]).toEqual([false, 'shown', 'shown']);
+	expect([graph.read('state:open'), painted.get('state:open'), hold.asShown(() => graph.read('state:open'))]).toEqual([false, 'shown', 'shown']);
 	release('state:label');
 	await macrotask();
 	expect([hold.showing(), painted.get('state:open')]).toEqual([false, false]);
@@ -136,9 +137,60 @@ test('an async value first read while painting a held state loads once, with the
 	} as never);
 	const hold = graph.holdPaint!((internals) => createPaintHold(internals, (graphNodeId) => graphNodeId === 'state:picked'))!;
 	graph.write({ graphNodeId: 'state:picked', value: 'b' });
-	hold.readShown('computed:detail', ['status']);
+	hold.asShown(() => graph.read('computed:detail', ['status']));
 	await macrotask();
 	hold.release('state:picked');
 	await macrotask();
 	expect(keys).toEqual(['b']);
+});
+
+test(`a handler's own run reads a held state, and a computed over it, as the page paints them; after it, code reads the new value`, async () => {
+	const { graph, painted, paint } = heldGraph([
+		{ graphNodeId: 'computed:loud', dependencies: [{ graphNodeId: 'state:label' }], compute: (read) => (read('state:label') as string).toUpperCase() },
+	]);
+	paint('computed:loud');
+	await macrotask();
+	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
+	await macrotask();
+	const span = { open: true };
+	expect(runAsDispatchOwn(span, () => [graph.read('state:label'), graph.read('computed:loud')])).toEqual(['Saving', 'SAVING']);
+	expect([graph.read('state:label'), graph.read('computed:loud')]).toEqual(['Saved', 'SAVED']);
+	expect(painted.get('computed:loud')).toBe('SAVING');
+});
+
+test('an async value a press starts asks with what code holds, not the held value on screen', async () => {
+	const keys: unknown[] = [];
+	const graph = createRuntimeGraph({
+		async: createAsyncComputedPlane,
+		held: createHeldInputsPlane,
+		cells: [{ graphNodeId: 'state:picked', value: 'none' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:detail',
+				dependencies: [{ graphNodeId: 'state:picked', path: [] }],
+				key: (read) => read('state:picked'),
+				run: ({ key }: { key: unknown }) => (keys.push(key), Promise.resolve({ key })),
+			},
+		],
+	} as never);
+	graph.holdPaint!((internals) => createPaintHold(internals, (graphNodeId) => graphNodeId === 'state:picked'));
+	graph.write({ graphNodeId: 'state:picked', value: 'b' });
+	expect(runAsDispatchOwn({ open: true }, () => [graph.read('state:picked'), graph.read('computed:detail', ['status'])])[0]).toBe('none');
+	await macrotask();
+	expect(keys).toEqual(['b']);
+});
+
+test('a press reads back its own update of a held state, and a computed over it, as code stores them', async () => {
+	const { graph } = heldGraph([
+		{ graphNodeId: 'computed:loud', dependencies: [{ graphNodeId: 'state:label' }], compute: (read) => (read('state:label') as string).toUpperCase() },
+	]);
+	graph.write({ graphNodeId: 'state:label', value: 'Saved' });
+	await macrotask();
+	const sent = runAsDispatchOwn({ open: true }, () => {
+		const seen = graph.read('state:label');
+		graph.update({ graphNodeId: 'state:label', update: (value) => `${value as string}!` });
+		return [seen, graph.read('state:label'), graph.read('computed:loud')];
+	});
+	expect(sent).toEqual(['Saving', 'Saved!', 'SAVED!']);
+	expect([graph.read('state:label'), graph.read('computed:loud')]).toEqual(['Saved!', 'SAVED!']);
 });

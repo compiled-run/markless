@@ -497,10 +497,12 @@ export type PaintHoldPlane = {
 	readonly end: () => void;
 	/** Whether any state is held. */
 	readonly showing: () => boolean;
+	/** Whether a handler's own run reads `graphNodeId` now: until its first await, it reads what the page shows, except what that run wrote. */
+	readonly pressing: (graphNodeId: string) => boolean;
 	/** Whether the page paints another value of `graphNodeId` than code reads. */
 	readonly shows: (graphNodeId: string) => boolean;
-	/** Reads as the page paints. */
-	readonly readShown: RuntimeGraphRead;
+	/** Runs `run` with every graph read answering as the page paints. */
+	readonly asShown: <T>(run: () => T) => T;
 	/**
 	 * Writes a derived `value`; while a state is shown, `run` also derives, through the read it is handed, what the
 	 * page paints, landing both in one turn. `skip` is the answer that keeps the last painted value.
@@ -548,6 +550,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	let paintPlane: PaintHoldPlane | undefined;
 	// Above zero while the flush paints, so its reads see what is shown.
 	let painting = 0;
+	// Above zero while an async value works out its key, which reads what code holds.
+	let asking = 0;
+	const pressed = (graphNodeId: string): boolean => !asking && !!paintPlane?.pressing(graphNodeId);
 	const paint = <T,>(run: () => T): T => {
 		painting++;
 		try {
@@ -560,7 +565,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const readGraph: RuntimeGraphRead = (graphNodeId, path = []) => {
 		const computed = computedNodes.get(graphNodeId);
 		if (computed?.compute) {
-			if (!painting && paintPlane?.fresh(graphNodeId)) return readPath(computed.compute(readGraph), path);
+			if (!painting && !pressed(graphNodeId) && paintPlane?.fresh(graphNodeId))
+				return readPath(computed.compute(readGraph), path);
 			return readComputedNode(
 				computed,
 				readGraph,
@@ -575,10 +581,12 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			// A run this read starts asks with what code holds, not what is still painted.
 			const was = painting;
 			painting = 0;
+			asking++;
 			try {
 				return asyncPlane!.read(asyncComputed, path);
 			} finally {
 				painting = was;
+				asking--;
 			}
 		}
 
@@ -592,7 +600,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			} catch {}
 		}
 
-		const shown = painting ? paintPlane?.shown(graphNodeId) : undefined;
+		const shown = painting || pressed(graphNodeId) ? paintPlane?.shown(graphNodeId) : undefined;
 		return readPath(shown ? shown.value : cells.get(graphNodeId), path);
 	};
 
