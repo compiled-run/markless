@@ -126,14 +126,22 @@ async function openSettled(path: string) {
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.goto(`${server!.origin}${path}`, { waitUntil: 'load' });
-	await page.evaluate(
+	const settled = await page.evaluate(
 		() =>
-			new Promise<void>((done) =>
+			new Promise<string>((done) => {
+				const stuck = setTimeout(
+					() =>
+						done(
+							`no idle period 10 s after load: ${document.querySelectorAll('template[m\\:arm]').length} arm templates uncommitted`,
+						),
+					10_000,
+				);
 				(
 					globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }
-				).__mArm.idle(() => requestIdleCallback(() => done())),
-			),
+				).__mArm.idle(() => requestIdleCallback(() => (clearTimeout(stuck), done('idle'))));
+			}),
 	);
+	expect(settled, path).toBe('idle');
 	return { page, errors };
 }
 

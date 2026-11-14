@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 29,
+			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 29,
+			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
+			"date": "2026-11-14"
+		}
+	]
+}
