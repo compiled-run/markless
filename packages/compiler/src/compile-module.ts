@@ -545,6 +545,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 						sharedCallbackBindings: (inputs.semanticGraph as SemanticGraphArtifact)
 							.sharedCallbackBindings,
 						keyedRepeats: (inputs.semanticGraph as SemanticGraphArtifact).keyedRepeats,
+						events: (inputs.semanticGraph as SemanticGraphArtifact).events,
 					};
 					const runtimeDemandMaps = {
 						'plain-ssr': createRuntimeDemandMap(demandInput, 'plain-ssr'),

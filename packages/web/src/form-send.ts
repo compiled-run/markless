@@ -1,5 +1,4 @@
 import type { ProtocolSubmitEventFacts } from '@markless/serializer/protocol';
-import { submitRecord } from './event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER, IN_PLACE_REQUEST_HEADER } from './fns/in-place-headers.ts';
 import type { KeptSubmission } from './inline/sync-policy-core.ts';
 import { holdSubmit } from './submit-hold.ts';
@@ -53,7 +52,7 @@ function follow(url: URL): void {
 
 /**
  * Sends a submission the browser would have sent as a same-origin POST, from inside its dispatch so the save refreshes
- * what is shown, and rejects with the route's message. `held` hears the hold's end once the submission is held, as a
+ * what is shown, and rejects with the route's message. `sent` is what the form carried at the press. `held` hears the hold's end once the submission is held, as a
  * running handler's is. On success it does what the browser's answer would have shown: a redirect to another page of
  * this site is followed in place, one to another site loads it, and otherwise the form shows fresh unless its fields
  * are bound to state. The app's api/ wrapper answers a marked request's redirect without the browser following it.
@@ -62,18 +61,12 @@ export async function sendInPlace(
 	event: SubmitEvent,
 	kept: KeptSubmission,
 	record: ProtocolSubmitEventFacts,
+	sent: string,
 	held: (end: () => void) => void,
 ): Promise<void> {
 	const form = event.target as HTMLFormElement;
 	const by = event.submitter;
-	held(
-		holdSubmit(
-			form,
-			by,
-			submitRecord(form),
-			record.authoredSubmitAriaDisabled,
-		),
-	);
+	held(holdSubmit(form, by, sent, record.authoredSubmitAriaDisabled));
 	const relList = Object.getOwnPropertyDescriptor(
 		HTMLFormElement.prototype,
 		'relList',

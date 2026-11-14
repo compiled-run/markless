@@ -55,9 +55,13 @@ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 	readonly graph: RuntimeGraph;
 };
 
-// Kept once loaded, so a later submission is held without waiting on another import.
-type SubmitHoldModule = typeof import('./submit-hold.ts');
-let submitHold: SubmitHoldModule | undefined;
+// Asked for once a submission is still running and never awaited on the way to a handler; a page whose forms need it preloads it.
+let submitHold: Promise<typeof import('./submit-hold.ts') | undefined> | undefined;
+const loadSubmitHold = () => (submitHold ??= import('./submit-hold.ts').catch(() => (submitHold = undefined)));
+// What a form sent in place carried when the runtime heard its press; a handler's form is read when the handler runs.
+const pressRecords = new WeakMap<object, string>();
+const submittedForm = (event: ResumeDomEvent) =>
+	event.type === 'submit' && event.target?.tagName === 'FORM' ? (event.target as unknown as HTMLFormElement) : undefined;
 
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
@@ -522,6 +526,8 @@ export function createEventWiring(input: {
 	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
 		// Another dispatch's flush may land while this one's handler still loads.
 		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
+		const pressed = submittedForm(event);
+		if (pressed) pressRecords.set(event, submitRecord(pressed));
 		const handled = marklessEventReceived(input.root, event);
 		return dispatchArrived(event, handled, dispatchOptions).finally(() => {
 			handled();
@@ -771,15 +777,12 @@ export function createEventWiring(input: {
 		// that closes it then needs no guard.
 		const focusCommit = marklessBeginFocusCommit(input.graph.hasPendingFlush);
 		// Only a real DOM event opens a user action; every call this dispatch makes inherits it.
-		const form =
-			event.type === 'submit' && event.target?.tagName === 'FORM'
-				? (event.target as unknown as HTMLFormElement)
-				: undefined;
+		const form = submittedForm(event);
 		const userActionToken: DispatchSpan = {
 			open: true,
 			control: event.type === 'submit' ? undefined : (element as unknown as Element),
 		};
-		// What the submit carries, read before its handler can change the form; the hold, loaded only for a submission still running.
+		// What the hold's repeat check compares with: the form as the handler reads it, or as an in-place send took it.
 		let sent: string | undefined;
 		let hold: Promise<(() => void) | undefined> | undefined;
 		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
@@ -820,17 +823,17 @@ export function createEventWiring(input: {
 					if (form && !held && !hold) {
 						// The marks paint with the pass that paints the handler's writes before its first await, held as they are.
 						const painted = graph.pendingFlush?.();
-						const start = (module: SubmitHoldModule) =>
-							module.holdSubmit(
-								form,
-								(event as unknown as SubmitEvent).submitter,
-								sent!,
-								record.authoredSubmitAriaDisabled,
-								painted,
-							);
 						// A hold that fails to load or start leaves the submission unmarked, never failing it.
-						hold = (submitHold ? Promise.resolve(submitHold) : import('./submit-hold.ts'))
-							.then((module) => start((submitHold = module)))
+						hold = loadSubmitHold()
+							.then((module) =>
+								module?.holdSubmit(
+									form,
+									(event as unknown as SubmitEvent).submitter,
+									sent!,
+									record.authoredSubmitAriaDisabled,
+									painted,
+								),
+							)
 							.catch(() => undefined);
 					}
 					// A body that returns a promise owns what follows, which may be the navigation it started.
@@ -899,7 +902,7 @@ export function createEventWiring(input: {
 						// The submission is this dispatch's own save, so its reload is the one the form's hold waits for.
 						(module) =>
 							runAsDispatchOwn(userActionToken, () =>
-								module.sendInPlace(event as unknown as SubmitEvent, kept, record, (end) => {
+								module.sendInPlace(event as unknown as SubmitEvent, kept, record, pressRecords.get(event) ?? submitRecord(form!), (end) => {
 									hold = Promise.resolve(end);
 									// Waiting on the answer is this dispatch's own await, so the next gesture starts now.
 									options.releaseQueue?.();

@@ -157,7 +157,6 @@ An entry is a table row naming the test, its expiry date, its owner and why it i
 
 | Test | Expires | Owner | Why |
 | --- | --- | --- | --- |
-| `packages/vitest-browser/browser/form-submit-busy/form-submit-busy.test.ts` "the reloaded list and the cleared form land in one frame" | 2026-11-27 | markless PM (async-dx T155) | A real runtime defect, not the test. The save's round ends when the reloaded value arrives (`settleReload` in `packages/web/src/resume-return-reask.ts`) and clears the form's `aria-busy` at once, while the list it reloaded commits through the async journal, a task or more later when its code is still loading. A second cause shows in the same test: the form's busy mark comes from a lazily imported `submit-hold.ts`, so on a slow, cold page the reload can start before the form is marked. Failed once in a whole-project local run on 2026-11-12. At 6x CPU throttle, 60 runs: the form cleared one or two frames before the list 5 times and was not yet busy when its reload started 2 times; 0 of 30 unthrottled. With #660 merged (2026-11-13) it still fails the same ways: 5 split frames and 2 late marks in 60 runs at 6x throttle. Open #645 also changes the submit hold, so the fix is made on top of it. |
 
 ### Quarantine list
 

@@ -13,6 +13,7 @@ type Graph = {
 	readonly subscribe?: RuntimeGraph['subscribe'];
 	readonly changed?: RuntimeGraph['changed'];
 	readonly holdPaint?: RuntimeGraph['holdPaint'];
+	readonly pendingFlush?: RuntimeGraph['pendingFlush'];
 };
 type Boundary = { readonly asyncReads: ReadonlyArray<{ readonly graphNodeId: string }> };
 type Boundaries = ReadonlyMap<string, Boundary>;
@@ -263,20 +264,25 @@ function reloadOwed(sender: DispatchSpan): boolean {
 	return false;
 }
 
-// Ends a round: the states it held show what was written unless another open round still holds them, then its mark and `refreshed`.
-function closeRound(sender: DispatchSpan, round: OpenRound): void {
+// Ends a round: the states it held show what was written unless another open round still holds them, then its mark and `refreshed`, with the pass `landed` names.
+function closeRound(sender: DispatchSpan, round: OpenRound, landed?: Promise<void>): void {
 	rounds.delete(sender);
 	for (const [graph, ids] of round.held)
 		for (const id of ids) if (![...rounds.values()].some((other) => other.held.get(graph)?.has(id))) releases.get(graph)?.(id);
-	round.done();
-	if (sender.control) holdBusy(sender.control, sender, false);
+	const unmark = () => {
+		round.done();
+		if (sender.control) holdBusy(sender.control, sender, false);
+	};
+	// A pass that throws still ends the marks; its failure reaches whoever flushed it.
+	if (landed) void landed.then(unmark, unmark);
+	else unmark();
 }
 
 // Ends each holding sender's round once no reload it is owed is still to land; a page left behind ends them all.
-function roundDone(senders: Iterable<DispatchSpan>, left = false): void {
+function roundDone(senders: Iterable<DispatchSpan>, left = false, landed?: Promise<void>): void {
 	for (const sender of senders) {
 		const round = rounds.get(sender);
-		if (round && (left || (round.phase === ROUND_HOLDING && !reloadOwed(sender)))) closeRound(sender, round);
+		if (round && (left || (round.phase === ROUND_HOLDING && !reloadOwed(sender)))) closeRound(sender, round, landed);
 	}
 }
 
@@ -315,13 +321,13 @@ function reloadingUnattributed(): boolean {
 	return false;
 }
 
-// Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks.
-function settleReload(reload: Reload): void {
+// Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks; the marks end when that pass lands.
+function settleReload(reload: Reload, landed?: Promise<void>): void {
 	if (!reloads.has(reload) || reload.starting.size > 0) return;
 	for (const node of reload.asked) if (node.snapshot.status === 'pending') return;
 	reloads.delete(reload);
 	for (const stop of reload.stops.splice(0)) stop?.();
-	roundDone(reload.senders);
+	roundDone(reload.senders, false, landed);
 }
 
 // `wentOn` is a sender that went on past its save, so the reload need not wait for it to return.
@@ -334,7 +340,7 @@ function refreshIfOwed(wentOn?: DispatchSpan): void {
 	reloads.add(reload);
 	const id = `markless:reload:${++reloadCount}`;
 	for (const [node, graph] of held)
-		reload.stops.push(graph.subscribe?.({ id, graphNodeId: node.graphNodeId, path: ['status'], run: () => settleReload(reload) }));
+		reload.stops.push(graph.subscribe?.({ id, graphNodeId: node.graphNodeId, path: ['status'], run: () => settleReload(reload, graph.pendingFlush?.()) }));
 	const landed = [...due].map((entry) => {
 		const [container, versions] = entry;
 		const started = () => {

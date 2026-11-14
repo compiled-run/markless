@@ -67,10 +67,15 @@ for (const from of roundPhases)
 		}
 
 // A fetch whose answers the test hands out one by one, and a control that records its aria-busy.
+// The write watch wraps fetch once per module, so every rig shares the one fetch it wrapped.
+const answers: Array<(answer: Response) => void> = [];
+const answered = ((() => new Promise<Response>((answer) => answers.push(answer))) as unknown) as typeof fetch;
+let rigged = false;
 function saveRig() {
-	const answers: Array<(answer: Response) => void> = [];
+	answers.length = 0;
 	globalThis.location ??= new URL('http://write-watch.test/page') as unknown as Location;
-	globalThis.fetch = ((() => new Promise<Response>((answer) => answers.push(answer))) as unknown) as typeof fetch;
+	if (!rigged) globalThis.fetch = answered;
+	rigged = true;
 	const control = () => {
 		const attributes = new Map<string, string>();
 		return {
@@ -108,4 +113,59 @@ test('a save sent after another save left the page ends its busy mark once it an
 	await turns();
 	expect([older.attributes.has('aria-busy'), leaving.attributes.has('aria-busy'), later.attributes.has('aria-busy')]).toEqual([false, false, false]);
 	release();
+});
+
+test('a reload whose screen update throws still clears the sending control, and the failure is reported once, by the pass', async () => {
+	const { answers, control, send } = saveRig();
+	const node = { graphNodeId: 'shelf', version: 1, snapshot: { status: 'fulfilled' } };
+	const subscriptions: Array<{ readonly run: () => unknown }> = [];
+	let reports = 0;
+	const unhandled: unknown[] = [];
+	const onUnhandled = (reason: unknown) => void unhandled.push(reason);
+	process.on('unhandledRejection', onUnhandled);
+	const plane = {
+		nodes: new Map([[node.graphNodeId, node]]),
+		withInputs: () => [node],
+		markEntry() {},
+		endEntry() {},
+		refreshAfterWrite(_versions: unknown, started: () => void) {
+			node.snapshot = { status: 'pending' };
+			queueMicrotask(started);
+			return Promise.resolve();
+		},
+	};
+	const graph = {
+		asyncPlane: () => plane,
+		subscribe: (subscription: { readonly run: () => unknown }) => {
+			subscriptions.push(subscription);
+			return () => {};
+		},
+		// The pass that lands the reloaded value rejects; whoever flushed reports it, which this catch stands in for.
+		pendingFlush: () => {
+			const pass = Promise.reject(new Error('a text update threw'));
+			pass.catch(() => reports++);
+			return pass;
+		},
+	};
+	const release = registerWriteRefresh(graph as never, new Map([['b', { asyncReads: [{ graphNodeId: node.graphNodeId }] }]]));
+	try {
+		const button = control();
+		const span: DispatchSpan = { open: true, control: button as unknown as Element };
+		send(span);
+		expect(button.attributes.get('aria-busy')).toBe('true');
+		answers[0]!(new Response('{}'));
+		await turns();
+		expect(subscriptions).toHaveLength(1);
+		node.snapshot = { status: 'fulfilled' };
+		subscriptions[0]!.run();
+		await turns();
+		await new Promise((resolve) => setTimeout(resolve, 0));
+		expect(button.attributes.has('aria-busy')).toBe(false);
+		await expect(span.refreshed).resolves.toBeUndefined();
+		expect(reports).toBe(1);
+		expect(unhandled).toEqual([]);
+	} finally {
+		process.off('unhandledRejection', onUnhandled);
+		release();
+	}
 });
