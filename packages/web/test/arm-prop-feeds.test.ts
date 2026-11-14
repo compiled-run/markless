@@ -1,7 +1,8 @@
 import { expect, test } from 'vitest';
 import { marklessQualifyChildState, type ComposeStateDraft } from '../src/fns/composition.ts';
 
-// A component an escalated arm placed reads its props off its own cell; its feeds take the routes a prop read would.
+// A component an arm placed reads its props where they live, as one the server placed does: its own cell holds no copy
+// anyone keeps current, and nothing marks it as fed.
 
 const routes = [{ name: 'subject', kind: 'graph-reference', graphNodeId: 'state:picked', path: [] }];
 
@@ -9,11 +10,7 @@ function placedChild(): ComposeStateDraft {
 	return {
 		cells: [
 			{ graphNodeId: 'state:round', directValue: 0 },
-			{
-				graphNodeId: 'prop:props',
-				directValue: { subject: 4, tone: 'dim' },
-				follows: [{ graphNodeId: 'prop:props', path: ['subject'], prop: 'subject' }],
-			},
+			{ graphNodeId: 'prop:props', directValue: { subject: 4, tone: 'dim' } },
 		],
 		computed: [
 			{
@@ -28,20 +25,21 @@ function placedChild(): ComposeStateDraft {
 	};
 }
 
-test('a placed instance keeps its computeds on its own prop cell and feeds that cell from the route', () => {
+test('a placed instance routes a live prop to its source and keeps its own state under its path', () => {
 	const state = placedChild();
 	marklessQualifyChildState(state, routes, 'c3:');
 	expect(state.computed?.[0]?.dependencies).toEqual([
-		{ graphNodeId: 'c3:prop:props', path: ['subject', 'name'] },
-		{ graphNodeId: 'c3:prop:props', path: ['tone'] },
+		{ graphNodeId: 'state:picked', path: ['name'] },
+		{ graphNodeId: 'c3:prop:tone', path: [] },
 		{ graphNodeId: 'c3:state:round', path: [] },
 	]);
-	expect(state.cells?.find((cell) => cell.graphNodeId === 'c3:prop:props')?.follows).toEqual([
-		{ graphNodeId: 'state:picked', path: [], prop: 'subject' },
+	expect(state.cells?.map((cell) => Object.keys(cell).sort())).toEqual([
+		['directValue', 'graphNodeId'],
+		['directValue', 'graphNodeId'],
 	]);
 });
 
-test('one level up, the placed instance keeps its own cell and its feed takes the outer route', () => {
+test('one level up, the route takes the outer one', () => {
 	const state = placedChild();
 	marklessQualifyChildState(state, routes, 'c3:');
 	marklessQualifyChildState(
@@ -49,18 +47,5 @@ test('one level up, the placed instance keeps its own cell and its feed takes th
 		[{ name: 'picked', kind: 'graph-reference', graphNodeId: 'computed:list', path: ['value', '0'] }],
 		'c1:',
 	);
-	expect(state.computed?.[0]?.dependencies?.[0]).toEqual({
-		graphNodeId: 'c1:c3:prop:props',
-		path: ['subject', 'name'],
-	});
-	expect(state.cells?.find((cell) => cell.graphNodeId === 'c1:c3:prop:props')?.follows).toEqual([
-		{ graphNodeId: 'c1:state:picked', path: [], prop: 'subject' },
-	]);
-});
-
-test('an instance nothing placed still routes its prop reads to the parent', () => {
-	const state = placedChild();
-	state.cells = state.cells?.map(({ follows: _follows, ...cell }) => cell);
-	marklessQualifyChildState(state, routes, 'c3:');
-	expect(state.computed?.[0]?.dependencies?.[0]).toEqual({ graphNodeId: 'state:picked', path: ['name'] });
+	expect(state.computed?.[0]?.dependencies?.[0]).toEqual({ graphNodeId: 'c1:state:picked', path: ['name'] });
 });

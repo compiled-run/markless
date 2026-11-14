@@ -233,14 +233,6 @@ export type ResumeBranchUpdate = {
 	readonly computed?: ProtocolStatePayload['computed'];
 	// State cells of components the escalated render created.
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
-	readonly propFeeds?: ReadonlyArray<ResumePropFeed>;
-};
-/** A live prop of a component an escalated arm holds: its source, copied into the component's own prop cell while the arm shows. */
-export type ResumePropFeed = {
-	readonly graphNodeId: string;
-	readonly path: ReadonlyArray<string>;
-	readonly propCellId: string;
-	readonly prop: string;
 };
 // Async-arm records use indexes relative to the boundary's start anchor.
 export type ResumeArmLocator = {
@@ -292,7 +284,8 @@ export type ElementHandleQualifier = (
 type ComposedBoundary = Pick<
 	ResumeAsyncBoundaryRecord,
 	'id' | 'composedInstancePath' | 'composedGraphProps' | 'composedSymbolPrefix' | 'updateSymbolId'
->;
+> &
+	Partial<Pick<ResumeAsyncBoundaryRecord, 'startAnchor'>>;
 export type ComposedArmRecordQualifier = ((
 	boundary: ComposedBoundary,
 	set: ResumeArmRecordSet,

@@ -1,0 +1,190 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/composition"
+			],
+			"delta": -745,
+			"reason": "a component an arm placed no longer reads its props off a fed cell of its own (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": -288,
+			"reason": "an arm render no longer marks the components it places as fed (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": -960,
+			"reason": "a branch no longer copies its arm's props into the arm's components while the arm shows (PR run 43509724501)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 294,
+			"reason": "an arm's symbols read their owner's props on the owner's routes, kept per instance until its markup leaves the document (PR run 43555013572 against #682's PR run 43554211590)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-constants"
+			],
+			"delta": -77,
+			"reason": "Composition no longer reads the props node id (-77 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/composition"
+			],
+			"delta": -750,
+			"reason": "A component an arm placed no longer reads its props off a fed cell of its own (-750 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/instance-scope"
+			],
+			"delta": 319,
+			"reason": "A scoped read of a prop an arm owner's routes name goes to the route; the copy-feeding code it replaces left (+319 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": -331,
+			"reason": "An arm render no longer marks the components it places as fed (-331 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": -916,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -88,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-constants"
+			],
+			"delta": -77,
+			"reason": "Composition no longer reads the props node id (-77 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/composition"
+			],
+			"delta": -750,
+			"reason": "A component an arm placed no longer reads its props off a fed cell of its own (-750 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
+			],
+			"delta": 319,
+			"reason": "A scoped read of a prop an arm owner's routes name goes to the route; the copy-feeding code it replaces left (+319 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": -331,
+			"reason": "An arm render no longer marks the components it places as fed (-331 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": -916,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 53,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -120,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		}
+	]
+}
