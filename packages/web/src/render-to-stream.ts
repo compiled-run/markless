@@ -14,6 +14,7 @@ import {
 	PROTOCOL_IDLE_EVENT_NAME,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 	PROTOCOL_CONTAINER_END_COMMENT,
+	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
@@ -440,13 +441,7 @@ function renderArmAppend(
 		output.structure?.anchors ?? [],
 	);
 	const servedArmRecords = withPaintedBranchArms(armEvents, output) as ProtocolArmRecordSet;
-	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
-	const armPatch: ProtocolStreamedArmPatch = [
-		boundary.initiallyServedArm,
-		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
-			? servedArmRecords
-			: encodeStreamedArmRecords(servedArmRecords),
-	];
+	const armPatch: ProtocolStreamedArmPatch = [boundary.initiallyServedArm, streamedArmRecords(servedArmRecords)];
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const rows = rowsBefore + servedRowCount(servedArmRecords.keyedRepeats ?? [], output.state);
@@ -683,6 +678,26 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		: '';
 	const source = `globalThis.__mArm ||= (() => {
 	const d = document;
+	const me = d.currentScript;
+	// The server streams everything after its first executor, so the served page is what precedes it.
+	const pin = (root) => {
+		let x;
+		const c = [root], m = [], cw = d.createTreeWalker(root, 129);
+		for (; (x = cw.nextNode()) && x !== me;)
+			if (x.nodeType !== 8) c.push(x);
+			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)}) (c.length = 1), (m.length = 0);
+			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)}) break;
+			else m.push(x);
+		root.__marklessComments = m;
+		if (root.__marklessCensus) return;
+		const p = x === me && root.getAttribute?.(${JSON.stringify(PROTOCOL_LOCATOR_PATHS_ATTRIBUTE)}), o = p && p.split('|')[3];
+		let g = 0;
+		if (o) for (const el of c.slice(1)) { const n = el.localName || ''; g = (g * 31 + n.length * 32 + (n.charCodeAt(0) | 32)) | 0; }
+		if (p && (parseInt(p) !== c.length || (o && o !== (g >>> 0).toString(36)))) root.__marklessShifted = 1;
+		root.__marklessCensus = c;
+	};
+	const own = me && me.closest && me.closest('[data-async-container]');
+	if (own && !own.__marklessComments) pin(own);
 	const queue = [];
 	const done = new Set();
 	let last = -1 / 0;
@@ -697,16 +712,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	}
 	if (!s || !e || s.parentNode !== e.parentNode) throw new Error('MARKLESS_STREAM_ARM_ANCHORS_MISSING: ' + id);
 	const root = s.parentElement && s.parentElement.closest && s.parentElement.closest('[data-async-container]');
-	if (root && !root.__marklessComments) {
-		const c = [root], m = [], cw = d.createTreeWalker(root, 129);
-		for (let x; (x = cw.nextNode());)
-			if (x.nodeType !== 8) c.push(x);
-			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_START_COMMENT)}) (c.length = 1), (m.length = 0);
-			else if (x.data === ${JSON.stringify(PROTOCOL_CONTAINER_END_COMMENT)}) break;
-			else m.push(x);
-		root.__marklessComments = m;
-		root.__marklessCensus ||= c;
-	}
+	if (root && !root.__marklessComments) pin(root);
 	if (root && root.__mArmLive && root.__mArmLive(id)) return;
 	if (root && root.__mAdopted) return;
 	const tpl = d.querySelector('template[m\\\\:arm="' + id + '"]');
@@ -753,30 +759,44 @@ const UNPROMPTED_EVENT_NAMES: ReadonlySet<string> = new Set([
 	PROTOCOL_VISIBLE_EVENT_NAME,
 ]);
 
+type ArmEventRecords = {
+	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
+	readonly keyedRepeats?: ReadonlyArray<{
+		readonly rowEvents?: ReadonlyArray<{ readonly eventName: string }>;
+	}>;
+	readonly branches?: ReadonlyArray<{ readonly servedArmRecords?: ArmEventRecords }>;
+};
+
+// The event names an arm, its rows and its painted branches handle.
+function armEventNames(records: ArmEventRecords): Set<string> {
+	const names = new Set<string>();
+	const add = (set: ArmEventRecords) => {
+		for (const event of set.events ?? []) names.add(event.eventName);
+		for (const repeat of set.keyedRepeats ?? [])
+			for (const event of repeat.rowEvents ?? []) names.add(event.eventName);
+	};
+	add(records);
+	for (const branch of records.branches ?? []) if (branch.servedArmRecords) add(branch.servedArmRecords);
+	return names;
+}
+
 // An arm, its rows or its painted branches naming an idle or visible host.
 function armRunsWithoutInteraction(records: ProtocolArmRecordSet): boolean {
-	const named = (set: {
-		readonly events?: ReadonlyArray<{ readonly eventName: string }>;
-		readonly keyedRepeats?: ReadonlyArray<{
-			readonly rowEvents?: ReadonlyArray<{ readonly eventName: string }>;
-		}>;
-	}) =>
-		(set.events ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)) ||
-		(set.keyedRepeats ?? []).some((repeat) =>
-			(repeat.rowEvents ?? []).some((event) => UNPROMPTED_EVENT_NAMES.has(event.eventName)),
-		);
-	const branches =
-		(
-			records as {
-				readonly branches?: ReadonlyArray<{
-					readonly servedArmRecords?: Parameters<typeof named>[0];
-				}>;
-			}
-		).branches ?? [];
-	return (
-		named(records) ||
-		branches.some((branch) => !!branch.servedArmRecords && named(branch.servedArmRecords))
-	);
+	return [...armEventNames(records as ArmEventRecords)].some((name) => UNPROMPTED_EVENT_NAMES.has(name));
+}
+
+// The arm's records as streamed, naming every event the boot listens for when a row or branch handles one its own events do not.
+function streamedArmRecords(records: ProtocolArmRecordSet): ProtocolArmRecordSet {
+	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
+	const served =
+		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
+			? records
+			: encodeStreamedArmRecords(records);
+	const names = armEventNames(records as ArmEventRecords);
+	const own = new Set((records.events ?? []).map((event) => event.eventName));
+	return [...names].some((name) => !own.has(name))
+		? { ...served, eventNames: [...new Set([...(served.eventNames ?? []), ...names])] }
+		: served;
 }
 
 // Every keyed repeat the shell served: the page's own and those in @try arms it rendered settled.

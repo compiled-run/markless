@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page, type Request } from '@playwright/test';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
 import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -91,6 +92,37 @@ test('streamed answers show before any interaction, and the runtime has not star
 		);
 		expect(await runtimeStarted(page)).toBe(false);
 		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('the census pinned at idle counts the served page, not the answers streamed after it', async () => {
+	const { page, errors } = await openIdle('/');
+	try {
+		const census = await page.evaluate((attribute) => {
+			const root = document.querySelector('[data-async-container]') as Element & {
+				__marklessCensus?: unknown[];
+				__marklessShifted?: number;
+			};
+			return { pinned: root.__marklessCensus?.length, served: parseInt(root.getAttribute(attribute) ?? ''), shifted: !!root.__marklessShifted };
+		}, PROTOCOL_LOCATOR_PATHS_ATTRIBUTE);
+		expect(census).toEqual({ pinned: census.served, served: census.served, shifted: false });
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a press on a row of a streamed list is the first interaction, and it applies', async () => {
+	const { page, errors } = await openIdle('/rows');
+	try {
+		expect(await runtimeStarted(page)).toBe(false);
+		await page.locator('.pick').nth(1).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
