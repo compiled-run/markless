@@ -4,6 +4,7 @@ import type { MdxRoutePart as RouterMdxRoutePart } from '../../packages/router/s
 import * as core from '@markless/core';
 import { frameCodeBlocks } from '../components/docs/snippet/torn-strip.ts';
 import { countElements, elementTags, highlightFences } from './highlight-code.ts';
+import { closeSharedFencePool } from './fence-pool.ts';
 
 type MdxRoutePart = RouterMdxRoutePart & { readonly html: string };
 
@@ -179,6 +180,8 @@ async function highlightSoloHtml(code: string): Promise<string> {
 export function highlightMdx(): Plugin {
 	return {
 		name: 'compiled-website:highlight-mdx',
+		// Vite runs this when a build finishes and when a dev server closes.
+		closeBundle: () => closeSharedFencePool(),
 		transform: {
 			filter: { id: /\.mdx(?:$|\?)/ },
 			async handler(code: string, id: string) {
