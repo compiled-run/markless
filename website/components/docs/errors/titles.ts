@@ -262,6 +262,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_PRERENDER_ENTRY_MISSING: 'Prerender has no entry',
 	MARKLESS_PRERENDER_INLINE_RESUMER_EVENT_NAMES_TOKEN_LOST: 'The inline loader lost its event names',
 	MARKLESS_PRERENDER_INLINE_RESUMER_EVENT_NAMES_UNPLACEABLE: 'The inline loader’s event names have no place',
+	MARKLESS_PRERENDER_OWNER_UNPLACED: 'A browser-drawn part has no component to start from',
 	MARKLESS_PRERENDER_PROJECTED_PROP_READ: 'A browser-built row reads its owner’s prop',
 	MARKLESS_PRERENDER_PROP_UNDERIVABLE: 'A prerendered prop cannot be worked out',
 	MARKLESS_PRERENDER_RENDER_DATA_MISSING: 'An imported component has no build data',

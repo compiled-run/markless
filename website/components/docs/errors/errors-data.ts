@@ -8377,7 +8377,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_PRERENDER_OWNER_UNPLACED',
-		title: '',
+		title: 'A browser-drawn part has no component to start from',
 		area: 'internal',
 		packageName: '@markless/web',
 		stage: 'runtime',

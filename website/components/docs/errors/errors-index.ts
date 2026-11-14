@@ -1484,14 +1484,6 @@ export const errorIndex: ErrorIndex = {
 			blurb: 'Markless checking itself. If you see one, it is a Markless bug: please open an issue.',
 			codes: [
 				{
-					code: 'MARKLESS_PRERENDER_OWNER_UNPLACED',
-					title: '',
-					chip: 'error',
-					kind: 'runtime error',
-					guided: false,
-					words: ' markless_prerender_owner_unplaced a markless runtime error from @markless/web.',
-				},
-				{
 					code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 					title: 'A @catch reset has no graph to re-run values in',
 					chip: 'error',
@@ -1514,6 +1506,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a browser-built row reads its owner’s prop markless_prerender_projected_prop_read a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_PRERENDER_OWNER_UNPLACED',
+					title: 'A browser-drawn part has no component to start from',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a browser-drawn part has no component to start from markless_prerender_owner_unplaced a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_RENDER_DATA_READER_SPECIFIER_UNRESOLVABLE',
