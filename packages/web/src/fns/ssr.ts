@@ -2016,14 +2016,16 @@ function marklessSsrComposedRoutes(
 	const nested = record.composedInstancePath !== undefined;
 	if (!nested && marklessInstancePath(record.id) !== '') return undefined;
 	const props = nested
-		? (record.composedGraphProps ?? []).flatMap((prop) => {
-				const mapped = marklessCsrRemapChildGraph(
-					{ graphNodeId: prop.graphNodeId, path: prop.path ?? [] },
-					child.graphProps,
-					childInstancePath,
-				);
-				return mapped ? [marklessSsrComposedGraphProp(prop.name, mapped)] : [];
-			})
+		? (record.composedGraphProps ?? []).map((prop) =>
+				marklessSsrComposedGraphProp(
+					prop.name,
+					marklessSsrRemapBehaviorRead(
+						{ graphNodeId: prop.graphNodeId, path: prop.path ?? [] },
+						child.graphProps,
+						childInstancePath,
+					),
+				),
+			)
 		: (child.graphProps ?? []).flatMap((prop) => {
 				const route = marklessLiveBoundGraphRoute(prop);
 				return route ? [marklessSsrComposedGraphProp(prop.name, route)] : [];

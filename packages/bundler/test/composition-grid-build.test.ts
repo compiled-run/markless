@@ -289,6 +289,7 @@ const partsRows = (board: Board) => board.items.map((row) => `row: ${row.label}e
 const upperRows = (board: Board) => board.items.map((row) => `row: ${row.label.toUpperCase()}`);
 const card = (board: Board) => `card: ${board.parity} card for ${board.title}`;
 const childTryIf = (board: Board) => [title(board), `count: ${board.items.length} rows`, ...rows(board)];
+const tryNest = (board: Board) => [title(board), ...rows(board), `count: ${board.items.length} rows`];
 
 const shapes: ReadonlyArray<readonly [string, Shape]> = [
 	['a. child in a @try in layout children', { path: '/a-layout', view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)] }],
@@ -373,6 +374,8 @@ describe('composition grid, production build', () => {
 		['j. a list straight in a click-opened arm, closed at load', { path: '/j-arm-list-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
 		['k. an @if in a child\'s own @try, open at load', { path: '/k-child-try-if-open', view: childTryIf, closed: (b) => [title(b), 'closed: Summary', ...rows(b)] }],
 		['k. an @if in a child\'s own @try, closed at load', { path: '/k-child-try-if-closed', openAtLoad: false, view: childTryIf, closed: (b) => [title(b), 'closed: Summary', ...rows(b)] }],
+		["l. a child's @try holds a child with its own @try, open at load", { path: '/l-child-try-nest-open', view: tryNest, closed: (b) => [title(b), ...rows(b), 'closed: Summary'] }],
+		["l. a child's @try holds a child with its own @try, closed at load", { path: '/l-child-try-nest-closed', openAtLoad: false, view: tryNest, closed: (b) => [title(b), ...rows(b), 'closed: Summary'] }],
 	];
 	for (const [name, shape] of armLists)
 		test(`${name}: first render, open, reload, close and reopen, save held, handler rejects`, async () => {
@@ -654,6 +657,43 @@ describe('composition grid, production build', () => {
 		await expect.poll(said, poll).toEqual(['nobody', 'ADA']);
 		expect(errors).toEqual([]);
 	});
+
+	test("l. a child's @try holds a child with its own @try: the inner @try's button flips its @if", async () => {
+		const run = new Run({ path: '/l-child-try-nest-open', view: tryNest }, await visit('/l-child-try-nest-open'));
+		await run.firstRender();
+		const board = run.visit.api.board('a', 0);
+		await run.visit.page.locator('[data-nest-toggle]').click();
+		await run.shows([title(board), 'hidden: Hidden', `count: ${board.items.length} rows`]);
+		await run.visit.page.locator('[data-nest-toggle]').click();
+		await run.shows(tryNest(board));
+		expect(run.visit.errors).toEqual([]);
+	});
+
+	// Each step presses one button, the nth with data-flag, and names the lines the page then shows.
+	for (const [name, path, steps] of [
+		["a child's own @try", '/n-streamed-child-try', [[0, ['hidden: one hidden']], [0, ['rows: one rows']]]],
+		[
+			"a child's @try that holds a child with its own @try",
+			'/n-streamed-child-try-nest',
+			[
+				[1, ['gate: outer open', 'hidden: outer hidden']],
+				[1, ['gate: outer open', 'rows: outer rows']],
+				[0, ['gate: outer shut', 'rows: outer rows']],
+				[0, ['gate: outer open', 'rows: outer rows']],
+			],
+		],
+	] as const)
+		test(`n. ${name} inside an arm the server streams: each nested button flips its own @if, and flips back`, async () => {
+			const html = await (await fetch(`${server.origin}${path}`)).text();
+			expect(html.indexOf('<template m:arm='), 'the @try arm streams after the shell').toBeGreaterThan(html.indexOf('data-g="pending"'));
+			const { page, errors } = await visit(path);
+			await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', ...steps.at(-1)![1]]);
+			for (const [at, shown] of steps) {
+				await page.locator('[data-flag]').nth(at).click();
+				await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', ...shown]);
+			}
+			expect(errors).toEqual([]);
+		});
 
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
 		const { page, errors } = await visit('/append-only');

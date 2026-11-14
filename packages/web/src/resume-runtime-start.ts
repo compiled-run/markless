@@ -98,12 +98,15 @@ export async function startResumeRuntime(input: {
 		readonly holdPendingFlip: (graphNodeId: string) => boolean;
 	}) => void;
 	readonly connectAsyncBoundaryWiring: (wiring: () => Promise<AsyncBoundaryWiring>) => void;
+	// Hosts of behaviors a served arm holds, activated once the runtime has started.
+	readonly servedBehaviors: string[];
 	readonly receiveSharedPatch: RuntimeShared['receiveSharedPatch'];
 	readonly sharedPatchEventType: string;
 	// Handed straight to the repeat runtime, which hands it to a component row's
 	// bridge: the registrar a row born after boot registers its records through.
 	readonly armRegistrationDeps: (
 		records: import('./resume-commit-arm.ts').ArmCommitUpdate['armRecords'],
+		servedBehaviors?: string[],
 	) => Promise<import('./resume-commit-arm.ts').ArmRegistrationDeps>;
 	readonly installArmEventType: (eventType: string) => void;
 	readonly rowComponentHost: import('./fns/row-component-mint.ts').RowComponentMintHost;
@@ -222,6 +225,17 @@ export async function startResumeRuntime(input: {
 		})());
 	if (runtimeInput.view.asyncBoundaries.length > 0) await wire();
 	input.connectAsyncBoundaryWiring(wire);
+	// After the wiring connects, so a served arm's nested @try registers into it as a committed arm's does.
+	for (const boundary of prepared.asyncBoundariesById.values()) {
+		const armRecords = boundary.armRecords as ArmCommitUpdate['armRecords'] | undefined;
+		if (!armRecords || Array.isArray(armRecords)) continue;
+		await (await import('./resume-commit-arm.ts')).registerArmRecordSet(
+			await input.armRegistrationDeps(armRecords, input.servedBehaviors),
+			input.installArmEventType,
+			boundary,
+			{ armRecords, computed: runtimeInput.state?.computed },
+		);
+	}
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
