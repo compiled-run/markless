@@ -1415,12 +1415,16 @@ export function evaluatePrerenderDataComponent(input: {
 							});
 							return arm;
 						},
-						selectAsyncArm: (slot) => {
+						selectAsyncArm: (slot, context) => {
 							const boundary = (definition.boundaries ?? []).find(
 								(candidate) => candidate.boundaryId === slot.boundaryId,
 							);
 							const status = boundary?.runnerGraphNodeId
-								? runnerStatus(boundary.runnerGraphNodeId, state.computed)
+								? runnerStatus(
+										boundary.runnerGraphNodeId,
+										state.computed,
+										!input.freshInstance && !context.freshInstances,
+									)
 								: undefined;
 							if (status === 'rejected') {
 								const error = runnerError(boundary!.runnerGraphNodeId!, state.computed);
@@ -1682,17 +1686,20 @@ export function evaluatePrerenderDataComponent(input: {
 function runnerStatus(
 	graphNodeId: string,
 	computed: ProtocolStatePayload['computed'],
+	onPage?: boolean,
 	visited = new Set<string>(),
 ): unknown {
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (!record || record.async) return record?.snapshot?.status;
+	// A @try already on the page keeps its content over a re-run of a value it showed (spec D8).
+	if (!record || record.async)
+		return onPage && record?.snapshot?.status === 'pending' && 'valueKey' in record.snapshot ? 'fulfilled' : record?.snapshot?.status;
 	let status = 'fulfilled';
 	for (const dependency of record.dependencies ?? []) {
 		if (visited.has(dependency.graphNodeId)) continue;
 		if (!computed.some((candidate) => candidate.graphNodeId === dependency.graphNodeId))
 			continue;
-		const settled = runnerStatus(dependency.graphNodeId, computed, visited);
+		const settled = runnerStatus(dependency.graphNodeId, computed, onPage, visited);
 		if (settled === 'rejected') return settled;
 		if (settled !== 'fulfilled') status = 'pending';
 	}
@@ -1708,7 +1715,7 @@ function runnerError(
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
 	if (record?.async) return (record.snapshot as { readonly error?: unknown } | undefined)?.error;
 	for (const { graphNodeId: next } of record?.dependencies ?? [])
-		if (!visited.has(next) && runnerStatus(next, computed, new Set(visited)) === 'rejected')
+		if (!visited.has(next) && runnerStatus(next, computed, false, new Set(visited)) === 'rejected')
 			return runnerError(next, computed, visited);
 }
 

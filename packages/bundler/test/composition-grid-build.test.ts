@@ -446,6 +446,20 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	test('k. a save opens an @if holding a component from another file inside the @try it reloads', async () => {
+		const { page, api, errors } = await visit('/k-saving-arm');
+		const loaded = ['title.even: a round 0', 'row: a one', 'row: a two'];
+		await expect.poll(() => lines(page), poll).toEqual(loaded);
+		await page.locator('[data-grid-save]').click();
+		await expect.poll(() => lines(page), poll).toEqual([...loaded, 'saving: a']);
+		await api.release(saveRequest('a'));
+		await expect.poll(api.waitingRequests, poll).toContain(boardRequest('a', 0));
+		expect(await lines(page)).toEqual([...loaded, 'saving: a']);
+		await api.release(boardRequest('a', 0));
+		await expect.poll(() => lines(page), poll).toEqual([...loaded, 'row: a saved 1']);
+		expect(errors).toEqual([]);
+	});
+
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
 		const { page, errors } = await visit('/append-only');
 		await expect.poll(() => lines(page), poll).toEqual(['title.even: a round 0']);
