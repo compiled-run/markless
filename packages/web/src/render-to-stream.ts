@@ -35,7 +35,7 @@ import {
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
-import { boundariesInside } from './prerender/records.ts';
+import { boundariesInside, isArmRecordSet } from './prerender/records.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -461,11 +461,10 @@ function renderArmAppend(
 		throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
 	const armHtml = renderedAnchor.html;
 
-	const boundary = (output.view?.asyncBoundaries ?? []).find(
-		(candidate) => candidate.id === arm.boundaryId,
-	) as StreamedBoundary & { readonly armRecords?: unknown };
+	const view = output.view;
+	const boundary = view?.asyncBoundaries.find((candidate) => candidate.id === arm.boundaryId);
 	const armRecords = boundary?.armRecords;
-	if (!armRecords || Array.isArray(armRecords)) {
+	if (!view || !boundary || !isArmRecordSet(armRecords)) {
 		throw streamArmError(arm.boundaryId, 'an armized record set', 'view payload');
 	}
 	const computed = (output.state?.computed ?? []).find(
@@ -496,15 +495,15 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const nested = boundariesInside(output.view!, boundary) as NonNullable<ProtocolArmRecordSet['asyncBoundaries']>;
+	const nested = boundariesInside(view, boundary);
 	const armEvents = withPaintedBlockEvents(
-		armRecords as ProtocolArmRecordSet,
+		armRecords,
 		nested,
 		renderedAnchor.elementStart,
 		output.structure?.anchors ?? [],
 	);
 	const servedArmRecords = withPaintedBranchArms(
-		nested.length > 0 ? { ...armEvents, asyncBoundaries: nested } : armEvents,
+		nested.length > 0 ? ({ ...armEvents, asyncBoundaries: nested } satisfies ProtocolArmRecordSet) : armEvents,
 		output,
 	) as ProtocolArmRecordSet;
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.

@@ -3,11 +3,11 @@ import {
 	PROTOCOL_CONTAINER_HOST_NODE_ID,
 	serializeRuntimeAsyncSnapshots,
 	serializeRuntimeStateCells,
+	type ProtocolArmRecordSet,
 	type ProtocolStatePayload,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
 import type { SsrRenderOutput } from '../render-to-string.ts';
-import type { ResumeArmRecordSet } from '../resume-types.ts';
 
 export async function prepareSsrResumeRecords(
 	output: SsrRenderOutput,
@@ -33,7 +33,7 @@ export function boundariesInside(
 		readonly startAnchor: { readonly index: number };
 		readonly endAnchor: { readonly index: number };
 	},
-): NonNullable<ResumeArmRecordSet['asyncBoundaries']> {
+): NonNullable<ProtocolArmRecordSet['asyncBoundaries']> {
 	const start = range.startAnchor.index;
 	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
 		...anchor,
@@ -47,11 +47,16 @@ export function boundariesInside(
 		)
 		.map(({ armRecords: served, ...candidate }) => ({
 			...candidate,
-			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
+			...(isArmRecordSet(served) && { armRecords: served }),
 			startAnchor: armIndex(candidate.startAnchor),
 			endAnchor: armIndex(candidate.endAnchor),
 		}));
 }
+
+// Array.isArray cannot narrow a readonly per-arm plan out of the union.
+export const isArmRecordSet = (
+	records: ProtocolArmRecordSet | ReadonlyArray<ProtocolArmRecordSet> | undefined,
+): records is ProtocolArmRecordSet => !!records && !Array.isArray(records);
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
 	const locators = view.locators.map((locator) => ({
