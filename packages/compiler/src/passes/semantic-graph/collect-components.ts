@@ -373,12 +373,10 @@ function componentPropBindings(
 					: {}),
 				...(inlined?.catchResets.size
 					? {
-							catchResets: [...inlined.catchResets].map(
-								([resetName, boundaryId]) => ({
-									name: resetName,
-									boundaryId,
-								}),
-							),
+							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
+								name: resetName,
+								boundaryId,
+							})),
 						}
 					: {}),
 			});
@@ -796,9 +794,7 @@ function relayedHandlerSource(
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string } | undefined {
 	const source =
-		expression.type === 'Identifier'
-			? getIdentifierName(expression)
-			: staticPropsMember(expression);
+		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
 	if (!source) return undefined;
 	const root = source.split('.')[0]!;
 	if (repeatRowBindsName(root, state)) return undefined;

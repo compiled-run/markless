@@ -1,9 +1,5 @@
 import type { SemanticGraphBinding } from '../../artifacts.ts';
-import {
-	graphBindingMap,
-	resolveGraphPath,
-	semanticAliasMap,
-} from '../../artifact-helpers/graph-paths.ts';
+import { graphBindingMap, resolveGraphPath, semanticAliasMap } from '../../artifact-helpers/graph-paths.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
 import { collectCompositeTemplateExpression, type GraphReadScope } from './composite-reads.ts';
@@ -35,9 +31,7 @@ export function catchErrorScope(
 function catchErrorCell(boundaryId: string, state: WalkState): SemanticGraphBinding | null {
 	const boundary = state.graph.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	if (!boundary) return null;
-	const kept = state.graph.graphBindings.find(
-		(binding) => binding.id === boundary.errorGraphNodeId,
-	);
+	const kept = state.graph.graphBindings.find((binding) => binding.id === boundary.errorGraphNodeId);
 	if (kept) return kept;
 	const name = `marklessCatchError${boundaryId.slice(boundaryId.lastIndexOf(':') + 1)}`;
 	return {
@@ -53,11 +47,7 @@ function catchErrorCell(boundaryId: string, state: WalkState): SemanticGraphBind
 	};
 }
 
-function keepCatchErrorCell(
-	boundaryId: string,
-	cell: SemanticGraphBinding,
-	state: WalkState,
-): void {
+function keepCatchErrorCell(boundaryId: string, cell: SemanticGraphBinding, state: WalkState): void {
 	const boundary = state.graph.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	if (!boundary || boundary.errorGraphNodeId) return;
 	boundary.errorGraphNodeId = cell.id;
@@ -74,40 +64,23 @@ export function catchErrorPropRead(
 	readonly path: ReadonlyArray<string>;
 } | null {
 	const inlined = inlineRenderLocals(expression, state, { catchErrors: true });
-	if (
-		inlined.kind !== 'inlined' ||
-		inlined.catchErrors.size === 0 ||
-		inlined.definitions.length > 0
-	)
+	if (inlined.kind !== 'inlined' || inlined.catchErrors.size === 0 || inlined.definitions.length > 0)
 		return null;
+	const component = state.currentComponentName;
 	const caught = catchErrorScope(
 		inlined.catchErrors,
 		{
-			bindings: graphBindingMap(
-				state.graph,
-				state.currentSharedDefinitionId,
-				state.currentComponentName,
-			),
-			aliases: semanticAliasMap(
-				state.graph,
-				state.currentSharedDefinitionId,
-				state.currentComponentName,
-			),
+			bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId, component),
+			aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId, component),
 		},
 		state,
 	);
 	if (!caught) return null;
 	const source = expressionSource(expression, state.source);
-	const direct = source
-		? resolveGraphPath(source, caught.scope.bindings, caught.scope.aliases)
-		: null;
+	const direct = source ? resolveGraphPath(source, caught.scope.bindings, caught.scope.aliases) : null;
 	if (direct) {
 		caught.keep();
-		return {
-			graphNodeId: direct.binding.id,
-			graphBindingKind: direct.binding.kind,
-			path: direct.path,
-		};
+		return { graphNodeId: direct.binding.id, graphBindingKind: direct.binding.kind, path: direct.path };
 	}
 	const composite = collectCompositeTemplateExpression(expression, state, {
 		scope: caught.scope,
