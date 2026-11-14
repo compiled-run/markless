@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -94,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -94,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -94,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 163,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 71,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "a save's mark, a handler's failure and a failed save's end dirty only how the block shows, so typed text stays (PR #712, CI run 43630493027 vs merge-queue run 43628768420)",
+			"date": "2026-11-14"
+		}
+	]
+}
