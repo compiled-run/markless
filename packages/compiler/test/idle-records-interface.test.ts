@@ -63,3 +63,19 @@ test('a page with no idle record anywhere carries no fact', async () => {
 	expect(child.moduleGraphInterface.idleRecords).toBeUndefined();
 	expect(parent.moduleGraphInterface.idleRecords).toBeUndefined();
 });
+
+test('a page rendering only a sibling of the idle component carries no fact', async () => {
+	const child = await compile(
+		'/w/src/child.tsrx',
+		`${armChild}
+export function Plain() @{
+	<button type="button" onClick={() => {}}>x</button>
+}
+`,
+	);
+	const parent = await compile('/w/src/page.tsrx', page('Plain'), {
+		'./child.tsrx': child.moduleGraphInterface,
+	});
+	expect(child.moduleGraphInterface.idleRecords).toBe(true);
+	expect(parent.moduleGraphInterface.idleRecords).toBeUndefined();
+});
