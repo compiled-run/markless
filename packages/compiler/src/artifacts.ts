@@ -166,6 +166,8 @@ export type SemanticComponentPropBinding =
 			readonly buildTimeValue?: { readonly value: unknown };
 			// The value is a plain member read of an enclosing `@for` row's item.
 			readonly rowRead?: SemanticComponentRowRead;
+			// The value reads nothing the browser can change, so the child keeps the one it rendered with.
+			readonly fixedValue?: true;
 			// A body local named as a handler whose function the browser cannot rebuild, and the rewrite that it can.
 			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 			// Imported `const` values an opaque prop reads that this compile was not
@@ -2351,6 +2353,8 @@ export type CaptureSlotRoute =
 			};
 			// The expression reads only the keyed row's item or index: rendered with the row, never live.
 			readonly rowValue?: true;
+			// The expression reads nothing the browser can change: the child's own props hold the value it rendered with.
+			readonly fixedValue?: true;
 			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
 	  };
 

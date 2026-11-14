@@ -426,6 +426,22 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	test('port. a page passes a child a value worked out from its url; the child\'s async value and arm read it again in the browser', async () => {
+		const { page, errors } = await visit('/k-fixed-prop?q=ada&page=2');
+		const shown = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>('[data-g]')].map((line) => `${line.dataset.g}: ${line.textContent}`),
+			);
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 0']);
+		await page.locator('main [data-again]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1']);
+		await page.locator('main [data-again]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 2']);
+		await page.locator('main [data-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 2', 'arm: ada!']);
+		expect(errors).toEqual([]);
+	});
+
 	test("a @try in a module's second export: first render, reload, save held, handler rejects", async () => {
 		const run = new Run(secondExport, await visit(secondExport.path));
 		await run.firstRender();

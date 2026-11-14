@@ -147,6 +147,8 @@ export type WalkState = {
 	readonly importedModuleInterfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>>;
 	readonly importedModuleConstants: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
+	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
+	readonly routeRoot: boolean;
 	/** Props the host provides only while rendering on the server, by component export. */
 	readonly serverOnlyProps: ReadonlyArray<{
 		readonly exportName: string;
@@ -314,6 +316,7 @@ export function createWalkState(input: {
 		readonly exportName: string;
 		readonly propName: string;
 	}>;
+	readonly routeRoot?: boolean;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -330,6 +333,7 @@ export function createWalkState(input: {
 		importedModuleConstants: input.importedModuleConstants ?? {},
 		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
+		routeRoot: input.routeRoot === true,
 		hostIds: new WeakMap<object, string>(),
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),

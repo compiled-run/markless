@@ -38,6 +38,7 @@ import {
 	readsUnroutedGraphCell,
 } from './composite-reads.ts';
 import { scopedClassValue } from './collect-elements.ts';
+import { readsOnlyFixedValues } from './fixed-prop-value.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
@@ -526,12 +527,18 @@ function componentPropBindings(
 			continue;
 		}
 		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
+		const fixedValue =
+			!rowRead &&
+			!constant?.value.ok &&
+			expression !== undefined &&
+			readsOnlyFixedValues(expression, state);
 		props.push({
 			name,
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
 			...(rowRead ? { rowRead } : {}),
+			...(fixedValue ? { fixedValue: true as const } : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }

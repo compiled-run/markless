@@ -312,10 +312,10 @@ function importedCaptureSymbols(
 											),
 											absentUse(slot),
 										);
-										// The child's symbol reads this slot, so a value worked out from the row comes from the instance's own props too.
+										// The child's symbol reads this slot, so a value worked out from the row, or fixed at render, comes from the instance's own props too.
 										return ownRead &&
 											route.kind === 'unsupported-opaque' &&
-											route.rowValue === true
+											(route.rowValue === true || route.fixedValue === true)
 											? ownInstancePropRoute(
 													edge.id,
 													path.map((step) => step.id),
@@ -356,7 +356,8 @@ function importedCaptureSymbols(
 						route.kind !== 'row-local' &&
 						(route.kind !== 'unsupported-opaque' ||
 							(captureSymbol.kind !== 'sync-computed-derive' &&
-								route.rowValue !== true)),
+								route.rowValue !== true &&
+								route.fixedValue !== true)),
 				);
 				return routes.length > 0 ? [{ ...slot, routes }] : [];
 			});
@@ -1262,6 +1263,7 @@ function resolvePropCaptureRoute(
 		expression: prop.source,
 		...(prop.sourceSpan ? { sourceSpan: prop.sourceSpan } : {}),
 		...(readsOnlyRowLocals(prop.source, edge, input) ? { rowValue: true as const } : {}),
+		...(prop.kind === 'opaque' && prop.fixedValue ? { fixedValue: true as const } : {}),
 		...('unroutableHandler' in prop && prop.unroutableHandler
 			? { unroutableHandler: prop.unroutableHandler }
 			: {}),
@@ -1550,7 +1552,8 @@ function lazySymbolRole(kind: string | undefined): string {
 	if (kind === 'event-handler') return 'an event handler';
 	if (kind === 'dom-update') return 'a DOM update';
 	if (kind === 'sync-computed-derive') return 'a computed';
-	return 'a lazy symbol';
+	if (kind === 'async-computed-runner') return 'an async computed';
+	return 'code';
 }
 
 function asNode(value: unknown): AnyNode | undefined {
@@ -1595,7 +1598,7 @@ function opaqueSlotDiagnostics(
 					title: 'Lazy handler prop capture is not resumable',
 					message: route.absentProp
 						? `"${componentName}" ${absentAction} its prop "${propName}" in \`${absentSource}\`${absentAt} without checking that it was passed, and this <${componentName}> passes no "${propName}", so that code would throw when it runs in the browser.`
-						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
+						: `"${componentName}" reads its prop "${propName}" as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser, but this <${componentName}> passes \`${route.expression}\`: code that runs only while the page renders, with no way for the browser to get its value.`,
 					why: route.unroutableHandler
 						? route.unroutableHandler.why
 						: route.absentProp
