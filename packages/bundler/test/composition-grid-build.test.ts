@@ -464,6 +464,22 @@ describe('composition grid, production build', () => {
 	});
 });
 
+describe('a failed save, production build', () => {
+	test('shows @catch and keeps what was typed over the loaded value', async () => {
+		const { page, errors } = await visit('/failed-save-typed');
+		await page.route('**/fst/**', (route) => route.fulfill({ status: 500, body: 'nope' }));
+		const field = page.locator('input[name="first"]');
+		await expect.poll(() => field.inputValue(), poll).toBe('Ada a1');
+		await field.fill('Typed');
+		await page.locator('[data-submit]').click();
+		await expect.poll(() => page.locator('[data-caught]').textContent(), poll).toBe('Saving failed (500)');
+		await expect.poll(() => busy(page), poll).toBe(0);
+		await quiet(page);
+		expect(await field.inputValue(), 'what was typed').toBe('Typed');
+		expect(errors).toEqual([]);
+	});
+});
+
 describe('prop-fed rows of a row component from another file, production build', () => {
 	const rowLines = (...labels: string[]) => labels.map((label) => `row: ${label}`);
 

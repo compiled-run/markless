@@ -66,7 +66,8 @@ export function marklessNoteArrivingControlEdits(event: {
 	readonly type?: string;
 	readonly target?: unknown;
 }): () => void {
-	const element = /^(?:input|change)$/.test(event.type ?? '') && marklessEditableControl(event.target);
+	const element =
+		/^(?:input|change)$/.test(event.type ?? '') && marklessEditableControl(event.target);
 	if (!element || !edited(element)) return noRelease;
 	arrived.set(event, element);
 	unread.set(element, (unread.get(element) ?? new Set()).add(event));
@@ -79,14 +80,21 @@ export function marklessControlEditsRead(event: object): void {
 	if (events?.delete(event) && !events.size) unread.delete(element!);
 }
 
-function edited(element: ControlLike): boolean {
+// What the control last took from the page: its last flush write, or the markup it was drawn with.
+function settledValue(element: ControlLike, name: string): unknown {
 	const last = written.get(element);
+	return last?.has(name)
+		? last.get(name)
+		: element[name === 'value' ? 'defaultValue' : 'defaultChecked'];
+}
+
+function edited(element: ControlLike): boolean {
 	return EDITED_PROPERTIES.some((name) => {
 		const live = element[name];
-		const settled = last?.has(name)
-			? last.get(name)
-			: element[name === 'value' ? 'defaultValue' : 'defaultChecked'];
-		return (typeof live === 'string' || typeof live === 'boolean') && live !== settled;
+		return (
+			(typeof live === 'string' || typeof live === 'boolean') &&
+			live !== settledValue(element, name)
+		);
 	});
 }
 
@@ -98,6 +106,12 @@ function edited(element: ControlLike): boolean {
  * One that changes the control while an earlier dispatch runs may answer older text.
  */
 export function marklessControlWriteHeld(target: unknown, name: string, value: unknown): boolean {
+	// A value the control already took is no change, and writing it again would undo what was typed since.
+	if (
+		(name === 'value' || name === 'checked') &&
+		Object.is(value, settledValue(target as ControlLike, name))
+	)
+		return true;
 	if (heldForUnread(target as ControlLike, name, value)) return true;
 	const notes = noted.get(target as ControlLike);
 	const newest = notes?.[notes.length - 1];
