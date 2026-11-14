@@ -62,6 +62,13 @@ async function run(source: string, cells: Cells, options: { shown?: Cells; local
 		Counted: class {
 			readonly id = `id${++event.calls}`;
 		},
+		*ids() {
+			yield 'x';
+		},
+		list: ['x'],
+		many: () => [event.next()],
+		tag: () => event.next(),
+		table: { id1: 2 } as Record<string, number>,
 	};
 	const webFns = new URL('../../web/src/fns/', import.meta.url).href;
 	const resolved = source.replace(/"@markless\/web\/fns\/([\w-]+)"/g, (_, name: string) => JSON.stringify(`${webFns}${name}.ts`));
@@ -97,6 +104,8 @@ const updates: ReadonlyArray<Case> = [
 	{ label: 'a toggle at a literal key', body: 'let flags = state<Record<string, boolean>>({});', handler: "flags['a'] = !flags['a'];", before: { flags: { a: false } }, after: { flags: { a: true } }, shown: { flags: { a: true } }, shownAfter: { flags: { a: false } } },
 	{ label: 'an object spread', body: 'let flags = state<Record<string, boolean>>({});', handler: 'flags = { ...flags, b: true };', before: { flags: { a: true } }, after: { flags: { a: true, b: true } }, shown: { flags: {} }, shownAfter: { flags: { b: true } } },
 	{ label: 'the state read twice', body: 'let n = state(0);', handler: 'n = n * n + n;', before: { n: 3 }, after: { n: 12 }, shown: { n: 1 }, shownAfter: { n: 2 } },
+	{ label: 'a compound assignment of a literal', body: "let log = state('');", handler: "log += 'b';", before: { log: 'a' }, after: { log: 'ab' }, shown: { log: '' }, shownAfter: { log: 'b' } },
+	{ label: 'a list spread of a method on the list', body: 'let pending = state<string[]>([]);', handler: "pending = [...pending, ...pending.filter((each) => each !== 'a')];", before: { pending: ['a', 'b'] }, after: { pending: ['a', 'b', 'b'] }, shown: { pending: ['c'] }, shownAfter: { pending: ['c', 'c'] } },
 ];
 for (const { label, body, handler, before, after, shown, shownAfter, calls = 0 } of updates)
 	test(`${label} reading the state it replaces lowers to an update that replays on a shown value`, async () => {
@@ -141,6 +150,29 @@ const writes: ReadonlyArray<Case> = [
 	{ label: 'a list spread with a new object', body: 'let items = state<unknown[]>([]);', handler: 'items = [...items, new event.Counted().id];', before: { items: [] }, after: { items: ['id1'] }, shown: { items: [] }, calls: 1 },
 	{ label: 'a list filter whose callback calls', body: 'let items = state<string[]>([]);', handler: "items = items.filter((each) => each !== event.next());", before: { items: ['a', 'id2'] }, after: { items: ['a'] }, shown: { items: ['b'] }, calls: 2 },
 	{ label: 'a global call over the state', body: 'let n = state(0);', handler: 'n = Math.max(n, 3);', before: { n: 1 }, after: { n: 3 } },
+	{ label: 'a compound assignment with a call', body: "let log = state('');", handler: 'log += event.next();', before: { log: 'a' }, after: { log: 'aid1' }, shown: { log: '' }, calls: 1 },
+	{ label: 'a compound assignment at a field with a call', body: "let t = state({ log: '' });", handler: 't.log += event.next();', before: { t: { log: 'a' } }, after: { t: { log: 'aid1' } }, shown: { t: { log: '' } }, shownAfter: { t: { log: 'aid1' } }, calls: 1 },
+	{ label: 'a logical compound assignment with a call', body: 'let label = state<string | null>(null);', handler: 'label ??= event.next();', before: { label: null }, after: { label: 'id1' }, shown: { label: null }, calls: 1 },
+	{
+		label: 'a row item compound assignment with a call',
+		body: rowList,
+		handler: '',
+		markup: '<ul>@for (const todo of todos; key todo.id) { <li><button onClick={(event) => { todo.n += event.next().length; }}>go</button></li> }</ul>',
+		locals: { todo: { id: 'a', done: false, all: false, n: 1 } },
+		before: { todos: [{ id: 'a', done: false, all: false, n: 1 }] },
+		after: { todos: [{ id: 'a', done: false, all: false, n: 4 }] },
+		calls: 1,
+	},
+	{ label: 'a compound assignment through a local with a call', body: 'let box = state({ n: 1, inner: { n: 5 } });', handler: 'const inner = box.inner; inner.n += event.next().length;', before: { box: { n: 1, inner: { n: 5 } } }, after: { box: { n: 1, inner: { n: 8 } } }, calls: 1 },
+	{ label: 'a list spread of a one-shot iterable', body: 'let items = state<string[]>([]);', handler: 'const it = event.ids(); items = [...items, ...it];', before: { items: ['a'] }, after: { items: ['a', 'x'] }, shown: { items: [] } },
+	{ label: 'a list spread of another value', body: 'let items = state<string[]>([]);', handler: 'items = [...items, ...event.list];', before: { items: ['a'] }, after: { items: ['a', 'x'] }, shown: { items: [] } },
+	{ label: 'a method on the list spreading a one-shot iterable', body: 'let items = state<string[]>([]);', handler: 'const it = event.ids(); items = items.concat(...it);', before: { items: ['a'] }, after: { items: ['a', 'x'] }, shown: { items: [] } },
+	{ label: 'a nullish fallback that calls', body: 'let items = state<string[] | null>(null);', handler: 'items = items ?? [event.next()];', before: { items: null }, after: { items: ['id1'] }, shown: { items: null }, calls: 1 },
+	{ label: 'an optional call', body: 'let items = state<string[]>([]);', handler: 'items = [...items, event.next?.()];', before: { items: [] }, after: { items: ['id1'] }, shown: { items: [] }, calls: 1 },
+	{ label: 'a tagged template', body: 'let items = state<string[]>([]);', handler: 'items = [...items, event.tag`x`];', before: { items: [] }, after: { items: ['id1'] }, shown: { items: [] }, calls: 1 },
+	{ label: 'a spread of a call', body: 'let items = state<string[]>([]);', handler: 'items = [...items, ...event.many()];', before: { items: [] }, after: { items: ['id1'] }, shown: { items: [] }, calls: 1 },
+	{ label: 'a computed key that calls', body: 'let n = state(0);', handler: 'n = n + event.table[event.next()];', before: { n: 1 }, after: { n: 3 }, shown: { n: 0 }, calls: 1 },
+	{ label: 'an increment inside a callback', body: 'let items = state<number[]>([]);', handler: 'let i = 0; items = items.map((each) => each + i++);', before: { items: [5, 5] }, after: { items: [5, 6] }, shown: { items: [1] } },
 ];
 for (const { label, body, handler, markup, locals, before, after, shown, shownAfter, calls = 0 } of writes)
 	test(`${label} stays a plain write`, async () => {

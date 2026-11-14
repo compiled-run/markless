@@ -7619,7 +7619,8 @@ function replaysOnShownValue(
 		node.type === 'TaggedTemplateExpression' ||
 		node.type === 'ImportExpression' ||
 		(node.type === 'UnaryExpression' && node.operator === 'delete') ||
-		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite))
+		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite)) ||
+		spreadsOnce(node, target, rewrite)
 	)
 		return false;
 	const inside = insideFunction || isFunctionLikeNode(node);
@@ -7631,6 +7632,22 @@ function replaysOnShownValue(
 		} else if (isNode(child) && !replaysOnShownValue(child, target, rewrite, inside)) return false;
 	}
 	return true;
+}
+
+// A spread into a list or call of anything but the assigned state's own value: a one-shot iterator is empty on the replay.
+function spreadsOnce(
+	node: AnyNode,
+	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	rewrite: EventHandlerRewrite,
+): boolean {
+	const iterated = node.type === 'ArrayExpression' ? node.elements : node.type === 'CallExpression' ? node.arguments : undefined;
+	return asNodes(iterated).some((item) => {
+		if (item.type !== 'SpreadElement' || !isNode(item.argument)) return false;
+		const spread = item.argument;
+		return spread.type === 'CallExpression'
+			? !callsAssignedStateMethod(spread, target, rewrite)
+			: !isAssignedStateRead(spread, target, rewrite);
+	});
 }
 
 // Whether a value reads the assigned state outside any function inside it.
@@ -7839,6 +7856,22 @@ function loweredEventWriteNode(
 
 		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
 		if (!operator) return null;
+
+		// A right side that calls would run again on the replay, so it is read and written once, in JavaScript's order.
+		if (isNode(node.right) && !replaysOnShownValue(node.right, write, rewrite)) {
+			const current = isNode(node.left) ? eventWriteValueNode(node.left, rewrite) : null;
+			if (!current) return null;
+			return graphWriteCall({
+				calleeNode: throughCallee('write'),
+				graphNodeId: write.graphNodeId,
+				path: write.path,
+				pathNode,
+				value:
+					operator === '&&' || operator === '||' || operator === '??'
+						? logicalNode(operator, current, value)
+						: binaryNode(operator, current, value),
+			});
+		}
 
 		const parameterName = freshUpdaterParameter(value);
 		return graphUpdateCall({
