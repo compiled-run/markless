@@ -2,196 +2,135 @@
 	"changes": [
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/fns/ssr"
-			],
+			"path": ["modules", "@fixtures/vite-csr", "web/fns/ssr"],
 			"delta": -61,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime"
-			],
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-runtime"],
 			"delta": -601,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime-start"
-			],
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-runtime-start"],
 			"delta": 535,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
+			"path": ["walls", "@fixtures/vite-csr", "maxEmittedRuntimeGzipBytes", "measured"],
 			"delta": -53,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/ssr"
-			],
+			"path": ["modules", "@fixtures/vite-plus", "web/fns/ssr"],
 			"delta": -61,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime"
-			],
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-runtime"],
 			"delta": -601,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime-start"
-			],
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-runtime-start"],
 			"delta": 535,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
+			"path": ["walls", "@fixtures/vite-plus", "maxRuntimeChunkGzipBytes", "measured"],
 			"delta": -4,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
+			"path": ["walls", "@fixtures/vite-plus", "maxEmittedRuntimeGzipBytes", "measured"],
 			"delta": -66,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-runtime-start"
-			],
-			"delta": 582,
-			"reason": "served @try arms register here, after the async wiring connects, so a streamed arm's nested @try blocks wire up",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 9,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/resume-runtime"
-			],
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 9,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 9,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 30,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 30,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 30,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["runtimeModules", "web/fns/ssr"],
+			"delta": -61,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["runtimeModules", "web/resume-commit-arm"],
+			"delta": 33,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["runtimeModules", "web/resume-runtime"],
 			"delta": -601,
-			"reason": "the served @try arm registration moved to resume-runtime-start",
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		},
 		{
 			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 26,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 26,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 26,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 39,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 39,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 39,
-			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"path": ["runtimeModules", "web/resume-runtime-start"],
+			"delta": 525,
+			"reason": "served @try arms register in resume-runtime-start after the pending runners start, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
 		}
 	]
