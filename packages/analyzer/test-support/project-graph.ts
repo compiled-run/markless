@@ -118,7 +118,10 @@ export const DISK_INPUT_READERS: readonly { glob: string; tests: readonly string
 	{ glob: 'demos/**', tests: ['packages/bundler/', 'packages/web/', 'scripts/benchmarks/'] },
 	{ glob: 'packages/cli/templates/**', tests: ['packages/cli/'] },
 	{ glob: 'packages/cli/README.md', tests: ['packages/cli/'] },
-	{ glob: 'packages/core/agent/**', tests: ['packages/core/test/storage-types.test.ts'] },
+	{
+		glob: 'packages/core/agent/**',
+		tests: ['packages/core/test/storage-types.test.ts', 'packages/compiler/test/agent-async-doc.test.ts'],
+	},
 	{
 		glob: 'packages/bundler/README.md',
 		tests: ['packages/bundler/test/render-data-literals.test.ts'],
