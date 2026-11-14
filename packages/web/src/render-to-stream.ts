@@ -35,7 +35,7 @@ import {
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
-import { boundariesInside, isArmRecordSet } from './prerender/records.ts';
+import { boundariesInside } from './prerender/records.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -464,7 +464,7 @@ function renderArmAppend(
 	const view = output.view;
 	const boundary = view?.asyncBoundaries.find((candidate) => candidate.id === arm.boundaryId);
 	const armRecords = boundary?.armRecords;
-	if (!view || !boundary || !isArmRecordSet(armRecords)) {
+	if (!view || !armRecords || !('locators' in armRecords)) {
 		throw streamArmError(arm.boundaryId, 'an armized record set', 'view payload');
 	}
 	const computed = (output.state?.computed ?? []).find(

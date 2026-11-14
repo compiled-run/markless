@@ -47,16 +47,11 @@ export function boundariesInside(
 		)
 		.map(({ armRecords: served, ...candidate }) => ({
 			...candidate,
-			...(isArmRecordSet(served) && { armRecords: served }),
+			...(served && !Array.isArray(served) && { armRecords: served as ProtocolArmRecordSet }),
 			startAnchor: armIndex(candidate.startAnchor),
 			endAnchor: armIndex(candidate.endAnchor),
 		}));
 }
-
-// Array.isArray cannot narrow a readonly per-arm plan out of the union.
-export const isArmRecordSet = (
-	records: ProtocolArmRecordSet | ReadonlyArray<ProtocolArmRecordSet> | undefined,
-): records is ProtocolArmRecordSet => !!records && !Array.isArray(records);
 
 function containerScopedView(view: ProtocolViewPayload): ProtocolViewPayload {
 	const locators = view.locators.map((locator) => ({
