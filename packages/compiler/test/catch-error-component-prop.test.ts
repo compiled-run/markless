@@ -21,6 +21,8 @@ export default function Page() @{
 		${catchBody}
 	}
 }
+
+class NotFound extends Error {}
 `;
 
 async function compilePage(catchBody: string) {
@@ -152,6 +154,31 @@ test('a field the server render drops, or the whole error passed on, is refused 
 		"MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error` passes the whole `@catch` error to <Oops>, but a server-rendered page sends the browser only the error's name and message, so any other field <Oops> reads would be missing once the page loads.",
 	]);
 	expect(await lost('<p>{error.message} ({error.cause})</p>')).toEqual([
-		expect.stringMatching(/^MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error\.message` reads `cause`/),
+		"MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error.cause` reads `cause` from the `@catch` error, but a server-rendered page sends the browser only the error's name and message, so `cause` would be missing once the page loads.",
+	]);
+});
+
+const suggestion = async (catchBody: string) =>
+	errors(await compilePage(catchBody)).map((diagnostic) => diagnostic.suggestions?.[0]?.message);
+
+test('a refused component prop suggests passing only what the child shows', async () => {
+	expect(await suggestion('<Oops message={error} />')).toEqual([
+		'Pass <Oops> only what it shows, such as `message={error.message}`, and put what the page needs into the message when you throw.',
+	]);
+	expect(await suggestion('<Oops message={error.cause} />')).toEqual([
+		'Pass <Oops> only what it shows, such as `message={error.message}`, and put what the page needs into the message when you throw.',
+	]);
+});
+
+// After a server-rendered load the browser holds the error as its name and message, so this test was false there (and a client render showed the same).
+test('an instanceof test on the caught error is refused, in a prop and in joined text', async () => {
+	expect(await lost("<Oops message={error instanceof NotFound ? 'gone' : 'other'} />")).toEqual([
+		"MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error instanceof NotFound` tests the `@catch` error with `instanceof`, but the browser gets the error back as its name and message only, not as an instance of its class, so the test is false there.",
+	]);
+	expect(await lost("<p>{error.message} {error instanceof NotFound ? 'gone' : 'other'}</p>")).toEqual([
+		expect.stringMatching(/^MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error instanceof NotFound` tests/),
+	]);
+	expect(await suggestion("<p>{error.message} {error instanceof NotFound ? 'gone' : 'other'}</p>")).toEqual([
+		'Tell errors apart by `error.name` instead, and set `name` in your error class.',
 	]);
 });

@@ -426,8 +426,13 @@ function componentPropBindings(
 			if (
 				caught &&
 				!caught.keep(
-					expression!,
-					[{ graphNodeId: graph.binding.id, path: graph.path }],
+					[
+						{
+							node: expression!,
+							reads: [{ graphNodeId: graph.binding.id, path: graph.path }],
+							instanceofs: caught.instanceofs,
+						},
+					],
 					childComponentName,
 				)
 			)
@@ -477,7 +482,20 @@ function componentPropBindings(
 				})
 			: null;
 		if (composite) {
-			if (caught && !caught.keep(expression!, computedReads(composite.graphNodeId, state))) continue;
+			if (
+				caught &&
+				!caught.keep(
+					[
+						{
+							node: expression!,
+							reads: computedReads(composite.graphNodeId, state),
+							instanceofs: caught.instanceofs,
+						},
+					],
+					childComponentName,
+				)
+			)
+				continue;
 			props.push({
 				name,
 				source,

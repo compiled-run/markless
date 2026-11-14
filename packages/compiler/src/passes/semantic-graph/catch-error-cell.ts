@@ -23,36 +23,46 @@ export function catchErrorScope(
 	}
 	return {
 		scope: { bindings, aliases: scope.aliases },
-		keep: (expression, reads, child) => {
+		keep: (parts, child) => {
 			for (const { boundaryId, cell } of cells) keepCatchErrorCell(boundaryId, cell, state);
-			const lost = reads.find(
-				(read) =>
-					cells.some(({ cell }) => cell.id === read.graphNodeId) &&
-					(read.path.length > 0 ? !DURABLE_ERROR_FIELDS.has(read.path[0]!) : child !== undefined),
-			);
-			if (!lost) return true;
-			state.graph.diagnostics.push(
-				catchErrorFieldLostDiagnostic({
-					source: expressionSource(expression, state.source) ?? '',
-					...(lost.path[0] === undefined ? { child: child! } : { field: lost.path[0] }),
-					node: expression,
-					filename: state.filename,
-				}),
-			);
-			return false;
+			const cellName = (graphNodeId: string) =>
+				[...errors.keys()].find((name) => bindings.get(name)?.id === graphNodeId);
+			for (const part of parts) {
+				const test = part.instanceofs[0];
+				const lost = part.reads.find(
+					(read) =>
+						cellName(read.graphNodeId) !== undefined &&
+						(read.path.length > 0 ? !DURABLE_ERROR_FIELDS.has(read.path[0]!) : child !== undefined),
+				);
+				if (!test && !lost) continue;
+				const node = test ?? part.node;
+				state.graph.diagnostics.push(
+					catchErrorFieldLostDiagnostic({
+						source: expressionSource(node, state.source) ?? '',
+						binding: test ? (expressionSource(test.left as AnyNode, state.source) ?? '') : cellName(lost!.graphNodeId)!,
+						reads: test ? { instanceof: true } : lost!.path[0] === undefined ? { whole: true } : { field: lost!.path[0] },
+						...(child ? { child } : {}),
+						node,
+						filename: state.filename,
+					}),
+				);
+				return false;
+			}
+			return true;
 		},
 	};
 }
 
 type CaughtErrorScope = {
 	readonly scope: GraphReadScope;
-	// Keeps the error cells, and refuses a read of a field the server render does not send; false when refused.
-	readonly keep: (
-		expression: AnyNode,
-		reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
-		// A component the expression is passed to as a prop: it may read any field, so the whole error is refused.
-		child?: string,
-	) => boolean;
+	// Keeps the error cells, and refuses the first part reading what the browser never gets back; false when refused.
+	readonly keep: (parts: ReadonlyArray<CaughtErrorPart>, child?: string) => boolean;
+};
+
+export type CaughtErrorPart = {
+	readonly node: AnyNode;
+	readonly reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
+	readonly instanceofs: ReadonlyArray<AnyNode>;
 };
 
 export function computedReads(graphNodeId: string, state: WalkState): ReadonlyArray<SemanticGraphDependency> {
@@ -90,9 +100,10 @@ export function catchErrorPropScope(
 	expression: AnyNode,
 	scope: GraphReadScope,
 	state: WalkState,
-): CaughtErrorScope | null {
+): (CaughtErrorScope & { readonly instanceofs: ReadonlyArray<AnyNode> }) | null {
 	const inlined = inlineRenderLocals(expression, state, { catchErrors: true });
 	if (inlined.kind !== 'inlined' || inlined.catchErrors.size === 0 || inlined.definitions.length > 0)
 		return null;
-	return catchErrorScope(inlined.catchErrors, scope, state);
+	const caught = catchErrorScope(inlined.catchErrors, scope, state);
+	return caught ? { ...caught, instanceofs: inlined.catchErrorInstanceofs } : null;
 }

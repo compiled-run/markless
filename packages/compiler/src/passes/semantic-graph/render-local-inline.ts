@@ -55,6 +55,8 @@ export type RenderLocalInline =
 			readonly catchResets: ReadonlyMap<string, string>;
 			// `@catch (error)` error bindings left free, with the boundary whose error each names.
 			readonly catchErrors: ReadonlyMap<string, string>;
+			// `error instanceof X` tests on such a binding.
+			readonly catchErrorInstanceofs: ReadonlyArray<AnyNode>;
 	  }
 	| { readonly kind: 'row-item'; readonly name: string }
 	| { readonly kind: 'render-local'; readonly name: string }
@@ -92,7 +94,8 @@ export function inlineRenderLocals(
 	const names = new Set<string>();
 	const catchResets = new Map<string, string>();
 	const catchErrors = new Map<string, string>();
-	const result = inlineWithin(node, state, definitions, names, { catchResets, catchErrors }, new Set(), {
+	const catchErrorInstanceofs: AnyNode[] = [];
+	const result = inlineWithin(node, state, definitions, names, { catchResets, catchErrors, catchErrorInstanceofs }, new Set(), {
 		leaveCaptureOwned: options.leaveCaptureOwned === true,
 		leaveRowItems: options.leaveRowItems === true,
 		inlineFunctions: options.inlineFunctions === true,
@@ -100,7 +103,7 @@ export function inlineRenderLocals(
 		catchErrors: options.catchErrors === true,
 	});
 	return 'source' in result
-		? { kind: 'inlined', source: result.source, definitions, names, catchResets, catchErrors }
+		? { kind: 'inlined', source: result.source, definitions, names, catchResets, catchErrors, catchErrorInstanceofs }
 		: result;
 }
 
@@ -112,6 +115,7 @@ function inlineWithin(
 	catches: {
 		readonly catchResets: Map<string, string>;
 		readonly catchErrors: Map<string, string>;
+		readonly catchErrorInstanceofs: AnyNode[];
 	},
 	inlining: Set<number>,
 	options: {
@@ -170,6 +174,8 @@ function inlineWithin(
 					else {
 						catches.catchErrors.set(name, boundaryId);
 						freeNames.add(name);
+						if (parent?.type === 'BinaryExpression' && parent.operator === 'instanceof' && parent.left === candidate)
+							catches.catchErrorInstanceofs.push(parent);
 					}
 				} else if (repeatRowBindsName(name, state)) {
 					if (options.leaveRowItems) freeNames.add(name);

@@ -216,7 +216,9 @@ export const DURABLE_ERROR_FIELDS: ReadonlySet<string> = new Set(['name', 'messa
 // A live Error is not durable graph state; its name and message are, so a handled failure never fails the render.
 export function durableError(error: unknown): unknown {
 	if (error instanceof Error) {
-		return { $type: 'error', name: error.name, message: error.message };
+		const fields: Record<string, unknown> = { $type: 'error' };
+		for (const field of DURABLE_ERROR_FIELDS) fields[field] = error[field as keyof Error];
+		return fields;
 	}
 	return error;
 }
