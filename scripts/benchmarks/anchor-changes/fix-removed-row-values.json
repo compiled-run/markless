@@ -1,14 +1,14 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
+			"surface": "build-scale",
 			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"serializer/protocol-instance-path"
+				"budgets",
+				"clientModules",
+				"value"
 			],
-			"set": 441,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
+			"delta": 1,
+			"reason": "the serializer's instance-path grammar is its own module, so browser resume reads it without the rest of the protocol constants",
 			"date": "2026-11-14"
 		},
 		{
@@ -18,8 +18,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 507,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
+			"delta": 301,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
 		},
 		{
@@ -30,19 +30,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": -5,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"serializer/protocol-instance-path"
-			],
-			"set": 441,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
+			"delta": 9,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
 		},
 		{
@@ -52,8 +41,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-keyed-repeats"
 			],
-			"delta": 507,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
+			"delta": 301,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
 		},
 		{
@@ -64,8 +53,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": -3,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
+			"delta": 4,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
 		},
 		{
@@ -76,19 +65,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 2,
-			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them under the row's instance path",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "build-scale",
-			"path": [
-				"budgets",
-				"clientModules",
-				"value"
-			],
-			"delta": 1,
-			"reason": "the serializer's instance-path grammar is its own module, so browser resume reads it without the rest of the protocol constants",
+			"delta": 23,
+			"reason": "a removed @for row's components stop their async values, dropped by the async plane under the row's instance path",
 			"date": "2026-11-14"
 		}
 	]
