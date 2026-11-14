@@ -246,8 +246,7 @@ test('a visible host inside a streamed arm fires on scroll with no click', async
 	}
 });
 
-// Existing defect, same on main: an onIdle host inside a streamed arm never runs, even once the runtime has started.
-test.fails('an idle host inside a streamed arm ticks with no click', async () => {
+test('an idle host inside a streamed arm ticks with no click', async () => {
 	const { page } = await openIdle('/watched');
 	try {
 		await expect.poll(async () => Number(await page.locator('.arm-ticks').textContent()), { timeout: 3_000 }).toBeGreaterThan(1);
@@ -286,8 +285,7 @@ test.fails('a streamed answer that never arrives because the body failed settles
 	}
 });
 
-// Existing defect, same on main: a child's own slower @try inside a streamed arm stays on @pending.
-test.fails('a child with its own slower async value inside a streamed arm settles with no click', async () => {
+test('a child with its own slower async value inside a streamed arm settles with no click', async () => {
 	const { page, errors } = await openIdle('/nested');
 	try {
 		await expect.poll(() => page.locator('.outer .count').textContent()).toBe('3 books');
@@ -298,8 +296,7 @@ test.fails('a child with its own slower async value inside a streamed arm settle
 	}
 });
 
-// Existing defect, same on main: a shared() value read only inside a streamed arm does not repaint on a write.
-test.fails('shared() read only inside a streamed arm shows its value and updates on the first click', async () => {
+test('shared() read only inside a streamed arm shows its value and updates on the first click', async () => {
 	const { page, errors, requests } = await openIdle('/shared');
 	try {
 		expect(await page.locator('.theme').textContent()).toBe('Theme paper');
