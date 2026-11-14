@@ -12,7 +12,6 @@ import {
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
-	PROTOCOL_STREAMED_ARM_START_ATTRIBUTE,
 	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
@@ -29,6 +28,7 @@ import type {
 	ProtocolServedRecords,
 } from '../../../serializer/src/protocol-record-templates.ts';
 import { PROTOCOL_RECORD_KEYS } from '../../../serializer/src/protocol-record-keys.ts';
+import { PROTOCOL_STREAMED_ARM_START_ATTRIBUTE } from '../../../serializer/src/protocol-stream-scripts.ts';
 
 const listKeys = (type: keyof typeof PROTOCOL_RECORD_KEYS, list: string) =>
 	(PROTOCOL_RECORD_KEYS[type] as Readonly<Record<string, string | undefined>>)[list] ?? '';

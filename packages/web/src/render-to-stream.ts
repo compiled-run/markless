@@ -11,15 +11,12 @@ import {
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_VISIBLE_EVENT_NAME,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_CONTAINER_START_COMMENT,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
 	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
-	PROTOCOL_STREAMED_ARM_START_ATTRIBUTE,
 	type ProtocolArmRecordSet,
 } from '@markless/serializer/protocol';
 import {
@@ -28,6 +25,7 @@ import {
 } from './pending-timing.ts';
 import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
 import { resumesAtLoad, servedRowCount } from './fns/served-rows.ts';
+import { PROTOCOL_STREAMED_ARM_START_ATTRIBUTE } from '../../serializer/src/protocol-stream-scripts.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
@@ -523,7 +521,8 @@ function renderArmAppend(
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const rows = rowsBefore + servedRowCount(servedArmRecords.keyedRepeats ?? [], output.state);
-	const starts = armRunsWithoutInteraction(servedArmRecords) || resumesAtLoad(rows);
+	// A press inside an arm pays its adoption and wiring at the press, measured over a frame above main, so an arm that handles any event starts the page after load.
+	const starts = armEventNames(servedArmRecords as ArmEventRecords).size > 0 || resumesAtLoad(rows);
 	const revealArguments = arm.revealDependencyIds.length
 		? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}`
 		: JSON.stringify(arm.boundaryId);
@@ -706,6 +705,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set(records.eventNames || (records.events || []).map((x) => x.eventName));
+			const wakes = records.wakeEventNames || [];
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
@@ -724,7 +724,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					}
 				}
 				const input = { root: r, event: e, element: e.target, eventRecord: null, propagationStopped: e.cancelBubble, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
-				if (r.__marklessDispatch) return r.__marklessDispatch(input);
+				// A started runtime hears a row's or branch's event through its own listener; forwarding it too sends the press down the record-less path.
+				if (r.__marklessDispatch) return names.has(t) || !r.__asyncResumeRuntimeStarted ? r.__marklessDispatch(input) : undefined;
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;
 				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
@@ -736,8 +737,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				if (r.__mL !== life) return;
 				await mod.resumeContainerEvent(input);
 			};
-			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
-			for (const t of names) {
+			r.__marklessListen ||= (t) => (names.add(t), r.addEventListener(t, forward, true));
+			for (const t of new Set([...names, ...wakes])) {
 			r.addEventListener(t, forward, true);
 				${debugRegistration}
 			}
@@ -821,11 +822,6 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	return `<script data-markless-stream-executor${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
 
-const UNPROMPTED_EVENT_NAMES: ReadonlySet<string> = new Set([
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_VISIBLE_EVENT_NAME,
-]);
-
 type ArmEventRecords = {
 	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
 	readonly keyedRepeats?: ReadonlyArray<{
@@ -847,23 +843,16 @@ function armEventNames(records: ArmEventRecords): Set<string> {
 	return names;
 }
 
-// An arm, its rows or its painted branches naming an idle or visible host.
-function armRunsWithoutInteraction(records: ProtocolArmRecordSet): boolean {
-	return [...armEventNames(records as ArmEventRecords)].some((name) => UNPROMPTED_EVENT_NAMES.has(name));
-}
-
-// The arm's records as streamed, naming every event the boot listens for when a row or branch handles one its own events do not.
+// The arm's records as streamed, with the events a row or branch handles that its own events do not named apart.
 function streamedArmRecords(records: ProtocolArmRecordSet): ProtocolArmRecordSet {
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const served =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? records
 			: encodeStreamedArmRecords(records);
-	const names = armEventNames(records as ArmEventRecords);
 	const own = new Set((records.events ?? []).map((event) => event.eventName));
-	return [...names].some((name) => !own.has(name))
-		? { ...served, eventNames: [...new Set([...(served.eventNames ?? []), ...names])] }
-		: served;
+	const wakes = [...armEventNames(records as ArmEventRecords)].filter((name) => !own.has(name));
+	return wakes.length ? { ...served, wakeEventNames: wakes } : served;
 }
 
 // Every keyed repeat the shell served: the page's own and those in @try arms it rendered settled.

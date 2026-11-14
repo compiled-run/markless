@@ -2,16 +2,16 @@ import { computed, state } from '@markless/core';
 import type { PageProps } from '@markless/router';
 import { listKept, listNumbered } from '../lib/shelf.ts';
 
-// A streamed list whose row count the address sets, after `shell` rows served with the page, for the rows a page may serve and still start at its first interaction.
+// A streamed list with no handlers in its rows, whose count the address sets, after `shell` rows served with the page, and a button outside it that drops a row.
 export default function Page({ url }: PageProps) @{
 	const rows = Number(new URLSearchParams(url.search).get('rows') ?? 1);
 	const shell = Number(new URLSearchParams(url.search).get('shell') ?? 0);
 	const kept = computed(async () => listKept(shell));
-	let picked = state('');
-	const books = computed(async () => listNumbered(rows));
+	let size = state(rows);
+	const books = computed(async () => listNumbered(size));
 
 	<main data-page="long">
-		<p class="picked">Picked {picked}</p>
+		<button class="shrink" onClick={() => (size = size - 1)}>Rows {size}</button>
 		@try {
 			<ul class="kept">
 				@for (const book of kept; key book.id) {
@@ -24,9 +24,7 @@ export default function Page({ url }: PageProps) @{
 		@try {
 			<ul class="books">
 				@for (const book of books; key book.id) {
-					<li>
-						<button class="pick" onClick={() => (picked = book.title)}>{book.title}</button>
-					</li>
+					<li>{book.title}</li>
 				}
 			</ul>
 		} @pending {

@@ -110,14 +110,27 @@ async function openIdle(path: string, on: Browser = browser!) {
 	return { page, errors, requests };
 }
 
-test('streamed answers show before any interaction, and the runtime has not started', async () => {
+test('streamed answers with no handler in them show before any interaction, and the runtime has not started', async () => {
+	const { page, errors } = await openIdle('/display');
+	try {
+		expect(await page.locator('.books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(await runtimeStarted(page)).toBe(false);
+		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// A press inside a streamed arm adopts and wires the arm at the press, measured over a frame above main, so such a page starts after load.
+test('streamed answers holding handlers show before any interaction, and the runtime starts after load as on main', async () => {
 	const { page, errors } = await openIdle('/');
 	try {
 		expect(await titles(page, 'all')).toEqual(['Dune', 'Emma', 'Ulysses']);
 		expect(await page.locator('[data-shelf="remote"] .failed').textContent()).toContain(
 			'shelf offline',
 		);
-		expect(await runtimeStarted(page)).toBe(false);
+		await expect.poll(() => runtimeStarted(page)).toBe(true);
 		expect(await browserRuns(page)).toBe(0);
 		expect(errors).toEqual([]);
 	} finally {
@@ -137,7 +150,7 @@ const routeModuleEvaluated = (page: Page) =>
 
 for (const engine of engines)
 test(`at idle the page evaluates its resume modules and the runtime stays asleep (${engine})`, async () => {
-	const { page, errors } = await openIdle('/rows', browserOf(engine));
+	const { page, errors } = await openIdle('/display', browserOf(engine));
 	try {
 		expect(await routeModuleEvaluated(page)).toBe(true);
 		expect(await runtimeStarted(page)).toBe(false);
@@ -147,8 +160,8 @@ test(`at idle the page evaluates its resume modules and the runtime stays asleep
 			),
 		).toBe(false);
 		expect(await browserRuns(page)).toBe(0);
-		await page.locator('.pick').nth(1).click();
-		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
@@ -163,10 +176,10 @@ test(`a page serving rows up to the limit stays asleep; one more row starts the 
 	] as const) {
 		const { page, errors } = await openIdle(`/long?rows=${rows}`, browserOf(engine));
 		try {
-			expect(await page.locator('.pick').count()).toBe(rows);
+			expect(await page.locator('.books li').count()).toBe(rows);
 			expect(await runtimeStarted(page)).toBe(started);
-			await page.locator('.pick').nth(1).click();
-			await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Book 1');
+			await page.click('.shrink');
+			await expect.poll(() => page.locator('.books li').count()).toBe(rows - 1);
 			expect(errors).toEqual([]);
 		} finally {
 			await page.close();
@@ -213,10 +226,9 @@ test('the census pinned at idle counts the served page, not the answers streamed
 	}
 });
 
-test('a press on a row of a streamed list is the first interaction, and it applies', async () => {
+test('a press on a row of a streamed list applies', async () => {
 	const { page, errors } = await openIdle('/rows');
 	try {
-		expect(await runtimeStarted(page)).toBe(false);
 		await page.locator('.pick').nth(1).click();
 		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
 		expect(errors).toEqual([]);
@@ -549,11 +561,12 @@ const asked = (page: Page) =>
 for (const [name, path] of [
 	['streamed rows over the limit', `/long?rows=${MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1}`],
 	['rows over the limit served with the page', `/long?rows=1&shell=${MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1}`],
+	['handlers inside a streamed arm', '/rows'],
 ] as const)
 	test(`a page with ${name} starts its runtime at the deferred triggers' idle point, as main's self-wake does, and at no other`, async () => {
 		const { page, errors } = await openHeld(path);
 		try {
-			await page.locator('.pick').first().waitFor();
+			await page.locator('.books li').first().waitFor();
 			await page.waitForTimeout(1_000);
 			expect(await asked(page)).toBe(false);
 			expect(await runtimeStarted(page)).toBe(false);
@@ -568,9 +581,9 @@ for (const [name, path] of [
 	});
 
 test('a page within the row limit evaluates nothing before the idle point, then only modules', async () => {
-	const { page, errors } = await openHeld('/rows');
+	const { page, errors } = await openHeld('/display');
 	try {
-		await page.locator('.pick').first().waitFor();
+		await page.locator('.books li').first().waitFor();
 		await page.waitForTimeout(1_000);
 		expect(await asked(page)).toBe(false);
 		await expect
@@ -689,13 +702,46 @@ test('a back/forward cache restore of a sleeping page (pageshow, persisted) leav
 test('a handler that throws on the first press inside a streamed block reports once, and the next press applies', async () => {
 	const { page, errors } = await openIdle('/faulty');
 	try {
-		expect(await runtimeStarted(page)).toBe(false);
 		await page.click('.fail');
 		await expect.poll(() => errors.filter((message) => message.includes('first press failed')).length).toBe(1);
 		await page.click('.fail');
 		await expect.poll(() => page.locator('.fail').textContent()).toBe('Tries 2');
 		expect(await page.locator('.faulty .count').textContent()).toBe('3 books');
 		expect(errors.filter((message) => !message.includes('first press failed'))).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a streamed block the server could not answer shows its error while the page sleeps, and a press outside it asks again', async () => {
+	const { page, errors } = await openIdle('/unreachable');
+	try {
+		expect(await page.locator('.unreachable .failed').textContent()).toBe('shelf offline');
+		expect(await runtimeStarted(page)).toBe(false);
+		await page.click('.ask');
+		await expect.poll(() => page.locator('.unreachable .books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// The stream executor listens for a row's events only to start the runtime; a started runtime hears them itself, with their record, as on main.
+test('once the runtime has started, a row press reaches it once, with no copy from the stream executor', async () => {
+	const { page, errors } = await openIdle('/rows');
+	try {
+		await expect.poll(() => runtimeStarted(page)).toBe(true);
+		const forwarded = await page.evaluate(() => {
+			const root = document.querySelector('[data-async-container]') as Element & { __marklessDispatch?: (input: unknown) => unknown };
+			const dispatch = root.__marklessDispatch!;
+			let calls = 0;
+			root.__marklessDispatch = (input) => (calls++, dispatch(input));
+			document.querySelectorAll<HTMLButtonElement>('.pick')[1]!.click();
+			return calls;
+		});
+		expect(forwarded).toBe(0);
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
 	}
