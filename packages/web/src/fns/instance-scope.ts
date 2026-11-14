@@ -1090,24 +1090,15 @@ export function marklessComposedGraphNodeId(
 function composedBoundaryPrefixes(
 	boundary: Parameters<ComposedArmRecordQualifier>[0],
 	symbolPrefix?: string,
-	renderedBoundaryId?: string,
 ): { readonly prefix: string; readonly symbols: string } | undefined {
 	const local = /(?:boundary|branch-site):[^:]*$/.exec(boundary.id);
-	// A helper in the page's own module renders with the page, so its records already carry the path its rendered id holds.
-	const drawn =
-		renderedBoundaryId && boundary.id.endsWith(renderedBoundaryId)
-			? renderedBoundaryId.slice(0, renderedBoundaryId.lastIndexOf('boundary:'))
-			: '';
-	const prefix = local ? boundary.id.slice(0, local.index - drawn.length) : '';
+	const prefix = local ? boundary.id.slice(0, local.index) : '';
 	if (!prefix) return undefined;
 	// A served boundary's update symbol was spelled through the composing edges' symbol prefixes.
-	const composedSymbols =
-		boundary.composedSymbolPrefix ?? (marklessInstancePath(boundary.updateSymbolId) || undefined);
 	const symbols =
 		symbolPrefix ??
-		(composedSymbols?.endsWith(drawn)
-			? composedSymbols.slice(0, composedSymbols.length - drawn.length)
-			: prefix);
+		boundary.composedSymbolPrefix ??
+		(marklessInstancePath(boundary.updateSymbolId) || prefix);
 	return { prefix, symbols };
 }
 
@@ -1125,8 +1116,7 @@ function composedBoundaryArmRecords(
 	set: ResumeArmRecordSet,
 	graph?: RuntimeGraph,
 	symbolPrefix?: string,
-	renderedBoundaryId?: string,
-	// Set for an escalated @if render rooted at its owner: bound ids stay spelled from the module root.
+	// Set for a render rooted at its owner: bound ids stay spelled from the module root.
 	moduleRootPath?: string,
 ): ResumeArmRecordSet {
 	const exhaustive = {
@@ -1140,7 +1130,7 @@ function composedBoundaryArmRecords(
 		asyncBoundaries: true,
 	} satisfies Record<keyof ResumeArmRecordSet, true>;
 	void exhaustive;
-	const prefixes = composedBoundaryPrefixes(boundary, symbolPrefix, renderedBoundaryId);
+	const prefixes = composedBoundaryPrefixes(boundary, symbolPrefix);
 	if (!prefixes) return set;
 	const { prefix, symbols } = prefixes;
 	const instancePath = marklessInstancePath(symbols);
@@ -1319,7 +1309,6 @@ function composedBoundaryArmRecords(
 							armRecords,
 							graph,
 							symbols,
-							undefined,
 							moduleRootPath,
 						),
 					}),
@@ -1357,7 +1346,6 @@ function composedBranchUpdate<U extends ComposedUpdate>(
 			update.armRecords,
 			graph,
 			symbolPrefix,
-			undefined,
 			update.moduleRootPath,
 		),
 	});
@@ -1368,13 +1356,12 @@ function composedBoundaryUpdate<U extends ComposedUpdate>(
 	boundary: Parameters<ComposedArmRecordQualifier>[0],
 	update: U,
 	graph: RuntimeGraph | undefined,
-	renderedBoundaryId?: string,
 ): U {
-	const prefixes = composedBoundaryPrefixes(boundary, undefined, renderedBoundaryId);
+	const prefixes = composedBoundaryPrefixes(boundary);
 	if (!prefixes) return update;
 	noteLiveProps(graph, prefixes.symbols, boundary.composedGraphProps, boundary.startAnchor);
 	const rooted = update.moduleRootPath;
-	const armRecords = composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId, rooted);
+	const armRecords = composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, rooted);
 	// A kernel-drawn arm names its rows from the module root, as the evaluator's render does.
 	if (rooted !== undefined) for (const repeat of armRecords.keyedRepeats ?? []) Object.assign(repeat, { instancePath: rooted });
 	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, { ...update, armRecords });

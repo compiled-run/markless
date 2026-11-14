@@ -314,7 +314,7 @@ function linkedRenderDataBranchSymbolSource(input: {
 	return [
 		...linkedRenderDataSymbolPreamble(input, 'renderPrerenderBranch'),
 		`export async function ${input.exportName}(context) {`,
-		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol);`,
+		`\tconst rendered = await renderPrerenderBranch(marklessPrerenderData, ${JSON.stringify(input.branchSiteId)}, context.graph, marklessLoadLinkedSymbol, context.composedBranchId);`,
 		// `resolved` marks the render authoritative: an arm that legitimately shows
 		// nothing must not be mistaken for a module that found no parts.
 		'\treturn { ...rendered, arm: context.arm, resolved: true };',
