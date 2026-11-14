@@ -6,6 +6,7 @@ import { resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from 'vitest';
 import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer, type BuiltServer } from '../../../scripts/test-utils/built-server.ts';
+import { withBuildSlot } from '../../router/test/support/fixture-build.ts';
 import {
 	boardFor,
 	boardRequest,
@@ -50,7 +51,7 @@ afterEach(async () => {
 
 beforeAll(async () => {
 	await linkPackages();
-	await exec(vp, ['build'], { cwd: app, env: process.env });
+	await withBuildSlot(() => exec(vp, ['build'], { cwd: app, env: process.env }));
 	server = await startBuiltServer(resolve(app, '.output/server/index.mjs'), {
 		env: { ...process.env, HOST: '127.0.0.1' },
 	});

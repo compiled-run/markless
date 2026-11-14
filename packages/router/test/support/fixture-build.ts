@@ -86,6 +86,16 @@ const failure = (build: FixtureBuild, report: string, output: string, exit: stri
 	}) as FixtureBuildError;
 };
 
+/** Runs `run`, a production build in another process, in a build slot unless this file holds one. */
+export async function withBuildSlot<T>(run: () => Promise<T>): Promise<T> {
+	const slot = (await heldByThisFile()) ? null : await acquireSlot();
+	try {
+		return await run();
+	} finally {
+		if (slot) await rm(slot, { recursive: true, force: true });
+	}
+}
+
 /**
  * Runs `createBuilder(...).buildApp()` in a child process that exits once the app is built, so the
  * test worker does not hold the build's memory for the rest of the file. The child inherits the
