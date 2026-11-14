@@ -87,6 +87,10 @@ export async function startResumeRuntime(input: {
 		boundary: ResumeAsyncBoundaryRecord,
 		update: ArmCommitUpdate,
 	) => Promise<void>;
+	readonly prepareArmCommit: (
+		boundary: ResumeAsyncBoundaryRecord,
+		update: ArmCommitUpdate,
+	) => Promise<() => Promise<void>>;
 	// Receives the branch-runtime hooks built here (escalated-flip re-settle +
 	// pending-flip hold) before any branch runtime loads.
 	readonly connectBranchWiring: (wiring: {
@@ -210,6 +214,7 @@ export async function startResumeRuntime(input: {
 				elementHandles: prepared.elementHandles,
 				storeContainerSubscription,
 				commitArm: input.commitArm,
+				prepareArmCommit: input.prepareArmCommit,
 				demandOnStart: runtimeInput.demandAsyncBoundaries === true,
 			});
 			settleTracker = started.settleTracker;
@@ -249,6 +254,7 @@ export async function startResumeRuntime(input: {
 					renderAsyncBoundary: runtimeInput.renderAsyncBoundary,
 					elementHandles: prepared.elementHandles,
 					commitArm: input.commitArm,
+					prepareArmCommit: input.prepareArmCommit,
 					settleTracker,
 				},
 				boundary,

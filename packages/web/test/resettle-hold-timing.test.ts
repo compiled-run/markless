@@ -72,7 +72,10 @@ async function mountedBlock() {
 	});
 	const publish = async (status: string, quiet?: true) => {
 		snapshot = { status, version: snapshot.version + 1, ...(quiet && { quiet }) };
-		for (const subscriber of subscribers) await subscriber.run(snapshot);
+		// As the graph's pass does: a settle hands back its DOM commit, landed once every subscription ran.
+		const landing = [];
+		for (const subscriber of subscribers) landing.push(await subscriber.run(snapshot));
+		await Promise.all(landing.map((commit) => (typeof commit === 'function' ? commit() : undefined)));
 		await vi.advanceTimersByTimeAsync(0);
 	};
 	const dispose = () => {
