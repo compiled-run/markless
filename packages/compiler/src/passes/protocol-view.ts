@@ -692,7 +692,7 @@ function asyncArmField(
 	return {};
 }
 
-// Rows the browser cannot build (a row holding two components, or an @if over page state around one), and text written straight into the arm, re-render the arm on refresh.
+// Rows the browser cannot build (two components under a wrapper reading page state, or an @if over page state around one), and text written straight into the arm, re-render the arm on refresh.
 function rerendersOnRefreshField(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,

@@ -134,8 +134,9 @@ export function rowComponentReadsIndex(
 }
 
 /**
- * A row whose markup an @if or @switch picks from the row item, rendered whole
- * by the client the way the server rendered it.
+ * A row whose markup an @if or @switch picks from the row item, or whose element
+ * holds more than one child component, rendered whole by the client the way the
+ * server rendered it.
  *
  * The record names the owner's row chunk, and the mint runs the same chunk
  * render the server ran - arm choice, child components and projections included -
@@ -155,7 +156,11 @@ export function resolveRowChunkMint(
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
 	if (!chunk?.componentName || !input.semanticGraph || input.rowElementCount < 1) return null;
-	if (!chunk.slots.some((slot) => slot.kind === 'branch')) return null;
+	if (
+		!chunk.slots.some((slot) => slot.kind === 'branch') &&
+		chunk.slots.filter((slot) => slot.kind === 'child-component').length < 2
+	)
+		return null;
 	// One row element holds everything, so the row's root is that element whichever arm renders.
 	if (chunk.hosts.filter((host) => host.coordinate.path.length === 1).length !== 1) return null;
 	const onRowElement = chunk.slots.every(
