@@ -21,11 +21,19 @@ const freePort = () =>
 	});
 
 /** Starts a Vite dev server for a router fixture in a child process and resolves once it says where it listens. */
-export async function startFixtureDev(root: string): Promise<FixtureDevServer> {
+export async function startFixtureDev(
+	root: string,
+	options: { readonly watch?: boolean } = {},
+): Promise<FixtureDevServer> {
 	const port = await freePort();
 	const proc = spawn(
 		process.execPath,
-		[resolve(import.meta.dirname, 'fixture-dev-child.ts'), root, String(port)],
+		[
+			resolve(import.meta.dirname, 'fixture-dev-child.ts'),
+			root,
+			String(port),
+			options.watch ? 'watch' : '',
+		],
 		{ stdio: ['pipe', 'pipe', 'pipe'] },
 	);
 	const exited = new Promise<void>((done) => proc.once('exit', () => done()));
@@ -48,7 +56,9 @@ export async function startFixtureDev(root: string): Promise<FixtureDevServer> {
 		proc.stderr.on('data', (chunk: Buffer) => (output += chunk));
 		proc.once('error', fail);
 		proc.once('exit', (code, signal) =>
-			fail(new Error(`fixture dev server for ${root} exited (${code ?? signal}):\n${output}`)),
+			fail(
+				new Error(`fixture dev server for ${root} exited (${code ?? signal}):\n${output}`),
+			),
 		);
 	});
 }
