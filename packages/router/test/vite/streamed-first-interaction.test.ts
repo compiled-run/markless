@@ -79,7 +79,9 @@ async function openIdle(path: string) {
 	// The page's own idle work runs in idle periods after this one: its resume modules, then link prefetches.
 	await expect.poll(() => routeModuleEvaluated(page), { timeout: 10_000 }).toBe(true);
 	// Idle-time link prefetches are the page's own, not the interaction's: wait until the network is quiet.
-	for (let seen = -1; seen !== requests.length; ) {
+	for (let seen = -1, round = 0; seen !== requests.length; round++) {
+		if (round === 20)
+			throw new Error(`the network never went quiet: ${requests.slice(-6).map((request) => request.url()).join(', ')}`);
 		seen = requests.length;
 		await page.waitForTimeout(500);
 	}
