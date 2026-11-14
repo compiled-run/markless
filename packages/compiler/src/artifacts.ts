@@ -155,10 +155,7 @@ export type SemanticComponentPropBinding =
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
-			readonly catchResets?: ReadonlyArray<{
-				readonly name: string;
-				readonly boundaryId: string;
-			}>;
+			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
 			readonly catchBoundaryId?: string;
 			readonly returnsPromise?: true;
@@ -925,10 +922,7 @@ export type SemanticEvent = {
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
-	readonly handlerCatchResets?: ReadonlyArray<{
-		readonly name: string;
-		readonly boundaryId: string;
-	}>;
+	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
 	readonly handlerCatchBoundaryId?: string;
 	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
@@ -1186,10 +1180,7 @@ export type SemanticTemplateRead = {
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
 	// The async values a row expression reads beside its row item, which its @try waits on.
-	readonly asyncGateReads?: ReadonlyArray<{
-		readonly source: string;
-		readonly graphNodeId: string;
-	}>;
+	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).

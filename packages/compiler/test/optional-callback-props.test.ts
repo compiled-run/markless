@@ -12,10 +12,7 @@ const handlerSlots = (
 	result: Awaited<ReturnType<typeof compile>>,
 	predicate: (symbol: { readonly kind: string }) => boolean = (symbol) =>
 		symbol.kind === 'event-handler',
-) =>
-	result.captureAnalysis.extractedSymbols
-		.filter(predicate)
-		.flatMap((symbol) => symbol.captureSlots);
+) => result.captureAnalysis.extractedSymbols.filter(predicate).flatMap((symbol) => symbol.captureSlots);
 
 test('an absent callback prop invoked optionally resolves to a compiler-known undefined', async () => {
 	const result = await compile(
