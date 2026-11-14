@@ -10,7 +10,7 @@ import {
 	type StructureToken,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
-import type { ResumeArmRecordSet, ResumePropFeed } from '../resume-types.ts';
+import type { ResumeArmRecordSet } from '../resume-types.ts';
 import type { RuntimeGraph } from '@markless/runtime';
 import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
@@ -27,14 +27,10 @@ import {
 	type MarklessSsrComposedChild,
 	type SsrAsyncArmPlacement,
 } from '../fns/ssr.ts';
-import type { ComposeGraphProps, ComposeStateNode } from '../fns/composition.ts';
+import type { ComposeGraphProps } from '../fns/composition.ts';
 import { marklessCsrRemapChildGraph } from '../fns/composition.ts';
 import { childEdgeSurface } from './owning-surface.ts';
-import {
-	marklessBoundSymbolId,
-	marklessLiveBoundGraphRoute,
-	marklessReboundSymbolId,
-} from '../fns/bound-symbol.ts';
+import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
 	marklessInstanceScopedGraph,
@@ -408,7 +404,6 @@ export async function renderPrerenderBranch(
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
-	readonly propFeeds: ReadonlyArray<ResumePropFeed>;
 	// Bound symbol ids are spelled from the module root, which stands here on the page.
 	readonly moduleRootPath?: string;
 }> {
@@ -440,7 +435,6 @@ export async function renderPrerenderBranch(
 			...inArm,
 			computed: records.state.computed,
 			cells: freshArmCells(output, freshCellIds),
-			propFeeds: armPropFeeds(output, freshCellIds),
 			...placed,
 		};
 	const arm = prerenderBranchArm({
@@ -471,7 +465,6 @@ export async function renderPrerenderBranch(
 		},
 		computed: records.state.computed,
 		cells: freshArmCells(output, freshCellIds),
-		propFeeds: armPropFeeds(output, freshCellIds),
 		...placed,
 	};
 }
@@ -617,22 +610,6 @@ function freshArmCells(
 							(cell as { readonly directValue?: unknown }).directValue,
 					},
 				]
-			: [],
-	);
-}
-
-function armPropFeeds(
-	output: SsrRenderOutput,
-	freshCellIds: ReadonlySet<string>,
-): ReadonlyArray<ResumePropFeed> {
-	return (output.state?.cells ?? []).flatMap((cell) =>
-		freshCellIds.has(cell.graphNodeId)
-			? ((cell as ComposeStateNode).follows ?? []).map(({ graphNodeId, path, prop }) => ({
-					graphNodeId,
-					path,
-					propCellId: cell.graphNodeId,
-					prop,
-				}))
 			: [],
 	);
 }
@@ -1322,25 +1299,13 @@ export function evaluatePrerenderDataComponent(input: {
 					const propCell = state.cells.find(
 						(cell) => cell.graphNodeId === definition.propCellId,
 					);
-					// An instance this arm render places follows each live prop while the arm shows it.
-					const follows =
-						input.freshInstance && input.placingBranchSiteId
-							? (input.graphProps ?? []).flatMap((prop) =>
-									marklessLiveBoundGraphRoute(prop)
-										? [{ graphNodeId: definition.propCellId!, path: [prop.name], prop: prop.name }]
-										: [],
-								)
-							: [];
-					const fed = follows.length > 0 ? { follows } : {};
-					if (propCell)
-						Object.assign(propCell, { value: undefined, directValue: input.props, ...fed });
+					if (propCell) Object.assign(propCell, { value: undefined, directValue: input.props });
 					else
 						(state.cells as Array<ProtocolStatePayload['cells'][number]>).push({
 							graphNodeId: definition.propCellId,
 							name: 'props',
 							valueKind: 'object',
 							directValue: input.props,
-							...fed,
 						});
 				}
 				// An arm test or child prop the compiler could not reduce to a graph read is

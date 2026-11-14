@@ -9,7 +9,6 @@ import type {
 	ResumeDomElement,
 	ResumeDomNode,
 	ResumeKeyedRepeatRecord,
-	ResumePropFeed,
 	ResumeViewRecord,
 } from './resume-types.ts';
 
@@ -193,12 +192,7 @@ function createBranchRegistration(
 					html,
 				};
 				const commit = await input.prepareArmCommit(branch, armUpdate);
-				const feeds = armUpdate.propFeeds ?? [];
-				// The commit runs the arm's first derives, which read these cells.
-				return () => (
-					shows(update.arm) && feeds.forEach(follow),
-					commit().then(() => (feedArmProps(update.arm, feeds), wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats)))
-				);
+				return () => commit().then(() => wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats));
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
@@ -223,8 +217,6 @@ function createBranchRegistration(
 				{ type: 'insertRange', locator: `branch:${branch.id}:start`, fragment },
 			] as DomJournalResult;
 		}
-		// What the arm holds reads its props off its own cells: each follows its source while the branch shows this arm.
-		const feedReleases: Array<() => void> = [];
 		// A row built again or a range another commit replaced took this branch's wiring with it.
 		const wired = () =>
 			branchesById.get(branch.id) === branch && !(branch.armBoundaryId && detached(input.root, branch.startAnchor));
@@ -232,33 +224,6 @@ function createBranchRegistration(
 			if (at) armFlipReleasesByBoundary.set(at, [...(armFlipReleasesByBoundary.get(at) ?? []), release]);
 			input.storeContainerSubscription(release);
 		};
-		const shows = (arm: number) => wired() && readBranchArm(input.graph, branch) === arm;
-		const follow = (feed: ResumePropFeed) =>
-			input.graph.write({
-				graphNodeId: feed.propCellId,
-				path: [feed.prop],
-				value: input.graph.read(feed.graphNodeId, feed.path),
-			});
-		function feedArmProps(arm: number, feeds: ReadonlyArray<ResumePropFeed>) {
-			for (const release of feedReleases.splice(0)) release();
-			if (!shows(arm)) return;
-			for (const feed of feeds) {
-				follow(feed);
-				const release = onceRelease(
-					input.graph.subscribe({
-						id: `branch-prop:${branch.id}:${feed.propCellId}:${feed.prop}`,
-						graphNodeId: feed.graphNodeId,
-						path: feed.path,
-						run() {
-							if (!shows(arm)) return release();
-							follow(feed);
-						},
-					}),
-				);
-				feedReleases.push(release);
-				releasedWithArm(release);
-			}
-		}
 		function wireRead(kind: 'test' | 'content', read: ResumeBranchRecord['testReads'][number]) {
 			const release = onceRelease(
 				input.graph.subscribe({

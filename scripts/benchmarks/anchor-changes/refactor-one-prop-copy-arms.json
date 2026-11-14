@@ -1,0 +1,150 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-constants"
+			],
+			"delta": -77,
+			"reason": "Composition no longer reads the props node id (-77 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/composition"
+			],
+			"delta": -750,
+			"reason": "A component an arm placed no longer reads its props off a fed cell of its own (-750 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/instance-scope"
+			],
+			"delta": 319,
+			"reason": "A scoped read of a prop an arm owner's routes name goes to the route; the copy-feeding code it replaces left (+319 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": -331,
+			"reason": "An arm render no longer marks the components it places as fed (-331 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": -916,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -88,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-constants"
+			],
+			"delta": -77,
+			"reason": "Composition no longer reads the props node id (-77 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/composition"
+			],
+			"delta": -750,
+			"reason": "A component an arm placed no longer reads its props off a fed cell of its own (-750 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/instance-scope"
+			],
+			"delta": 319,
+			"reason": "A scoped read of a prop an arm owner's routes name goes to the route; the copy-feeding code it replaces left (+319 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": -331,
+			"reason": "An arm render no longer marks the components it places as fed (-331 B rendered, measured by this fixture build)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": -916,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 53,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -120,
+			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		}
+	]
+}
