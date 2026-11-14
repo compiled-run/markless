@@ -147,12 +147,12 @@ for (const mode of ['CSR', 'SSR'] as const) {
 		expect(loads.filter((load) => load !== 'a:1')).toEqual(['b:2', 'a:3']);
 	});
 
-	// Known defect, not the arm's: a removed row's component keeps running, with or without an arm around it (row teardown).
+	// A removed row's component stops, with or without an arm around it.
 	for (const [shape, page] of [
 		['in an arm', pages.rows],
 		['with no arm', pages.plainRows],
 	] as const)
-		test.fails(`${mode}: a component ${shape} in a @for row that is removed runs nothing after the row goes`, async () => {
+		test(`${mode}: a component ${shape} in a @for row that is removed runs nothing after the row goes`, async () => {
 			await page[mode]();
 			if (mode === 'CSR') {
 				await settle('row1', 0);

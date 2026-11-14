@@ -12,6 +12,7 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
+import { protocolRowSegment } from '../../serializer/src/protocol-row-segment.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
 import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
 
@@ -51,6 +52,8 @@ export async function primeKeyedRepeatCollections(input: {
 }
 
 type RepeatReadableGraph = Pick<RuntimeGraph, 'read'>;
+// A nested repeat's instance carries the segments of the rows it stands in, outermost first.
+export type RowScopedRepeat = ResumeKeyedRepeatRecord & { readonly rowPath?: string };
 let armRows: typeof import('./resume-repeat-branch-arm.ts') | undefined;
 // Loaded only on a page with a list whose rows are not one element each.
 let rowRanges: typeof import('./fns/served-row-ranges.ts') | undefined;
@@ -490,7 +493,19 @@ function applyKeyedRepeatRowOrder(
 		arm.nodes = [];
 	}
 	// A key that left returns as a fresh row where one can be built; the old row keeps its parent for an in-flight dispatch.
-	const staying = new Set(nextRows);
+	const staying = new Set(nextRows),
+		leaving = new Set(currentRows.filter((rowRoot) => !staying.has(rowRoot))),
+		plane = leaving.size ? graph.asyncPlane?.() : undefined;
+	// A removed row's components stop: a load in flight lands nothing, and a key that returns starts fresh.
+	if (plane) {
+		const at = (repeat.instancePath ?? '') + ((repeat as RowScopedRepeat).rowPath ?? ''),
+			left = new Set<string>();
+		for (const [rowKey, rowRoot] of rowRootsByKey)
+			if (leaving.has(rowRoot)) left.add(protocolRowSegment(rowKey));
+		plane.drop(
+			(id) => id.startsWith(at) && left.has(id.slice(at.length, id.indexOf(':', at.length + 2) + 1)),
+		);
+	}
 	if (mint && (repeat.rowTemplate ?? repeat.rowComponent))
 		for (const [rowKey, rowRoot] of rowRootsByKey)
 			if (!staying.has(rowRoot)) {

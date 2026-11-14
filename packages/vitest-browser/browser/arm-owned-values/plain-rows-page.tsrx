@@ -8,6 +8,7 @@ export default function PlainRowsPage() @{
 	<div>
 		<button type="button" data-drop onClick={() => (rows = rows.filter((row) => row.id !== 2))}>Drop</button>
 		<button type="button" data-next onClick={() => round++}>Next</button>
+		<button type="button" data-back onClick={() => (rows = [...rows, { id: 2 }])}>Back</button>
 		<ul>
 			@for (const row of rows; key row.id) {
 				<li>

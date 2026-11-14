@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"serializer/protocol-row-segment"
+			],
+			"set": 260,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 470,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"serializer/protocol-row-segment"
+			],
+			"set": 260,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 470,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -2,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -5,
+			"reason": "a removed @for row's components stop their async values: keyed-repeats drops them by row segment",
+			"date": "2026-11-14"
+		}
+	]
+}

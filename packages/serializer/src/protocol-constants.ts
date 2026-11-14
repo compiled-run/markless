@@ -56,10 +56,7 @@ export function protocolProjectionSegment(edgeIndex: number): string {
 	return `p${edgeIndex}:`;
 }
 
-/** One keyed `@for` row's identity segment. The key is identity, never the index. */
-export function protocolRowSegment(key: unknown): string {
-	return `r:${encodeURIComponent(String(key))}:`;
-}
+export { protocolRowSegment } from './protocol-row-segment.ts';
 
 /** The leading instance path of a composed id, or '' when the id is page-local. */
 export function protocolInstancePath(id: string): string {
