@@ -30,3 +30,12 @@ test('an arm opened and closed in a row whose key changes many times keeps live 
 	expect(seen.size).toBeGreaterThanOrEqual(8);
 	expect(paths().length).toBeLessThanOrEqual(2);
 });
+
+// Known defect, not the live routes': main and #682 show the same `loaded undefined` for a row-placed owner handed its props.
+test.fails('an arm opened in a row-placed owner reads the prop it was handed in its async value', async () => {
+	await render(RowArmPage);
+	click('[data-row="1"] [data-open]');
+	await expect.poll(() => document.querySelector('[data-row="1"] [data-loaded]')?.textContent).toMatch(/^loaded /);
+	expect(document.querySelector('[data-row="1"] [data-text]')?.textContent).toBe('1');
+	expect(document.querySelector('[data-row="1"] [data-loaded]')?.textContent).toBe('loaded 1');
+});
