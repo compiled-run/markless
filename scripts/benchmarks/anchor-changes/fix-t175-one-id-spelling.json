@@ -44,7 +44,7 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": -131,
+			"delta": -58,
 			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
 			"date": "2026-11-14"
 		},
@@ -56,7 +56,7 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": -131,
+			"delta": -26,
 			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
 			"date": "2026-11-14"
 		},
@@ -68,7 +68,7 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": -128,
+			"delta": -52,
 			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
 			"date": "2026-11-14"
 		}
