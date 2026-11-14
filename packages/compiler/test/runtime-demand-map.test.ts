@@ -1028,3 +1028,45 @@ test.each([
 			);
 	}
 });
+
+test('the arm gate is demanded only by a branch whose arm holds a component that owns a value, nested arms included', async () => {
+	const { compileTsrxModule } = await import('../src/index.ts');
+	const gate = 'web/fns/arm-gate';
+	const owning = await compileTsrxModule({
+		filename: '/workspace/src/Shelf.tsrx',
+		symbols: [],
+		source: `import { computed, state } from '@markless/core';
+		function Spine({ id }: { id: number }) @{ const title = computed(() => 'vol ' + id); <p>{title}</p> }
+		export default function Shelf() @{
+			let outer = state(true);
+			let inner = state(false);
+			let id = state(1);
+			<div><button onClick={() => (inner = !inner)}>Inner</button><button onClick={() => id++}>Next</button>@if (outer) { <section><b>{id}</b>@if (inner) { <Spine id={id} /> }</section> }</div>
+		}`,
+	});
+	expect(owning.protocolView.branches?.some((branch) => branch.armComponents)).toBe(true);
+	for (const map of Object.values(owning.runtimeDemandMaps)) {
+		const branches = map.payloadRecords.filter((record) => record.kind === 'branch');
+		expect(branches.some((record) => record.runtimeModuleIds.includes(gate))).toBe(true);
+		expect(map.capabilityModuleIds).toContain(gate);
+		expect(map.unknownRecordModuleIds).toContain(gate);
+		expect(map.nestedRecordModuleIds).toContain(gate);
+	}
+	const plain = await compileTsrxModule({
+		filename: '/workspace/src/Lamp.tsrx',
+		symbols: [],
+		source: `import { state } from '@markless/core';
+		function Icon({ name }: { name: string }) @{ <i>{name}</i> }
+		export default function Lamp() @{
+			let on = state(false);
+			<div><button onClick={() => (on = !on)}>Switch</button>@if (on) { <Icon name="bulb" /> } @else { <p>dark</p> }</div>
+		}`,
+	});
+	expect(plain.protocolView.branches?.length).toBeGreaterThan(0);
+	for (const map of Object.values(plain.runtimeDemandMaps)) {
+		for (const entry of [...map.payloadRecords, ...map.actions, ...map.symbols])
+			expect(entry.runtimeModuleIds).not.toContain(gate);
+		expect(map.capabilityModuleIds ?? []).not.toContain(gate);
+		expect(map.nestedRecordModuleIds ?? []).not.toContain(gate);
+	}
+});

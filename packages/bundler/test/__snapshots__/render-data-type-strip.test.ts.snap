@@ -127,6 +127,7 @@ export const runtimeDemandMap = {
 		"core/web/resume-storage-free",
 		"web/dom-journal",
 		"web/dom-update",
+		"web/fns/arm-gate",
 		"web/fns/async-plane",
 		"web/fns/async-refresh",
 		"web/fns/busy-elements",
