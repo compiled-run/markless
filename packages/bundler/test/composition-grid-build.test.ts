@@ -669,12 +669,13 @@ describe('composition grid, production build', () => {
 		expect(run.visit.errors).toEqual([]);
 	});
 
-	// Each step presses one button, the nth with data-flag, and names the lines the page then shows.
-	for (const [name, path, steps] of [
-		["a child's own @try", '/n-streamed-child-try', [[0, ['hidden: one hidden']], [0, ['rows: one rows']]]],
+	// Each step presses one button (the nth with data-flag, or the one a selector names) and names the lines the page then shows.
+	for (const [name, path, first, steps] of [
+		["a child's own @try", '/n-streamed-child-try', ['rows: one rows'], [[0, ['hidden: one hidden']], [0, ['rows: one rows']]]],
 		[
 			"a child's @try that holds a child with its own @try",
 			'/n-streamed-child-try-nest',
+			['gate: outer open', 'rows: outer rows'],
 			[
 				[1, ['gate: outer open', 'hidden: outer hidden']],
 				[1, ['gate: outer open', 'rows: outer rows']],
@@ -682,33 +683,28 @@ describe('composition grid, production build', () => {
 				[0, ['gate: outer open', 'rows: outer rows']],
 			],
 		],
+		[
+			"a keyed list beside a child's own @try",
+			'/n-streamed-list-child-try',
+			['row: a one', 'row: a two', 'rows: one rows'],
+			[
+				['[data-drop="a-one"]', ['row: a two', 'rows: one rows']],
+				[0, ['row: a two', 'hidden: one hidden']],
+				[0, ['row: a two', 'rows: one rows']],
+			],
+		],
 	] as const)
-		test(`n. ${name} inside an arm the server streams: each nested button flips its own @if, and flips back`, async () => {
+		test(`n. ${name} inside an arm the server streams: each press changes only its own lines`, async () => {
 			const html = await (await fetch(`${server.origin}${path}`)).text();
 			expect(html.indexOf('<template m:arm='), 'the @try arm streams after the shell').toBeGreaterThan(html.indexOf('data-g="pending"'));
 			const { page, errors } = await visit(path);
-			await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', ...steps.at(-1)![1]]);
+			await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', ...first]);
 			for (const [at, shown] of steps) {
-				await page.locator('[data-flag]').nth(at).click();
+				await (typeof at === 'number' ? page.locator('[data-flag]').nth(at) : page.locator(at)).click();
 				await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', ...shown]);
 			}
 			expect(errors).toEqual([]);
 		});
-
-	test("n. a keyed list beside a child's own @try inside an arm the server streams: a row drops, and the child's button flips its @if", async () => {
-		const path = '/n-streamed-list-child-try';
-		const html = await (await fetch(`${server.origin}${path}`)).text();
-		expect(html.indexOf('<template m:arm='), 'the @try arm streams after the shell').toBeGreaterThan(html.indexOf('data-g="pending"'));
-		const { page, errors } = await visit(path);
-		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a one', 'row: a two', 'rows: one rows']);
-		await page.locator('[data-drop="a-one"]').click();
-		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'rows: one rows']);
-		await page.locator('[data-flag]').click();
-		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'hidden: one hidden']);
-		await page.locator('[data-flag]').click();
-		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'rows: one rows']);
-		expect(errors).toEqual([]);
-	});
 
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
 		const { page, errors } = await visit('/append-only');
