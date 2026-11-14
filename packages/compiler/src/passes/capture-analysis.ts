@@ -1620,7 +1620,9 @@ function opaqueSlotDiagnostics(
 									? !callsAbsent
 										? `Read it optionally as ${propName}?.…, guard it with if (${propName}) or ${propName} ? … : …, or pass ${propName} where "${componentName}" is rendered.`
 										: `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
-									: isEventAttribute(propName)
+									: route.fixedValue && (symbol.kind === 'event-handler' || symbol.kind === 'callback-prop')
+										? `Work the value out inside the handler from what the browser has, such as \`new URLSearchParams(location.search)\` for a value from the page url, or hold it in state() in the component that renders "${componentName}" and pass that.`
+										: isEventAttribute(propName)
 										? `Pass ${propName} an arrow written inline (${propName}={() => …}) or the name of a const arrow or function declared in the component body (${propName}={add}).`
 										: `Pass plain constant data (such as TREE[0] from a module that only declares it), pass a string, number or boolean literal (such as an id) and look the value up inside "${componentName}", or hold the value in state() in the component that renders "${componentName}".`,
 						},

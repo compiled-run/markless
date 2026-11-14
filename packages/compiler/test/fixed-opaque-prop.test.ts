@@ -86,3 +86,36 @@ export default function Page() @{
 
 	expect(result.semanticGraph.componentEdges[0]!.props[0]).not.toHaveProperty('fixedValue');
 });
+
+test('a handler reading the fixed prop still refuses, and says what to write instead', async () => {
+	const handlerChild = `
+import { state } from '@markless/core';
+export default function Child({ q }) @{
+	let said = state('');
+	<button onClick={() => (said = q)}>{said}</button>
+}
+`;
+	const compiled = await compileTsrxModule({ filename: 'src/child.tsrx', source: handlerChild, symbols: [] });
+	const handler = compiled.captureAnalysis.extractedSymbols.find((symbol) => symbol.kind === 'event-handler')!;
+	const result = await compileTsrxModule({
+		filename: 'src/page.tsrx',
+		source: page,
+		routeRoot: true,
+		symbols: [
+			{
+				id: 'imported:Child:symbol:0',
+				chunk: 'virtual:markless:symbol:Child:0',
+				exportName: 'child0',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: handler,
+			},
+		],
+	});
+	const [refusal, ...rest] = opaque(result);
+
+	expect(rest).toEqual([]);
+	expect(refusal?.message).toContain('"Child" reads its prop "q" as `q` in an event handler');
+	expect(refusal?.suggestions?.[0]?.message).toBe(
+		'Work the value out inside the handler from what the browser has, such as `new URLSearchParams(location.search)` for a value from the page url, or hold it in state() in the component that renders "Child" and pass that.',
+	);
+});
