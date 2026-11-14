@@ -44,7 +44,7 @@ test('a key event never holds a write', () => {
 	const input = field('typed');
 	const release = marklessNoteArrivingControlEdits({ type: 'keyup', target: input });
 
-	expect(marklessControlWriteHeld(input, 'value', '')).toBe(false);
+	expect(marklessControlWriteHeld(input, 'value', 'answer')).toBe(false);
 	release();
 });
 
@@ -53,5 +53,14 @@ test('releasing the event lets the write through', () => {
 	const release = marklessNoteArrivingControlEdits({ type: 'input', target: input });
 	release();
 
-	expect(marklessControlWriteHeld(input, 'value', '')).toBe(false);
+	expect(marklessControlWriteHeld(input, 'value', 'answer')).toBe(false);
+});
+
+test('a write of the value the control already took leaves what was typed since', () => {
+	const drawn = field('typed', 'Ada');
+	expect(marklessControlWriteHeld(drawn, 'value', 'Ada')).toBe(true);
+	expect(marklessControlWriteHeld(drawn, 'value', 'Grace')).toBe(false);
+	drawn.value = 'typed again';
+	expect(marklessControlWriteHeld(drawn, 'value', 'Grace')).toBe(true);
+	expect(marklessControlWriteHeld(drawn, 'value', 'Lin')).toBe(false);
 });

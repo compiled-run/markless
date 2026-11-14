@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/control-edit-hold"
+			],
+			"delta": 159,
+			"reason": "a control write of the value the control already took is skipped, so a failed save no longer puts the loaded value back over typed text",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 31,
+			"reason": "a control write of the value the control already took is skipped, so a failed save no longer puts the loaded value back over typed text",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/control-edit-hold"
+			],
+			"delta": 159,
+			"reason": "a control write of the value the control already took is skipped, so a failed save no longer puts the loaded value back over typed text",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 30,
+			"reason": "a control write of the value the control already took is skipped, so a failed save no longer puts the loaded value back over typed text",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 60,
+			"reason": "a control write of the value the control already took is skipped, so a failed save no longer puts the loaded value back over typed text",
+			"date": "2026-11-14"
+		}
+	]
+}
