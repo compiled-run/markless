@@ -1,6 +1,7 @@
 // A first press made the way a person makes it, at 6x CPU after idle: mouse (move, down, hold, up), touch (start, hold, end),
 // keyboard (Tab to the control, then Enter or Space held), and the instantaneous click and element.click() as the lower bound.
 // Times from the release (the moment a person expects the response) to the visible effect; longest main-thread task from a trace.
+// Mode early-50: element.click() 50 ms after the load event, throttled from navigation, before the page's idle work has run.
 // Usage: node real-input.mjs <built app dir> [runs]   env: PATHNAME, CLICK (control), EFFECT (element whose text changes), MODES
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -44,12 +45,17 @@ try {
 			const context = await browser.newContext({ hasTouch: touch, isMobile: false });
 			const page = await context.newPage();
 			const requests = [];
-			await page.goto(url, { waitUntil: 'load' });
-			await page.waitForSelector(process.env.READY ?? '[data-list] li');
-			await page.evaluate(() => new Promise((done) => requestIdleCallback(() => setTimeout(done, 300), { timeout: 2000 })));
-			page.on('request', (request) => request.resourceType() === 'script' && requests.push(request.url()));
+			const early = mode.startsWith('early');
 			const cdp = await context.newCDPSession(page);
-			await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+			if (early) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
+			await page.goto(url, { waitUntil: 'load' });
+			if (early) await page.waitForSelector(control);
+			else {
+				await page.waitForSelector(process.env.READY ?? '[data-list] li');
+				await page.evaluate(() => new Promise((done) => requestIdleCallback(() => setTimeout(done, 300), { timeout: 2000 })));
+			}
+			page.on('request', (request) => request.resourceType() === 'script' && requests.push(request.url()));
+			if (!early) await cdp.send('Emulation.setCPUThrottlingRate', { rate: 6 });
 			await page.evaluate(([effectSelector]) => {
 				const target = document.querySelector(effectSelector);
 				const record = (window.__press = { before: target.textContent });
@@ -61,12 +67,16 @@ try {
 						// Whether the press-time resume had already been asked for, and had finished, when the person let go.
 						record.wakingAtUp = !!root?.__marklessDelegatedDispatch;
 						record.startedAtUp = !!root?.__asyncResumeRuntimeStarted;
+						record.modulesAtUp = !!root?.__mResume;
+						// Whether the chunk holding the page's own resume module had run, by its route script.
+						const route = JSON.parse(document.querySelector('script[type="@markless/core/route"]')?.textContent ?? '{}');
+						record.routeAtUp = !!route.resume && new URL(route.resume[0], location.href).href in (globalThis.__marklessPacks ?? {});
 					}, { capture: true });
 				new MutationObserver(() => {
 					if (record.effect === undefined && target.textContent !== record.before) record.effect = performance.now();
 				}).observe(target, { subtree: true, characterData: true, childList: true });
 			}, [effect]);
-			if (mode === 'click' || mode === 'element-click')
+			if (mode === 'click' || mode === 'element-click' || early)
 				await page.evaluate(() => (window.__press.clickOnly = true));
 			const box = await page.locator(control).first().boundingBox();
 			const x = box.x + box.width / 2;
@@ -94,7 +104,12 @@ try {
 				await page.keyboard.down(key);
 				await page.waitForTimeout(hold);
 				await page.keyboard.up(key);
-			} else if (mode === 'click') await page.click(control);
+			} else if (early)
+				await page.evaluate(([selector, after]) => {
+					const loaded = performance.getEntriesByType('navigation')[0].loadEventEnd;
+					setTimeout(() => document.querySelector(selector).click(), Math.max(0, loaded + after - performance.now()));
+				}, [control, Number(mode.split('-').at(-1))]);
+			else if (mode === 'click') await page.click(control);
 			else await page.evaluate((selector) => document.querySelector(selector).click(), control);
 			await page.waitForFunction(() => window.__press.effect !== undefined, null, { timeout: 10000 }).catch(() => {});
 			await page.waitForTimeout(300);
@@ -108,6 +123,8 @@ try {
 				scripts: requests.length,
 				wakingAtUp: record.wakingAtUp,
 				startedAtUp: record.startedAtUp,
+				modulesAtUp: record.modulesAtUp,
+				routeAtUp: record.routeAtUp,
 			});
 			await context.close();
 		}
