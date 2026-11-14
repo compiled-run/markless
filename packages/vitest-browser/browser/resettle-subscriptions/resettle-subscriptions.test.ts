@@ -40,6 +40,10 @@ function collectionSubscriptions(graph: Graph, held: ReadonlyArray<string> = [])
 	return () => [...nodes].reduce((total, node) => total + graph.subscriptionCount(node), 0);
 }
 
+// The first event demand-loads its handler from the dev server in up to three rounds of fetches (measured:
+// symbol:4 and symbol:0, then symbol:5, then symbol:2); a starved CI runner took past the 1 s default.
+const firstWake = { timeout: 5_000 };
+
 const names = () => [...document.querySelectorAll('[data-result]')].map((node) => node.textContent?.trim());
 const type = (value: string) => {
 	const query = document.querySelector<HTMLInputElement>('[data-query]')!;
@@ -97,26 +101,28 @@ const TOOLS = {
 test('CSR: a @try whose row list settles over and over keeps its wiring bounded', async () => {
 	const { runtime } = await render(Aviary);
 	open();
-	await expect.poll(names).toEqual(BIRDS['']);
+	await expect.poll(names, firstWake).toEqual(BIRDS['']);
 	await staysBounded(BIRDS, collectionSubscriptions(runtime.graph as never, ['computed:birds']));
 });
 
 test('SSR: a @try that rewires its row list at every settle keeps its rows and wiring steady', async () => {
 	await renderSSR(Aviary);
 	open();
-	await expect.poll(names).toEqual(BIRDS['']);
+	await expect.poll(names, firstWake).toEqual(BIRDS['']);
 	await staysBounded(BIRDS);
 });
 
 test('CSR: rows written straight into a @try keep one wiring across re-settles', async () => {
 	const { runtime } = await render(Finder);
 	type('f');
-	await expect.poll(names).toEqual(FRUIT.f);
+	await expect.poll(names, firstWake).toEqual(FRUIT.f);
 	await staysBounded(FRUIT, collectionSubscriptions(runtime.graph as never));
 });
 
 test('SSR: rows written straight into a @try keep one wiring across re-settles', async () => {
 	await renderSSR(Finder);
+	type('f');
+	await expect.poll(names, firstWake).toEqual(FRUIT.f);
 	await staysBounded(FRUIT);
 });
 
@@ -124,12 +130,14 @@ test('CSR: rows written straight into a @try an @if rendered keep one wiring acr
 	const { runtime } = await render(Toolbox);
 	open();
 	type('f');
-	await expect.poll(names).toEqual(TOOLS.f);
+	await expect.poll(names, firstWake).toEqual(TOOLS.f);
 	await staysBounded(TOOLS, collectionSubscriptions(runtime.graph as never));
 });
 
 test('SSR: rows written straight into a @try an @if rendered keep one wiring across re-settles', async () => {
 	await renderSSR(Toolbox);
 	open();
+	type('f');
+	await expect.poll(names, firstWake).toEqual(TOOLS.f);
 	await staysBounded(TOOLS);
 });
