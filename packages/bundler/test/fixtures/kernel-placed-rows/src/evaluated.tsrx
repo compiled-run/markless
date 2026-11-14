@@ -55,7 +55,7 @@ function Joined({ initialFilter, reload }: { initialFilter: string; reload: numb
 	</div>
 }
 
-function Carded({ initialFilter, reload }: { initialFilter: string; reload: number }) @{
+export function Carded({ initialFilter, reload }: { initialFilter: string; reload: number }) @{
 	let filter = state(initialFilter);
 	let picked = state('');
 	let mark = state('-');

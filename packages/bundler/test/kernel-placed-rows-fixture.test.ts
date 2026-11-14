@@ -25,7 +25,7 @@ afterEach(async () => {
 	server = undefined;
 });
 
-type Shape = 'lists' | 'evaluated' | 'siblings';
+type Shape = 'lists' | 'evaluated' | 'siblings' | 'edits' | 'hidden';
 
 let built: Shape | undefined;
 async function buildAndServe(shape: Shape): Promise<string> {
@@ -266,6 +266,111 @@ describe('a list added in component rows, answered in the browser of a productio
 			await addedListFill(page, url, false);
 			await exerciseRows(page, '.joined', 1);
 			await exerciseRows(page, '.carded', 2);
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+	test('evaluator-drawn rows over the owner state follow it when reordered, and when one is removed under a held save', async () => {
+		const url = await buildAndServe('edits');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			const ran = await addedListFill(page, url, false);
+			expect(ran.has(EVALUATOR)).toBe(true);
+			for (const [view, count] of SHOWN.entries()) {
+				const owner = page.locator(`[data-view="${view}"] .edited`);
+				const rows = rowsOf(page, view, '.edited');
+				const ids = () => rows.evaluateAll((all) => all.map((row) => row.getAttribute('data-row')));
+				const marks = () => owner.locator('[data-mark-text]').allTextContents();
+				await expect.poll(() => rows.count()).toBe(count);
+				const before = await ids();
+				await rows.evaluateAll((all) => {
+					for (const row of all) (row as HTMLElement & { __kept?: string }).__kept = row.getAttribute('data-row')!;
+				});
+				await owner.locator('[data-flip]').click();
+				await expect.poll(ids, { message: `list ${view} reordered` }).toEqual(before.toReversed());
+				expect(
+					await rows.evaluateAll((all) => all.map((row) => (row as HTMLElement & { __kept?: string }).__kept)),
+				).toEqual(before.toReversed());
+				await owner.locator('[data-mark]').click();
+				await expect.poll(marks, { message: `list ${view} reordered mark` }).toEqual(Array(count).fill('-+'));
+
+				await page.evaluate(() => {
+					const held = globalThis as typeof globalThis & { __saves?: Promise<void>; __releaseSaves?: () => void };
+					held.__saves = new Promise<void>((release) => (held.__releaseSaves = release));
+				});
+				const dune = rows.filter({ has: page.locator('[data-name]', { hasText: 'Dune' }) });
+				await dune.locator('[data-save]').click();
+				await dune.locator('[data-drop]').click();
+				await expect.poll(() => rows.count(), { message: `list ${view} dropped` }).toBe(count - 1);
+				await page.evaluate(() =>
+					(globalThis as typeof globalThis & { __releaseSaves?: () => void }).__releaseSaves?.(),
+				);
+				await expect.poll(() => owner.locator('[data-saved]').textContent()).toBe('Dune');
+				await owner.locator('[data-mark]').click();
+				await expect.poll(marks, { message: `list ${view} after drop` }).toEqual(Array(count - 1).fill('-++'));
+			}
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	// Fails on main too: the arm commit looks for the list's element among the arm's own, not inside the @if.
+	test.fails('evaluator-drawn rows inside an @if follow the owner state when it hides and shows them', async () => {
+		const url = await buildAndServe('hidden');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			const ran = await addedListFill(page, url, false);
+			expect(ran.has(EVALUATOR)).toBe(true);
+			for (const [view, count] of SHOWN.entries()) {
+				const owner = page.locator(`[data-view="${view}"] .shown`);
+				const marks = () => owner.locator('[data-mark-text]').allTextContents();
+				await owner.locator('[data-mark]').click();
+				await expect.poll(marks, { message: `list ${view} mark` }).toEqual(Array(count).fill('-+'));
+				await owner.locator('[data-shown]').click();
+				await expect.poll(() => rowsOf(page, view, '.shown').count(), { message: `list ${view} hidden` }).toBe(0);
+				await owner.locator('[data-mark]').click();
+				await owner.locator('[data-shown]').click();
+				await expect.poll(marks, { message: `list ${view} shown again` }).toEqual(Array(count).fill('-++'));
+			}
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	test('rows of a component from another file follow the owner state through the evaluator', async () => {
+		const url = await buildAndServe('edits');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await addedListFill(page, url, false);
+			await exerciseRows(page, '.tiled', 1);
+			expect(errors).toEqual([]);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	// Fails on main too: the row callback's name joins the importer's path to the exporting module's own.
+	test.fails('a list component imported from a module whose own root renders it keeps its row callbacks', async () => {
+		const url = await buildAndServe('edits');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await addedListFill(page, url, false);
+			await exerciseRows(page, '.carded', 1);
 			expect(errors).toEqual([]);
 		} finally {
 			await browser.close();

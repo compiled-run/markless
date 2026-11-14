@@ -4,7 +4,8 @@ import { defineConfig, type Plugin } from 'vite';
 import { markless } from '../../../../core/src/vite.ts';
 
 // Not a workspace package, so it builds with no install: @markless/core resolves through its own exports map.
-// Which placed-list page this build serves: the kernel's shapes, the evaluator's, or sibling lists in one row.
+// Which placed-list page this build serves: the kernel's shapes, the evaluator's, sibling lists in one row,
+// or the evaluator's rows under owner edits.
 const shape = process.env.KERNEL_ROWS_SHAPE ?? 'lists';
 const core = new URL('../../../../core/', import.meta.url);
 const coreExports = JSON.parse(readFileSync(new URL('package.json', core), 'utf8'))
