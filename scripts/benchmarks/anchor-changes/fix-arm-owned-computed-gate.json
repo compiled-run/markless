@@ -300,7 +300,7 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 3,
+			"delta": 1,
 			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
 			"date": "2026-11-14"
 		},
@@ -312,7 +312,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 45,
+			"delta": 41,
 			"reason": "A component an @if or @switch arm holds stops when its arm closes: the arm gate module, its hooks in the graph, branch wiring and sync derives, and a reload that stops waiting on a closed arm's value (measured against the merge-base by this fixture build)",
 			"date": "2026-11-14"
 		}
