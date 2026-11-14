@@ -642,20 +642,32 @@ export function marklessInstanceScopedGraph(
 // Installed with the composed arm records, which only a composing page loads.
 let liveRoute: ((page: RuntimeGraph, instancePath: string, graphNodeId: string, path: ReadonlyArray<string>) => ReturnType<typeof marklessPropRoute>) | undefined;
 
-// The live routes of each instance whose arm the browser rendered, by page graph and instance path.
-const liveProps = new WeakMap<RuntimeGraph, Map<string, NonNullable<ResumeAsyncBoundaryRecord['composedGraphProps']>>>();
+// The live routes of each instance whose arm the browser rendered, by page graph and instance path, with an anchor that lives as long as the instance.
+const liveProps = new WeakMap<
+	RuntimeGraph,
+	Map<string, { readonly routes: NonNullable<ResumeAsyncBoundaryRecord['composedGraphProps']>; readonly anchor?: object }>
+>();
+
+/** The instance paths whose live prop routes a page graph keeps. */
+export function __marklessLivePropPathsForTest(graph: RuntimeGraph): string[] {
+	return [...(liveProps.get(graph)?.keys() ?? [])];
+}
 
 // What the arm's symbols read of their owner's props, they find on the owner's routes.
 function noteLiveProps(
 	graph: RuntimeGraph | undefined,
 	symbolPrefix: string,
 	routes: ResumeAsyncBoundaryRecord['composedGraphProps'],
+	anchor: object | undefined,
 ): void {
 	const instancePath = marklessInstancePath(symbolPrefix);
 	if (!graph || !instancePath || !routes?.length) return;
 	let byPath = liveProps.get(graph);
 	if (!byPath) liveProps.set(graph, (byPath = new Map()));
-	byPath.set(instancePath, routes);
+	// A removed row or closed arm sends no teardown here; an instance whose anchor left the document is gone.
+	for (const [path, live] of byPath)
+		if ((live.anchor as { readonly isConnected?: boolean } | undefined)?.isConnected === false) byPath.delete(path);
+	byPath.set(instancePath, { routes, anchor });
 }
 
 /**
@@ -1337,7 +1349,7 @@ function composedBranchUpdate<U extends ComposedUpdate>(
 	// Past one level of nesting the symbol prefix differs from the host prefix the branch id carries.
 	const symbolPrefix = marklessInstancePath(branch.symbolId);
 	if (!symbolPrefix) return update;
-	noteLiveProps(graph, symbolPrefix, branch.composedGraphProps);
+	noteLiveProps(graph, symbolPrefix, branch.composedGraphProps, branch.startAnchor);
 	return composedUpdateNodes(branch, update, graph, symbolPrefix, {
 		...update,
 		armRecords: composedBoundaryArmRecords(
@@ -1360,7 +1372,7 @@ function composedBoundaryUpdate<U extends ComposedUpdate>(
 ): U {
 	const prefixes = composedBoundaryPrefixes(boundary, undefined, renderedBoundaryId);
 	if (!prefixes) return update;
-	noteLiveProps(graph, prefixes.symbols, boundary.composedGraphProps);
+	noteLiveProps(graph, prefixes.symbols, boundary.composedGraphProps, boundary.startAnchor);
 	const rooted = update.moduleRootPath;
 	const armRecords = composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, renderedBoundaryId, rooted);
 	// A kernel-drawn arm names its rows from the module root, as the evaluator's render does.
@@ -1445,7 +1457,7 @@ function composedBoundaryGraph(
  */
 export function installMarklessComposedArmRecords(): void {
 	liveRoute = (page, instancePath, graphNodeId, path) =>
-		marklessPropRoute(liveProps.get(page)?.get(instancePath), graphNodeId, path);
+		marklessPropRoute(liveProps.get(page)?.get(instancePath)?.routes, graphNodeId, path);
 	installComposedArmRecordQualifier(
 		Object.assign(composedBoundaryArmRecords, {
 			graph: composedBoundaryGraph,
