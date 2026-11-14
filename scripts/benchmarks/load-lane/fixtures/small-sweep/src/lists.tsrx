@@ -1,7 +1,7 @@
 import { computed, state } from '@markless/core';
 import { loadItems, type Item } from './data.ts';
 
-// Rows with a few elements and a handler each: a press that refreshes the list and a press that edits one row.
+// Rows with a few elements and a handler each: a press that refreshes the list (to 10 rows, or 5 on a 10-row list) and a press that edits one row.
 export function PlainList({ rows }: { readonly rows: number }) @{
 	const full = state(rows);
 	let size = state(rows);
@@ -9,7 +9,7 @@ export function PlainList({ rows }: { readonly rows: number }) @{
 	const items = computed(async () => loadItems(size));
 
 	<section class="list">
-		<button class="shrink" onClick={() => (size = size === full ? 10 : full)}>Rows {size}</button>
+		<button class="shrink" onClick={() => (size = size === full ? (full === 10 ? 5 : 10) : full)}>Rows {size}</button>
 		@try {
 			<ul data-list>
 				@for (const item of items; key item.id) {
@@ -42,7 +42,7 @@ export function ComponentList({ rows }: { readonly rows: number }) @{
 	const items = computed(async () => loadItems(size));
 
 	<section class="list">
-		<button class="shrink" onClick={() => (size = size === full ? 10 : full)}>Rows {size}</button>
+		<button class="shrink" onClick={() => (size = size === full ? (full === 10 ? 5 : 10) : full)}>Rows {size}</button>
 		@try {
 			<ul data-list>
 				@for (const item of items; key item.id) {
