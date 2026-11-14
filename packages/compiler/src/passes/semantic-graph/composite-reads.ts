@@ -233,15 +233,51 @@ function methodCallReadSources(
 	if (offset === null && !isMethodCallExpression(node)) return null;
 	const receiver =
 		offset === null
-			? pureCompositeReadSources(callee.object as AnyNode | undefined, state, options)
+			? callOperandReadSources(callee.object as AnyNode | undefined, state, options)
 			: [];
 	if (!receiver) return null;
 	return joinReadSources([
 		receiver,
 		...asNodes(node.arguments).map((argument) =>
-			pureCompositeReadSources(argument, state, options),
+			callOperandReadSources(argument, state, options),
 		),
 	]);
+}
+
+// A call's receiver or argument may be an object or array literal built from reads (`hrefFor('/a/[id]', { id: item.id })`); elsewhere a literal is a value the caller would stringify wrongly.
+function callOperandReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	if (node?.type === 'ObjectExpression') {
+		return joinReadSources(
+			asNodes(node.properties).map((property) => {
+				if (property.type === 'SpreadElement')
+					return callOperandReadSources(property.argument as AnyNode | undefined, state, options);
+				if (property.type !== 'Property' || property.kind !== 'init' || property.method === true)
+					return null;
+				return joinReadSources([
+					property.computed === true
+						? pureCompositeReadSources(property.key as AnyNode | undefined, state, options)
+						: [],
+					callOperandReadSources(property.value as AnyNode | undefined, state, options),
+				]);
+			}),
+		);
+	}
+	if (node?.type === 'ArrayExpression') {
+		return joinReadSources(
+			asNodes(node.elements).map((element) =>
+				callOperandReadSources(
+					element.type === 'SpreadElement' ? (element.argument as AnyNode | undefined) : element,
+					state,
+					options,
+				),
+			),
+		);
+	}
+	return pureCompositeReadSources(node, state, options);
 }
 
 function callsModuleFunction(callee: AnyNode, offset: number, state: WalkState): boolean {

@@ -386,6 +386,61 @@ describe('composition grid, production build', () => {
 		});
 
 	const ownOpen: Shape = { ...ownArm, path: '/h-own-arm-open', openAtLoad: true };
+	test('port. <Link params> fed from an async value: the href follows each new value and the link navigates', async () => {
+		const { page, errors } = await visit('/k-link-params/a1');
+		const href = () => page.locator('[data-g="link"]').getAttribute('href');
+		await expect.poll(href, poll).toBe('/k-link-params/a1-0/edit');
+		await page.locator('main button').click();
+		await expect.poll(href, poll).toBe('/k-link-params/a1-1/edit');
+		await page.locator('[data-g="link"]').click();
+		await expect.poll(() => page.locator('[data-g="edit"]').textContent(), poll).toBe('editing a1-1');
+		expect(new URL(page.url()).pathname).toBe('/k-link-params/a1-1/edit');
+		expect(errors).toEqual([]);
+	});
+
+	test('port. <Link params> in keyed rows: each href follows its row through a reload, stays put while it loads, and a Link under @catch reads the error', async () => {
+		const { page, api, errors } = await visit('/k-link-rows');
+		const hrefs = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll('[data-g="row"], [data-g="failed"]')].map(
+					(link) => `${(link as HTMLElement).dataset.g} ${link.getAttribute('href')} ${link.textContent}`,
+				),
+			);
+		const reload = () => page.locator('[data-grid-reload]').click();
+		await expect.poll(hrefs, poll).toEqual([
+			'row /k-link-params/a-one-0/edit a-one-0',
+			'row /k-link-params/a-two-0/edit a-two-0',
+		]);
+		await reload();
+		await expect.poll(api.waitingRequests, poll).toContain(boardRequest('a', 1));
+		await quiet(page);
+		expect(await hrefs()).toEqual([
+			'row /k-link-params/a-one-0/edit a-one-0',
+			'row /k-link-params/a-two-0/edit a-two-0',
+		]);
+		await api.release(boardRequest('a', 1));
+		await expect.poll(hrefs, poll).toEqual([
+			'row /k-link-params/a-one-1/edit a-one-1',
+			'row /k-link-params/a-two-1/edit a-two-1',
+		]);
+		await reload();
+		// A failed re-fetch keeps the rows and draws @catch after them.
+		await expect.poll(hrefs, poll).toEqual([
+			'row /k-link-params/a-one-1/edit a-one-1',
+			'row /k-link-params/a-two-1/edit a-two-1',
+			'failed /k-link-params/refused-2/edit refused-2',
+		]);
+		await reload();
+		await api.release(boardRequest('a', 3));
+		await expect.poll(hrefs, poll).toEqual([
+			'row /k-link-params/a-one-3/edit a-one-3',
+			'row /k-link-params/a-two-3/edit a-two-3',
+		]);
+		await page.locator('[data-g="row"]').first().click();
+		await expect.poll(() => page.locator('[data-g="edit"]').textContent(), poll).toBe('editing a-one-3');
+		expect(errors).toEqual([]);
+	});
+
 	test('h. own async value in an @if arm, open at load: a closed arm loads nothing, and one closed while loading asks again when it reopens', async () => {
 		const run = new Run(ownOpen, await visit(ownOpen.path));
 		await run.firstRender();

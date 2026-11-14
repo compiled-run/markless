@@ -164,3 +164,27 @@ test('a module with no style block emits the same class bytes it always did', as
 	expect(targets).toContainEqual({ kind: 'class' });
 	expect(targets.some((target) => 'constantClass' in target)).toBe(false);
 });
+
+test('an array or object class on a component call-site is never string-joined with the scope', async () => {
+	const source = CALL_SITES.replace(
+		'<accordion.item class={cls}>b</accordion.item>',
+		'<accordion.item class={[cls, "card"]}>b</accordion.item>\n\t\t<accordion.item class={{ card: on }}>d</accordion.item>',
+	);
+	const { props, computeds } = await callSiteClassProps(source);
+
+	expect(computeds.filter((binding) => binding.functionSource?.includes('.join('))).toEqual([]);
+	expect(props[1]).not.toMatchObject({ graphBindingKind: 'computed' });
+	expect(props[2]).not.toMatchObject({ graphBindingKind: 'computed' });
+});
+
+test('a joined array class on a component call-site composes the scope onto the joined string', async () => {
+	const source = CALL_SITES.replace(
+		'<accordion.item class={cls}>b</accordion.item>',
+		'<accordion.item class={[cls, "card"].join(" ")}>b</accordion.item>',
+	);
+	const { scope, props, computeds } = await callSiteClassProps(source);
+
+	expect(props[1]).toMatchObject({ kind: 'graph-reference', graphBindingKind: 'computed' });
+	expect(computeds).toHaveLength(1);
+	expect(computeds[0]?.functionSource).toContain(`[[cls, "card"].join(" "), "${scope}"]`);
+});
