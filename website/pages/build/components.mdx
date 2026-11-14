@@ -67,6 +67,8 @@ export default function Profile() @{
 ```
 </Code>
 
+A prop worked out only from values outside the component, such as a module constant or what an imported function returns, keeps the value it rendered with. If that value can change later, keep it in `state()` so the child follows it.
+
 ## A callback talks back
 
 A child can't change the parent's state. The parent hands it a *callback*: a function the child calls.

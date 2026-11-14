@@ -132,6 +132,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		importedModuleConstants: input.importedModuleConstants,
 		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
+		routeRoot: input.routeRoot,
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);

@@ -482,6 +482,73 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	test('port. a page passes a child a value worked out from its url; the child\'s async value and arm read it again in the browser', async () => {
+		const { page, errors } = await visit('/k-fixed-prop?q=ada&page=2');
+		const shown = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>('[data-g]')].map((line) => `${line.dataset.g}: ${line.textContent}`),
+			);
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 0']);
+		await page.locator('main [data-again]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1']);
+		await page.locator('main [data-again]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 2']);
+		await page.locator('main [data-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 2', 'arm: ada!']);
+		expect(errors).toEqual([]);
+	});
+
+	test('port. a child fed from the page url follows a Link to another query and Back, its async value and arms included', async () => {
+		const { page, errors } = await visit('/k-fixed-prop?q=ada');
+		const shown = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>('[data-g]')].map((line) => `${line.dataset.g}: ${line.textContent}`),
+			);
+		const again = () => page.locator('main [data-again]').click();
+		const query = () => new URL(page.url()).search;
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 0']);
+		await again();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1']);
+		await page.locator('main [data-kept-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1', 'kept: ada?']);
+		await page.locator('main [data-kept-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1']);
+
+		await page.evaluate(() => {
+			(window as { stayed?: boolean }).stayed = true;
+			(document.querySelector('main section') as { marked?: boolean }).marked = true;
+		});
+		const stayed = () =>
+			page.evaluate(() => [
+				(window as { stayed?: boolean }).stayed === true,
+				(document.querySelector('main section') as { marked?: boolean } | null)?.marked === true,
+			]);
+		await page.locator('main [data-to-bob]').click();
+		await expect.poll(query, poll).toBe('?q=bob');
+		// The page did not load anew, and the router kept the part whose markup both pages share.
+		expect(await stayed()).toEqual([true, true]);
+		await expect.poll(shown, poll).toEqual(['q: bob', 'found: BOB 0']);
+		await again();
+		await expect.poll(shown, poll).toEqual(['q: bob', 'found: BOB 1']);
+		await page.locator('main [data-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: bob', 'found: BOB 1', 'arm: bob!']);
+		await page.locator('main [data-kept-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: bob', 'found: BOB 1', 'arm: bob!', 'kept: bob?']);
+		await page.locator('main [data-kept-toggle]').click();
+
+		await page.goBack();
+		await expect.poll(query, poll).toBe('?q=ada');
+		expect(await stayed()).toEqual([true, true]);
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 0']);
+		await again();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1']);
+		await page.locator('main [data-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1', 'arm: ada!']);
+		await page.locator('main [data-kept-toggle]').click();
+		await expect.poll(shown, poll).toEqual(['q: ada', 'found: ADA 1', 'arm: ada!', 'kept: ada?']);
+		expect(errors).toEqual([]);
+	});
+
 	test("a @try in a module's second export: first render, reload, save held, handler rejects", async () => {
 		const run = new Run(secondExport, await visit(secondExport.path));
 		await run.firstRender();

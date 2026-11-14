@@ -69,8 +69,10 @@ test('an imported constant prop names the module the bundler must evaluate', asy
 	expect(prop).toMatchObject({
 		kind: 'opaque',
 		importedConstants: [{ source: './groups.ts', exportName: 'GROUPS' }],
+		fixedValue: true,
 	});
-	expect(opaqueDiagnostics(parent)).toHaveLength(1);
+	// Until the bundler hands it the value, the child's update reads the copy its own props hold.
+	expect(opaqueDiagnostics(parent)).toEqual([]);
 });
 
 test('an imported constant prop reaches browser code as the fields it reads', async () => {
@@ -114,7 +116,7 @@ export function Sidebar() @{
 	]);
 });
 
-test('runtime values and constants their module mutates keep the refusal', async () => {
+test('runtime values and constants their module mutates are fixed at render, so the child keeps its own copy', async () => {
 	const computed = await compileParent(`
 import { Group } from './Group.tsrx';
 import { loadGroups } from './groups.ts';
@@ -140,15 +142,39 @@ export function Sidebar() @{
 
 	expect(importedMutated).toEqual({});
 	for (const result of [computed, mutated]) {
-		const [opaque, ...rest] = opaqueDiagnostics(result);
-		expect(rest).toEqual([]);
-		expect(opaque?.message).toContain('"Group" reads it as `group.title` in a DOM update');
-		expect(opaque?.why).toContain('Constant data reaches the browser as its build-time value');
-		expect(opaque?.suggestions?.[0]?.message).toContain('Pass plain constant data');
+		expect(result.semanticGraph.componentEdges[0]?.props[0]).toMatchObject({
+			kind: 'opaque',
+			fixedValue: true,
+		});
+		expect(opaqueDiagnostics(result)).toEqual([]);
 	}
-	expect(opaqueDiagnostics(computed)[0]?.message).toContain(
-		'prop "group" for "Group" is the runtime expression "loadGroups()[0]"',
+});
+
+test('a runtime value over a prop the browser can change keeps the refusal, in plain words', async () => {
+	const live = await compileParent(`
+import { state } from '@markless/core';
+import { Group } from './Group.tsrx';
+
+function Panel({ groups }) @{
+	<Group group={groups.find((group) => group.title !== '')} />
+}
+
+export function Sidebar() @{
+	let groups = state([{ title: 'Docs' }]);
+	<Panel groups={groups} />
+}
+`);
+	const [opaque, ...rest] = opaqueDiagnostics(live);
+
+	expect(rest).toEqual([]);
+	expect(
+		live.semanticGraph.componentEdges.find((edge) => edge.childComponentName === 'Group')
+			?.props[0],
+	).not.toHaveProperty('fixedValue');
+	expect(opaque?.message).toBe(
+		'"Group" reads its prop "group" as `group.title` in a DOM update, which runs in the browser, but this <Group> passes `groups.find((group) => group.title !== \'\')`: code that runs only while the page renders, with no way for the browser to get its value.',
 	);
+	expect(opaque?.suggestions?.[0]?.message).toContain('hold the value in state()');
 });
 
 // A keyed row's item is data the row was rendered from, and a changed item
