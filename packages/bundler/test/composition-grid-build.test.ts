@@ -552,3 +552,37 @@ describe('prop-fed rows of a row component from another file, production build',
 		expect(errors).toEqual([]);
 	});
 });
+
+describe('a failed save under a wrapper with a value from url, production build', () => {
+	async function failsIntoCatch(page: Page, id: string, q: string) {
+		await expect.poll(() => page.locator('input[name="first"]').inputValue(), poll).toBe(`Ada ${id}`);
+		expect(await page.locator('[data-q]').textContent()).toBe(`q=${q}`);
+		await page.locator('[data-submit]').click();
+		await expect.poll(() => page.locator('[data-caught]').textContent(), poll).toBe('Saving failed (500)');
+		await expect.poll(() => busy(page), poll).toBe(0);
+		await quiet(page);
+		expect(await page.locator('[data-q]').textContent()).toBe(`q=${q}`);
+	}
+
+	for (const [wrapper, route] of [
+		['state(...)', 'failed-save'],
+		['computed(() => url.search)', 'failed-save-computed'],
+	] as const) {
+		test(`${wrapper}: a page value read from params shows @catch, and the wrapper keeps its value`, async () => {
+			const { page, errors } = await visit(`/${route}/a7?q=x`);
+			await page.route('**/fsw/**', (answer) => answer.fulfill({ status: 500, body: 'nope' }));
+			await failsIntoCatch(page, 'a7', 'x');
+			expect(errors).toEqual([]);
+		});
+
+		test(`${wrapper}: after navigating to the same page with another url, a failed save shows @catch with the new url's value`, async () => {
+			const { page, errors } = await visit(`/${route}/a7?q=x`);
+			await page.route('**/fsw/**', (answer) => answer.fulfill({ status: 500, body: 'nope' }));
+			await expect.poll(() => page.locator('input[name="first"]').inputValue(), poll).toBe('Ada a7');
+			await page.locator('[data-next]').click();
+			await expect.poll(() => new URL(page.url()).pathname + new URL(page.url()).search, poll).toBe(`/${route}/b8?q=y`);
+			await failsIntoCatch(page, 'b8', 'y');
+			expect(errors).toEqual([]);
+		});
+	}
+});
