@@ -7605,49 +7605,113 @@ function callsAssignedStateMethod(
 		: isAssignedStateRead(receiver, target, rewrite);
 }
 
-// An update runs again on the value a page still shows, so its value may repeat only reads: no call or `new` but a
-// method on the assigned state's own value, and no read of that state inside a function, which would keep a snapshot.
-function replaysOnShownValue(
+type AssignedTarget = { readonly graphNodeId: string; readonly path: ReadonlyArray<string> };
+// A part of an update's value that must run once, before the update: a call, or the copy of what a spread iterates.
+type OncePart = { readonly node: AnyNode; readonly spread: boolean };
+
+// An update runs again on the value a page still shows, so its value repeats only reads; a call, `new` or spread of
+// something else runs once ahead of it and the replay reuses its result. `null` when that cannot keep the value's
+// meaning: the part reads the assigned state, sits in a function or a branch that may skip it, or is a `delete`.
+function replayedValueParts(
 	node: AnyNode,
-	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+	target: AssignedTarget,
 	rewrite: EventHandlerRewrite,
+	branch = false,
 	insideFunction = false,
-): boolean {
-	if (isAssignedStateRead(node, target, rewrite)) return !insideFunction;
+	parts: OncePart[] = [],
+): OncePart[] | null {
+	const once = (part: AnyNode, spread: boolean): OncePart[] | null =>
+		insideFunction || branch || readsAssignedNode(part, target, rewrite) ? null : (parts.push({ node: part, spread }), parts);
+	if (isAssignedStateRead(node, target, rewrite)) return insideFunction ? null : parts;
+	if (node.type === 'UnaryExpression' && node.operator === 'delete') return null;
 	if (
 		node.type === 'NewExpression' ||
 		node.type === 'TaggedTemplateExpression' ||
 		node.type === 'ImportExpression' ||
-		(node.type === 'UnaryExpression' && node.operator === 'delete') ||
-		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite)) ||
-		spreadsOnce(node, target, rewrite)
+		(node.type === 'CallExpression' && !callsAssignedStateMethod(node, target, rewrite))
 	)
-		return false;
+		return once(node, false);
 	const inside = insideFunction || isFunctionLikeNode(node);
+	const iterated = node.type === 'ArrayExpression' || node.type === 'CallExpression' ? asNodes(node.type === 'ArrayExpression' ? node.elements : node.arguments) : [];
 	for (const [key, child] of Object.entries(node)) {
 		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
 		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
-		if (Array.isArray(child)) {
-			if (child.some((item) => isNode(item) && !replaysOnShownValue(item, target, rewrite, inside))) return false;
-		} else if (isNode(child) && !replaysOnShownValue(child, target, rewrite, inside)) return false;
+		const skippable =
+			branch ||
+			node.type === 'ChainExpression' ||
+			(node.type === 'LogicalExpression' && key === 'right') ||
+			(node.type === 'ConditionalExpression' && key !== 'test');
+		for (const item of Array.isArray(child) ? child : [child]) {
+			if (!isNode(item)) continue;
+			const spread = item.type === 'SpreadElement' && iterated.includes(item) && isNode(item.argument) ? item.argument : undefined;
+			const ownValue =
+				spread && (spread.type === 'CallExpression' ? callsAssignedStateMethod(spread, target, rewrite) : isAssignedStateRead(spread, target, rewrite));
+			const walked =
+				spread && !ownValue
+					? once(spread, true)
+					: replayedValueParts(item, target, rewrite, skippable, inside, parts);
+			if (!walked) return null;
+		}
 	}
-	return true;
+	return parts;
 }
 
-// A spread into a list or call of anything but the assigned state's own value: a one-shot iterator is empty on the replay.
-function spreadsOnce(
-	node: AnyNode,
-	target: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> },
+// Whether a node reads the assigned state's graph node at any path, inside functions too.
+function readsAssignedNode(node: AnyNode, target: AssignedTarget, rewrite: EventHandlerRewrite): boolean {
+	const text = valueNodeText(node, rewrite.source);
+	const read =
+		text &&
+		(rewrite.reads.find((candidate) => candidate.source === text) ??
+			rewrite.writeValueInput.graphReads.find((candidate) => candidate.source === text));
+	if (read && read.graphNodeId === target.graphNodeId) return true;
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (key === 'property' && node.type === 'MemberExpression' && node.computed !== true) continue;
+		for (const item of Array.isArray(child) ? child : [child])
+			if (isNode(item) && readsAssignedNode(item, target, rewrite)) return true;
+	}
+	return false;
+}
+
+// The value with each once part standing as the parameter that carries its result.
+function withOnceParameters(node: AnyNode, parts: ReadonlyArray<OncePart>, names: ReadonlyArray<string>): AnyNode {
+	const index = parts.findIndex((part) => part.node === node);
+	if (index >= 0) return { type: 'Identifier', name: names[index] } as AnyNode;
+	const copy: Record<string, unknown> = { ...(node as Record<string, unknown>) };
+	for (const [key, child] of Object.entries(node)) {
+		if (EVENT_WALK_IGNORED_KEYS.has(key)) continue;
+		if (Array.isArray(child)) copy[key] = child.map((item) => (isNode(item) ? withOnceParameters(item, parts, names) : item));
+		else if (isNode(child)) copy[key] = withOnceParameters(child, parts, names);
+	}
+	return copy as AnyNode;
+}
+
+// `((once) => <update>)(<part>)`: each part runs once, ahead of the update, and the replay reuses it.
+function onceAheadOfUpdate(
+	update: EmissionNode,
+	parts: ReadonlyArray<OncePart>,
+	names: ReadonlyArray<string>,
 	rewrite: EventHandlerRewrite,
-): boolean {
-	const iterated = node.type === 'ArrayExpression' ? node.elements : node.type === 'CallExpression' ? node.arguments : undefined;
-	return asNodes(iterated).some((item) => {
-		if (item.type !== 'SpreadElement' || !isNode(item.argument)) return false;
-		const spread = item.argument;
-		return spread.type === 'CallExpression'
-			? !callsAssignedStateMethod(spread, target, rewrite)
-			: !isAssignedStateRead(spread, target, rewrite);
-	});
+): EmissionNode {
+	if (parts.length === 0) return update;
+	return callNode(
+		arrowFunctionNode(names, update),
+		parts.map(({ node, spread }) => {
+			const value = eventWriteValueNode(node, rewrite);
+			return spread ? arrayNode([spreadNode(value)]) : value;
+		}),
+	);
+}
+
+function onceParameterNames(node: AnyNode, count: number): string[] {
+	const taken = new Set<string>();
+	collectIdentifierNames(node, taken);
+	const names: string[] = [];
+	for (let index = 0; names.length < count; index++) {
+		const name = index === 0 ? 'once' : `once${index}`;
+		if (!taken.has(name)) names.push(name);
+	}
+	return names;
 }
 
 // Whether a value reads the assigned state outside any function inside it.
@@ -7814,77 +7878,64 @@ function loweredEventWriteNode(
 			? memberNode(writeThroughCall(authored.through, authored.graphNodeId), method)
 			: undefined;
 	if (write.operation === 'assign') {
+		if (!isNode(node.right)) return null;
+		const right = node.right;
+		const logical = write.assignmentOperator === '&&=' || write.assignmentOperator === '||=' || write.assignmentOperator === '??=';
+		const replayable = !containsWriteExpression(right) && !pausesOutsideFunctions(right);
 		// A plain assignment whose value reads exactly what it replaces is an update, so a page still showing an earlier value applies it there too.
+		const parts = !replayable
+			? null
+			: write.assignmentOperator
+				? replayedValueParts(right, write, rewrite, logical)
+				: !write.row && !write.through && readsAssignedState(right, write, rewrite)
+					? replayedValueParts(right, write, rewrite)
+					: null;
+		const names = parts ? onceParameterNames(right, parts.length) : [];
+		const replayed = parts && parts.length > 0 ? withOnceParameters(right, parts, names) : right;
 		const updaterRead =
-			!write.assignmentOperator &&
-			!write.row &&
-			!write.through &&
-			isNode(node.right) &&
-			!containsWriteExpression(node.right) &&
-			!pausesOutsideFunctions(node.right) &&
-			readsAssignedState(node.right, write, rewrite) &&
-			replaysOnShownValue(node.right, write, rewrite)
-				? { graphNodeId: write.graphNodeId, path: write.path, name: freshUpdaterParameter(node.right as unknown as EmissionNode) }
+			parts && !write.assignmentOperator
+				? { graphNodeId: write.graphNodeId, path: write.path, name: freshUpdaterParameter(right as unknown as EmissionNode) }
 				: undefined;
-		const value = isNode(node.right)
-			? eventWriteValueNode(
-					node.right,
-					updaterRead ? { ...rewrite, writeValueInput: { ...rewrite.writeValueInput, updaterRead } } : rewrite,
-				)
-			: null;
+		const value = eventWriteValueNode(
+			parts ? replayed : right,
+			updaterRead ? { ...rewrite, writeValueInput: { ...rewrite.writeValueInput, updaterRead } } : rewrite,
+		);
 		if (!value) return null;
+		const operator = write.assignmentOperator ? EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator) : undefined;
+		if (write.assignmentOperator && !operator) return null;
+		const combined = (current: EmissionNode) =>
+			!operator
+				? value
+				: operator === '&&' || operator === '||' || operator === '??'
+					? logicalNode(operator, current, value)
+					: binaryNode(operator, current, value);
 
-		if (updaterRead)
-			return graphUpdateCall({
-				calleeNode: throughCallee('update'),
-				graphNodeId: write.graphNodeId,
-				path: write.path,
-				pathNode,
-				returnValue: 'next',
-				parameterName: updaterRead.name,
-				updateExpression: value,
-			});
-		if (!write.assignmentOperator) {
-			return graphWriteCall({
-				calleeNode: throughCallee('write'),
-				graphNodeId: write.graphNodeId,
-				path: write.path,
-				pathNode,
-				value,
-			});
+		if (parts) {
+			const parameterName = updaterRead?.name ?? freshUpdaterParameter(value);
+			return onceAheadOfUpdate(
+				graphUpdateCall({
+					calleeNode: throughCallee('update'),
+					graphNodeId: write.graphNodeId,
+					path: write.path,
+					pathNode,
+					returnValue: 'next',
+					parameterName,
+					updateExpression: combined(identifierNode(parameterName)),
+				}),
+				parts,
+				names,
+				rewrite,
+			);
 		}
-
-		const operator = EVENT_COMPOUND_ASSIGNMENT_OPERATORS.get(write.assignmentOperator);
-		if (!operator) return null;
-
-		// A right side that calls would run again on the replay, so it is read and written once, in JavaScript's order.
-		if (isNode(node.right) && !replaysOnShownValue(node.right, write, rewrite)) {
-			const current = isNode(node.left) ? eventWriteValueNode(node.left, rewrite) : null;
-			if (!current) return null;
-			return graphWriteCall({
-				calleeNode: throughCallee('write'),
-				graphNodeId: write.graphNodeId,
-				path: write.path,
-				pathNode,
-				value:
-					operator === '&&' || operator === '||' || operator === '??'
-						? logicalNode(operator, current, value)
-						: binaryNode(operator, current, value),
-			});
-		}
-
-		const parameterName = freshUpdaterParameter(value);
-		return graphUpdateCall({
-			calleeNode: throughCallee('update'),
+		// A compound right side that cannot replay is read and written once, in JavaScript's order.
+		const current = operator && isNode(node.left) ? eventWriteValueNode(node.left, rewrite) : undefined;
+		if (operator && !current) return null;
+		return graphWriteCall({
+			calleeNode: throughCallee('write'),
 			graphNodeId: write.graphNodeId,
 			path: write.path,
 			pathNode,
-			returnValue: 'next',
-			parameterName,
-			updateExpression:
-				operator === '&&' || operator === '||' || operator === '??'
-					? logicalNode(operator, identifierNode(parameterName), value)
-					: binaryNode(operator, identifierNode(parameterName), value),
+			value: current ? combined(current) : value,
 		});
 	}
 

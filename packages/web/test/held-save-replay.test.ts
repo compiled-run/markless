@@ -40,20 +40,20 @@ async function runWhileShown(name: string, shown: unknown, held: unknown, handle
 	return { value: graph.read(graphNodeId), painted };
 }
 
-test('a compound assignment whose right side calls runs the call once and paints the value code holds', async () => {
+test('a compound assignment whose right side calls runs the call once and replays its result on the shown value', async () => {
 	let calls = 0;
 	const handler = await compiledHandler("let log = state('');", 'log += event.next();');
 	const result = await runWhileShown('log', '', 'a', handler, { next: () => `id${++calls}` });
 	expect(calls).toBe(1);
-	expect(result).toEqual({ value: 'aid1', painted: 'aid1' });
+	expect(result).toEqual({ value: 'aid1', painted: 'id1' });
 });
 
-test('a list spread of a one-shot iterable paints the items the held list got', async () => {
+test('a list spread of a one-shot iterable replays the same items on the shown list', async () => {
 	const handler = await compiledHandler('let items = state<string[]>([]);', 'const it = event.ids(); items = [...items, ...it];');
 	const result = await runWhileShown('items', [], ['a'], handler, {
 		*ids() {
 			yield 'x';
 		},
 	});
-	expect(result).toEqual({ value: ['a', 'x'], painted: ['a', 'x'] });
+	expect(result).toEqual({ value: ['a', 'x'], painted: ['x'] });
 });
