@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 772,
-			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields the server render drops; bench and /ui pages unchanged",
+			"delta": 1300,
+			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields, the whole error and instanceof that the server render drops; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 835,
-			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields the server render drops; bench and /ui pages unchanged",
+			"delta": 1363,
+			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields, the whole error and instanceof that the server render drops; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
@@ -32,8 +32,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 2,
-			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields the server render drops; bench and /ui pages unchanged",
+			"delta": 36,
+			"reason": "the docs playground's in-browser compile worker resolves a component prop read from the @catch error through the error cell and refuses error fields, the whole error and instanceof that the server render drops; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		}
 	]
