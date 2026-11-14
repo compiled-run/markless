@@ -1218,8 +1218,8 @@ function composedBoundaryArmRecords(
 				(({ graphNodeId, path }) => ({ collectionGraphNodeId: graphNodeId, collectionPath: path }))(
 					qualifyRead({ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath }),
 				)),
+			instancePath: instancePath + (repeat.instancePath ?? ''),
 			...(routes.length > 0 && {
-				instancePath,
 				propRoutes: routes.map((route) => ({ ...route, path: route.path ?? [] })),
 			}),
 			...(repeat.rowTemplate && { rowTemplate: qualifyRowTemplate(repeat.rowTemplate) }),
@@ -1362,8 +1362,6 @@ function composedBoundaryUpdate<U extends ComposedUpdate>(
 	noteLiveProps(graph, prefixes.symbols, boundary.composedGraphProps, boundary.startAnchor);
 	const rooted = update.moduleRootPath;
 	const armRecords = composedBoundaryArmRecords(boundary, update.armRecords, graph, undefined, rooted);
-	// A kernel-drawn arm names its rows from the module root, as the evaluator's render does.
-	if (rooted !== undefined) for (const repeat of armRecords.keyedRepeats ?? []) Object.assign(repeat, { instancePath: rooted });
 	return composedUpdateNodes(boundary, update, graph, prefixes.symbols, { ...update, armRecords });
 }
 

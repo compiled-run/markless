@@ -25,7 +25,7 @@ afterEach(async () => {
 	server = undefined;
 });
 
-type Shape = 'lists' | 'evaluated';
+type Shape = 'lists' | 'evaluated' | 'siblings';
 
 let built: Shape | undefined;
 async function buildAndServe(shape: Shape): Promise<string> {
@@ -181,7 +181,9 @@ async function exerciseRows(page: Page, list: string, reloads: number) {
 		const owner = page.locator(`[data-view="${view}"] ${list}`);
 		await expect.poll(() => rowsOf(page, view, list).count()).toBe(count);
 		await rowsOf(page, view, list).first().locator('[data-pick]').click();
-		await expect.poll(() => owner.locator('[data-picked]').textContent()).toBe('Dune');
+		await expect
+			.poll(() => owner.locator('[data-picked]').textContent(), { message: `${list} list ${view} pick` })
+			.toBe('Dune');
 		await owner.locator('[data-mark]').click();
 		await expect
 			.poll(() => owner.locator('[data-mark-text]').allTextContents(), { message: `${list} list ${view}` })
@@ -242,14 +244,29 @@ describe('a list added in component rows, answered in the browser of a productio
 		}
 	}, 180_000);
 
-	// Ships on main: rows the evaluator draws in a placed arm render an expression over the owner's state once and never follow its writes.
-	test.fails('rows whose expression reads the owner state follow its writes through the evaluator', async () => {
+	test('rows whose expression reads the owner state follow its writes through the evaluator', async () => {
 		const url = await buildAndServe('evaluated');
 		const browser = await chromium.launch();
 		try {
 			const page = await browser.newPage();
 			await addedListFill(page, url, false);
 			await exerciseRows(page, '.joined', 1);
+		} finally {
+			await browser.close();
+		}
+	}, 180_000);
+
+	test('a row holding two list components as direct siblings fills both, and their rows stay live', async () => {
+		const url = await buildAndServe('siblings');
+		const browser = await chromium.launch();
+		try {
+			const page = await browser.newPage();
+			const errors: string[] = [];
+			page.on('pageerror', (error) => errors.push(error.message));
+			await addedListFill(page, url, false);
+			await exerciseRows(page, '.joined', 1);
+			await exerciseRows(page, '.carded', 2);
+			expect(errors).toEqual([]);
 		} finally {
 			await browser.close();
 		}

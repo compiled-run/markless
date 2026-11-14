@@ -214,3 +214,48 @@ export function App() @{
 	]);
 	expect(rowMintCodes).toEqual([]);
 });
+
+test.each([
+	`
+function Count({ label }) @{
+	let seen = state(0);
+	<button onClick={() => seen++}>{label}</button>
+}
+
+export function App() @{
+	let views = state([{ id: 1, label: 'A' }]);
+	<section>
+		@for (const view of views; key view.id) {
+			<div data-row={view.id}><Count label={view.label} /><Count label={view.label} /></div>
+		}
+	</section>
+}
+`,
+	`
+function Tag({ text }) @{
+	<b>{text}</b>
+}
+
+function Note({ text }) @{
+	let open = state(false);
+	<small onClick={() => (open = !open)}>{text}</small>
+}
+
+export function Board() @{
+	let entries = state([{ key: 'a', text: 'A' }]);
+	<ul>
+		@for (const entry of entries; key entry.key) {
+			<li><Tag text={entry.text} /><em>and</em><Note text={entry.text} /><Tag text="x" /></li>
+		}
+	</ul>
+}
+`,
+])('a row element holding sibling components renders the row chunk whole', async (body) => {
+	const { repeat, rowMintCodes } = await compile(`import { state } from '@markless/core';\n${body}`);
+	expect(repeat?.rowComponent).toEqual({
+		componentName: body.includes('Board') ? 'Board' : 'App',
+		rowChunkId: 'repeat:repeat:0:row',
+	});
+	expect(repeat?.rowTemplate).toBeUndefined();
+	expect(rowMintCodes).toEqual([]);
+});
