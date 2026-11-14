@@ -211,6 +211,8 @@ type InlineDispatchInput = {
 };
 type InlineResumeModule = {
 	resumeContainerEvent(input: InlineDispatchInput): Promise<void> | void;
+	/** The router's entry evaluates the page's own resume module without starting it. */
+	routeModule?(root: ParentNode): Promise<unknown> | undefined;
 };
 type InlineSyncPolicyRuntime = {
 	decode?: (slot: unknown, records: ReadonlyMap<number, SerializedRecord>) => unknown;
@@ -893,6 +895,11 @@ function runInlineResumerStreamedWake(
 		currentScript?.getAttribute?.('data-markless-resume-module') ?? fallbackResumeModuleUrl;
 	if (!root || !resumeModuleUrl) return;
 	const life = (root.__mL ||= {});
+	const asleep = () => root.__mL === life && !root.__marklessDelegatedDispatch && !root.__asyncResumeRuntimeStarted;
+	const load = () =>
+		(root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
+			throw ((root.__mResume = undefined), error);
+		}));
 	// Once the response has ended and every queued arm has shown, an arm that never came still needs the runtime.
 	const check = () =>
 		defer.idle(root, async () => {
@@ -901,12 +908,18 @@ function runInlineResumerStreamedWake(
 				boundaryIds.every((id) =>
 					document.querySelector(`script[type="markless/arm"][data-boundary="${CSS.escape(id)}"]`),
 				)
-			)
+			) {
+				// Every answer arrived: evaluate the start's modules, one idle period each, and leave the runtime asleep for the first interaction.
+				const whenIdle = (run: () => void) =>
+					(globalThis.requestIdleCallback || setTimeout)(() => asleep() && run());
+				whenIdle(async () => {
+					const entry = await load().catch(() => undefined);
+					if (entry) whenIdle(() => void entry.routeModule?.(root)?.catch(() => {}));
+				});
 				return;
+			}
 			root.__marklessDelegatedDispatch = true;
-			const module = await (root.__mResume ||= loadModule(resumeModuleUrl).catch((error) => {
-				throw ((root.__mResume = undefined), error);
-			}));
+			const module = await load();
 			if (root.__mL === life) await module.resumeContainerEvent({ root, event: 0 });
 		});
 	if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', check, { once: true });

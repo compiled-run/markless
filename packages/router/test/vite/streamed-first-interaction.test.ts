@@ -6,6 +6,7 @@ import { join, resolve } from 'pathe';
 import { chromium, type Browser, type Page, type Request } from '@playwright/test';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
+import { MARKLESS_FIRST_INTERACTION_ROW_LIMIT } from '../../../web/src/first-interaction-rows.ts';
 import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -92,6 +93,72 @@ test('streamed answers show before any interaction, and the runtime has not star
 		);
 		expect(await runtimeStarted(page)).toBe(false);
 		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// Whether the chunk holding the page's own resume module, named by its route script, has run.
+const routeModuleEvaluated = (page: Page) =>
+	page.evaluate(() => {
+		const route = JSON.parse(
+			document.querySelector('script[type="@markless/core/route"]')?.textContent ?? '{}',
+		) as { resume?: [string] };
+		const packs = (globalThis as { __marklessPacks?: Record<string, unknown> }).__marklessPacks ?? {};
+		return !!route.resume && new URL(route.resume[0], location.href).href in packs;
+	});
+
+test('at idle the page evaluates its resume modules and the runtime stays asleep', async () => {
+	const { page, errors } = await openIdle('/rows');
+	try {
+		expect(await routeModuleEvaluated(page)).toBe(true);
+		expect(await runtimeStarted(page)).toBe(false);
+		expect(
+			await page.evaluate(
+				() => !!(document.querySelector('[data-async-container]') as { __marklessDispatch?: unknown }).__marklessDispatch,
+			),
+		).toBe(false);
+		expect(await browserRuns(page)).toBe(0);
+		await page.locator('.pick').nth(1).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a page serving rows up to the limit stays asleep; one more row starts the runtime after load', async () => {
+	for (const [rows, started] of [
+		[MARKLESS_FIRST_INTERACTION_ROW_LIMIT, false],
+		[MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1, true],
+	] as const) {
+		const { page, errors } = await openIdle(`/long?rows=${rows}`);
+		try {
+			expect(await page.locator('.pick').count()).toBe(rows);
+			expect(await runtimeStarted(page)).toBe(started);
+			await page.locator('.pick').nth(1).click();
+			await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Book 1');
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}
+});
+
+test('a press soon after load, before idle, starts the runtime once and fetches nothing', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	try {
+		await page.goto(`${server!.origin}/rows`, { waitUntil: 'load' });
+		const requests: string[] = [];
+		page.on('request', (request) => request.resourceType() === 'script' && requests.push(request.url()));
+		await page.locator('.pick').nth(1).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		await page.locator('.pick').nth(0).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Dune');
+		expect(requests).toEqual([]);
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
