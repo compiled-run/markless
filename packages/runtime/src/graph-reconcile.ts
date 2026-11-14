@@ -1,7 +1,6 @@
 import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 import { readPath } from './graph-core.ts';
-import { asyncCarriesValue, asyncShownPaths } from './graph-async-commit.ts';
 import { isAsyncSnapshotMetaKey, type DirtyPath } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncSnapshot,
@@ -353,11 +352,12 @@ export type DerivedReconcilePlane = {
 	readonly reconcileComputed: (computed: RuntimeComputedNode, previous: unknown) => void;
 	/** Commits a whole derived value onto a cell-backed computed node. */
 	readonly commitDerived: (write: RuntimeGraphWrite, path: ReadonlyArray<string>) => boolean;
-	/** Dirties the paths an async snapshot commit changed; `kept` when it puts the shown value back. */
+	/** Dirties the paths an async snapshot commit changed: the `shown` fields it moved, and its value unless it is `carried` forward. */
 	readonly publishAsync: (
 		node: RuntimeAsyncComputedNode,
 		previous: RuntimeGraphAsyncSnapshot,
-		kept: boolean,
+		shown: ReadonlyArray<ReadonlyArray<string>>,
+		carried: boolean,
 	) => void;
 	/** Flush-pass start: recompute the dirty computeds something is subscribed to. */
 	readonly recomputeSubscribed: () => void;
@@ -465,8 +465,8 @@ export const createDerivedReconcilePlane: DerivedReconcilePlaneFactory = (intern
 			scheduleFlush();
 			return true;
 		},
-		publishAsync(node, previous, kept) {
-			for (const path of asyncCommitPaths(node, previous, node.snapshot, kept)) {
+		publishAsync(node, previous, shown, carried) {
+			for (const path of asyncCommitPaths(node, previous, node.snapshot, shown, carried)) {
 				markDirtyPath(node.graphNodeId, path);
 			}
 		},
@@ -521,10 +521,11 @@ function asyncCommitPaths(
 	node: RuntimeAsyncComputedNode,
 	previous: RuntimeGraphAsyncSnapshot,
 	next: RuntimeGraphAsyncSnapshot,
-	kept: boolean,
+	shown: ReadonlyArray<ReadonlyArray<string>>,
+	carried: boolean,
 ): ReadonlyArray<ReadonlyArray<string>> {
-	const paths: ReadonlyArray<string>[] = asyncShownPaths(previous, next);
-	if (asyncCarriesValue(previous, next, kept)) return paths;
+	const paths: ReadonlyArray<string>[] = [...shown];
+	if (carried) return paths;
 
 	const previousValue = snapshotField(previous, 'value');
 	const nextValue = snapshotField(next, 'value');
