@@ -276,7 +276,13 @@ const item = computed(() => items[picked.id]);
     waits as before.
   - An event handler reads the inputs it pairs with an async-backed value the
     same way, except an input the handler writes: that stays live, so two
-    clicks count as two.
+    clicks count as two. This pairing is separate from a save's hold, below.
+  - While a save's hold still shows a state at its earlier value, an event
+    handler's own run (before its first `await`) reads that state, and any
+    sync computed over it, as shown, so a second press acts on what is on
+    screen. Three things read the new value instead: what that same run has
+    already written (and computeds over it), the inputs an async value works
+    out its key from, and all code after the first `await`.
   - The clicked control's own text (2026-11-10, owner, UC23): text inside a
     control element (`button`, `select`, `option`, `textarea`, `label`, the
     nearest one enclosing the text) reads the state that control's own

@@ -81,6 +81,23 @@ export function createPaintHold(
 	// What values derived while a state is shown paint, until no state is shown.
 	const shownDerived = new Map<string, unknown>();
 	let shownReaders: Set<string> | undefined;
+	// The press whose own run last wrote, and what it wrote: it reads those, and computeds over them, as code holds them.
+	let press: object | undefined;
+	let wrote = new Set<string>();
+	let live: Set<string> | undefined;
+	const readers = (ids: Iterable<string>): Set<string> => {
+		const found = new Set<string>();
+		const dependents = internals.dependents();
+		const visit = (id: string): void => {
+			for (const [node, , isAsync] of dependents.get(id) ?? [])
+				if (!isAsync && !found.has(node.graphNodeId)) {
+					found.add(node.graphNodeId);
+					visit(node.graphNodeId);
+				}
+		};
+		for (const id of ids) visit(id);
+		return found;
+	};
 
 	// Ends showing a state's earlier value; once none is shown, derived values paint what code reads again.
 	const unshow = (graphNodeId: string): boolean => {
@@ -105,21 +122,18 @@ export function createPaintHold(
 		// Computeds deriving from a shown state: code reads them afresh from the written values, paints from the cache.
 		fresh(graphNodeId) {
 			if (shownCells.size === 0) return false;
-			if (!shownReaders) {
-				const readers = (shownReaders = new Set());
-				const dependents = internals.dependents();
-				const visit = (id: string): void => {
-					for (const [node, , isAsync] of dependents.get(id) ?? [])
-						if (!isAsync && !readers.has(node.graphNodeId)) {
-							readers.add(node.graphNodeId);
-							visit(node.graphNodeId);
-						}
-				};
-				for (const id of shownCells.keys()) visit(id);
-			}
-			return shownReaders.has(graphNodeId);
+			return (shownReaders ??= readers(shownCells.keys())).has(graphNodeId);
 		},
 		before(graphNodeId, path, leaf) {
+			const current = currentDispatch();
+			if (current) {
+				if (current !== press) {
+					press = current;
+					wrote = new Set();
+				}
+				wrote.add(graphNodeId);
+				live = undefined;
+			}
 			const held = !computedNodes.has(graphNodeId) && hold(graphNodeId, path);
 			if (held && !shownCells.has(graphNodeId)) {
 				shownCells.set(graphNodeId, cells.get(graphNodeId));
@@ -142,8 +156,13 @@ export function createPaintHold(
 			for (const graphNodeId of shownCells.keys()) release(graphNodeId);
 		},
 		showing: () => shownCells.size > 0,
+		pressing(graphNodeId) {
+			const current = shownCells.size > 0 && currentDispatch();
+			if (!current) return false;
+			return current !== press || !(live ??= new Set([...wrote, ...readers(wrote)])).has(graphNodeId);
+		},
 		shows: (graphNodeId) => shownCells.has(graphNodeId) || shownDerived.has(graphNodeId),
-		readShown: (graphNodeId, path) => paint(() => read(graphNodeId, path)),
+		asShown: paint,
 		derived(graph, graphNodeId, value, run, skip) {
 			const land = (painted: unknown) => {
 				graph.write({ graphNodeId, value });

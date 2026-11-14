@@ -176,11 +176,11 @@ for (const mode of MODES) {
 		await expect.poll(() => text('[data-status]'), poll).toBe('Cancelled');
 	});
 
-	test(`${mode}: a handler reading the held state, and a computed over it, gets the new value`, async () => {
+	test(`${mode}: a handler reading the held state, and a computed over it, reads what the page shows until the reload lands`, async () => {
 		await ready(mode, 'after');
 		const { reload } = await saveThenKeepWorking();
 		click('[data-read]');
-		await expect.poll(() => text('[data-seen]'), poll).toBe('Saved/SAVED');
+		await expect.poll(() => text('[data-seen]'), poll).toBe('Saving/SAVING');
 		expect(text('[data-status]')).toBe('Saving');
 		reload.resolve();
 		await expect.poll(() => text('[data-status]'), poll).toBe('Saved');
