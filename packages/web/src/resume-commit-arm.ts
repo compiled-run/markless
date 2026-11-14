@@ -113,6 +113,7 @@ export function createArmCommitter(
 		readonly registerArmBranches?: (
 			boundaryId: string,
 			records: ReadonlyArray<ResumeArmBranchRecord>,
+			armLists?: ReadonlyArray<ResumeKeyedRepeatRecord>,
 		) => Promise<void>;
 		readonly graph?: import('@markless/runtime').RuntimeGraph;
 		// The live registration census: a born-late registration grows it, because a
@@ -288,7 +289,7 @@ function registerArmNow(
 			for (const [hostNodeId, records] of byHost) await deps.addBehaviors(hostNodeId, records);
 		}
 		if (materialized.branches.length)
-			await deps.registerArmBranches?.(boundary.id, materialized.branches);
+			await deps.registerArmBranches?.(boundary.id, materialized.branches, update.armRecords.keyedRepeats);
 		if (update.armRecords.asyncBoundaries?.length)
 			await registerNestedAsyncBoundaries(
 				deps,

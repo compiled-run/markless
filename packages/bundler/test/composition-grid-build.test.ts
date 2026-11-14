@@ -314,6 +314,21 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	const armLists: ReadonlyArray<readonly [string, Shape]> = [
+		['j. a list straight in a click-opened arm, open at load', { path: '/j-arm-list-open', view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
+		['j. a list straight in a click-opened arm, closed at load', { path: '/j-arm-list-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
+	];
+	for (const [name, shape] of armLists)
+		test(`${name}: first render, open, reload, close and reopen, save held, handler rejects`, async () => {
+			const run = new Run(shape, await visit(shape.path));
+			await run.firstRender();
+			await run.openArm();
+			await run.reload();
+			await run.closeAndReopen();
+			await run.saveHeld();
+			await run.handlerRejects();
+		});
+
 	test(`${armed[0]![0]}: first render, reload, close and reopen, save held, handler rejects`, async () => {
 		const run = new Run(openArm, await visit(openArm.path));
 		await run.firstRender();

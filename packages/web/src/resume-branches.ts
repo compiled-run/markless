@@ -8,6 +8,7 @@ import type {
 	ResumeDomComment,
 	ResumeDomElement,
 	ResumeDomNode,
+	ResumeKeyedRepeatRecord,
 	ResumePropFeed,
 	ResumeViewRecord,
 } from './resume-types.ts';
@@ -17,12 +18,14 @@ type Hosted<T> = T & { readonly hostPath: ReadonlyArray<number> };
 let journal: typeof import('./dom-journal.ts') | undefined;
 type RegisteredResumeBranch = ResumeBranchRecord & {
 	readonly armBoundaryId?: string;
+	readonly armLists?: ReadonlyArray<ResumeKeyedRepeatRecord>;
 };
 
 export function wireBranches(input: any) {
 	const branchesById = new Map<string, ResumeBranchRecord>(),
 		currentArmByBranchId = new Map<string, number>(),
-		startupArmBehaviorHostIds: string[] = [];
+		startupArmBehaviorHostIds: string[] = [],
+		startupArmLists: Array<Promise<void> | undefined> = [];
 	// Arm-scoped flips rewire per commit (fresh anchors); escalated records wire once per site.
 	const armFlipReleasesByBoundary = new Map<string, Array<() => void>>(),
 		wiredEscalationIds = new Set<string>();
@@ -43,6 +46,7 @@ export function wireBranches(input: any) {
 		const arm = currentArmByBranchId.get(branch.id);
 		if (arm === undefined || !branch.armRecords?.[arm]) continue;
 		startupArmBehaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
+		startupArmLists.push(wireArmLists(input, branch, arm));
 	}
 	async function materializeFlippedBranchArms(
 		entries: ReadonlyArray<DomJournalEntry>,
@@ -65,6 +69,7 @@ export function wireBranches(input: any) {
 				if (symbolId) void Promise.resolve(input.loadSymbol(symbolId)).catch(() => {});
 			for (const hostNodeId of materializeBranchArmRecords(input, branch, arm))
 				await activate(hostNodeId);
+			await wireArmLists(input, branch, arm);
 			if (branch.takenArm === arm && branch.servedArmRecords)
 				await input.registerServedArmRecords?.(branch, branch.servedArmRecords);
 		}
@@ -104,7 +109,7 @@ export function wireBranches(input: any) {
 	}
 	return {
 		branchesById,
-		startupArmBehaviorHostIds,
+		startupArmBehaviorHostIds: Promise.all(startupArmLists).then(() => startupArmBehaviorHostIds),
 		materializeFlippedBranchArms,
 		disposeRemovedRangeHosts,
 		registerArmBranches,
@@ -184,7 +189,10 @@ function createBranchRegistration(
 				const commit = await input.prepareArmCommit(branch, armUpdate);
 				const feeds = armUpdate.propFeeds ?? [];
 				// The commit runs the arm's first derives, which read these cells.
-				return () => (shows(update.arm) && feeds.forEach(follow), commit().then(() => feedArmProps(update.arm, feeds)));
+				return () => (
+					shows(update.arm) && feeds.forEach(follow),
+					commit().then(() => (feedArmProps(update.arm, feeds), wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats)))
+				);
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
@@ -293,13 +301,16 @@ function createBranchRegistration(
 	}
 
 	// Release prior flip subscriptions first: a fresh arm brings fresh anchors.
-	function registerArmBranches(
+	async function registerArmBranches(
 		boundaryId: string,
 		records: ReadonlyArray<RegisteredResumeBranch>,
-	): string[] {
+		// The lists the arm's record set carries: a streamed arm brings them with it.
+		armLists?: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	): Promise<string[]> {
 		for (const release of armFlipReleasesByBoundary.get(boundaryId) ?? []) release();
 		armFlipReleasesByBoundary.delete(boundaryId);
-		const behaviorHostIds: string[] = [];
+		const behaviorHostIds: string[] = [],
+			lists: Array<Promise<void> | undefined> = [];
 		for (const record of records) {
 			// A decided branch wires with no test; unwirable is a record with neither
 			// a test to read nor an arm the render painted.
@@ -311,12 +322,14 @@ function createBranchRegistration(
 				continue;
 			}
 			if (!live) continue;
-			const branch = { ...record, armBoundaryId: boundaryId };
+			const branch = { ...record, armBoundaryId: boundaryId, ...(armLists?.length && { armLists }) };
 			wireBranchRecord(branch);
 			const arm = currentArmByBranchId.get(branch.id);
 			if (arm === undefined || !branch.armRecords?.[arm]) continue;
 			behaviorHostIds.push(...materializeBranchArmRecords(input, branch, arm));
+			lists.push(wireArmLists(input, branch, arm));
 		}
+		await Promise.all(lists);
 		return behaviorHostIds;
 	}
 
@@ -430,9 +443,8 @@ function materializeBranchArmRecords(
 	const claim = (hostPath: ReadonlyArray<number>) => {
 		const element = marklessElementAt({ childNodes: armNodes }, hostPath);
 		if (!element) return;
-		const hostNodeId = `branch:${branch.id}:arm:${String(armIndex)}:${hostPath.join('.')}`;
-		input.disposedHosts.delete(hostNodeId);
-		input.elementsByHostId.set(hostNodeId, element);
+		const hostNodeId = armHostId(branch, armIndex, hostPath);
+		input.fileHost(hostNodeId, element);
 		return { hostNodeId, element };
 	};
 	for (const armEvent of set.events) {
@@ -489,6 +501,25 @@ function materializeBranchArmRecords(
 		if (host) elementHandles.register(host.hostNodeId, handle, host.element, branch.id, graph);
 	}
 	return [...byHost.keys()];
+}
+
+// Loaded only by a page whose arms hold a list, which its records demand, so a flip fetches nothing.
+function wireArmLists(
+	input: any,
+	branch: ResumeBranchRecord,
+	armIndex: number,
+	// The lists an arm's own commit wired.
+	committed?: ReadonlyArray<{ readonly id: string }>,
+): Promise<void> | undefined {
+	const lists = branch.armRecords?.[armIndex]?.repeatParents;
+	if (lists)
+		return import('./resume-arm-lists.ts').then((module) =>
+			module.wireArmLists(input, branch, armIndex, lists, nodesBetweenAnchors(branch.startAnchor, branch.endAnchor), committed),
+		);
+}
+
+export function armHostId(branch: ResumeBranchRecord, armIndex: number, hostPath: ReadonlyArray<number>): string {
+	return `branch:${branch.id}:arm:${String(armIndex)}:${hostPath.join('.')}`;
 }
 
 function isLiveComment(value: unknown): value is ResumeDomComment {

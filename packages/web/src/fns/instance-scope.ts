@@ -1214,6 +1214,9 @@ function composedBoundaryArmRecords(
 							? {
 									armRecords: branch.armRecords.map((arm) => ({
 										...arm,
+										...(arm.repeatParents && {
+											repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: prefix + list.repeatId })),
+										}),
 										events: (arm.events ?? []).map((event) => ({
 											...event,
 											symbolIds: (event.symbolIds ?? []).map(

@@ -141,6 +141,7 @@ export const runtimeDemandMap = {
 		"web/payload-graph-construct",
 		"web/payload-resume",
 		"web/repeat-runtime",
+		"web/resume-arm-lists",
 		"web/resume-async-boundaries",
 		"web/resume-async-wiring",
 		"web/resume-behaviors",
