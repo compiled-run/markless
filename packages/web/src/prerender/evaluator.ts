@@ -614,16 +614,15 @@ function freshArmCells(
 	);
 }
 
-// Composition routes read the live graph, where a whole async value is its snapshot's `value`.
+// Composition routes read the live graph, where an async value is its snapshot's `value`.
 export function runtimeEdgeProps<P extends { readonly kind?: string; readonly graphNodeId?: string; readonly path?: ReadonlyArray<string> }>(
 	props: ReadonlyArray<P>,
 	computed: ReadonlyArray<{ readonly graphNodeId: string; readonly async?: boolean }>,
 ): ReadonlyArray<P> {
 	return props.map((prop) =>
 		prop.kind === 'graph-reference' &&
-		!prop.path?.length &&
 		computed.some((record) => record.graphNodeId === prop.graphNodeId && record.async)
-			? { ...prop, path: ['value'] }
+			? { ...prop, path: ['value', ...(prop.path ?? [])] }
 			: prop,
 	);
 }

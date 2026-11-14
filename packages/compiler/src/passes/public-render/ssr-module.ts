@@ -109,6 +109,7 @@ import { createResidueDependencyReader, residueReferences } from './residue-depe
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { boundSymbolsForEdge, componentEdgeGraphRoutes } from './component-wiring.ts';
 import type { ComponentEdge, PublicRenderRoot } from './types.ts';
+import { asyncComputedGraphNodeIds } from '../../artifact-helpers/graph-paths.ts';
 
 /**
  * The minted id for one handle, as an expression usable anywhere this module's
@@ -1149,11 +1150,7 @@ function emitSsrDataLines(
 			graphProps: componentEdgeGraphRoutes(
 				edge,
 				hasProjection,
-				new Set(
-					input.semanticGraph.graphBindings.flatMap((binding) =>
-						binding.kind === 'computed' && binding.async === true ? [binding.id] : [],
-					),
-				),
+				asyncComputedGraphNodeIds(input.semanticGraph),
 			),
 			boundSymbols: boundSymbolsForEdge(edge, callbacks),
 			// A child inside an @try arm files its @if records with that arm, so a streamed arm carries them.

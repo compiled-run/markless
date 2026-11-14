@@ -48,8 +48,8 @@ import { asNodes, getIdentifierName, isNode, type AnyNode } from '../ast/nodes.t
 import { parseJavaScriptModule } from '../js-ast.ts';
 import {
 	asyncComputedGraphNodeIds,
-	asyncComputedReadPath,
 	browserGraphReads,
+	browserReadPath,
 } from '../artifact-helpers/graph-paths.ts';
 import { moduleIdOf } from '../module-id.ts';
 import {
@@ -1348,29 +1348,13 @@ function sourceModuleScopeLines(source: SymbolModulesInput['source']): string[] 
 	}
 }
 
-// A handler sees an async value as the template does: the resolved value, never its snapshot.
-function asyncValueReads<Read extends LoweredStateRead>(
-	reads: ReadonlyArray<Read> | undefined,
-	asyncComputedNodeIds: ReadonlySet<string>,
-): ReadonlyArray<Read> {
-	return browserGraphReads(reads ?? [], asyncComputedNodeIds);
-}
-
 function withAsyncValueReads<Symbol extends { readonly reads?: ReadonlyArray<LoweredStateRead> }>(
 	symbol: Symbol,
 	asyncComputedNodeIds: ReadonlySet<string>,
 ): Symbol {
 	return symbol.reads && asyncComputedNodeIds.size > 0
-		? { ...symbol, reads: asyncValueReads(symbol.reads, asyncComputedNodeIds) }
+		? { ...symbol, reads: browserGraphReads(symbol.reads, asyncComputedNodeIds) }
 		: symbol;
-}
-
-function armPartReadPath(
-	graphNodeId: string,
-	path: ReadonlyArray<string>,
-	asyncComputedNodeIds: ReadonlySet<string>,
-): ReadonlyArray<string> {
-	return asyncComputedNodeIds.has(graphNodeId) ? asyncComputedReadPath(path) : path;
 }
 
 // The first refusal recorded for a branch is the one its diagnostic reports.
@@ -1792,7 +1776,7 @@ function renderChunkParts(
 				parts.push({
 					read: {
 						graphNodeId: slot.residue.graphNodeId,
-						path: armPartReadPath(
+						path: browserReadPath(
 							slot.residue.graphNodeId,
 							slot.residue.path,
 							asyncComputedNodeIds,
@@ -1866,7 +1850,7 @@ function renderChunkParts(
 										: {
 												read: {
 													graphNodeId: rowSlot.residue.graphNodeId,
-													path: armPartReadPath(
+													path: browserReadPath(
 														rowSlot.residue.graphNodeId,
 														rowSlot.residue.path,
 														asyncComputedNodeIds,
@@ -1893,7 +1877,7 @@ function renderChunkParts(
 							rowParts.push({
 								read: {
 									graphNodeId: rowSlot.residue.graphNodeId,
-									path: armPartReadPath(
+									path: browserReadPath(
 										rowSlot.residue.graphNodeId,
 										rowSlot.residue.path,
 										asyncComputedNodeIds,
@@ -1917,7 +1901,7 @@ function renderChunkParts(
 					repeat: {
 						read: {
 							graphNodeId: repeat.collectionGraphNodeId,
-							path: armPartReadPath(
+							path: browserReadPath(
 								repeat.collectionGraphNodeId,
 								repeat.collectionPath,
 								asyncComputedNodeIds,
@@ -1987,7 +1971,7 @@ function renderChunkParts(
 				const read = scoped ?? {
 					read: {
 						graphNodeId: slot.residue.graphNodeId,
-						path: armPartReadPath(
+						path: browserReadPath(
 							slot.residue.graphNodeId,
 							slot.residue.path,
 							asyncComputedNodeIds,
@@ -8752,8 +8736,8 @@ export function buildSymbolModuleEmission(
 						? { moduleImports: symbol.graphAccess.moduleImports }
 						: {}),
 					order: symbol.order,
-					reads: asyncValueReads(
-						symbol.graphAccess.reads,
+					reads: browserGraphReads(
+						symbol.graphAccess.reads ?? [],
 						asyncComputedGraphNodeIds(input.semanticGraph),
 					),
 					writes: symbol.graphAccess.writes,

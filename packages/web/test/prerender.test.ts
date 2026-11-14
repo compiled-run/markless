@@ -852,13 +852,14 @@ test('linked boundary evaluation carries a composed branch graph-prop mapping in
 	);
 
 	expect(rendered.html).toContain('markless:branch:c0:branch-site:0-class');
+	// The live route reads the async value's field through its snapshot's value.
 	expect(rendered.armRecords.branches).toEqual([
 		expect.objectContaining({
 			id: 'c0:branch-site:0-class',
 			testReads: [
 				expect.objectContaining({
 					graphNodeId: 'computed:status',
-					path: ['active'],
+					path: ['value', 'active'],
 				}),
 			],
 		}),

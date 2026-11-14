@@ -9,7 +9,7 @@ import {
 	isSpreadAttribute,
 	unwrapExpressionContainer,
 } from '../../ast/tsrx.ts';
-import { asyncComputedReadPath } from '../../artifact-helpers/graph-paths.ts';
+import { browserReadPath } from '../../artifact-helpers/graph-paths.ts';
 import { emitHtmlChildren } from './html.ts';
 import { componentEdgeInstanceSegment, objectPropertyName } from './shared.ts';
 import type { ComponentEdge, CsrRenderContext, SsrRenderContext } from './types.ts';
@@ -195,7 +195,7 @@ export function componentEdgeGraphRoutes(
 					name: prop.name,
 					graphNodeId: prop.graphNodeId,
 					// The runtime reads an async value whole through its snapshot's value.
-					path: asyncGraphNodeIds?.has(prop.graphNodeId) ? asyncComputedReadPath(prop.path) : prop.path,
+					path: asyncGraphNodeIds ? browserReadPath(prop.graphNodeId, prop.path, asyncGraphNodeIds) : prop.path,
 				}
 			: {
 					name: prop.name,
