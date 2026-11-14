@@ -30,7 +30,7 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 10,
+			"delta": 5,
 			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
 			"date": "2026-11-14"
 		},
@@ -61,22 +61,10 @@
 			"path": [
 				"walls",
 				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 4,
-			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 16,
+			"delta": -5,
 			"reason": "a flip or settle rendered at an owner its own file places rebinds through the edges above it",
 			"date": "2026-11-14"
 		}
