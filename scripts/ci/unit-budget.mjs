@@ -372,6 +372,7 @@ const sameFactors = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {}
 export function evaluate(budget, measurements) {
 	const latest = latestPerShard(measurements);
 	const failures = validate([...latest.values()], budget);
+	const warnings = [];
 	const lines = [];
 	const measured = [...latest.keys()];
 	if (!latest.size) failures.push('no unit budget measurements: every unit shard uploads one');
@@ -413,13 +414,29 @@ export function evaluate(budget, measurements) {
 					`stale anchor: ${name} ${change}. The suite got lighter, so the anchor no longer protects anything; re-anchor from this run`,
 				);
 		};
-		band(
-			"total CPU at the anchors' speed",
-			cpuS,
-			budget.anchors.cpuS,
-			budget.margin.cpu,
-			'CPU-s',
-		);
+		// A shard on a model with no factor gets the band measured before factors existed.
+		const unknown = budget.models
+			? [...latest].filter(([, m]) => !budget.models.factors?.[m.cpuModel])
+			: [];
+		const unknownMargin = budget.models?.unknownMargin ?? budget.margin.cpu;
+		const anchorOf = (shard) => budget.anchors.shards?.[shard]?.cpuS ?? 0;
+		const cpuMargin = unknown.length
+			? round(
+					[...latest.keys()].reduce(
+						(sum, shard) =>
+							sum +
+							anchorOf(shard) *
+								(unknown.some(([s]) => s === shard) ? unknownMargin : budget.margin.cpu),
+						0,
+					) / budget.anchors.cpuS,
+					3,
+				)
+			: budget.margin.cpu;
+		for (const [shard, m] of unknown)
+			warnings.push(
+				`shard ${shard} ran on ${m.cpuModel}, a CPU model with no factor, so its share of the CPU band is the ±${round(unknownMargin * 100)}% measured without factors. Once that model has 5 samples, refit with \`node scripts/ci/unit-budget.mjs models --from <run>... --reason "..."\`, then re-run \`margin\` and \`accept\``,
+			);
+		band("total CPU at the anchors' speed", cpuS, budget.anchors.cpuS, cpuMargin, 'CPU-s');
 		band(
 			'largest shard peak RSS',
 			peakRssMb,
@@ -431,6 +448,7 @@ export function evaluate(budget, measurements) {
 	const run = [...latest.values()][0]?.run;
 	return {
 		failures,
+		warnings,
 		cpuS,
 		peakRssMb,
 		report: [
@@ -633,6 +651,7 @@ export function deriveModels(budget, runs, reason, date = today(), minimumSample
 		[...factors.values()].reduce((sum, f) => sum + Math.log(f), 0) / factors.size,
 	);
 	const models = {
+		unknownMargin: budget.models?.unknownMargin ?? budget.margin?.cpu ?? null,
 		factors: Object.fromEntries(
 			[...factors]
 				.sort(([a], [b]) => a.localeCompare(b))
@@ -677,6 +696,7 @@ async function main(argv) {
 		const measurements = readMeasurements(dir);
 		const result = evaluate(budget, measurements);
 		console.log(result.report);
+		for (const warning of result.warnings) console.log(`::warning::${warning}`);
 		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) => a.localeCompare(b)))
 			console.log(describePeak(m));
 		if (!result.failures.length) {

@@ -385,10 +385,11 @@
 				"43556033887",
 				"43551039878"
 			],
-			"reason": "re-anchored with CPU-model factors from today's 9 green merge-queue runs (27 shard measurements): main's suite reads +9.5% against the 2026-11-12 anchor, as 214 test files changed since 64b23daf, growth the old 20.4% band absorbed; peak RSS median 4171 MB"
+			"reason": "re-anchored with CPU-model factors from 9 green merge-queue runs of 2026-11-14 (27 shard measurements); main reads +9.5% against the 2026-11-12 anchor (+7.8% at d61244a69, run 43551039878, against the 36 measurements of 64b23daf). Per-file test time, machine-normalised, 64b23daf to d61244a69: +365 s, of which router child-async-catch.test.ts grew 2 tests to 112 in #653 (c1fe2b983), 14 s to 140 s (raw, runs 43134571598 and 43576277596), 40% of the normalised growth; 37 new test files 90 s, 25% (bundler composition-grid-build 18 s, kernel-placed-rows-fixture 16 s, router form-in-place 15 s, submit-hold-preload 10 s, prerender-inline-event-record 9 s); router vite build tests (fragment-navigation-webkit, async-child-ssr, kept-late-handler, navigation-stream) and bundler ssr-row-outer-read-fixture most of the rest; the old 20.4% band absorbed it. Peak RSS median 4171 MB"
 		}
 	],
 	"models": {
+		"unknownMargin": 0.204,
 		"factors": {
 			"AMD EPYC 7763 64-Core Processor": 1.045,
 			"AMD EPYC 9V45 96-Core Processor": 0.89,

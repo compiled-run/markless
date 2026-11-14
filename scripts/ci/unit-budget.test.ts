@@ -160,6 +160,31 @@ describe('check', () => {
 		expect(result.status).toBe(0);
 	});
 
+	test('a shard on a CPU model with no factor gets the band measured without factors, and a warning', () => {
+		const models = { unknownMargin: 0.2, factors: { 'test cpu': 1 } };
+		const budget = {
+			...anchored,
+			models,
+			anchors: { ...anchored.anchors, models: models.factors },
+			margin: { ...anchored.margin, models: models.factors },
+		};
+		const shards = (cpuModel: string) => [
+			{ shard: '1/2', cpuS: 100, peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 230, cpuModel, peakRssMb: 1500 },
+		];
+		// +10% overall: outside the 5% band, inside 1/3 * 5% + 2/3 * 20% = 15%.
+		const known = check(budget, shards('test cpu'));
+		expect(known.status).toBe(1);
+		expect(known.output).toContain('noise margin ±5%');
+		const unknown = check(budget, shards('new runner cpu'));
+		expect(unknown.status).toBe(0);
+		expect(unknown.output).toContain('noise margin ±15%');
+		expect(unknown.output).toContain(
+			'::warning::shard 2/2 ran on new runner cpu, a CPU model with no factor',
+		);
+		expect(unknown.output).toContain('unit-budget.mjs models --from');
+	});
+
 	test('fails when the CPU model factors changed after the anchors and the margin', () => {
 		const result = check({ ...anchored, models: { factors: { 'test cpu': 1.1 } } }, [
 			{ shard: '1/2', cpuS: 110, peakRssMb: 2000 },
