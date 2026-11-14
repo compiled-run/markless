@@ -2720,6 +2720,7 @@ export type ProtocolViewArmBranchRecord = {
 		NonNullable<ProtocolViewPayload['branches']>[number]['contentReads']
 	>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
+	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly startAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
 	readonly endAnchor?: { readonly strategy: 'arm-branch-comment'; readonly index: number };
 	readonly armRecords?: NonNullable<ProtocolViewPayload['branches']>[number]['armRecords'];

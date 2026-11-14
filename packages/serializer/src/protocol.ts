@@ -344,6 +344,12 @@ export type ProtocolBranchArmSeed = {
 	readonly value: unknown;
 };
 
+/**
+ * Per arm, the instance segments of the components it holds, under the branch's own instance path.
+ * Their computeds run only while that arm shows.
+ */
+export type ProtocolBranchArmComponents = ReadonlyArray<ReadonlyArray<string>>;
+
 export type ProtocolArmBranchRecord = {
 	readonly id: string;
 	readonly testReads: ReadonlyArray<{
@@ -355,6 +361,7 @@ export type ProtocolArmBranchRecord = {
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
+	readonly armComponents?: ProtocolBranchArmComponents;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch inside the arm keeps the `dom-order-comment`
 	// anchors its own module counted; they name its comment text, not an index
@@ -776,6 +783,7 @@ export type ProtocolViewPayload = {
 		readonly symbolId?: string;
 		readonly armTests?: ReadonlyArray<unknown>;
 		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
+		readonly armComponents?: ProtocolBranchArmComponents;
 		readonly armRecords?: ReadonlyArray<{
 			readonly events: ReadonlyArray<ProtocolSubmitEventFacts & {
 				readonly hostPath: ProtocolElementAddress;

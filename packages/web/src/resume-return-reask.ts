@@ -184,7 +184,7 @@ type WriteState =
 /** A round whose refresh runs: it ends, releasing its senders' controls, once none of the values it asked is pending. */
 type Reload = {
 	readonly senders: Set<DispatchSpan>;
-	asked: RuntimeAsyncComputedNode[];
+	readonly asked: Held;
 	/** Containers whose re-asked runs have not started yet. */
 	readonly starting: Set<Container>;
 	readonly stops: Array<(() => void) | undefined>;
@@ -310,21 +310,25 @@ function endHolds(held: Held, outcome: WriteOutcome, graph?: Graph): void {
 	for (const [node, owner] of held)
 		if (!graph || owner === graph) {
 			held.delete(node);
-			owner.asyncPlane?.()?.endEntry(node.graphNodeId, outcome);
+			if (live(node, owner)) owner.asyncPlane?.()?.endEntry(node.graphNodeId, outcome);
 		}
 }
+
+// A value whose arm closed left its plane: it keeps the pending look its mark gave it, but nothing will settle it.
+const live = (node: RuntimeAsyncComputedNode, graph: Graph) => graph.asyncPlane?.()?.nodes.get(node.graphNodeId) === node;
+const waitedFor = (node: RuntimeAsyncComputedNode, graph: Graph) => node.snapshot.status === 'pending' && live(node, graph);
 
 // A reload that no named dispatch started (it came from a write sent after an await) is still loading.
 function reloadingUnattributed(): boolean {
 	for (const reload of reloads)
-		if (reload.senders.size === 0) for (const node of reload.asked) if (node.snapshot.status === 'pending') return true;
+		if (reload.senders.size === 0) for (const [node, graph] of reload.asked) if (waitedFor(node, graph)) return true;
 	return false;
 }
 
 // Heard in the flush pass that publishes the last answer, after the older subscriptions that clear the content's marks; the marks end when that pass lands.
 function settleReload(reload: Reload, landed?: Promise<void>): void {
 	if (!reloads.has(reload) || reload.starting.size > 0) return;
-	for (const node of reload.asked) if (node.snapshot.status === 'pending') return;
+	for (const [node, graph] of reload.asked) if (waitedFor(node, graph)) return;
 	reloads.delete(reload);
 	for (const stop of reload.stops.splice(0)) stop?.();
 	roundDone(reload.senders, false, landed);
@@ -336,7 +340,7 @@ function refreshIfOwed(wentOn?: DispatchSpan): void {
 	for (const sender of state.senders) if (sender !== wentOn && dispatchSpans().has(sender)) return;
 	const { due, senders, held } = state;
 	move({ phase: WRITE_IDLE });
-	const reload: Reload = { senders, asked: [...held.keys()], starting: new Set(due.keys()), stops: [] };
+	const reload: Reload = { senders, asked: new Map(held), starting: new Set(due.keys()), stops: [] };
 	reloads.add(reload);
 	const id = `markless:reload:${++reloadCount}`;
 	for (const [node, graph] of held)
@@ -531,10 +535,9 @@ export function registerWriteRefresh(graph: Container[0], boundaries: Container[
 		if (state.phase !== WRITE_IDLE) endHolds(state.held, 'saved', graph);
 		if (state.phase === WRITE_OWED) state.due.delete(container);
 		// A page that goes mid-refresh ends its part of each round, so no control or form stays marked by it.
-		const nodes = graph.asyncPlane?.()?.nodes;
 		for (const reload of reloads) {
 			reload.starting.delete(container);
-			reload.asked = reload.asked.filter((node) => nodes?.get(node.graphNodeId) !== node);
+			for (const [node, owner] of reload.asked) if (owner === graph) reload.asked.delete(node);
 			settleReload(reload);
 		}
 	};

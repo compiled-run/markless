@@ -29,6 +29,8 @@ export const NODE_RUNNING = 3;
 /** A run on the inputs the screen shows while an async input refreshes; it lands into blocked. */
 export const NODE_RUNNING_ON_SHOWN = 4;
 export const NODE_SETTLED = 5;
+/** Its arm closed: the plane forgot it, so it never runs, publishes or holds a mark again, and nothing waits on it. */
+export const NODE_DROPPED = 6;
 
 export type AsyncNodePhase =
 	| typeof NODE_IDLE
@@ -36,7 +38,8 @@ export type AsyncNodePhase =
 	| typeof NODE_BLOCKED
 	| typeof NODE_RUNNING
 	| typeof NODE_RUNNING_ON_SHOWN
-	| typeof NODE_SETTLED;
+	| typeof NODE_SETTLED
+	| typeof NODE_DROPPED;
 
 /** Throws when an async value could not move from `from` to `to`. */
 export function assertAsyncNodeMove(from: AsyncNodePhase, to: AsyncNodePhase): void {
@@ -55,9 +58,13 @@ export function assertAsyncNodeMove(from: AsyncNodePhase, to: AsyncNodePhase): v
 		case NODE_SETTLED:
 			allowed = from !== NODE_PLANNED && from !== NODE_BLOCKED;
 			break;
+		case NODE_DROPPED:
+			allowed = true;
+			break;
 		default:
 			allowed = false;
 	}
+	if (from === NODE_DROPPED) allowed = false;
 	if (!allowed) throw new Error(`Illegal async node phase move ${from} -> ${to}`);
 }
 
@@ -150,7 +157,7 @@ export type AsyncPlaneContext = AsyncComputedPlaneInternals & {
 
 /** What the refresh half reads: the context, plus the derived cells sync hops write, by source, and those written since their derive. */
 export type AsyncPlaneState = AsyncPlaneContext & {
-	/** Called for each settled snapshot a value publishes, as it publishes. */
+	/** Called for each settled snapshot a value publishes, as it publishes, and for a value dropped while a reload waited on it. */
 	readonly settled: Set<(node: RuntimeAsyncComputedNode) => void>;
 	/** Asks a value to run again in the next microtask, as a write to one of its inputs does. */
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
@@ -205,7 +212,7 @@ export function createAsyncPlane(
 	// Inputs written in one synchronous turn start one run per value, on the final inputs; a read in between starts them first.
 	let written: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
 	const invalidate = (node: RuntimeAsyncComputedNode): void => {
-		if (node.phase === NODE_IDLE) return;
+		if (node.phase === NODE_IDLE || nodes.get(node.graphNodeId) !== node) return;
 		if (!written) {
 			written = new Map();
 			queueMicrotask(startWritten);
@@ -236,10 +243,11 @@ export function createAsyncPlane(
 				}
 			},
 		});
-	const withRefresh = (run: (bound: AsyncRefresh) => void): void => {
+	const withRefresh = (run: (bound: AsyncRefresh) => void, node?: RuntimeAsyncComputedNode): void => {
 		if (bound) return run(bound);
 		const quiet = context().isQuiet?.();
 		const replay = (loaded: AsyncRefresh) => {
+			if (node?.phase === NODE_DROPPED) return;
 			replaying = quiet;
 			try {
 				run(loaded);
@@ -268,10 +276,17 @@ export function createAsyncPlane(
 		}
 	};
 	for (const each of asyncComputed ?? []) add(createNode(each));
-	function startWritten(): void {
-		const batch = written;
-		written = undefined;
-		batch?.forEach((quiet, node) =>
+	// Runs that writes asked of loads an arm owns, held until the pass has flipped the arm.
+	let armHeld: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
+	function startWritten(passEnd?: boolean): void {
+		const batch = passEnd ? armHeld : written;
+		if (passEnd) armHeld = undefined;
+		else written = undefined;
+		batch?.forEach((quiet, node) => {
+			// A gate fetches nothing, so it never waits.
+			const shown = node.boundaryGate ? undefined : internals.armShown?.(node.graphNodeId);
+			if (!passEnd && shown !== undefined) return void (armHeld ??= new Map()).set(node, quiet);
+			if (shown === false || nodes.get(node.graphNodeId) !== node) return;
 			withRefresh((loaded) => {
 				replaying = quiet;
 				try {
@@ -279,23 +294,37 @@ export function createAsyncPlane(
 				} finally {
 					replaying = undefined;
 				}
-			}),
-		);
+			}, node);
+		});
 	}
 	const forward = (graphNodeId: string, call: (bound: AsyncRefresh, node: RuntimeAsyncComputedNode) => void): void => {
 		const node = nodes.get(graphNodeId);
-		if (node) withRefresh((loaded) => call(loaded, node));
+		if (node) withRefresh((loaded) => call(loaded, node), node);
 	};
 
 	const plane: AsyncComputedPlane = {
 		nodes,
 		read(node, path) {
 			if (written?.has(node)) startWritten();
-			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node));
+			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node), node);
 			return peek(node, path);
 		},
 		invalidate,
 		startWritten,
+		drop(owns) {
+			for (const [graphNodeId, node] of nodes)
+				if (owns(graphNodeId)) {
+					moveNode(node, NODE_DROPPED);
+					node.controller?.abort();
+					node.version++;
+					node.entryHold = undefined;
+					nodes.delete(graphNodeId);
+					written?.delete(node);
+					armHeld?.delete(node);
+					// A reload that re-asked it waits on it no more.
+					state?.settled.forEach((heard) => heard(node));
+				}
+		},
 		markEntry(graphNodeId, save) {
 			forward(graphNodeId, (loaded, node) => loaded.markEntry(node, save));
 		},
@@ -319,7 +348,7 @@ export function createAsyncPlane(
 			if (node?.snapshot.status !== (revalidate ? 'fulfilled' : 'rejected')) return false;
 			// A reset re-runs a rejected value, and a page shown again re-asks a fulfilled one, though the key has not changed.
 			moveNode(node, NODE_PLANNED);
-			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined));
+			withRefresh((loaded) => loaded.advance(node, revalidate ? 'revalidate' : undefined), node);
 			return true;
 		},
 		withInputs(graphNodeIds) {

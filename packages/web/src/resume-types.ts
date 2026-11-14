@@ -204,6 +204,7 @@ export type ResumeBranchRecord = {
 		readonly graphNodeId: string;
 		readonly value: unknown;
 	}>;
+	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	readonly armRecords?: ReadonlyArray<ResumeBranchArmRecordSet>;
 	// A branch whose arm holds a component that has to run: flips commit a range.
@@ -264,6 +265,7 @@ export type ResumeArmBranchRecord = {
 	readonly takenArm?: number;
 	readonly symbolId?: string;
 	readonly armTests?: ReadonlyArray<unknown>;
+	readonly armComponents?: ReadonlyArray<ReadonlyArray<string>>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
 	// A composed child's branch keeps the `dom-order-comment` anchors its own
 	// module counted; they resolve by anchor text inside the arm, not by index.

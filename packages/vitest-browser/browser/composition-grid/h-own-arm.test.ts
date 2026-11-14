@@ -36,14 +36,13 @@ test('other file, open at load: SSR', () => someSteps(lookupOpen('SSR', () => re
 test('served open by a caller: CSR', () => someSteps(servedOpen('CSR', () => render(ServedOpenPage)), BEFORE_CLOSE));
 test('served open by a caller: SSR', () => someSteps(servedOpen('SSR', () => renderSSR(ServedOpenPage)), BEFORE_CLOSE));
 
-// Known defect: a child composed while its arm was open in the first render keeps following its props after the arm
-// closes, so it loads while closed and is reused, without asking again, when the arm reopens.
+// A child composed while its arm was open in the first render stops when the arm closes, and asks again when it reopens.
 for (const [name, run] of [
 	['other file, open at load: CSR', lookupOpen('CSR', () => render(LookupPage))],
 	['other file, open at load: SSR', lookupOpen('SSR', () => renderSSR(LookupPage))],
 	['served open by a caller: CSR', servedOpen('CSR', () => render(ServedOpenPage))],
 	['served open by a caller: SSR', servedOpen('SSR', () => renderSSR(ServedOpenPage))],
 ] as const) {
-	test.fails(`${name}: a closed arm loads nothing on a reload`, () => oneStep(run, 'reload while closed, then open'));
-	test.fails(`${name}: an arm closed while loading asks again when it reopens`, () => oneStep(run, 'close while loading'));
+	test(`${name}: a closed arm loads nothing on a reload`, () => oneStep(run, 'reload while closed, then open'));
+	test(`${name}: an arm closed while loading asks again when it reopens`, () => oneStep(run, 'close while loading'));
 }

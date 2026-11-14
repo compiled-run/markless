@@ -84,6 +84,8 @@ const KEYED_REPEAT = ['web/repeat-runtime', 'web/resume-keyed-repeats'];
 // Arm range commits and served-arm registration load only for records that own an arm.
 const ARM_COMMIT = ['web/resume-commit-arm'];
 const BRANCH = ['web/resume-branches', ...ARM_COMMIT];
+// Stops what an arm's components own once the arm closes; only a branch naming such components loads it.
+const ARM_GATE = ['web/fns/arm-gate'];
 // Settle tracking and streamed-arm adoption load only for async boundaries.
 const ASYNC_BOUNDARY = [
 	'web/resume-async-boundaries',
@@ -110,6 +112,7 @@ export const RUNTIME_CAPABILITY_MODULE_IDS: ReadonlyArray<string> = [
 	...ASYNC_BOUNDARY,
 	...HELD_INPUTS,
 	...SHARED_INSTANCES,
+	...ARM_GATE,
 ];
 // The overlay behaviour. Recording the demand here is what makes it emittable at
 // all: no module the runtime always loads may write the `import()` specifier, or
@@ -335,6 +338,7 @@ export function createRuntimeDemandMap(
 			...ARM_ROWS,
 			...ARM_LISTS,
 			...BRANCH,
+			...ARM_GATE,
 			...ASYNC_BOUNDARY,
 			...HELD_INPUTS,
 			...BEHAVIOR,
@@ -472,7 +476,24 @@ function capabilityModuleIds(
 		...(asyncBoundary ? ASYNC_BOUNDARY : []),
 		...(state.computed.some((computed) => computed.holds) ? HELD_INPUTS : []),
 		...(hasLiveSharedDefinitions(state) ? SHARED_INSTANCES : []),
+		...(viewGatesArms(view) ? ARM_GATE : []),
 	];
+}
+
+function viewGatesArms(view: ProtocolViewPayload): boolean {
+	type Arm = ProtocolArmRecordSet | NonNullable<ProtocolArmBranchRecord['armRecords']>[number];
+	const armGates = (arm: Arm): boolean =>
+		(('branches' in arm && arm.branches) || []).some(
+			(branch) => !!branch.armComponents || (branch.armRecords ?? []).some(armGates),
+		);
+	return (
+		(view.branches ?? []).some(
+			(branch) =>
+				!!branch.armComponents ||
+				(branch.armRecords ?? []).some(armGates) ||
+				(!!branch.servedArmRecords && armGates(branch.servedArmRecords)),
+		) || (view.asyncBoundaries ?? []).some((boundary) => [boundary.armRecords ?? []].flat().some(armGates))
+	);
 }
 
 // Component rows and arms that run a component render records this view declares; an imported child's are in its own map.
@@ -1068,6 +1089,7 @@ function payloadDemandRecords(
 				runtimeModuleIds: unique([
 					...BRANCH,
 					...(armsHoldLists([record]) ? ARM_LISTS : []),
+					...(record.armComponents ? ARM_GATE : []),
 					...symbolIdsDemand(flipSymbolIds, symbolDemand),
 				]),
 			};

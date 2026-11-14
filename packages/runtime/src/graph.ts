@@ -62,6 +62,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly isQuiet?: () => boolean;
 	/** True while a write's dirty paths are still queued or being processed; `endEntry` waits on this before concluding a handler's write never reached anything. */
 	readonly hasPendingFlush?: () => boolean;
+	/** False for a value an @if or @switch arm owns once that arm no longer shows; undefined for a value no arm owns. */
+	readonly armShown?: (graphNodeId: string) => boolean | undefined;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -69,8 +71,13 @@ export type AsyncComputedPlane = {
 	readonly nodes: ReadonlyMap<string, RuntimeAsyncComputedNode>;
 	readonly read: (node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>) => unknown;
 	readonly invalidate: (node: RuntimeAsyncComputedNode) => void;
-	/** Starts the runs that writes since the last call asked for; a flush calls it before its subscriptions read. */
-	readonly startWritten?: () => void;
+	/**
+	 * Starts the runs that writes since the last call asked for; a flush calls it before its subscriptions read.
+	 * A value an arm owns waits for `passEnd`, when the pass has decided its arm, and starts only if the arm still shows.
+	 */
+	readonly startWritten?: (passEnd?: boolean) => void;
+	/** Forgets the async values `owns` names, aborting a run in flight: a closed arm's answer is never shown, and a reopened one defines them fresh. */
+	readonly drop: (owns: (graphNodeId: string) => boolean) => void;
 	readonly define: (asyncComputed: RuntimeGraphAsyncComputed) => void;
 	/** Re-runs a rejected async value with the key it already has, or quietly revalidates a fulfilled one when `revalidate` is set; false otherwise. */
 	readonly rerun: (graphNodeId: string, revalidate?: boolean) => boolean;
@@ -386,6 +393,9 @@ export type RuntimeGraph = {
 	readonly pullBeforeRead?: (graphNodeId: string, pull: () => void) => void;
 	/** The async plane, when the graph has async values: re-runs, failures, entry marks, matched reads and derive marks go through it. */
 	readonly asyncPlane?: () => AsyncComputedPlane | undefined;
+	/** Which values an @if or @switch arm owns: `shown` answers false once the owning arm no longer shows, undefined for any other value. */
+	readonly gateArms?: (shown: (graphNodeId: string) => boolean | undefined) => void;
+	readonly armShown?: (graphNodeId: string) => boolean | undefined;
 	/** Adds an async computed a component rendered after the graph was built; false when the node already exists. */
 	readonly defineAsyncComputed?: (
 		asyncComputed: RuntimeGraphAsyncComputed,
@@ -604,6 +614,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		scheduleFlush();
 	};
 
+	let armShown: ((graphNodeId: string) => boolean | undefined) | undefined;
 	const commitCell = (
 		graphNodeId: string,
 		path: ReadonlyArray<string>,
@@ -729,6 +740,7 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 		hasPendingFlush() {
 			return hasPendingFlush();
 		},
+		armShown: (graphNodeId) => armShown?.(graphNodeId),
 	};
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
@@ -774,7 +786,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 
 		try {
 			try {
-				while (dirtyPaths.length > 0) {
+				// The runs arm-owned values deferred start last, and what they dirty lands in this pass.
+				while (dirtyPaths.length > 0 || (asyncPlane?.startWritten?.(true), dirtyPaths.length > 0)) {
 					asyncPlane?.startWritten?.();
 					if (plane) paint(() => plane.recomputeSubscribed());
 					const pending = dirtyPaths.splice(0);
@@ -995,6 +1008,10 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return paintPlane;
 		},
 		paintHold: () => paintPlane,
+		gateArms(shown) {
+			armShown = shown;
+		},
+		armShown: internals.armShown,
 		holdFlush() {
 			flushHolds++;
 			let held = true;

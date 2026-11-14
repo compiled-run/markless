@@ -107,9 +107,8 @@ test('a closed panel derives nothing: its sync computed never sees the value tha
 	expect(labelLog).not.toContain(null);
 });
 
-// Known defect, also on main: a close that lands after the arm commits but before its values first run is read through the
-// panel's bound captures, which name the parent's value, so the first run sees the value that closed it.
-test.fails('closing an @if right after it opens runs nothing with the closing value', async () => {
+// A close that lands after the arm commits but before its values first run: they wait for the pass that removes the arm.
+test('closing an @if right after it opens runs nothing with the closing value', async () => {
 	await render(HeldPicker);
 	// The handler closes the @if once the render that opens it has derived the panel's label.
 	click('[data-open-then-close]');
@@ -121,16 +120,19 @@ test.fails('closing an @if right after it opens runs nothing with the closing va
 	expect(subjectLog).toEqual([1]);
 });
 
-// Known defect: an @if served open composed its child on the server, and the served page does not name the child's live props,
-// so closing it still runs the child's computeds with the value that closed it.
-test.fails('an @if served open loads nothing when it closes', async () => {
-	await render(OpenSubjectPicker);
-	await settle(1);
-	await shows('subject 1 round 0');
-	click('[data-close]');
-	await expect.poll(panel).toBeNull();
-	click('[data-open-one]');
-	await settle(1);
-	await shows('subject 1 round 0');
-	expect(subjectLog).not.toContain(null);
-});
+// An arm open in the first render names the components it holds, so closing it stops their values too.
+// renderSSR takes its component literally.
+const openPicker = { CSR: () => render(OpenSubjectPicker), SSR: () => renderSSR(OpenSubjectPicker) };
+for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: an @if open in the first render loads nothing when it closes`, async () => {
+		await openPicker[mode]();
+		if (mode === 'CSR') await settle(1);
+		await shows('subject 1 round 0');
+		click('[data-close]');
+		await expect.poll(panel).toBeNull();
+		click('[data-open-one]');
+		await settle(1);
+		await shows('subject 1 round 0');
+		expect(subjectLog).toEqual(mode === 'CSR' ? [1, 1] : [1]);
+	});
+

@@ -134,7 +134,13 @@ function createBranchRegistration(
 			for (const armEvent of armRecordSet.events) input.eventTypes.add(armEvent.eventName);
 		// IDREFs outside the arms follow the PAINTED arm; the served arm never materializes.
 		const paintArm = (arm: number) => {
+			const left = currentArmByBranchId.get(branch.id);
 			currentArmByBranchId.set(branch.id, arm);
+			// The components an arm holds run their values only while it shows.
+			if (branch.armComponents)
+				void import('./fns/arm-gate.ts').then((gate) =>
+					gate.gateBranchArms(input.graph, branch, left, currentArmByBranchId, wired, readBranchArm, releasedWithArm),
+				);
 			if (branch.idrefSites?.length)
 				void import('./resume-arm-records-lazy.ts').then((records) =>
 					records.syncBranchIdrefSites(input.elementsByHostId, branch, arm),
