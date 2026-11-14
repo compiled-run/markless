@@ -1,6 +1,6 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt } from '../resume-anchor-census.ts';
-import { protocolRowSegment } from '../../../serializer/src/protocol-row-segment.ts';
+import { protocolRowSegment } from '../../../serializer/src/protocol-instance-path.ts';
 import {
 	findRepeatItemByKey,
 	readKeyedRepeatCollection,

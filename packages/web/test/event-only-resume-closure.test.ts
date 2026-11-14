@@ -147,10 +147,10 @@ const resumeOnDemandEntries = [
 // moves and removes it as that whole range: 33,512 -> 35,910 raw. The range code itself is the lazy
 // fns/served-row-ranges.ts, loaded only by a page with such a list; minified 10,887 -> 11,524, gzip 4,381 -> 4,550 bytes
 // (rolldown, workspace packages and lazy imports external, same method both sides).
-// 2026-11-14: a removed row's components stop their async values: resume-keyed-repeats.ts drops them by the row's
-// instance segment, imported from a new one-function serializer module: 35,910 -> 36,914 raw; minified 11,586 -> 11,906,
-// gzip 4,578 -> 4,689 bytes (rolldown, workspace packages and lazy imports external, same method both sides).
-const sourceByteLimit = 36914;
+// 2026-11-14: a removed row's components stop their async values: resume-keyed-repeats.ts drops them under the row's
+// instance path, read with the serializer's instance-path grammar, now its own module: 35,910 -> 37,206 raw; minified
+// 11,586 -> 11,968, gzip 4,578 -> 4,731 bytes (rolldown, workspace packages and lazy imports external, same method both sides).
+const sourceByteLimit = 37206;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',

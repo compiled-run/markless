@@ -12,7 +12,7 @@ import type {
 	ResumeViewRecord,
 } from './resume-types.ts';
 import type { DisposedRepeatRow, ResumeEventWiring } from './resume-events.ts';
-import { protocolRowSegment } from '../../serializer/src/protocol-row-segment.ts';
+import { protocolInstancePath, protocolRowSegment } from '../../serializer/src/protocol-instance-path.ts';
 import { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from '../../serializer/src/protocol-prop-prefix.ts';
 import { elementsOf, marklessElementAt, pageNodes } from './resume-anchor-census.ts';
 
@@ -498,7 +498,7 @@ function applyKeyedRepeatRowOrder(
 		plane = leaving.size ? graph.asyncPlane?.() : undefined;
 	// A removed row's components stop: a load in flight lands nothing, and a key that returns starts fresh.
 	if (plane) {
-		const at = (repeat.instancePath ?? '') + ((repeat as RowScopedRepeat).rowPath ?? ''),
+		const at = protocolInstancePath(repeat.id) + ((repeat as RowScopedRepeat).rowPath ?? ''),
 			left = new Set<string>();
 		for (const [rowKey, rowRoot] of rowRootsByKey)
 			if (leaving.has(rowRoot)) left.add(protocolRowSegment(rowKey));

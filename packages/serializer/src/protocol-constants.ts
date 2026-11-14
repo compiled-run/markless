@@ -1,3 +1,5 @@
+import { protocolInstancePath } from './protocol-instance-path.ts';
+
 export const ASYNC_PROTOCOL_VERSION = 1;
 export const STORAGE_PROTOCOL_VERSION = 2;
 
@@ -41,8 +43,6 @@ export const ASYNC_BOUNDARY_ARM_MAX = 2;
 // MDX route) mounted. Each island composes from its own root, so two islands of
 // one component spell identical `c`/`p` paths; without this segment their
 // widget cells, computeds and element-handle rosters merge into one.
-const PROTOCOL_INSTANCE_PATH = /^(?:[cpm]\d+:|r:[^:]*:)+/;
-
 export function protocolInstanceSegment(edgeIndex: number): string {
 	return `c${edgeIndex}:`;
 }
@@ -56,12 +56,7 @@ export function protocolProjectionSegment(edgeIndex: number): string {
 	return `p${edgeIndex}:`;
 }
 
-export { protocolRowSegment } from './protocol-row-segment.ts';
-
-/** The leading instance path of a composed id, or '' when the id is page-local. */
-export function protocolInstancePath(id: string): string {
-	return PROTOCOL_INSTANCE_PATH.exec(id)?.[0] ?? '';
-}
+export { protocolInstancePath, protocolRowSegment } from './protocol-instance-path.ts';
 
 export const PROTOCOL_PROPS_GRAPH_NODE_ID = 'prop:props';
 export { PROTOCOL_PROP_GRAPH_NODE_PREFIX } from './protocol-prop-prefix.ts';
