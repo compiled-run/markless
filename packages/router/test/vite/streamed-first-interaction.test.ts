@@ -57,12 +57,19 @@ const browserRuns = (page: Page) =>
 const titles = (page: Page, shelf: string) =>
 	page.locator(`[data-shelf="${shelf}"] .books li`).allTextContents();
 
-// On a fast link the router's idle tier wakes its navigation code at idle on a page that links to another route; its download is not the press's.
+// The router's idle tier wakes its navigation code at idle on a page that links to another route and, on a fast link, prefetches the links in view and preloads their code; that is the page's own idle work, not the press's.
+type IdleTierHost = { __marklessFragmentIdle?: Promise<boolean>; __marklessFragmentNav?: { prefetches: Map<string, unknown> } };
 const idleTierWoken = (page: Page) =>
 	expect
-		.poll(() => page.evaluate(() => !!(document as unknown as { __marklessFragmentNav?: object }).__marklessFragmentNav), {
-			timeout: 10_000,
-		})
+		.poll(
+			() =>
+				page.evaluate(async () => {
+					const host = document as unknown as IdleTierHost;
+					if (!host.__marklessFragmentNav) return false;
+					return !(await host.__marklessFragmentIdle) || host.__marklessFragmentNav.prefetches.size > 0;
+				}),
+			{ timeout: 10_000 },
+		)
 		.toBe(true);
 
 async function openIdle(path: string) {
@@ -116,13 +123,7 @@ test('the first interaction fetches nothing, applies at once and keeps the strea
 		await page.click('.tap');
 		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
 		await page.waitForTimeout(300);
-		// A link prefetch the idle tier sends after its own idle period carries `Purpose: prefetch`; it is not the press's.
-		expect(
-			requests
-				.slice(before)
-				.filter((request) => request.headers()['purpose'] !== 'prefetch')
-				.map((request) => request.url()),
-		).toEqual([]);
+		expect(requests.slice(before).map((request) => request.url())).toEqual([]);
 		expect(await titles(page, 'all')).toEqual(['Dune', 'Emma', 'Ulysses']);
 		expect(await browserRuns(page)).toBe(0);
 		expect(errors).toEqual([]);
