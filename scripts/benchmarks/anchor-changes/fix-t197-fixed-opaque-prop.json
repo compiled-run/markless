@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 244,
-			"reason": "the docs playground's in-browser compile worker carries the fixed-value prop fact and the plain-words opaque-prop message; bench and /ui pages unchanged",
+			"delta": 367,
+			"reason": "the docs playground's in-browser compile worker works out which component props keep the value they rendered with, and says what to write instead in a handler; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 244,
-			"reason": "the docs playground's in-browser compile worker carries the fixed-value prop fact and the plain-words opaque-prop message; bench and /ui pages unchanged",
+			"delta": 367,
+			"reason": "the docs playground's in-browser compile worker works out which component props keep the value they rendered with, and says what to write instead in a handler; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
