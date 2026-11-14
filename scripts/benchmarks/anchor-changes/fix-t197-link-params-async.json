@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 90,
-			"reason": "the docs playground's in-browser compile worker reads object and array literals in composite reads; bench and /ui pages unchanged",
+			"delta": 99,
+			"reason": "the docs playground's in-browser compile worker reads object and array literals as a call's receiver or argument, for <Link params> from an async value; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 90,
-			"reason": "the docs playground's in-browser compile worker reads object and array literals in composite reads; bench and /ui pages unchanged",
+			"delta": 99,
+			"reason": "the docs playground's in-browser compile worker reads object and array literals as a call's receiver or argument, for <Link params> from an async value; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		}
 	]
