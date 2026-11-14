@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 231,
+			"reason": "the docs playground's in-browser compile worker carries the absent-prop guard check that names the code that would throw; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 231,
+			"reason": "the docs playground's in-browser compile worker carries the absent-prop guard check that names the code that would throw; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 2,
+			"reason": "the docs playground's in-browser compile worker carries the absent-prop guard check that names the code that would throw; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		}
+	]
+}
