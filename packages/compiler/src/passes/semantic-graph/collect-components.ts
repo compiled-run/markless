@@ -39,6 +39,7 @@ import {
 } from './composite-reads.ts';
 import { scopedClassValue } from './collect-elements.ts';
 import { readsOnlyFixedValues } from './fixed-prop-value.ts';
+import { catchErrorPropRead } from './catch-error-cell.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
@@ -372,10 +373,12 @@ function componentPropBindings(
 					: {}),
 				...(inlined?.catchResets.size
 					? {
-							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
-								name: resetName,
-								boundaryId,
-							})),
+							catchResets: [...inlined.catchResets].map(
+								([resetName, boundaryId]) => ({
+									name: resetName,
+									boundaryId,
+								}),
+							),
 						}
 					: {}),
 			});
@@ -475,6 +478,12 @@ function componentPropBindings(
 				path: [],
 				sourceSpan: span,
 			});
+			continue;
+		}
+
+		const caughtError = expression ? catchErrorPropRead(expression, state) : null;
+		if (caughtError) {
+			props.push({ name, source, kind: 'graph-reference', ...caughtError, sourceSpan: span });
 			continue;
 		}
 
@@ -787,7 +796,9 @@ function relayedHandlerSource(
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string } | undefined {
 	const source =
-		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
+		expression.type === 'Identifier'
+			? getIdentifierName(expression)
+			: staticPropsMember(expression);
 	if (!source) return undefined;
 	const root = source.split('.')[0]!;
 	if (repeatRowBindsName(root, state)) return undefined;

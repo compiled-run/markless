@@ -581,6 +581,23 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	test('port. @catch passes error.message to a component from another file: each failure shows its own message', async () => {
+		const { page, errors } = await visit('/k-catch-error-prop');
+		const shown = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll<HTMLElement>('[data-g]')].map((line) => `${line.dataset.g}: ${line.textContent}`),
+			);
+		const next = page.locator('main button');
+		await expect.poll(shown, poll).toEqual(['oops: Not Found 0']);
+		await next.click();
+		await expect.poll(shown, poll).toEqual(['loaded: found 1']);
+		await next.click();
+		await expect.poll(shown, poll).toEqual(['loaded: found 1', 'oops: Not Found 2']);
+		await next.click();
+		await expect.poll(shown, poll).toEqual(['loaded: found 3']);
+		expect(errors).toEqual([]);
+	});
+
 	test('g. the ported form: a child with no props whose refused submit reaches @catch', async () => {
 		const shape: Shape = { path: '/g-status', view: (b) => [title(b)] };
 		const run = new Run(shape, await visit(shape.path));

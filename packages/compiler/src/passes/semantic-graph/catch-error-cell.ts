@@ -1,5 +1,13 @@
 import type { SemanticGraphBinding } from '../../artifacts.ts';
-import type { GraphReadScope } from './composite-reads.ts';
+import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
+import type { AnyNode } from '../../ast/nodes.ts';
+import { expressionSource } from '../../ast/source.ts';
+import { collectCompositeTemplateExpression, type GraphReadScope } from './composite-reads.ts';
+import { inlineRenderLocals } from './render-local-inline.ts';
 import type { WalkState } from './types.ts';
 
 // Text joining a `@catch (error)` binding with graph reads reads the error from a cell each shown @catch arm writes.
@@ -27,7 +35,9 @@ export function catchErrorScope(
 function catchErrorCell(boundaryId: string, state: WalkState): SemanticGraphBinding | null {
 	const boundary = state.graph.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	if (!boundary) return null;
-	const kept = state.graph.graphBindings.find((binding) => binding.id === boundary.errorGraphNodeId);
+	const kept = state.graph.graphBindings.find(
+		(binding) => binding.id === boundary.errorGraphNodeId,
+	);
 	if (kept) return kept;
 	const name = `marklessCatchError${boundaryId.slice(boundaryId.lastIndexOf(':') + 1)}`;
 	return {
@@ -43,9 +53,68 @@ function catchErrorCell(boundaryId: string, state: WalkState): SemanticGraphBind
 	};
 }
 
-function keepCatchErrorCell(boundaryId: string, cell: SemanticGraphBinding, state: WalkState): void {
+function keepCatchErrorCell(
+	boundaryId: string,
+	cell: SemanticGraphBinding,
+	state: WalkState,
+): void {
 	const boundary = state.graph.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	if (!boundary || boundary.errorGraphNodeId) return;
 	boundary.errorGraphNodeId = cell.id;
 	state.graph.graphBindings.push(cell);
+}
+
+// A component prop worked out from a `@catch (error)` binding reads the error from the same cell, so the child follows each failure.
+export function catchErrorPropRead(
+	expression: AnyNode,
+	state: WalkState,
+): {
+	readonly graphNodeId: string;
+	readonly graphBindingKind: SemanticGraphBinding['kind'];
+	readonly path: ReadonlyArray<string>;
+} | null {
+	const inlined = inlineRenderLocals(expression, state, { catchErrors: true });
+	if (
+		inlined.kind !== 'inlined' ||
+		inlined.catchErrors.size === 0 ||
+		inlined.definitions.length > 0
+	)
+		return null;
+	const caught = catchErrorScope(
+		inlined.catchErrors,
+		{
+			bindings: graphBindingMap(
+				state.graph,
+				state.currentSharedDefinitionId,
+				state.currentComponentName,
+			),
+			aliases: semanticAliasMap(
+				state.graph,
+				state.currentSharedDefinitionId,
+				state.currentComponentName,
+			),
+		},
+		state,
+	);
+	if (!caught) return null;
+	const source = expressionSource(expression, state.source);
+	const direct = source
+		? resolveGraphPath(source, caught.scope.bindings, caught.scope.aliases)
+		: null;
+	if (direct) {
+		caught.keep();
+		return {
+			graphNodeId: direct.binding.id,
+			graphBindingKind: direct.binding.kind,
+			path: direct.path,
+		};
+	}
+	const composite = collectCompositeTemplateExpression(expression, state, {
+		scope: caught.scope,
+		methodCalls: true,
+		unaryOperators: true,
+	});
+	if (!composite) return null;
+	caught.keep();
+	return { graphNodeId: composite.graphNodeId, graphBindingKind: 'computed', path: [] };
 }
