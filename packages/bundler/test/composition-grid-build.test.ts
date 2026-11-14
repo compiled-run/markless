@@ -385,6 +385,18 @@ describe('composition grid, production build', () => {
 		});
 
 	const ownOpen: Shape = { ...ownArm, path: '/h-own-arm-open', openAtLoad: true };
+	test('port. <Link params> fed from an async value: the href follows each new value and the link navigates', async () => {
+		const { page, errors } = await visit('/k-link-params/a1');
+		const href = () => page.locator('[data-g="link"]').getAttribute('href');
+		await expect.poll(href, poll).toBe('/k-link-params/a1-0/edit');
+		await page.locator('main button').click();
+		await expect.poll(href, poll).toBe('/k-link-params/a1-1/edit');
+		await page.locator('[data-g="link"]').click();
+		await expect.poll(() => page.locator('[data-g="edit"]').textContent(), poll).toBe('editing a1-1');
+		expect(new URL(page.url()).pathname).toBe('/k-link-params/a1-1/edit');
+		expect(errors).toEqual([]);
+	});
+
 	test('h. own async value in an @if arm, open at load: a closed arm loads nothing, and one closed while loading asks again when it reopens', async () => {
 		const run = new Run(ownOpen, await visit(ownOpen.path));
 		await run.firstRender();

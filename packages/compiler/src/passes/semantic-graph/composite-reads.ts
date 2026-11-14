@@ -214,6 +214,34 @@ export function pureCompositeReadSources(
 			asNodes(node.expressions).map((part) => pureCompositeReadSources(part, state, options)),
 		);
 	}
+	// An object or array literal built from reads, as a call's argument (`hrefFor('/a/[id]', { id: item.id })`), reads what its parts read.
+	if (node.type === 'ObjectExpression') {
+		return joinReadSources(
+			asNodes(node.properties).map((property) => {
+				if (property.type === 'SpreadElement')
+					return pureCompositeReadSources(property.argument as AnyNode | undefined, state, options);
+				if (property.type !== 'Property' || property.kind !== 'init' || property.method === true)
+					return null;
+				return joinReadSources([
+					property.computed === true
+						? pureCompositeReadSources(property.key as AnyNode | undefined, state, options)
+						: [],
+					pureCompositeReadSources(property.value as AnyNode | undefined, state, options),
+				]);
+			}),
+		);
+	}
+	if (node.type === 'ArrayExpression') {
+		return joinReadSources(
+			asNodes(node.elements).map((element) =>
+				pureCompositeReadSources(
+					element.type === 'SpreadElement' ? (element.argument as AnyNode | undefined) : element,
+					state,
+					options,
+				),
+			),
+		);
+	}
 	return null;
 }
 
