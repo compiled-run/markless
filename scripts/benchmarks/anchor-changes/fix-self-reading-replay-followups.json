@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 527,
+			"reason": "a call or spread in an update that reads the state it replaces runs once ahead of the update, so a held save's replay reuses its result: the docs playground's compile and explore workers ship the compiler, +1482 B raw each; the docs' own notes handler (+12 B gzip) now emits ((t) => graph.update(...))(call); measured as PR #706 run 43588918039 (head 478f473d9 merged with main 9a0d68594, linux-x64) minus main 9a0d68594's merge-queue run 43586167058; executed chars at load unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 527,
+			"reason": "a call or spread in an update that reads the state it replaces runs once ahead of the update, so a held save's replay reuses its result: the docs playground's compile and explore workers ship the compiler, +1482 B raw each; the docs' own notes handler (+12 B gzip) now emits ((t) => graph.update(...))(call); measured as PR #706 run 43588918039 (head 478f473d9 merged with main 9a0d68594, linux-x64) minus main 9a0d68594's merge-queue run 43586167058; executed chars at load unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -1,
+			"reason": "a call or spread in an update that reads the state it replaces runs once ahead of the update, so a held save's replay reuses its result: the docs playground's compile and explore workers ship the compiler, +1482 B raw each; the docs' own notes handler (+12 B gzip) now emits ((t) => graph.update(...))(call); measured as PR #706 run 43588918039 (head 478f473d9 merged with main 9a0d68594, linux-x64) minus main 9a0d68594's merge-queue run 43586167058; executed chars at load unchanged",
+			"date": "2026-11-14"
+		}
+	]
+}
