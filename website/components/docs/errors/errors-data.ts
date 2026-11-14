@@ -8376,6 +8376,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_PRERENDER_OWNER_UNPLACED',
+		title: '',
+		area: 'internal',
+		packageName: '@markless/web',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/web.',
+		printed: [
+			'MARKLESS_PRERENDER_OWNER_UNPLACED: <pageId> has no owner instance to render from',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/web/src/prerender/evaluator.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/prerender/evaluator.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_PRERENDER_PROJECTED_PROP_READ',
 		title: 'A browser-built row reads its owner’s prop',
 		area: 'internal',

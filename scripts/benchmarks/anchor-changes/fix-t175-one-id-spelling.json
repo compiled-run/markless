@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -88,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -88,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -88,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -131,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -131,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -128,
+			"reason": "browser-drawn arms spell page ids once: the settle's module-root render, longest-suffix anchor pick and partial-prefix qualifier are gone",
+			"date": "2026-11-14"
+		}
+	]
+}
