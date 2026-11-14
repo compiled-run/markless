@@ -78,6 +78,12 @@ export async function intervalStarted(ms: number): Promise<void> {
 }
 
 
+/** Counts the page's `setTimeout(fn, ms)` calls from now on; an `attach` timer starts only once its code has loaded, a task or more after its content shows. */
+export function timeoutsOf(ms: number): () => number {
+	const started = vi.spyOn(globalThis, 'setTimeout');
+	return () => started.mock.calls.filter(([, after]) => after === ms).length;
+}
+
 /** Resolves after two painted frames. */
 export const frames = () =>
 	new Promise<void>((done) => requestAnimationFrame(() => requestAnimationFrame(() => done())));
