@@ -33,6 +33,7 @@ import { childEdgeSurface } from './owning-surface.ts';
 import { marklessBoundSymbolId, marklessReboundSymbolId } from '../fns/bound-symbol.ts';
 import {
 	marklessInstancePath,
+	marklessInstanceScopedGraph,
 	marklessRecordRowScope,
 	marklessRowFreeSymbolId,
 	marklessRowPath,
@@ -126,6 +127,8 @@ export type PrerenderDataDefinition = {
 			readonly structureTokens?: ReadonlyArray<StructureToken>;
 		};
 	}>;
+	// The same-module edge chains that place this component, from a component nothing in the module places.
+	readonly placements?: ReadonlyArray<ReadonlyArray<{ readonly edgeId: string; readonly rows?: number }>>;
 	readonly propCellId?: string | null;
 	// The shared() element() handles a rendered instance of this component binds,
 	// published by the compiler so a widget's seed phase can file them before any
@@ -662,6 +665,10 @@ async function evaluatePrerenderDataSurface(
 		fresh?.rootName ?? branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const ownerPath = fresh?.owner?.ownerPath;
+	const ownerModule: PrerenderBoundModule | undefined = ownerPath
+		? { rootPrefix: '', instanceReads: new Map(), ownerPath }
+		: undefined;
+	const placed = ownerModule && graph && fresh?.owner && composersAbove(fresh.owner, ownerModule, graph);
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
@@ -671,7 +678,8 @@ async function evaluatePrerenderDataSurface(
 		idPrefix: fresh?.drawnAt ?? '',
 		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
-		...(ownerPath ? { module: { rootPrefix: '', instanceReads: new Map(), ownerPath } } : {}),
+		...(ownerModule && { module: ownerModule }),
+		...placed,
 		loadSymbol,
 		graph,
 		requireHtml,
@@ -703,17 +711,58 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
+// A render rooted at a flip's owner stands in for the components above it, each read where it stands, so bound ids rebind through their edges as in a whole render.
+function composersAbove(
+	owner: BranchOwnerPlacement,
+	module: PrerenderBoundModule,
+	graph: RuntimeGraph,
+):
+	| {
+			readonly composer: PrerenderBoundComposer;
+			readonly boundSymbols: Readonly<Record<string, string>>;
+			readonly placedAbove: ReadonlyArray<Readonly<Record<string, string>>>;
+	  }
+	| undefined {
+	const page = pageGraphOf(graph);
+	let composer: PrerenderBoundComposer | undefined;
+	let boundSymbols: Readonly<Record<string, string>> | undefined;
+	const placedAbove: Array<Readonly<Record<string, string>>> = [];
+	let path = '';
+	for (const step of owner.above ?? []) {
+		const at = marklessInstanceScopedGraph(page, owner.moduleRootPath + path);
+		const read: PrerenderRead = (graphNodeId, readPath) => at.read(graphNodeId, readPath);
+		module.instanceReads.set(path, read);
+		composer = { symbolPrefix: '', read, module, ...(composer && boundSymbols && { bound: { boundSymbols, composer } }) };
+		boundSymbols = step.edge.boundSymbols ?? {};
+		placedAbove.unshift(boundSymbols);
+		path = step.path;
+	}
+	return composer && boundSymbols && { composer, boundSymbols, placedAbove };
+}
+
+// What an edge of the owner binds, carried on through the edges above the owner, as a whole render's composition would.
+function boundThroughAbove(
+	boundSymbols: Readonly<Record<string, string>> | undefined,
+	above: ReadonlyArray<Readonly<Record<string, string>>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+	if (!boundSymbols || !above) return boundSymbols;
+	return Object.fromEntries(
+		Object.entries(boundSymbols).map(([symbolId, bound]) => [
+			symbolId,
+			above.reduce((id, edge) => marklessReboundSymbolId(edge, id) ?? id, bound),
+		]),
+	);
+}
+
 // A flip's symbol runs as the instance of the component holding the branch, not always the module root.
 function branchOwnerName(
 	surface: PrerenderDataSurface,
 	branchSiteId: string | undefined,
 ): string | undefined {
 	if (!branchSiteId) return undefined;
-	const holds = (name: string | null | undefined) =>
-		!!name &&
-		!!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId);
-	if (holds(surface.rootComponentName)) return undefined;
-	return Object.keys(surface.components).find(holds);
+	return Object.keys(surface.components).find(
+		(name) => !!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId),
+	);
 }
 
 type RosterResumeHost = {
@@ -819,9 +868,7 @@ function marklessPlacedInstanceRead(
 	module: PrerenderBoundModule,
 	placed: string,
 ): PrerenderRead | undefined {
-	const owner = module.ownerPath;
-	const local = owner && placed.startsWith(owner) ? placed.slice(owner.length) : placed;
-	return module.instanceReads.get(module.rootPrefix + local);
+	return module.instanceReads.get(module.rootPrefix + placed);
 }
 
 // Per live graph, the component instances its last re-render placed on the page.
@@ -922,7 +969,7 @@ function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayl
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
-// A module as one render placed it: its root's prefix and each evaluated instance's reader.
+// A module as one render placed it: its root's prefix and each instance's reader, keyed by that prefix and its path from the module root.
 type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
@@ -980,6 +1027,8 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshBranchSiteId?: string;
 	// Set through the whole render when it brings in an escalated arm, whose commit feeds the props of what it places.
 	readonly placingBranchSiteId?: string;
+	// Set on a render rooted at a flip's owner: what each edge above it binds, the owner's own edge first.
+	readonly placedAbove?: ReadonlyArray<Readonly<Record<string, string>>>;
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1080,7 +1129,10 @@ export function evaluatePrerenderDataComponent(input: {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, symbolRead);
+	ownModule.instanceReads.set(
+		ownModule.rootPrefix + (ownModule.ownerPath ?? '') + input.symbolPrefix.slice(ownModule.rootPrefix.length),
+		symbolRead,
+	);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -1445,6 +1497,7 @@ export function evaluatePrerenderDataComponent(input: {
 								throw new Error(
 									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
 								);
+							const boundSymbols = boundThroughAbove(edge.boundSymbols, input.placedAbove);
 							// One compile-time edge inside a keyed `@for` is many instances at render time.
 							const rowSegment = marklessRowPath(context) ?? '';
 							const hostPrefix = rowSegment + edge.hostPrefix;
@@ -1460,7 +1513,7 @@ export function evaluatePrerenderDataComponent(input: {
 									symbolPrefix,
 									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									...asyncArmPlacement(edge),
-									boundSymbols: edge.boundSymbols ?? {},
+									boundSymbols: boundSymbols ?? {},
 									callbackProps: {},
 								});
 								return materialized;
@@ -1601,7 +1654,7 @@ export function evaluatePrerenderDataComponent(input: {
 										symbolPrefix,
 										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 										...asyncArmPlacement(edge),
-										boundSymbols: edge.boundSymbols ?? {},
+										boundSymbols: boundSymbols ?? {},
 										callbackProps: callbacks,
 										// Where this child's own composition puts the children written into it,
 										// so composition can register the widget a projected part sits beside.

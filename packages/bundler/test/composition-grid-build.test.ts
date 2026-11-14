@@ -350,6 +350,23 @@ describe('composition grid, production build', () => {
 		await run.handlerRejects();
 	});
 
+	const sameFileOwner: Shape = {
+		path: '/l-same-file-owner',
+		openAtLoad: false,
+		ownsLoad: true,
+		view: (b) => [...rows(b), title(b)],
+		closed: () => ['closed: Hidden'],
+	};
+	test('l. an arm whose owner a later component of its file places: first render, open, reload, close and reopen, save held, handler rejects', async () => {
+		const run = new Run(sameFileOwner, await visit(sameFileOwner.path));
+		await run.firstRender();
+		await run.openArm();
+		await run.reload();
+		await run.closeAndReopen();
+		await run.saveHeld();
+		await run.handlerRejects();
+	});
+
 	const armLists: ReadonlyArray<readonly [string, Shape]> = [
 		['j. a list straight in a click-opened arm, open at load', { path: '/j-arm-list-open', view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
 		['j. a list straight in a click-opened arm, closed at load', { path: '/j-arm-list-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
