@@ -83,7 +83,7 @@ export function App() @{
 		(item) => item.code === 'MARKLESS_CAPTURE_OPAQUE_PROP',
 	);
 	expect(diagnostic?.propName).toBe('onChange');
-	expect(diagnostic?.message).toContain('is not passed by');
+	expect(diagnostic?.message).toContain('passes no "onChange"');
 	expect(diagnostic?.suggestions.map((suggestion) => suggestion.message).join(' ')).toContain(
 		'onChange?.(',
 	);
@@ -266,3 +266,169 @@ for (const [name, body] of safeGuards)
 		]);
 		expect(result.captureAnalysis.diagnostics).toEqual([]);
 	});
+
+const optionalObject = `
+import { state } from '@markless/core';
+export default function OptionalObject({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={() => (said = item ? item.name : 'none')}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+`;
+
+test('an absent object prop a handler reads behind a guard is undefined there, not refused', async () => {
+	const result = await compile(
+		'src/OptionalObjectPage.tsrx',
+		`${optionalObject.replace('export default function', 'function')}
+export function Page() @{
+	<OptionalObject />
+}
+`,
+	);
+	const slots = handlerSlots(result).filter((candidate) => candidate.propName === 'item');
+
+	expect(slots.map((slot) => [slot.source, slot.routes])).toEqual([
+		['item', [expect.objectContaining({ kind: 'compiler-known-constant', value: undefined })]],
+		[
+			'item.name',
+			[expect.objectContaining({ kind: 'compiler-known-constant', value: undefined })],
+		],
+	]);
+	expect(result.captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('a child from another file reading an absent object prop behind a guard builds in the page that leaves it out', async () => {
+	const child = await compile('src/optional-object.tsrx', optionalObject);
+	const handler = child.captureAnalysis.extractedSymbols.find(
+		(symbol) => symbol.kind === 'event-handler',
+	)!;
+	const page = await compile(
+		'src/page.tsrx',
+		`
+import OptionalObject from './optional-object.tsrx';
+export default function Page() @{
+	<OptionalObject />
+}
+`,
+		[
+			{
+				id: 'imported:OptionalObject:symbol:say',
+				chunk: 'virtual:markless:symbol:OptionalObject:say',
+				exportName: 'say',
+				componentEdgeId: 'component-edge:0',
+				captureSymbol: handler,
+			},
+		],
+	);
+
+	expect(page.captureAnalysis.diagnostics).toEqual([]);
+});
+
+test('an absent object prop a handler reads a field of with no guard stays refused, naming the read', async () => {
+	const result = await compile(
+		'src/UnguardedRead.tsrx',
+		`
+import { state } from '@markless/core';
+function Card({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={() => (said = item.name.toUpperCase())}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+export function Page() @{
+	<Card />
+}
+`,
+	);
+	const diagnostic = result.captureAnalysis.diagnostics.find(
+		(item) => item.code === 'MARKLESS_CAPTURE_OPAQUE_PROP',
+	);
+
+	expect(diagnostic?.message).toBe(
+		'"Card" reads into its prop "item" in `item.name` (src/UnguardedRead.tsrx:6:34) without checking that it was passed, and this <Card> passes no "item", so that code would throw when it runs in the browser.',
+	);
+	expect(diagnostic?.primarySpan).toBeDefined();
+	expect(diagnostic?.suggestions[0]?.message).toContain('item?.');
+});
+
+// Each handler below runs with no `item`: a use JavaScript would throw on refuses, one it would pass through builds.
+async function absentItem(handler: string) {
+	const result = await compile(
+		'src/Absent.tsrx',
+		`
+import { state } from '@markless/core';
+function Card({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={${handler}}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+export function Page() @{
+	<Card />
+}
+`,
+	);
+	return result.captureAnalysis.diagnostics
+		.filter((item) => item.code === 'MARKLESS_CAPTURE_OPAQUE_PROP')
+		.map((item) => item.message);
+}
+
+test.each([
+	['a plain field read', '() => (said = item.name)', 'reads into', 'item.name'],
+	['an alias read later', '() => { const it = item; said = it.name; }', 'uses', 'it = item'],
+	['destructuring', '() => { const { name } = item; said = name; }', 'uses', '{ name } = item'],
+	['for...of', '() => { for (const part of item) said = part; }', 'uses', 'for (const part of item) said = part;'],
+	['an in check', "() => (said = 'name' in item ? 'y' : 'n')", 'uses', "'name' in item"],
+	['a call', "() => item('x')", 'calls', "item('x')"],
+])('an absent prop refuses %s, naming the code and its line', async (_name, handler, action, code) => {
+	const [message, ...rest] = await absentItem(handler);
+	expect(rest).toEqual([]);
+	expect(message).toContain(`"Card" ${action} its prop "item" in \`${code}\` (src/Absent.tsrx:6:`);
+});
+
+test.each([
+	['a guard', "() => (said = item ? item.name : 'none')"],
+	['optional reads', "() => (said = item?.name ?? 'none')"],
+	['an early return', '() => { if (!item) return; said = item.name; }'],
+	['an early return over a block', "() => { if (item === undefined) { said = 'none'; return; } said = item.name; }"],
+	['a bare read', '() => (said = item)'],
+	['a typeof check', "() => (said = typeof item === 'undefined' ? 'none' : item.name)"],
+	['a parameter that shadows the prop', '(item) => (said = String(item.type))'],
+])('an absent prop builds behind %s', async (_name, handler) => {
+	expect(await absentItem(handler)).toEqual([]);
+});
+
+test('a child from another file names its own line when the page leaves the prop out', async () => {
+	const child = await compile(
+		'src/card.tsrx',
+		`import { state } from '@markless/core';
+export default function Card({ item }) @{
+	let said = state('');
+	<div>
+		<button onClick={() => {
+			said = item.name;
+		}}>Say</button>
+		<p>{said}</p>
+	</div>
+}
+`,
+	);
+	const handler = child.captureAnalysis.extractedSymbols.find((symbol) => symbol.kind === 'event-handler')!;
+	expect(handler.sourceStart).toEqual({ filename: 'src/card.tsrx', line: 5, column: 20 });
+	const page = await compile(
+		'src/page.tsrx',
+		`import Card from './card.tsrx';
+export default function Page() @{
+	<Card />
+}
+`,
+		[{ id: 'imported:Card:symbol:say', chunk: 'c', exportName: 'say', componentEdgeId: 'component-edge:0', captureSymbol: handler }],
+	);
+	const [diagnostic] = page.captureAnalysis.diagnostics;
+	expect(diagnostic?.message).toContain('in `item.name` (src/card.tsrx:6:11) without checking');
+	expect(diagnostic?.primarySpan?.filename).toBe('src/page.tsrx');
+});

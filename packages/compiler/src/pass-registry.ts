@@ -46,7 +46,7 @@ export const defaultCompilerPasses: ReadonlyArray<CompilerPassDefinition> = [
 	{
 		passId: 'capture-analysis',
 		description: 'Analyze extracted symbol sources for resumable capture eligibility.',
-		consumes: ['semanticGraph', 'symbolResolver', 'symbols'],
+		consumes: ['source', 'semanticGraph', 'symbolResolver', 'symbols'],
 		produces: ['captureAnalysis'],
 	},
 	{

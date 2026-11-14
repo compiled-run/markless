@@ -2231,6 +2231,8 @@ export type BoundSymbolResolverInput = {
 };
 
 export type CaptureAnalysisInput = {
+	/** The module's own source, so a refusal can name the line a handler would throw on. */
+	readonly moduleSource?: string;
 	readonly semanticGraph: SemanticGraphArtifact;
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly symbols?: SymbolResolverModuleInput['symbols'];
@@ -2341,6 +2343,12 @@ export type CaptureSlotRoute =
 			// The consumer passed no such prop, so the diagnostic names the missing
 			// prop instead of an authored runtime expression.
 			readonly absentProp?: true;
+			// The call or member read of the absent prop, as written, that would throw.
+			readonly absentUse?: {
+				readonly kind: 'call' | 'member' | 'use';
+				readonly source: string;
+				readonly at?: SourcePosition;
+			};
 			// The expression reads only the keyed row's item or index: rendered with the row, never live.
 			readonly rowValue?: true;
 			readonly unroutableHandler?: { readonly why: string; readonly rewrite: string };
@@ -2366,11 +2374,16 @@ export type CaptureSlot = {
 	readonly routes: ReadonlyArray<CaptureSlotRoute>;
 };
 
+/** A file, line and column (both from 1), for naming code another module's compile cannot see. */
+export type SourcePosition = { readonly filename: string; readonly line: number; readonly column: number };
+
 export type ExtractedCaptureSymbol = {
 	readonly symbolId: string;
 	readonly loaderSymbolId?: string;
 	readonly kind: PlannedSymbol['kind'];
 	readonly source: string;
+	/** Where a handler's source starts in its own file, so a composing module can name a line in it. */
+	readonly sourceStart?: SourcePosition;
 	readonly graphWrites?: ReadonlyArray<{
 		readonly graphNodeId: string;
 		readonly path: ReadonlyArray<string>;

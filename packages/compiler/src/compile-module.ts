@@ -328,6 +328,7 @@ function defaultRunnableCompilerPasses(): ReadonlyArray<RunnableCompilerPassDefi
 				run({ inputs }) {
 					const semanticGraph = inputs.semanticGraph as SemanticGraphArtifact;
 					const captureAnalysis = analyzeCaptures({
+						moduleSource: sourceInput(inputs.source).source,
 						semanticGraph,
 						symbolResolver: inputs.symbolResolver as SymbolResolverPlan,
 						symbols: inputs.symbols as CompileTsrxModuleInput['symbols'],
