@@ -286,6 +286,8 @@ type Site = {
 	readonly message?: string | null;
 	readonly why?: string | null;
 	readonly suggestion?: string | null;
+	/** The other arms of a ternary message, why or suggestion, in source order. */
+	readonly alternates?: Readonly<Partial<Record<'message' | 'why' | 'suggestion', readonly string[]>>>;
 };
 
 /** What the scan knows about one code before it becomes page data. */
@@ -299,6 +301,8 @@ export type ScannedCode = {
 	readonly message: string | null;
 	readonly why: string | null;
 	readonly suggestion: string | null;
+	/** Each further arm of a message chosen by a ternary, printed as its own block. */
+	readonly variants?: ReadonlyArray<{ readonly message: string; readonly why: string | null; readonly suggestion: string | null }>;
 	readonly printsDocsLink: boolean;
 	readonly structured: boolean;
 	readonly referenceOnly: boolean;
@@ -475,25 +479,40 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 		return tokens.length - 1;
 	}
 
-	// First string literal of a property value, stopping at the next depth-0 comma.
-	function firstString(tokens: Token[], k: number, b: number): string | null {
+	// The first string literal of a property value, then, when the value is a ternary, every other arm's string at depth 0.
+	function valueStrings(tokens: Token[], k: number, b: number): string[] {
+		const strings: string[] = [];
 		let depth = 0;
+		let ternary = false;
 		for (; k < b; k++) {
 			const t = tokens[k]!;
 			if (t.type === 'punct' && '([{'.includes(t.value)) depth++;
 			if (t.type === 'punct' && ')]}'.includes(t.value)) {
-				if (depth === 0) return null;
+				if (depth === 0) break;
 				depth--;
 			}
-			if (depth === 0 && t.type === 'punct' && t.value === ',') return null;
-			if (t.type === 'str') return t.template ? renderTemplate(t) : t.value;
+			if (depth === 0 && t.type === 'punct' && t.value === ',') break;
+			if (depth === 0 && t.type === 'punct' && t.value === '?') ternary = true;
+			if (t.type === 'str' && (depth === 0 || strings.length === 0)) {
+				strings.push(t.template ? renderTemplate(t) : t.value);
+				if (!ternary && depth === 0) break;
+			}
 		}
-		return null;
+		return ternary ? strings : strings.slice(0, 1);
 	}
 
-	// `key: <first string>` at depth 0 of the object literal spanning tokens[a..b].
-	function objectProps(tokens: Token[], a: number, b: number): Record<string, string> {
-		const props: Record<string, string> = {};
+	// `key: <first string>` at depth 0 of the object literal spanning tokens[a..b]; a ternary's other arms go to `alternates`.
+	function objectProps(
+		tokens: Token[],
+		a: number,
+		b: number,
+	): Record<string, string> & { alternates?: Record<string, string[]> } {
+		const props: Record<string, string> & { alternates?: Record<string, string[]> } = {};
+		const keep = (key: string, strings: string[]) => {
+			if (!strings[0]) return;
+			props[key] = strings[0];
+			if (strings.length > 1) (props.alternates ??= {})[key] = strings.slice(1);
+		};
 		let depth = 0;
 		for (let k = a + 1; k < b; k++) {
 			const t = tokens[k]!;
@@ -509,15 +528,13 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 						tokens[m]!.value === 'message' &&
 						tokens[m + 1]?.value === ':'
 					) {
-						const s = firstString(tokens, m + 2, b);
-						if (s) props.suggestion = s;
+						keep('suggestion', valueStrings(tokens, m + 2, b));
 						break;
 					}
 				}
 				continue;
 			}
-			const s = firstString(tokens, k + 2, b);
-			if (s) props[key] = s;
+			keep(key, valueStrings(tokens, k + 2, b));
 		}
 		return props;
 	}
@@ -650,6 +667,7 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 					message: props.message ?? null,
 					why: props.why ?? null,
 					suggestion: props.suggestion ?? null,
+					...(props.alternates ? { alternates: props.alternates } : {}),
 				});
 				return;
 			}
@@ -758,6 +776,7 @@ export function scanCodes(files: readonly SourceFile[]): ScannedCode[] {
 				message: pick('message'),
 				why: pick('why'),
 				suggestion: pick('suggestion'),
+				...variantsOf(sites.find((s) => s.message)),
 				printsDocsLink: sites.some((s) => s.context === 'docs-link'),
 				structured: sites.some((s) => s.context === 'diagnostic'),
 				referenceOnly: !sites.some((s) => s.context !== 'reference'),
@@ -816,12 +835,31 @@ export function segments(text: string): Segment[] {
 	return out;
 }
 
+// A message chosen by a ternary prints once per arm; the why and suggestion pair with the arm in the same position.
+function variantsOf(site: Site | undefined): Pick<ScannedCode, 'variants'> {
+	const messages = site?.alternates?.message ?? [];
+	if (!site || messages.length === 0) return {};
+	const pair = (key: 'why' | 'suggestion', at: number) =>
+		site.alternates?.[key]?.[at] ?? site[key] ?? null;
+	return {
+		variants: messages.map((message, at) => ({
+			message,
+			why: pair('why', at),
+			suggestion: pair('suggestion', at),
+		})),
+	};
+}
+
 export function printedLines(e: ScannedCode): string[] {
 	const lines: string[] = [];
-	const head = e.message ?? e.title;
-	lines.push(head ? `${e.code}: ${oneLine(head)}` : e.code);
-	if (e.why) lines.push(oneLine(e.why));
-	if (e.suggestion) lines.push(oneLine(e.suggestion));
+	const block = (message: string | null, why: string | null, suggestion: string | null) => {
+		const head = message ?? e.title;
+		lines.push(head ? `${e.code}: ${oneLine(head)}` : e.code);
+		if (why) lines.push(oneLine(why));
+		if (suggestion) lines.push(oneLine(suggestion));
+	};
+	block(e.message, e.why, e.suggestion);
+	for (const variant of e.variants ?? []) block(variant.message, variant.why, variant.suggestion);
 	if (e.printsDocsLink) lines.push(`${DOCS_URL}${e.code}`);
 	return lines;
 }

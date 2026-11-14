@@ -491,8 +491,9 @@ function rowMintRefusal(input: {
 		})
 	)
 		return null;
-	const componentSlot = chunk.slots.find((slot) => slot.kind === 'child-component');
-	if (componentSlot?.kind === 'child-component') {
+	const componentSlots = chunk.slots.filter((slot) => slot.kind === 'child-component');
+	const componentSlot = componentSlots[0];
+	if (componentSlots.length === 1 && componentSlot?.kind === 'child-component') {
 		const mint = resolveRowComponentMint({
 			...(input.recordHostIds ? { recordHostIds: input.recordHostIds } : {}),
 			...(input.liveHostIds ? { liveHostIds: input.liveHostIds } : {}),
@@ -519,12 +520,19 @@ function rowMintRefusal(input: {
 				? { importedModuleInterfaces: input.importedModuleInterfaces }
 				: {}),
 		};
-		return chunk.hosts.length === 0 &&
+		if (
+			chunk.hosts.length === 0 &&
 			edge &&
 			childRootBoundary(reachInput, edge, componentSlot.childTemplateId, new Set())
-			? { kind: 'component-root-boundary', componentName: componentSlot.childComponentName }
-			: { kind: 'component', componentName: componentSlot.childComponentName };
+		)
+			return { kind: 'component-root-boundary', componentName: componentSlot.childComponentName };
 	}
+	const unseen = componentSlots.find(
+		(slot) =>
+			slot.kind === 'child-component' && !componentSeen(input, slot.componentEdgeId),
+	);
+	if (unseen?.kind === 'child-component')
+		return { kind: 'component', componentName: unseen.childComponentName };
 	for (const slot of chunk.slots) {
 		if (slot.kind === 'text' || slot.kind === 'attribute') {
 			if (stepsAfterNestedRows(chunk, slot.coordinate.path, slot.kind === 'text') === null)
@@ -534,7 +542,6 @@ function rowMintRefusal(input: {
 			if (mintableSlotValue(slot)) continue;
 			if (isLoweredStyleObject(slot)) return { kind: 'style-object' };
 			if (
-				!componentSlot &&
 				chunk.componentName &&
 				expressionSlotValue(slot, input.graph, chunk.componentName, input.rowNames)
 			)
@@ -559,9 +566,23 @@ function rowMintRefusal(input: {
 			)
 		)
 			continue;
+		if (slot.kind === 'child-component') continue;
 		return { kind: 'nested-construct', label: nestedConstructLabel(slot, input.branchSites) };
 	}
-	return null;
+	return componentSlot?.kind === 'child-component'
+		? { kind: 'component-content', componentName: componentSlot.childComponentName }
+		: null;
+}
+
+// A child from another module is seen when the build compiled that module's interface.
+function componentSeen(input: Parameters<typeof rowMintRefusal>[0], componentEdgeId: string): boolean {
+	const edge = input.componentEdges.find((candidate) => candidate.id === componentEdgeId);
+	if (!edge?.importSource) return true;
+	return (
+		input.importedModuleInterfaces?.[edge.importSource]?.render.components.some(
+			(candidate) => candidate.componentName === edge.childComponentName,
+		) ?? false
+	);
 }
 
 // A nested @for builds its own rows inside a minted row when it could build them anywhere.

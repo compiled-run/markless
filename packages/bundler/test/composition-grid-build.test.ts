@@ -20,7 +20,6 @@ import {
 const exec = promisify(execFile);
 const root = resolve(import.meta.dirname, '../../..');
 const app = resolve(import.meta.dirname, 'fixtures/composition-grid');
-const rowsApp = resolve(app, 'rows-app');
 const vp = resolve(root, 'node_modules/.bin/vp');
 const poll = { timeout: 5_000, interval: 20 };
 // Each page runs several steps against a real server and browser.
@@ -63,7 +62,6 @@ afterAll(async () => {
 	await server?.close();
 	await Promise.all([
 		cleanOutput(app),
-		cleanOutput(rowsApp),
 		rm(resolve(app, 'node_modules'), { force: true, recursive: true }),
 	]);
 });
@@ -286,6 +284,7 @@ class Run {
 
 const title = (board: Board) => `title.${board.parity}: ${board.title}`;
 const rows = (board: Board) => board.items.map((row) => `row: ${row.label}`);
+const partsRows = (board: Board) => board.items.map((row) => `row: ${row.label}edit`);
 const upperRows = (board: Board) => board.items.map((row) => `row: ${row.label.toUpperCase()}`);
 const card = (board: Board) => `card: ${board.parity} card for ${board.title}`;
 
@@ -294,6 +293,17 @@ const shapes: ReadonlyArray<readonly [string, Shape]> = [
 	['b. attribute and @if test on the async prop', { path: '/b-header', view: (b) => [title(b), b.items.length > 1 ? `many: ${b.items.length} rows` : 'one: One row'] }],
 	['c. child in a @switch arm', { path: '/c-switch', view: (b) => (b.parity === 'even' ? [title(b), card(b)] : [card(b), title(b)]) }],
 	['d. own async value in layout children', { path: '/d-layout-own', view: (b) => [title(b), ...rows(b)] }],
+	['e. row component from another file in rows fed by a prop', { path: '/e-rows', view: (b) => [title(b), ...rows(b)] }],
+	['e. one row component rendering two from another file, in rows fed by a prop', { path: '/e-row-parts', view: (b) => [title(b), ...partsRows(b)] }],
+	['e. two components from another file in one row fed by a prop', { path: '/e-row-pair', view: (b) => [title(b), ...partsRows(b)] }],
+	[
+		'e. row component from another file over a computed of a prop',
+		{ path: '/e-sorted', view: (b) => [...[...b.items].reverse().map((row, at) => `row: ${at + 1}. ${row.label}`), title(b)] },
+	],
+	[
+		'i. row component with its own async value in rows fed by a prop',
+		{ path: '/i-prop-rows-detail', view: (b) => [title(b), ...b.items.map((row) => `row: ${row.label}: detail of ${row.id}`)] },
+	],
 ];
 
 const armed: ReadonlyArray<readonly [string, Shape]> = [
@@ -454,10 +464,44 @@ describe('composition grid, production build', () => {
 	});
 });
 
-describe('a row component from another file in rows fed by a prop', () => {
-	// Known defect: the build refuses it, saying the row's markup cannot be seen, while dev builds it and adds rows.
-	test.fails('builds for production', async () => {
-		await exec(vp, ['build'], { cwd: rowsApp, env: process.env });
-	}, 120_000);
-});
+describe('prop-fed rows of a row component from another file, production build', () => {
+	const rowLines = (...labels: string[]) => labels.map((label) => `row: ${label}`);
 
+	async function picks(visited: Visit, at: number, id: string) {
+		const from = visited.api.details.length;
+		await visited.page.locator('[data-pick]').nth(at).click();
+		await expect.poll(() => visited.api.details.slice(from), poll).toEqual([id]);
+	}
+
+	for (const [name, path] of [
+		['imported row component', '/e-pick'],
+		['row component through a barrel', '/e-pick-barrel'],
+		['default row component under another local name', '/e-pick-renamed'],
+	] as const)
+		test(`${name}: add, remove and reorder, and each row's handler acts on its own item`, async () => {
+			const visited = await visit(path);
+			const { page } = visited;
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('one', 'two'));
+			await picks(visited, 1, 'r2');
+			await page.locator('[data-grid-add]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('one', 'two', 'row 3'));
+			await picks(visited, 2, 'r3');
+			await page.locator('[data-grid-remove]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('two', 'row 3'));
+			await picks(visited, 0, 'r2');
+			await page.locator('[data-grid-reverse]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('row 3', 'two'));
+			await picks(visited, 0, 'r3');
+			await picks(visited, 1, 'r2');
+			expect(visited.errors).toEqual([]);
+		});
+
+	test('a recursive tree whose rows hold a component from another file and the tree itself grows', async () => {
+		const { page, errors } = await visit('/e-tree');
+		const amounts = () => page.evaluate(() => [...document.querySelectorAll('main em')].map((amount) => amount.textContent));
+		await expect.poll(amounts, poll).toEqual(['1', '11']);
+		await page.locator('[data-add]').click();
+		await expect.poll(amounts, poll).toEqual(['1', '11', '2', '21']);
+		expect(errors).toEqual([]);
+	});
+});

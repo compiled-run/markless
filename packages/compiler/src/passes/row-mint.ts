@@ -155,7 +155,12 @@ export function resolveRowChunkMint(
 ): RowComponentMint | null {
 	const chunk = input.chunks.find((candidate) => candidate.id === input.rowChunkId);
 	if (!chunk?.componentName || !input.semanticGraph || input.rowElementCount < 1) return null;
-	if (!chunk.slots.some((slot) => slot.kind === 'branch')) return null;
+	// Rows with one component and no branch take the component mint or the row template instead.
+	if (
+		!chunk.slots.some((slot) => slot.kind === 'branch') &&
+		chunk.slots.filter((slot) => slot.kind === 'child-component').length < 2
+	)
+		return null;
 	// One row element holds everything, so the row's root is that element whichever arm renders.
 	if (chunk.hosts.filter((host) => host.coordinate.path.length === 1).length !== 1) return null;
 	const onRowElement = chunk.slots.every(

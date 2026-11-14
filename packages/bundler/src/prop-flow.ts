@@ -223,8 +223,8 @@ export class PropFlowRegistry {
 		this.#modules.set(source, { flow, childSources });
 	}
 
-	/** Replaces only what the projection check reads with a later compile's reading of the same module. */
-	recordProjection(source: string, flow: ModulePropFlow): void {
+	/** Replaces the verdicts that read the children's interfaces with the linked compile's reading of the same module. */
+	recordLinked(source: string, flow: ModulePropFlow): void {
 		const recorded = this.#modules.get(source);
 		if (!recorded) return;
 		const live = new Map(flow.edges.map((edge) => [edge.id, edge.liveChildren]));
@@ -233,6 +233,7 @@ export class PropFlowRegistry {
 			...recorded,
 			flow: {
 				...rest,
+				decided: flow.decided,
 				...(flow.projectionArms ? { projectionArms: flow.projectionArms } : {}),
 				...(flow.liveComponents ? { liveComponents: flow.liveComponents } : {}),
 				edges: recorded.flow.edges.map(({ liveChildren: _children, ...edge }) => {

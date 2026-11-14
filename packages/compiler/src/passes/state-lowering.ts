@@ -693,6 +693,15 @@ export function staticTemplateReadDiagnostic(
 		readSource,
 		sourceSpan: read.sourceSpan,
 		filename: semanticGraph.filename,
+		target: read.target,
+		...(read.propMemberReads?.length
+			? {
+					propMembers: read.propMemberReads,
+					changingProps: (read.readNames ?? []).filter(
+						(name) => resolveGraphPath(name, lookup.bindings, lookup.aliases)?.binding.kind === 'prop',
+					),
+				}
+			: {}),
 	});
 	const props = read.componentName
 		? propsOnlyReads(read.readNames ?? [], lookup, semanticGraph.moduleImports)
@@ -722,24 +731,63 @@ function propsOnlyReads(
 	return props.size > 0 ? [...props] : null;
 }
 
+function listed(items: ReadonlyArray<string>, joiner = 'and'): string {
+	return items.length < 2 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} ${joiner} ${items.at(-1)}`;
+}
+
+function callSite(
+	target: SemanticGraphArtifact['templateReads'][number]['target'] | undefined,
+	prop: string,
+): string {
+	if (target?.kind === 'class') return `class={classFor(${prop})}`;
+	if (target?.kind === 'attribute' || target?.kind === 'property')
+		return `${target.name}={valueFor(${prop})}`;
+	return `{textFor(${prop})}`;
+}
+
 function templateExpressionStaticDiagnostic({
 	source,
 	readSource,
 	sourceSpan,
 	filename,
+	target,
+	propMembers,
+	changingProps,
 }: {
 	readonly source: string;
 	readonly readSource: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly filename: string;
+	readonly target?: SemanticGraphArtifact['templateReads'][number]['target'];
+	readonly propMembers?: ReadonlyArray<string>;
+	readonly changingProps?: ReadonlyArray<string>;
 }): StateLoweringDiagnostic {
+	const names = propMembers?.map((name) => `\`${name}\``);
+	const props = names && (names.length === 1 ? `the prop ${names[0]}` : `the props ${listed(names)}`);
+	const each = names && (names.length === 1 ? names[0]! : listed(names, 'or'));
+	const changing = listed(
+		(changingProps?.length ? changingProps : (propMembers ?? [])).map((name) => `\`${name}\``),
+		'or',
+	);
+	const place =
+		target?.kind === 'class'
+			? 'This class attribute'
+			: target?.kind === 'attribute'
+				? `This ${target.name} attribute`
+				: target?.kind === 'property'
+					? `This ${target.name} property`
+					: 'This text';
 	return {
 		code: 'MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		severity: 'warning',
 		phase: 'state-lowering',
 		title: 'This expression reads state but never updates',
-		message: `This text reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
-		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		message: props
+			? `${place} reads into ${props} in \`${source}\`. The browser holds a prop only as the plain value the caller passed, and the build cannot tell whether ${each} is a plain value or an object, so the expression renders its initial value and never changes when ${changing} changes.`
+			: `${place} reads \`${readSource}\`, but only plain reads like \`{${readSource}}\` update the page today. The expression renders its initial value and never changes when \`${readSource}\` changes.`,
+		why: props
+			? 'A child keeps each prop as one value the caller passed: a string, number or boolean, never the object behind it. An expression that reads into a prop is lowered only when that cannot be an object, so no subscription exists to wake it.'
+			: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
 		primarySpan: sourceSpan ?? fallbackSpan(filename),
 		passId: 'state-lowering',
 		artifactKeys: ['semanticGraph', 'stateLowering'],
@@ -747,8 +795,9 @@ function templateExpressionStaticDiagnostic({
 		source,
 		suggestions: [
 			{
-				message:
-					"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+				message: propMembers?.length
+					? `If ${names!.length === 1 ? `${each} is` : `${listed(names!)} are each`} a string, number or boolean, move the whole expression into a function declared outside the component that takes ${names!.length === 1 ? 'the prop' : 'those props'}, and call it in its place: \`${callSite(target, propMembers.join(', '))}\`. If one is an object, have the caller pass the value the expression needs as its own prop.`
+					: "Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
 			},
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
