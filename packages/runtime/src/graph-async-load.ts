@@ -268,13 +268,16 @@ export function createAsyncPlane(
 		}
 	};
 	for (const each of asyncComputed ?? []) add(createNode(each));
+	// Runs that writes asked of loads an arm owns, held until the pass has flipped the arm.
+	let armHeld: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
 	function startWritten(passEnd?: boolean): void {
-		const batch = written;
-		written = undefined;
+		const batch = passEnd ? armHeld : written;
+		if (passEnd) armHeld = undefined;
+		else written = undefined;
 		batch?.forEach((quiet, node) => {
-			// A gate fetches nothing; a load its arm may be closing on runs once the pass has flipped the arm, if it still shows.
+			// A gate fetches nothing, so it never waits.
 			const shown = node.boundaryGate ? undefined : internals.armShown?.(node.graphNodeId);
-			if (shown !== undefined && !passEnd) return void (written ??= new Map()).set(node, quiet);
+			if (!passEnd && shown !== undefined) return void (armHeld ??= new Map()).set(node, quiet);
 			if (shown === false || nodes.get(node.graphNodeId) !== node) return;
 			withRefresh((loaded) => {
 				replaying = quiet;
@@ -307,6 +310,7 @@ export function createAsyncPlane(
 					node.version++;
 					nodes.delete(graphNodeId);
 					written?.delete(node);
+					armHeld?.delete(node);
 				}
 		},
 		markEntry(graphNodeId, save) {
