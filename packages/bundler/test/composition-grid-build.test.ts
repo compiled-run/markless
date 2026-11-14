@@ -552,3 +552,21 @@ describe('prop-fed rows of a row component from another file, production build',
 		expect(errors).toEqual([]);
 	});
 });
+
+describe('a failed save under a wrapper with state from url, production build', () => {
+	test('a page value read from params shows @catch, and the wrapper keeps its state', async () => {
+		const { page, errors } = await visit('/failed-save/a7?q=x');
+		await page.route('**/fsw/**', (route) => route.fulfill({ status: 500, body: 'nope' }));
+		await expect
+			.poll(() => page.locator('input[name="first"]').inputValue(), poll)
+			.toBe('Ada a7');
+		await page.locator('[data-submit]').click();
+		await expect
+			.poll(() => page.locator('[data-caught]').textContent(), poll)
+			.toBe('Saving failed (500)');
+		await expect.poll(() => busy(page), poll).toBe(0);
+		await quiet(page);
+		expect(await page.locator('[data-q]').textContent()).toBe('q=x');
+		expect(errors).toEqual([]);
+	});
+});

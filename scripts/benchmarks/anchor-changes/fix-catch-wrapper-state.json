@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 60,
+			"reason": "a boundary drawn again in the browser skips the initializer of a state cell the live graph already holds, so a @catch under a wrapper with state from url renders",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a boundary drawn again in the browser skips the initializer of a state cell the live graph already holds, so a @catch under a wrapper with state from url renders",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 60,
+			"reason": "a boundary drawn again in the browser skips the initializer of a state cell the live graph already holds, so a @catch under a wrapper with state from url renders",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a boundary drawn again in the browser skips the initializer of a state cell the live graph already holds, so a @catch under a wrapper with state from url renders",
+			"date": "2026-11-14"
+		}
+	]
+}
