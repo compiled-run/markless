@@ -1,0 +1,38 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 88,
+			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 88,
+			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"date": "2026-11-14"
+		}
+	]
+}

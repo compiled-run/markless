@@ -1686,7 +1686,9 @@ function runnerStatus(
 ): unknown {
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
-	if (!record || record.async) return record?.snapshot?.status;
+	// A re-run over a value already shown keeps the @try content on screen (spec D8).
+	if (!record || record.async)
+		return record?.snapshot?.status === 'pending' && 'valueKey' in record.snapshot ? 'fulfilled' : record?.snapshot?.status;
 	let status = 'fulfilled';
 	for (const dependency of record.dependencies ?? []) {
 		if (visited.has(dependency.graphNodeId)) continue;
