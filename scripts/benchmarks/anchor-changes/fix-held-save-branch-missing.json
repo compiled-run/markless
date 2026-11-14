@@ -133,6 +133,83 @@
 			"delta": 3,
 			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "runtime/graph-kept: one shared kept-answer rule for the runtime, the async plane and the evaluator (PR run 43621345293)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph-kept"
+			],
+			"set": 672,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/prerender/evaluator"
+			],
+			"delta": 635,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 332,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 149,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 149,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 197,
+			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"date": "2026-11-14"
 		}
 	]
 }
