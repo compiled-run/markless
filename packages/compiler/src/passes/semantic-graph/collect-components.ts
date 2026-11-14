@@ -39,6 +39,7 @@ import {
 } from './composite-reads.ts';
 import { scopedClassValue } from './collect-elements.ts';
 import { readsOnlyFixedValues } from './fixed-prop-value.ts';
+import { catchErrorPropScope, computedReads } from './catch-error-cell.ts';
 import {
 	callbackPropArityUnsupportedDiagnostic,
 	componentPropExpressionUnsupportedDiagnostic,
@@ -216,7 +217,6 @@ function componentPropBindings(
 	// Component-body scope: an unscoped map resolves `checklist` to the shared
 	// factory's own local of the same name, which is a different node.
 	const scope = componentBodyScope(state);
-	const { bindings, aliases } = scope;
 	const props: SemanticComponentPropBinding[] = [];
 
 	for (const attribute of getElementAttributes(node)) {
@@ -416,11 +416,27 @@ function componentPropBindings(
 		// to that local's cell, and every row sends the same value to its child.
 		// The instance local must be THIS component's: a same-named local declared
 		// in a sibling component is not in scope here (defect 46).
+		const caught = expression ? catchErrorPropScope(expression, scope, state) : null;
+		const propScope = caught?.scope ?? scope;
 		const graph = repeatRowBindsName(source, state)
 			? null
-			: (resolveGraphPath(source, bindings, aliases) ??
+			: (resolveGraphPath(source, propScope.bindings, propScope.aliases) ??
 				resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName));
 		if (graph) {
+			if (
+				caught &&
+				!caught.keep(
+					[
+						{
+							node: expression!,
+							reads: [{ graphNodeId: graph.binding.id, path: graph.path }],
+							instanceofs: caught.instanceofs,
+						},
+					],
+					childComponentName,
+				)
+			)
+				continue;
 			// `aria-labelledby={headingEl}` names an element the PARENT renders, so
 			// what crosses the edge is the id minted for it, not the handle. Sent as
 			// an ordinary graph reference the child receives a DOM object and writes
@@ -460,12 +476,26 @@ function componentPropBindings(
 		// out sent it to the refusal below instead of the route it already had.
 		const composite = expression
 			? collectCompositeTemplateExpression(expression, state, {
-					scope,
+					scope: propScope,
 					methodCalls: true,
 					unaryOperators: true,
 				})
 			: null;
 		if (composite) {
+			if (
+				caught &&
+				!caught.keep(
+					[
+						{
+							node: expression!,
+							reads: computedReads(composite.graphNodeId, state),
+							instanceofs: caught.instanceofs,
+						},
+					],
+					childComponentName,
+				)
+			)
+				continue;
 			props.push({
 				name,
 				source,

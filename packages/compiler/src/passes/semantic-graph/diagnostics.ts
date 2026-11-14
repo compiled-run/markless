@@ -1,6 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
-import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
+import { DURABLE_ERROR_FIELDS, PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 import type {
 	SemanticElementHandleBinding,
@@ -2311,4 +2311,39 @@ export function formLeavesPageDiagnostic(
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
 	};
+}
+
+export function catchErrorFieldLostDiagnostic(input: {
+	readonly source: string;
+	// The `@catch` binding as the author named it.
+	readonly binding: string;
+	readonly reads: { readonly field: string } | { readonly whole: true } | { readonly instanceof: true };
+	// The component the value is passed to, when it is a prop.
+	readonly child?: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	const kept = [...DURABLE_ERROR_FIELDS].join(' and ');
+	const { binding, child, reads } = input;
+	const field = 'field' in reads ? reads.field : undefined;
+	const whole = 'whole' in reads;
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_CATCH_ERROR_FIELD_LOST',
+		title: 'Only the name and message of a caught error reach the browser',
+		message:
+			field !== undefined
+				? `\`${input.source}\` reads \`${field}\` from the \`@catch\` error, but a server-rendered page sends the browser only the error's ${kept}, so \`${field}\` would be missing once the page loads.`
+				: whole
+					? `\`${input.source}\` passes the whole \`@catch\` error to <${child}>, but a server-rendered page sends the browser only the error's ${kept}, so any other field <${child}> reads would be missing once the page loads.`
+					: `\`${input.source}\` tests the \`@catch\` error with \`instanceof\`, but the browser gets the error back as its ${kept} only, not as an instance of its class, so the test is false there.`,
+		why: 'A failure caught while the server renders the page travels to the browser as page data, and an Error keeps only its name and message there. Anything else, such as `cause`, a field your own error class adds, or the class itself, is dropped.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion:
+			field !== undefined && !child
+				? `Read \`${binding}.message\` or \`${binding}.name\` instead, and put what the page needs into the message when you throw.`
+				: whole || (child && field !== undefined)
+					? `Pass <${child}> only what it shows, such as \`message={${binding}.message}\`, and put what the page needs into the message when you throw.`
+					: `Tell errors apart by \`${binding}.name\` instead, and set \`name\` in your error class.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CATCH_ERROR_FIELD_LOST',
+	});
 }

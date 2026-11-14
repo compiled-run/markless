@@ -64,7 +64,7 @@ import {
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import { collectRowLocalReads } from './row-local-reads.ts';
-import { catchErrorScope } from './catch-error-cell.ts';
+import { catchErrorScope, computedReads } from './catch-error-cell.ts';
 import { takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import {
 	extractSyncPolicy,
@@ -427,7 +427,7 @@ function joinTextParts(
 	const shared = Boolean(state.currentSharedDefinitionId);
 	const inlined = new Map<
 		AnyNode,
-		{ readonly source: string; readonly definitions: AnyNode[] }
+		{ readonly source: string; readonly definitions: AnyNode[]; readonly instanceofs: ReadonlyArray<AnyNode> }
 	>();
 	const catchErrors = new Map<string, string>();
 	for (const value of values as AnyNode[]) {
@@ -437,6 +437,7 @@ function joinTextParts(
 					source: expressionSource(value, state.source),
 					definitions: [],
 					catchErrors: new Map<string, string>(),
+					catchErrorInstanceofs: [],
 				}
 			: inlineRenderLocals(value, state, { catchErrors: true });
 		if (entry.kind !== 'inlined') return null;
@@ -444,7 +445,11 @@ function joinTextParts(
 			if ((catchErrors.get(name) ?? boundaryId) !== boundaryId) return null;
 			catchErrors.set(name, boundaryId);
 		}
-		inlined.set(value, { source: entry.source ?? '', definitions: [...entry.definitions] });
+		inlined.set(value, {
+			source: entry.source ?? '',
+			definitions: [...entry.definitions],
+			instanceofs: entry.catchErrorInstanceofs,
+		});
 	}
 	const baseScope = {
 		bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
@@ -454,9 +459,11 @@ function joinTextParts(
 	if (catchErrors.size > 0 && !caught) return null;
 	const scope = caught?.scope ?? baseScope;
 	const definitions = [...inlined.values()].flatMap((entry) => entry.definitions);
+	const valueSources = new Map<AnyNode, ReadonlySet<string>>();
 	const readSources = joinReadSources([
 		...values.map((value) => {
 			const sources = pureCompositeReadSources(value, state, TEMPLATE_READ_OPTIONS);
+			valueSources.set(value as AnyNode, new Set(sources?.map((read) => read.source)));
 			return shared
 				? sources
 				: (sources?.filter(
@@ -485,7 +492,18 @@ function joinTextParts(
 		true,
 	);
 	if (!composite) return null;
-	caught?.keep();
+	const compositeReads = computedReads(composite.graphNodeId, state);
+	if (
+		caught &&
+		!caught.keep(
+			(values as AnyNode[]).map((value) => ({
+				node: value,
+				reads: compositeReads.filter((read) => valueSources.get(value)!.has(read.source)),
+				instanceofs: inlined.get(value)!.instanceofs,
+			})),
+		)
+	)
+		return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });

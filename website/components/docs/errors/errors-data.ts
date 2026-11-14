@@ -3237,6 +3237,40 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CATCH_ERROR_FIELD_LOST',
+		title: 'Only the name and message of a caught error reach the browser',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'Only the name and message of a caught error reach the browser: a Markless build error.',
+		printed: [
+			"MARKLESS_CATCH_ERROR_FIELD_LOST: `<source>` reads `<field>` from the `@catch` error, but a server-rendered page sends the browser only the error's <kept>, so `<field>` would be missing once the page loads.",
+			'A failure caught while the server renders the page travels to the browser as page data, and an Error keeps only its name and message there. Anything else, such as `cause`, a field your own error class adds, or the class itself, is dropped.',
+			'Read `<binding>.message` or `<binding>.name` instead, and put what the page needs into the message when you throw.',
+			"MARKLESS_CATCH_ERROR_FIELD_LOST: `<source>` passes the whole `@catch` error to <<child>>, but a server-rendered page sends the browser only the error's <kept>, so any other field <<child>> reads would be missing once the page loads.",
+			'A failure caught while the server renders the page travels to the browser as page data, and an Error keeps only its name and message there. Anything else, such as `cause`, a field your own error class adds, or the class itself, is dropped.',
+			'Pass <<child>> only what it shows, such as `message={<binding>.message}`, and put what the page needs into the message when you throw.',
+			'MARKLESS_CATCH_ERROR_FIELD_LOST: `<source>` tests the `@catch` error with `instanceof`, but the browser gets the error back as its <kept> only, not as an instance of its class, so the test is false there.',
+			'A failure caught while the server renders the page travels to the browser as page data, and an Error keeps only its name and message there. Anything else, such as `cause`, a field your own error class adds, or the class itself, is dropped.',
+			'Tell errors apart by `<binding>.name` instead, and set `name` in your error class.',
+			'https://markless.dev/errors/MARKLESS_CATCH_ERROR_FIELD_LOST',
+		],
+		structured: true,
+		why: 'A failure caught while the server renders the page travels to the browser as page data, and an Error keeps only its name and message there. Anything else, such as `cause`, a field your own error class adds, or the class itself, is dropped.',
+		suggestion:
+			'Read `<binding>.message` or `<binding>.name` instead, and put what the page needs into the message when you throw.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 		title: 'A @catch reset has no graph to re-run values in',
 		area: 'internal',
