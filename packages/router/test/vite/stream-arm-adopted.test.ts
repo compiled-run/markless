@@ -138,8 +138,7 @@ async function openSettled(path: string) {
 	return { page, errors };
 }
 
-// Open defect: the idle queue is installed only for idle records in the page's own module, so a child's streamed arm never queues its host.
-test.fails('an onIdle host inside a streamed arm runs once the runtime has started', async () => {
+test('an onIdle host inside a streamed arm runs once the runtime has started', async () => {
 	const { page, errors } = await openSettled('/watched');
 	try {
 		expect(await page.locator('.watched .value').textContent()).toBe('value idle');

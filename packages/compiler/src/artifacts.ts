@@ -411,6 +411,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly sharedDefinitions?: ReadonlyArray<ModuleGraphInterfaceSharedDefinition>;
 	/** This module or one it imports serves async computeds; `held` when a reader pairs one with an input of its key. */
 	readonly asyncPlanes?: ModuleAsyncPlanes;
+	/** This module or one it imports renders an `onIdle` record, rows and arms included. */
+	readonly idleRecords?: true;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{

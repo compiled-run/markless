@@ -1,3 +1,4 @@
+import { PROTOCOL_IDLE_EVENT_NAME } from '@markless/serializer';
 import { parseModule } from '../../js-ast.ts';
 import { asNodes, childNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
@@ -284,10 +285,14 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const handlerProps = moduleHandlerProps(state);
 	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
+	const idleRecords =
+		graph.events.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME) ||
+		Object.values(input.importedModuleInterfaces ?? {}).some((module) => module?.idleRecords);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
 		...(planes ? { asyncPlanes: planes } : {}),
+		...(idleRecords ? { idleRecords: true as const } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {

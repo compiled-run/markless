@@ -669,7 +669,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				payloadState: compiled.payloadScripts.state,
 				asyncPlanes,
 				payloadView: containerScopedResumeView(compiled.payloadScripts.view),
-				hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+				hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
 				streamsArms: authorsPendingArm(compiled.semanticGraph.markup),
 				runtimeDemandMap: compiled.runtimeDemandMap,
 				servedScalarPlans,
@@ -723,7 +723,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							payloadState: compiled.payloadScripts.state,
 							asyncPlanes,
 							payloadView: containerScopedResumeView(compiled.payloadScripts.view),
-							hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+							hasIdleEvents: compiled.moduleGraphInterface.idleRecords === true,
 							runtimeDemandMap: compiled.runtimeDemandMap,
 							executionLog: input.executionLog,
 							needsFullResume: prerenderClosureNeedsWake,
@@ -907,7 +907,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						(record) => record.kind === 'overlay',
 					),
 					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
-					hasIdleEvents: viewHasIdleEvents(compiled.payloadScripts.view),
+					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
 					scalarActions: input.includeScalarActionPlans
@@ -1705,34 +1705,11 @@ function componentEdgesReachableFrom(
 	return edges;
 }
 
-type IdleEventRecordSet = {
-	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
-	readonly keyedRepeats?: ReadonlyArray<{
-		readonly rowEvents: ReadonlyArray<{ readonly eventName: string }>;
-	}>;
-};
-
-// An idle record anywhere, arm and row records included, means a CSR mount wakes its runtime at idle.
-function viewHasIdleEvents(view: ProtocolViewPayload): boolean {
-	const sets: IdleEventRecordSet[] = [
-		view,
-		...(view.branches ?? []).flatMap((branch) => [
-			...(branch.armRecords ?? []),
-			...(branch.servedArmRecords ? [branch.servedArmRecords] : []),
-		]),
-		...view.asyncBoundaries.flatMap((boundary) =>
-			boundary.armRecords && !Array.isArray(boundary.armRecords)
-				? [boundary.armRecords as IdleEventRecordSet]
-				: [],
-		),
-	];
-	return sets.some(
-		(set) =>
-			(set.events ?? []).some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME) ||
-			(set.keyedRepeats ?? []).some((repeat) =>
-				repeat.rowEvents.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME),
-			),
-	);
+// A client-rendered mount wakes its runtime at idle from the module whose own records, arms and rows included, name idle.
+function moduleHasIdleEvents(graph: {
+	readonly events: ReadonlyArray<{ readonly eventName: string }>;
+}): boolean {
+	return graph.events.some((event) => event.eventName === PROTOCOL_IDLE_EVENT_NAME);
 }
 
 function authorsPendingArm(markup: {
