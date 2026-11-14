@@ -15219,15 +15219,15 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error-or-warning',
 		description: 'A markup expression assigns a value, so its text never updates.',
 		printed: [
-			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: This text reads `<readSource>`, but only plain reads like `{<readSource>}` update the page today. The expression renders its initial value and never changes when `<readSource>` changes.',
-			'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
-			"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+			'MARKLESS_TEMPLATE_EXPRESSION_STATIC: <place> reads a member of the prop `<propMember>` in `<source>`. The browser holds a prop only as the plain value the caller passed, and the build cannot tell whether `<propMember>` is a plain value or an object, so the expression renders its initial value and never changes when `<propMember>` changes.',
+			'A child keeps each prop as one value the caller passed: a string, number or boolean, never the object behind it. An expression that reads into a prop is lowered only when that cannot be an object, so no subscription exists to wake it.',
+			'If `<propMember>` is a string, number or boolean, move the whole expression into a function declared outside the component that takes the prop, and call it in its place: `<callSite>`. If it is an object, have the caller pass the value the expression needs as its own prop.',
 			'https://markless.dev/errors/MARKLESS_TEMPLATE_EXPRESSION_STATIC',
 		],
 		structured: true,
-		why: 'Each template read compiles to a graph subscription with a DOM-update record; composite expressions are not lowered yet, so no subscription exists to wake this text.',
+		why: 'A child keeps each prop as one value the caller passed: a string, number or boolean, never the object behind it. An expression that reads into a prop is lowered only when that cannot be an object, so no subscription exists to wake it.',
 		suggestion:
-			"Hoist the logic into a derived value: `const label = computed(() => a ? 'x' : 'y');` with `<p>{label}</p>`.",
+			'If `<propMember>` is a string, number or boolean, move the whole expression into a function declared outside the component that takes the prop, and call it in its place: `<callSite>`. If it is an object, have the caller pass the value the expression needs as its own prop.',
 		guide: {
 			summary: 'A markup expression assigns a value, so its text never updates.',
 			what: [

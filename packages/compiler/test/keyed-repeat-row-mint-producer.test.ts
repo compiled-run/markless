@@ -174,13 +174,13 @@ test('a wrapper holding an item-only branch beside a component renders its whole
 	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
 });
 
-test('a wrapper holding a page-state branch beside a component warns', async () => {
+test('a wrapper holding a page-state branch beside a component warns, naming the branch', async () => {
 	const compiled = await compilePage(
 		`<ul>@for (const row of rows; key row.id) { <li>@if (chosen === 'a') { <em>on</em> }<Cell label={row.label} /></li> }</ul>`,
 	);
 
 	expect(rowMintWarnings(compiled)).toEqual([
-		['warning', expect.stringContaining('This @for row renders <Cell>')],
+		['warning', expect.stringContaining('This @for row holds @if')],
 	]);
 	expect(rowRecord(compiled)?.rowComponent).toBeUndefined();
 	expect(rowRecord(compiled)?.rowTemplate).toBeUndefined();
@@ -216,5 +216,36 @@ test('a plain text row stays silent - the row template fills it', async () => {
 	expect(rowMintWarnings(compiled)).toEqual([]);
 	expect(rowRecord(compiled)?.rowTemplate?.textSlots).toEqual([
 		expect.objectContaining({ itemPath: ['label'] }),
+	]);
+});
+
+test('a row of two components mints its whole row chunk and stays silent', async () => {
+	const compiled = await compilePage(
+		`<ul>@for (const row of rows; key row.id) { <li><Cell label={row.label} /><Cell label={row.id} /></li> }</ul>`,
+	);
+
+	expect(rowMintWarnings(compiled)).toEqual([]);
+	expect(rowRecord(compiled)?.rowComponent).toEqual({ componentName: 'App', rowChunkId: 'repeat:repeat:0:row' });
+});
+
+// Unlinked, the second child's markup is unknown, so the clause names that child rather than the first.
+test('a row whose component from another module was not compiled names that component', async () => {
+	const compiled = await compileTsrxModule({
+		filename: 'src/Rows.tsrx',
+		source: `import { state } from '@markless/core';
+import { Far } from './far.tsrx';
+function Cell({ label }) @{
+	<span>{label}</span>
+}
+export function App() @{
+	let rows = state([{ id: 'a', label: 'Alpha' }]);
+	<ul>@for (const row of rows; key row.id) { <li><Cell label={row.id} /><Far label={row.label} /></li> }</ul>
+}
+`,
+		symbols: [],
+	});
+
+	expect(rowMintWarnings(compiled)).toEqual([
+		['warning', expect.stringContaining('This @for row renders <Far>, and what <Far> renders could not be seen from here')],
 	]);
 });

@@ -103,6 +103,7 @@ export const KEYED_REPEAT_ROW_MINT_UNSUPPORTED_CODE =
  */
 export type KeyedRepeatRowMintRefusal =
 	| { readonly kind: 'component'; readonly componentName: string }
+	| { readonly kind: 'component-content'; readonly componentName: string }
 	| { readonly kind: 'component-root-boundary'; readonly componentName: string }
 	| { readonly kind: 'nested-construct'; readonly label: string }
 	| { readonly kind: 'attribute'; readonly attributeName: string }
@@ -300,6 +301,11 @@ function refusalCause(
 			return {
 				message: `This @for row renders <${refusal.componentName}>, and what <${refusal.componentName}> renders could not be seen from here, so a row built in the browser would not know what to register.`,
 				suggestion: `Make sure the module declaring <${refusal.componentName}> is part of this build, or move <${refusal.componentName}> outside the @for and keep the row to plain elements and text read off ${itemName}.`,
+			};
+		case 'component-content':
+			return {
+				message: `This @for row renders <${refusal.componentName}>, and something <${refusal.componentName}> renders cannot be built in the browser for a new row.`,
+				suggestion: `Keep <${refusal.componentName}> to elements, text, attributes and components that read only its props, or move <${refusal.componentName}> outside the @for.`,
 			};
 		case 'component-root-boundary':
 			return {

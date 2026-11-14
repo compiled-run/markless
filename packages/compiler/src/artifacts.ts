@@ -1167,6 +1167,8 @@ export type SemanticTemplateRead = {
 	readonly computedGraphNodeId?: string;
 	// Names a composite read with no route reads, resolved by scope analysis.
 	readonly readNames?: ReadonlyArray<string>;
+	// The reads into a prop's members that kept the composite from a computed, such as `label.length`.
+	readonly propMemberReads?: ReadonlyArray<string>;
 	// The expression as written, when `source` carries a body function spliced into its call.
 	readonly authoredSource?: string;
 	// The graph path a plain read names when written through `?.` or `!`: `data.name` for `data?.name`.

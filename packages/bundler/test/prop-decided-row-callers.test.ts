@@ -9,7 +9,6 @@ vi.setConfig({ testTimeout: 30_000 });
 
 const root = resolve(import.meta.dirname, '..');
 
-// A row holding a child whose content awaits is one the browser cannot build after load.
 const chip = `
 import { computed } from '@markless/core';
 
@@ -25,21 +24,33 @@ export default function Chip({ label }) @{
 }
 `;
 
+// A row holding a component beside an @if over the list's own state is one the browser cannot build after load.
 const list = `
+import { state } from '@markless/core';
 import Chip from './chip.tsrx';
 
 export function List({ marks }) @{
-	<ul>
+	let open = state(true);
+	<ul onClick={() => (open = !open)}>
 		@for (const mark of marks; key mark.key) {
-			<li><Chip label={mark.key} /></li>
+			<li>
+				@if (open) {
+					<b>on</b>
+				}
+				<Chip label={mark.key} />
+			</li>
 		}
 	</ul>
 }
 
 export function Tree({ nodes }) @{
-	<ul>
+	let open = state(true);
+	<ul onClick={() => (open = !open)}>
 		@for (const node of nodes; key node.key) {
 			<li>
+				@if (open) {
+					<b>on</b>
+				}
 				<Chip label={node.key} />
 				<Tree nodes={node.children} />
 			</li>
@@ -112,7 +123,7 @@ export default function Page() @{
 `,
 		}),
 	).rejects.toThrow(
-		/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: .*list\.tsrx:\d+:\d+: <List>: .*The list comes from the prop `marks`, and <Page> in .*page\.tsrx passes it `marks`, which changes\./,
+		/MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: .*list\.tsrx:\d+:\d+: <List>: This @for row holds @if.*The list comes from the prop `marks`, and <Page> in .*page\.tsrx passes it `marks`, which changes\./,
 	);
 });
 
@@ -217,4 +228,82 @@ export default function Page() @{
 	).rejects.toThrow(
 		/MARKLESS_KEYED_REPEAT_ROW_NOT_ONE_ELEMENT: .*runs\.tsrx:\d+:\d+: <Runs>: .*passes it `list`, which changes\./,
 	);
+});
+
+const badge = `
+export function Badge({ label }) @{
+	<span class="badge">{label}</span>
+}
+
+export function Icon({ iconClass }) @{
+	<svg class={iconClass} viewBox="0 0 1 1"><path d="M0 0"></path></svg>
+}
+
+export function IconBadge({ label }) @{
+	<span class="badge">{label}<Icon iconClass="w-4" /></span>
+}
+
+export function EditLink({ id }) @{
+	<a href={\`/x/\${id}/edit\`}>edit</a>
+}
+`;
+
+const table = `
+import { Badge, EditLink, IconBadge } from './badge.tsrx';
+
+export function Table({ rows }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><Badge label={row.label} /></li>
+		}
+	</ul>
+}
+
+export function IconTable({ rows }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><IconBadge label={row.label} /></li>
+		}
+	</ul>
+}
+
+export function PairTable({ rows }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><Badge label={row.label} /><EditLink id={row.id} /></li>
+		}
+	</ul>
+}
+
+export function LinkTable({ rows }) @{
+	<ul>
+		@for (const row of rows; key row.id) {
+			<li><EditLink id={row.id} /></li>
+		}
+	</ul>
+}
+`;
+
+test('rows fed by a changing prop build when each row is a component from another file the browser can build', async () => {
+	await expect(
+		buildPage('row-component', {
+			'badge.tsrx': badge,
+			'table.tsrx': table,
+			'page.tsrx': `
+import { state } from '@markless/core';
+import { IconTable, LinkTable, PairTable, Table } from './table.tsrx';
+
+export default function Page() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<main>
+		<button type="button" onClick={() => rows.push({ id: 'b', label: 'B' })}>add</button>
+		<Table rows={rows} />
+		<IconTable rows={rows} />
+		<LinkTable rows={rows} />
+		<PairTable rows={rows} />
+	</main>
+}
+`,
+		}),
+	).resolves.toBeUndefined();
 });

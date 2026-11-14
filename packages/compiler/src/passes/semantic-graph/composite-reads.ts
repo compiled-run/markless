@@ -421,6 +421,40 @@ export function mintTemplateExpressionComputed(
 	propObjectRoots?: ReadonlySet<string>,
 	joinsText = false,
 ): { readonly graphNodeId: string } | null {
+	const dependencies = graphReadDependencies(readSources, state, scope);
+	if (!dependencies) return null;
+	if (dependencies.length === 0 && !allowConstant) return null;
+	if (
+		!allowConstant &&
+		!armRebuildsFromGraph(state) &&
+		propMemberReads(dependencies, propObjectRoots).length > 0
+	)
+		return null;
+
+	const index = state.graph.graphBindings.filter((binding) =>
+		binding.id.startsWith('computed:templateExpression:'),
+	).length;
+	const graphNodeId = `computed:templateExpression:${index}`;
+	state.graph.graphBindings.push({
+		id: graphNodeId,
+		name: `marklessTemplateExpression${index}`,
+		kind: 'computed',
+		writable: false,
+		async: false,
+		asyncCapable: false,
+		functionSource,
+		dependencies: uniqueDependencies(dependencies),
+		...(joinsText ? { joinsText: true as const } : {}),
+		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
+	});
+	return { graphNodeId };
+}
+
+function graphReadDependencies(
+	readSources: ReadonlyArray<GraphReadSource>,
+	state: WalkState,
+	scope?: GraphReadScope,
+): SemanticGraphDependency[] | null {
 	const component = state.currentComponentName ?? undefined;
 	const bindings =
 		scope?.bindings ?? graphBindingMap(state.graph, state.currentSharedDefinitionId, component);
@@ -450,36 +484,42 @@ export function mintTemplateExpressionComputed(
 			);
 		dependencies.push({ source, graphNodeId: resolved.binding.id, path: resolved.path, local });
 	}
-	if (dependencies.length === 0 && !allowConstant) return null;
-	if (
-		!allowConstant &&
-		!armRebuildsFromGraph(state) &&
-		dependencies.every((dependency) => dependency.graphNodeId.startsWith('prop:')) &&
-		dependencies.some(
+	return dependencies;
+}
+
+// A prop cell carries only scalars, so a derive reading into a prop would see undefined when the caller passes an object.
+function propMemberReads(
+	dependencies: ReadonlyArray<SemanticGraphDependency>,
+	propObjectRoots?: ReadonlySet<string>,
+): ReadonlyArray<string> {
+	if (!dependencies.every((dependency) => dependency.graphNodeId.startsWith('prop:'))) return [];
+	return dependencies
+		.filter(
 			(dependency) =>
 				propObjectRoots?.has(dependency.source) ||
 				dependency.path.length > (dependency.graphNodeId === 'prop:props' ? 1 : 0),
 		)
-	)
-		return null;
+		.map((dependency) => dependency.source);
+}
 
-	const index = state.graph.graphBindings.filter((binding) =>
-		binding.id.startsWith('computed:templateExpression:'),
-	).length;
-	const graphNodeId = `computed:templateExpression:${index}`;
-	state.graph.graphBindings.push({
-		id: graphNodeId,
-		name: `marklessTemplateExpression${index}`,
-		kind: 'computed',
-		writable: false,
-		async: false,
-		asyncCapable: false,
-		functionSource,
-		dependencies: uniqueDependencies(dependencies),
-		...(joinsText ? { joinsText: true as const } : {}),
-		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
-	});
-	return { graphNodeId };
+/** The props whose members an expression reads, when that alone kept it from becoming a computed. */
+export function refusedPropMemberReads(
+	expression: AnyNode,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<string> {
+	if (armRebuildsFromGraph(state) || !isCompositeTemplateExpression(expression, options)) return [];
+	const readSources = pureCompositeReadSources(expression, state, options);
+	const dependencies = readSources && graphReadDependencies(readSources, state);
+	if (!dependencies?.length) return [];
+	const members = new Set(propMemberReads(dependencies, memberRoots(expression)));
+	return [
+		...new Set(
+			dependencies.flatMap((dependency) =>
+				members.has(dependency.source) && dependency.local ? [dependency.local.name] : [],
+			),
+		),
+	];
 }
 
 /**

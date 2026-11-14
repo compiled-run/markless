@@ -1,6 +1,7 @@
 import { beforeEach, expect, test } from 'vitest';
 import { render, renderSSR, renderStream } from '../../src/index.ts';
 import EntryNotePage from './i-entry-note-page.tsrx';
+import PropRowsDetailPage from './i-prop-rows-detail-page.tsrx';
 import RowDetailPage from './i-row-detail-page.tsrx';
 import SingleDetailPage from './i-single-detail-page.tsrx';
 import { installServer, resetServer, server, type Board } from './grid-server.ts';
@@ -48,3 +49,6 @@ test.fails('single child: SSR streamed: a new subject reaches the nested @try', 
 	oneStep(single('SSR', () => playStream(renderStream(SingleDetailPage))), 'switch subject while open'));
 test('renamed: CSR', () => fullTimeline(run((board) => [...rows(board), title(board)], 'CSR', () => render(EntryNotePage))));
 test('renamed: SSR', () => fullTimeline(run((board) => [...rows(board), title(board)], 'SSR', () => renderSSR(EntryNotePage))));
+// The same rows fed to a table component from another file as a prop.
+test('rows fed by a prop: CSR', () => fullTimeline(run((board) => [title(board), ...rows(board)], 'CSR', () => render(PropRowsDetailPage))));
+test('rows fed by a prop: SSR', () => fullTimeline(run((board) => [title(board), ...rows(board)], 'SSR', () => renderSSR(PropRowsDetailPage))));

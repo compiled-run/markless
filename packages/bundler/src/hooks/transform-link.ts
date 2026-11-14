@@ -335,8 +335,8 @@ export async function linkTransformChildren(
 			linkedTransformInput,
 			linkedChildHasBrowserTriggers,
 		);
-		// The linked compile sees the children's interfaces, so it is the one that places projected rows.
-		if (transformed.propFlow) moduleMetadata.propFlow.recordProjection(request.source, transformed.propFlow);
+		// The linked compile sees the children's interfaces, so its row and projection verdicts are the ones that hold.
+		if (transformed.propFlow) moduleMetadata.propFlow.recordLinked(request.source, transformed.propFlow);
 	}
 	// A build checks the whole graph once; dev checks each module once the children it links have recorded theirs.
 	if (internalOptions.dev === true) throwDevProjectionRefusals(moduleMetadata.propFlow, request.source);

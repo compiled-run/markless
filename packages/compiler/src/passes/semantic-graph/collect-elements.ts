@@ -56,6 +56,7 @@ import {
 	type GraphReadScope,
 	pureCompositeReadSources,
 	readsUnroutedGraphCell,
+	refusedPropMemberReads,
 } from './composite-reads.ts';
 import {
 	collectExpressionReads,
@@ -316,13 +317,15 @@ function unroutedReadNames(
 	expression: AnyNode,
 	composite: { readonly graphNodeId: string } | null | undefined,
 	state: WalkState,
-): { readonly readNames?: ReadonlyArray<string> } {
+): { readonly readNames?: ReadonlyArray<string>; readonly propMemberReads?: ReadonlyArray<string> } {
 	if (composite) return {};
 	const unwrapped =
 		expression.type === 'ChainExpression' ? (expression.expression as AnyNode) : expression;
 	if (isDottedPath(unwrapped)) return {};
 	const names = expressionReadNames(expression, state);
-	return names.length > 0 ? { readNames: names } : {};
+	if (names.length === 0) return {};
+	const members = refusedPropMemberReads(expression, state, TEMPLATE_READ_OPTIONS);
+	return { readNames: names, ...(members.length > 0 ? { propMemberReads: members } : {}) };
 }
 
 function templateReadSource(

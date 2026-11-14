@@ -91,7 +91,7 @@ export default function Page() @{
 	expect(updateModule(fixed)).not.toContain('armRecords');
 });
 
-test('a @try whose keyed rows hold two components still re-renders on refresh; rows the browser builds update in place', async () => {
+test('keyed rows in a @try holding two components, or a wrapper beside one, are built by the browser and update in place', async () => {
 	const twoChildren = await compile(`
 import { computed, state } from '@markless/core';
 async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
@@ -107,7 +107,7 @@ export default function Page() @{
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(twoChildren.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
+	expect(twoChildren.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBeUndefined();
 	const wrapped = await compile(`
 import { computed, state } from '@markless/core';
 async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
