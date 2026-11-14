@@ -141,6 +141,7 @@
 		"packages/router/test/vite/navigation-release.test.ts",
 		"packages/router/test/vite/navigation-restyle.test.ts",
 		"packages/router/test/vite/navigation-stream.test.ts",
+		"packages/router/test/vite/one-server-module.test.ts",
 		"packages/router/test/vite/page-http.test.ts",
 		"packages/router/test/vite/page-region.test.ts",
 		"packages/router/test/vite/palette-port.test.ts",

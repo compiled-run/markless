@@ -90,6 +90,14 @@ import {
 	type ServerBuildState,
 } from './nitro-prerender.ts';
 import {
+	PAGE_SERVER_HANDLERS_ID,
+	pageServerHandlerChunksPlugin,
+	pageServerHandlerImportsPlugin,
+	pageServerHandlersModule,
+	pageServerHandlersState,
+	type PageServerHandlersState,
+} from './nitro-page-server-handlers.ts';
+import {
 	cloudflareModule,
 	cloudflareNodeBuildsPlugin,
 	cloudflareWorkerTrimPlugin,
@@ -210,6 +218,7 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 	const serverBuild = serverBuildState();
 	const devNitro = devNitroState();
 	const compressedAssets = compressedAssetsState();
+	const pageServerHandlers = pageServerHandlersState();
 
 	return [
 		routerConfigPlugin(
@@ -222,7 +231,9 @@ export function router(options: MarklessRouterOptions = {}): PluginOption[] {
 			serverBuild,
 			devNitro,
 			compressedAssets,
+			pageServerHandlers,
 		),
+		pageServerHandlerChunksPlugin(pageServerHandlers),
 		devSourceModuleRequestPlugin(),
 		devPageForUrlPlugin(options),
 		pageServerOnlyPropsPlugin(),
@@ -394,6 +405,7 @@ function routerConfigPlugin(
 	serverBuild: ServerBuildState = serverBuildState(),
 	devNitro: DevNitroState = devNitroState(),
 	compressedAssets: CompressedAssetsState = compressedAssetsState(),
+	pageServerHandlers: PageServerHandlersState = pageServerHandlersState(),
 ): Plugin {
 	let clientOutDir = '';
 	let clientEnvironmentName = '';
@@ -444,6 +456,7 @@ function routerConfigPlugin(
 				serverBuild,
 				devNitro,
 				compressedAssets,
+				pageServerHandlers,
 			);
 			config.server = { ...config.server, watch: serverWatch };
 		},
@@ -482,8 +495,9 @@ function routerConfigPlugin(
 			) as { api: { chunkImportMap(): boolean; enableChunkImportMap?(): void } } | undefined;
 			markless?.api.enableChunkImportMap?.();
 			if (config.command === 'build')
-				(markless?.api as { deliverStylesheetsInDocuments?(): void } | undefined)
-					?.deliverStylesheetsInDocuments?.();
+				(
+					markless?.api as { deliverStylesheetsInDocuments?(): void } | undefined
+				)?.deliverStylesheetsInDocuments?.();
 			routePreloads.chunkSpecifiers = markless?.api.chunkImportMap() === true;
 		},
 		configEnvironment(_name, config) {
@@ -819,6 +833,7 @@ function createNitroConfig(
 	serverBuild: ServerBuildState = serverBuildState(),
 	devNitro: DevNitroState = devNitroState(),
 	compressedAssets: CompressedAssetsState = compressedAssetsState(),
+	pageServerHandlers: PageServerHandlersState = pageServerHandlersState(),
 ): NonNullable<UserConfig['nitro']> {
 	const scanDirs = Array.isArray(nitroConfig?.scanDirs)
 		? nitroConfig.scanDirs.filter((dir): dir is string => typeof dir === 'string')
@@ -852,6 +867,7 @@ function createNitroConfig(
 			cloudflareModule({
 				autoSubfolderIndex: nitroConfig?.prerender?.autoSubfolderIndex !== undefined,
 			}),
+			pageServerHandlersModule(pageServerHandlers),
 			...(isBuild
 				? [prerenderRendererModule(serverBuild, [MARKLESS_BUILD_PREFIX, LINK_BRIDGE_DIR])]
 				: [devNitroModule(devNitro)]),
@@ -873,7 +889,9 @@ function createNitroConfig(
 				...nitroConfig?.routeRules,
 			},
 		}),
-		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root),
+		rolldownConfig: withRequestFileBuildPlugin(nitroConfig?.rolldownConfig, root, [
+			pageServerHandlerImportsPlugin(pageServerHandlers, !isBuild),
+		]),
 		rollupConfig: withRequestFileBuildPlugin(nitroConfig?.rollupConfig, root),
 		scanDirs: [...new Set(['.', ...scanDirs])],
 		watchOptions,
@@ -916,7 +934,11 @@ function isPatternList<Pattern>(value: Pattern | readonly Pattern[]): value is r
 	return Array.isArray(value);
 }
 
-function withRequestFileBuildPlugin(config: unknown, root: string): Record<string, unknown> {
+function withRequestFileBuildPlugin(
+	config: unknown,
+	root: string,
+	extraPlugins: readonly unknown[] = [],
+): Record<string, unknown> {
 	const configObject = isRecord(config) ? config : {};
 	const plugins = Array.isArray(configObject.plugins)
 		? configObject.plugins
@@ -926,7 +948,7 @@ function withRequestFileBuildPlugin(config: unknown, root: string): Record<strin
 
 	return {
 		...configObject,
-		plugins: [requestFileBuildTransformPlugin(root), ...plugins],
+		plugins: [requestFileBuildTransformPlugin(root), ...extraPlugins, ...plugins],
 	};
 }
 
@@ -1415,6 +1437,9 @@ function serverEntrySource(root: string, options: MarklessRouterOptions): string
 		`  routeFileIds,`,
 		`});`,
 		`export const fetch = entry.fetch;`,
+		...(options.nitro === false
+			? []
+			: [`export { pageServerHandlers } from ${JSON.stringify(PAGE_SERVER_HANDLERS_ID)};`]),
 		`export default entry;`,
 	].join('\n');
 }
