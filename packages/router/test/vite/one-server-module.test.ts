@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
 import { afterAll, describe, expect, test, vi } from 'vitest';
@@ -35,17 +35,19 @@ afterAll(async () => {
 	await Promise.all(roots.map((root) => rm(root, { recursive: true, force: true })));
 });
 
-const page = async (origin: string) => (await fetch(`${origin}/`)).text();
+const text = async (origin: string, path: string) => (await fetch(`${origin}${path}`)).text();
+const json = async (origin: string, path: string, init?: RequestInit) =>
+	(await fetch(`${origin}${path}`, init)).json();
 
-async function expectOneCounter(origin: string): Promise<void> {
-	expect(await page(origin)).toContain('<p data-counts="">0/1</p>');
-	const bumped = await fetch(`${origin}/api/bump`, { method: 'POST' });
-	expect(await bumped.json()).toEqual({ count: 1 });
-	expect(await (await fetch(`${origin}/api/count`)).json()).toEqual({
-		count: 1,
-		pageRequests: 1,
-	});
-	expect(await page(origin)).toContain('<p data-counts="">1/2</p>');
+async function expectOneCounter(origin: string, mode: 'dev' | 'prod'): Promise<void> {
+	expect(await text(origin, '/')).toContain('<p data-counts="">0/1</p>');
+	expect(await json(origin, '/api/bump', { method: 'POST' })).toEqual({ count: 1 });
+	expect(await json(origin, '/api/count')).toEqual({ count: 1, pageRequests: 1, afterNext: 1 });
+	expect(await text(origin, '/')).toContain('<p data-counts="">1/2</p>');
+	// The server half of pages/total.tsrx imports api/total.ts itself; the page and the route still share one copy.
+	expect(await text(origin, '/total')).toContain('<p data-total="">total 1</p>');
+	expect(await json(origin, '/api/total')).toEqual({ total: 'total 1' });
+	expect(await json(origin, '/api/mode')).toEqual({ mode });
 }
 
 describe('one server module instance per server', () => {
@@ -56,7 +58,7 @@ describe('one server module instance per server', () => {
 			env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 		});
 		try {
-			await expectOneCounter(server.origin);
+			await expectOneCounter(server.origin, 'prod');
 		} finally {
 			server.close();
 		}
@@ -66,7 +68,34 @@ describe('one server module instance per server', () => {
 		const root = await app();
 		const server = await startFixtureDev(root);
 		try {
-			await expectOneCounter(server.origin);
+			await expectOneCounter(server.origin, 'dev');
+		} finally {
+			await server.close();
+		}
+	});
+
+	test('dev server: an edited api route answers with its new code and keeps the shared count', async () => {
+		const root = await app();
+		const server = await startFixtureDev(root, { watch: true });
+		try {
+			const { origin } = server;
+			expect(await json(origin, '/api/bump', { method: 'POST' })).toEqual({ count: 1 });
+			const route = join(root, 'api/bump.post.ts');
+			await writeFile(
+				route,
+				(await readFile(route, 'utf8')).replace(
+					'{ count: bumpCount() }',
+					'{ count: bumpCount(), edited: true }',
+				),
+			);
+			await expect
+				.poll(async () => json(origin, '/api/bump', { method: 'POST' }), {
+					timeout: 20_000,
+				})
+				.toMatchObject({ edited: true });
+			const { count } = (await json(origin, '/api/count')) as { count: number };
+			expect(count).toBeGreaterThan(1);
+			expect(await text(origin, '/')).toContain(`<p data-counts="">${count}/`);
 		} finally {
 			await server.close();
 		}

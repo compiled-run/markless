@@ -17,3 +17,13 @@ export function notePageRequest(): void {
 export function readPageRequests(): number {
 	return pageRequests;
 }
+
+let afterNext = 0;
+
+export function noteAfterNext(): void {
+	afterNext += 1;
+}
+
+export function readAfterNext(): number {
+	return afterNext;
+}

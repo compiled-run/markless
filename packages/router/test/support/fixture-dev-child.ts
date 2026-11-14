@@ -16,7 +16,7 @@ const server = await createServer({
 		host: '127.0.0.1',
 		port,
 		strictPort: true,
-		watch: null,
+		watch: process.argv[4] === 'watch' ? {} : null,
 		fs: { allow: [root, resolve(import.meta.dirname, '../../../..')] },
 	},
 });
