@@ -1118,6 +1118,8 @@ export function evaluatePrerenderDataComponent(input: {
 		// derive reaches it unbound and dies on the capture context it never got.
 		if (!marklessOwnsDerivedNode(input.surface, input.componentName, initial.graphNodeId))
 			return undefined;
+		// Component-body code: a live cell's initializer never runs again.
+		if (liveCellIds?.has(initial.graphNodeId)) return undefined;
 		if (asyncPlanes.awaits?.(definition.state, initial.graphNodeId, symbolRead))
 			return undefined;
 		const symbolId = symbolValue.symbolId;
