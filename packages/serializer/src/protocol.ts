@@ -391,6 +391,12 @@ export type ProtocolArmRecordSet = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
+	/** @try blocks the arm renders inside itself, anchor indexes counted from the arm start. */
+	readonly asyncBoundaries?: ReadonlyArray<
+		Omit<ProtocolViewPayload['asyncBoundaries'][number], 'armRecords'> & {
+			readonly armRecords?: ProtocolArmRecordSet;
+		}
+	>;
 	/** Served beside `events` sent as templates: the names the stream boot listens for. */
 	readonly eventNames?: ReadonlyArray<string>;
 };

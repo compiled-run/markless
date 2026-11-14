@@ -35,6 +35,7 @@ import {
 } from './render-to-string.ts';
 import { __marklessDebugBootstrapSource } from './debug-channel.ts';
 import { RESUME_MODULE_ATTRIBUTE } from './fns/container-region.ts';
+import { boundariesInside } from './prerender/records.ts';
 
 // D5/D6 out-of-order streaming (T107, owner-ratified three-layer semantics):
 // the shell flushes with @pending arms in place of unsettled boundaries and
@@ -460,11 +461,10 @@ function renderArmAppend(
 		throw streamArmError(arm.boundaryId, 'renderData boundary record', 'structure');
 	const armHtml = renderedAnchor.html;
 
-	const boundary = (output.view?.asyncBoundaries ?? []).find(
-		(candidate) => candidate.id === arm.boundaryId,
-	) as StreamedBoundary & { readonly armRecords?: unknown };
+	const view = output.view;
+	const boundary = view?.asyncBoundaries.find((candidate) => candidate.id === arm.boundaryId);
 	const armRecords = boundary?.armRecords;
-	if (!armRecords || Array.isArray(armRecords)) {
+	if (!view || !armRecords || !('locators' in armRecords)) {
 		throw streamArmError(arm.boundaryId, 'an armized record set', 'view payload');
 	}
 	const computed = (output.state?.computed ?? []).find(
@@ -495,12 +495,17 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const armEvents = withServedBranchArmEvents(
-		armRecords as ProtocolArmRecordSet,
+	const nested = boundariesInside(view, boundary);
+	const armEvents = withPaintedBlockEvents(
+		armRecords,
+		nested,
 		renderedAnchor.elementStart,
 		output.structure?.anchors ?? [],
 	);
-	const servedArmRecords = withPaintedBranchArms(armEvents, output) as ProtocolArmRecordSet;
+	const servedArmRecords = withPaintedBranchArms(
+		nested.length > 0 ? ({ ...armEvents, asyncBoundaries: nested } satisfies ProtocolArmRecordSet) : armEvents,
+		output,
+	) as ProtocolArmRecordSet;
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const armPatch: ProtocolStreamedArmPatch = [
 		boundary.initiallyServedArm,
@@ -526,25 +531,37 @@ type ServedBranch = NonNullable<ProtocolArmRecordSet['branches']>[number] & {
 	readonly servedArmRecords?: ProtocolArmRecordSet;
 };
 
-// The stream boot reads only the arm's own events, so an @if's painted arm lends its events and their hosts to the arm,
-// placed where the render put the @if.
-function withServedBranchArmEvents(
+// The stream boot reads only the arm's own events, so every block painted inside the arm (an @if's served arm, a
+// nested @try's arm) lends its events and their hosts to the arm, placed where the render put the block.
+function withPaintedBlockEvents(
 	armRecords: ProtocolArmRecordSet,
+	nested: NonNullable<ProtocolArmRecordSet['asyncBoundaries']>,
 	armStart: number,
 	anchors: NonNullable<SsrRenderOutput['structure']>['anchors'],
 ): ProtocolArmRecordSet {
-	const branches = (armRecords.branches ?? []) as ReadonlyArray<ServedBranch>;
-	if (!branches.some((branch) => branch.servedArmRecords?.events.length)) return armRecords;
+	const branchBlocks = (records: ProtocolArmRecordSet | undefined) =>
+		((records?.branches ?? []) as ReadonlyArray<ServedBranch>).map((branch) => ({
+			kind: 'branch',
+			id: branch.id,
+			records: branch.servedArmRecords,
+		}));
+	const blocks = [
+		...branchBlocks(armRecords),
+		...nested.flatMap((boundary) => {
+			const records = boundary.armRecords as ProtocolArmRecordSet | undefined;
+			return [{ kind: 'async', id: boundary.id, records }, ...branchBlocks(records)];
+		}),
+	];
+	if (!blocks.some((block) => block.records?.events.length)) return armRecords;
 	const locators = [...armRecords.locators];
 	const events = [...armRecords.events];
-	for (const branch of branches) {
-		const served = branch.servedArmRecords;
+	for (const block of blocks) {
 		const anchor = anchors.find(
-			(candidate) => candidate.kind === 'branch' && candidate.id === branch.id,
+			(candidate) => candidate.kind === block.kind && candidate.id === block.id,
 		);
-		if (!served?.events.length || !anchor) continue;
-		const placed = new Map(served.locators.map((locator) => [locator.hostNodeId, locator]));
-		for (const event of served.events) {
+		if (!block.records?.events.length || !anchor) continue;
+		const placed = new Map(block.records.locators.map((locator) => [locator.hostNodeId, locator]));
+		for (const event of block.records.events) {
 			const locator = placed.get(event.hostNodeId);
 			if (!locator) continue;
 			if (!locators.some((held) => held.hostNodeId === locator.hostNodeId))

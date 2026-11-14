@@ -195,8 +195,10 @@ export async function registerArmRecordSet(
 		readonly comments?: ReadonlyArray<ResumeDomComment>;
 	},
 	eventTypesInstalled?: boolean,
+	// The records a nested @try defines its runners from; refreshes and list priming take only `update.computed`.
+	nestedComputed: ArmCommitUpdate['computed'] = update.computed,
 ) {
-	const deferred: DeferredArmWiring = { repeats: [], steps: [], computed: update.computed };
+	const deferred: DeferredArmWiring = { repeats: [], steps: [], computed: nestedComputed };
 	const materialized = registerArmNow(deps, installEventType, boundary, update, deferred, eventTypesInstalled);
 	// Before any refresh subscribes: a derive that runs first would read nothing.
 	for (const cell of update.cells ?? []) {

@@ -407,20 +407,6 @@ export function createResumeRuntime(
 		else if (phase === 1)
 			input.root.addEventListener?.(eventType, dispatchCaptured, { capture: true });
 	}
-	async function registerServedBoundaryArms(servedBehaviors: string[]): Promise<void> {
-		for (const boundary of asyncBoundariesById.values()) {
-			const armRecords = boundary.armRecords as ResumeArmRecordSet | undefined;
-			if (!armRecords || Array.isArray(armRecords)) continue;
-			const { registerArmRecordSet } = await import('./resume-commit-arm.ts');
-			await registerArmRecordSet(
-				await armRegistrationDeps(armRecords, servedBehaviors),
-				installArmEventType,
-				boundary,
-				{ armRecords },
-			);
-		}
-	}
-
 	// The branch runtime files and disposes hosts only through this pair.
 	function fileHost(hostNodeId: string, element: ResumeDomElement): void {
 		disposedHosts.delete(hostNodeId);
@@ -491,7 +477,6 @@ export function createResumeRuntime(
 			});
 		await registerComputedRefreshes(input.state?.computed ?? [], input.state?.sharedSeeds);
 		const servedBehaviors: string[] = [];
-		await registerServedBoundaryArms(servedBehaviors);
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')
 		).startResumeRuntime({
@@ -513,6 +498,7 @@ export function createResumeRuntime(
 			connectAsyncBoundaryWiring: (wiring) => {
 				asyncBoundaryWiring = wiring;
 			},
+			servedBehaviors,
 			receiveSharedPatch,
 			sharedPatchEventType: SHARED_PATCH_EVENT_TYPE,
 			armRegistrationDeps,

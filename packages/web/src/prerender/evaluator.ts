@@ -16,7 +16,7 @@ import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
 import { PROTOCOL_PROPS_GRAPH_NODE_ID } from '../../../serializer/src/protocol-constants.ts';
-import { prepareSsrResumeRecords } from './records.ts';
+import { boundariesInside, prepareSsrResumeRecords } from './records.ts';
 import {
 	marklessSsrAttachSnapshots,
 	marklessComposeState,
@@ -557,33 +557,6 @@ function armBranchRange(
 			...(nested.length > 0 && { asyncBoundaries: nested }),
 		},
 	};
-}
-
-// @try blocks inside a range, re-addressed from its start anchor so the commit can wire them.
-function boundariesInside(
-	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
-	range: {
-		readonly startAnchor: { readonly index: number };
-		readonly endAnchor: { readonly index: number };
-	},
-): NonNullable<ResumeArmRecordSet['asyncBoundaries']> {
-	const start = range.startAnchor.index;
-	const armIndex = <A extends { readonly index: number }>(anchor: A): A => ({
-		...anchor,
-		index: anchor.index - start - 1,
-	});
-	return view.asyncBoundaries
-		.filter(
-			(candidate) =>
-				candidate.startAnchor.index > start &&
-				candidate.endAnchor.index < range.endAnchor.index,
-		)
-		.map(({ armRecords: served, ...candidate }) => ({
-			...candidate,
-			...(served && !Array.isArray(served) && { armRecords: served as ResumeArmRecordSet }),
-			startAnchor: armIndex(candidate.startAnchor),
-			endAnchor: armIndex(candidate.endAnchor),
-		}));
 }
 
 // @if and @switch blocks inside a range, outside any @try in it (whose own records carry those);
