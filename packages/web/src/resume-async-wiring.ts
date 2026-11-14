@@ -496,8 +496,7 @@ async function prepareBoundarySettle(
 		if (rawArmRecords !== undefined && !armRecords) throw emptySettleRenderError(boundary.id);
 		if (armRecords) {
 			if (claim?.() === false) return;
-			const { computed, cells, renderedBoundaryId, moduleRootPath } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'> & {
-				readonly renderedBoundaryId?: string;
+			const { computed, cells, moduleRootPath } = update as Pick<ArmCommitUpdate, 'computed' | 'cells'> & {
 				readonly moduleRootPath?: string;
 			};
 			const own = {
@@ -508,7 +507,7 @@ async function prepareBoundarySettle(
 			};
 			return commit(
 				{
-					...(composedArmRecordQualifier()?.boundaryUpdate?.(boundary, own, input.graph, renderedBoundaryId) ?? own),
+					...(composedArmRecordQualifier()?.boundaryUpdate?.(boundary, own, input.graph) ?? own),
 					html: update.html,
 				},
 				rawArmRecords !== undefined,

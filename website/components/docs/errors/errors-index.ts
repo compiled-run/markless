@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 315,
+	total: 316,
 	guided: 51,
 	groups: [
 		{
@@ -1506,6 +1506,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'a browser-built row reads its owner’s prop markless_prerender_projected_prop_read a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_PRERENDER_OWNER_UNPLACED',
+					title: 'A browser-drawn part has no component to start from',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a browser-drawn part has no component to start from markless_prerender_owner_unplaced a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_RENDER_DATA_READER_SPECIFIER_UNRESOLVABLE',

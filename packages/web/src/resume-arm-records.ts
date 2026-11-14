@@ -231,8 +231,7 @@ function materializeArmBranchRecords(
 	const planned = (anchor: ResumeArmBranchRecord['startAnchor']) =>
 		anchor as { readonly strategy?: string; readonly index?: number } | undefined;
 	// A composed child's own branch arrives still spelling the index it counted in
-	// its OWN module's census, which names nothing here; its anchors carry its
-	// instance-prefixed id, or its module id when the arm was drawn at its owner.
+	// its OWN module's census, which names nothing here; its anchors carry its page id.
 	const composed = (record: ResumeArmBranchRecord) =>
 		planned(record.startAnchor)?.strategy === 'dom-order-comment';
 	const census = records.some(
@@ -243,9 +242,7 @@ function materializeArmBranchRecords(
 	return records.map((record) => {
 		if (composed(record)) {
 			const own = (mark: string) =>
-				census.find((comment) =>
-					[record.id, record.sourceId].some((id) => commentText(comment) === `${mark}markless:branch:${id}`),
-				);
+				census.find((comment) => commentText(comment) === `${mark}markless:branch:${record.id}`);
 			const startAnchor = own('');
 			const endAnchor = own('/');
 			if (!startAnchor || !endAnchor) throw missingComposedArmBranchAnchorError(record.id);
@@ -255,12 +252,9 @@ function materializeArmBranchRecords(
 		const endIndex = planned(record.endAnchor)?.index;
 		if (startIndex === undefined || endIndex === undefined) return record;
 		// A branch nested in another's arm is found by name: planned indexes count siblings only.
-		// An arm a composed child drew in the browser spells its module id, as above.
 		const named = (index: number, mark: string) =>
 			[census[index], ...census].find(
-				(comment) =>
-					comment &&
-					[record.id, record.sourceId].some((id) => id && commentText(comment) === `${mark}markless:arm-branch:${id}`),
+				(comment) => comment && commentText(comment) === `${mark}markless:arm-branch:${record.id}`,
 			);
 		const startAnchor = named(startIndex, '');
 		const endAnchor = named(endIndex, '/');

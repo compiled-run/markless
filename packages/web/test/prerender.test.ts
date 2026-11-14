@@ -14,6 +14,7 @@ import {
 	evaluatePrerenderClosure,
 	renderPrerenderDataSurface,
 	renderPrerenderBoundary,
+	renderPrerenderBranch,
 } from '../src/prerender/evaluator.ts';
 import { attachPrerenderStagedGraphRegistration } from '../src/prerender/staged-graph.ts';
 import {
@@ -666,6 +667,64 @@ test('renders a settled prerender boundary from declared structure coordinates',
 
 	expect(receivedContext).toEqual({ prerenderSettle: { graph } });
 	expect(rendered).toEqual({ html: '<section>Stable</section>', armRecords, computed: [] });
+});
+
+// The page's own @if and a child's share a local id: the whole page spells the child's from the page root.
+test('a whole-page branch render takes the branch the page id names, not its local namesake', async () => {
+	const emptyView = {
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		keyedRepeats: [],
+	};
+	const site = (id: string, start: number) => ({
+		id,
+		startAnchor: { strategy: 'dom-order-comment', index: start },
+		endAnchor: { strategy: 'dom-order-comment', index: start + 1 },
+	});
+	const artifact: SsrRenderArtifact = {
+		async renderSsr() {
+			return {
+				html: '<main><p>page arm</p><section><p>child arm</p></section></main>',
+				structure: {
+					anchors: [
+						{
+							kind: 'branch',
+							id: 'branch-site:0',
+							html: '<p>page arm</p>',
+							elementStart: 1,
+							elementEnd: 2,
+						},
+						{
+							kind: 'branch',
+							id: 'c0:branch-site:0',
+							html: '<p>child arm</p>',
+							elementStart: 3,
+							elementEnd: 4,
+						},
+					],
+				},
+				view: {
+					version: 1,
+					...emptyView,
+					branches: [site('branch-site:0', 0), site('c0:branch-site:0', 2)],
+					asyncBoundaries: [],
+				},
+			};
+		},
+	};
+
+	const rendered = await renderPrerenderBranch(
+		artifact,
+		'branch-site:0',
+		{ read: () => undefined } as never,
+		undefined,
+		'c0:branch-site:0',
+	);
+
+	expect(rendered.html).toBe('<p>child arm</p>');
 });
 
 test('registers newly discovered settled computeds while rendering their local value', async () => {

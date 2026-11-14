@@ -287,6 +287,7 @@ const rows = (board: Board) => board.items.map((row) => `row: ${row.label}`);
 const partsRows = (board: Board) => board.items.map((row) => `row: ${row.label}edit`);
 const upperRows = (board: Board) => board.items.map((row) => `row: ${row.label.toUpperCase()}`);
 const card = (board: Board) => `card: ${board.parity} card for ${board.title}`;
+const childTryIf = (board: Board) => [title(board), `count: ${board.items.length} rows`, ...rows(board)];
 
 const shapes: ReadonlyArray<readonly [string, Shape]> = [
 	['a. child in a @try in layout children', { path: '/a-layout', view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)] }],
@@ -352,6 +353,8 @@ describe('composition grid, production build', () => {
 	const armLists: ReadonlyArray<readonly [string, Shape]> = [
 		['j. a list straight in a click-opened arm, open at load', { path: '/j-arm-list-open', view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
 		['j. a list straight in a click-opened arm, closed at load', { path: '/j-arm-list-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
+		['k. an @if in a child\'s own @try, open at load', { path: '/k-child-try-if-open', view: childTryIf, closed: (b) => [title(b), 'closed: Summary', ...rows(b)] }],
+		['k. an @if in a child\'s own @try, closed at load', { path: '/k-child-try-if-closed', openAtLoad: false, view: childTryIf, closed: (b) => [title(b), 'closed: Summary', ...rows(b)] }],
 	];
 	for (const [name, shape] of armLists)
 		test(`${name}: first render, open, reload, close and reopen, save held, handler rejects`, async () => {
@@ -444,6 +447,18 @@ describe('composition grid, production build', () => {
 		await run.firstRender();
 		await run.saveHeld();
 		await run.handlerRejects();
+	});
+
+	test("m. a child a same-module helper's retried @try places afresh starts from its own state", async () => {
+		const { page, api, errors } = await visit('/m-helper-fresh');
+		await expect.poll(() => lines(page), poll).toEqual(['failed: refused']);
+		await page.locator('[data-grid-reload]').click();
+		await page.locator('[data-grid-reset]').click();
+		await api.release(boardRequest('a', 1));
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 1', 'tally: 5']);
+		await page.locator('[data-tally]').click();
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 1', 'tally: 6']);
+		expect(errors).toEqual([]);
 	});
 
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
