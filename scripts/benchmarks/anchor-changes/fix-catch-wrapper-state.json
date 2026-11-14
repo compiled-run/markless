@@ -45,42 +45,6 @@
 			"delta": 2,
 			"reason": "a boundary drawn again in the browser skips the initializer of a state cell the live graph already holds, so a @catch under a wrapper with state from url renders",
 			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 5,
-			"reason": "a boundary drawn again in the browser skips a live cell's initializer (PR #713, CI run 43595894145 vs merge-queue run 43586167058)",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 5,
-			"reason": "a boundary drawn again in the browser skips a live cell's initializer (PR #713, CI run 43595894145 vs merge-queue run 43586167058)",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 5,
-			"reason": "a boundary drawn again in the browser skips a live cell's initializer (PR #713, CI run 43595894145 vs merge-queue run 43586167058)",
-			"date": "2026-11-14"
 		}
 	]
 }

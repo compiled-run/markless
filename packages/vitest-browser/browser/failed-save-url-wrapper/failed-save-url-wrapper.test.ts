@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { installApi } from './api.ts';
+import { ComputedEditPage } from './computed-edit-page.tsrx';
 import { EditPage } from './edit-page.tsrx';
 
 // A failed save in a @try whose value reads a page prop, inside a wrapper that keeps state from another page prop.
@@ -27,10 +28,14 @@ afterEach(() => {
 	window.removeEventListener('unhandledrejection', onRejection);
 });
 
-const pages = { CSR: () => render(EditPage), SSR: () => renderSSR(EditPage) };
+const wrappers = {
+	'state(...)': { CSR: () => render(EditPage), SSR: () => renderSSR(EditPage) },
+	'computed(() => url.search)': { CSR: () => render(ComputedEditPage), SSR: () => renderSSR(ComputedEditPage) },
+};
 
-for (const mode of ['CSR', 'SSR'] as const)
-	test(`${mode}: the failure shows in @catch and the wrapper's state is not worked out again`, async () => {
+for (const [wrapper, pages] of Object.entries(wrappers))
+	for (const mode of ['CSR', 'SSR'] as const)
+	test(`${mode}: a wrapper with ${wrapper}: the failure shows in @catch and the wrapper's value is not worked out again`, async () => {
 		const { container } = await pages[mode]();
 		await expect
 			.poll(() => container.querySelector<HTMLInputElement>('input[name=first]')?.value)
