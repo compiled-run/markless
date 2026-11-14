@@ -42,6 +42,23 @@ function saysOutcome(snapshot: RuntimeGraphAsyncSnapshot, outcome: SavesOutcome)
 	return plain as RuntimeGraphAsyncSnapshot;
 }
 
+const ASYNC_SHOWN_FIELDS = ['status', 'version', 'quiet', 'key', 'error', 'writeFailed', 'pageLeft'];
+
+/** The fields an async commit moved that say how its block shows, beside its value. */
+function asyncShownPaths(previous: object, next: object): string[][] {
+	const was = previous as Record<string, unknown>;
+	const now = next as Record<string, unknown>;
+	return ASYNC_SHOWN_FIELDS.filter((field) =>
+		field === 'quiet' ? !was.quiet !== !now.quiet : !Object.is(was[field], now[field]),
+	).map((field) => [field]);
+}
+
+/** A commit that carries the shown value forward: a pending flip, or one that puts the shown value back (`kept`). */
+function asyncCarriesValue(previous: object, next: object, kept: boolean): boolean {
+	const now = next as { readonly status?: unknown; readonly value?: unknown };
+	return (now.status === 'pending' || kept) && Object.is((previous as { readonly value?: unknown }).value, now.value);
+}
+
 /** The refresh half of an async plane: loaded with its first run, failure, handler rejection or entry mark. */
 export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	const { asyncComputedNodes: nodes, computedNodes, readGraph, staleDerives, move } = state;
@@ -50,13 +67,18 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		node: RuntimeAsyncComputedNode,
 		snapshot: RuntimeGraphAsyncSnapshot,
 		landed = false,
+		kept = false,
 	): void => {
 		const previous = node.snapshot;
 		node.snapshot = snapshot;
 		// Readers held at the inputs the old value was fetched with move on even when the new value equals it.
 		state.landWithoutObservers(() => {
+			const shown = asyncShownPaths(previous, snapshot);
+			const carried = asyncCarriesValue(previous, snapshot, kept);
 			if (landed && node.pinned) node.pinned = false;
-			else if (state.reconcile) return state.reconcile.publishAsync(node, previous);
+			else if (state.reconcile) return state.reconcile.publishAsync(node, previous, shown, carried);
+			// A save's mark, a handler's failure and a failed save's end keep the shown value: only how the block shows is dirtied.
+			else if (kept && carried) return shown.forEach((path) => state.markDirtyPath(node.graphNodeId, path));
 			state.markDirtyPath(node.graphNodeId, []);
 		});
 		state.scheduleFlush();
@@ -301,7 +323,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			node.quiet = false;
 			const loud: { quiet?: boolean } = { ...node.snapshot };
 			delete loud.quiet;
-			publish(node, loud as RuntimeGraphAsyncSnapshot);
+			publish(node, loud as RuntimeGraphAsyncSnapshot, false, true);
 			void state.flush?.();
 			return;
 		}
@@ -309,7 +331,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const version = ++node.version;
 		node.entryHold = { phase: HOLD_MARKING, version, previous, holders: save ? 0 : 1, writing: save ? 1 : 0, outcome: SAVES_ANSWERED };
 		node.quiet = false;
-		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
+		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key), false, save === true);
 		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
 		void state.flush?.();
 	};
@@ -369,7 +391,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		if (node.version !== hold.version) return;
 		// A new version, so the block settles on it: its input's failure was held back while this value was busy.
 		const restored = outlived ? { ...hold.previous, version: ++node.version } : hold.previous;
-		publish(node, saysOutcome(restored as RuntimeGraphAsyncSnapshot, hold.outcome));
+		publish(node, saysOutcome(restored as RuntimeGraphAsyncSnapshot, hold.outcome), false, !outlived && hold.outcome === SAVES_FAILED);
 		void state.flush?.();
 	};
 
@@ -386,7 +408,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			const version = ++node.version;
 			const key = (node.snapshot as { readonly key?: unknown }).key;
 			// A handler's rejection rode no refresh of its own, so it speaks on its own; a save in flight still closes through its hold.
-			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot), quiet: true });
+			publish(node, { status: 'rejected', version, key, error, ...lastGood(node.snapshot), quiet: true }, false, true);
 		},
 	};
 }

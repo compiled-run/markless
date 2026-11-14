@@ -511,6 +511,33 @@ describe('composition grid, production build', () => {
 	});
 });
 
+describe('a failed save, production build', () => {
+	// The page owns the async value, or only places a component from another file that does.
+	for (const path of ['/failed-save-typed', '/failed-save-composed'])
+		test(`${path}: a failed save shows @catch and keeps what was typed; the next save that works shows the saved value`, async () => {
+			const { page, errors } = await visit(path);
+			let failing = true;
+			await page.route('**/fst/**', (route) => route.fulfill(failing ? { status: 500, body: 'nope' } : { status: 200, body: 'ok' }));
+			const field = page.locator('input[name="first"]');
+			const caught = page.locator('[data-caught]');
+			await expect.poll(() => field.inputValue(), poll).toBe('Ada a1');
+			await field.fill('Typed');
+			await page.locator('[data-submit]').click();
+			await expect.poll(() => caught.textContent(), poll).toBe('Saving failed (500)');
+			await expect.poll(() => busy(page), poll).toBe(0);
+			await quiet(page);
+			expect(await field.inputValue(), 'what was typed').toBe('Typed');
+			failing = false;
+			await field.fill('Grace');
+			await page.locator('[data-submit]').click();
+			await expect.poll(() => caught.count(), poll).toBe(0);
+			await expect.poll(() => busy(page), poll).toBe(0);
+			await quiet(page);
+			expect(await field.inputValue(), 'the saved value').toBe('Grace');
+			expect(errors).toEqual([]);
+		});
+});
+
 describe('prop-fed rows of a row component from another file, production build', () => {
 	const rowLines = (...labels: string[]) => labels.map((label) => `row: ${label}`);
 

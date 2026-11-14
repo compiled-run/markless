@@ -673,11 +673,9 @@ for (const [mode, mount, readsBefore] of modes) {
 		answered.resolve();
 		await allClear(container);
 		await expect.poll(said, poll).toEqual(['Update failed']);
-		// The input is not asked again. A served reader blocked behind the marked input asks its unchanged key once (known gap).
+		// Neither the input nor the reader behind it is asked again.
 		expect(server.gets.slice(before).filter((get) => get.includes('v=people'))).toEqual([]);
-		expect(server.gets.slice(before).filter((get) => get.includes('count='))).toEqual(
-			mode === 'CSR' ? [] : ['/mut/items?count=1'],
-		);
+		expect(server.gets.slice(before).filter((get) => get.includes('count='))).toEqual([]);
 		expect(text(container, '[data-count]')).toBe('1');
 	});
 
