@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 244,
+			"reason": "the docs playground's in-browser compile worker carries the fixed-value prop fact and the plain-words opaque-prop message; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 244,
+			"reason": "the docs playground's in-browser compile worker carries the fixed-value prop fact and the plain-words opaque-prop message; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "the docs playground's in-browser compile worker carries the fixed-value prop fact and the plain-words opaque-prop message; bench and /ui pages unchanged",
+			"date": "2026-11-14"
+		}
+	]
+}
