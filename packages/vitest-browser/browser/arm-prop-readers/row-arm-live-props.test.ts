@@ -31,7 +31,7 @@ test('an arm opened and closed in a row whose key changes many times keeps live 
 	expect(paths().length).toBeLessThanOrEqual(2);
 });
 
-// Known defect, not the live routes': main and #682 show the same `loaded undefined` for a row-placed owner handed its props.
+// Known defect, not the live routes': its file binds the arm's reads only along the chain from the component there that places it, so placed from another file they read `undefined`.
 test.fails('an arm opened in a row-placed owner reads the prop it was handed in its async value', async () => {
 	await render(RowArmPage);
 	click('[data-row="1"] [data-open]');

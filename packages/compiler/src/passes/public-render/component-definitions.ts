@@ -35,6 +35,7 @@ import {
 } from './shared.ts';
 import { collectSsrPropEvents } from './component-wiring.ts';
 import { PROJECTION_PROP_NAME } from './shared-seed-pass.ts';
+import { componentPlacementChains } from '../../component-edge-instance.ts';
 import { moduleIdOf } from '../../module-id.ts';
 import type { PublicRenderRoot } from './types.ts';
 
@@ -322,6 +323,8 @@ export function collectPublicRenderComponentDefinitions(
 					boundaryIds.has(boundary.boundaryId),
 				),
 				edges,
+				// A flip or settle renders only the instance holding it, so it rebinds through the edges that placed it.
+				...((branchIds.size > 0 || boundaryIds.size > 0) && ownerPlacements(componentName)),
 				propCellId:
 					input.semanticGraph.components.find(
 						(component) => component.name === componentName,
@@ -364,6 +367,19 @@ export function collectPublicRenderComponentDefinitions(
 			},
 		];
 
+		function ownerPlacements(name: string) {
+			const chains = componentPlacementChains(name, input.semanticGraph.componentEdges);
+			return (
+				chains.length > 0 && {
+					placements: chains.map((chain) =>
+						chain.map((edge) => ({
+							edgeId: edge.id,
+							...(edge.keyedRepeatScopeIds.length > 0 && { rows: edge.keyedRepeatScopeIds.length }),
+						})),
+					),
+				}
+			);
+		}
 		function cellLessWidgetRoots(name: string): string[] {
 			return widgetRootDefinitionIds(input, name).filter(
 				(definitionId) =>

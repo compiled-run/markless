@@ -99,6 +99,19 @@ export function componentEdgeInstanceSegment(
 	);
 }
 
+/** The same-module edge chains that place a component, each from a component nothing else in the module places; a cycle is walked once. */
+export function componentPlacementChains(
+	componentName: string,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+	seen: ReadonlySet<string> = new Set(),
+): ReadonlyArray<ReadonlyArray<SemanticComponentEdge>> {
+	return edges.flatMap((edge) => {
+		if (edge.importSource || edge.childComponentName !== componentName || seen.has(edge.id)) return [];
+		const above = componentPlacementChains(edge.parentComponentName, edges, new Set(seen).add(edge.id));
+		return above.length > 0 ? above.map((chain) => [...chain, edge]) : [[edge]];
+	});
+}
+
 // The path of a component-edge chain, outermost segment first. Each edge
 // contributes the path its OWN module spells, so the chain concatenates across
 // module boundaries exactly as composition does at render time.
