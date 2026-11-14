@@ -11,6 +11,8 @@ import {
 	PROTOCOL_EVENT_ACTION_KIND,
 	PROTOCOL_EVENT_HOST_ATTRIBUTE,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
+	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_START_ATTRIBUTE,
 	PROTOCOL_SYNC_POLICY_TABLE_TYPE,
 	PROTOCOL_VISIBLE_EVENT_NAME,
 } from '@markless/serializer/protocol';
@@ -317,13 +319,15 @@ export function createInlineResumerSelfWakeSource(
 	return `;${selfWakeCall(resumeModuleUrl, wakes)};`;
 }
 
+const STREAMED_ARM_RECORDS = `script[type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}"]`;
+
 // Appended to a page whose async answers the server streams instead of a self-wake: the runtime wakes at load only if one never arrived.
 export function createInlineResumerStreamedWakeSource(
 	resumeModuleUrl: string | undefined,
 	boundaryIds: ReadonlyArray<string>,
 	wakes: InlineWakeSources = authoredInlineWakeSources(),
 ): string {
-	return `;(${wakes.streamedWake})(${JSON.stringify(boundaryIds)},${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()});`;
+	return `;(${wakes.streamedWake})(${JSON.stringify(boundaryIds)},${JSON.stringify(STREAMED_ARM_RECORDS)},${JSON.stringify(PROTOCOL_STREAMED_ARM_START_ATTRIBUTE)},${JSON.stringify(resumeModuleUrl)},${wakes.moduleLoader},${inlineDeferSource()});`;
 }
 
 // Appended to a page whose async values the browser can re-ask: shown again as it was left, it wakes at idle and re-asks them.
@@ -885,6 +889,8 @@ function runInlineResumerSelfWake(
 
 function runInlineResumerStreamedWake(
 	boundaryIds: ReadonlyArray<string>,
+	armRecords: string,
+	startAttribute: string,
 	fallbackResumeModuleUrl: string | undefined,
 	loadModule: (url: string) => Promise<InlineResumeModule>,
 	defer: MarklessDefer,
@@ -904,14 +910,15 @@ function runInlineResumerStreamedWake(
 	const check = () =>
 		defer.idle(root, async () => {
 			if (root.__asyncResumeRuntimeStarted || root.__mL !== life) return;
+			// An arm that marks the start (too many rows, or hosts that run unprompted) takes the self-wake's start, at this same moment.
 			if (
-				boundaryIds.every((id) =>
-					document.querySelector(`script[type="markless/arm"][data-boundary="${CSS.escape(id)}"]`),
-				)
+				!document.querySelector(`${armRecords}[${startAttribute}]`) &&
+				boundaryIds.every((id) => document.querySelector(`${armRecords}[data-boundary="${CSS.escape(id)}"]`))
 			) {
 				// Every answer arrived: evaluate the start's modules, one idle period each, and leave the runtime asleep for the first interaction.
+				// With no idle callbacks (Safari) one task each: this already runs after load, a frame and the arm train.
 				const whenIdle = (run: () => void, next = () => asleep() && run()) =>
-					typeof requestIdleCallback === 'function' ? requestIdleCallback(next, { timeout: 2000 }) : setTimeout(next, 200);
+					typeof requestIdleCallback === 'function' ? requestIdleCallback(next, { timeout: 2000 }) : setTimeout(next);
 				whenIdle(async () => {
 					const entry = await load().catch(() => undefined);
 					if (entry) whenIdle(() => void entry.routeModule?.(root)?.catch(() => {}));

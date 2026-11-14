@@ -35,6 +35,7 @@ export { PROTOCOL_CONTAINER_HOST_NODE_ID } from './protocol-page-markers.ts';
 export {
 	PROTOCOL_STATE_PATCH_SCRIPT_TYPE,
 	PROTOCOL_STREAMED_ARM_SCRIPT_TYPE,
+	PROTOCOL_STREAMED_ARM_START_ATTRIBUTE,
 } from './protocol-stream-scripts.ts';
 export {
 	protocolBoundSymbolBase,

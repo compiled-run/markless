@@ -96,3 +96,62 @@ export function SharedPage() @{
 		<Themed />
 	</div>
 }
+
+// A streamed block whose first press throws, and a second block beside it.
+function Faulty() @{
+	let tries = state(0);
+	const books = computed(async () => listBooks('all', 0));
+
+	<section class="faulty">
+		@try {
+			<div class="arm">
+				<button
+					class="fail"
+					onClick={() => {
+						tries++;
+						if (tries === 1) throw new Error('first press failed');
+					}}
+				>
+					Tries {tries}
+				</button>
+				<p class="count">{books.length} books</p>
+			</div>
+		} @pending {
+			<p class="loading">Loading</p>
+		}
+	</section>
+}
+
+export function FaultyPage() @{
+	<div class="faulty-page">
+		<Faulty />
+	</div>
+}
+
+// A tall page: a field inside the streamed answer, a pinned button and the page's height outside it.
+function Tall() @{
+	let taps = state(0);
+	const books = computed(async () => listBooks('all', 0));
+
+	<section class="tall">
+		<button class="pinned" style="position: fixed; top: 0; right: 0" onClick={() => taps++}>Taps {taps}</button>
+		@try {
+			<div class="arm">
+				<p class="count">{books.length} books</p>
+				<form method="post" action="/api/notes" class="note-form">
+					<input name="title" class="note-title" aria-label="Note" autocomplete="name" />
+					<button type="submit" class="note-submit">Add note</button>
+				</form>
+			</div>
+		} @pending {
+			<p class="loading">Loading</p>
+		}
+		<div style="height: 3000px">spacer</div>
+	</section>
+}
+
+export function TallPage() @{
+	<div class="tall-page">
+		<Tall />
+	</div>
+}
