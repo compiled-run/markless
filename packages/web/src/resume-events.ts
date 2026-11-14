@@ -55,10 +55,10 @@ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 	readonly graph: RuntimeGraph;
 };
 
-// Asked for at the press and never awaited on the way to a handler; a page that may hold a submission preloads it.
+// Asked for once a submission is still running and never awaited on the way to a handler; a page whose forms need it preloads it.
 let submitHold: Promise<typeof import('./submit-hold.ts') | undefined> | undefined;
 const loadSubmitHold = () => (submitHold ??= import('./submit-hold.ts').catch(() => (submitHold = undefined)));
-// What each submission carried when the runtime heard its press, before any handler or load could change the form.
+// What a form sent in place carried when the runtime heard its press; a handler's form is read when the handler runs.
 const pressRecords = new WeakMap<object, string>();
 const submittedForm = (event: ResumeDomEvent) =>
 	event.type === 'submit' && event.target?.tagName === 'FORM' ? (event.target as unknown as HTMLFormElement) : undefined;
@@ -527,10 +527,7 @@ export function createEventWiring(input: {
 		// Another dispatch's flush may land while this one's handler still loads.
 		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
 		const pressed = submittedForm(event);
-		if (pressed) {
-			pressRecords.set(event, submitRecord(pressed));
-			void loadSubmitHold();
-		}
+		if (pressed) pressRecords.set(event, submitRecord(pressed));
 		const handled = marklessEventReceived(input.root, event);
 		return dispatchArrived(event, handled, dispatchOptions).finally(() => {
 			handled();
@@ -785,7 +782,8 @@ export function createEventWiring(input: {
 			open: true,
 			control: event.type === 'submit' ? undefined : (element as unknown as Element),
 		};
-		const sent = form && pressRecords.get(event);
+		// What the hold's repeat check compares with: the form as the handler reads it, or as an in-place send took it.
+		let sent: string | undefined;
 		let hold: Promise<(() => void) | undefined> | undefined;
 		// Its span outlives `open`: a refresh after a save waits until the handler's writes have flushed.
 		dispatchSpans().add(userActionToken);
@@ -807,6 +805,7 @@ export function createEventWiring(input: {
 					quiet = context.quietTurn === true;
 					if (quiet) graph.markQuietStart?.();
 					marklessControlEditsRead(event);
+					if (form && !held) sent ??= submitRecord(form);
 					// A write sent in this synchronous run is this dispatch's own.
 					const result = runAsDispatchOwn(userActionToken, () =>
 						marklessRunAtCurrentTarget(context.event, element, symbol, {
@@ -903,7 +902,7 @@ export function createEventWiring(input: {
 						// The submission is this dispatch's own save, so its reload is the one the form's hold waits for.
 						(module) =>
 							runAsDispatchOwn(userActionToken, () =>
-								module.sendInPlace(event as unknown as SubmitEvent, kept, record, sent!, (end) => {
+								module.sendInPlace(event as unknown as SubmitEvent, kept, record, pressRecords.get(event) ?? submitRecord(form!), (end) => {
 									hold = Promise.resolve(end);
 									// Waiting on the answer is this dispatch's own await, so the next gesture starts now.
 									options.releaseQueue?.();

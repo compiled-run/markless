@@ -1,86 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-return-reask"
-			],
-			"delta": 151,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 17,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-events"
-			],
-			"delta": 179,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-return-reask"
-			],
-			"delta": 151,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 21,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 24,
-			"reason": "a submission loads its hold beside its handler, and a save's round ends its marks when the pass painting the reloaded content lands",
-			"date": "2026-11-13"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
@@ -147,6 +67,108 @@
 			"delta": 233,
 			"reason": "the hold and in-place sender leave the preload of docs pages, which have no such form (-1,048 B gzip preloaded against the PR head), while files these two pages fetch after the preload, outside it, grew +1,218 B gzip (/ui/accordion, which fetches none of them, is -1,049 B in total); CI run 43517700994 against merge-group run 43505090454",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/form-send"
+			],
+			"delta": -39,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 281,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-return-reask"
+			],
+			"delta": 159,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 36,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/form-send"
+			],
+			"delta": -39,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 281,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-return-reask"
+			],
+			"delta": 159,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 44,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 32,
+			"reason": "the hold's repeat record is read when the handler runs and the hold is asked for only by a running submission; the in-place send carries the press-time record",
+			"date": "2026-11-14"
 		}
 	]
 }
