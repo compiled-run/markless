@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 745,
-			"reason": "the docs playground's in-browser compile worker carries the linked row verdicts, the multi-component row chunk mint and the prop-member warning; bench and /ui pages unchanged",
+			"delta": 942,
+			"reason": "the docs playground's in-browser compile worker carries the linked row verdicts, the multi-component row chunk mint and the prop-member warning naming every prop; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 745,
-			"reason": "the docs playground's in-browser compile worker carries the linked row verdicts, the multi-component row chunk mint and the prop-member warning; bench and /ui pages unchanged",
+			"delta": 942,
+			"reason": "the docs playground's in-browser compile worker carries the linked row verdicts, the multi-component row chunk mint and the prop-member warning naming every prop; bench and /ui pages unchanged",
 			"date": "2026-11-14"
 		},
 		{
