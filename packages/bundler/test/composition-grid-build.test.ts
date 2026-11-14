@@ -80,7 +80,9 @@ class Api {
 	waitingRequests = () => this.waiting.map((each) => each.request);
 
 	async release(request: string) {
-		await expect.poll(this.waitingRequests, { ...poll, message: `waiting for ${request}` }).toContain(request);
+		await expect
+			.poll(this.waitingRequests, { ...poll, message: `waiting for ${request}` })
+			.toContain(request);
 		const found = this.waiting.find((each) => each.request === request)!;
 		this.waiting.splice(this.waiting.indexOf(found), 1);
 		found.answer();
@@ -119,7 +121,12 @@ class Api {
 	};
 }
 
-type Visit = { readonly page: Page; readonly api: Api; readonly errors: string[]; navigations: number };
+type Visit = {
+	readonly page: Page;
+	readonly api: Api;
+	readonly errors: string[];
+	navigations: number;
+};
 
 async function visit(path: string): Promise<Visit> {
 	const page = await browser.newPage();
@@ -143,7 +150,8 @@ const lines = (page: Page) =>
 				`${element.dataset.g}${element.className ? `.${element.className}` : ''}: ${(element.textContent ?? '').replace(/\s+/g, ' ').trim()}`,
 		),
 	);
-const busy = (page: Page) => page.evaluate(() => document.querySelectorAll('[aria-busy="true"]').length);
+const busy = (page: Page) =>
+	page.evaluate(() => document.querySelectorAll('[aria-busy="true"]').length);
 // A few frames and a task with nothing new: no fixed sleep decides a result.
 const quiet = (page: Page) =>
 	page.evaluate(async () => {
@@ -190,7 +198,9 @@ class Run {
 	async settled(requests: ReadonlyArray<string>) {
 		await this.shows(this.expected());
 		await quiet(this.visit.page);
-		expect(await lines(this.visit.page), 'content after the page went quiet').toEqual(this.expected());
+		expect(await lines(this.visit.page), 'content after the page went quiet').toEqual(
+			this.expected(),
+		);
 		expect(this.visit.api.log.slice(this.from), 'requests this step').toEqual(requests);
 		expect(this.visit.api.waitingRequests(), 'requests left waiting').toEqual([]);
 		expect(await busy(this.visit.page), 'busy marks with nothing loading').toBe(0);
@@ -212,7 +222,12 @@ class Run {
 		this.round++;
 		const request = boardRequest(this.subject, this.round);
 		await expect.poll(this.visit.api.waitingRequests, poll).toContain(request);
-		await expect.poll(() => busy(this.visit.page), { ...poll, message: 'a busy mark while the value loads' }).toBeGreaterThan(0);
+		await expect
+			.poll(() => busy(this.visit.page), {
+				...poll,
+				message: 'a busy mark while the value loads',
+			})
+			.toBeGreaterThan(0);
 		expect(await lines(this.visit.page), 'content kept while the value loads').toEqual(before);
 		await this.visit.api.release(request);
 		await this.settled([request]);
@@ -264,10 +279,14 @@ class Run {
 		const before = await lines(this.visit.page);
 		await send();
 		await this.visit.api.release(saveRequest(this.subject));
-		await expect.poll(() => busy(this.visit.page), { ...poll, message: 'a busy mark from the save' }).toBeGreaterThan(0);
+		await expect
+			.poll(() => busy(this.visit.page), { ...poll, message: 'a busy mark from the save' })
+			.toBeGreaterThan(0);
 		const reask = boardRequest(this.subject, this.round);
 		await expect.poll(this.visit.api.waitingRequests, poll).toContain(reask);
-		expect(await lines(this.visit.page), 'content kept while the value reloads').toEqual(before);
+		expect(await lines(this.visit.page), 'content kept while the value reloads').toEqual(
+			before,
+		);
 		await this.visit.api.release(reask);
 		await this.settled([saveRequest(this.subject), reask]);
 	}
@@ -275,7 +294,9 @@ class Run {
 	async handlerRejects() {
 		await this.click('[data-grid-fail]');
 		await this.shows([...this.expected(), 'failed: The save was refused']);
-		expect(this.visit.api.log.slice(this.from), 'requests from the rejected handler').toEqual([failRequest(this.subject)]);
+		expect(this.visit.api.log.slice(this.from), 'requests from the rejected handler').toEqual([
+			failRequest(this.subject),
+		]);
 		this.from = this.visit.api.log.length;
 		await this.click('[data-grid-reset]');
 		await this.settled([]);
@@ -289,35 +310,92 @@ const upperRows = (board: Board) => board.items.map((row) => `row: ${row.label.t
 const card = (board: Board) => `card: ${board.parity} card for ${board.title}`;
 
 const shapes: ReadonlyArray<readonly [string, Shape]> = [
-	['a. child in a @try in layout children', { path: '/a-layout', view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)] }],
-	['b. attribute and @if test on the async prop', { path: '/b-header', view: (b) => [title(b), b.items.length > 1 ? `many: ${b.items.length} rows` : 'one: One row'] }],
-	['c. child in a @switch arm', { path: '/c-switch', view: (b) => (b.parity === 'even' ? [title(b), card(b)] : [card(b), title(b)]) }],
-	['d. own async value in layout children', { path: '/d-layout-own', view: (b) => [title(b), ...rows(b)] }],
-	['e. row component from another file in rows fed by a prop', { path: '/e-rows', view: (b) => [title(b), ...rows(b)] }],
-	['e. one row component rendering two from another file, in rows fed by a prop', { path: '/e-row-parts', view: (b) => [title(b), ...partsRows(b)] }],
-	['e. two components from another file in one row fed by a prop', { path: '/e-row-pair', view: (b) => [title(b), ...partsRows(b)] }],
+	[
+		'a. child in a @try in layout children',
+		{ path: '/a-layout', view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)] },
+	],
+	[
+		'b. attribute and @if test on the async prop',
+		{
+			path: '/b-header',
+			view: (b) => [
+				title(b),
+				b.items.length > 1 ? `many: ${b.items.length} rows` : 'one: One row',
+			],
+		},
+	],
+	[
+		'c. child in a @switch arm',
+		{
+			path: '/c-switch',
+			view: (b) => (b.parity === 'even' ? [title(b), card(b)] : [card(b), title(b)]),
+		},
+	],
+	[
+		'd. own async value in layout children',
+		{ path: '/d-layout-own', view: (b) => [title(b), ...rows(b)] },
+	],
+	[
+		'e. row component from another file in rows fed by a prop',
+		{ path: '/e-rows', view: (b) => [title(b), ...rows(b)] },
+	],
+	[
+		'e. one row component rendering two from another file, in rows fed by a prop',
+		{ path: '/e-row-parts', view: (b) => [title(b), ...partsRows(b)] },
+	],
+	[
+		'e. two components from another file in one row fed by a prop',
+		{ path: '/e-row-pair', view: (b) => [title(b), ...partsRows(b)] },
+	],
 	[
 		'e. row component from another file over a computed of a prop',
-		{ path: '/e-sorted', view: (b) => [...[...b.items].reverse().map((row, at) => `row: ${at + 1}. ${row.label}`), title(b)] },
+		{
+			path: '/e-sorted',
+			view: (b) => [
+				...[...b.items].reverse().map((row, at) => `row: ${at + 1}. ${row.label}`),
+				title(b),
+			],
+		},
 	],
 	[
 		'i. row component with its own async value in rows fed by a prop',
-		{ path: '/i-prop-rows-detail', view: (b) => [title(b), ...b.items.map((row) => `row: ${row.label}: detail of ${row.id}`)] },
+		{
+			path: '/i-prop-rows-detail',
+			view: (b) => [
+				title(b),
+				...b.items.map((row) => `row: ${row.label}: detail of ${row.id}`),
+			],
+		},
 	],
 ];
 
 const armed: ReadonlyArray<readonly [string, Shape]> = [
 	[
 		'f. click-opened arm, open at load',
-		{ path: '/f-tabs-open', view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] },
+		{
+			path: '/f-tabs-open',
+			view: (b) => [title(b), ...upperRows(b)],
+			closed: (b) => [title(b), 'closed: Summary'],
+		},
 	],
 	[
 		'f. click-opened arm, closed at load',
-		{ path: '/f-switcher-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Hidden'] },
+		{
+			path: '/f-switcher-closed',
+			openAtLoad: false,
+			view: (b) => [title(b), ...upperRows(b)],
+			closed: (b) => [title(b), 'closed: Hidden'],
+		},
 	],
 	[
 		'h. own async value in an @if arm, closed at load',
-		{ path: '/h-own-arm', openAtLoad: false, ownsLoad: true, view: (b) => [title(b), ...rows(b)], closed: () => ['closed: Closed'] },
+		{
+			path: '/h-own-arm',
+			openAtLoad: false,
+			ownsLoad: true,
+			view: (b) => [title(b), ...rows(b)],
+			closed: () => ['closed: Closed'],
+		},
 	],
 ];
 
@@ -333,7 +411,10 @@ describe('composition grid, production build', () => {
 	}
 
 	const [openArm, closedArm, ownArm] = armed.map(([, shape]) => shape) as [Shape, Shape, Shape];
-	const secondExport: Shape = { path: '/second-export', view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)] };
+	const secondExport: Shape = {
+		path: '/second-export',
+		view: (b) => [title(b), `count: ${b.items.length} rows`, ...rows(b)],
+	};
 	const rowDetail: Shape = {
 		path: '/i-row-detail',
 		view: (b) => [title(b), ...b.items.map((row) => `row: ${row.label}: detail of ${row.id}`)],
@@ -350,8 +431,23 @@ describe('composition grid, production build', () => {
 	});
 
 	const armLists: ReadonlyArray<readonly [string, Shape]> = [
-		['j. a list straight in a click-opened arm, open at load', { path: '/j-arm-list-open', view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
-		['j. a list straight in a click-opened arm, closed at load', { path: '/j-arm-list-closed', openAtLoad: false, view: (b) => [title(b), ...upperRows(b)], closed: (b) => [title(b), 'closed: Summary'] }],
+		[
+			'j. a list straight in a click-opened arm, open at load',
+			{
+				path: '/j-arm-list-open',
+				view: (b) => [title(b), ...upperRows(b)],
+				closed: (b) => [title(b), 'closed: Summary'],
+			},
+		],
+		[
+			'j. a list straight in a click-opened arm, closed at load',
+			{
+				path: '/j-arm-list-closed',
+				openAtLoad: false,
+				view: (b) => [title(b), ...upperRows(b)],
+				closed: (b) => [title(b), 'closed: Summary'],
+			},
+		],
 	];
 	for (const [name, shape] of armLists)
 		test(`${name}: first render, open, reload, close and reopen, save held, handler rejects`, async () => {
@@ -381,7 +477,9 @@ describe('composition grid, production build', () => {
 		await run.reload();
 		await run.reload();
 		const derives = await run.visit.page.evaluate(
-			() => (globalThis as { __gridServer?: { derives: string[] } }).__gridServer?.derives ?? [],
+			() =>
+				(globalThis as { __gridServer?: { derives: string[] } }).__gridServer?.derives ??
+				[],
 		);
 		expect(derives.length, 'the cards derived in the browser').toBeGreaterThan(0);
 		expect(derives.filter((entry) => entry.split(':')[0] !== entry.split(':')[1])).toEqual([]);
@@ -425,8 +523,13 @@ describe('composition grid, production build', () => {
 	test('g. forms in a child file in a streamed @try: a pointer click and Enter both save, a refused submit reaches @catch', async () => {
 		const response = await fetch(`${server.origin}/g-editor`);
 		const html = await response.text();
-		expect(html.indexOf('data-g="pending"'), 'the response starts with the @pending arm').toBeGreaterThan(-1);
-		expect(html.indexOf('a round 0'), 'and streams the answer after it').toBeGreaterThan(html.indexOf('data-g="pending"'));
+		expect(
+			html.indexOf('data-g="pending"'),
+			'the response starts with the @pending arm',
+		).toBeGreaterThan(-1);
+		expect(html.indexOf('a round 0'), 'and streams the answer after it').toBeGreaterThan(
+			html.indexOf('data-g="pending"'),
+		);
 		const shape: Shape = { path: '/g-editor', view: (b) => [title(b), ...rows(b)] };
 		const run = new Run(shape, await visit(shape.path));
 		await run.firstRender();
@@ -457,9 +560,13 @@ describe('composition grid, production build', () => {
 			}).observe(document.body, { subtree: true, childList: true, attributes: true });
 		});
 		await page.locator('[data-append]').click();
-		await expect.poll(() => lines(page), poll).toEqual(['title.even: a round 0', 'note: note 1']);
+		await expect
+			.poll(() => lines(page), poll)
+			.toEqual(['title.even: a round 0', 'note: note 1']);
 		await quiet(page);
-		expect(await page.evaluate(() => (window as unknown as { busySeen: string[] }).busySeen)).toEqual([]);
+		expect(
+			await page.evaluate(() => (window as unknown as { busySeen: string[] }).busySeen),
+		).toEqual([]);
 		expect(errors).toEqual([]);
 	});
 });
@@ -498,10 +605,31 @@ describe('prop-fed rows of a row component from another file, production build',
 
 	test('a recursive tree whose rows hold a component from another file and the tree itself grows', async () => {
 		const { page, errors } = await visit('/e-tree');
-		const amounts = () => page.evaluate(() => [...document.querySelectorAll('main em')].map((amount) => amount.textContent));
+		const amounts = () =>
+			page.evaluate(() =>
+				[...document.querySelectorAll('main em')].map((amount) => amount.textContent),
+			);
 		await expect.poll(amounts, poll).toEqual(['1', '11']);
 		await page.locator('[data-add]').click();
 		await expect.poll(amounts, poll).toEqual(['1', '11', '2', '21']);
+		expect(errors).toEqual([]);
+	});
+});
+
+describe('a failed save under a wrapper with state from url, production build', () => {
+	test('a page value read from params shows @catch, and the wrapper keeps its state', async () => {
+		const { page, errors } = await visit('/failed-save/a7?q=x');
+		await page.route('**/fsw/**', (route) => route.fulfill({ status: 500, body: 'nope' }));
+		await expect
+			.poll(() => page.locator('input[name="first"]').inputValue(), poll)
+			.toBe('Ada a7');
+		await page.locator('[data-submit]').click();
+		await expect
+			.poll(() => page.locator('[data-caught]').textContent(), poll)
+			.toBe('Saving failed (500)');
+		await expect.poll(() => busy(page), poll).toBe(0);
+		await quiet(page);
+		expect(await page.locator('[data-q]').textContent()).toBe('q=x');
 		expect(errors).toEqual([]);
 	});
 });
