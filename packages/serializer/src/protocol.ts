@@ -787,6 +787,18 @@ export type ProtocolViewPayload = {
 			readonly domUpdates: ReadonlyArray<Record<string, unknown>>;
 			readonly behaviors: ReadonlyArray<Record<string, unknown>>;
 			readonly elementHandles: ReadonlyArray<Record<string, unknown>>;
+			/**
+			 * The `@for`s whose parent element this arm renders (not `keyedRepeats`:
+			 * an arm record set's `keyedRepeats` are whole records). Each names its page
+			 * record by `repeatId`, which composition prefixes exactly as it prefixes that
+			 * record's `id` and this branch's `id`, and its parent by `parentHostPath`,
+			 * arm-relative like `hostPath` above. The browser wires them whenever this arm
+			 * shows. Pay-per-use: an arm holding no list omits the field.
+			 */
+			readonly repeatParents?: ReadonlyArray<{
+				readonly repeatId: string;
+				readonly parentHostPath: ProtocolElementAddress;
+			}>;
 		}>;
 		readonly testReads?: ReadonlyArray<{
 			readonly source: string;

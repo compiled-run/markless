@@ -104,6 +104,7 @@ type SsrArmRecordSet = SsrRecord & {
 	readonly elementHandles?: ReadonlyArray<SsrHostedRecord>;
 	readonly keyedRepeats?: ReadonlyArray<SsrKeyedRepeatRecord>;
 	readonly branches?: ReadonlyArray<SsrBranchRecord>;
+	readonly repeatParents?: ReadonlyArray<{ readonly repeatId: string }>;
 };
 type SsrAsyncReadRecord = ComposeGraphRead & { readonly runnerSymbolId?: string };
 type SsrBoundaryRecord = SsrAnchoredRecord & {
@@ -1123,6 +1124,17 @@ function marklessSsrComposedView(
 		.filter((child) => marklessSsrChildServed(child, renderedHostIds, idPrefix));
 	const locators: SsrLocatorRecord[] = [];
 	const renderedRepeatIds = new Set(structure.repeatIds ?? []);
+	// A list in an arm this render left shut ships too: the browser builds it when the arm opens.
+	const renderedAnchorIds = new Set(structure.anchors.map((anchor) => anchor.id));
+	for (const repeatId of marklessSsrArmListIds([
+		...(view.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
+		...(view.asyncBoundaries ?? []).flatMap((boundary) =>
+			renderedAnchorIds.has(idPrefix + boundary.id)
+				? [boundary.armRecords ?? []].flat().flatMap((set) => set.branches ?? [])
+				: [],
+		),
+	]))
+		renderedRepeatIds.add(idPrefix + repeatId);
 	const { events, domUpdates, keyedRepeats, branches, asyncBoundaries } =
 		marklessSsrUnbindLocalView(view, localHostIds, (repeat) =>
 			renderedRepeatIds.has(idPrefix + repeat.id),
@@ -1356,6 +1368,10 @@ export function marklessSsrArmizeBoundaries(
 			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
 				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		}
+		// A list in an arm of a branch here travels with the arm, whichever arm the render painted.
+		const armListIds = new Set(marklessSsrArmListIds(planned.branches ?? []));
+		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--)
+			if (armListIds.has(streams.keyedRepeats[i].id)) movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
 		return {
 			...boundary,
@@ -1398,6 +1414,7 @@ export function marklessSsrArmizeBranches(
 			.filter((anchor) => anchor.kind === 'branch')
 			.map((anchor) => [anchor.id, anchor] as const),
 	);
+	const armLists = new Set(marklessSsrArmListIds(branches));
 	return branches.map((branch) => {
 		const anchor = anchorById.get(idPrefix + branch.id);
 		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: branch:${branch.id}`);
@@ -1405,15 +1422,23 @@ export function marklessSsrArmizeBranches(
 			if (branch.servedArmRecords) return branch;
 			return { ...branch, servedArmRecords: marklessSsrMoveArmRange(streams, anchor) };
 		}
+		// A list in a component the arm draws has no record on the branch, so the painted arm's copy carries it.
 		const projected = marklessSsrMoveServedBranchRepeats(
 			structure,
-			streams.keyedRepeats,
+			streams.keyedRepeats.filter((repeat) => !armLists.has(repeat.id)),
 			anchor,
 			idPrefix,
 		);
 		if (!projected) return branch;
+		for (const repeat of projected.keyedRepeats ?? []) streams.keyedRepeats.splice(streams.keyedRepeats.indexOf(repeat), 1);
 		return { ...branch, escalates: true, servedArmRecords: projected };
 	});
+}
+// The page record ids of the lists whose parent element the branches' arms render.
+function marklessSsrArmListIds(branches: ReadonlyArray<SsrBranchRecord>): string[] {
+	return branches.flatMap((branch) =>
+		(branch.armRecords ?? []).flatMap((arm) => (arm.repeatParents ?? []).map((list) => list.repeatId)),
+	);
 }
 
 function marklessSsrMoveServedBranchRepeats(
@@ -2029,6 +2054,7 @@ function marklessSsrArmRecordSetIsLive(arm: SsrArmRecordSet | undefined): boolea
 			(arm.behaviors?.length ?? 0) > 0 ||
 			(arm.elementHandles?.length ?? 0) > 0 ||
 			(arm.keyedRepeats?.length ?? 0) > 0 ||
+			(arm.repeatParents?.length ?? 0) > 0 ||
 			(arm.branches?.length ?? 0) > 0),
 	);
 }
@@ -2092,6 +2118,9 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 			behaviors: arm.behaviors.map((behavior) =>
 				marklessSsrBindBehavior(behavior, child, instancePath),
 			),
+		}),
+		...(arm.repeatParents && {
+			repeatParents: arm.repeatParents.map((list) => ({ ...list, repeatId: child.hostPrefix + list.repeatId })),
 		}),
 	};
 }

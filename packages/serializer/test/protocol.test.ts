@@ -951,3 +951,38 @@ test('the in-place submit policy is served as the constant code f, and read back
 	expect(served).toBe('submit:0!f');
 	expect(parseEventHostEntries(served)).toEqual([{ name: 'submit', ref: 0, policy: 'f' }]);
 });
+
+test('branch arm records round-trip the lists an arm holds, and a malformed field is refused', () => {
+	const arm = {
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		repeatParents: [{ repeatId: 'repeat:0', parentHostPath: [0, 1] }],
+	};
+	const view = (armRecords: ReadonlyArray<unknown>): ProtocolViewPayload => ({
+		version: ASYNC_PROTOCOL_VERSION,
+		locators: [],
+		events: [],
+		domUpdates: [],
+		behaviors: [],
+		elementHandles: [],
+		asyncBoundaries: [],
+		branches: [
+			{
+				id: 'branch-site:0',
+				startAnchor: { strategy: 'dom-order-comment', index: 0 },
+				endAnchor: { strategy: 'dom-order-comment', index: 1 },
+				symbolId: 'symbol:1',
+				armRecords: armRecords as never,
+			},
+		],
+	});
+	const state: ProtocolStatePayload = { version: ASYNC_PROTOCOL_VERSION, cells: [], computed: [] };
+
+	const decoded = decodePayloadScripts(renderPayloadScripts({ state, view: view([arm, { ...arm, repeatParents: undefined }]) }));
+	expect(decoded.view.branches?.[0]?.armRecords?.[0]?.repeatParents).toEqual(arm.repeatParents);
+	expect(() =>
+		decodePayloadScripts(renderPayloadScripts({ state, view: view([{ ...arm, repeatParents: 'repeat:0' }]) })),
+	).toThrow(/repeatParents/);
+});

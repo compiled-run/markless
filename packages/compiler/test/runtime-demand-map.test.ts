@@ -484,6 +484,34 @@ const PANEL = `
 	}
 `;
 
+test('only a branch whose arm renders a list\'s parent demands the arm-list wiring', async () => {
+	const armList = 'web/resume-arm-lists';
+	const branchModules = (map: Awaited<ReturnType<typeof panelDemandMap>>['map']) =>
+		map.payloadRecords.find((record) => record.kind === 'branch')?.runtimeModuleIds ?? [];
+	const withList = await panelDemandMap(`
+		import { state } from '@markless/core';
+		export default function Panel() @{
+			let open = state(false);
+			let items = state(['a']);
+			<section>
+				<button onClick={() => (open = !open)}>toggle</button>
+				@if (open) {
+					<ul>
+						@for (const item of items; key item) {
+							<li>{item}</li>
+						}
+					</ul>
+				}
+			</section>
+		}
+	`);
+	expect(branchModules(withList.map)).toContain(armList);
+	const plain = await panelDemandMap(PANEL);
+	expect(branchModules(plain.map)).toContain('web/resume-branches');
+	expect(branchModules(plain.map)).not.toContain(armList);
+	expect(plain.map.unknownRecordModuleIds).toContain(armList);
+});
+
 test('a control that flips a branch through a computed reaches the flip, its derive and the arm handlers', async () => {
 	const { action, kinds } = await panelDemandMap(PANEL);
 	const input = action('h1', 'input');

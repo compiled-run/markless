@@ -49,10 +49,21 @@ for (const { shape, csr, ssr, csrEmpty, ssrEmpty } of shapes) {
 		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 1));
 	});
 
-	// Not yet: a list in an arm that opened late misses the next re-fetch.
-	const refetch = shape.endsWith('Length') ? test.fails : test;
+	test(`CSR ${shape}: open from the first answer, follows the next re-fetch`, async () => {
+		await csr();
+		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 1));
+		await press('[data-more]');
+		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 2));
+	});
 
-	refetch(`CSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
+	test(`SSR ${shape}: open from the first answer, follows the next re-fetch`, async () => {
+		await ssr();
+		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 1));
+		await press('[data-more]');
+		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 2));
+	});
+
+	test(`CSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
 		await csrEmpty();
 		await expect.poll(() => document.querySelector('[data-loading]'), poll).toBe(null);
 		expect(document.querySelector('[data-shown]')).toBe(null);
@@ -62,7 +73,7 @@ for (const { shape, csr, ssr, csrEmpty, ssrEmpty } of shapes) {
 		await expect.poll(() => text('[data-shown]'), poll).toBe(shown(shape, 2));
 	});
 
-	refetch(`SSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
+	test(`SSR ${shape}: stays shut on an empty answer and opens after a re-fetch`, async () => {
 		await ssrEmpty();
 		expect(document.querySelector('[data-shown]')).toBe(null);
 		await press('[data-more]');
@@ -80,13 +91,12 @@ async function picksItsOwnNote() {
 	await expect.poll(() => text('[data-picked]'), poll).toBe('note a:1');
 }
 
-// Not yet: a row built when its arm opens late hands the callback `undefined` for its own prop.
-test.fails('CSR: a row built when its @if opens later passes its own prop to the parent callback', async () => {
+test('CSR: a row built when its @if opens later passes its own prop to the parent callback', async () => {
 	await render(PickList);
 	await picksItsOwnNote();
 });
 
-test.fails('SSR: a row built when its @if opens later passes its own prop to the parent callback', async () => {
+test('SSR: a row built when its @if opens later passes its own prop to the parent callback', async () => {
 	await renderSSR(PickList);
 	await picksItsOwnNote();
 });

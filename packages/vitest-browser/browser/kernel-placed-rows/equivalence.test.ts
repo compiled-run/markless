@@ -211,6 +211,10 @@ function committed(update: Rendered, ownerPath: string) {
 				(event) => event.symbolIds,
 			),
 		})),
+		armLists: (records.branches ?? []).map((branch) => ({
+			id: branch.id,
+			repeatParents: ((branch.armRecords ?? []) as ReadonlyArray<{ readonly repeatParents?: unknown }>).map((arm) => arm.repeatParents),
+		})),
 		ownerComputedIds: (update.computed ?? [])
 			.map((computed) => computed.graphNodeId)
 			.filter((graphNodeId) => graphNodeId.startsWith(ownerPath))

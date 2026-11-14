@@ -858,6 +858,7 @@ function assertOptionalBranchArmRecords(record: Record<string, unknown>, context
 		assertOptionalArrayField(arm, 'domUpdates', armContext);
 		assertOptionalArrayField(arm, 'behaviors', armContext);
 		assertOptionalArrayField(arm, 'elementHandles', armContext);
+		assertOptionalArrayField(arm, 'repeatParents', armContext);
 	}
 }
 

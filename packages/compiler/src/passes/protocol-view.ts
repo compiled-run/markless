@@ -1501,6 +1501,22 @@ function armScopedBranchRecords(
 // Per-arm records for gate-supported branch sites: everything the resume
 // runtime must rewire when an arm flips in, addressed by arm-relative host
 // paths (the keyed-repeat rowEvents convention).
+// The page's lists whose parent element this arm renders, addressed from the arm.
+function armRepeatParents(
+	input: ProtocolViewPayloadInput,
+	chunkId: string,
+	hostIds: ReturnType<typeof branchArmHostPaths>,
+	pageRepeats: ReturnType<typeof resumableKeyedRepeats>,
+) {
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
+	return (chunk?.slots ?? []).flatMap((slot) => {
+		if (slot.kind !== 'repeat') return [];
+		const record = pageRepeats.find((candidate) => candidate.id === slot.repeatId);
+		const parent = record && !record.enclosingRow ? hostIds.get(record.parentHostNodeId) : undefined;
+		return parent ? [{ repeatId: slot.repeatId, parentHostPath: parent.path }] : [];
+	});
+}
+
 function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string) {
 	const branch = renderDataOf(input).branches.find(
 		(entry) => entry.branchSiteId === branchSiteId,
@@ -1524,9 +1540,12 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 			);
 		}
 	}
+	const pageRepeats = resumableKeyedRepeats(input);
 	return branch.armChunkIds.map((chunkId) => {
 		const hostIds = branchArmHostPaths(input, chunkId);
+		const repeatParents = armRepeatParents(input, chunkId, hostIds, pageRepeats);
 		return {
+			...(repeatParents.length > 0 ? { repeatParents } : {}),
 			events: oneRecordPerEvent(input.payloadArena.view.events)
 				.filter((event) => hostIds.has(event.hostNodeId))
 				.map((event) => ({

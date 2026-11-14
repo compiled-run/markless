@@ -134,6 +134,10 @@ const ROW_BRANCH_MINT = ['web/fns/row-branch-mint'];
 // Rows that are comment ranges, and rows an @if arm renders, each wired only for a repeat that has them.
 const ROW_RANGES = ['web/fns/served-row-ranges'];
 const ARM_ROWS = ['web/resume-repeat-branch-arm'];
+// The wiring of a list whose parent element an @if or @switch arm renders, folded only into a branch whose arms hold one.
+const ARM_LISTS = ['web/resume-arm-lists'];
+const armsHoldLists = (branches: ReadonlyArray<Pick<ProtocolArmBranchRecord, 'armRecords'>>) =>
+	branches.some((branch) => branch.armRecords?.some((arm) => arm.repeatParents));
 const FULL_RESUME_CORE = ['web/resume-locators'];
 const FULL_TIER_COMMON = [
 	'web/resume-runtime',
@@ -329,6 +333,7 @@ export function createRuntimeDemandMap(
 			...KEYED_REPEAT,
 			...ROW_RANGES,
 			...ARM_ROWS,
+			...ARM_LISTS,
 			...BRANCH,
 			...ASYNC_BOUNDARY,
 			...HELD_INPUTS,
@@ -1062,6 +1067,7 @@ function payloadDemandRecords(
 				symbolIds: flipSymbolIds,
 				runtimeModuleIds: unique([
 					...BRANCH,
+					...(armsHoldLists([record]) ? ARM_LISTS : []),
 					...symbolIdsDemand(flipSymbolIds, symbolDemand),
 				]),
 			};
@@ -1079,6 +1085,9 @@ function payloadDemandRecords(
 				...fullTier,
 				...ASYNC_BOUNDARY,
 				...ARM_COMMIT,
+				...(armsHoldLists([record.armRecords ?? []].flat().flatMap((arm) => arm.branches ?? []))
+					? ARM_LISTS
+					: []),
 				...symbolIdsDemand(
 					[
 						record.updateSymbolId,

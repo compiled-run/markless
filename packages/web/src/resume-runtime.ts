@@ -274,7 +274,9 @@ export function createResumeRuntime(
 					loadSymbol: input.loadSymbol,
 					renderBranchHtml: input.renderBranchHtml,
 					elementsByHostId,
-					disposedHosts,
+					fileHost,
+					disposeHost,
+					armRegistrationDeps,
 					elementHandles,
 					events: eventWiring,
 					eventTypes,
@@ -295,9 +297,10 @@ export function createResumeRuntime(
 				);
 			}
 		}
-		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds)
+		const startupHostIds = await branchRuntime.startupArmBehaviorHostIds;
+		for (const hostNodeId of startupHostIds)
 			await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
-		if (branchRuntime.startupArmBehaviorHostIds.length > 0) await flushRuntimeGraph();
+		if (startupHostIds.length > 0) await flushRuntimeGraph();
 		return branchRuntime;
 	}
 	function dispatchCaptured(event: ResumeDomEvent): Promise<void> | void {
@@ -377,9 +380,9 @@ export function createResumeRuntime(
 					}
 				: undefined,
 			asyncBoundaryWiring: () => asyncBoundaryWiring?.(),
-			registerArmBranches: async (boundaryId, records) => {
+			registerArmBranches: async (boundaryId, records, armLists) => {
 				const branches = await loadBranchRuntime();
-				for (const hostNodeId of branches.registerArmBranches(boundaryId, records as never))
+				for (const hostNodeId of await branches.registerArmBranches(boundaryId, records as never, armLists))
 					await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });
 			},
 		};
@@ -418,6 +421,11 @@ export function createResumeRuntime(
 		}
 	}
 
+	// The branch runtime files and disposes hosts only through this pair.
+	function fileHost(hostNodeId: string, element: ResumeDomElement): void {
+		disposedHosts.delete(hostNodeId);
+		elementsByHostId.set(hostNodeId, element);
+	}
 	function disposeHost(
 		hostNodeId: string,
 		options: { readonly ignoreFutureEvents?: boolean } = {},
