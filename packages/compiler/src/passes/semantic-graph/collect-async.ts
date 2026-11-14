@@ -14,6 +14,7 @@ import {
 	templateReadPath,
 } from '../../artifact-helpers/graph-paths.ts';
 import { placeAsyncArmText } from './collect-elements.ts';
+import { readLocal } from './composite-reads.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
@@ -137,7 +138,7 @@ export function finalizeComputedDependencies(state: WalkState): void {
 			pending.body,
 			state,
 			declaringComponentName,
-		).filter((dependency) => directBindingNames.has(dependency.source.split('.')[0] ?? ''));
+		).filter((dependency) => directBindingNames.has(dependency.local.name));
 		state.currentSharedDefinitionId = previousSharedDefinitionId;
 		state.graph.graphBindings = state.graph.graphBindings.map((binding) => {
 			if (binding.id !== pending.graphNodeId) return binding;
@@ -361,12 +362,13 @@ function graphDependency(
 		resolveGraphPath(source, bindings, aliases) ??
 		resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
 	if (!resolved) return null;
+	const local = readLocal(node);
+	if (!local)
+		throw new Error(
+			`A graph read of ${source} resolved to ${resolved.binding.id} without a static name and members.`,
+		);
 
-	return {
-		source,
-		graphNodeId: resolved.binding.id,
-		path: resolved.path,
-	};
+	return { source, graphNodeId: resolved.binding.id, path: resolved.path, local };
 }
 
 /**

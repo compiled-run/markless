@@ -63,8 +63,18 @@ test('a @catch text joining the error with state reads the error from the bounda
 	const read = graph.templateReads.find((candidate) => candidate.source.includes('error.message'))!;
 	const joined = graph.graphBindings.find((binding) => binding.id === read.computedGraphNodeId)!;
 	expect(joined.dependencies).toEqual([
-		{ source: 'error.message', graphNodeId: cell!.id, path: ['message'] },
-		{ source: 'attempt', graphNodeId: 'state:attempt', path: [] },
+		{
+			source: 'error.message',
+			graphNodeId: cell!.id,
+			path: ['message'],
+			local: { name: 'error', members: ['message'] },
+		},
+		{
+			source: 'attempt',
+			graphNodeId: 'state:attempt',
+			path: [],
+			local: { name: 'attempt', members: [] },
+		},
 	]);
 	// One update for the whole run of text: the `{attempt}` hole no longer rewrites the element on its own.
 	expect(graph.templateReads.filter((candidate) => candidate.hostNodeId === read.hostNodeId)).toEqual([read]);

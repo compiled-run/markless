@@ -112,7 +112,7 @@ function scanRowNode(node: AnyNode | undefined, rowNames: ReadonlySet<string>, s
 
 	const sources = pureCompositeReadSources(node, scan.state, ROW_READ_OPTIONS);
 	if (sources) {
-		for (const source of sources) classifyRowRead(source, rowNames, scan);
+		for (const { source } of sources) classifyRowRead(source, rowNames, scan);
 		return;
 	}
 

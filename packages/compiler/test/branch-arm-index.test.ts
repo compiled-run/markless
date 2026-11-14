@@ -91,7 +91,14 @@ test('an @else if chain is one branch site picked by an index computed over ever
 	expect(computed).toMatchObject({
 		kind: 'computed',
 		functionSource: '() => (charge > 50) ? 0 : (charge > 15) ? 1 : 2',
-		dependencies: [{ source: 'charge', graphNodeId: 'state:charge', path: [] }],
+		dependencies: [
+			{
+				source: 'charge',
+				graphNodeId: 'state:charge',
+				path: [],
+				local: { name: 'charge', members: [] },
+			},
+		],
 	});
 	const slot = graph.markup.chunks
 		.flatMap((chunk) => chunk.slots)
@@ -167,7 +174,12 @@ test('a @switch whose case tests are expressions is picked by an index computed,
 	expect(site!.propTest).toBeUndefined();
 	const computed = graph.graphBindings.find((binding) => binding.id === site!.testComputedGraphNodeId);
 	expect(computed?.dependencies).toEqual([
-		{ source: 'charge', graphNodeId: 'state:charge', path: [] },
+		{
+			source: 'charge',
+			graphNodeId: 'state:charge',
+			path: [],
+			local: { name: 'charge', members: [] },
+		},
 	]);
 	const { result, pick } = await flipModule('src/Battery.tsrx', conditionSwitchSource);
 	expect(result.protocolView.branches?.[0]).toEqual(

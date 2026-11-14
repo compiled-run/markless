@@ -1,0 +1,74 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": -263,
+			"reason": "The routed-key drop runs only in the server render body's composition, so a forwarding component is served no copy and the browser bundle carries none of the drop (measured by this fixture build against its merge-base)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "The routed-key drop runs only in the server render body's composition, so a forwarding component is served no copy and the browser bundle carries none of the drop (measured by this fixture build against its merge-base)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": -263,
+			"reason": "The routed-key drop runs only in the server render body's composition, so a forwarding component is served no copy and the browser bundle carries none of the drop (measured by this fixture build against its merge-base)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "The routed-key drop runs only in the server render body's composition, so a forwarding component is served no copy and the browser bundle carries none of the drop (measured by this fixture build against its merge-base)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 221,
+			"reason": "Every dependency carries its name and members from the read's syntax (the docs playground's in-browser compiler grows) and the routed-key drop ships with the server render body these pages download (PR run 43528054969 against merge-group run 43518593538 at 6dfc9c4608)",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 221,
+			"reason": "Every dependency carries its name and members from the read's syntax (the docs playground's in-browser compiler grows) and the routed-key drop ships with the server render body these pages download (PR run 43528054969 against merge-group run 43518593538 at 6dfc9c4608)",
+			"date": "2026-11-13"
+		}
+	]
+}

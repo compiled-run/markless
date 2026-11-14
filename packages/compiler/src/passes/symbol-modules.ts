@@ -4408,14 +4408,13 @@ function asyncRunnerDependencyStatements(
 	const byName = new Map<
 		string,
 		Array<{
-			readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+			readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
 			readonly dependency: SemanticGraphDependency;
 			readonly slot: CaptureSlot | undefined;
 		}>
 	>();
 	for (const dependency of dependencies) {
 		const binding = asyncRunnerDependencyBinding(dependency);
-		if (!binding) continue;
 		const slot = captureSlots.find((candidate) =>
 			captureSlotMatchesRead(candidate, dependency),
 		);
@@ -4430,7 +4429,10 @@ function asyncRunnerDependencyStatements(
 		const answered = reads.some(
 			(read) =>
 				read.binding.memberPath.length > 0 &&
-				(read.slot || read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX)),
+				(read.slot ||
+					read.dependency.graphNodeId.startsWith(PROTOCOL_PROP_GRAPH_NODE_PREFIX) ||
+					// A shared instance's member resolves to that member's own node, not the instance's.
+					read.binding.memberPath.length > read.dependency.path.length),
 		);
 		if (whole || !answered) return constDeclarationNode(name, asyncRunnerRootRead(whole ?? reads[0]!));
 		return constDeclarationNode(
@@ -4452,7 +4454,7 @@ function asyncRunnerDependencyStatements(
 }
 
 function asyncRunnerRootRead(read: {
-	readonly binding: NonNullable<ReturnType<typeof asyncRunnerDependencyBinding>>;
+	readonly binding: ReturnType<typeof asyncRunnerDependencyBinding>;
 	readonly slot: CaptureSlot | undefined;
 }): EmissionNode {
 	return read.slot && read.binding.memberPath.length === 0
@@ -4485,33 +4487,19 @@ function memberReadsObjectNode(
 	);
 }
 
-/** Matches `isIdentifierObjectKey`, which sits inside the scanner band. */
-const ASYNC_RUNNER_IDENTIFIER = /^[$A-Z_a-z][$0-9A-Z_a-z]*$/;
-
-/**
- * The local name a dependency binds and the graph path it reads, or `null` when
- * the dependency source is not a plain dotted name.
- *
- * The band-free twin of `asyncRunnerDependencyDeclaration`: same trailing-member
- * arithmetic, with the identifier test inlined so this site reaches no scanner.
- */
+/** The local name a dependency binds, the member reads on it, and the graph path the name itself stands for. */
 function asyncRunnerDependencyBinding(dependency: SemanticGraphDependency): {
 	readonly name: string;
 	readonly memberPath: ReadonlyArray<string>;
 	readonly graphNodeId: string;
 	readonly path: ReadonlyArray<string>;
-} | null {
-	const parts = dependency.source.split('.');
-	if (parts.some((part) => !ASYNC_RUNNER_IDENTIFIER.test(part))) return null;
-
-	const [name, ...memberPath] = parts;
-	if (!name) return null;
-
+} {
+	const { name, members } = dependency.local;
 	return {
 		name,
-		memberPath,
+		memberPath: members,
 		graphNodeId: dependency.graphNodeId,
-		path: dependency.path.slice(0, Math.max(0, dependency.path.length - memberPath.length)),
+		path: dependency.path.slice(0, Math.max(0, dependency.path.length - members.length)),
 	};
 }
 

@@ -126,6 +126,7 @@ test('a class prop on a component call-site carries the calling module scope', a
 		source: 'cls',
 		graphNodeId: 'prop:props',
 		path: ['cls'],
+		local: { name: 'cls', members: [] },
 	});
 	// A call-site that wrote no class gets none synthesized.
 	expect(props[2]).toBeUndefined();
