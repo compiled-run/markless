@@ -162,6 +162,25 @@ test(`at idle the page evaluates its resume modules and the runtime stays asleep
 		expect(await browserRuns(page)).toBe(0);
 		await page.click('.tap');
 		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		await page.waitForTimeout(300);
+		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a press right after load on a page whose answers hold no handler applies and runs no list again', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	try {
+		await page.goto(`${server!.origin}/display`, { waitUntil: 'load' });
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		await page.waitForTimeout(300);
+		expect(await page.locator('.books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(await browserRuns(page)).toBe(0);
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
