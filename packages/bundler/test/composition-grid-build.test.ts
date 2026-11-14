@@ -415,3 +415,45 @@ describe('composition grid, production build', () => {
 		expect(errors).toEqual([]);
 	});
 });
+
+describe('prop-fed rows of a row component from another file, production build', () => {
+	const rowLines = (...labels: string[]) => labels.map((label) => `row: ${label}`);
+
+	async function picks(visited: Visit, at: number, id: string) {
+		const from = visited.api.details.length;
+		await visited.page.locator('[data-pick]').nth(at).click();
+		await expect.poll(() => visited.api.details.slice(from), poll).toEqual([id]);
+	}
+
+	for (const [name, path] of [
+		['imported row component', '/e-pick'],
+		['row component through a barrel', '/e-pick-barrel'],
+		['default row component under another local name', '/e-pick-renamed'],
+	] as const)
+		test(`${name}: add, remove and reorder, and each row's handler acts on its own item`, async () => {
+			const visited = await visit(path);
+			const { page } = visited;
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('one', 'two'));
+			await picks(visited, 1, 'r2');
+			await page.locator('[data-grid-add]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('one', 'two', 'row 3'));
+			await picks(visited, 2, 'r3');
+			await page.locator('[data-grid-remove]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('two', 'row 3'));
+			await picks(visited, 0, 'r2');
+			await page.locator('[data-grid-reverse]').click();
+			await expect.poll(() => lines(page), poll).toEqual(rowLines('row 3', 'two'));
+			await picks(visited, 0, 'r3');
+			await picks(visited, 1, 'r2');
+			expect(visited.errors).toEqual([]);
+		});
+
+	test('a recursive tree whose rows hold a component from another file and the tree itself grows', async () => {
+		const { page, errors } = await visit('/e-tree');
+		const amounts = () => page.evaluate(() => [...document.querySelectorAll('main em')].map((amount) => amount.textContent));
+		await expect.poll(amounts, poll).toEqual(['1', '11']);
+		await page.locator('[data-add]').click();
+		await expect.poll(amounts, poll).toEqual(['1', '11', '2', '21']);
+		expect(errors).toEqual([]);
+	});
+});

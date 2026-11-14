@@ -6,7 +6,7 @@ async function staticWarnings(markup: string) {
 	const result = await compileTsrxModule({
 		filename: '/app/badge.tsrx',
 		source: `const classFor = (label: string) => (label.endsWith('1') ? 'badge odd' : 'badge');
-export function Badge({ label }: { readonly label: string }) @{
+export function Badge({ label, note, size }: { readonly label: string; readonly note: string; readonly size: number }) @{
 	${markup}
 }
 `,
@@ -21,20 +21,29 @@ test('a ternary class over a method call on a prop names the class attribute and
 	const [[message, suggestion] = []] = await staticWarnings(
 		`<span class={label.endsWith('1') ? 'badge odd' : 'badge'}>{label}</span>`,
 	);
-	expect(message).toContain('This class attribute reads a member of the prop `label`');
+	expect(message).toContain('This class attribute reads into the prop `label`');
 	expect(message).not.toContain('This text');
 	expect(suggestion).toContain('`class={classFor(label)}`');
 });
 
 test('an attribute and a text over a prop member name their own place', async () => {
 	expect((await staticWarnings(`<a title={label.length > 2 ? 'long' : 'short'}>x</a>`))[0]?.[0]).toContain(
-		'This title attribute reads a member of the prop `label`',
+		'This title attribute reads into the prop `label`',
 	);
 	expect((await staticWarnings(`<p>{label.toUpperCase()}</p>`))[0]?.[0]).toContain(
-		'This text reads a member of the prop `label`',
+		'This text reads into the prop `label`',
 	);
 });
 
 test('the rewrite the warning names compiles without it', async () => {
 	expect(await staticWarnings(`<span class={classFor(label)}>{label}</span>`)).toEqual([]);
+});
+
+test('every prop the expression reads into, and every prop it reads, is named', async () => {
+	const [[message, suggestion] = []] = await staticWarnings(
+		`<span title={label.length > note.length ? 'long' : size}>{label}</span>`,
+	);
+	expect(message).toContain('This title attribute reads into the props `label` and `note`');
+	expect(message).toContain('never changes when `label`, `note` or `size` changes');
+	expect(suggestion).toContain('`title={valueFor(label, note)}`');
 });

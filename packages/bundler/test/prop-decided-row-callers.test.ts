@@ -307,3 +307,55 @@ export default function Page() @{
 		}),
 	).resolves.toBeUndefined();
 });
+
+const pill = `
+export default function Pill({ label }) @{
+	<span class="pill">{label}</span>
+}
+`;
+
+const pillTable = (imports: string, tag: string, row: string) => `
+import { state } from '@markless/core';
+${imports}
+
+export function PillTable({ rows }) @{
+	let open = state(true);
+	<ul onClick={() => (open = !open)}>
+		@for (const row of rows; key row.id) {
+			${row.replaceAll('TAG', tag)}
+		}
+	</ul>
+}
+`;
+
+const pillPage = `
+import { state } from '@markless/core';
+import { PillTable } from './pill-table.tsrx';
+
+export default function Page() @{
+	let rows = state([{ id: 'a', label: 'A' }]);
+	<main>
+		<button type="button" onClick={() => rows.push({ id: 'b', label: 'B' })}>add</button>
+		<PillTable rows={rows} />
+	</main>
+}
+`;
+
+for (const [name, imports, tag] of [
+	['through a barrel', "import { Pill } from './pills.ts';", 'Pill'],
+	['as a default import under another local name', "import Tag from './pill.tsrx';", 'Tag'],
+] as const) {
+	const files = (row: string) => ({
+		'pill.tsrx': pill,
+		'pills.ts': "export { default as Pill } from './pill.tsrx';\n",
+		'pill-table.tsrx': pillTable(imports, tag, row),
+		'page.tsrx': pillPage,
+	});
+
+	test(`a row component imported ${name} builds in rows fed by a changing prop, and a row that cannot grow names its real cause`, async () => {
+		await expect(buildPage(`pill-${tag}`, files('<li><TAG label={row.label} /></li>'))).resolves.toBeUndefined();
+		await expect(
+			buildPage(`pill-${tag}-if`, files('<li>@if (open) { <b>on</b> }<TAG label={row.label} /></li>')),
+		).rejects.toThrow(/<PillTable>: This @for row holds @if/);
+	});
+}
