@@ -5,10 +5,54 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
+				"runtime/graph-kept"
+			],
+			"set": 660,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": -718,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 179,
-			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
+			"delta": 635,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 332,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 27,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
@@ -19,8 +63,30 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 1,
-			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
+			"delta": 3,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph-kept"
+			],
+			"set": 660,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": -718,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
@@ -30,54 +96,42 @@
 				"@fixtures/vite-plus",
 				"web/prerender/evaluator"
 			],
-			"delta": 179,
-			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
+			"delta": 635,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
-			"surface": "perf-guards",
+			"surface": "fixture-runtime",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
 			],
-			"delta": 73,
-			"reason": "a @try already on the page draws its content when a component arm inside it re-renders during a held save (PR run 43595096454)",
+			"delta": 332,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
-			"surface": "perf-guards",
+			"surface": "fixture-runtime",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
 			],
-			"delta": 73,
-			"reason": "a @try already on the page draws its content when a component arm inside it re-renders during a held save (PR run 43595096454)",
+			"delta": 27,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
-			"surface": "perf-guards",
+			"surface": "fixture-runtime",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
 			],
-			"delta": 73,
-			"reason": "a @try already on the page draws its content when a component arm inside it re-renders during a held save (PR run 43595096454)",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
-				"web/prerender/evaluator"
-			],
-			"delta": 179,
-			"reason": "a @try already on the page draws its content when a component arm inside it re-renders during a held save (PR run 43595096454)",
+			"delta": 3,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		}
 	]

@@ -255,6 +255,15 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				input.demandOnStart === true,
 			input.demandOnStart === true,
 		);
+	// An arm the browser re-renders draws each @try around it as this page shows it.
+	input.root.__marklessShownAsyncArm = (id) => {
+		const boundary = input.asyncBoundariesById.get(id);
+		const shown =
+			boundary &&
+			(shownArms.get(boundary) ??
+				(input.settleTracker?.hasSettledContent(id) ? ASYNC_BOUNDARY_ARM.try : boundary.initiallyServedArm));
+		return shown === SHOWN_TRY_KEPT ? ASYNC_BOUNDARY_ARM.try : shown;
+	};
 	if (!disposed) {
 		stopReasking = reaskOnReturn(input.root, input.graph, input.asyncBoundariesById);
 		stopWriteRefresh = registerWriteRefresh(input.graph, input.asyncBoundariesById);

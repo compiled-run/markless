@@ -216,7 +216,7 @@ export type SsrDataStructure = {
 		readonly elementStart: number;
 		readonly elementEnd: number;
 		readonly html: string;
-		/** The arm a branch painted: a served @try arm's branch is wired to it, since its test reads nothing until the browser derives it. */
+		/** The arm a branch or @try painted: a served @try arm's branch is wired to it, since its test reads nothing until the browser derives it. */
 		readonly arm?: number;
 	}>;
 	readonly elementCount: number;
@@ -967,7 +967,7 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 								return {
 									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
 									tokens: [
-										commentToken('async', id, 'start', body.html),
+										commentToken('async', id, 'start', body.html, arm),
 										...body.tokens,
 										commentToken('async', id, 'end'),
 									],

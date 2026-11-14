@@ -60,6 +60,7 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessComments?: ResumeDomComment[];
 	// The arm each flipping branch shows, for rows written straight into an arm.
 	__marklessBranchArms?: Map<string, ResumeBranchArmEntry>;
+	__marklessShownAsyncArm?: (boundaryId: string) => number | undefined;
 	// Set on a keyed row's root when its repeat wires the row: the items that row names, read at dispatch.
 	__marklessRowLocals?: () => Record<string, unknown>;
 	// Resume reads the host document off the root element (streamed arm patch

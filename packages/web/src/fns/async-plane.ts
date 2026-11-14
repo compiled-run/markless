@@ -1,3 +1,4 @@
+import { lastGood } from '@markless/runtime/graph-kept';
 import { createAsyncPlane, type AsyncRefreshModule } from '@markless/runtime/graph-async-load';
 import type {
 	AsyncComputedPlane,
@@ -119,19 +120,11 @@ function awaitsAsyncAncestor(
 		visited.add(graphNodeId);
 		const record = byNode.get(graphNodeId)?.[0];
 		if (record?.async === true) {
-			if (!hasReadableValue(graph.read(graphNodeId, []))) return true;
+			if (!lastGood(graph.read(graphNodeId, []) as never)) return true;
 		} else if (record && awaitsAsyncAncestor(record, byNode, graph, visited)) return true;
 	}
 	return false;
 }
-
-// A re-run and a failed refresh keep the prior settled value readable (spec D8), so only a first run or first failure has nothing to read.
-function hasReadableValue(snapshot: unknown): boolean {
-	const { status, value } =
-		(snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
-	return status === 'fulfilled' || ((status === 'pending' || status === 'rejected') && value !== undefined);
-}
-
 
 // A first render skips a sync computed while an async value it derives from has nothing to read yet.
 function awaitsAsyncValue(
