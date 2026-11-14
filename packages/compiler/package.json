@@ -39,5 +39,8 @@
 		"@markless/web": "workspace:*",
 		"@tsrx/yuku": "0.8.0",
 		"yuku-css": "0.1.0"
+	},
+	"devDependencies": {
+		"satteri": "catalog:"
 	}
 }
