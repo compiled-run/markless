@@ -138,20 +138,21 @@ async function openSettled(path: string) {
 	return { page, errors };
 }
 
-test('an onIdle host inside a streamed arm runs once the runtime has started', async () => {
-	const { page, errors } = await openSettled('/watched');
-	try {
-		expect(await page.locator('.watched .value').textContent()).toBe('value idle');
-		await expect
-			.poll(async () => Number(await page.locator('.arm-ticks').textContent()), {
-				timeout: 3_000,
-			})
-			.toBeGreaterThan(1);
-		expect(errors).toEqual([]);
-	} finally {
-		await page.close();
-	}
-});
+for (const path of ['/watched', '/watched-alias', '/watched-barrel'])
+	test(`an onIdle host inside a streamed arm runs once the runtime has started: ${path}`, async () => {
+		const { page, errors } = await openSettled(path);
+		try {
+			expect(await page.locator('.watched .value').textContent()).toBe('value idle');
+			await expect
+				.poll(async () => Number(await page.locator('.arm-ticks').textContent()), {
+					timeout: 3_000,
+				})
+				.toBeGreaterThan(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	});
 
 test('a shared() value read only inside a streamed arm repaints when written', async () => {
 	const { page, errors } = await openSettled('/shared');

@@ -1,5 +1,6 @@
 import { PROTOCOL_IDLE_EVENT_NAME } from '@markless/serializer';
 import type { ModuleGraphInterfaceArtifact, SemanticGraphArtifact } from '../../artifacts.ts';
+import { importedEdgeComponent } from '../link/component-target.ts';
 
 type IdleGraph = Pick<SemanticGraphArtifact, 'events' | 'componentEdges'>;
 type ImportedInterfaces = Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined;
@@ -18,9 +19,8 @@ export function componentsWithIdleRecords(
 		for (const edge of graph.componentEdges) {
 			if (idle.has(edge.parentComponentName)) continue;
 			const childIdle = edge.importSource
-				? importedModuleInterfaces?.[edge.importSource]?.render.components.find(
-						(component) => component.componentName === edge.childComponentName,
-					)?.idleRecords === true
+				? importedEdgeComponent(edge, importedModuleInterfaces?.[edge.importSource])?.idleRecords ===
+					true
 				: idle.has(edge.childComponentName);
 			if (!childIdle) continue;
 			idle.add(edge.parentComponentName);

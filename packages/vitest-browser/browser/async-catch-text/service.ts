@@ -4,6 +4,7 @@ export const service = {
 		['first', 'Service down.'],
 		['south', 'South down.'],
 		['slow', 'Slow down.'],
+		['late', 'Late down.'],
 	]),
 	held: false,
 	waiting: [] as Array<() => void>,
@@ -23,14 +24,19 @@ export function release(): void {
 	for (const answer of service.waiting.splice(0)) answer();
 }
 
-// Past the server's first-flush deadline, so its @catch streams rather than renders inline.
-const STREAMED_AFTER_MS = 60;
+// The server answers `slow` long past its first-flush deadline and `late` just past it, so their @catch streams rather than renders inline.
+const STREAMED_AFTER_MS = { slow: 60, late: 15 } as Record<string, number>;
 
+// On the server every other report answers before any timer fires, so it renders inside the first flush however loaded the machine is.
 export async function loadReport(id: string): Promise<string> {
 	service.asked.push(id);
-	const wait = typeof window === 'undefined' && id === 'slow' ? STREAMED_AFTER_MS : 5;
+	const server = typeof window === 'undefined';
 	await new Promise<void>((resolve) =>
-		service.held ? service.waiting.push(resolve) : setTimeout(resolve, wait),
+		service.held
+			? service.waiting.push(resolve)
+			: server && !STREAMED_AFTER_MS[id]
+				? queueMicrotask(resolve)
+				: setTimeout(resolve, server ? STREAMED_AFTER_MS[id] : 5),
 	);
 	const failure = service.down.get(id);
 	if (failure) throw new Error(failure);

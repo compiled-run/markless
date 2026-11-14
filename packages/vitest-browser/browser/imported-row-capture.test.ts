@@ -2,6 +2,8 @@ import { afterEach, beforeEach, expect, test } from 'vitest';
 import { cleanup, render, renderServerHTML, renderStream } from '../src/index.ts';
 import { resetService } from './async-catch-text/service.ts';
 import { CatchRows } from './imported-row-capture/catch-rows.tsrx';
+import { LateCatchRows } from './imported-row-capture/late-catch-rows.tsrx';
+import { LateList } from './imported-row-capture/late-list.tsrx';
 import { ImportedPage } from './imported-row-capture/imported-page.tsrx';
 import { List } from './imported-row-capture/list.tsrx';
 import { SoloPage } from './imported-row-capture/solo-page.tsrx';
@@ -137,5 +139,35 @@ test("SSR, an imported row's @catch text streamed after the first flush, from a 
 		click('[data-region="slow"] [data-next]');
 		await expect.poll(() => textOf(slow), WAIT).toBe(`Slow down. (try ${tries} for slow)`);
 	}
+	expect(uncaught).toEqual([]);
+});
+
+// A real server answers at any time: a row answering just after the first flush streams in on its own.
+test('SSR, a row that answers just after the first flush streams in and counts', async () => {
+	const { shell, appends } = await renderStream(LateList);
+	expect(appends).toHaveLength(2);
+	const { container } = renderServerHTML(shell);
+	expect(textOf('[data-row="late"] [data-pending]')).toBe('Loading late');
+	for (const chunk of appends) appendStreamed(container, chunk);
+	await rowCounts('late');
+	await rowCounts('slow');
+	await rowCounts('north');
+});
+
+test("SSR, an imported row's @catch text that answers just after the first flush streams in and resets", async () => {
+	resetService([['slow', 'Slow down.']]);
+	const { shell, appends } = await renderStream(LateCatchRows);
+	expect(appends).toHaveLength(2);
+	const { container } = renderServerHTML(shell);
+	expect(textOf('[data-region="late"] [data-pending]')).toBe('Checking late');
+	for (const chunk of appends) appendStreamed(container, chunk);
+	for (const name of ['late', 'slow']) {
+		const error = `[data-region="${name}"] [data-error]`;
+		const said = name === 'late' ? 'Late down.' : 'Slow down.';
+		await expect.poll(() => textOf(error), WAIT).toBe(`${said} (try 1 for ${name})`);
+		click(`[data-region="${name}"] [data-next]`);
+		await expect.poll(() => textOf(error), WAIT).toBe(`${said} (try 2 for ${name})`);
+	}
+	expect(textOf('[data-region="north"] [data-ok]')).toBe('north ready');
 	expect(uncaught).toEqual([]);
 });
