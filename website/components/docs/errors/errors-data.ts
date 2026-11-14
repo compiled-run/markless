@@ -3237,6 +3237,34 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CATCH_ERROR_FIELD_LOST',
+		title: 'Only the name and message of a caught error reach the browser',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'Only the name and message of a caught error reach the browser: a Markless build error.',
+		printed: [
+			'MARKLESS_CATCH_ERROR_FIELD_LOST: field',
+			'A failure caught while the server renders the page travels to the browser as page data, and an Error object keeps only its name and message there. Anything else on it, such as `cause` or a field your own error class adds, is dropped, so the browser would show something different from the server.',
+			'Pass or read `error.message` or `error.name` instead, and put what the page needs to show into the message when you throw, for example `throw new Error(`Not found: ${id}`)`.',
+			'https://markless.dev/errors/MARKLESS_CATCH_ERROR_FIELD_LOST',
+		],
+		structured: true,
+		why: 'A failure caught while the server renders the page travels to the browser as page data, and an Error object keeps only its name and message there. Anything else on it, such as `cause` or a field your own error class adds, is dropped, so the browser would show something different from the server.',
+		suggestion:
+			'Pass or read `error.message` or `error.name` instead, and put what the page needs to show into the message when you throw, for example `throw new Error(`Not found: ${id}`)`.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_CATCH_RESET_GRAPH_MISSING',
 		title: 'A @catch reset has no graph to re-run values in',
 		area: 'internal',

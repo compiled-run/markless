@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 316,
+	total: 317,
 	guided: 51,
 	groups: [
 		{
@@ -2242,6 +2242,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'markless failed while the page ran markless_runtime_error a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_CATCH_ERROR_FIELD_LOST',
+					title: 'Only the name and message of a caught error reach the browser',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'only the name and message of a caught error reach the browser markless_catch_error_field_lost only the name and message of a caught error reach the browser: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_DATA_COMPONENT_MISSING',

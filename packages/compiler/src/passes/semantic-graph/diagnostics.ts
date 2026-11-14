@@ -1,6 +1,6 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
-import { PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
+import { DURABLE_ERROR_FIELDS, PROTOCOL_SHARED_SCOPES } from '@markless/serializer';
 import { DEBUGGING_PLAYBOOK_HINT } from '../../debugging-playbook.ts';
 import type {
 	SemanticElementHandleBinding,
@@ -2311,4 +2311,27 @@ export function formLeavesPageDiagnostic(
 		],
 		docsUrl: 'https://markless.dev/errors/MARKLESS_ASYNC_POST_FORM_LEAVES_PAGE',
 	};
+}
+
+export function catchErrorFieldLostDiagnostic(
+	input: {
+		readonly source: string;
+		readonly node: AnyNode;
+		readonly filename: string;
+	} & ({ readonly field: string } | { readonly child: string }),
+): SemanticGraphDiagnostic {
+	const kept = [...DURABLE_ERROR_FIELDS].join(' and ');
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_CATCH_ERROR_FIELD_LOST',
+		title: 'Only the name and message of a caught error reach the browser',
+		message:
+			'field' in input
+				? `\`${input.source}\` reads \`${input.field}\` from the \`@catch\` error, but a server-rendered page sends the browser only the error's ${kept}, so \`${input.field}\` would be missing once the page loads.`
+				: `\`${input.source}\` passes the whole \`@catch\` error to <${input.child}>, but a server-rendered page sends the browser only the error's ${kept}, so any other field <${input.child}> reads would be missing once the page loads.`,
+		why: 'A failure caught while the server renders the page travels to the browser as page data, and an Error object keeps only its name and message there. Anything else on it, such as `cause` or a field your own error class adds, is dropped, so the browser would show something different from the server.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion:
+			'Pass or read `error.message` or `error.name` instead, and put what the page needs to show into the message when you throw, for example `throw new Error(`Not found: ${id}`)`.',
+		docsUrl: 'https://markless.dev/errors/MARKLESS_CATCH_ERROR_FIELD_LOST',
+	});
 }

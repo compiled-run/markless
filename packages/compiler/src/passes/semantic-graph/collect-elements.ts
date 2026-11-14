@@ -64,7 +64,7 @@ import {
 	resolvedSymbolAt,
 } from './collect-expressions.ts';
 import { collectRowLocalReads } from './row-local-reads.ts';
-import { catchErrorScope } from './catch-error-cell.ts';
+import { catchErrorScope, computedReads } from './catch-error-cell.ts';
 import { takesStyleScopeClass } from '../public-render/style-scopes.ts';
 import {
 	extractSyncPolicy,
@@ -485,7 +485,7 @@ function joinTextParts(
 		true,
 	);
 	if (!composite) return null;
-	caught?.keep();
+	if (caught && !caught.keep(values[0] as AnyNode, computedReads(composite.graphNodeId, state))) return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
 	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });

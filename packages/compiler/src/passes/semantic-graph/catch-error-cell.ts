@@ -1,8 +1,9 @@
-import type { SemanticGraphBinding } from '../../artifacts.ts';
-import { graphBindingMap, resolveGraphPath, semanticAliasMap } from '../../artifact-helpers/graph-paths.ts';
+import { DURABLE_ERROR_FIELDS } from '@markless/serializer';
+import type { SemanticGraphBinding, SemanticGraphDependency } from '../../artifacts.ts';
 import type { AnyNode } from '../../ast/nodes.ts';
 import { expressionSource } from '../../ast/source.ts';
-import { collectCompositeTemplateExpression, type GraphReadScope } from './composite-reads.ts';
+import { catchErrorFieldLostDiagnostic } from './diagnostics.ts';
+import type { GraphReadScope } from './composite-reads.ts';
 import { inlineRenderLocals } from './render-local-inline.ts';
 import type { WalkState } from './types.ts';
 
@@ -11,7 +12,7 @@ export function catchErrorScope(
 	errors: ReadonlyMap<string, string>,
 	scope: GraphReadScope,
 	state: WalkState,
-): { readonly scope: GraphReadScope; readonly keep: () => void } | null {
+): CaughtErrorScope | null {
 	const bindings = new Map(scope.bindings);
 	const cells: Array<{ readonly boundaryId: string; readonly cell: SemanticGraphBinding }> = [];
 	for (const [name, boundaryId] of errors) {
@@ -22,10 +23,40 @@ export function catchErrorScope(
 	}
 	return {
 		scope: { bindings, aliases: scope.aliases },
-		keep: () => {
+		keep: (expression, reads, child) => {
 			for (const { boundaryId, cell } of cells) keepCatchErrorCell(boundaryId, cell, state);
+			const lost = reads.find(
+				(read) =>
+					cells.some(({ cell }) => cell.id === read.graphNodeId) &&
+					(read.path.length > 0 ? !DURABLE_ERROR_FIELDS.has(read.path[0]!) : child !== undefined),
+			);
+			if (!lost) return true;
+			state.graph.diagnostics.push(
+				catchErrorFieldLostDiagnostic({
+					source: expressionSource(expression, state.source) ?? '',
+					...(lost.path[0] === undefined ? { child: child! } : { field: lost.path[0] }),
+					node: expression,
+					filename: state.filename,
+				}),
+			);
+			return false;
 		},
 	};
+}
+
+type CaughtErrorScope = {
+	readonly scope: GraphReadScope;
+	// Keeps the error cells, and refuses a read of a field the server render does not send; false when refused.
+	readonly keep: (
+		expression: AnyNode,
+		reads: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>,
+		// A component the expression is passed to as a prop: it may read any field, so the whole error is refused.
+		child?: string,
+	) => boolean;
+};
+
+export function computedReads(graphNodeId: string, state: WalkState): ReadonlyArray<SemanticGraphDependency> {
+	return state.graph.graphBindings.find((binding) => binding.id === graphNodeId)?.dependencies ?? [];
 }
 
 function catchErrorCell(boundaryId: string, state: WalkState): SemanticGraphBinding | null {
@@ -54,40 +85,14 @@ function keepCatchErrorCell(boundaryId: string, cell: SemanticGraphBinding, stat
 	state.graph.graphBindings.push(cell);
 }
 
-// A component prop worked out from a `@catch (error)` binding reads the error from the same cell, so the child follows each failure.
-export function catchErrorPropRead(
+// A component prop worked out from a `@catch (error)` binding resolves in a scope where the error reads the boundary's error cell.
+export function catchErrorPropScope(
 	expression: AnyNode,
+	scope: GraphReadScope,
 	state: WalkState,
-): {
-	readonly graphNodeId: string;
-	readonly graphBindingKind: SemanticGraphBinding['kind'];
-	readonly path: ReadonlyArray<string>;
-} | null {
+): CaughtErrorScope | null {
 	const inlined = inlineRenderLocals(expression, state, { catchErrors: true });
 	if (inlined.kind !== 'inlined' || inlined.catchErrors.size === 0 || inlined.definitions.length > 0)
 		return null;
-	const component = state.currentComponentName;
-	const caught = catchErrorScope(
-		inlined.catchErrors,
-		{
-			bindings: graphBindingMap(state.graph, state.currentSharedDefinitionId, component),
-			aliases: semanticAliasMap(state.graph, state.currentSharedDefinitionId, component),
-		},
-		state,
-	);
-	if (!caught) return null;
-	const source = expressionSource(expression, state.source);
-	const direct = source ? resolveGraphPath(source, caught.scope.bindings, caught.scope.aliases) : null;
-	if (direct) {
-		caught.keep();
-		return { graphNodeId: direct.binding.id, graphBindingKind: direct.binding.kind, path: direct.path };
-	}
-	const composite = collectCompositeTemplateExpression(expression, state, {
-		scope: caught.scope,
-		methodCalls: true,
-		unaryOperators: true,
-	});
-	if (!composite) return null;
-	caught.keep();
-	return { graphNodeId: composite.graphNodeId, graphBindingKind: 'computed', path: [] };
+	return catchErrorScope(inlined.catchErrors, scope, state);
 }

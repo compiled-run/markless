@@ -210,6 +210,9 @@ function serializeComputedSnapshot(
 }
 
 
+/** The fields of a caught Error a server-rendered page sends to the browser; any other field is gone after the page loads. */
+export const DURABLE_ERROR_FIELDS: ReadonlySet<string> = new Set(['name', 'message']);
+
 // A live Error is not durable graph state; its name and message are, so a handled failure never fails the render.
 export function durableError(error: unknown): unknown {
 	if (error instanceof Error) {

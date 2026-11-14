@@ -89,3 +89,69 @@ test('a prop that reads no @catch binding keeps its own route', async () => {
 		kind: 'serializable',
 	});
 });
+
+test('error.name reaches a component from the error cell', async () => {
+	const result = await compilePage('<Oops message={error.name} />');
+	const cell = result.semanticGraph.asyncBoundaries[0]!.errorGraphNodeId;
+
+	expect(result.semanticGraph.componentEdges[0]!.props[0]).toMatchObject({
+		kind: 'graph-reference',
+		graphNodeId: cell,
+		path: ['name'],
+	});
+	expect(errors(result)).toEqual([]);
+});
+
+test('a nested @try reads its own boundary error cell', async () => {
+	const source = `
+import { computed } from '@markless/core';
+import Oops from './oops.tsrx';
+
+export default function Page() @{
+	const outer = computed(async () => 'outer');
+	const inner = computed(async () => 'inner');
+	@try {
+		<>
+			<p>{outer}</p>
+			@try {
+				<p>{inner}</p>
+			} @catch (error) {
+				<Oops message={error.message} />
+			}
+		</>
+	} @catch (error) {
+		<Oops message={error.message} />
+	}
+}
+`;
+	const result = await compileTsrxModule({ filename: 'src/page.tsrx', source, symbols: [] });
+	const cells = result.semanticGraph.asyncBoundaries.map((boundary) => boundary.errorGraphNodeId);
+	const props = result.semanticGraph.componentEdges.map(
+		(edge) => edge.props.find((item) => item.name === 'message') as { graphNodeId?: string } | undefined,
+	);
+
+	expect(new Set(cells).size).toBe(2);
+	expect(props.map((prop) => prop?.graphNodeId).sort()).toEqual([...cells].sort());
+	expect(errors(result)).toEqual([]);
+});
+
+const lost = async (catchBody: string) =>
+	errors(await compilePage(catchBody)).map((diagnostic) => {
+		const line = page(catchBody).slice(0, diagnostic.primarySpan?.start).split('\n').length;
+		return `${diagnostic.code} ${line}: ${diagnostic.message}`;
+	});
+
+test('a field the server render drops, or the whole error passed on, is refused at the line that reads it', async () => {
+	expect(await lost('<Oops message={error.cause} />')).toEqual([
+		"MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error.cause` reads `cause` from the `@catch` error, but a server-rendered page sends the browser only the error's name and message, so `cause` would be missing once the page loads.",
+	]);
+	expect(await lost("<Oops message={error.code ?? 'none'} />")).toEqual([
+		expect.stringMatching(/^MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error\.code \?\? 'none'` reads `code`/),
+	]);
+	expect(await lost('<Oops message={error} />')).toEqual([
+		"MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error` passes the whole `@catch` error to <Oops>, but a server-rendered page sends the browser only the error's name and message, so any other field <Oops> reads would be missing once the page loads.",
+	]);
+	expect(await lost('<p>{error.message} ({error.cause})</p>')).toEqual([
+		expect.stringMatching(/^MARKLESS_CATCH_ERROR_FIELD_LOST 12: `error\.message` reads `cause`/),
+	]);
+});
