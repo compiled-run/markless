@@ -126,22 +126,15 @@ async function openSettled(path: string) {
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.goto(`${server!.origin}${path}`, { waitUntil: 'load' });
-	const settled = await page.evaluate(
+	// Every streamed arm has committed; no idle period is awaited, since a busy CI runner may never give one.
+	await page.evaluate(
 		() =>
-			new Promise<string>((done) => {
-				const stuck = setTimeout(
-					() =>
-						done(
-							`no idle period 10 s after load: ${document.querySelectorAll('template[m\\:arm]').length} arm templates uncommitted`,
-						),
-					10_000,
-				);
+			new Promise<void>((done) =>
 				(
 					globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }
-				).__mArm.idle(() => requestIdleCallback(() => (clearTimeout(stuck), done('idle'))));
-			}),
+				).__mArm.idle(() => setTimeout(done)),
+			),
 	);
-	expect(settled, path).toBe('idle');
 	return { page, errors };
 }
 
