@@ -1,7 +1,12 @@
 import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 import { readPath } from './graph-core.ts';
-import { isAsyncSnapshotMetaKey, type DirtyPath } from './graph-scheduler.ts';
+import {
+	asyncCarriesValue,
+	asyncShownPaths,
+	isAsyncSnapshotMetaKey,
+	type DirtyPath,
+} from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncSnapshot,
 	RuntimeGraphRead,
@@ -352,10 +357,11 @@ export type DerivedReconcilePlane = {
 	readonly reconcileComputed: (computed: RuntimeComputedNode, previous: unknown) => void;
 	/** Commits a whole derived value onto a cell-backed computed node. */
 	readonly commitDerived: (write: RuntimeGraphWrite, path: ReadonlyArray<string>) => boolean;
-	/** Dirties the paths an async snapshot commit changed. */
+	/** Dirties the paths an async snapshot commit changed; `kept` when it puts the shown value back. */
 	readonly publishAsync: (
 		node: RuntimeAsyncComputedNode,
 		previous: RuntimeGraphAsyncSnapshot,
+		kept: boolean,
 	) => void;
 	/** Flush-pass start: recompute the dirty computeds something is subscribed to. */
 	readonly recomputeSubscribed: () => void;
@@ -463,8 +469,8 @@ export const createDerivedReconcilePlane: DerivedReconcilePlaneFactory = (intern
 			scheduleFlush();
 			return true;
 		},
-		publishAsync(node, previous) {
-			for (const path of asyncCommitPaths(node, previous, node.snapshot)) {
+		publishAsync(node, previous, kept) {
+			for (const path of asyncCommitPaths(node, previous, node.snapshot, kept)) {
 				markDirtyPath(node.graphNodeId, path);
 			}
 		},
@@ -519,21 +525,13 @@ function asyncCommitPaths(
 	node: RuntimeAsyncComputedNode,
 	previous: RuntimeGraphAsyncSnapshot,
 	next: RuntimeGraphAsyncSnapshot,
+	kept: boolean,
 ): ReadonlyArray<ReadonlyArray<string>> {
-	const paths: ReadonlyArray<string>[] = [];
-	if (previous.status !== next.status) paths.push(['status']);
-	if (previous.version !== next.version) paths.push(['version']);
-	// A run already loading that a save turns loud changes only how it is shown.
-	if (!snapshotField(previous, 'quiet') !== !snapshotField(next, 'quiet')) paths.push(['quiet']);
-	if (!Object.is(snapshotField(previous, 'key'), snapshotField(next, 'key'))) paths.push(['key']);
-	if (!Object.is(snapshotField(previous, 'error'), snapshotField(next, 'error'))) {
-		paths.push(['error']);
-	}
+	const paths: ReadonlyArray<string>[] = asyncShownPaths(previous, next);
+	if (asyncCarriesValue(previous, next, kept)) return paths;
 
 	const previousValue = snapshotField(previous, 'value');
 	const nextValue = snapshotField(next, 'value');
-	// A pending flip carries the prior value forward; only a run on held inputs brings a new one.
-	if (next.status === 'pending' && Object.is(previousValue, nextValue)) return paths;
 
 	if (
 		!Object.is(previousValue, nextValue) &&

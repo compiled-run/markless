@@ -1,4 +1,5 @@
 import type { RuntimeGraphAsyncSnapshot, RuntimeGraphRead } from './graph.ts';
+import { asyncCarriesValue, asyncShownPaths } from './graph-scheduler.ts';
 import {
 	NODE_BLOCKED,
 	NODE_DROPPED,
@@ -42,9 +43,6 @@ function saysOutcome(snapshot: RuntimeGraphAsyncSnapshot, outcome: SavesOutcome)
 	return plain as RuntimeGraphAsyncSnapshot;
 }
 
-const SHOWN_FIELDS = ['status', 'version', 'quiet', 'key', 'error'];
-const shownValue = (snapshot: RuntimeGraphAsyncSnapshot): unknown => (snapshot as { readonly value?: unknown }).value;
-
 /** The refresh half of an async plane: loaded with its first run, failure, handler rejection or entry mark. */
 export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 	const { asyncComputedNodes: nodes, computedNodes, readGraph, staleDerives, move } = state;
@@ -60,10 +58,10 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		// Readers held at the inputs the old value was fetched with move on even when the new value equals it.
 		state.landWithoutObservers(() => {
 			if (landed && node.pinned) node.pinned = false;
-			// Putting back the shown value changes only how the block shows it; rewriting the value would undo typed text.
-			else if (kept && Object.is(shownValue(previous), shownValue(snapshot)))
-				return SHOWN_FIELDS.forEach((field) => state.markDirtyPath(node.graphNodeId, [field]));
-			else if (state.reconcile) return state.reconcile.publishAsync(node, previous);
+			else if (state.reconcile) return state.reconcile.publishAsync(node, previous, kept);
+			// A save's mark, a handler's failure and a failed save's end keep the shown value: only how the block shows is dirtied.
+			else if (kept && asyncCarriesValue(previous, snapshot, kept))
+				return asyncShownPaths(previous, snapshot).forEach((path) => state.markDirtyPath(node.graphNodeId, path));
 			state.markDirtyPath(node.graphNodeId, []);
 		});
 		state.scheduleFlush();
@@ -308,7 +306,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 			node.quiet = false;
 			const loud: { quiet?: boolean } = { ...node.snapshot };
 			delete loud.quiet;
-			publish(node, loud as RuntimeGraphAsyncSnapshot);
+			publish(node, loud as RuntimeGraphAsyncSnapshot, false, true);
 			void state.flush?.();
 			return;
 		}
@@ -316,7 +314,7 @@ export function bindAsyncRefresh(state: AsyncPlaneState): AsyncRefresh {
 		const version = ++node.version;
 		node.entryHold = { phase: HOLD_MARKING, version, previous, holders: save ? 0 : 1, writing: save ? 1 : 0, outcome: SAVES_ANSWERED };
 		node.quiet = false;
-		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key));
+		publish(node, pendingSnapshot(node, version, (previous as { readonly key?: unknown }).key), false, save === true);
 		// A callback prop runs under a held flush (resume-events.ts `invokeSymbol`); flush past it.
 		void state.flush?.();
 	};

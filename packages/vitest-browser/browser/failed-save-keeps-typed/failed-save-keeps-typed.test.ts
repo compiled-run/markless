@@ -8,7 +8,11 @@ import { TypedPage } from './typed-page.tsrx';
 // An input shows a loaded value, the person types over it, and the save fails: what was typed stays.
 
 installApi();
-afterEach(() => cleanup());
+afterEach(() => {
+	cleanup();
+	api.failing = true;
+	api.saved = undefined;
+});
 
 const field = (container: ParentNode) =>
 	container.querySelector<HTMLInputElement>('input[name=first]')!;
@@ -42,6 +46,25 @@ for (const mode of ['CSR', 'SSR'] as const) {
 			.toBe('Saving failed (500)');
 		await settled(container as HTMLElement);
 		expect(field(container).value).toBe('Typed');
+	});
+
+	test(`${mode}: a save that works after a failed one shows the saved value and clears @catch`, async () => {
+		const { container } = await throwing[mode]();
+		await typeAndSave(container as HTMLElement, 'Ada a1');
+		await expect
+			.poll(() => container.querySelector('[data-caught]')?.textContent)
+			.toBe('Saving failed (500)');
+		await settled(container as HTMLElement);
+		api.failing = false;
+		const loads = api.loads;
+		field(container).value = 'Grace';
+		field(container).dispatchEvent(new Event('input', { bubbles: true }));
+		container.querySelector<HTMLButtonElement>('[data-submit]')!.click();
+		await expect.poll(() => api.saved).toBe('Grace');
+		await expect.poll(() => api.loads, 'the save loads the value again').toBeGreaterThan(loads);
+		await expect.poll(() => container.querySelector('[data-caught]')).toBeNull();
+		await settled(container as HTMLElement);
+		expect(field(container).value).toBe('Grace');
 	});
 
 	test(`${mode}: a save that answers 500 and a handler that goes on keeps the typed text`, async () => {

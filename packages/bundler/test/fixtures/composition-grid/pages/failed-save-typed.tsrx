@@ -8,7 +8,7 @@ export default function Page() @{
 			<form
 				onSubmit={async (event) => {
 					event.preventDefault();
-					await save();
+					await save(String(new FormData(event.currentTarget).get('first')));
 				}}
 			>
 				<input name="first" value={person.first} />

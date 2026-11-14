@@ -8,7 +8,7 @@ export function TypedPage() @{
 			<form
 				onSubmit={async (event) => {
 					event.preventDefault();
-					await save();
+					await save(String(new FormData(event.currentTarget).get('first')));
 				}}
 			>
 				<input name="first" value={person.first} />
