@@ -7,8 +7,8 @@
 				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 88,
-			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"delta": 179,
+			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,7 +20,7 @@
 				"measured"
 			],
 			"delta": 1,
-			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
 			"date": "2026-11-14"
 		},
 		{
@@ -30,8 +30,8 @@
 				"@fixtures/vite-plus",
 				"web/prerender/evaluator"
 			],
-			"delta": 88,
-			"reason": "a component arm's browser render draws the @try content a reload over a shown value keeps on screen",
+			"delta": 179,
+			"reason": "a @try already on the page draws its content when an arm inside it re-renders while its value reloads",
 			"date": "2026-11-14"
 		}
 	]
