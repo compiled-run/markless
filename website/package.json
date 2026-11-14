@@ -10,7 +10,7 @@
 		"doctor": "node scripts/markless-doctor.mjs",
 		"fmt": "vp fmt",
 		"test": "vp test",
-		"test:boxes": "witness run",
+		"test:boxes": "node scripts/run-boxes.ts",
 		"witness": "node --experimental-strip-types scripts/witness.ts",
 		"route-types": "node scripts/write-route-types.ts",
 		"typecheck": "pnpm run route-types && pnpm run typecheck:tsrx",

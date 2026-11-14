@@ -54,7 +54,7 @@ const procStat = (pid) => {
 };
 
 /** Every descendant of rootPid with its parent and resident bytes. */
-function descendants(rootPid, pageSize) {
+export function descendants(rootPid, pageSize) {
 	const parentOf = new Map();
 	const rssOf = new Map();
 	for (const entry of readdirSync('/proc')) {

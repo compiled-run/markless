@@ -17,3 +17,7 @@ export declare function describePeak(
 	limit?: number,
 ): string;
 export declare function processLabel(args: readonly string[]): string;
+export declare function descendants(
+	rootPid: number,
+	pageSize: number,
+): Array<{ readonly pid: number; readonly ppid: number; readonly rss: number }>;

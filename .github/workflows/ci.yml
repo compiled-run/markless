@@ -1149,7 +1149,7 @@ jobs:
               run: node scripts/ci/warm-chrome.mjs
 
             - name: Run website boxes
-              run: pnpm --dir website test:boxes
+              run: node scripts/ci/memory-watch.mjs -- pnpm --dir website test:boxes
 
             - name: Mark the website box lane complete
               run: echo ok > website-boxes-completed.txt
