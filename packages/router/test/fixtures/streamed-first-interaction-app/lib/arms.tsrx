@@ -96,3 +96,89 @@ export function SharedPage() @{
 		<Themed />
 	</div>
 }
+
+// A streamed block whose first press throws.
+function Faulty() @{
+	let tries = state(0);
+	const books = computed(async () => listBooks('all', 0));
+
+	<section class="faulty">
+		@try {
+			<div class="arm">
+				<button
+					class="fail"
+					onClick={() => {
+						tries++;
+						if (tries === 1) throw new Error('first press failed');
+					}}
+				>
+					Tries {tries}
+				</button>
+				<p class="count">{books.length} books</p>
+			</div>
+		} @pending {
+			<p class="loading">Loading</p>
+		}
+	</section>
+}
+
+export function FaultyPage() @{
+	<div class="faulty-page">
+		<Faulty />
+	</div>
+}
+
+// A streamed block the server could not answer, shown by a @catch with no handler; a button outside it asks again.
+function Unreachable() @{
+	let asks = state(0);
+	const books = computed(async () => listBooks('remote', asks));
+
+	<section class="unreachable">
+		<button class="ask" onClick={() => asks++}>Ask again</button>
+		@try {
+			<ul class="books">
+				@for (const book of books; key book.id) {
+					<li>{book.title}</li>
+				}
+			</ul>
+		} @pending {
+			<p class="loading">Loading</p>
+		} @catch (error) {
+			<p class="failed">{error.message}</p>
+		}
+	</section>
+}
+
+export function UnreachablePage() @{
+	<div class="unreachable-page">
+		<Unreachable />
+	</div>
+}
+
+// A tall page: a streamed answer with no handler, and a pinned button, a form and the page's height outside it.
+function Tall() @{
+	let taps = state(0);
+	const books = computed(async () => listBooks('all', 0));
+
+	<section class="tall">
+		<button class="pinned" style="position: fixed; top: 0; right: 0" onClick={() => taps++}>Taps {taps}</button>
+		<form method="post" action="/api/notes" class="note-form">
+			<input name="title" class="note-title" aria-label="Note" autocomplete="name" />
+			<button type="submit" class="note-submit">Add note</button>
+		</form>
+		@try {
+			<div class="arm">
+				<p class="count">{books.length} books</p>
+			</div>
+		} @pending {
+			<p class="loading">Loading</p>
+		}
+		<div style="height: 3000px">spacer</div>
+	</section>
+}
+
+export function TallPage() @{
+	<div class="tall-page">
+		<Tall />
+	</div>
+}

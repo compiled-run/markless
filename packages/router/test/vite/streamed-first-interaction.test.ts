@@ -3,9 +3,10 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'pathe';
-import { chromium, type Browser, type Page, type Request } from '@playwright/test';
+import { chromium, webkit, type Browser, type Page, type Request } from '@playwright/test';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
 import { PROTOCOL_LOCATOR_PATHS_ATTRIBUTE } from '../../../serializer/src/protocol-locator-paths.ts';
+import { MARKLESS_FIRST_INTERACTION_ROW_LIMIT } from '../../../web/src/first-interaction-rows.ts';
 import { buildFixture } from '../support/fixture-build.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
@@ -18,6 +19,10 @@ const packagesRoot = resolve(import.meta.dirname, '../../..');
 let root = '';
 let server: BuiltServer | undefined;
 let browser: Browser | undefined;
+// WebKit has no requestIdleCallback, so it runs the start's fallback timing.
+let webkitBrowser: Browser | undefined;
+const engines = ['chromium', 'webkit'] as const;
+const browserOf = (engine: (typeof engines)[number]) => (engine === 'webkit' ? webkitBrowser : browser)!;
 
 beforeAll(async () => {
 	root = await mkdtemp(join(tmpdir(), 'markless-streamed-first-interaction-'));
@@ -37,10 +42,12 @@ beforeAll(async () => {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
 	browser = await launchBrowser(chromium);
+	webkitBrowser = await launchBrowser(webkit);
 }, 240_000);
 
 afterAll(async () => {
 	await browser?.close();
+	await webkitBrowser?.close();
 	await server?.close();
 	if (root) await rm(root, { recursive: true, force: true });
 });
@@ -73,8 +80,8 @@ const idleTierWoken = (page: Page) =>
 		)
 		.toBe(true);
 
-async function openIdle(path: string) {
-	const page = await browser!.newPage();
+async function openIdle(path: string, on: Browser = browser!) {
+	const page = await on.newPage();
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	const requests: Request[] = [];
@@ -86,11 +93,13 @@ async function openIdle(path: string) {
 			new Promise<void>((done, fail) => {
 				const arm = (globalThis as unknown as { __mArm?: { idle: (run: () => void) => void } }).__mArm;
 				const stalled = setTimeout(() => fail(new Error('the stream executor never finished its reveal train')), 10_000);
-				const idle = () => (clearTimeout(stalled), requestIdleCallback(() => done(), { timeout: 2000 }));
+				const idle = () => (clearTimeout(stalled), typeof requestIdleCallback === 'function' ? requestIdleCallback(() => done(), { timeout: 2000 }) : setTimeout(done));
 				if (arm) arm.idle(idle);
 				else idle();
 			}),
 	);
+	// The page's own idle work runs in idle periods after this one: its resume modules, then link prefetches.
+	await expect.poll(() => routeModuleEvaluated(page), { timeout: 10_000 }).toBe(true);
 	// Idle-time link prefetches are the page's own, not the interaction's: wait until the network is quiet.
 	for (let seen = -1, round = 0; seen !== requests.length; round++) {
 		if (round === 20)
@@ -101,15 +110,116 @@ async function openIdle(path: string) {
 	return { page, errors, requests };
 }
 
-test('streamed answers show before any interaction, and the runtime has not started', async () => {
+test('streamed answers with no handler in them show before any interaction, and the runtime has not started', async () => {
+	const { page, errors } = await openIdle('/display');
+	try {
+		expect(await page.locator('.books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(await runtimeStarted(page)).toBe(false);
+		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// A press inside a streamed arm adopts and wires the arm at the press, measured over a frame above main, so such a page starts after load.
+test('streamed answers holding handlers show before any interaction, and the runtime starts after load as on main', async () => {
 	const { page, errors } = await openIdle('/');
 	try {
 		expect(await titles(page, 'all')).toEqual(['Dune', 'Emma', 'Ulysses']);
 		expect(await page.locator('[data-shelf="remote"] .failed').textContent()).toContain(
 			'shelf offline',
 		);
-		expect(await runtimeStarted(page)).toBe(false);
+		await expect.poll(() => runtimeStarted(page)).toBe(true);
 		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// Whether the chunk holding the page's own resume module, named by its route script, has run.
+const routeModuleEvaluated = (page: Page) =>
+	page.evaluate(() => {
+		const route = JSON.parse(
+			document.querySelector('script[type="@markless/core/route"]')?.textContent ?? '{}',
+		) as { resume?: [string] };
+		const packs = (globalThis as { __marklessPacks?: Record<string, unknown> }).__marklessPacks ?? {};
+		return !!route.resume && new URL(route.resume[0], location.href).href in packs;
+	});
+
+for (const engine of engines)
+test(`at idle the page evaluates its resume modules and the runtime stays asleep (${engine})`, async () => {
+	const { page, errors } = await openIdle('/display', browserOf(engine));
+	try {
+		expect(await routeModuleEvaluated(page)).toBe(true);
+		expect(await runtimeStarted(page)).toBe(false);
+		expect(
+			await page.evaluate(
+				() => !!(document.querySelector('[data-async-container]') as { __marklessDispatch?: unknown }).__marklessDispatch,
+			),
+		).toBe(false);
+		expect(await browserRuns(page)).toBe(0);
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		await page.waitForTimeout(300);
+		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a press right after load on a page whose answers hold no handler applies and runs no list again', async () => {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	try {
+		await page.goto(`${server!.origin}/display`, { waitUntil: 'load' });
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		await page.waitForTimeout(300);
+		expect(await page.locator('.books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(await browserRuns(page)).toBe(0);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+for (const engine of engines)
+test(`a page serving rows up to the limit stays asleep; one more row starts the runtime after load (${engine})`, async () => {
+	for (const [rows, started] of [
+		[MARKLESS_FIRST_INTERACTION_ROW_LIMIT, false],
+		[MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1, true],
+	] as const) {
+		const { page, errors } = await openIdle(`/long?rows=${rows}`, browserOf(engine));
+		try {
+			expect(await page.locator('.books li').count()).toBe(rows);
+			expect(await runtimeStarted(page)).toBe(started);
+			await page.click('.shrink');
+			await expect.poll(() => page.locator('.books li').count()).toBe(rows - 1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	}
+});
+
+for (const engine of engines)
+test(`a press soon after load, before idle, starts the runtime once and fetches nothing (${engine})`, async () => {
+	const page = await browserOf(engine).newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	try {
+		await page.goto(`${server!.origin}/rows`, { waitUntil: 'load' });
+		const requests: string[] = [];
+		page.on('request', (request) => request.resourceType() === 'script' && requests.push(request.url()));
+		await page.locator('.pick').nth(1).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		await page.locator('.pick').nth(0).click();
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Dune');
+		expect(requests).toEqual([]);
 		expect(errors).toEqual([]);
 	} finally {
 		await page.close();
@@ -135,10 +245,9 @@ test('the census pinned at idle counts the served page, not the answers streamed
 	}
 });
 
-test('a press on a row of a streamed list is the first interaction, and it applies', async () => {
+test('a press on a row of a streamed list applies', async () => {
 	const { page, errors } = await openIdle('/rows');
 	try {
-		expect(await runtimeStarted(page)).toBe(false);
 		await page.locator('.pick').nth(1).click();
 		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
 		expect(errors).toEqual([]);
@@ -147,8 +256,9 @@ test('a press on a row of a streamed list is the first interaction, and it appli
 	}
 });
 
-test('the first interaction fetches nothing, applies at once and keeps the streamed lists', async () => {
-	const { page, errors, requests } = await openIdle('/');
+for (const engine of engines)
+test(`the first interaction fetches nothing, applies at once and keeps the streamed lists (${engine})`, async () => {
+	const { page, errors, requests } = await openIdle('/', browserOf(engine));
 	try {
 		await idleTierWoken(page);
 		const before = requests.length;
@@ -385,8 +495,9 @@ for (const typed of [false, true])
 		}
 	});
 
-test('two quick clicks as the first interaction both apply exactly once', async () => {
-	const { page, errors } = await openIdle('/');
+for (const engine of engines)
+test(`two quick clicks as the first interaction both apply exactly once (${engine})`, async () => {
+	const { page, errors } = await openIdle('/', browserOf(engine));
 	try {
 		await page.click('.tap');
 		await page.click('.tap');
@@ -399,8 +510,9 @@ test('two quick clicks as the first interaction both apply exactly once', async 
 	}
 });
 
-test('Enter on a focused button with no pointer events applies', async () => {
-	const { page, errors } = await openIdle('/');
+for (const engine of engines)
+test(`Enter on a focused button with no pointer events applies (${engine})`, async () => {
+	const { page, errors } = await openIdle('/', browserOf(engine));
 	try {
 		await page.focus('.tap');
 		await page.keyboard.press('Enter');
@@ -440,6 +552,216 @@ test('a press forwarded while the resume module loads stays with the page it was
 		expect(errors).toEqual([]);
 	} finally {
 		release();
+		await page.close();
+	}
+});
+
+// The deferred triggers' idle clock, held by the test: every start that waits for the page's idle point waits for a release.
+async function openHeld(path: string) {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.addInitScript(() => {
+		const held: Array<() => void> = [];
+		const clock = { frame: (run: () => void) => requestAnimationFrame(run), idle: (run: () => void) => void held.push(run) };
+		Object.defineProperty(Element.prototype, '__mClock', { configurable: true, get: () => clock });
+		(window as { releaseIdle?: () => number }).releaseIdle = () => {
+			const runs = held.splice(0);
+			for (const run of runs) run();
+			return runs.length;
+		};
+	});
+	await page.goto(`${server!.origin}${path}`, { waitUntil: 'load' });
+	return { page, errors };
+}
+const asked = (page: Page) =>
+	page.evaluate(() => !!(document.querySelector('[data-async-container]') as { __mResume?: unknown }).__mResume);
+
+for (const [name, path] of [
+	['streamed rows over the limit', `/long?rows=${MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1}`],
+	['rows over the limit served with the page', `/long?rows=1&shell=${MARKLESS_FIRST_INTERACTION_ROW_LIMIT + 1}`],
+	['handlers inside a streamed arm', '/rows'],
+] as const)
+	test(`a page with ${name} starts its runtime at the deferred triggers' idle point, as main's self-wake does, and at no other`, async () => {
+		const { page, errors } = await openHeld(path);
+		try {
+			await page.locator('.books li').first().waitFor();
+			await page.waitForTimeout(1_000);
+			expect(await asked(page)).toBe(false);
+			expect(await runtimeStarted(page)).toBe(false);
+			await expect
+				.poll(async () => (await page.evaluate(() => (window as unknown as { releaseIdle: () => number }).releaseIdle()), runtimeStarted(page)), { timeout: 10_000 })
+				.toBe(true);
+			expect(await browserRuns(page)).toBe(0);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	});
+
+test('a page within the row limit evaluates nothing before the idle point, then only modules', async () => {
+	const { page, errors } = await openHeld('/display');
+	try {
+		await page.locator('.books li').first().waitFor();
+		await page.waitForTimeout(1_000);
+		expect(await asked(page)).toBe(false);
+		await expect
+			.poll(async () => (await page.evaluate(() => (window as unknown as { releaseIdle: () => number }).releaseIdle()), routeModuleEvaluated(page)), { timeout: 10_000 })
+			.toBe(true);
+		expect(await runtimeStarted(page)).toBe(false);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a value another tab stored while this page sleeps: the first press flips the value this page shows, as a started page does', async () => {
+	const context = await browser!.newContext();
+	const errors: string[] = [];
+	try {
+		const open = async () => {
+			const page = await context.newPage();
+			page.on('pageerror', (error) => errors.push(error.message));
+			await page.goto(`${server!.origin}/stored`, { waitUntil: 'load' });
+			await expect.poll(() => routeModuleEvaluated(page), { timeout: 10_000 }).toBe(true);
+			return page;
+		};
+		const sleeping = await open();
+		expect(await sleeping.locator('.mode').textContent()).toBe('Mode light');
+		const other = await open();
+		await other.click('.mode');
+		await expect.poll(() => other.locator('.mode').textContent()).toBe('Mode dark');
+		expect(await runtimeStarted(sleeping)).toBe(false);
+		await sleeping.click('.mode');
+		await expect.poll(() => sleeping.locator('.mode').textContent()).toBe('Mode dark');
+		await sleeping.waitForTimeout(300);
+		expect(await sleeping.locator('.mode').textContent()).toBe('Mode dark');
+		expect(errors).toEqual([]);
+	} finally {
+		await context.close();
+	}
+});
+
+test('the first interaction keeps the scroll position, the typed text and the focus the press gave', async () => {
+	const { page, errors } = await openIdle('/tall');
+	try {
+		await page.locator('.note-title').fill('kept text');
+		await page.evaluate(() => scrollTo(0, 1200));
+		expect(await runtimeStarted(page)).toBe(false);
+		await page.click('.pinned');
+		await expect.poll(() => page.locator('.pinned').textContent()).toBe('Taps 1');
+		await page.waitForTimeout(300);
+		expect(await page.evaluate(() => scrollY)).toBe(1200);
+		expect(await page.locator('.note-title').inputValue()).toBe('kept text');
+		expect(await page.evaluate(() => document.activeElement?.className)).toBe('pinned');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a reload of a scrolled page that sleeps is restored to its scroll position, and its first press applies', async () => {
+	const { page, errors } = await openIdle('/tall');
+	try {
+		await page.evaluate(() => scrollTo(0, 1500));
+		await page.reload({ waitUntil: 'load' });
+		await expect.poll(() => page.evaluate(() => scrollY)).toBe(1500);
+		await expect.poll(() => routeModuleEvaluated(page), { timeout: 10_000 }).toBe(true);
+		expect(await runtimeStarted(page)).toBe(false);
+		await page.click('.pinned');
+		await expect.poll(() => page.locator('.pinned').textContent()).toBe('Taps 1');
+		expect(await page.evaluate(() => scrollY)).toBe(1500);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a field the browser autofilled while the page sleeps keeps its value through the first interaction and is sent', async () => {
+	const { page, errors } = await openIdle('/tall');
+	try {
+		const title = `autofilled ${Date.now()}`;
+		// Autofill sets the value and fires input and change, with no key or pointer event.
+		await page.evaluate((value) => {
+			const field = document.querySelector<HTMLInputElement>('.note-title')!;
+			field.value = value;
+			field.dispatchEvent(new Event('input', { bubbles: true }));
+			field.dispatchEvent(new Event('change', { bubbles: true }));
+		}, title);
+		await page.click('.pinned');
+		await expect.poll(() => page.locator('.pinned').textContent()).toBe('Taps 1');
+		expect(await page.locator('.note-title').inputValue()).toBe(title);
+		await page.click('.note-submit');
+		await expect.poll(async () => (await (await fetch(`${server!.origin}/api/notes`)).json()) as string[]).toContain(title);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// Neither Playwright browser restores from the back/forward cache (Chromium: disabled for its automation delegate; WebKit: never kept), so the restore's own event is sent.
+test('a back/forward cache restore of a sleeping page (pageshow, persisted) leaves its first press working', async () => {
+	const { page, errors } = await openIdle('/');
+	try {
+		await page.evaluate(() => {
+			dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+			dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+		});
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('1');
+		await page.click('.tap');
+		await expect.poll(() => page.locator('.tap').textContent()).toBe('2');
+		expect(await titles(page, 'all')).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a handler that throws on the first press inside a streamed block reports once, and the next press applies', async () => {
+	const { page, errors } = await openIdle('/faulty');
+	try {
+		await page.click('.fail');
+		await expect.poll(() => errors.filter((message) => message.includes('first press failed')).length).toBe(1);
+		await page.click('.fail');
+		await expect.poll(() => page.locator('.fail').textContent()).toBe('Tries 2');
+		expect(await page.locator('.faulty .count').textContent()).toBe('3 books');
+		expect(errors.filter((message) => !message.includes('first press failed'))).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a streamed block the server could not answer shows its error while the page sleeps, and a press outside it asks again', async () => {
+	const { page, errors } = await openIdle('/unreachable');
+	try {
+		expect(await page.locator('.unreachable .failed').textContent()).toBe('shelf offline');
+		expect(await runtimeStarted(page)).toBe(false);
+		await page.click('.ask');
+		await expect.poll(() => page.locator('.unreachable .books li').allTextContents()).toEqual(['Dune', 'Emma', 'Ulysses']);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+// The stream executor listens for a row's events only to start the runtime; a started runtime hears them itself, with their record, as on main.
+test('once the runtime has started, a row press reaches it once, with no copy from the stream executor', async () => {
+	const { page, errors } = await openIdle('/rows');
+	try {
+		await expect.poll(() => runtimeStarted(page)).toBe(true);
+		const forwarded = await page.evaluate(() => {
+			const root = document.querySelector('[data-async-container]') as Element & { __marklessDispatch?: (input: unknown) => unknown };
+			const dispatch = root.__marklessDispatch!;
+			let calls = 0;
+			root.__marklessDispatch = (input) => (calls++, dispatch(input));
+			document.querySelectorAll<HTMLButtonElement>('.pick')[1]!.click();
+			return calls;
+		});
+		expect(forwarded).toBe(0);
+		await expect.poll(() => page.locator('.picked').textContent()).toBe('Picked Emma');
+		expect(errors).toEqual([]);
+	} finally {
 		await page.close();
 	}
 });

@@ -1,9 +1,10 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderServerHTML, renderStream } from '../../src/index.ts';
+import DisplayPage from './display-page.tsrx';
 import ShelvesPage from './shelves-page.tsrx';
 import TickingPage from './ticking-page.tsrx';
 
-// Answers the server streams after its first flush are shown without the runtime; it starts at the first interaction and adopts them.
+// Answers the server streams after its first flush are shown without the runtime; with no handler inside them it starts at the first interaction and adopts them.
 
 afterEach(() => cleanup());
 
@@ -36,23 +37,33 @@ const titles = (shelf: string) =>
 	Array.from(document.querySelectorAll(`[data-shelf="${shelf}"] .books li`), (item) => item.textContent);
 const idle = () => new Promise<void>((done) => requestIdleCallback(() => setTimeout(done, 50), { timeout: 500 }));
 
-test('streamed answers show with no interaction, and the runtime stays asleep', async () => {
-	const root = await mountStreamed(await renderStream(ShelvesPage));
+test('streamed answers with no handler in them show with no interaction, and the runtime stays asleep', async () => {
+	const root = await mountStreamed(await renderStream(DisplayPage));
 	await expect.poll(() => titles('all'), WAIT).toEqual(['Dune', 'Emma', 'Ulysses']);
-	await expect.poll(() => document.querySelector('[data-shelf="remote"] .failed')?.textContent ?? '', WAIT).toContain('shelf offline');
 	await idle();
 	await idle();
 	expect(root.__asyncResumeRuntimeStarted).toBeFalsy();
 	expect((globalThis as { browserRuns?: number }).browserRuns).toBe(0);
+	document.querySelector<HTMLButtonElement>('.tap')!.click();
+	await expect.poll(() => document.querySelector('.tap')?.textContent, WAIT).toBe('1');
 });
 
-test('the first click applies and keeps the streamed lists without running them again', async () => {
-	await mountStreamed(await renderStream(ShelvesPage));
+// A streamed @catch holds a Retry handler, so the page starts after load, as on main.
+test('streamed answers holding a handler show with no interaction, and the runtime starts after load', async () => {
+	const root = await mountStreamed(await renderStream(ShelvesPage));
+	await expect.poll(() => titles('all'), WAIT).toEqual(['Dune', 'Emma', 'Ulysses']);
+	await expect.poll(() => document.querySelector('[data-shelf="remote"] .failed')?.textContent ?? '', WAIT).toContain('shelf offline');
+	await expect.poll(() => !!root.__asyncResumeRuntimeStarted, WAIT).toBe(true);
+	expect((globalThis as { browserRuns?: number }).browserRuns).toBe(0);
+});
+
+// This harness re-runs the lists' values at the press (2 runs, the same on main); the production-build suite checks that a press re-runs nothing.
+test('the first click applies and keeps the streamed lists', async () => {
+	await mountStreamed(await renderStream(DisplayPage));
 	await expect.poll(() => titles('all'), WAIT).toEqual(['Dune', 'Emma', 'Ulysses']);
 	document.querySelector<HTMLButtonElement>('.tap')!.click();
 	await expect.poll(() => document.querySelector('.tap')?.textContent, WAIT).toBe('1');
 	expect(titles('all')).toEqual(['Dune', 'Emma', 'Ulysses']);
-	expect((globalThis as { browserRuns?: number }).browserRuns).toBe(0);
 });
 
 test('a refresh, a reset and a save work from the adopted lists', async () => {

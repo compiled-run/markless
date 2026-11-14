@@ -391,8 +391,10 @@ export type ProtocolArmRecordSet = {
 	readonly elementHandles: ProtocolViewPayload['elementHandles'];
 	readonly keyedRepeats?: ProtocolViewPayload['keyedRepeats'];
 	readonly branches?: ReadonlyArray<ProtocolArmBranchRecord>;
-	/** The names the stream boot listens for: served beside `events` sent as templates, or when a row or painted branch handles an event the arm's own events do not. */
+	/** Served beside `events` sent as templates: the names the stream boot listens for. */
 	readonly eventNames?: ReadonlyArray<string>;
+	/** Names a row or painted branch handles that the arm's own events do not: the stream boot listens for them only to start the runtime. */
+	readonly wakeEventNames?: ReadonlyArray<string>;
 };
 
 // A streamed arm carries its served-arm discriminator beside the record set,

@@ -317,8 +317,9 @@ export async function assembleSsrContainer(
 					deferredTriggerSource(view) +
 						(selfWake
 							? ''
-							: storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes) +
-								streamedWakeSource(view, streamed, selectedResumeModuleUrl, artifactSources?.wakes)) +
+							: // The streamed wake runs at once, so it installs the deferred-trigger helper the storage wake's self-wake reads only on a change.
+								streamedWakeSource(view, streamed, selectedResumeModuleUrl, artifactSources?.wakes) +
+								storageWakeSource(state, selectedResumeModuleUrl, artifactSources?.wakes)) +
 						sharedWakeSource(state) +
 						returnWakeSource(view, selectedResumeModuleUrl, artifactSources?.wakes) +
 						(sendsFormInPlace(view) ? createInlineInPlaceCheckSource() : ''),

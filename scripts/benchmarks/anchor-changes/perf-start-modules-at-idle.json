@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 69,
+			"reason": "the load stack's idle module evaluation on streamed pages: +69 B gzip over main 63385e409 on docs pages, measured on CI; 47 B was already on #699's head, 22 B comes from this PR, unchanged when the start-mark constant left the protocol module",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 69,
+			"reason": "the load stack's idle module evaluation on streamed pages: +69 B gzip over main 63385e409 on docs pages, measured on CI; 47 B was already on #699's head, 22 B comes from this PR, unchanged when the start-mark constant left the protocol module",
+			"date": "2026-11-14"
+		}
+	]
+}

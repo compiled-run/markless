@@ -24,3 +24,13 @@ export async function saveBook(title: string): Promise<void> {
 	await new Promise((done) => setTimeout(done, 30));
 	books.push({ id: `b${books.length + 1}`, title, read: false });
 }
+
+export async function listNumbered(count: number): Promise<ReadonlyArray<Book>> {
+	await new Promise((done) => setTimeout(done, 30));
+	return Array.from({ length: count }, (_, index) => ({ id: `n${index}`, title: `Book ${index}`, read: false }));
+}
+
+// Settles at once, so the server serves these rows with the page, not streamed after it.
+export async function listKept(count: number): Promise<ReadonlyArray<Book>> {
+	return Array.from({ length: count }, (_, index) => ({ id: `k${index}`, title: `Kept ${index}`, read: false }));
+}

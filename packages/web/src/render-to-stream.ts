@@ -11,8 +11,6 @@ import {
 	type ProtocolSyncPolicyCondition,
 } from '@markless/serializer';
 import {
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_VISIBLE_EVENT_NAME,
 	PROTOCOL_CONTAINER_END_COMMENT,
 	PROTOCOL_LOCATOR_PATHS_ATTRIBUTE,
 	PROTOCOL_CONTAINER_START_COMMENT,
@@ -27,6 +25,7 @@ import {
 } from './pending-timing.ts';
 import { createInlineInPlaceCheckSource, IN_PLACE_CHECK } from './inline/resumer.ts';
 import { resumesAtLoad, servedRowCount } from './fns/served-rows.ts';
+import { PROTOCOL_STREAMED_ARM_START_ATTRIBUTE } from '../../serializer/src/protocol-stream-scripts.ts';
 import {
 	artifactResumeModuleUrl,
 	assembleSsrContainer,
@@ -522,17 +521,17 @@ function renderArmAppend(
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 
 	const rows = rowsBefore + servedRowCount(servedArmRecords.keyedRepeats ?? [], output.state);
-	const starts = armRunsWithoutInteraction(servedArmRecords) || resumesAtLoad(rows);
-	const revealArguments =
-		arm.revealDependencyIds.length || starts
-			? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}${starts ? ',1' : ''}`
-			: JSON.stringify(arm.boundaryId);
+	// A press inside an arm pays its adoption and wiring at the press, measured over a frame above main, so an arm that handles any event starts the page after load.
+	const starts = armEventNames(servedArmRecords as ArmEventRecords).size > 0 || resumesAtLoad(rows);
+	const revealArguments = arm.revealDependencyIds.length
+		? `${JSON.stringify(arm.boundaryId)},${JSON.stringify(arm.revealDependencyIds)}`
+		: JSON.stringify(arm.boundaryId);
 
 	return {
 		rows,
 		html:
 			`<template m:arm="${escapeAttribute(arm.boundaryId)}">${withArmEventHostMarks(armEvents, armHtml)}</template>` +
-			`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
+			`<script type="${PROTOCOL_STREAMED_ARM_SCRIPT_TYPE}" data-boundary="${escapeAttribute(arm.boundaryId)}"${starts ? ` ${PROTOCOL_STREAMED_ARM_START_ATTRIBUTE}` : ''}${nonceAttribute}>${escapeScriptJson(JSON.stringify(armPatch))}</script>` +
 			`<script type="${PROTOCOL_STATE_PATCH_SCRIPT_TYPE}" data-graph-node="${escapeAttribute(arm.graphNodeId)}"${nonceAttribute}>${escapeScriptJson(JSON.stringify(patch))}</script>` +
 			`<script${nonceAttribute}>${sendsFormInPlace(servedArmRecords) ? escapeInlineScript(createInlineInPlaceCheckSource()) : ''}__mArm(${escapeScriptJson(revealArguments)})</script>`,
 	};
@@ -706,6 +705,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!rec || !r) return;
 			const records = (JSON.parse(rec.textContent || 'null') || [])[1] || {};
 			const names = new Set(records.eventNames || (records.events || []).map((x) => x.eventName));
+			const wakes = records.wakeEventNames || [];
 			const armEnd = e;
 			const applyPolicy = ${applyStreamedArmSyncPolicy.toString()};
 			${debugSetup}
@@ -724,7 +724,8 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 					}
 				}
 				const input = { root: r, event: e, element: e.target, eventRecord: null, propagationStopped: e.cancelBubble, ...(applied ? { syncPolicyAlreadyApplied: true } : {}) };
-				if (r.__marklessDispatch) return r.__marklessDispatch(input);
+				// A started runtime hears a row's or branch's event through its own listener; forwarding it too sends the press down the record-less path.
+				if (r.__marklessDispatch) return names.has(t) || !r.__asyncResumeRuntimeStarted ? r.__marklessDispatch(input) : undefined;
 				if (r.__asyncResumeRuntimeStarted) return;
 				r.__marklessDelegatedDispatch = true;
 				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
@@ -736,22 +737,12 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 				if (r.__mL !== life) return;
 				await mod.resumeContainerEvent(input);
 			};
-			r.__marklessListen ||= (t) => r.addEventListener(t, forward, true);
-			for (const t of names) {
+			r.__marklessListen ||= (t) => (names.add(t), r.addEventListener(t, forward, true));
+			for (const t of new Set([...names, ...wakes])) {
 			r.addEventListener(t, forward, true);
 				${debugRegistration}
 			}
-			${debugActivate}
-			// An arm whose hosts run at idle or when visible needs the runtime with no interaction, as the shell's own would.
-			if (starts) (globalThis.requestIdleCallback || setTimeout)(async () => {
-				if (r.__mL !== life || r.__marklessDispatch || r.__asyncResumeRuntimeStarted) return;
-				r.__marklessDelegatedDispatch = true;
-				const own = r.querySelector('script[${RESUME_MODULE_ATTRIBUTE}]');
-				const mod = await (r.__mResume ||= import((own && own.getAttribute(${JSON.stringify(RESUME_MODULE_ATTRIBUTE)})) || ${JSON.stringify(resumeModuleUrl)}).catch((error) => {
-					throw ((r.__mResume = undefined), error);
-				}));
-				if (r.__mL === life) await mod.resumeContainerEvent({ root: r, event: 0 });
-			});`
+			${debugActivate}`
 		: '';
 	const source = `globalThis.__mArm ||= (() => {
 	const d = document;
@@ -780,7 +771,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	let last = -1 / 0;
 	let scheduled = false;
 	const idle = [];
-	const commit = (id, starts) => {
+	const commit = (id) => {
 	const w = d.createTreeWalker(d.body, 128);
 	let s, e, n;
 	while ((n = w.nextNode())) {
@@ -806,11 +797,11 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 			moved = false;
 			for (let i = 0; i < queue.length; i++) {
 				if (queue[i][1].some((dep) => !done.has(dep))) continue;
-				const [id, , starts] = queue.splice(i--, 1)[0];
+				const id = queue.splice(i--, 1)[0][0];
 				done.add(id);
 				moved = true;
 				last = performance.now();
-				try { commit(id, starts); } catch (error) { setTimeout(() => { throw error; }); }
+				try { commit(id); } catch (error) { setTimeout(() => { throw error; }); }
 			}
 		}
 		for (const f of idle.splice(0)) f();
@@ -822,7 +813,7 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 		if (!paint) return void requestAnimationFrame(flush);
 		setTimeout(flush, Math.max(paint.startTime + ${String(MARKLESS_PENDING_MIN_VISIBLE_MS)}, last + ${String(MARKLESS_REVEAL_TRAIN_CADENCE_MS)}) - performance.now());
 	};
-	const arm = (id, deps, starts) => { queue.push([id, deps || [], starts]); schedule(); };
+	const arm = (id, deps) => { queue.push([id, deps || []]); schedule(); };
 	arm.idle = (f) => (scheduled ? idle.push(f) : f());
 	arm.flush = flush;
 	return arm;
@@ -830,11 +821,6 @@ function armExecutorScript(resumeModuleUrl: string | undefined, nonce: string | 
 	const nonceAttribute = nonce ? ` nonce="${escapeAttribute(nonce)}"` : '';
 	return `<script data-markless-stream-executor${nonceAttribute}>${escapeInlineScript(source)}</script>`;
 }
-
-const UNPROMPTED_EVENT_NAMES: ReadonlySet<string> = new Set([
-	PROTOCOL_IDLE_EVENT_NAME,
-	PROTOCOL_VISIBLE_EVENT_NAME,
-]);
 
 type ArmEventRecords = {
 	readonly events?: ReadonlyArray<{ readonly eventName: string }>;
@@ -857,23 +843,16 @@ function armEventNames(records: ArmEventRecords): Set<string> {
 	return names;
 }
 
-// An arm, its rows or its painted branches naming an idle or visible host.
-function armRunsWithoutInteraction(records: ProtocolArmRecordSet): boolean {
-	return [...armEventNames(records as ArmEventRecords)].some((name) => UNPROMPTED_EVENT_NAMES.has(name));
-}
-
-// The arm's records as streamed, naming every event the boot listens for when a row or branch handles one its own events do not.
+// The arm's records as streamed, with the events a row or branch handles that its own events do not named apart.
 function streamedArmRecords(records: ProtocolArmRecordSet): ProtocolArmRecordSet {
 	// The debug boot registers each arm event against its locator, so a debug page serves both plain.
 	const served =
 		typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__
 			? records
 			: encodeStreamedArmRecords(records);
-	const names = armEventNames(records as ArmEventRecords);
 	const own = new Set((records.events ?? []).map((event) => event.eventName));
-	return [...names].some((name) => !own.has(name))
-		? { ...served, eventNames: [...new Set([...(served.eventNames ?? []), ...names])] }
-		: served;
+	const wakes = [...armEventNames(records as ArmEventRecords)].filter((name) => !own.has(name));
+	return wakes.length ? { ...served, wakeEventNames: wakes } : served;
 }
 
 // Every keyed repeat the shell served: the page's own and those in @try arms it rendered settled.

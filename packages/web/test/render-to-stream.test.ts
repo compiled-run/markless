@@ -549,11 +549,12 @@ test('renderToStream flushes the pending shell and appends the settled arm out o
 	const chunk = chunks[0]!;
 	// Inert template + records + incremental snapshot + executor invocation.
 	expect(chunk).toContain('globalThis.__mArm');
-	expect(chunk).toContain('if (r.__marklessDispatch) return r.__marklessDispatch');
+	expect(chunk).toContain('if (r.__marklessDispatch) return names.has(t) || !r.__asyncResumeRuntimeStarted ? r.__marklessDispatch(input)');
 	expect(chunk).not.toContain('if (installed.has(t)) continue');
 	expect(chunk).toContain('<template m:arm="boundary:0">');
 	expect(chunk).toContain('<h2>Relay report ready</h2>');
-	expect(chunk).toContain('<script type="markless/arm" data-boundary="boundary:0">');
+	// The arm handles a click, so its records mark the page to start after load.
+	expect(chunk).toContain('<script type="markless/arm" data-boundary="boundary:0" data-start>');
 	expect(chunk).toContain('"eventName":"click"');
 	expect(chunk).toContain(
 		'<script type="markless/state-patch" data-graph-node="computed:report">',
@@ -904,7 +905,7 @@ test('a composed child-owned boundary streams under its instance-prefixed id wit
 	expect(appended).toContain(
 		`<template m:arm="c0:boundary:0"><p ${PROTOCOL_EVENT_HOST_ATTRIBUTE}="click:0" data-settled>Rhubarb ready</p></template>`,
 	);
-	expect(appended).toContain('<script type="markless/arm" data-boundary="c0:boundary:0">');
+	expect(appended).toContain('<script type="markless/arm" data-boundary="c0:boundary:0" data-start>');
 	expect(appended).toContain('__mArm("c0:boundary:0")');
 	// The streamed record set keeps the composed id space (prefixed host and
 	// symbol ids) so adopt-time registration matches the payload records.
