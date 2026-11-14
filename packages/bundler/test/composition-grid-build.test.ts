@@ -695,6 +695,21 @@ describe('composition grid, production build', () => {
 			expect(errors).toEqual([]);
 		});
 
+	test("n. a keyed list beside a child's own @try inside an arm the server streams: a row drops, and the child's button flips its @if", async () => {
+		const path = '/n-streamed-list-child-try';
+		const html = await (await fetch(`${server.origin}${path}`)).text();
+		expect(html.indexOf('<template m:arm='), 'the @try arm streams after the shell').toBeGreaterThan(html.indexOf('data-g="pending"'));
+		const { page, errors } = await visit(path);
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a one', 'row: a two', 'rows: one rows']);
+		await page.locator('[data-drop="a-one"]').click();
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'rows: one rows']);
+		await page.locator('[data-flag]').click();
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'hidden: one hidden']);
+		await page.locator('[data-flag]').click();
+		await expect.poll(() => lines(page), poll).toEqual(['title: a round 0', 'row: a two', 'rows: one rows']);
+		expect(errors).toEqual([]);
+	});
+
 	test('a handler that only appends to local state, beside a @catch, marks nothing busy', async () => {
 		const { page, errors } = await visit('/append-only');
 		await expect.poll(() => lines(page), poll).toEqual(['title.even: a round 0']);

@@ -225,18 +225,6 @@ export async function startResumeRuntime(input: {
 		})());
 	if (runtimeInput.view.asyncBoundaries.length > 0) await wire();
 	input.connectAsyncBoundaryWiring(wire);
-	// After the wiring connects, so a served arm's nested @try registers into it as a committed arm's does.
-	for (const boundary of prepared.asyncBoundariesById.values()) {
-		const armRecords = boundary.armRecords as ArmCommitUpdate['armRecords'] | undefined;
-		if (!armRecords || Array.isArray(armRecords)) continue;
-		await (await import('./resume-commit-arm.ts')).registerArmRecordSet(
-			await input.armRegistrationDeps(armRecords, input.servedBehaviors),
-			input.installArmEventType,
-			boundary,
-			// Its nested @try blocks define their runners from these, as a committed arm's do.
-			{ armRecords, ...(!!armRecords.asyncBoundaries?.length && { computed: runtimeInput.state?.computed }) },
-		);
-	}
 	for (const computed of runtimeInput.state?.computed ?? []) {
 		if (
 			computed.snapshot?.status === 'pending' &&
@@ -250,6 +238,20 @@ export async function startResumeRuntime(input: {
 		) {
 			runtimeInput.graph.read(computed.graphNodeId, ['status']);
 		}
+	}
+	// After the wiring connects and pending runners start, so a served arm's nested @try registers into it as a committed arm's does.
+	for (const boundary of prepared.asyncBoundariesById.values()) {
+		const armRecords = boundary.armRecords as ArmCommitUpdate['armRecords'] | undefined;
+		if (!armRecords || Array.isArray(armRecords)) continue;
+		await (await import('./resume-commit-arm.ts')).registerArmRecordSet(
+			await input.armRegistrationDeps(armRecords, input.servedBehaviors),
+			input.installArmEventType,
+			boundary,
+			{ armRecords },
+			undefined,
+			// The page's records, registered at boot: only the arm's nested @try runners are defined from them.
+			runtimeInput.state?.computed,
+		);
 	}
 	// Branch-runtime hooks live here with the settle machinery they depend on;
 	// the runtime core only carries their connection point.
