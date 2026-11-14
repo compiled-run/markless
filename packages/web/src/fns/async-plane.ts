@@ -10,6 +10,7 @@ import type {
 import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serializer/protocol';
 import type { SerializedGraphPayload } from '../../../serializer/src/value-decode-client.ts';
 import type { ResumePayloadGraphInput } from '../payload-graph-construct.ts';
+import { protocolInstancePath, protocolRowSegment } from '../../../serializer/src/protocol-instance-path.ts';
 import { asyncPlanes } from '../reconcile-plane-slot.ts';
 import type {
 	ResumeArmRange,
@@ -72,6 +73,14 @@ const parts = {
 		await Promise.all(
 			unresolved.map((computed) => refreshSyncComputed({ ...input, computed, records: all })),
 		);
+	},
+	// A removed row's components stop: a load in flight lands nothing, and a key that returns starts fresh.
+	dropRows(graph: RuntimeGraph, repeatId: string, rowPath: string, keys: ReadonlyArray<unknown>) {
+		const at = protocolInstancePath(repeatId) + rowPath,
+			left = new Set(keys.map(protocolRowSegment));
+		graph
+			.asyncPlane?.()
+			?.drop((id) => id.startsWith(at) && left.has(id.slice(at.length, id.indexOf(':', at.length + 2) + 1)));
 	},
 	busy: {
 		note(...args: Parameters<typeof note>) {
@@ -245,6 +254,7 @@ export type AsyncPlaneSlot = {
 		records: ReadonlyArray<SyncRefresh['computed']>,
 		all: NonNullable<SyncRefresh['records']>,
 	) => Promise<void>;
+	dropRows?: (graph: RuntimeGraph, repeatId: string, rowPath: string, keys: ReadonlyArray<unknown>) => void;
 	busy?: {
 		readonly note: typeof note;
 		readonly set: typeof set;

@@ -1,8 +1,10 @@
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessElementAt } from '../resume-anchor-census.ts';
+import { protocolRowSegment } from '../../../serializer/src/protocol-instance-path.ts';
 import {
 	findRepeatItemByKey,
 	readKeyedRepeatCollection,
+	type RowScopedRepeat,
 	wireKeyedRepeats,
 } from '../resume-keyed-repeats.ts';
 import type {
@@ -14,7 +16,7 @@ import type {
 type WireInput = Parameters<typeof wireKeyedRepeats>[0];
 // `locals` answers the items of the rows enclosing an instance, for its row handlers;
 // `rowOuter` the enclosing row, by its authored repeat id, for its row slots.
-type NestedRecord = ResumeKeyedRepeatRecord & {
+type NestedRecord = RowScopedRepeat & {
 	readonly locals?: () => object;
 	readonly authoredId?: string;
 	readonly rowOuter?: () => RowOuter;
@@ -90,7 +92,7 @@ export function wireNestedRepeats(
 				const parent = parentOf(record);
 				if (!parent) continue;
 				const item = () => findRepeatItemByKey(input.graph, enclosing, rowKey);
-				const instance = nestedInstance(input.graph, record, enclosing, item);
+				const instance = nestedInstance(input.graph, record, enclosing, rowKey, item);
 				const root = record.enclosingRow!.itemPath
 					? (roots.get(enclosing) ?? {
 							graphNodeId: enclosing.collectionGraphNodeId ?? '',
@@ -147,6 +149,7 @@ function nestedInstance(
 	graph: RuntimeGraph,
 	record: ResumeKeyedRepeatRecord,
 	enclosing: NestedRecord,
+	rowKey: unknown,
 	item: () => unknown,
 ): NestedRecord {
 	const { enclosingRow, ...own } = record;
@@ -156,6 +159,7 @@ function nestedInstance(
 			: '';
 	const instance: NestedRecord = {
 		...own,
+		rowPath: (enclosing.rowPath ?? '') + protocolRowSegment(rowKey),
 		locals: () => ({ ...enclosing.locals?.(), [enclosing.itemName]: item() }),
 		authoredId: record.id.startsWith(prefix) ? record.id.slice(prefix.length) : record.id,
 		rowOuter: () => ({
