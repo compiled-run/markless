@@ -2931,7 +2931,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'An event handler uses a prop whose value the browser cannot get back.',
 		printed: [
-			'MARKLESS_CAPTURE_OPAQUE_PROP: "<componentName>" <absentAction> its prop "<propName>" in `<absentSource>` without checking that it was passed, and this <<componentName>> passes no "<propName>", so that code would throw when it runs in the browser.',
+			'MARKLESS_CAPTURE_OPAQUE_PROP: "<componentName>" <absentAction> its prop "<propName>" in `<absentSource>`<absentAt> without checking that it was passed, and this <<componentName>> passes no "<propName>", so that code would throw when it runs in the browser.',
 			'A prop the caller leaves out is undefined. Reading it, or checking it, works; calling it or reading a field of it throws unless the code checks first that it is there.',
 			'Read it optionally as <propName>?.…, guard it with if (<propName>) or <propName> ? … : …, or pass <propName> where "<componentName>" is rendered.',
 			'MARKLESS_CAPTURE_OPAQUE_PROP: Cannot bind lazy symbol "<symbolId>" on component edge "<componentEdgeId>" because prop "<propName>" for "<componentName>" is the runtime expression "<expression>". "<componentName>" reads it as `<source>` in <lazySymbolRole>, which runs in the browser after resume, and this value has no route there.',

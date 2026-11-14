@@ -112,6 +112,6 @@ export function App() @{
 	const diagnostic = opaquePropDiagnostics(result)[0];
 	expect(diagnostic?.propName).toBe('onChange');
 	expect(diagnostic?.message).toContain(
-		'calls its prop "onChange" in `onChange((event.target as HTMLInputElement).value)` without checking',
+		'calls its prop "onChange" in `onChange((event.target as HTMLInputElement).value)` (src/UnconditionalWithTypes.tsrx:3:41) without checking',
 	);
 });

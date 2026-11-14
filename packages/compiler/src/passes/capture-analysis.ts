@@ -15,6 +15,7 @@ import type {
 	SemanticSharedDefinition,
 	SemanticStateRead,
 	SemanticTemplateRead,
+	SourcePosition,
 	SourceSpan,
 } from '../artifacts.ts';
 import {
@@ -34,6 +35,7 @@ import { parseJavaScriptModule } from '../js-ast.ts';
 import { isClassInstanceValue } from './semantic-graph/collect-state.ts';
 import {
 	createSymbolSourceSemanticsReader,
+	type AbsentUse,
 	type SymbolSourceSemanticsReader,
 } from './capture-semantics.ts';
 import { sharedCallbackSlotGraphNodeId } from './semantic-graph/collect-shared.ts';
@@ -87,10 +89,12 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 	const localSymbols = input.symbolResolver.symbols.map((symbol) => {
 		const captureSlots = symbolCaptureSlots(symbol, input, semantics);
 		const firstOwner = captureSlots[0]?.owner;
+		const start = handlerSourceStart(symbol, input);
 		return {
 			symbolId: symbol.id,
 			kind: symbol.kind,
 			source: symbolSource(symbol),
+			...(start ? { sourceStart: start } : {}),
 			...('writes' in symbol && symbol.writes?.length
 				? {
 						graphWrites: symbol.writes.map(({ graphNodeId, path }) => ({
@@ -117,7 +121,7 @@ export function analyzeCaptures(input: CaptureAnalysisInput): CaptureAnalysisArt
 			captureSlots,
 		};
 	});
-	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input)];
+	const extractedSymbols = [...localSymbols, ...importedCaptureSymbols(input, semantics)];
 	const componentScopeBindings = componentScopeLocalBindings(input);
 	const diagnostics = [
 		...extractedSymbols.flatMap((symbol) => opaqueSlotDiagnostics(symbol, input)),
@@ -217,6 +221,7 @@ function symbolTouchesPageSpaceGraph(
 
 function importedCaptureSymbols(
 	input: CaptureAnalysisInput,
+	semantics: SymbolSourceSemanticsReader,
 ): CaptureAnalysisArtifact['extractedSymbols'] {
 	return (input.symbols ?? []).flatMap((symbol) => {
 		if (!symbol.captureSymbol || !symbol.componentEdgeId) return [];
@@ -237,7 +242,7 @@ function importedCaptureSymbols(
 		const absentUse = (slot: CaptureSlot) =>
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
 				? null
-				: unguardedAbsentUse(captureSymbol.source, slot.source);
+				: absentPropUse(semantics, captureSymbol.source, slot.source, slot.path, captureSymbol.sourceStart);
 		const absentPropIsUndefined = (slot: CaptureSlot) => absentUse(slot) === null;
 		// A widget-callback claim binds one thing: the slot the enclosing root
 		// answers. The child's own graph reads keep resolving in the child's
@@ -971,7 +976,7 @@ function captureSlot(
 	// a derive reads an absent prop as undefined, as an imported claim's derive already does.
 	const absentUse =
 		symbol.kind === 'event-handler' || symbol.kind === 'callback-prop'
-			? unguardedAbsentUse(symbolSource(symbol), read.source)
+			? absentPropUse(semantics, symbolSource(symbol), read.source, routePath, handlerSourceStart(symbol, input))
 			: null;
 	const absentPropIsUndefined =
 		symbol.kind === 'sync-computed-derive' ||
@@ -1349,7 +1354,7 @@ function readsOnlyRowLocals(
 
 const rowLocalReaders = new WeakMap<CaptureAnalysisInput, SymbolSourceSemanticsReader>();
 
-function withAbsentUse(route: CaptureSlotRoute, use: AbsentUse | null): CaptureSlotRoute {
+function withAbsentUse(route: CaptureSlotRoute, use: RefusedAbsentUse | null): CaptureSlotRoute {
 	return route.kind === 'unsupported-opaque' && route.absentProp && use !== null
 		? { ...route, absentUse: use }
 		: route;
@@ -1501,154 +1506,44 @@ function valueAtPath(value: unknown, path: ReadonlyArray<string>): unknown {
 	}, value);
 }
 
-type AbsentUse = { readonly kind: 'call' | 'member'; readonly source: string };
-
-const absentUseMemo = createSourceMemo<AbsentUse | null>(2048);
-
-// Where source calls `reference`, or reads a member of it, with no ?. or if/&&/?: guard: what would throw if it is missing.
-function unguardedAbsentUse(source: string, reference: string): AbsentUse | null {
-	return absentUseMemo(reference, source, () => computeUnguardedAbsentUse(source, reference));
+// What would throw in `source` if the prop that `read` reads were missing, matched on the prop's own root binding.
+function absentPropUse(
+	semantics: SymbolSourceSemanticsReader,
+	source: string,
+	read: string,
+	pathBelowProp: ReadonlyArray<string>,
+	sourceStart: SourcePosition | undefined,
+): RefusedAbsentUse | null {
+	const chain = semantics.read(read).memberChain;
+	const use: AbsentUse | null = chain
+		? semantics
+				.read(source)
+				.absentUse(chain.root, chain.keys.length > pathBelowProp.length ? chain.keys[0] : undefined)
+		: { kind: 'use', source: read, offset: 0 };
+	if (!use) return null;
+	const at = sourceStart ? positionWithin(sourceStart, source, use.offset) : undefined;
+	return { kind: use.kind, source: use.source, ...(at ? { at } : {}) };
 }
 
-function computeUnguardedAbsentUse(source: string, reference: string): AbsentUse | null {
-	const moduleSource = `const __marklessCaptureSource = ${source};`;
-	let ast: AnyNode;
-	try {
-		// Handler sources are TypeScript: parsing them as JavaScript throws on the
-		// first annotation or cast, and the catch would read that as unconditional.
-		ast = parseJavaScriptModule(moduleSource, CAPTURE_SOURCE_PARSE_FILENAME);
-	} catch {
-		return { kind: 'call', source: reference };
-	}
-	const isReference = (node: AnyNode | undefined): boolean =>
-		node !== undefined &&
-		typeof node.start === 'number' &&
-		typeof node.end === 'number' &&
-		moduleSource.slice(node.start, node.end) === reference;
-	const isUndefinedLiteral = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Identifier' && node.name === 'undefined';
-	const isNullLiteral = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Literal' && node.value === null && node.raw === 'null';
-	const isTypeofReference = (node: AnyNode | undefined): boolean =>
-		node?.type === 'UnaryExpression' &&
-		node.operator === 'typeof' &&
-		isReference(asNode(node.argument));
-	const isUndefinedString = (node: AnyNode | undefined): boolean =>
-		node?.type === 'Literal' && node.value === 'undefined';
-	// A comparison pairs the reference (or `typeof reference`) with the value the
-	// side names: `onChange !== null` names null, which an absent prop is not.
-	const comparesWith = (
-		node: AnyNode,
-		operand: (side: AnyNode | undefined) => boolean,
-		value: (side: AnyNode | undefined) => boolean,
-	): boolean => {
-		const left = asNode(node.left);
-		const right = asNode(node.right);
-		return (operand(left) && value(right)) || (operand(right) && value(left));
-	};
-	// True when the test cannot be truthy while `reference` is absent, so its
-	// consequent never runs on an absent prop.
-	const provesPresent = (node: AnyNode | undefined): boolean => {
-		if (!node) return false;
-		if (isReference(node)) return true;
-		if (node.type === 'ChainExpression') return provesPresent(asNode(node.expression));
-		if (node.type === 'UnaryExpression' && node.operator === '!')
-			return provesAbsent(asNode(node.argument));
-		if (node.type === 'LogicalExpression' && node.operator === '&&')
-			return provesPresent(asNode(node.left)) || provesPresent(asNode(node.right));
-		if (node.type !== 'BinaryExpression') return false;
-		if (node.operator === '!==')
-			return (
-				comparesWith(node, isReference, isUndefinedLiteral) ||
-				comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		if (node.operator === '!=')
-			return (
-				comparesWith(
-					node,
-					isReference,
-					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
-				) || comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		return false;
-	};
-	// The mirror: the test cannot be falsy while `reference` is absent, so its
-	// alternate never runs on an absent prop.
-	const provesAbsent = (node: AnyNode | undefined): boolean => {
-		if (!node) return false;
-		if (node.type === 'ChainExpression') return provesAbsent(asNode(node.expression));
-		if (node.type === 'UnaryExpression' && node.operator === '!')
-			return provesPresent(asNode(node.argument));
-		if (node.type === 'LogicalExpression' && node.operator === '||')
-			return provesAbsent(asNode(node.left)) || provesAbsent(asNode(node.right));
-		if (node.type !== 'BinaryExpression') return false;
-		if (node.operator === '===')
-			return (
-				comparesWith(node, isReference, isUndefinedLiteral) ||
-				comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		if (node.operator === '==')
-			return (
-				comparesWith(
-					node,
-					isReference,
-					(side) => isUndefinedLiteral(side) || isNullLiteral(side),
-				) || comparesWith(node, isTypeofReference, isUndefinedString)
-			);
-		return false;
-	};
+type RefusedAbsentUse = NonNullable<Extract<CaptureSlotRoute, { readonly kind: 'unsupported-opaque' }>['absentUse']>;
 
-	let unguarded: AbsentUse | null = null;
-	const visit = (node: AnyNode, guarded: boolean): void => {
-		if (unguarded !== null) return;
-		const dereferenced =
-			node.type === 'CallExpression'
-				? asNode(node.callee)
-				: node.type === 'MemberExpression'
-					? asNode(node.object)
-					: undefined;
-		if (!guarded && node.optional !== true && isReference(dereferenced)) {
-			unguarded = {
-				kind: node.type === 'CallExpression' ? 'call' : 'member',
-				source: moduleSource.slice(node.start as number, node.end as number),
-			};
-			return;
-		}
-		if (node.type === 'IfStatement' || node.type === 'ConditionalExpression') {
-			const test = asNode(node.test);
-			visit(test ?? node, guarded);
-			const consequent = asNode(node.consequent);
-			if (consequent) visit(consequent, guarded || provesPresent(test));
-			const alternate = asNode(node.alternate);
-			if (alternate) visit(alternate, guarded || provesAbsent(test));
-			return;
-		}
-		// `??` and `||` run their right side when the left is absent/falsy, so the
-		// left proves nothing about presence there; only `&&` carries a guard.
-		if (
-			node.type === 'LogicalExpression' &&
-			(node.operator === '&&' || node.operator === '||' || node.operator === '??')
-		) {
-			const left = asNode(node.left);
-			if (left) visit(left, guarded);
-			const right = asNode(node.right);
-			if (right)
-				visit(
-					right,
-					guarded ||
-						(node.operator === '&&'
-							? provesPresent(left)
-							: node.operator === '||'
-								? provesAbsent(left)
-								: false),
-				);
-			return;
-		}
-		for (const child of childNodes(node)) visit(child, guarded);
+function positionWithin(start: SourcePosition, source: string, offset: number): SourcePosition {
+	const lines = source.slice(0, offset).split('\n');
+	return {
+		filename: start.filename,
+		line: start.line + lines.length - 1,
+		column: lines.length === 1 ? start.column + offset : lines.at(-1)!.length + 1,
 	};
-	visit(ast, false);
+}
 
-	return unguarded;
+// Only a handler whose source is its own authored text can be placed in its file.
+function handlerSourceStart(symbol: PlannedSymbol, input: CaptureAnalysisInput): SourcePosition | undefined {
+	if (symbol.kind !== 'event-handler' && symbol.kind !== 'callback-prop') return undefined;
+	const span = 'sourceSpan' in symbol ? symbol.sourceSpan : undefined;
+	const module = input.moduleSource;
+	if (!span || module === undefined || module.slice(span.start, span.end) !== symbolSource(symbol)) return undefined;
+	const lines = module.slice(0, span.start).split('\n');
+	return { filename: span.filename, line: lines.length, column: lines.at(-1)!.length + 1 };
 }
 
 function lazySymbolRole(kind: string | undefined): string {
@@ -1684,9 +1579,10 @@ function opaqueSlotDiagnostics(
 			if (reportedRoutes.has(routeKey)) return [];
 			reportedRoutes.add(routeKey);
 			const absentUse = route.absentProp ? route.absentUse : undefined;
-			const readsIntoAbsent = absentUse?.kind === 'member';
-			const absentAction = readsIntoAbsent ? 'reads into' : 'calls';
+			const callsAbsent = absentUse?.kind === 'call';
+			const absentAction = callsAbsent ? 'calls' : absentUse?.kind === 'member' ? 'reads into' : 'uses';
 			const absentSource = absentUse?.source ?? propName;
+			const absentAt = absentUse?.at ? ` (${absentUse.at.filename}:${absentUse.at.line}:${absentUse.at.column})` : '';
 			const edgeSpan = input.semanticGraph.componentEdges.find(
 				(edge) => edge.id === route.componentEdgeId,
 			)?.sourceSpan;
@@ -1698,7 +1594,7 @@ function opaqueSlotDiagnostics(
 					phase: CAPTURE_ANALYSIS_PHASE,
 					title: 'Lazy handler prop capture is not resumable',
 					message: route.absentProp
-						? `"${componentName}" ${absentAction} its prop "${propName}" in \`${absentSource}\` without checking that it was passed, and this <${componentName}> passes no "${propName}", so that code would throw when it runs in the browser.`
+						? `"${componentName}" ${absentAction} its prop "${propName}" in \`${absentSource}\`${absentAt} without checking that it was passed, and this <${componentName}> passes no "${propName}", so that code would throw when it runs in the browser.`
 						: `Cannot bind lazy symbol "${symbol.symbolId}" on component edge "${route.componentEdgeId}" because prop "${propName}" for "${componentName}" is the runtime expression "${route.expression}". "${componentName}" reads it as \`${slot.source}\` in ${lazySymbolRole(symbol.kind)}, which runs in the browser after resume, and this value has no route there.`,
 					why: route.unroutableHandler
 						? route.unroutableHandler.why
@@ -1718,7 +1614,7 @@ function opaqueSlotDiagnostics(
 							message: route.unroutableHandler
 								? route.unroutableHandler.rewrite
 								: route.absentProp
-									? readsIntoAbsent
+									? !callsAbsent
 										? `Read it optionally as ${propName}?.…, guard it with if (${propName}) or ${propName} ? … : …, or pass ${propName} where "${componentName}" is rendered.`
 										: `Call it optionally as ${propName}?.(…), guard it with if (${propName}), or pass ${propName} where "${componentName}" is rendered.`
 									: isEventAttribute(propName)
