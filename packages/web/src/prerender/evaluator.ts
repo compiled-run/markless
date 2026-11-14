@@ -127,6 +127,8 @@ export type PrerenderDataDefinition = {
 			readonly structureTokens?: ReadonlyArray<StructureToken>;
 		};
 	}>;
+	// The same-module edge chains that place this component, from a component nothing in the module places.
+	readonly placements?: ReadonlyArray<ReadonlyArray<{ readonly edgeId: string; readonly rows?: number }>>;
 	readonly propCellId?: string | null;
 	// The shared() element() handles a rendered instance of this component binds,
 	// published by the compiler so a widget's seed phase can file them before any
@@ -353,38 +355,44 @@ export async function renderPrerenderBoundary(
 	readonly armRecords: ResumeArmRecordSet;
 	readonly computed: ProtocolStatePayload['computed'];
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
-	readonly renderedBoundaryId?: string;
+	readonly moduleRootPath?: string;
 }> {
+	const drawnAt = pagePrefix(pageBoundaryId, boundaryId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
 		}
 		const freshCellIds = new Set<string>();
-		const { graph: moduleGraph, rootName } = boundaryModuleRoot(page, boundaryId, graph);
+		const ownerName = Object.keys(page.components).find(
+			(name) => !!page.components[name]?.boundaries?.some((boundary) => boundary.boundaryId === boundaryId),
+		);
+		const owner = branchOwnerPlacement(page, ownerName, graph);
 		const output = await evaluatePrerenderDataSurface(
 			page,
 			propsOrLoadSymbol,
-			moduleGraph,
+			graph,
 			true,
-			servedPageProps(moduleGraph),
+			servedPageProps(graph, page, ownerName),
 			{
 				cellIds: freshCellIds,
-				rootName,
+				rootName: owner && ownerName,
+				drawnAt,
+				...(owner && { owner }),
 				...(status === 'rejected' && { keepsShown: true as const }),
-				...(pageBoundaryId && {
-					settling: {
-						boundaryId,
-						ownerPath: pageBoundaryId.slice(0, pageBoundaryId.lastIndexOf(boundaryId)),
-					},
-				}),
+				...(pageBoundaryId && { settling: boundaryId }),
 			},
 		);
-		const settled = await settledBoundaryResult(output, boundaryId, pageBoundaryId);
+		const settled = await settledBoundaryResult(output, drawnAt + boundaryId, boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
-		return cells.length > 0 ? { ...settled, cells } : settled;
+		return { ...settled, ...(cells.length > 0 && { cells }), ...(owner && { moduleRootPath: owner.moduleRootPath }) };
 	}
 	const output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
-	return settledBoundaryResult(output, boundaryId, pageBoundaryId);
+	return settledBoundaryResult(output, pageBoundaryId ?? boundaryId, pageBoundaryId ?? boundaryId);
+}
+
+// Where the render root stands on the page: the page id of what it renders, less its own id.
+function pagePrefix(pageId: string | undefined, localId: string): string {
+	return pageId?.endsWith(localId) ? pageId.slice(0, pageId.length - localId.length) : '';
 }
 
 /**
@@ -399,6 +407,7 @@ export async function renderPrerenderBranch(
 	branchSiteId: string,
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
+	pageBranchId?: string,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
@@ -410,6 +419,7 @@ export async function renderPrerenderBranch(
 	let output: SsrRenderOutput;
 	let owner: BranchOwnerPlacement | undefined;
 	const freshCellIds = new Set<string>();
+	const drawnAt = isPrerenderDataSurface(page) ? pagePrefix(pageBranchId, branchSiteId) : '';
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
@@ -422,13 +432,13 @@ export async function renderPrerenderBranch(
 			graph,
 			true,
 			servedPageProps(graph, page, ownerName),
-			{ branchSiteId, cellIds: freshCellIds, ...(owner && { owner }) },
+			{ branchSiteId, cellIds: freshCellIds, drawnAt, ...(owner && { owner }) },
 		);
 	} else {
 		output = await renderBuiltPage(page, propsOrLoadSymbol, { prerenderSettle: { graph } });
 	}
 	const records = await prepareSsrResumeRecords(output);
-	const inArm = armBranchRange(output, records.view, branchSiteId);
+	const inArm = armBranchRange(output, records.view, branchSiteId, drawnAt);
 	const placed = owner ? { moduleRootPath: owner.moduleRootPath } : {};
 	if (inArm)
 		return {
@@ -439,7 +449,7 @@ export async function renderPrerenderBranch(
 		};
 	const arm = prerenderBranchArm({
 		structure: output.structure,
-		branchSiteId,
+		branchSiteId: drawnAt + branchSiteId,
 		// The structure's element ranges count the render's own elements; the
 		// prepared view has already shifted for the container root, so the range
 		// has to be read off the render's own locators.
@@ -476,10 +486,11 @@ function armBranchRange(
 	output: SsrRenderOutput,
 	view: Awaited<ReturnType<typeof prepareSsrResumeRecords>>['view'],
 	branchSiteId: string,
+	drawnAt: string,
 ): { readonly html: string; readonly armRecords: ResumeArmRecordSet } | undefined {
 	const anchors = (output.structure as SsrDataStructure | undefined)?.anchors ?? [];
 	const range = anchors.find(
-		(candidate) => candidate.kind === 'arm-branch' && candidate.id === branchSiteId,
+		(candidate) => candidate.kind === 'arm-branch' && candidate.id === drawnAt + branchSiteId,
 	);
 	if (!range) return undefined;
 	let owner: StructureAnchor | undefined;
@@ -491,13 +502,13 @@ function armBranchRange(
 			candidate.startIndex > (owner?.startIndex ?? -1)
 		)
 			owner = candidate;
-	const served = view.asyncBoundaries.find((boundary) => boundary.id === owner?.id)?.armRecords;
+	const served = view.asyncBoundaries.find((boundary) => drawnAt + boundary.id === owner?.id)?.armRecords;
 	if (!owner || !served || Array.isArray(served))
 		throw new Error(`MARKLESS_PRERENDER_BRANCH_MISSING: ${branchSiteId}`);
 	const set = served as ResumeArmRecordSet;
 	const arm = prerenderBranchArm({
 		structure: { anchors: [{ ...range, kind: 'branch' }] },
-		branchSiteId,
+		branchSiteId: range.id,
 		view: {
 			...set,
 			locators: set.locators.map((locator) => ({
@@ -527,7 +538,7 @@ function armBranchRange(
 	// Branches the range's markup holds flip inside it, so the commit wires them again.
 	const branches = (set.branches ?? []).filter(
 		(branch) =>
-			branch.id !== branchSiteId && range.html.includes(`<!--markless:arm-branch:${branch.id}-->`),
+			branch.id !== branchSiteId && range.html.includes(`<!--markless:arm-branch:${drawnAt + branch.id}-->`),
 	);
 	return {
 		...arm,
@@ -642,7 +653,9 @@ async function evaluatePrerenderDataSurface(
 		readonly branchSiteId?: string;
 		readonly owner?: BranchOwnerPlacement;
 		readonly cellIds: Set<string>;
-		readonly settling?: PrerenderSettling;
+		readonly settling?: string;
+		// Where the render root stands on the page, so its ids are spelled as the server spelled them.
+		readonly drawnAt?: string;
 		// A @catch drawn after shown @try content: the instances that content placed stay on the page.
 		readonly keepsShown?: true;
 	},
@@ -651,16 +664,21 @@ async function evaluatePrerenderDataSurface(
 		fresh?.rootName ?? branchOwnerName(surface, fresh?.branchSiteId) ?? surface.rootComponentName;
 	if (!rootName) throw new Error('MARKLESS_PRERENDER_DATA_ROOT_MISSING');
 	const ownerPath = fresh?.owner?.ownerPath;
+	const ownerModule: PrerenderBoundModule | undefined = ownerPath
+		? { rootPrefix: '', instanceReads: new Map(), ownerPath }
+		: undefined;
+	const placed = ownerModule && graph && fresh?.owner && composersAbove(fresh.owner, ownerModule, graph);
 	const sharedSeeds = marklessRosterPositionSeeds();
 	const mountedNow = new Set<string>();
 	const rendered = await evaluatePrerenderDataComponent({
 		surface,
 		componentName: rootName,
 		props,
-		idPrefix: '',
+		idPrefix: fresh?.drawnAt ?? '',
 		...(surface.elementIdScope ? { elementIdScope: surface.elementIdScope } : {}),
 		symbolPrefix: '',
-		...(ownerPath ? { module: { rootPrefix: '', instanceReads: new Map(), ownerPath } } : {}),
+		...(ownerModule && { module: ownerModule }),
+		...placed,
 		loadSymbol,
 		graph,
 		requireHtml,
@@ -692,26 +710,47 @@ async function evaluatePrerenderDataSurface(
 	);
 }
 
-// The settle symbol runs scoped to the boundary's owner; the render starts where the module root stands, or at the owner when another module composed it directly.
-function boundaryModuleRoot(
-	surface: PrerenderDataSurface,
-	boundaryId: string,
+// A render rooted at a flip's owner stands in for the components above it, each read where it stands, so bound ids rebind through their edges as in a whole render.
+function composersAbove(
+	owner: BranchOwnerPlacement,
+	module: PrerenderBoundModule,
 	graph: RuntimeGraph,
-): { readonly graph: RuntimeGraph; readonly rootName?: string | undefined } {
-	const ownerName = Object.keys(surface.components).find(
-		(name) =>
-			!!surface.components[name]?.boundaries?.some(
-				(boundary) => boundary.boundaryId === boundaryId,
-			),
+):
+	| {
+			readonly composer: PrerenderBoundComposer;
+			readonly boundSymbols: Readonly<Record<string, string>>;
+			readonly placedAbove: ReadonlyArray<Readonly<Record<string, string>>>;
+	  }
+	| undefined {
+	const page = pageGraphOf(graph);
+	let composer: PrerenderBoundComposer | undefined;
+	let boundSymbols: Readonly<Record<string, string>> | undefined;
+	const placedAbove: Array<Readonly<Record<string, string>>> = [];
+	let path = '';
+	for (const step of owner.above ?? []) {
+		const at = marklessInstanceScopedGraph(page, owner.moduleRootPath + path);
+		const read: PrerenderRead = (graphNodeId, readPath) => at.read(graphNodeId, readPath);
+		module.instanceReads.set(path, read);
+		composer = { symbolPrefix: '', read, module, ...(composer && boundSymbols && { bound: { boundSymbols, composer } }) };
+		boundSymbols = step.edge.boundSymbols ?? {};
+		placedAbove.unshift(boundSymbols);
+		path = step.path;
+	}
+	return composer && boundSymbols && { composer, boundSymbols, placedAbove };
+}
+
+// What an edge of the owner binds, carried on through the edges above the owner, as a whole render's composition would.
+function boundThroughAbove(
+	boundSymbols: Readonly<Record<string, string>> | undefined,
+	above: ReadonlyArray<Readonly<Record<string, string>>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+	if (!boundSymbols || !above) return boundSymbols;
+	return Object.fromEntries(
+		Object.entries(boundSymbols).map(([symbolId, bound]) => [
+			symbolId,
+			above.reduce((id, edge) => marklessReboundSymbolId(edge, id) ?? id, bound),
+		]),
 	);
-	const placement = branchOwnerPlacement(surface, ownerName, graph);
-	if (!placement || placement.ownerPath === '') return { graph, rootName: placement && ownerName };
-	return {
-		graph: marklessInstanceScopedGraph(
-			(graph as MarklessScopedGraph).marklessPageGraph ?? graph,
-			placement.moduleRootPath,
-		),
-	};
 }
 
 // A flip's symbol runs as the instance of the component holding the branch, not always the module root.
@@ -720,11 +759,9 @@ function branchOwnerName(
 	branchSiteId: string | undefined,
 ): string | undefined {
 	if (!branchSiteId) return undefined;
-	const holds = (name: string | null | undefined) =>
-		!!name &&
-		!!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId);
-	if (holds(surface.rootComponentName)) return undefined;
-	return Object.keys(surface.components).find(holds);
+	return Object.keys(surface.components).find(
+		(name) => !!surface.components[name]?.branches?.some((branch) => branch.branchSiteId === branchSiteId),
+	);
 }
 
 type RosterResumeHost = {
@@ -830,9 +867,7 @@ function marklessPlacedInstanceRead(
 	module: PrerenderBoundModule,
 	placed: string,
 ): PrerenderRead | undefined {
-	const owner = module.ownerPath;
-	const local = owner && placed.startsWith(owner) ? placed.slice(owner.length) : placed;
-	return module.instanceReads.get(module.rootPrefix + local);
+	return module.instanceReads.get(module.rootPrefix + placed);
 }
 
 // Per live graph, the component instances its last re-render placed on the page.
@@ -896,21 +931,16 @@ function instanceCellIds(
 	return ids;
 }
 
-// The boundary a settle renders, and the page path of the instance holding it.
-type PrerenderSettling = { readonly boundaryId: string; readonly ownerPath: string };
-
-// Only what renders inside the settling boundary can be new: everything else the render passes is on the page.
+// Only what renders inside the settling boundary, which the render root holds, can be new: everything else is on the page.
 function settlesInside(
-	settling: PrerenderSettling | undefined,
+	settling: string | undefined,
 	edge: { readonly asyncBoundaryId?: string },
 	parentPath: string,
 	enclosingBoundaryIds: ReadonlyArray<string> | undefined,
 ): boolean {
 	return (
 		!settling ||
-		((edge.asyncBoundaryId === settling.boundaryId ||
-			!!enclosingBoundaryIds?.includes(settling.boundaryId)) &&
-			(!parentPath || settling.ownerPath.endsWith(parentPath)))
+		(!parentPath && (edge.asyncBoundaryId === settling || !!enclosingBoundaryIds?.includes(settling)))
 	);
 }
 
@@ -938,7 +968,7 @@ function ownedStateCells(definition: PrerenderDataDefinition): ProtocolStatePayl
 	return definition.state.cells.filter((cell) => owned.size === 0 || owned.has(cell.graphNodeId));
 }
 
-// A module as one render placed it: its root's prefix and each evaluated instance's reader.
+// A module as one render placed it: its root's prefix and each instance's reader, keyed by that prefix and its path from the module root.
 type PrerenderBoundModule = {
 	readonly rootPrefix: string;
 	readonly instanceReads: Map<string, PrerenderRead>;
@@ -990,12 +1020,14 @@ export function evaluatePrerenderDataComponent(input: {
 	readonly freshInstance?: true;
 	readonly freshCellIds?: Set<string>;
 	readonly mountedInstances?: Set<string>;
-	readonly settling?: PrerenderSettling;
+	readonly settling?: string;
 	// The branch site whose arm this render brings in, forwarded to the renderer
 	// so it can mark that arm's subtree.
 	readonly freshBranchSiteId?: string;
 	// Set through the whole render when it brings in an escalated arm, whose commit feeds the props of what it places.
 	readonly placingBranchSiteId?: string;
+	// Set on a render rooted at a flip's owner: what each edge above it binds, the owner's own edge first.
+	readonly placedAbove?: ReadonlyArray<Readonly<Record<string, string>>>;
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1096,7 +1128,10 @@ export function evaluatePrerenderDataComponent(input: {
 		rootPrefix: input.symbolPrefix,
 		instanceReads: input.composer?.module?.instanceReads ?? new Map(),
 	};
-	ownModule.instanceReads.set(input.symbolPrefix, symbolRead);
+	ownModule.instanceReads.set(
+		ownModule.rootPrefix + (ownModule.ownerPath ?? '') + input.symbolPrefix.slice(ownModule.rootPrefix.length),
+		symbolRead,
+	);
 	// A part may derive where it stands in its family's roster. First paint has no
 	// DOM, so the answer is the order this widget instance emits its members.
 	// A row minted after resume is its own small render, with no page seeds to
@@ -1461,6 +1496,7 @@ export function evaluatePrerenderDataComponent(input: {
 								throw new Error(
 									`MARKLESS_PRERENDER_CHILD_MISSING: ${slot.componentEdgeId}`,
 								);
+							const boundSymbols = boundThroughAbove(edge.boundSymbols, input.placedAbove);
 							// One compile-time edge inside a keyed `@for` is many instances at render time.
 							const rowSegment = marklessRowPath(context) ?? '';
 							const hostPrefix = rowSegment + edge.hostPrefix;
@@ -1476,7 +1512,7 @@ export function evaluatePrerenderDataComponent(input: {
 									symbolPrefix,
 									graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 									...asyncArmPlacement(edge),
-									boundSymbols: edge.boundSymbols ?? {},
+									boundSymbols: boundSymbols ?? {},
 									callbackProps: {},
 								});
 								return materialized;
@@ -1617,7 +1653,7 @@ export function evaluatePrerenderDataComponent(input: {
 										symbolPrefix,
 										graphProps: runtimeEdgeProps(edge.props, definition.state.computed),
 										...asyncArmPlacement(edge),
-										boundSymbols: edge.boundSymbols ?? {},
+										boundSymbols: boundSymbols ?? {},
 										callbackProps: callbacks,
 										// Where this child's own composition puts the children written into it,
 										// so composition can register the widget a projected part sits beside.
@@ -1712,24 +1748,11 @@ function runnerError(
 			return runnerError(next, computed, visited);
 }
 
-// A helper component in the page's own module renders under its instance path, so its boundary is the one the page id ends with.
-async function settledBoundaryResult(
-	output: SsrRenderOutput,
-	moduleBoundaryId: string,
-	pageBoundaryId?: string,
-) {
+async function settledBoundaryResult(output: SsrRenderOutput, anchorId: string, boundaryId: string) {
 	const records = await prepareSsrResumeRecords(output);
-	let anchor: NonNullable<SsrRenderOutput['structure']>['anchors'][number] | undefined;
-	for (const candidate of output.structure?.anchors ?? [])
-		if (
-			candidate.kind === 'async' &&
-			(candidate.id === moduleBoundaryId ||
-				(!!pageBoundaryId?.endsWith(candidate.id) &&
-					candidate.id.endsWith(`:${moduleBoundaryId}`))) &&
-			candidate.id.length > (anchor?.id.length ?? -1)
-		)
-			anchor = candidate;
-	const boundaryId = anchor?.id ?? moduleBoundaryId;
+	const anchor = output.structure?.anchors.find(
+		(candidate) => candidate.kind === 'async' && candidate.id === anchorId,
+	);
 	const boundary = records.view.asyncBoundaries.find((candidate) => candidate.id === boundaryId);
 	const armRecords = boundary?.armRecords;
 	if (!anchor || !armRecords || Array.isArray(armRecords)) {
@@ -1742,7 +1765,6 @@ async function settledBoundaryResult(
 		html: anchor.html,
 		armRecords: nested.length > 0 ? { ...set, asyncBoundaries: nested } : set,
 		computed: records.state.computed,
-		...(boundaryId !== moduleBoundaryId && { renderedBoundaryId: boundaryId }),
 	};
 }
 

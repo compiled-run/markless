@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from 'vitest';
+import { afterEach, beforeEach, expect, onTestFinished, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../../src/index.ts';
 import { derives, loads, resetLogs } from './api.ts';
 import ArmOpenPage from './arm-open-page.tsrx';
@@ -8,6 +8,9 @@ import PropArmOpenPage from './prop-arm-open-page.tsrx';
 import PropArmPage from './prop-arm-page.tsrx';
 import ForwardArmOpenPage from './forward-arm-open-page.tsrx';
 import ForwardArmPage from './forward-arm-page.tsrx';
+import NestedArmPage from './nested-arm-page.tsrx';
+import OtherPropArmPage from './other-prop-arm-page.tsrx';
+import TryArmPage from './try-arm-page.tsrx';
 
 // What every reader of one prop sees, in each place a component can stand: the text, an attribute, an @if test, a @for,
 // a sync and an async computed, a handler and a child's prop all follow the owner's value, and a closed arm runs nothing.
@@ -52,6 +55,20 @@ async function followsAndReads(first: number) {
 	await expect.poll(readers).toEqual(expected(first + 1, first + 1));
 }
 
+// What a known defect throws outside the test, kept so it fails the test rather than the run.
+function pageErrors(): unknown[] {
+	const errors: unknown[] = [];
+	const onError = (event: ErrorEvent) => (errors.push(event.error), event.preventDefault());
+	const onRejection = (event: PromiseRejectionEvent) => (errors.push(event.reason), event.preventDefault());
+	window.addEventListener('error', onError);
+	window.addEventListener('unhandledrejection', onRejection);
+	onTestFinished(() => {
+		window.removeEventListener('error', onError);
+		window.removeEventListener('unhandledrejection', onRejection);
+	});
+	return errors;
+}
+
 type Mode = 'CSR' | 'SSR';
 // renderSSR takes its component literally, so each page spells both mounts.
 const pages = {
@@ -62,6 +79,9 @@ const pages = {
 	forwardArmOpen: { CSR: () => render(ForwardArmOpenPage), SSR: () => renderSSR(ForwardArmOpenPage) },
 	propArm: { CSR: () => render(PropArmPage), SSR: () => renderSSR(PropArmPage) },
 	propArmOpen: { CSR: () => render(PropArmOpenPage), SSR: () => renderSSR(PropArmOpenPage) },
+	otherPropArm: { CSR: () => render(OtherPropArmPage), SSR: () => renderSSR(OtherPropArmPage) },
+	tryArm: { CSR: () => render(TryArmPage), SSR: () => renderSSR(TryArmPage) },
+	nestedArm: { CSR: () => render(NestedArmPage), SSR: () => renderSSR(NestedArmPage) },
 } satisfies Record<string, Record<Mode, () => Promise<unknown>>>;
 
 for (const mode of ['CSR', 'SSR'] as const) {
@@ -102,14 +122,13 @@ for (const mode of ['CSR', 'SSR'] as const) {
 			expect({ loads, derives }).toEqual(logs);
 		});
 
-	// Known defect, also with the fed copy: an arm the browser renders for an owner that shares its file with the component
-	// that placed it reads that component's values from its own render, where nothing stands, so a derive over the prop
-	// sees undefined. The served first render is right.
+	// An arm the browser renders for an owner that shares its file with the component that placed it reads that
+	// component's values where they stand on the page.
 	for (const [shape, page, openAtLoad] of [
 		['a click-opened arm whose owner shares a file with what placed it', pages.propArm, false],
 		['an arm open at load, reopened, whose owner shares a file with what placed it', pages.propArmOpen, true],
 	] as const)
-		test.fails(`${mode}: in ${shape}, every reader follows the prop`, async () => {
+		test(`${mode}: in ${shape}, every reader follows the prop`, async () => {
 			await page[mode]();
 			if (openAtLoad) {
 				click('[data-close]');
@@ -118,4 +137,34 @@ for (const mode of ['CSR', 'SSR'] as const) {
 			click('[data-open]');
 			await followsAndReads(1);
 		});
+
+	// Known defect: the owner's routed props are not on the page when its arm sits in its own @try, so the arm's DOM
+	// updates find no `prop:props` node and the arm never shows.
+	test.fails(`${mode}: in an arm inside its owner's @try, whose owner shares a file with what placed it, every reader follows the prop`, async () => {
+		const errors = pageErrors();
+		await pages.tryArm[mode]();
+		click('[data-open]');
+		await followsAndReads(1);
+		expect(errors).toEqual([]);
+	});
+
+	test(`${mode}: in an arm whose owner a second component of its file places, every reader follows the prop`, async () => {
+		const errors = pageErrors();
+		await pages.otherPropArm[mode]();
+		click('[data-open]');
+		await followsAndReads(1);
+		expect(errors).toEqual([]);
+	});
+
+	// Known defect: an arm drawn in the browser inside another one routes its owner's props only as far as the outer
+	// arm's owner, which its file placed, so committing it finds no `prop:props` node and its readers stop following.
+	test.fails(`${mode}: in an arm whose owner stands in another arm, both placed in one file, every reader follows the prop`, async () => {
+		const errors = pageErrors();
+		await pages.nestedArm[mode]();
+		click('[data-open-outer]');
+		await expect.poll(() => document.querySelector('[data-open]')).not.toBeNull();
+		click('[data-open]');
+		await followsAndReads(1);
+		expect(errors).toEqual([]);
+	});
 }

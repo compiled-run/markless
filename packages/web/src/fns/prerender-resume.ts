@@ -44,6 +44,7 @@ export async function renderPrerenderBranch(
 	branchSiteId: string,
 	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
 	propsOrLoadSymbol?: unknown,
+	pageBranchId?: string,
 ) {
 	const evaluator = await loadPrerenderEvaluator();
 	return evaluator.renderPrerenderBranch(
@@ -51,6 +52,7 @@ export async function renderPrerenderBranch(
 		branchSiteId,
 		graph as never,
 		propsOrLoadSymbol,
+		pageBranchId,
 	);
 }
 

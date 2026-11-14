@@ -184,6 +184,8 @@ function placedListSurface({ page, list, field }: Names) {
 					},
 				],
 				edges: [],
+				// The page places the list in one of its keyed rows.
+				placements: [[{ edgeId: 'component-edge:0', rows: 1 }]],
 				propCellId: 'prop:props',
 				readResidue: (residue: { readonly source: string }, context: { readonly read: (id: string) => unknown }) => {
 					if (residue.source !== 'attempt + 1') throw new Error(`MARKLESS_PRERENDER_RESIDUE_MISSING: ${residue.source}`);
