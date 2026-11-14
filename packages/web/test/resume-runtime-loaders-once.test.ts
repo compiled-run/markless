@@ -8,6 +8,7 @@ const built = vi.hoisted(() => ({
 	behaviors: 0,
 	branches: 0,
 	active: new Set<string>(),
+	failActivation: 0,
 	loaders: undefined as
 		| undefined
 		| {
@@ -34,6 +35,7 @@ vi.mock('../src/resume-behaviors.ts', () => ({
 		return {
 			activateBehaviors: async (hostNodeId: string) => {
 				await new Promise((resolve) => setTimeout(resolve, 0));
+				if (built.failActivation > 0 && built.failActivation--) throw new Error('activation failed');
 				built.active.add(hostNodeId);
 			},
 			addBehaviorRecords() {},
@@ -141,4 +143,16 @@ test('a branch runtime asked for twice at once builds its behaviour runtime once
 	await Promise.all([loadBranchRuntime(), loadBranchRuntime()]);
 	expect(built.behaviors).toBe(1);
 	expect(built.branches).toBe(1);
+});
+
+test('a startup arm behaviour that fails to activate is retried without wiring branches again', async () => {
+	built.events = built.behaviors = built.branches = 0;
+	built.active.clear();
+	built.failActivation = 1;
+	const { loadBranchRuntime } = await loaders();
+	await expect(loadBranchRuntime()).rejects.toThrow('activation failed');
+	const runtime = await loadBranchRuntime();
+	expect(built.branches).toBe(1);
+	expect(built.active.has('h-arm')).toBe(true);
+	expect(await loadBranchRuntime()).toBe(runtime);
 });

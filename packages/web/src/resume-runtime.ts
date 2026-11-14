@@ -258,39 +258,42 @@ export function createResumeRuntime(
 		return (branchLoad ??= loadOnce(buildBranchRuntime, () => (branchLoad = undefined)));
 	}
 	async function buildBranchRuntime(): Promise<BranchRuntime> {
-		const eventTypesBefore = new Set(eventTypes),
-			behaviors =
-				behaviorRuntime ??
-				(viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined);
-		const { wireBranches } = await import('./resume-branches.ts');
-		const eventWiring = await getEvents();
-		branchRuntime = wireBranches(
-			Object.assign(branchWiring, {
-				root: input.root,
-				graph: input.graph,
-				view: input.view,
-				loadSymbol: input.loadSymbol,
-				renderBranchHtml: input.renderBranchHtml,
-				elementsByHostId,
-				disposedHosts,
-				elementHandles,
-				events: eventWiring,
-				eventTypes,
-				storeContainerSubscription,
-				storeHostSubscription,
-				addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
-				commitArm: commitBoundaryArm,
-				prepareArmCommit: prepareBoundaryArmCommit,
-				registerServedArmRecords: registerServedBranchArmRecords,
-			}),
-		);
-		const listener = input.root.__marklessDelegatedDispatch ? eventWiring.applySyncPolicy : dispatchCaptured;
-		for (const eventType of eventTypes) {
-			if (eventTypesBefore.has(eventType)) continue;
-			input.root.addEventListener?.(eventType, listener, { capture: true });
-			storeContainerSubscription(() =>
-				input.root.removeEventListener?.(eventType, listener, { capture: true }),
+		// Wired once; a retry after a failed startup activation only activates.
+		if (!branchRuntime) {
+			const eventTypesBefore = new Set(eventTypes),
+				behaviors =
+					behaviorRuntime ??
+					(viewHasBranchArmBehaviors(input.view) ? await loadBehaviorRuntime() : undefined);
+			const { wireBranches } = await import('./resume-branches.ts');
+			const eventWiring = await getEvents();
+			branchRuntime = wireBranches(
+				Object.assign(branchWiring, {
+					root: input.root,
+					graph: input.graph,
+					view: input.view,
+					loadSymbol: input.loadSymbol,
+					renderBranchHtml: input.renderBranchHtml,
+					elementsByHostId,
+					disposedHosts,
+					elementHandles,
+					events: eventWiring,
+					eventTypes,
+					storeContainerSubscription,
+					storeHostSubscription,
+					addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+					commitArm: commitBoundaryArm,
+					prepareArmCommit: prepareBoundaryArmCommit,
+					registerServedArmRecords: registerServedBranchArmRecords,
+				}),
 			);
+			const listener = input.root.__marklessDelegatedDispatch ? eventWiring.applySyncPolicy : dispatchCaptured;
+			for (const eventType of eventTypes) {
+				if (eventTypesBefore.has(eventType)) continue;
+				input.root.addEventListener?.(eventType, listener, { capture: true });
+				storeContainerSubscription(() =>
+					input.root.removeEventListener?.(eventType, listener, { capture: true }),
+				);
+			}
 		}
 		for (const hostNodeId of branchRuntime.startupArmBehaviorHostIds)
 			await behaviorRuntime?.activateBehaviors(hostNodeId, { flush: false });

@@ -1,152 +1,6 @@
 {
 	"changes": [
 		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"runtime/graph"
-			],
-			"delta": 330,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-async-wiring"
-			],
-			"delta": 810,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-branches"
-			],
-			"delta": -46,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime"
-			],
-			"delta": 409,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
-				"web/resume-runtime-start"
-			],
-			"delta": 91,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-csr",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 11,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph"
-			],
-			"delta": 330,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 810,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-branches"
-			],
-			"delta": -46,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime"
-			],
-			"delta": 409,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-runtime-start"
-			],
-			"delta": 91,
-			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxRuntimeChunkGzipBytes",
-				"measured"
-			],
-			"delta": 1,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 7,
-			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
 			"surface": "perf-guards",
 			"path": [
 				"loadWeight",
@@ -301,13 +155,159 @@
 			"date": "2026-11-13"
 		},
 		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 330,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 810,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": -46,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 467,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 91,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 18,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 330,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 810,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": -46,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 467,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 91,
+			"reason": "two @try blocks settling on one value load first and land their commits in one task; arm registrations at once share one branch runtime",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"date": "2026-11-13"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 10,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
+			"date": "2026-11-13"
+		},
+		{
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
 				"web/resume-runtime"
 			],
-			"delta": 409,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
+			"delta": 467,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
 			"date": "2026-11-13"
 		}
 	]
