@@ -27,7 +27,10 @@ import {
 	widgetRootComponents,
 } from './shared-seed-pass.ts';
 
-export { componentEdgeHostSegment, componentEdgeInstanceSegment } from '../../component-edge-instance.ts';
+export {
+	componentEdgeHostSegment,
+	componentEdgeInstanceSegment,
+} from '../../component-edge-instance.ts';
 
 /**
  * The prop a component edge hands its child the ids of the symbols its callback
@@ -102,7 +105,9 @@ function collectModuleScopeDeclarations(
 		const lowered = lowerModuleStorageDeclaration(declaration, source, storageImports);
 		// A carry splices declarations ahead of `(expression)`, which a semicolon-less one would call.
 		const sourceText =
-			declaration.type === 'VariableDeclaration' && lowered && !lowered.trimEnd().endsWith(';')
+			declaration.type === 'VariableDeclaration' &&
+			lowered &&
+			!lowered.trimEnd().endsWith(';')
 				? `${lowered};`
 				: lowered;
 		return sourceText ? [{ names: declaredNames(declaration), source: sourceText }] : [];
@@ -167,7 +172,8 @@ function collectExportedSharedResolvingFunctions(
 	return asNodes(ast.body).flatMap((statement) => {
 		// A component is not a plain function: its body is where resolving a
 		// shared() definition is the supported, working shape.
-		if (statement.type !== 'ExportNamedDeclaration' || getComponentFunction(statement)) return [];
+		if (statement.type !== 'ExportNamedDeclaration' || getComponentFunction(statement))
+			return [];
 		const declaration = statement.declaration as AnyNode | undefined;
 		if (!declaration) return [];
 		const bodies = functionBodiesOf(declaration);
@@ -190,7 +196,8 @@ function functionBodiesOf(declaration: AnyNode): ReadonlyArray<AnyNode> {
 	if (declaration.type !== 'VariableDeclaration') return [];
 	return asNodes(declaration.declarations).flatMap((declarator) => {
 		const init = declarator.init as AnyNode | undefined;
-		if (init?.type !== 'ArrowFunctionExpression' && init?.type !== 'FunctionExpression') return [];
+		if (init?.type !== 'ArrowFunctionExpression' && init?.type !== 'FunctionExpression')
+			return [];
 		const body = init.body as AnyNode | undefined;
 		return body ? [body] : [];
 	});
@@ -238,7 +245,9 @@ function patternNames(pattern: AnyNode | undefined): string[] {
 	if (pattern.type === 'ArrayPattern') return asNodes(pattern.elements).flatMap(patternNames);
 	if (pattern.type === 'ObjectPattern') {
 		return asNodes(pattern.properties).flatMap((property) =>
-			patternNames((property.type === 'RestElement' ? property.argument : property.value) as AnyNode),
+			patternNames(
+				(property.type === 'RestElement' ? property.argument : property.value) as AnyNode,
+			),
 		);
 	}
 	return [];
@@ -404,7 +413,6 @@ export function hasPropDependentComputed(input: PublicRenderModuleInput): boolea
 	);
 }
 
-
 export function staticHostLocators(input: PublicRenderModuleInput) {
 	const rootChunkId = input.renderData.root?.templateId;
 	const rootChunk = input.renderData.chunks.find((chunk) => chunk.id === rootChunkId);
@@ -445,7 +453,9 @@ export function componentReferences(
 	for (const edge of componentEdges) {
 		if (
 			references.some(
-				(item) => componentReferenceKey(item.componentName, item.importSource) === edgeReferenceKey(edge),
+				(item) =>
+					componentReferenceKey(item.componentName, item.importSource) ===
+					edgeReferenceKey(edge),
 			)
 		)
 			continue;
@@ -601,11 +611,9 @@ export function edgeDeclaredComponentName(edge: {
 	if (!edge.importSource || !isTsrxComponentImport(edge.importSource)) return undefined;
 	if (isMemberTagName(edge.childComponentName))
 		return (
-			memberTagSurfacePath(
-				edge.childComponentName,
-				edge.importKind,
-				edge.importedName,
-			).at(-1) ?? undefined
+			memberTagSurfacePath(edge.childComponentName, edge.importKind, edge.importedName).at(
+				-1,
+			) ?? undefined
 		);
 	if (edge.importKind !== 'named' && edge.importKind !== 'namespace') return undefined;
 	return edge.importedName ?? edge.childComponentName;
@@ -704,7 +712,9 @@ export function componentPropNames(component: AnyNode | undefined): string[] {
 	return asNodes(param.properties).flatMap((property) => {
 		const authored = property.value as AnyNode | undefined;
 		const value =
-			authored?.type === 'AssignmentPattern' ? (authored.left as AnyNode | undefined) : authored;
+			authored?.type === 'AssignmentPattern'
+				? (authored.left as AnyNode | undefined)
+				: authored;
 		const key = property.key as AnyNode | undefined;
 		// A rest binding names the remaining props, so it is a render-scope name too.
 		const name =
@@ -825,11 +835,6 @@ export function componentOwnedStateNodes(
 		fallbacks
 			.get(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))
 			?.includes(componentName) ?? false;
-	const cellIndexes = input.protocolState.cells.flatMap((cell, index) =>
-		owner.cells[index] === componentName || carriesFallbackCells(cell.graphNodeId)
-			? [index]
-			: [],
-	);
 	// A page-space node the component only reads stays owned by the page, but its
 	// value must still seed this component's render — including a node it reaches
 	// only through a shared computed it derives.
@@ -842,6 +847,23 @@ export function componentOwnedStateNodes(
 			...repeatCollectionGraphNodeIds(ownChunks, input.renderData.repeats),
 		],
 		input.semanticGraph,
+	);
+	// The module root may not be on the page, so a component reading a node no widget roots carries it too.
+	const subtreeDefinitionIds = new Set(
+		input.semanticGraph.sharedDefinitions.flatMap((definition) =>
+			definition.scope === 'subtree' ? [definition.id] : [],
+		),
+	);
+	const readsPageNode = (graphNodeId: string) =>
+		isPageSpaceGraphNodeId(graphNodeId) &&
+		!subtreeDefinitionIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/'))) &&
+		readGraphNodeIds.has(graphNodeId);
+	const cellIndexes = input.protocolState.cells.flatMap((cell, index) =>
+		owner.cells[index] === componentName ||
+		carriesFallbackCells(cell.graphNodeId) ||
+		readsPageNode(cell.graphNodeId)
+			? [index]
+			: [],
 	);
 	// An adopted family's nodes are owned by no component here, which is what
 	// keeps a part from composing as a second root of it. A computed record
@@ -914,7 +936,9 @@ function graphReadClosure(
 		const graphNodeId = queue.pop();
 		if (graphNodeId === undefined || reached.has(graphNodeId)) continue;
 		reached.add(graphNodeId);
-		const binding = semanticGraph.graphBindings.find((candidate) => candidate.id === graphNodeId);
+		const binding = semanticGraph.graphBindings.find(
+			(candidate) => candidate.id === graphNodeId,
+		);
 		for (const dependency of binding?.dependencies ?? []) queue.push(dependency.graphNodeId);
 	}
 	return reached;
@@ -1047,7 +1071,9 @@ function resolvePayloadNodeOwners(
 	};
 	return {
 		cells: resolveOwners(input.protocolState.cells.map((cell) => cell.graphNodeId)),
-		computed: resolveOwners(input.protocolState.computed.map((computed) => computed.graphNodeId)),
+		computed: resolveOwners(
+			input.protocolState.computed.map((computed) => computed.graphNodeId),
+		),
 	};
 }
 
@@ -1071,7 +1097,10 @@ export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>)
 	const nestedIds = (slot: RenderDataChunk['slots'][number]): ReadonlyArray<string> => {
 		switch (slot.kind) {
 			case 'repeat':
-				return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
+				return [
+					slot.rowTemplateId,
+					...(slot.emptyTemplateId ? [slot.emptyTemplateId] : []),
+				];
 			case 'branch':
 				return slot.armTemplateIds;
 			case 'async':
@@ -1115,7 +1144,10 @@ export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>)
 }
 
 /** The view a component's SSR composition starts from: per-row copies only where its rows project elements. */
-export function ssrComposedPayloadView(input: PublicRenderModuleInput, componentName: string): string {
+export function ssrComposedPayloadView(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): string {
 	return projectsElementsIntoRows(
 		input.renderData.chunks.filter((chunk) => chunk.componentName === componentName),
 	)

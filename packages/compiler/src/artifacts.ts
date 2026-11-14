@@ -411,6 +411,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly sharedDefinitions?: ReadonlyArray<ModuleGraphInterfaceSharedDefinition>;
 	/** This module or one it imports serves async computeds; `held` when a reader pairs one with an input of its key. */
 	readonly asyncPlanes?: ModuleAsyncPlanes;
+	/** A component of this module renders an `onIdle` record, itself or through a component it renders, rows and arms included. */
+	readonly idleRecords?: true;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
@@ -441,6 +443,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
 			/** A handler this component or one it renders can reject past every @catch of its own, into its parent's. */
 			readonly rejectingHandlers?: true;
+			/** This component or one it renders has an `onIdle` record. */
+			readonly idleRecords?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**

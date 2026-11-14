@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 124,
+			"reason": "shared() cells kept once per page in composition; the docs playground's in-browser compiler gains the per-component onIdle fact and the import-binding lookup (#695)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 124,
+			"reason": "shared() cells kept once per page in composition; the docs playground's in-browser compiler gains the per-component onIdle fact and the import-binding lookup (#695)",
+			"date": "2026-11-14"
+		}
+	]
+}

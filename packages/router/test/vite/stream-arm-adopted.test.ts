@@ -26,6 +26,11 @@ beforeAll(async () => {
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
+	await symlink(
+		resolve(packagesRoot, 'router/node_modules/nitro'),
+		join(root, 'node_modules/nitro'),
+		'dir',
+	);
 	await buildFixture({
 		root,
 	});
@@ -46,7 +51,9 @@ async function splitAtArmCommit(upstream: string) {
 	let release = () => {};
 	const released = new Promise<void>((done) => (release = done));
 	const proxy: Server = createServer(async (request, response) => {
-		const answer = await fetch(`${upstream}${request.url}`, { headers: { accept: 'text/html' } });
+		const answer = await fetch(`${upstream}${request.url}`, {
+			headers: { accept: 'text/html' },
+		});
 		response.writeHead(answer.status, {
 			'content-type': answer.headers.get('content-type') ?? 'text/html',
 		});
@@ -96,20 +103,109 @@ test('a streamed arm the woken runtime adopted before the stream commits it show
 		await page.evaluate(
 			() =>
 				new Promise<void>((done) =>
-					(globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }).__mArm.idle(
-						() => setTimeout(done),
-					),
+					(
+						globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }
+					).__mArm.idle(() => setTimeout(done)),
 				),
 		);
 		await expect.poll(() => page.locator('.profile').getAttribute('data-attached')).toBe('yes');
 		expect(await page.locator('.profile').count()).toBe(1);
-		expect(await page.evaluate(() => (window as { browserRuns?: number }).browserRuns ?? 0)).toBe(
-			0,
-		);
+		expect(
+			await page.evaluate(() => (window as { browserRuns?: number }).browserRuns ?? 0),
+		).toBe(0);
 		expect(errors).toEqual([]);
 	} finally {
 		proxy.release();
 		await page.close();
 		await proxy.close();
+	}
+});
+
+async function openSettled(path: string) {
+	const page = await browser!.newPage();
+	const errors: string[] = [];
+	page.on('pageerror', (error) => errors.push(error.message));
+	await page.goto(`${server!.origin}${path}`, { waitUntil: 'load' });
+	// Every streamed arm has committed; no idle period is awaited, since a busy CI runner may never give one.
+	await page.evaluate(
+		() =>
+			new Promise<void>((done) =>
+				(
+					globalThis as unknown as { __mArm: { idle: (run: () => void) => void } }
+				).__mArm.idle(() => setTimeout(done)),
+			),
+	);
+	return { page, errors };
+}
+
+for (const path of ['/watched', '/watched-alias', '/watched-barrel'])
+	test(`an onIdle host inside a streamed arm runs once the runtime has started: ${path}`, async () => {
+		const { page, errors } = await openSettled(path);
+		try {
+			expect(await page.locator('.watched .value').textContent()).toBe('value idle');
+			await expect
+				.poll(async () => Number(await page.locator('.arm-ticks').textContent()), {
+					timeout: 3_000,
+				})
+				.toBeGreaterThan(1);
+			expect(errors).toEqual([]);
+		} finally {
+			await page.close();
+		}
+	});
+
+test('a shared() value read only inside a streamed arm repaints when written', async () => {
+	const { page, errors } = await openSettled('/shared');
+	try {
+		expect(await page.locator('.theme').textContent()).toBe('Theme paper');
+		await page.click('.flip');
+		await expect.poll(() => page.locator('.theme').textContent()).toBe('Theme ink');
+		await page.click('.flip');
+		await expect.poll(() => page.locator('.theme').textContent()).toBe('Theme paper');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a plain form inside a streamed arm is busy while it is sent in place', async () => {
+	const { page, errors } = await openSettled('/noted');
+	try {
+		await page.evaluate(() => {
+			const seen: Array<string | null> = ((
+				window as { busySeen?: Array<string | null> }
+			).busySeen = []);
+			const form = document.querySelector('.note-form')!;
+			new MutationObserver(() => seen.push(form.getAttribute('aria-busy'))).observe(form, {
+				attributeFilter: ['aria-busy'],
+			});
+		});
+		const title = `typed ${Date.now()}`;
+		await page.locator('.note-title').fill(title);
+		await page.click('.note-submit');
+		await expect
+			.poll(async () => (await fetch(`${server!.origin}/api/notes`)).json())
+			.toContain(title);
+		const busySeen = () =>
+			page.evaluate(() => (window as { busySeen?: Array<string | null> }).busySeen ?? []);
+		await expect.poll(async () => (await busySeen()).at(-1), { timeout: 5_000 }).toBeNull();
+		expect(await busySeen()).toContain('true');
+		expect(page.url()).toBe(`${server!.origin}/noted`);
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
+	}
+});
+
+test('a child with its own slower async value inside a streamed arm settles', async () => {
+	const { page, errors } = await openSettled('/nested');
+	try {
+		await expect.poll(() => page.locator('.outer .value').textContent()).toBe('value outer');
+		await expect
+			.poll(() => page.locator('.late').textContent(), { timeout: 5_000 })
+			.toBe('late answer');
+		expect(errors).toEqual([]);
+	} finally {
+		await page.close();
 	}
 });

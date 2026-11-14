@@ -1,4 +1,5 @@
 import type { ModuleGraphInterfaceArtifact, SemanticGraphArtifact } from '../../artifacts.ts';
+import { importedEdgeComponent } from '../link/component-target.ts';
 
 type RejectionGraph = Pick<SemanticGraphArtifact, 'events' | 'componentEdges'>;
 type ImportedInterfaces = Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined;
@@ -51,8 +52,7 @@ function childRejects(
 ): boolean {
 	if (!edge.importSource) return rejecting.has(edge.childComponentName);
 	return (
-		importedModuleInterfaces?.[edge.importSource]?.render.components.find(
-			(component) => component.componentName === edge.childComponentName,
-		)?.rejectingHandlers === true
+		importedEdgeComponent(edge, importedModuleInterfaces?.[edge.importSource])
+			?.rejectingHandlers === true
 	);
 }

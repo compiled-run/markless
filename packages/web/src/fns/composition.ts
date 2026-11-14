@@ -569,7 +569,7 @@ function marklessComposedState<T extends ComposeStateDraft>(
 			),
 		),
 	]);
-	const cells = marklessMergedWidgetCells(
+	const cells = marklessMergedSharedCells(
 		[...(state.cells ?? []), ...childStates.flatMap((childState) => childState.cells ?? [])],
 		sharedDefinitions,
 	);
@@ -601,7 +601,9 @@ function marklessComposedState<T extends ComposeStateDraft>(
 					...(computed.deriveSymbolId
 						? { deriveSymbolId: marklessBoundSymbolId(child, computed.deriveSymbolId) }
 						: {}),
-					...(computed.dependencies?.some((read) => read.graphNodeId.includes('/element:')) && {
+					...(computed.dependencies?.some((read) =>
+						read.graphNodeId.includes('/element:'),
+					) && {
 						hostScope: child.hostPrefix + (computed.hostScope ?? ''),
 					}),
 				})),
@@ -642,25 +644,17 @@ function marklessDropCarriedWidgetCells(children: ReadonlyArray<ComposeChild>): 
 	}
 }
 
-// One widget instance is one graph, and every part of a family nothing seeds
-// carries the family's cells - so several children qualify onto the same node
-// id and the collapse must leave one. Only widget nodes are asked: two page-space
-// records spelling one id are somebody else's question and ride through as they
-// always have.
-function marklessMergedWidgetCells(
+// Several children may carry one shared() instance's cells; the composed state keeps one per node id.
+function marklessMergedSharedCells(
 	cells: ReadonlyArray<ComposeStateNode>,
 	sharedDefinitions: ReadonlyArray<ComposeSharedDefinition>,
 ): ReadonlyArray<ComposeStateNode> {
-	const widgetIds = new Set(
-		sharedDefinitions.flatMap((definition) =>
-			definition.scope === 'subtree' ? [definition.id] : [],
-		),
-	);
-	if (widgetIds.size === 0) return cells;
+	const definitionIds = new Set(sharedDefinitions.map((definition) => definition.id));
+	if (definitionIds.size === 0) return cells;
 	const taken = new Set<string>();
 	return cells.filter((cell) => {
 		const graphNodeId = cell.graphNodeId;
-		if (!widgetIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
+		if (!definitionIds.has(graphNodeId.slice(0, graphNodeId.lastIndexOf('/')))) return true;
 		if (taken.has(graphNodeId)) return false;
 		taken.add(graphNodeId);
 		return true;
