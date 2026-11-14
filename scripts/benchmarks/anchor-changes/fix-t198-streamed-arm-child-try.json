@@ -130,7 +130,7 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 20,
+			"delta": 26,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		},
@@ -142,7 +142,7 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 20,
+			"delta": 26,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		},
@@ -154,7 +154,7 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 20,
+			"delta": 26,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		},
@@ -166,7 +166,7 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 23,
+			"delta": 39,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		},
@@ -178,7 +178,7 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 23,
+			"delta": 39,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		},
@@ -190,7 +190,7 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 23,
+			"delta": 39,
 			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
 			"date": "2026-11-14"
 		}
