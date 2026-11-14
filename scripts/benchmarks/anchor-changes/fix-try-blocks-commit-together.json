@@ -3,150 +3,6 @@
 		{
 			"surface": "perf-guards",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"executedChars"
-			],
-			"delta": 225,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /",
-				"jsGzipBytes"
-			],
-			"delta": 107,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"executedChars"
-			],
-			"delta": 225,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /records",
-				"jsGzipBytes"
-			],
-			"delta": 107,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"executedChars"
-			],
-			"delta": 1,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"bench /settings",
-				"jsGzipBytes"
-			],
-			"delta": 107,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"executedChars"
-			],
-			"delta": -34,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 201,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"executedChars"
-			],
-			"delta": -1,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 201,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"executedChars"
-			],
-			"delta": -1,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 85,
-			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
 				"runtimeModules",
 				"web/resume-async-wiring"
 			],
@@ -309,6 +165,78 @@
 			"delta": 467,
 			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each and wire branches once",
 			"date": "2026-11-13"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 118,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 118,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 118,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 212,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 212,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 96,
+			"reason": "two @try blocks on one value land together; a failed block no longer drops other blocks' commits; runtime loaders keep one promise each; re-measured on CI run 43534993114 against main 78d29d044 (run 43531988522)",
+			"date": "2026-11-14"
 		}
 	]
 }
