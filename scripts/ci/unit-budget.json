@@ -2,8 +2,17 @@
 	"version": 1,
 	"platform": "linux-x64",
 	"margin": {
-		"cpu": 0.204,
+		"cpu": 0.118,
 		"rss": 0.079,
+		"models": {
+			"AMD EPYC 7763 64-Core Processor": 1.045,
+			"AMD EPYC 9V45 96-Core Processor": 0.89,
+			"AMD EPYC 9V74 80-Core Processor": 0.91,
+			"Intel(R) Xeon(R) 6973P-C": 1.113,
+			"Intel(R) Xeon(R) 6975P-C": 1.075,
+			"Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz": 0.925,
+			"INTEL(R) XEON(R) PLATINUM 8573C": 1.069
+		},
 		"samples": {
 			"1/3": [
 				{
@@ -12,7 +21,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 780.1,
 					"calibrationS": 1.233,
-					"work": 632.7,
+					"work": 695.3,
 					"peakRssMb": 4118,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				},
@@ -22,7 +31,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 1011.5,
 					"calibrationS": 1.341,
-					"work": 754.3,
+					"work": 721.8,
 					"peakRssMb": 3881,
 					"cpuModel": "AMD EPYC 7763 64-Core Processor"
 				},
@@ -32,7 +41,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 681.9,
 					"calibrationS": 1.143,
-					"work": 596.6,
+					"work": 670.3,
 					"peakRssMb": 4129,
 					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
 				},
@@ -42,7 +51,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 806.9,
 					"calibrationS": 1.3,
-					"work": 620.7,
+					"work": 682.1,
 					"peakRssMb": 4448,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				}
@@ -54,7 +63,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 648.7,
 					"calibrationS": 1.283,
-					"work": 505.6,
+					"work": 555.6,
 					"peakRssMb": 4457,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				},
@@ -64,7 +73,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 545.8,
 					"calibrationS": 1.064,
-					"work": 513,
+					"work": 576.4,
 					"peakRssMb": 4465,
 					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
 				},
@@ -74,7 +83,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 637.2,
 					"calibrationS": 1.213,
-					"work": 525.3,
+					"work": 577.3,
 					"peakRssMb": 4324,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				}
@@ -86,7 +95,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 1078.2,
 					"calibrationS": 1.356,
-					"work": 795.1,
+					"work": 760.9,
 					"peakRssMb": 4272,
 					"cpuModel": "AMD EPYC 7763 64-Core Processor"
 				},
@@ -96,7 +105,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 703.3,
 					"calibrationS": 1.003,
-					"work": 701.2,
+					"work": 787.9,
 					"peakRssMb": 3963,
 					"cpuModel": "AMD EPYC 9V45 96-Core Processor"
 				},
@@ -106,7 +115,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 848.1,
 					"calibrationS": 1.271,
-					"work": 667.3,
+					"work": 733.3,
 					"peakRssMb": 4378,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				},
@@ -116,7 +125,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 857.7,
 					"calibrationS": 1.404,
-					"work": 610.9,
+					"work": 671.3,
 					"peakRssMb": 4228,
 					"cpuModel": "AMD EPYC 9V74 80-Core Processor"
 				},
@@ -126,7 +135,7 @@
 					"sha": "eb049036d03cf07f35e1885db62a99e74df37a1a",
 					"cpuS": 859.7,
 					"calibrationS": 1.038,
-					"work": 828.2,
+					"work": 774.8,
 					"peakRssMb": 4354,
 					"cpuModel": "INTEL(R) XEON(R) PLATINUM 8573C"
 				}
@@ -134,27 +143,44 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.342,
-		"cpuS": 2774.9,
-		"peakRssMb": 4042,
+		"calibrationS": 1.236,
+		"cpuS": 2865.2,
+		"peakRssMb": 4171,
+		"models": {
+			"AMD EPYC 7763 64-Core Processor": 1.045,
+			"AMD EPYC 9V45 96-Core Processor": 0.89,
+			"AMD EPYC 9V74 80-Core Processor": 0.91,
+			"Intel(R) Xeon(R) 6973P-C": 1.113,
+			"Intel(R) Xeon(R) 6975P-C": 1.075,
+			"Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz": 0.925,
+			"INTEL(R) XEON(R) PLATINUM 8573C": 1.069
+		},
 		"shards": {
 			"1/3": {
-				"cpuS": 990.8,
-				"peakRssMb": 4027
+				"cpuS": 933.6,
+				"peakRssMb": 4013
 			},
 			"2/3": {
-				"cpuS": 814.9,
-				"peakRssMb": 4042
+				"cpuS": 865.1,
+				"peakRssMb": 4171
 			},
 			"3/3": {
-				"cpuS": 969.2,
-				"peakRssMb": 3281
+				"cpuS": 1066.5,
+				"peakRssMb": 3637
 			}
 		},
 		"runs": [
-			"43134571598"
+			"43576277596",
+			"43575255804",
+			"43573612566",
+			"43572505302",
+			"43572444143",
+			"43571715066",
+			"43557674440",
+			"43556033887",
+			"43551039878"
 		],
-		"sha": "64b23daf0637be44c7adf26fc4215ee0e67e5755"
+		"sha": "d61244a6926656459160673b94883424d14dc992"
 	},
 	"history": [
 		{
@@ -214,6 +240,172 @@
 				"43134571598"
 			],
 			"reason": "router and bundler test builds left the vitest workers (buildFixture child processes, one build at a time on a 16 GB runner): 12 green CI measurements per shard on this tree (run 43134571598), shard medians 4027/4042/3281 MB against 4078/4367/4338, and against the old 4367 MB anchor 18% of runs would fail as stale; CPU at the anchors' speed moved +6.6% in this run, +0.5% in run 43132031162 on the same tests and +2.7% on main's last 31 runs, inside the 20.4% band"
+		},
+		{
+			"date": "2026-11-14",
+			"change": "models",
+			"from": null,
+			"to": {
+				"AMD EPYC 7763 64-Core Processor": 1.045,
+				"AMD EPYC 9V45 96-Core Processor": 0.89,
+				"AMD EPYC 9V74 80-Core Processor": 0.91,
+				"Intel(R) Xeon(R) 6973P-C": 1.113,
+				"Intel(R) Xeon(R) 6975P-C": 1.075,
+				"Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz": 0.925,
+				"INTEL(R) XEON(R) PLATINUM 8573C": 1.069
+			},
+			"runs": [
+				"43505064984",
+				"43505090454",
+				"43505730688",
+				"43507290060",
+				"43507620255",
+				"43508280303",
+				"43508801433",
+				"43508881349",
+				"43509358184",
+				"43509724501",
+				"43509873897",
+				"43510319315",
+				"43510853342",
+				"43511070470",
+				"43511283444",
+				"43511663126",
+				"43511966072",
+				"43512154657",
+				"43515103189",
+				"43515106121",
+				"43515114990",
+				"43515706813",
+				"43516699144",
+				"43517057988",
+				"43517132617",
+				"43517700994",
+				"43517861372",
+				"43518593538",
+				"43518858492",
+				"43520117316",
+				"43520796211",
+				"43521785205",
+				"43523020482",
+				"43526589496",
+				"43527411951",
+				"43528054969",
+				"43530073552",
+				"43531910284",
+				"43531988522",
+				"43532060341",
+				"43533698475",
+				"43534993114",
+				"43537107103",
+				"43543535585",
+				"43545054377",
+				"43545061241",
+				"43545918225",
+				"43549683819",
+				"43551039878",
+				"43554211590",
+				"43554488790",
+				"43555013572",
+				"43556033887",
+				"43556321644",
+				"43556785824",
+				"43557674440",
+				"43557736677",
+				"43559822977",
+				"43562604163",
+				"43562640301",
+				"43564256856",
+				"43564295048",
+				"43564618133",
+				"43566067554",
+				"43566489080",
+				"43567753633",
+				"43568217811",
+				"43568825439",
+				"43569465085",
+				"43570404490",
+				"43570420767",
+				"43570589091",
+				"43571715066",
+				"43571774888",
+				"43572264965",
+				"43572444143",
+				"43572505302",
+				"43573612566",
+				"43573998024",
+				"43575133551",
+				"43575173359",
+				"43575255804",
+				"43576277596",
+				"43576325290",
+				"43577007171",
+				"43579771611",
+				"43580017043",
+				"43581684276",
+				"43582062729"
+			],
+			"reason": "262 green unit-shard measurements from 89 CI runs (2026-11-12 to 2026-11-14) on 7 CPU models: against each shard's median, CPU-s over calibration CPU-s read 7-11% high on Intel Xeon 6973P-C, 6975P-C and 8573C and 9-11% low on AMD EPYC 9V45 and 9V74, so an all-Intel run (43572444143) read +22% on an unchanged suite"
+		},
+		{
+			"date": "2026-11-14",
+			"change": "margin",
+			"from": {
+				"cpu": 0.204,
+				"rss": 0.079
+			},
+			"to": {
+				"cpu": 0.118,
+				"rss": 0.079
+			},
+			"runs": [
+				"42842994876"
+			],
+			"reason": "the same 12 green measurements of one test set as the 0.204 margin (main eb049036d, run 42842994876 attempts 1-10, AMD EPYC 7763, 9V45, 9V74 and Intel Xeon 8573C), with each CPU model's factor applied: the largest deviation from a shard's median drops from 20.4% to 11.8%"
+		},
+		{
+			"date": "2026-11-14",
+			"change": "anchors",
+			"from": {
+				"cpuS": 2774.9,
+				"peakRssMb": 4042
+			},
+			"to": {
+				"cpuS": 2865.2,
+				"peakRssMb": 4171
+			},
+			"runs": [
+				"43576277596",
+				"43575255804",
+				"43573612566",
+				"43572505302",
+				"43572444143",
+				"43571715066",
+				"43557674440",
+				"43556033887",
+				"43551039878"
+			],
+			"reason": "re-anchored with CPU-model factors from today's 9 green merge-queue runs (27 shard measurements): main's suite reads +9.5% against the 2026-11-12 anchor, as 214 test files changed since 64b23daf, growth the old 20.4% band absorbed; peak RSS median 4171 MB"
 		}
-	]
+	],
+	"models": {
+		"factors": {
+			"AMD EPYC 7763 64-Core Processor": 1.045,
+			"AMD EPYC 9V45 96-Core Processor": 0.89,
+			"AMD EPYC 9V74 80-Core Processor": 0.91,
+			"Intel(R) Xeon(R) 6973P-C": 1.113,
+			"Intel(R) Xeon(R) 6975P-C": 1.075,
+			"Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz": 0.925,
+			"INTEL(R) XEON(R) PLATINUM 8573C": 1.069
+		},
+		"samples": {
+			"AMD EPYC 7763 64-Core Processor": 68,
+			"AMD EPYC 9V45 96-Core Processor": 45,
+			"AMD EPYC 9V74 80-Core Processor": 90,
+			"Intel(R) Xeon(R) 6973P-C": 7,
+			"Intel(R) Xeon(R) 6975P-C": 17,
+			"Intel(R) Xeon(R) Platinum 8370C CPU @ 2.80GHz": 11,
+			"INTEL(R) XEON(R) PLATINUM 8573C": 24
+		}
+	}
 }
