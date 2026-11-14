@@ -1,12 +1,8 @@
 import type { RuntimeAsyncComputedNode } from './graph-async-load.ts';
 import type { RuntimeComputedNode } from './graph-computed.ts';
 import { readPath } from './graph-core.ts';
-import {
-	asyncCarriesValue,
-	asyncShownPaths,
-	isAsyncSnapshotMetaKey,
-	type DirtyPath,
-} from './graph-scheduler.ts';
+import { asyncCarriesValue, asyncShownPaths } from './graph-async-commit.ts';
+import { isAsyncSnapshotMetaKey, type DirtyPath } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncSnapshot,
 	RuntimeGraphRead,

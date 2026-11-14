@@ -1,5 +1,5 @@
 import type { RuntimeGraphAsyncSnapshot, RuntimeGraphRead } from './graph.ts';
-import { asyncCarriesValue, asyncShownPaths } from './graph-scheduler.ts';
+import { asyncCarriesValue, asyncShownPaths } from './graph-async-commit.ts';
 import {
 	NODE_BLOCKED,
 	NODE_DROPPED,
