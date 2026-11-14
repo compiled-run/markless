@@ -1,0 +1,76 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": -4,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": -4,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": -4,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -17,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -17,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -17,
+			"reason": "evaluator-drawn list records take the owner's page path, and the kernel override that forced the module root is gone",
+			"date": "2026-11-14"
+		}
+	]
+}
