@@ -17,6 +17,7 @@ type Shard = {
 	cpuS: number;
 	peakRssMb: number;
 	calibrationS?: number;
+	cpuModel?: string;
 	attempt?: number;
 	exitCode?: number;
 	platform?: string;
@@ -141,6 +142,63 @@ describe('check', () => {
 		expect(result.status).toBe(0);
 	});
 
+	test('divides by the CPU model factor: a model the calibration rates too fast reads at its true work', () => {
+		const models = { factors: { 'fast at calibration': 1.2 } };
+		const budget = {
+			...anchored,
+			models,
+			anchors: { ...anchored.anchors, models: models.factors },
+			margin: { ...anchored.margin, models: models.factors },
+		};
+		const result = check(budget, [
+			{ shard: '1/2', cpuS: 120, cpuModel: 'fast at calibration', peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+		]);
+		expect(result.output).toContain("total CPU at the anchors' speed: 300 CPU-s");
+		expect(result.output).toContain('model factor 1.2');
+		expect(result.output).toContain('no factor recorded for this CPU model');
+		expect(result.status).toBe(0);
+	});
+
+	test('a shard on a CPU model with no factor gets the band measured without factors, and a warning', () => {
+		const models = { unknownMargin: 0.2, factors: { 'test cpu': 1 } };
+		const budget = {
+			...anchored,
+			models,
+			anchors: { ...anchored.anchors, models: models.factors },
+			margin: { ...anchored.margin, models: models.factors },
+		};
+		const shards = (cpuModel: string) => [
+			{ shard: '1/2', cpuS: 100, peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 230, cpuModel, peakRssMb: 1500 },
+		];
+		// +10% overall: outside the 5% band, inside 1/3 * 5% + 2/3 * 20% = 15%.
+		const known = check(budget, shards('test cpu'));
+		expect(known.status).toBe(1);
+		expect(known.output).toContain('noise margin ±5%');
+		const unknown = check(budget, shards('new runner cpu'));
+		expect(unknown.status).toBe(0);
+		expect(unknown.output).toContain('noise margin ±15%');
+		expect(unknown.output).toContain(
+			'::warning::shard 2/2 ran on new runner cpu, a CPU model with no factor',
+		);
+		expect(unknown.output).toContain('unit-budget.mjs models --from');
+	});
+
+	test('fails when the CPU model factors changed after the anchors and the margin', () => {
+		const result = check({ ...anchored, models: { factors: { 'test cpu': 1.1 } } }, [
+			{ shard: '1/2', cpuS: 110, peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 220, peakRssMb: 1500 },
+		]);
+		expect(result.status).toBe(1);
+		expect(result.output).toContain(
+			'stale anchor: the CPU-model factors changed after the anchors were accepted',
+		);
+		expect(result.output).toContain(
+			'stale margin: the CPU-model factors changed after the margin was derived',
+		);
+	});
+
 	test('reads the latest attempt of a rerun shard', () => {
 		const result = check(anchored, [
 			{ shard: '1/2', cpuS: 150, peakRssMb: 2000, attempt: 1 },
@@ -246,6 +304,55 @@ describe('accept and margin', () => {
 		// 1/2 CPU: 110 against a median of 104 is +5.77%; RSS: 1000 against 1050 is -4.76%.
 		expect(budget.margin.cpu).toBe(0.058);
 		expect(budget.margin.rss).toBe(0.053);
+	});
+});
+
+describe('models', () => {
+	const sample = (shard: string, cpuModel: string, cpuS: number): Shard => ({
+		shard,
+		cpuModel,
+		cpuS,
+		peakRssMb: 1000,
+	});
+	// Model B spends 21% more CPU-s per calibration second than model A on the same shards.
+	const runs = Array.from({ length: 5 }, (_, index) => [
+		sample('1/2', 'A', 100 + index),
+		sample('2/2', 'B', 242 + index),
+		sample('1/2', 'B', 121 + index),
+		sample('2/2', 'A', 200 + index),
+	]);
+
+	test('fits each model factor from its samples against the shard medians', () => {
+		const path = budgetFile(anchored);
+		const args = runs.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		const result = run('models', '--budget', path, ...args, '--reason', 'two models');
+		expect(result.status).toBe(0);
+		const budget = JSON.parse(readFileSync(path, 'utf8'));
+		expect(budget.models.factors.B / budget.models.factors.A).toBeCloseTo(1.21, 2);
+		expect(budget.models.factors.A * budget.models.factors.B).toBeCloseTo(1, 2);
+		expect(budget.models.samples).toEqual({ A: 10, B: 10 });
+		expect(budget.history.at(-1)).toMatchObject({ change: 'models', reason: 'two models' });
+	});
+
+	test('accept and margin record the factors they were computed with', () => {
+		const path = budgetFile(anchored);
+		const args = runs.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		expect(run('models', '--budget', path, ...args, '--reason', 'two models').status).toBe(0);
+		expect(run('accept', '--budget', path, ...args, '--reason', 'anchors').status).toBe(0);
+		expect(run('margin', '--budget', path, ...args, '--reason', 'margin').status).toBe(0);
+		const budget = JSON.parse(readFileSync(path, 'utf8'));
+		expect(budget.anchors.models).toEqual(budget.models.factors);
+		expect(budget.margin.models).toEqual(budget.models.factors);
+	});
+
+	test('a model with too few samples gets no factor, and one model alone fits nothing', () => {
+		const path = budgetFile(anchored);
+		const few = runs
+			.slice(0, 2)
+			.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		const result = run('models', '--budget', path, ...few, '--reason', 'too few');
+		expect(result.status).toBe(2);
+		expect(result.output).toContain('at least two CPU models with 5 samples each');
 	});
 });
 

@@ -24,13 +24,15 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
        node scripts/ci/unit-budget.mjs check --measurements <dir> [--budget <file>]
        node scripts/ci/unit-budget.mjs accept --from <run id | dir>... --reason "<why>" [--budget <file>]
        node scripts/ci/unit-budget.mjs margin --from <run id | dir>... --reason "<why>" [--budget <file>]
+       node scripts/ci/unit-budget.mjs models --from <run id | dir>... --reason "<why>" [--budget <file>]
 
   measure  runs the command; with MARKLESS_UNIT_BUDGET_OUT set (CI) it writes the process tree's
            CPU-seconds and sampled peak RSS there, for MARKLESS_UNIT_BUDGET_SHARD (Linux only)
   check    fails when the shards' summed CPU-seconds or their largest peak RSS leaves the anchor's
            noise band: above it is over budget, below it is a stale anchor
   accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
-  margin   derives the noise band from repeated CI measurements of one test set`;
+  margin   derives the noise band from repeated CI measurements of one test set
+  models   derives each CPU model's factor: how far the calibration misjudges its speed on the unit suite`;
 
 const flags = (args, name) => {
 	const values = [];
@@ -358,10 +360,19 @@ function validate(measurements, budget) {
 
 const shardList = (shards) => [...shards].sort().join(', ');
 
+// The calibration ranks CPU models differently from the unit suite, so each recorded model carries a factor.
+const modelFactor = (budget, m) => budget.models?.factors?.[m.cpuModel] ?? 1;
+
+/** A shard's CPU-seconds divided by its runner's calibration and its CPU model's factor. */
+export const workOf = (budget, m) => m.cpuS / m.calibrationS / modelFactor(budget, m);
+
+const sameFactors = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
+
 /** The verdict for one run's shards against the budget file. */
 export function evaluate(budget, measurements) {
 	const latest = latestPerShard(measurements);
 	const failures = validate([...latest.values()], budget);
+	const warnings = [];
 	const lines = [];
 	const measured = [...latest.keys()];
 	if (!latest.size) failures.push('no unit budget measurements: every unit shard uploads one');
@@ -372,13 +383,21 @@ export function evaluate(budget, measurements) {
 		failures.push(
 			`stale anchor: the anchors cover shards [${shardList(Object.keys(budget.anchors.shards))}] but this run measured [${shardList(measured)}]; re-anchor from this run`,
 		);
+	if (budget.anchors && !sameFactors(budget.anchors.models, budget.models?.factors))
+		failures.push(
+			'stale anchor: the CPU-model factors changed after the anchors were accepted; re-anchor with `unit-budget.mjs accept`',
+		);
+	if (budget.margin && !sameFactors(budget.margin.models, budget.models?.factors))
+		failures.push(
+			'stale margin: the CPU-model factors changed after the margin was derived; re-derive it with `unit-budget.mjs margin`',
+		);
 	const speed = budget.anchors?.calibrationS ?? 1;
-	const scaled = (m) => (m.cpuS / m.calibrationS) * speed;
+	const scaled = (m) => workOf(budget, m) * speed;
 	const cpuS = round([...latest.values()].reduce((sum, m) => sum + scaled(m), 0));
 	const peakRssMb = Math.max(0, ...[...latest.values()].map((m) => m.peakRssMb));
 	for (const [shard, m] of [...latest].sort(([a], [b]) => a.localeCompare(b)))
 		lines.push(
-			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
+			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s, ${budget.models?.factors?.[m.cpuModel] ? `model factor ${modelFactor(budget, m)}` : 'no factor recorded for this CPU model'}), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
 		);
 	if (budget.margin && budget.anchors) {
 		const band = (name, value, anchor, margin, unit) => {
@@ -395,13 +414,29 @@ export function evaluate(budget, measurements) {
 					`stale anchor: ${name} ${change}. The suite got lighter, so the anchor no longer protects anything; re-anchor from this run`,
 				);
 		};
-		band(
-			"total CPU at the anchors' speed",
-			cpuS,
-			budget.anchors.cpuS,
-			budget.margin.cpu,
-			'CPU-s',
-		);
+		// A shard on a model with no factor gets the band measured before factors existed.
+		const unknown = budget.models
+			? [...latest].filter(([, m]) => !budget.models.factors?.[m.cpuModel])
+			: [];
+		const unknownMargin = budget.models?.unknownMargin ?? budget.margin.cpu;
+		const anchorOf = (shard) => budget.anchors.shards?.[shard]?.cpuS ?? 0;
+		const cpuMargin = unknown.length
+			? round(
+					[...latest.keys()].reduce(
+						(sum, shard) =>
+							sum +
+							anchorOf(shard) *
+								(unknown.some(([s]) => s === shard) ? unknownMargin : budget.margin.cpu),
+						0,
+					) / budget.anchors.cpuS,
+					3,
+				)
+			: budget.margin.cpu;
+		for (const [shard, m] of unknown)
+			warnings.push(
+				`shard ${shard} ran on ${m.cpuModel}, a CPU model with no factor, so its share of the CPU band is the ±${round(unknownMargin * 100)}% measured without factors. Once that model has 5 samples, refit with \`node scripts/ci/unit-budget.mjs models --from <run>... --reason "..."\`, then re-run \`margin\` and \`accept\``,
+			);
+		band("total CPU at the anchors' speed", cpuS, budget.anchors.cpuS, cpuMargin, 'CPU-s');
 		band(
 			'largest shard peak RSS',
 			peakRssMb,
@@ -413,6 +448,7 @@ export function evaluate(budget, measurements) {
 	const run = [...latest.values()][0]?.run;
 	return {
 		failures,
+		warnings,
 		cpuS,
 		peakRssMb,
 		report: [
@@ -480,7 +516,7 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 			.map(([shard, list]) => [
 				shard,
 				{
-					cpuS: round(median(list.map((m) => m.cpuS / m.calibrationS)) * speed),
+					cpuS: round(median(list.map((m) => workOf(budget, m))) * speed),
 					peakRssMb: Math.round(median(list.map((m) => m.peakRssMb))),
 				},
 			]),
@@ -489,6 +525,7 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 		calibrationS: speed,
 		cpuS: round(Object.values(shards).reduce((sum, s) => sum + s.cpuS, 0)),
 		peakRssMb: Math.max(...Object.values(shards).map((s) => s.peakRssMb)),
+		models: budget.models?.factors ?? {},
 		shards,
 		runs: runs.map((r) => r.source),
 		sha: runs.at(-1).measurements[0]?.sha ?? null,
@@ -528,7 +565,7 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 				sha: m.sha,
 				cpuS: m.cpuS,
 				calibrationS: m.calibrationS,
-				work: Math.round((m.cpuS / m.calibrationS) * 10) / 10,
+				work: Math.round(workOf(budget, m) * 10) / 10,
 				peakRssMb: m.peakRssMb,
 				cpuModel: m.cpuModel,
 			});
@@ -552,6 +589,7 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 	const margin = {
 		cpu: spread('work'),
 		rss: spread('peakRssMb'),
+		models: budget.models?.factors ?? {},
 		samples: Object.fromEntries([...perShard].sort(([a], [b]) => a.localeCompare(b))),
 	};
 	return {
@@ -565,6 +603,76 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 				from: budget.margin ? { cpu: budget.margin.cpu, rss: budget.margin.rss } : null,
 				to: { cpu: margin.cpu, rss: margin.rss },
 				runs: runs.map((r) => r.source),
+				reason: reason.trim(),
+			},
+		],
+	};
+}
+
+/**
+ * Each CPU model's factor: the median, over its samples, of a sample's work (CPU-s over calibration CPU-s)
+ * against its shard's median, refined as the shard medians move. Samples of different commits pool per
+ * shard: runners are assigned at random, so test changes between them spread over every model alike.
+ * Normalised so the factors' geometric mean is 1; a model with fewer than `minimumSamples` gets none.
+ */
+export function deriveModels(budget, runs, reason, date = today(), minimumSamples = 5) {
+	if (!reason?.trim())
+		throw new Error('models needs --reason "<one line: what the samples are>"');
+	const samples = [];
+	for (const { source, measurements } of runs) {
+		const green = measurements.filter((m) => m.exitCode === 0);
+		const problems = validate(green, budget);
+		if (problems.length) throw new Error(`run ${source}: ${problems.join('; ')}`);
+		samples.push(...green);
+	}
+	const counts = new Map();
+	for (const m of samples) counts.set(m.cpuModel, (counts.get(m.cpuModel) ?? 0) + 1);
+	const fitted = samples.filter((m) => counts.get(m.cpuModel) >= minimumSamples);
+	if (new Set(fitted.map((m) => m.cpuModel)).size < 2)
+		throw new Error(
+			`factors need at least two CPU models with ${minimumSamples} samples each; got ${JSON.stringify(Object.fromEntries(counts))}`,
+		);
+	const factors = new Map();
+	const work = (m) => m.cpuS / m.calibrationS / (factors.get(m.cpuModel) ?? 1);
+	for (let pass = 0; pass < 8; pass += 1) {
+		const shardMedian = new Map();
+		for (const shard of new Set(fitted.map((m) => m.shard)))
+			shardMedian.set(shard, median(fitted.filter((m) => m.shard === shard).map(work)));
+		const ratios = new Map();
+		for (const m of fitted) {
+			const list = ratios.get(m.cpuModel) ?? [];
+			list.push(work(m) / shardMedian.get(m.shard));
+			ratios.set(m.cpuModel, list);
+		}
+		for (const [model, list] of ratios)
+			factors.set(model, (factors.get(model) ?? 1) * median(list));
+	}
+	const mean = Math.exp(
+		[...factors.values()].reduce((sum, f) => sum + Math.log(f), 0) / factors.size,
+	);
+	const models = {
+		unknownMargin: budget.models?.unknownMargin ?? budget.margin?.cpu ?? null,
+		factors: Object.fromEntries(
+			[...factors]
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(([model, f]) => [model, Math.round((f / mean) * 1000) / 1000]),
+		),
+		samples: Object.fromEntries(
+			[...counts].sort(([a], [b]) => a.localeCompare(b)),
+		),
+	};
+	const sources = [...new Set(samples.map((m) => m.run).filter(Boolean))];
+	return {
+		...budget,
+		models,
+		history: [
+			...budget.history,
+			{
+				date,
+				change: 'models',
+				from: budget.models?.factors ?? null,
+				to: models.factors,
+				runs: sources,
 				reason: reason.trim(),
 			},
 		],
@@ -588,6 +696,7 @@ async function main(argv) {
 		const measurements = readMeasurements(dir);
 		const result = evaluate(budget, measurements);
 		console.log(result.report);
+		for (const warning of result.warnings) console.log(`::warning::${warning}`);
 		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) => a.localeCompare(b)))
 			console.log(describePeak(m));
 		if (!result.failures.length) {
@@ -598,7 +707,7 @@ async function main(argv) {
 		console.error(`To re-anchor after an intended or measured change: ${result.acceptCommand}`);
 		return 1;
 	}
-	if (command === 'accept' || command === 'margin') {
+	if (command === 'accept' || command === 'margin' || command === 'models') {
 		const sources = flags(args, '--from');
 		if (!sources.length) throw new Error(USAGE);
 		const reason = flags(args, '--reason')[0];
@@ -633,7 +742,9 @@ async function main(argv) {
 		const next =
 			command === 'accept'
 				? acceptAnchors(budget, runs, reason)
-				: deriveMargin(budget, runs, reason);
+				: command === 'models'
+					? deriveModels(budget, runs, reason)
+					: deriveMargin(budget, runs, reason);
 		writeBudget(budgetPath, next);
 		const entry = next.history.at(-1);
 		console.log(
