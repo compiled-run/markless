@@ -10,32 +10,123 @@ import StreamAnatomy from '../../components/figures/stream/stream-anatomy.tsrx';
 
 # Load data for a page
 
-<PageMeta time="2 min" assumes="async, routes" />
+<PageMeta time="4 min" assumes="async, routes, API routes" />
 
 <Subtitle text="A page loads its data with async values inside @try, and the slow part arrives later in the same response." terms="values" />
 
 ```tsrx title="pages/recipes/[name].tsrx"
-import { computed } from '@markless/core';
+import { computed, state } from '@markless/core';
 import type { PageProps } from '@markless/router';
-import { reviews } from '../../src/db.ts';
+import { loadReviews } from '../../src/reviews.ts';
 
 export default function Recipe({ params }: PageProps<{ name: string }>) @{
-	const list = computed(async () => reviews(params.name));
+	let page = state(1);
+	const reviews = computed(async () => loadReviews(params.name, page));
 
 	<main>
 		<h1>{params.name}</h1>
 		@try {
-			<p>{list.length} reviews</p>
+			@for (const review of reviews; key review.id) {
+				<p>{review.text}</p>
+			}
 		} @pending {
 			<p>Loading reviews…</p>
-		} @catch {
-			<p>Couldn't load the reviews.</p>
+		} @catch (error) {
+			<p>Couldn't load the reviews: {error.message}</p>
 		}
+		<button onClick={() => page++}>Older reviews</button>
 	</main>
 }
 ```
 
-**`computed(async …)`** asks the database for the reviews. **`@try`** shows them when they arrive, and **`@pending`** holds their place until then. There is no loader function.
+**`computed(async …)`** asks for the reviews. **`@try`** shows them when they arrive, and **`@pending`** holds their place until then. Press **Older reviews**, and `page` changes, so the reviews load again.
+
+## Keep the database on the server
+
+The reviews load on the server for the first visit. They load again in the browser when `page` changes. So the code an async value runs goes to the browser too.
+
+A database can't run in a browser. If the page imports one, the build stops with `MARKLESS_NODE_IN_BROWSER` and lists the imports that lead to it. So give the loading its own file, with one half for each side:
+
+```ts title="src/reviews.ts"
+export type Review = { id: number; text: string };
+
+export async function loadReviews(name: string, page: number): Promise<Review[]> {
+	if (import.meta.env.SSR) {
+		const { reviews } = await import('../server/db.ts');
+		const { signedIn } = await import('../server/session.ts');
+		if (!signedIn()) throw new Error('Sign in to read reviews.');
+		return reviews(name, page);
+	}
+	const response = await fetch(`/api/reviews/${encodeURIComponent(name)}?page=${page}`);
+	if (!response.ok) throw new Error(await response.text());
+	return response.json();
+}
+```
+
+- `import.meta.env.SSR` is `true` on the server and `false` in the browser. The build drops the half that can't run there.
+- Import server files with `await import(…)` inside the server half. An `import` at the top of the file goes to the browser too, and the build stops.
+- In the browser, the loader asks an [API route](/router/api-routes) for the same data.
+
+The API route answers from the same database:
+
+```ts title="api/reviews/[name].get.ts"
+import type { EndpointHttpContext } from '@markless/router';
+import { reviews } from '../../server/db.ts';
+import { signedIn } from '../../server/session.ts';
+
+export default async function list({ params, request, url }: EndpointHttpContext<{ name: string }>) {
+	if (!signedIn(request)) return new Response('Sign in to read reviews.', { status: 401 });
+	const page = Number(url.searchParams.get('page') ?? 1);
+	return Response.json(await reviews(params.name, page));
+}
+```
+
+Here `server/db.ts` stands in for your database:
+
+```ts title="server/db.ts"
+import { DatabaseSync } from 'node:sqlite';
+import type { Review } from '../src/reviews.ts';
+
+const db = new DatabaseSync(':memory:');
+db.exec('CREATE TABLE reviews (id INTEGER PRIMARY KEY, recipe TEXT, text TEXT)');
+const add = db.prepare('INSERT INTO reviews (recipe, text) VALUES (?, ?)');
+for (const text of ['Lovely and lemony', 'Too sweet for me', 'Made it twice', 'Needs more zest'])
+	add.run('lemon-cake', text);
+
+export async function reviews(recipe: string, page: number): Promise<Review[]> {
+	const query = db.prepare('SELECT id, text FROM reviews WHERE recipe = ? ORDER BY id LIMIT 2 OFFSET ?');
+	return query.all(recipe, (page - 1) * 2) as Review[];
+}
+```
+
+## Check who is asking
+
+A *cookie* is a small value the browser sends with every request to your site, such as a sign-in. In the browser, `fetch` to your own site sends the visitor's cookies by itself.
+
+On the server, the loader gets no request to read them from. Turn on the server's request context in `vite.config.ts`:
+
+```ts title="vite.config.ts"
+import { markless } from '@markless/core/vite';
+import { router } from '@markless/router/vite';
+import { defineConfig } from 'vite-plus';
+
+export default defineConfig({
+	plugins: [markless(), router()],
+	nitro: { experimental: { asyncContext: true } },
+});
+```
+
+Then `useRequest()` gives server code the request the page is answering, cookies included:
+
+```ts title="server/session.ts"
+import { useRequest } from 'nitro/context';
+
+export function signedIn(request: Request = useRequest()): boolean {
+	return request.headers.get('cookie')?.includes('session=') ?? false;
+}
+```
+
+The API route passes its own `request`. The page's server half calls `signedIn()` with nothing, and gets the page's request. Replace the cookie check with your own sign-in check.
 
 ## The slow part arrives in the same response
 
@@ -86,7 +177,7 @@ Keep in mind:
 
 - Data that is ready within a few milliseconds goes out with the rest, and `@pending` is never sent.
 - The router can't wait for all the data first. A slow `@try` always sends its `@pending` content first.
-- On the server, `fetch` needs a full address. Build it from the `url` prop: `new URL('/api/reviews', url.href)`.
+- On the server, a `fetch` to your own API route goes out without the visitor's cookies, so a route that checks who is asking refuses it. Call the server code directly, as `loadReviews` does.
 
 <Collapsible
 	sprite="star-badge"

@@ -1,19 +1,19 @@
-import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'pathe';
+import { dirname, join, resolve } from 'pathe';
+import { chromium } from '@playwright/test';
 import { afterAll, beforeAll, expect, test, vi } from 'vitest';
+import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 import { startBuiltServer } from '../../../../scripts/test-utils/built-server.ts';
-import {
-	FRAGMENT_REGION_END,
-	fragmentRequestUrl,
-} from '../../src/vite/fragment-navigation.ts';
+import { FRAGMENT_REGION_END, fragmentRequestUrl } from '../../src/vite/fragment-navigation.ts';
 import { buildFixture } from '../support/fixture-build.ts';
 
-// A built router app whose pages read the server-only `http` prop.
+// A built router app whose pages read the server-only `http` prop, plus the app files the "Load data for a page" docs show.
 
 vi.setConfig({ testTimeout: 30_000 });
 
 const packagesRoot = resolve(import.meta.dirname, '../../..');
+const dataDocs = resolve(packagesRoot, '../website/pages/router/data.mdx');
 const roots: string[] = [];
 let origin = '';
 let close: (() => void) | undefined;
@@ -30,12 +30,41 @@ async function fixtureCopy(): Promise<string> {
 		join(root, 'node_modules/nitro'),
 		'dir',
 	);
+	await symlink(
+		resolve(packagesRoot, '../node_modules/vite-plus'),
+		join(root, 'node_modules/vite-plus'),
+		'dir',
+	);
+	for (const [file, source] of await docsAppFiles()) {
+		await mkdir(dirname(join(root, file)), { recursive: true });
+		await writeFile(join(root, file), source);
+	}
 	return root;
+}
+
+// Every titled fence outside a <Code> playground on the docs page is a file of the app it describes.
+async function docsAppFiles(): Promise<Map<string, string>> {
+	const files = new Map<string, string>();
+	const lines = (await readFile(dataDocs, 'utf8')).split('\n');
+	let playground = false;
+	for (let at = 0; at < lines.length; at++) {
+		const line = lines[at]!.trim();
+		if (line.startsWith('<Code')) playground = true;
+		if (line === '</Code>') playground = false;
+		const title = /^```\w+ title="([^"]+)"$/.exec(line)?.[1];
+		if (!title || playground) continue;
+		const body: string[] = [];
+		for (at++; lines[at]!.trim() !== '```'; at++) body.push(lines[at]!);
+		expect(files.has(title), `two fences on the docs page are titled ${title}`).toBe(false);
+		files.set(title, `${body.join('\n')}\n`);
+	}
+	return files;
 }
 
 async function build(root: string): Promise<void> {
 	await buildFixture({
 		root,
+		configFile: join(root, 'vite.config.ts'),
 	});
 }
 
@@ -154,5 +183,47 @@ export default function Leak({ http }: PageProps) @{
 `,
 	);
 
-	await expect(build(root)).rejects.toThrow(/MARKLESS_SERVER_ONLY_PROP_BROWSER_READ/);
+	await expect(buildFixture({ root })).rejects.toThrow(/MARKLESS_SERVER_ONLY_PROP_BROWSER_READ/);
 }, 240_000);
+
+test("the page data pattern the docs show builds, and keeps the visitor's cookie on both sides", async () => {
+	expect([...(await docsAppFiles()).keys()].toSorted()).toEqual([
+		'api/reviews/[name].get.ts',
+		'pages/recipes/[name].tsrx',
+		'server/db.ts',
+		'server/session.ts',
+		'src/reviews.ts',
+		'vite.config.ts',
+	]);
+	const signedIn = await fetch(`${origin}/recipes/lemon-cake`, {
+		headers: { cookie: 'session=top-secret' },
+	});
+	const html = await signedIn.text();
+	expect(signedIn.status).toBe(200);
+	expect(html).toContain('<p>Lovely and lemony</p><p>Too sweet for me</p>');
+	expect(html).not.toContain('Sign in to read reviews.');
+	expect(await (await fetch(`${origin}/recipes/lemon-cake`)).text()).toContain(
+		'Sign in to read reviews.',
+	);
+	expect((await fetch(`${origin}/api/reviews/lemon-cake?page=2`)).status).toBe(401);
+
+	const browser = await launchBrowser(chromium);
+	try {
+		const context = await browser.newContext();
+		await context.addCookies([{ name: 'session', value: 'top-secret', url: origin }]);
+		const tab = await context.newPage();
+		const errors: string[] = [];
+		tab.on('pageerror', (error) => errors.push(String(error)));
+		await tab.goto(`${origin}/recipes/lemon-cake`);
+		await tab.getByText('Lovely and lemony').waitFor();
+		await tab.getByRole('button', { name: 'Older reviews' }).click();
+		await tab.getByText('Needs more zest').waitFor();
+		expect(await tab.locator('main p').allInnerTexts()).toEqual([
+			'Made it twice',
+			'Needs more zest',
+		]);
+		expect(errors).toEqual([]);
+	} finally {
+		await browser.close();
+	}
+});
