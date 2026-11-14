@@ -101,6 +101,98 @@
 			"delta": -66,
 			"reason": "served @try arms register in resume-runtime-start after the async wiring connects, so a streamed arm's nested @try blocks wire up; resume-runtime sheds the same code",
 			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": 535,
+			"reason": "served @try arms register here, after the async wiring connects, so a streamed arm's nested @try blocks wire up",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": -601,
+			"reason": "the served @try arm registration moved to resume-runtime-start",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 38,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 38,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 37,
+			"reason": "served @try arms register after the async wiring connects, with nested @try blocks a streamed arm carries",
+			"date": "2026-11-14"
 		}
 	]
 }
