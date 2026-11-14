@@ -233,7 +233,8 @@ export async function startResumeRuntime(input: {
 			await input.armRegistrationDeps(armRecords, input.servedBehaviors),
 			input.installArmEventType,
 			boundary,
-			{ armRecords, computed: runtimeInput.state?.computed },
+			// Its nested @try blocks define their runners from these, as a committed arm's do.
+			{ armRecords, ...(!!armRecords.asyncBoundaries?.length && { computed: runtimeInput.state?.computed }) },
 		);
 	}
 	for (const computed of runtimeInput.state?.computed ?? []) {
