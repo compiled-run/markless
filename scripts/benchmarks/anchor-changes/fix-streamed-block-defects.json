@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 29,
-			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
+			"delta": 106,
+			"reason": "shared() cells kept once per page in composition, and the docs playground's in-browser compiler gains the per-component onIdle fact (#695)",
 			"date": "2026-11-14"
 		},
 		{
@@ -20,20 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 29,
-			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": -1,
-			"reason": "composition keeps one record per shared() cell, now that a non-root reader also carries it (#695)",
+			"delta": 106,
+			"reason": "shared() cells kept once per page in composition, and the docs playground's in-browser compiler gains the per-component onIdle fact (#695)",
 			"date": "2026-11-14"
 		}
 	]
