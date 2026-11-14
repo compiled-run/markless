@@ -4,16 +4,6 @@
 			"surface": "perf-guards",
 			"path": [
 				"runtimeModules",
-				"web/fns/instance-scope"
-			],
-			"delta": 166,
-			"reason": "a scoped read of a prop an arm owner's routes name goes to the route, replacing the feed that copied it into the owner's cell (PR run 43509724501)",
-			"date": "2026-11-13"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"runtimeModules",
 				"web/fns/composition"
 			],
 			"delta": -745,
@@ -184,6 +174,16 @@
 			],
 			"delta": -120,
 			"reason": "A component in an arm reads its props where they live, with no copy fed while the arm shows (measured against #682's head by this fixture build)",
+			"date": "2026-11-14"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 294,
+			"reason": "an arm's symbols read their owner's props on the owner's routes, kept per instance until its markup leaves the document (PR run 43555013572 against #682's PR run 43554211590)",
 			"date": "2026-11-14"
 		}
 	]
