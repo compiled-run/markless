@@ -76,6 +76,8 @@ async function openIdle(path: string) {
 					: requestIdleCallback(() => done()),
 			),
 	);
+	// The page's own idle work runs in idle periods after this one: its resume modules, then link prefetches.
+	await expect.poll(() => routeModuleEvaluated(page), { timeout: 10_000 }).toBe(true);
 	// Idle-time link prefetches are the page's own, not the interaction's: wait until the network is quiet.
 	for (let seen = -1; seen !== requests.length; ) {
 		seen = requests.length;
