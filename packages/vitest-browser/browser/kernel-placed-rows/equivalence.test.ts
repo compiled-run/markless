@@ -291,6 +291,9 @@ for (const fixture of fixtures)
 		expect(kernel.moduleRootPath).toBe(fixture.chain.length > 1 ? MODULE_ROOT : undefined);
 		expect(committed(viaKernel, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
 		expect(committed(viaServed, paths.symbols)).toEqual(committed(viaEvaluator, paths.symbols));
+		// A row slot reads the owner's ids through this path, so it is the owner's page path, as a served list spells it.
+		for (const repeat of committed(viaEvaluator, paths.symbols).keyedRepeats)
+			expect(repeat.instancePath).toBe(paths.symbols);
 	});
 
 // An arm that writes the renamed prop into its own markup binds it to the @if; the kernel refuses and the evaluator draws it.

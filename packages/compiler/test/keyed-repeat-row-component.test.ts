@@ -178,7 +178,7 @@ export function App() @{
 });
 
 // Two children in one row is two graphs to place, and the record names one.
-test('a row wrapping two components ships neither half', async () => {
+test('a row wrapping two components renders whole, never half', async () => {
 	const view = await viewOf(`import { state } from '@markless/core';
 function Row({ label }) @{
 	<span>{label}</span>
@@ -188,7 +188,7 @@ export function App() @{
 	<ul>@for (const row of rows; key row.id) { <li><Row label={row.label} /><Row label={row.id} /></li> }</ul>
 }
 `);
-	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowComponent');
+	expect(view.keyedRepeats?.[0]?.rowComponent).toEqual({ componentName: 'App', rowChunkId: 'repeat:repeat:0:row' });
 	expect(view.keyedRepeats?.[0]).not.toHaveProperty('rowTemplate');
 });
 

@@ -91,8 +91,24 @@ export default function Page() @{
 	expect(updateModule(fixed)).not.toContain('armRecords');
 });
 
-test('a @try whose keyed rows hold two components still re-renders on refresh; rows the browser builds update in place', async () => {
+test('a @try whose keyed rows hold two components under a wrapper reading page state still re-renders on refresh; rows the browser builds update in place', async () => {
 	const twoChildren = await compile(`
+import { computed, state } from '@markless/core';
+async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
+function Tag({ row }: { row: { amount: number } }) @{ <em>{row.amount}</em> }
+function Note({ unit }: { unit: string }) @{ <small>{unit}</small> }
+export default function Page() @{
+	let unit = state('a');
+	const rows = computed(async () => await load(unit));
+	<main>
+		<button onClick={() => (unit = 'b')}>b</button>
+		@try {
+			<ol>@for (const row of rows; key row.sku) { <li title={unit}><Tag row={row} /><Note unit={unit} /></li> }</ol>
+		} @pending { <p>wait</p> }
+	</main>
+}`);
+	expect(twoChildren.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
+	const twoWrapped = await compile(`
 import { computed, state } from '@markless/core';
 async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
 function Tag({ row }: { row: { amount: number } }) @{ <em>{row.amount}</em> }
@@ -107,7 +123,7 @@ export default function Page() @{
 		} @pending { <p>wait</p> }
 	</main>
 }`);
-	expect(twoChildren.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBe(true);
+	expect(twoWrapped.protocolView.asyncBoundaries[0]?.rerendersOnRefresh).toBeUndefined();
 	const wrapped = await compile(`
 import { computed, state } from '@markless/core';
 async function load(unit: string) { return [{ sku: 'p', amount: unit === 'a' ? 1 : 2 }]; }
