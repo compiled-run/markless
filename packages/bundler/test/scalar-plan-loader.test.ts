@@ -4,6 +4,7 @@ import { emitScalarPlanLoader } from '../src/scalar-plan-loader.ts';
 import { marklessClient } from '../src/rolldown.ts';
 import { transformTsrxModule } from '../src/transform.ts';
 import { callBuildStart, callTransform } from './helpers.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 
 test('emits no namespace export for a leaf with no scalar action', () => {
 	expect(emitScalarPlanLoader([], [])).toBe('');
@@ -59,7 +60,9 @@ test('nested metadata and handler routes request the same child module variant',
 	const imports: string[] = [];
 	const read = new Function(
 		'loadModule',
+		'marklessSsrLoadSymbolRouteWhenLoaded',
 		parent.code
+			.replace(/^import .*;$/gm, '')
 			.replace(/export\s*\{[^}]+\};?/g, '')
 			.replace(/export /g, '')
 			.replace(/\bimport\(/g, 'loadModule(') +
@@ -68,7 +71,7 @@ test('nested metadata and handler routes request the same child module variant',
 	const loaders = read(async (id: string) => {
 		imports.push(id);
 		return { loadSymbol: () => 'handler', loadScalarActionPlan: () => ({ scope: '' }) };
-	});
+	}, marklessWhenLoaded);
 	expect(await loaders.loadSymbol('c0:symbol:0')).toBe('handler');
 	expect(await loaders.loadScalarActionPlan('c0:symbol:0')).toEqual({ scope: 'c0:' });
 	expect(imports).toEqual([

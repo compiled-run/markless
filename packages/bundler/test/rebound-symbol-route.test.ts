@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { expect, test } from 'vitest';
 import { markless } from '../src/vite/index.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 
 // The page composes RelayRow twice; each RelayRow hands its Row an arrow that calls
 // RelayRow's own `onPicked` prop. Row invokes that arrow by instance path, so the
@@ -41,6 +42,7 @@ function runRoute(source: string) {
 		'__mxImport',
 		'marklessLoadLocalSymbol',
 		'marklessSsrLoadSymbolRouteRebound',
+		'marklessSsrLoadSymbolRouteWhenLoaded',
 		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
 	)(
 		async (specifier: string) => ({
@@ -58,6 +60,7 @@ function runRoute(source: string) {
 			prefix,
 			loadUnbound,
 		}),
+		marklessWhenLoaded,
 	) as (symbolId: string) => unknown;
 	return { route, calls };
 }

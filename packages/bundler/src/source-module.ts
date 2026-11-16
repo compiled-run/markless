@@ -12,7 +12,7 @@ import { ASYNC_PROTOCOL_VERSION, hasLiveSharedDefinitions } from '@markless/seri
 import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
-import { emitSymbolRouteTable } from './rebound-symbol-route.ts';
+import { RESIDENT_LOAD_MODULE, emitSymbolRouteTable } from './rebound-symbol-route.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -2333,8 +2333,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return import(${singleQuoted(symbol.chunk)})`,
-			`		.then((mod) => ${readerName}(mod, ${JSON.stringify(symbol.exportName)}));`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(import(${singleQuoted(symbol.chunk)}), ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
@@ -2344,9 +2343,12 @@ function emitDirectSourceSymbolLoader(
 
 function emitSourceSymbolExportReader(name = 'readMarklessSourceSymbol'): string {
 	return [
-		`function ${name}(mod, exportName) {`,
-		'	mod.init__virtual_markless_symbol?.();',
-		'	return mod[exportName];',
+		`import { marklessWhenLoaded as ${name}WhenLoaded } from '${RESIDENT_LOAD_MODULE}';`,
+		`function ${name}(loading, exportName) {`,
+		`	return ${name}WhenLoaded(loading, (mod) => {`,
+		'		mod.init__virtual_markless_symbol?.();',
+		'		return mod[exportName];',
+		'	});',
 		'}',
 	].join('\n');
 }

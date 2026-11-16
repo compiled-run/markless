@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from '@markless/serializer';
 import { marklessWriteScalar } from '../../web/src/fns/write-scalar.ts';
 import { marklessUpdateText } from '../../web/src/fns/update-text.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 import {
 	marklessDecodeScalarCell,
 	marklessReadScalarCell,
@@ -479,6 +480,7 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 		'marklessScalarSpecializedError',
 		'marklessFindElementAtDomOrderIndex',
 		'loadModule',
+		'readMarklessSourceSymbolWhenLoaded',
 		source + '\nreturn resumeContainerEvent;',
 	)(
 		marklessWriteScalar,
@@ -488,6 +490,7 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 		marklessScalarSpecializedError,
 		(_root: unknown, index: number) => (index === 3 ? host : label),
 		async () => ({ onClick: () => undefined }),
+		marklessWhenLoaded,
 	);
 	for (let value = 1; value <= 2; value++) {
 		await resume({ root, event: { type: 'click', target: host } });

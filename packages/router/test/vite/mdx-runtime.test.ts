@@ -3,6 +3,7 @@ import {
 	composeMdxState,
 	composeMdxView,
 	loadMdxSymbol,
+	mdxSymbolLoader,
 	type MdxChild,
 	renderMdxChild,
 } from '../../src/vite/runtime/mdx-route.ts';
@@ -13,6 +14,7 @@ import {
 	STORAGE_PROTOCOL_VERSION,
 } from '../../../serializer/src/protocol-constants.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../serializer/src/storage-cookie.ts';
+import { PACK_RESIDENT } from '../../../web/src/fns/resident-load.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
 import { renderSsrData, type SsrRenderData } from '../../../web/src/ssr-data/renderer.ts';
 
@@ -136,6 +138,21 @@ describe('Markless Router MDX route runtime helpers', () => {
 		) as MdxTestSymbol;
 
 		expect(symbol({})).toBe('live:symbol:click');
+	});
+
+	it('answers an island symbol in the caller task once its module is on the page', async () => {
+		const island = { loadSymbol: (symbolId: string) => () => `island:${symbolId}` };
+		const resident = mdxSymbolLoader('m2:', () =>
+			Object.assign(Promise.resolve(island), { [PACK_RESIDENT]: () => island }),
+		);
+		const symbol = loadMdxSymbol('m2:symbol:0', [], [resident]) as MdxTestSymbol;
+		expect(typeof symbol).toBe('function');
+		expect(symbol({})).toBe('island:symbol:0');
+
+		const fetched = mdxSymbolLoader('m2:', () => Promise.resolve(island));
+		const loading = loadMdxSymbol('m2:symbol:0', [], [fetched]);
+		expect(loading).toBeInstanceOf(Promise);
+		expect(((await loading) as MdxTestSymbol)({})).toBe('island:symbol:0');
 	});
 });
 

@@ -695,7 +695,7 @@ let active = state(true);
 		expect(result.code).toContain('if (symbolId === "symbol:0")');
 		expect(result.code).toContain('if (symbolId === "symbol:7")');
 		expect(result.code).toContain('import("virtual:markless:symbol:');
-		expect(result.code).toMatch(/readMarklessSourceSymbol\(mod, "symbol_0_[a-z0-9]+"\)/);
+		expect(result.code).toMatch(/readMarklessSourceSymbol\(import\("[^"]+"\), "symbol_0_[a-z0-9]+"\)/);
 		expect(result.code).toContain('mod.init__virtual_markless_symbol?.();');
 		expect(result.code).not.toContain('name.startsWith("init__virtual_markless_symbol")');
 	});

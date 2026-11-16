@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
 import { transformTsrxModule } from '../src/transform.ts';
+import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 import { emitPrerenderTriggerGroupModule } from '../src/trigger-groups.ts';
 import type { SourceLazySymbolRoute } from '../src/source-module.ts';
 
@@ -44,6 +45,7 @@ function runRouteFunction(source: string): RouteHarness {
 	const route = new Function(
 		'__mxImport',
 		'marklessLoadLocalSymbol',
+		'marklessSsrLoadSymbolRouteWhenLoaded',
 		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
 	)(
 		async (specifier: string) => ({
@@ -61,6 +63,7 @@ function runRouteFunction(source: string): RouteHarness {
 			local.push(symbolId);
 			return `local ${symbolId}`;
 		},
+		marklessWhenLoaded,
 	) as (symbolId: string) => Promise<unknown>;
 	harness.route = route;
 	return { route, imported, local };

@@ -1,6 +1,7 @@
 import { parseSync } from 'rolldown/experimental';
 import { expect, test, vi } from 'vitest';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
+import { mdxSymbolLoader } from '../../src/vite/runtime/mdx-route.ts';
 
 type Input = { root: Record<string, unknown>; event: object; scalar?: boolean; logOnly?: boolean };
 type RuntimeModule = { resumeFromPayloadDocument(input: unknown): unknown };
@@ -23,8 +24,9 @@ async function entry(source: string, load: (specifier: string) => Promise<Runtim
 		'tryResumeMdxScalar',
 		'load',
 		'globalThis',
+		'mdxSymbolLoader',
 		`${executable}; return resumeContainerEvent;`,
-	)((input: Input) => input.scalar === true, load, {}) as (input: Input) => Promise<void>;
+	)((input: Input) => input.scalar === true, load, {}, mdxSymbolLoader) as (input: Input) => Promise<void>;
 }
 
 test.each([

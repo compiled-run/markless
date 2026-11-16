@@ -1,0 +1,166 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/resident-load"
+			],
+			"set": 378,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 53,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-ssr",
+				"web/fns/resident-load"
+			],
+			"set": 378,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 29,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-ssr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 29,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/resident-load"
+			],
+			"set": 378,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 54,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "one runtime module, web/fns/resident-load, lets symbol loaders read code already on the page in the caller's task",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 211,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 211,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 211,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 481,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 262,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/resident-load"
+			],
+			"set": 390,
+			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
+			"date": "2026-11-16"
+		}
+	]
+}

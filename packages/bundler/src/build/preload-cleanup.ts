@@ -36,9 +36,16 @@ const PACK_LOAD_BODY_RE = new RegExp(
 	'y',
 );
 
+// A same-chunk pack load: `resident(<loader>)`.
+const RESIDENT_LOAD_BODY_RE = new RegExp(
+	`[$A-Z_a-z][$\\w]*\\(\\s*${PACK_LOADER_PREFIX.replaceAll('$', '\\$')}[$\\w]+\\s*\\)`,
+	'y',
+);
+
 function startsWithPackLoad(code: string, start: number): boolean {
 	PACK_LOAD_BODY_RE.lastIndex = start;
-	return PACK_LOAD_BODY_RE.test(code);
+	RESIDENT_LOAD_BODY_RE.lastIndex = start;
+	return PACK_LOAD_BODY_RE.test(code) || RESIDENT_LOAD_BODY_RE.test(code);
 }
 
 const IMPORT_DECLARATION_CANDIDATE_RE = /\bimport\s*\{[\s\S]*?\}\s*from\s*["'][^"']+["'];?/g;

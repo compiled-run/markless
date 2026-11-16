@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { parseSync } from 'rolldown/experimental';
 import { protocolIslandSegment } from '../../../serializer/src/protocol-constants.ts';
 import { transformMdxRoute } from '../../src/vite/mdx.ts';
+import { mdxSymbolLoader } from '../../src/vite/runtime/mdx-route.ts';
 
 type Module = {
 	loadSymbol(id: string): unknown;
@@ -25,8 +26,9 @@ async function loaders(source: string, load: (specifier: string) => Promise<Modu
 	if (!expression) throw new Error('No generated symbol loader table');
 	return new Function(
 		'load',
+		'mdxSymbolLoader',
 		'return ' + code.slice(expression.start, expression.end).replace(/\bimport\(/g, 'load('),
-	)(load) as Loader[];
+	)(load, mdxSymbolLoader) as Loader[];
 }
 
 test.each([

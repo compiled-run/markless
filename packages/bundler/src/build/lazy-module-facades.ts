@@ -17,7 +17,12 @@ import {
 } from './chunk-ast.ts';
 import { RolldownMagicString, type Plugin } from 'rolldown';
 import { CHUNK_WORKER_MIN_CODE_LENGTH, runChunkTask } from './chunk-workers.ts';
-import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
+import {
+	PACK_LOAD,
+	PACK_LOADER_PREFIX,
+	PACK_RESIDENT,
+	PACK_RESIDENT_LOAD,
+} from './pack-loader-names.ts';
 import { rootRelativeId } from '../module-id.ts';
 import { withoutMachinePaths } from './machine-paths.ts';
 import { packOfPiece, startupPackOfLazy } from './route-pack-groups.ts';
@@ -618,7 +623,7 @@ export function collapseLazyModuleFacades(
 				end: node.end,
 				source:
 					facade.target === chunk && !awaiting.has(chunk.fileName)
-						? `(async()=>{await 0;return ${facade.loader}()})()`
+						? `${PACK_RESIDENT_LOAD}(${facade.loader})`
 						: lookup
 							? `${PACK_LOAD}(${specifier},"${facade.loader}",()=>import(${specifier}))`
 							: `import(${specifier}).then(module=>module.${facade.loader}())`,
@@ -637,6 +642,12 @@ export function collapseLazyModuleFacades(
 			...(additions.get(chunk.fileName) ?? []),
 			...(lookup && replacements.some(({ source }) => source.startsWith(PACK_LOAD))
 				? [PACK_LOAD_SOURCE]
+				: []),
+			...(replacements.some(
+				({ source }) =>
+					source.startsWith(PACK_RESIDENT_LOAD) || (lookup && source.startsWith(PACK_LOAD)),
+			)
+				? [PACK_RESIDENT_LOAD_SOURCE]
 				: []),
 			...(evaluated.size
 				? [
@@ -678,7 +689,9 @@ export function collapseLazyModuleFacades(
 export const PACK_REGISTRY = '__marklessPacks';
 export const PACK_REGISTRATION = `(globalThis.${PACK_REGISTRY}??={})[import.meta.url]`;
 const PACKED_NAME_PATTERN = /\$ml[\w$]*|__marklessNamespace[\w$]*/g;
-const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?Promise.resolve().then(pack[loader]):load().then(module=>module[loader]())}`;
+// The module still evaluates a microtask after the import() call, as a native import() would; only a caller that reads the loader runs it sooner.
+const PACK_RESIDENT_LOAD_SOURCE = `function ${PACK_RESIDENT_LOAD}(load){const loading=(async()=>{await 0;return load()})();loading.${PACK_RESIDENT}=load;return loading}`;
+const PACK_LOAD_SOURCE = `function ${PACK_LOAD}(specifier,loader,load){const pack=globalThis.${PACK_REGISTRY}?.[import.meta.resolve?.(specifier)];return pack?${PACK_RESIDENT_LOAD}(pack[loader]):load().then(module=>module[loader]())}`;
 
 // Evaluating a pack only declares its lazy module bodies. A route preloads the lazy targets of every pack it
 // reaches, so a target serving the same route, or shared, is evaluated a task after its importer and registers.

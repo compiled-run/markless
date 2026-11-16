@@ -153,7 +153,7 @@ type MdxPart =
 
 function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): string {
 	return [
-		`import { createMdxRenderDataSurface, loadMdxSymbol${resume ? ', tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader${resume ? ', tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
 		renderOverlayLoader(),
@@ -179,7 +179,7 @@ function renderOverlayLoader(): string {
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
-		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
@@ -767,7 +767,7 @@ function renderSymbolLoaders(components: ReadonlyArray<MdxComponent>): string {
 	return `[${components
 		.map(
 			(component) =>
-				`(() => { let module; const loadModule = () => module ??= import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}).catch(error => { module = undefined; throw error; }); return { prefix: ${JSON.stringify(component.prefix)}, loadSymbol(symbolId) { return loadModule().then((mod) => mod.loadSymbol(symbolId.slice(${component.prefix.length}))); }, loadScalarActionPlan(symbolId) { return loadModule().then(mod => mod.loadScalarActionPlan?.(symbolId.slice(${component.prefix.length}))).then(action => action && ({ ...action, scope: ${JSON.stringify(component.prefix)} + action.scope })); } }; })()`,
+				`mdxSymbolLoader(${JSON.stringify(component.prefix)}, () => import(${JSON.stringify(scalarPlanSourceReference(component.specifier))}))`,
 		)
 		.join(', ')}]`;
 }
