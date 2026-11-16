@@ -130,6 +130,26 @@ describe('compileFiles', () => {
 		expect(specifiers).toContain('/code/math.ts');
 	});
 
+	it('marks the modules the compiler wrote, so the frame runs them before the component mounts', async () => {
+		const outcome = await compileFiles(
+			[
+				{ name: 'Panel.tsrx', code: panel },
+				{ name: 'math.ts', code: math },
+			],
+			'test',
+			host,
+		);
+		if (!outcome.ok) throw new Error(JSON.stringify(outcome.diagnostics));
+		const loadedLater = outcome.modules.flatMap((module) =>
+			module.imports.filter((site) => site.dynamic && !site.specifier.startsWith('@markless/')),
+		);
+		expect(loadedLater.length).toBeGreaterThan(0);
+		for (const site of loadedLater)
+			expect(outcome.modules.find((module) => module.id === site.specifier)?.generated).toBe(true);
+		for (const id of ['/code/Panel.tsrx', '/code/math.ts'])
+			expect(outcome.modules.find((module) => module.id === id)?.generated).toBeUndefined();
+	});
+
 	it('reports a build error with the file, line and column it names', async () => {
 		const outcome = await compileFiles(
 			[{ name: 'Panel.tsrx', code: panel.replace('state(1)', '1') }],
