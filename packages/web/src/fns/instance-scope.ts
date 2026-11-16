@@ -1193,6 +1193,7 @@ function composedBoundaryArmRecords(
 		events: set.events.map((event) => ({
 			...prefixHost(event),
 			symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
+			...(event.writes && { writes: event.writes.map(node) }),
 		})),
 		domUpdates: set.domUpdates?.map((update) => ({
 			...prefixHost(qualifyRead(update)),
@@ -1226,6 +1227,7 @@ function composedBoundaryArmRecords(
 			rowEvents: repeat.rowEvents.map((event) => ({
 				...event,
 				symbolIds: event.symbolIds.map((symbolId) => symbol(symbolId)),
+				...(event.writes && { writes: event.writes.map(node) }),
 			})),
 		})),
 		...(set.branches
@@ -1251,6 +1253,7 @@ function composedBoundaryArmRecords(
 											symbolIds: (event.symbolIds ?? []).map(
 												(symbolId) => symbol(symbolId),
 											),
+											...(event.writes && { writes: event.writes.map(node) }),
 										})),
 										domUpdates: (arm.domUpdates ?? []).map((update) => ({
 											...qualifyLooseRead(update),

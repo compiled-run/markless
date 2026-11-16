@@ -5997,7 +5997,7 @@ test('keyed repeat rows render component invocations from item-scope props', asy
 	// Row events ship for resume dispatch.
 	const repeat = output.view.keyedRepeats?.[0];
 	expect(repeat?.rowEvents).toEqual([
-		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)] },
+		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)], writes: ['state:picked'] },
 	]);
 
 	// Locators stay dom-order exact across component-rendered row elements:
@@ -6199,7 +6199,7 @@ export function Board() @{
 	// The repeat parent (nav) must be locatable, or resume never wires row events.
 	const repeat = output.view.keyedRepeats?.[0];
 	expect(repeat?.rowEvents).toEqual([
-		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)] },
+		{ hostPath: [], eventName: 'click', symbolIds: [expect.any(String)], writes: ['state:tally'] },
 	]);
 	expect(locatorIds.has(repeat!.parentHostNodeId)).toBe(true);
 	// The tally text update must survive composition (same id space as locators).

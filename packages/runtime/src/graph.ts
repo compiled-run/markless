@@ -418,10 +418,10 @@ export type RuntimeGraph = {
 	 */
 	readonly settleWriteObservers?: () => Promise<void> | undefined;
 	/**
-	 * Settles the code every subscription's `run` still loads, so a write made after it
-	 * paints in the writer's own turn instead of waiting for that code. `undefined` when all of it is here.
+	 * Settles the code still loading for the subscriptions that read `graphNodeIds` or a computed derived
+	 * from them, so a write to those nodes paints in the writer's own turn. `undefined` when all of it is here.
 	 */
-	readonly settleSubscriptionCode?: () => Promise<void> | undefined;
+	readonly settleCodeWritesReach?: (graphNodeIds: ReadonlyArray<string>) => Promise<void> | undefined;
 	/** Whether a write is waiting on a flush that has not yet reached the journal. */
 	readonly hasPendingFlush?: () => boolean;
 	/** Keeps the scheduled flush back until each returned release has run once; `flush()` itself still runs. */
@@ -532,7 +532,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 	const subscriptionOrder = new Map<RuntimeGraphSubscription, number>();
 	let subscriptionSequence = 0;
 	const writeObservers: RuntimeGraphWriteObserver[] = [];
-	const codeStillLoading = new Set<RuntimeGraphSubscription>();
 	const journalListeners: DomJournalListener[] = [];
 	const dirtyPaths: DirtyPath[] = [];
 	const journal: DomJournalEntry[] = [];
@@ -731,7 +730,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			if (!bucket) subscriptionsByNode.set(subscription.graphNodeId, (bucket = []));
 			bucket.push(subscription);
 			subscriptionOrder.set(subscription, subscriptionSequence++);
-			if (subscription.code) codeStillLoading.add(subscription);
 		},
 		// Read by the async plane only; as methods they cost a page without async values nothing at load.
 		get reconcile() {
@@ -989,7 +987,6 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 				const index = bucket.indexOf(held);
 				if (index >= 0) bucket.splice(index, 1);
 				subscriptionOrder.delete(held);
-				codeStillLoading.delete(held);
 				held = undefined;
 			};
 		},
@@ -1047,14 +1044,22 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}
 			return pending && Promise.all(pending).then(() => undefined);
 		},
-		settleSubscriptionCode() {
+		settleCodeWritesReach(graphNodeIds) {
 			let pending: Promise<unknown>[] | undefined;
-			for (const subscription of codeStillLoading) {
-				const code = subscription.code!() as PromiseLike<unknown> | undefined;
-				if (typeof code?.then !== 'function') codeStillLoading.delete(subscription);
-				// A failed load is the flush's to report, from the pass that needs it.
-				else (pending ??= []).push(Promise.resolve(code).catch(() => undefined));
-			}
+			for (const [graphNodeId, bucket] of subscriptionsByNode)
+				if (
+					graphNodeIds.some(
+						(written) =>
+							written === graphNodeId ||
+							derivesFromWrite(graphNodeId, { graphNodeId: written, path: [] }, new Set()),
+					)
+				)
+					for (const subscription of bucket) {
+						const code = subscription.code?.() as PromiseLike<unknown> | undefined;
+						// A failed load is the flush's to report, from the pass that needs it.
+						if (typeof code?.then === 'function')
+							(pending ??= []).push(Promise.resolve(code).catch(() => undefined));
+					}
 			return pending && Promise.all(pending).then(() => undefined);
 		},
 		subscribeJournal(listener) {

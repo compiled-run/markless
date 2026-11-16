@@ -809,6 +809,9 @@ function appendMdxChildView(context: {
 			...event,
 			hostNodeId: context.child.hostPrefix + event.hostNodeId,
 			symbolIds: event.symbolIds.map((symbolId) => context.child.symbolPrefix + symbolId),
+			...(Array.isArray(event.writes) && {
+				writes: event.writes.map((graphNodeId) => islandScopedGraphNodeId(String(graphNodeId), island)),
+			}),
 		});
 	}
 	for (const update of childView.domUpdates ?? []) {
@@ -894,6 +897,8 @@ function islandScopedFamilyRecord(
 	for (const key of MDX_GRAPH_ID_KEYS)
 		if (typeof record[key] === 'string')
 			mapped[key] = islandScopedGraphNodeId(record[key] as string, island);
+	if (Array.isArray(record.writes))
+		mapped.writes = record.writes.map((graphNodeId) => islandScopedGraphNodeId(String(graphNodeId), island));
 	if (typeof record.handleId === 'string')
 		mapped.handleId = islandScopedHandleId(record.handleId, island);
 	for (const key of MDX_INSTANCE_PATH_KEYS)

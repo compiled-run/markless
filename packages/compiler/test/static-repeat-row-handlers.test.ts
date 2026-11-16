@@ -31,7 +31,7 @@ export function Tones() @{
 	const [repeat] = result.protocolView.keyedRepeats ?? [];
 	expect(repeat?.collectionGraphNodeId).toMatch(/^computed:/);
 	expect(repeat?.rowEvents).toEqual([
-		{ hostPath: [], eventName: 'click', symbolIds: ['symbol:0'] },
+		{ hostPath: [], eventName: 'click', symbolIds: ['symbol:0'], writes: ['state:picked'] },
 	]);
 	expect(result.semanticGraph.diagnostics).toEqual([]);
 });
@@ -54,7 +54,7 @@ export function Menu({ group }: { readonly group: Group }) @{
 	const [repeat] = result.protocolView.keyedRepeats ?? [];
 	expect(repeat?.collectionGraphNodeId).toMatch(/^computed:/);
 	expect(repeat?.rowEvents).toEqual([
-		{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:0'] },
+		{ hostPath: [0], eventName: 'click', symbolIds: ['symbol:0'], writes: ['state:chosen'] },
 	]);
 });
 
@@ -117,7 +117,7 @@ export function People({ storyId }: { readonly storyId: string }) @{
 	const [repeat] = result.protocolView.keyedRepeats ?? [];
 	expect(repeat?.collectionGraphNodeId).toMatch(/^computed:/);
 	expect(repeat?.rowEvents).toEqual([
-		{ hostPath: [], eventName: 'click', symbolIds: ['symbol:0'] },
+		{ hostPath: [], eventName: 'click', symbolIds: ['symbol:0'], writes: ['state:said'] },
 	]);
 	const derive = result.symbolModules.modules.find(
 		(module) => module.kind === 'sync-computed-derive' && module.source.includes('STORIES'),

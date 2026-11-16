@@ -790,6 +790,11 @@ export function createEventWiring(input: {
 		try {
 			await input.prepareRuntimeShared();
 			const { rowScope, locals } = await prepare();
+			// The record's writes name page nodes; a row-scoped run writes the row's own.
+			let writesReach =
+				record.writes && !rowScope?.length
+					? input.graph.settleCodeWritesReach?.(record.writes)
+					: undefined;
 			// A widget rooted inside this row files its handles under the row, which only the row-scoped qualifier reaches.
 			const runSymbol = async (
 				symbolId: string,
@@ -801,11 +806,13 @@ export function createEventWiring(input: {
 				const { graph } = context;
 				let quiet = false;
 				try {
-					const loading = input.loadSymbol(symbolId);
-					// A write paints in the writer's own turn only once the code every subscription runs has arrived.
-					const settling = input.graph.settleSubscriptionCode?.();
-					const symbol = await loading;
-					if (settling) await settling;
+					const symbol = await input.loadSymbol(symbolId);
+					// The update code the record's writes wake loads beside its first handler, so the first write paints in its own turn.
+					if (writesReach && !held) {
+						const settling = writesReach;
+						writesReach = undefined;
+						await settling;
+					}
 					quiet = context.quietTurn === true;
 					if (quiet) graph.markQuietStart?.();
 					marklessControlEditsRead(event);
@@ -825,7 +832,9 @@ export function createEventWiring(input: {
 					releaseFlush?.();
 					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
-						// The marks paint with the pass that paints the handler's writes before its first await, held as they are.
+						// The marks paint with the pass that paints the handler's writes before its first await, held as they are,
+						// so that pass waits for the hold's code.
+						const releasePass = graph.holdFlush?.();
 						const painted = graph.pendingFlush?.();
 						// A hold that fails to load or start leaves the submission unmarked, never failing it.
 						hold = loadSubmitHold()
@@ -838,7 +847,8 @@ export function createEventWiring(input: {
 									painted,
 								),
 							)
-							.catch(() => undefined);
+							.catch(() => undefined)
+							.finally(() => releasePass?.());
 					}
 					// A body that returns a promise owns what follows, which may be the navigation it started.
 					marklessEventHandled(input.root, event);

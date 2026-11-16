@@ -2,6 +2,7 @@ import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
 	type ProtocolRowTemplateSlotValue,
+	type ProtocolEventWriteFacts,
 	type ProtocolSubmitEventFacts,
 	type ProtocolViewPayload,
 } from '@markless/serializer';
@@ -114,6 +115,7 @@ export function createProtocolViewPayload(
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 					...submitEventFacts(input, event),
+					...eventWriteFacts(input, event),
 				})),
 			forwarded.events,
 		),
@@ -569,6 +571,7 @@ function resumableKeyedRepeats(input: ProtocolViewPayloadInput) {
 			// first with no synchronous preventDefault.
 			...(event.syncPolicy ? { syncPolicy: event.syncPolicy } : {}),
 			...submitEventFacts(input, event),
+			...eventWriteFacts(input, event),
 		});
 		const events = oneRecordPerEvent(input.payloadArena.view.events);
 		const indexName = input.semanticGraph?.keyedRepeats.find(
@@ -1310,6 +1313,7 @@ function wiredArmRecordSet(
 				syncPolicy: event.syncPolicy,
 				symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 				...submitEventFacts(input, event),
+				...eventWriteFacts(input, event),
 			})),
 		behaviors: withBehaviorSymbols(
 			input,
@@ -1595,6 +1599,7 @@ function branchArmRecords(input: ProtocolViewPayloadInput, branchSiteId: string)
 					syncPolicy: event.syncPolicy,
 					symbolIds: eventSymbols.get(`${event.hostNodeId}:${event.eventName}`) ?? [],
 					...submitEventFacts(input, event),
+					...eventWriteFacts(input, event),
 				})),
 			domUpdates: input.payloadArena.view.domUpdates
 				.filter((domUpdate) => hostIds.has(domUpdate.hostNodeId))
@@ -1782,6 +1787,23 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 }
 
 // The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+function eventWriteFacts(
+	input: Pick<ProtocolViewPayloadInput, 'symbolResolver'>,
+	event: { readonly hostNodeId: string; readonly eventName: string },
+): ProtocolEventWriteFacts {
+	const writes = new Set<string>();
+	for (const symbol of input.symbolResolver.symbols)
+		if (
+			symbol.kind === 'event-handler' &&
+			symbol.hostNodeId === event.hostNodeId &&
+			symbol.eventName === event.eventName &&
+			// An inlined foreign body writes another module's graph.
+			!symbol.crossModuleInline
+		)
+			for (const write of symbol.writes ?? []) writes.add(write.graphNodeId);
+	return writes.size > 0 ? { writes: [...writes].sort() } : {};
+}
+
 function submitEventFacts(
 	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },

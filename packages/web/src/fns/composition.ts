@@ -838,6 +838,20 @@ export function marklessComposedSyncPolicy<T>(
 	) as T;
 }
 
+// The graph ids an event record names, spelled the way the instance composing it spells its other reads.
+export function marklessComposedEventGraphFacts<
+	E extends { readonly syncPolicy?: unknown; readonly writes?: ReadonlyArray<string> },
+>(event: E, graphProps: ComposeGraphProps, instancePath: string): Pick<E, 'syncPolicy' | 'writes'> {
+	return {
+		...(event.syncPolicy
+			? { syncPolicy: marklessComposedSyncPolicy(event.syncPolicy, graphProps, instancePath) }
+			: {}),
+		...(event.writes && {
+			writes: event.writes.map((graphNodeId) => marklessComposedGraphNodeId(graphNodeId, instancePath)),
+		}),
+	} as Pick<E, 'syncPolicy' | 'writes'>;
+}
+
 export function marklessCsrChildReadIsStatic(
 	record: ComposeGraphRead,
 	graphProps: ComposeGraphProps,

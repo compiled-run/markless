@@ -7,8 +7,30 @@
 				"@fixtures/vite-csr",
 				"runtime/graph"
 			],
-			"delta": 511,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 541,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/composition"
+			],
+			"delta": 332,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": -113,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -18,8 +40,8 @@
 				"@fixtures/vite-csr",
 				"web/resume-events"
 			],
-			"delta": 127,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 323,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -30,7 +52,7 @@
 				"web/resume-sync-computed"
 			],
 			"delta": 352,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -41,7 +63,7 @@
 				"web/resume-sync-demand"
 			],
 			"delta": 266,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -52,8 +74,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 11,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 37,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -63,8 +85,30 @@
 				"@fixtures/vite-plus",
 				"runtime/graph"
 			],
-			"delta": 511,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 541,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/composition"
+			],
+			"delta": 332,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": -113,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -74,8 +118,8 @@
 				"@fixtures/vite-plus",
 				"web/resume-events"
 			],
-			"delta": 127,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 323,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -86,7 +130,7 @@
 				"web/resume-sync-computed"
 			],
 			"delta": 352,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -97,7 +141,7 @@
 				"web/resume-sync-demand"
 			],
 			"delta": 266,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -108,8 +152,8 @@
 				"maxRuntimeChunkGzipBytes",
 				"measured"
 			],
-			"delta": 23,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 51,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		},
 		{
@@ -120,8 +164,8 @@
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
 			],
-			"delta": 9,
-			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"delta": 35,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
 		}
 	]

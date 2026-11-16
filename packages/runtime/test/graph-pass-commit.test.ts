@@ -158,6 +158,40 @@ test('a commit waits for code the next round loads, so that round lands in the t
 	expect(tasks).toBeLessThanOrEqual(1);
 });
 
+test('settling the code a write reaches loads only the subscriptions on the written node and the computeds derived from it', async () => {
+	const asked: string[] = [];
+	const loaded = new Set<string>();
+	const code = (id: string) => () => {
+		asked.push(id);
+		return loaded.has(id) ? 'loaded' : macrotask().then(() => void loaded.add(id));
+	};
+	const graph = createRuntimeGraph({
+		cells: [
+			{ graphNodeId: 'state:hand', value: ['7s'] },
+			{ graphNodeId: 'state:clicks', value: 0 },
+		],
+		computed: [
+			{
+				graphNodeId: 'computed:full',
+				dependencies: [{ graphNodeId: 'state:hand', path: ['length'] }],
+				compute: (read) => (read('state:hand', ['length']) as number) > 5,
+			},
+		],
+	});
+	for (const [id, graphNodeId] of [
+		['count', 'state:hand'],
+		['disabled', 'computed:full'],
+		['clicks', 'state:clicks'],
+	] as const)
+		graph.subscribe({ id, graphNodeId, code: code(id), run: () => undefined });
+
+	const settling = graph.settleCodeWritesReach!(['state:hand']);
+	expect(asked.sort()).toEqual(['count', 'disabled']);
+	await settling;
+	expect([...loaded].sort()).toEqual(['count', 'disabled']);
+	expect(graph.settleCodeWritesReach!(['state:hand'])).toBeUndefined();
+});
+
 test('an async answer leaves rows to the pass instead of a write observer', async () => {
 	const { createAsyncComputedPlane } = await import('../src/graph-async.ts');
 	const landed: string[] = [];

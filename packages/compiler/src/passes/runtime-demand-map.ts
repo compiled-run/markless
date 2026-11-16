@@ -664,10 +664,11 @@ function cellReadOutsideTextUpdates(
 	);
 }
 
+// An event record's `writes` name what it changes, never what reads the cell.
 function referencesValue(value: unknown, id: string): boolean {
 	if (value === id) return true;
 	if (!value || typeof value !== 'object') return false;
-	return Object.values(value).some((child) => referencesValue(child, id));
+	return Object.entries(value).some(([key, child]) => key !== 'writes' && referencesValue(child, id));
 }
 
 function isScalarOnlyKeyedRepeatModule(

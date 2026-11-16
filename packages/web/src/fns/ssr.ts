@@ -2,7 +2,7 @@ import {
 	marklessCarrierRootsWidget,
 	marklessCarryWidgetRegistry,
 	marklessComposedInstancePath,
-	marklessComposedSyncPolicy,
+	marklessComposedEventGraphFacts,
 	marklessComposeState,
 	marklessComposeWidgetRegistry,
 	marklessRegisterComposedWidgets,
@@ -55,6 +55,7 @@ type SsrEventRecord = SsrRecord & {
 	readonly hostNodeId: string;
 	symbolIds: ReadonlyArray<string>;
 	readonly eventName?: string;
+	readonly writes?: ReadonlyArray<string>;
 };
 type SsrDomUpdateRecord = SsrRecord & {
 	readonly hostNodeId: string;
@@ -68,7 +69,10 @@ type SsrBehaviorRecord = SsrRecord & {
 	readonly inputGraphReads?: ReadonlyArray<ComposeGraphRead>;
 };
 // Row events address their element by a row-relative path, not a host id.
-type SsrRowEventRecord = SsrRecord & { readonly symbolIds: ReadonlyArray<string> };
+type SsrRowEventRecord = SsrRecord & {
+	readonly symbolIds: ReadonlyArray<string>;
+	readonly writes?: ReadonlyArray<string>;
+};
 type SsrKeyedRepeatRecord = SsrRecord & {
 	readonly id: string;
 	readonly parentHostNodeId: string;
@@ -1618,15 +1622,7 @@ export function marklessSsrAppendChildView(context: {
 			...event,
 			hostNodeId: context.child.hostPrefix + event.hostNodeId,
 			symbolIds,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
+			...marklessComposedEventGraphFacts(event, context.child.graphProps, childInstancePath),
 		};
 		// The consumer's `{...rest}` handler for this same element was forwarded
 		// into the PARENT's payload, so the part's own record and the consumer's
@@ -1649,6 +1645,9 @@ export function marklessSsrAppendChildView(context: {
 			...(composed.syncPolicy || !forwarded.syncPolicy
 				? {}
 				: { syncPolicy: forwarded.syncPolicy }),
+			...(forwarded.writes && {
+				writes: [...new Set([...(composed.writes ?? []), ...forwarded.writes])],
+			}),
 			symbolIds: [
 				...composed.symbolIds,
 				...forwarded.symbolIds.filter((symbolId) => !composed.symbolIds.includes(symbolId)),
@@ -1683,15 +1682,7 @@ export function marklessSsrAppendChildView(context: {
 		if (!mapped) continue;
 		const rowEvents = repeat.rowEvents.map((event) => ({
 			...event,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
+			...marklessComposedEventGraphFacts(event, context.child.graphProps, childInstancePath),
 			symbolIds: event.symbolIds.map((symbolId) => {
 				const callbackSymbolId = callbackSymbolIds.get(symbolId);
 				if (callbackSymbolId) {
@@ -1884,15 +1875,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 					: marklessBoundSymbolId(child, symbolId),
 			),
 			// An arm event's policy reads the graph by id like any other child event.
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							child.graphProps,
-							instancePath,
-						),
-					}
-				: {}),
+			...marklessComposedEventGraphFacts(event, child.graphProps, instancePath),
 		})),
 		domUpdates: (set.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(
@@ -1960,15 +1943,7 @@ export function marklessSsrPrefixBoundaryArmRecords(
 								symbolIds: event.symbolIds.map((symbolId) =>
 									marklessBoundSymbolId(child, symbolId),
 								),
-								...(event.syncPolicy
-									? {
-											syncPolicy: marklessComposedSyncPolicy(
-												event.syncPolicy,
-												child.graphProps,
-												instancePath,
-											),
-										}
-									: {}),
+								...marklessComposedEventGraphFacts(event, child.graphProps, instancePath),
 							})),
 						},
 					]
@@ -2086,15 +2061,7 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 					? symbolId
 					: marklessBoundSymbolId(child, symbolId),
 			),
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							child.graphProps,
-							instancePath,
-						),
-					}
-				: {}),
+			...marklessComposedEventGraphFacts(event, child.graphProps, instancePath),
 		})),
 		domUpdates: (arm.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(

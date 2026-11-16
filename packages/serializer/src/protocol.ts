@@ -140,7 +140,16 @@ export type ProtocolEventRecord = {
 	readonly action?: ProtocolEventAction;
 	/** The element sits in a child this record's component spread its props onto, so that component's instance is one edge above the host. */
 	readonly forwarded?: true;
-} & ProtocolSubmitEventFacts;
+} & ProtocolSubmitEventFacts &
+	ProtocolEventWriteFacts;
+
+/**
+ * The graph nodes this record's own handlers write when they run, so a first press loads the update code
+ * those writes wake alongside its handler. Absent when the handlers write nothing the analysis can name.
+ */
+export type ProtocolEventWriteFacts = {
+	readonly writes?: ReadonlyArray<string>;
+};
 
 /** On a submit event record: a control that submits this form has an author-written aria-disabled, so a submitting form marks no control. */
 export type ProtocolSubmitEventFacts = {
@@ -769,7 +778,7 @@ export type ProtocolViewPayload = {
 			readonly name: string;
 			readonly plural?: boolean;
 		}>;
-		readonly rowEvents: ReadonlyArray<ProtocolSubmitEventFacts & {
+		readonly rowEvents: ReadonlyArray<ProtocolSubmitEventFacts & ProtocolEventWriteFacts & {
 			readonly hostPath: ProtocolElementAddress;
 			readonly eventName: string;
 			readonly symbolIds: ReadonlyArray<string>;
@@ -791,7 +800,7 @@ export type ProtocolViewPayload = {
 		readonly armSeeds?: ReadonlyArray<ProtocolBranchArmSeed>;
 		readonly armComponents?: ProtocolBranchArmComponents;
 		readonly armRecords?: ReadonlyArray<{
-			readonly events: ReadonlyArray<ProtocolSubmitEventFacts & {
+			readonly events: ReadonlyArray<ProtocolSubmitEventFacts & ProtocolEventWriteFacts & {
 				readonly hostPath: ProtocolElementAddress;
 				readonly eventName: string;
 				readonly symbolIds: ReadonlyArray<string>;

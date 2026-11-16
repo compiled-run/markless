@@ -929,7 +929,11 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 			...view,
 			locators: view.locators.map(host),
 			elementHandles: view.elementHandles.map(host),
-			events: view.events.map((event) => ({ ...host(event), symbolIds: event.symbolIds.map(symbol) })),
+			events: view.events.map((event) => ({
+				...host(event),
+				symbolIds: event.symbolIds.map(symbol),
+				...(event.writes && { writes: event.writes.map(graphNode) }),
+			})),
 			domUpdates: view.domUpdates.map((update) => ({
 				...host(update),
 				graphNodeId: graphNode(update.graphNodeId),
@@ -971,6 +975,7 @@ function ownerRecordsInPageSpace<R extends { readonly state: ProtocolStatePayloa
 							rowEvents: repeat.rowEvents.map((event) => ({
 								...event,
 								symbolIds: event.symbolIds.map(symbol),
+								...(event.writes && { writes: event.writes.map(graphNode) }),
 							})),
 						})),
 					}

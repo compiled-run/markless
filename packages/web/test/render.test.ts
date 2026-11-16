@@ -1302,16 +1302,9 @@ export default function CaptureSlotSiblings() @{
 			await runtime.runtime.dispatch(event('click', buttons[1]!) as never);
 			expect(runtime.graph.read('state:count')).toBe(1);
 			expect(runtime.graph.read('state:graphResult')).toBe('Graph cedar:1');
-			// The first press also loads each label's text update, so any write it makes paints in its own turn.
-			const labelUpdates = output.view.domUpdates.flatMap((update) =>
-				update.symbolId?.startsWith('bound:') ? [update.symbolId] : [],
+			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual(
+				rows.map((row) => row.id),
 			);
-			expect(labelUpdates).toHaveLength(2);
-			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual([
-				rows[0]!.id,
-				...labelUpdates,
-				rows[1]!.id,
-			]);
 		},
 	);
 });
@@ -2492,10 +2485,70 @@ test('render wires CSR sync computed dependencies through the full runtime', asy
 
 	await container.root.listeners[0].listener(event('click', container.root));
 
-	// The press loads every subscription's code alongside its handler, so its write paints in its own turn.
-	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:text', 'symbol:derive']);
+	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:derive', 'symbol:text']);
 	expect(container.graph.read('computed:doubled')).toBe(6);
 	expect(button.textContent).toBe('6');
+});
+
+test('a press loads the update code its writes reach before its handler runs, and an unrelated press loads none of it', async () => {
+	const target = {
+		children: [] as FakeElement[],
+		replaceChildren(...children: FakeElement[]) {
+			this.children = children;
+		},
+	};
+	const button = element('BUTTON');
+	button.textContent = '0';
+	const state = createProtocolStatePayload({
+		cells: [
+			{ graphNodeId: 'state:count', name: 'count', valueKind: 'scalar', value: 0 },
+			{ graphNodeId: 'state:other', name: 'other', valueKind: 'scalar', value: 0 },
+		],
+	});
+	const view = viewWithClickDomUpdate();
+	const steps: string[] = [];
+
+	await render(
+		() => ({
+			root: button,
+			state,
+			view: {
+				...view,
+				events: [
+					{ hostNodeId: 'h0', eventName: 'click', symbolIds: ['symbol:click'], writes: ['state:count'] },
+					{ hostNodeId: 'h0', eventName: 'keydown', symbolIds: ['symbol:key'], writes: ['state:other'] },
+				],
+			},
+			loadSymbol(symbolId: string) {
+				steps.push(`load ${symbolId}`);
+				if (symbolId === 'symbol:click' || symbolId === 'symbol:key') {
+					const graphNodeId = symbolId === 'symbol:click' ? 'state:count' : 'state:other';
+					return ({ graph }) => {
+						steps.push(`${symbolId} ran`);
+						graph.update({ graphNodeId, path: [], returnValue: 'next', update: (value) => Number(value) + 1 });
+					};
+				}
+				return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
+					steps.push('text arrived');
+					return (context: { domUpdate?: { hostNodeId: string }; value: unknown }) => ({
+						type: 'setText',
+						locator: context.domUpdate?.hostNodeId ?? 'h0',
+						value: context.value,
+					});
+				});
+			},
+		}),
+		{ target },
+	);
+	const listener = (type: string) => button.listeners.find((entry) => entry.type === type)!.listener;
+
+	await listener('keydown')(event('keydown', button));
+	expect(steps).toEqual(['load symbol:key', 'symbol:key ran']);
+
+	steps.length = 0;
+	await listener('click')(event('click', button));
+	expect(steps.indexOf('text arrived')).toBeLessThan(steps.indexOf('symbol:click ran'));
+	expect(button.textContent).toBe('1');
 });
 
 test('render falls back from the event-only path when element handles are present', async () => {
