@@ -167,6 +167,158 @@
 			"delta": 35,
 			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn (graph settleCodeWritesReach, event write facts composed per instance, sync-computed derive code, submit hold paints with the pass)",
 			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 541,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/composition"
+			],
+			"delta": 332,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/instance-scope"
+			],
+			"delta": 177,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/ssr"
+			],
+			"delta": -113,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-events"
+			],
+			"delta": 323,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-computed"
+			],
+			"delta": 352,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-demand"
+			],
+			"delta": 266,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"constructGlue",
+				"event handler"
+			],
+			"delta": 56,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 274,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 274,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 274,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 1120,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 1713,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 817,
+			"reason": "a press loads the update code its own writes reach before its handler runs, so the first write paints in the writer's own turn: event records carry the cells their handlers write, the graph settles that code, sync-computed demand names its derive code",
+			"date": "2026-11-16"
 		}
 	]
 }
