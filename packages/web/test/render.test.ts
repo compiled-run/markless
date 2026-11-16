@@ -1302,9 +1302,16 @@ export default function CaptureSlotSiblings() @{
 			await runtime.runtime.dispatch(event('click', buttons[1]!) as never);
 			expect(runtime.graph.read('state:count')).toBe(1);
 			expect(runtime.graph.read('state:graphResult')).toBe('Graph cedar:1');
-			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual(
-				rows.map((row) => row.id),
+			// The first press also loads each label's text update, so any write it makes paints in its own turn.
+			const labelUpdates = output.view.domUpdates.flatMap((update) =>
+				update.symbolId?.startsWith('bound:') ? [update.symbolId] : [],
 			);
+			expect(labelUpdates).toHaveLength(2);
+			expect(loadedIds.filter((symbolId) => symbolId.startsWith('bound:'))).toEqual([
+				rows[0]!.id,
+				...labelUpdates,
+				rows[1]!.id,
+			]);
 		},
 	);
 });
@@ -2485,7 +2492,8 @@ test('render wires CSR sync computed dependencies through the full runtime', asy
 
 	await container.root.listeners[0].listener(event('click', container.root));
 
-	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:derive', 'symbol:text']);
+	// The press loads every subscription's code alongside its handler, so its write paints in its own turn.
+	expect(loadedSymbols).toEqual(['symbol:click', 'symbol:text', 'symbol:derive']);
 	expect(container.graph.read('computed:doubled')).toBe(6);
 	expect(button.textContent).toBe('6');
 });

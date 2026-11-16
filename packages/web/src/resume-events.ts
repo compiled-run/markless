@@ -801,7 +801,11 @@ export function createEventWiring(input: {
 				const { graph } = context;
 				let quiet = false;
 				try {
-					const symbol = await input.loadSymbol(symbolId);
+					const loading = input.loadSymbol(symbolId);
+					// A write paints in the writer's own turn only once the code every subscription runs has arrived.
+					const settling = input.graph.settleSubscriptionCode?.();
+					const symbol = await loading;
+					if (settling) await settling;
 					quiet = context.quietTurn === true;
 					if (quiet) graph.markQuietStart?.();
 					marklessControlEditsRead(event);

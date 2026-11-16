@@ -1,0 +1,128 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 511,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-events"
+			],
+			"delta": 127,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 352,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 266,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 11,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 511,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-events"
+			],
+			"delta": 127,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 352,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 266,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 23,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 9,
+			"reason": "a press loads every subscription's code before its handler runs, so the first write paints in the writer's own turn (graph settleSubscriptionCode, sync-computed derive code)",
+			"date": "2026-11-16"
+		}
+	]
+}

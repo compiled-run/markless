@@ -65,6 +65,8 @@ export function pendingRosterResume(): Promise<unknown> | undefined {
 	return load && !rosters.has(load) ? loadRosterResume() : undefined;
 }
 
+let rowPlaced: typeof import('./fns/row-placed-derive.ts') | undefined;
+
 // Only a bound derive inside a keyed row needs its row placed; the loaded module decides exactly.
 function loadDerive(
 	loadSymbol: ResumeRuntimeInput['loadSymbol'],
@@ -73,9 +75,20 @@ function loadDerive(
 	const symbol = loadSymbol(record.deriveSymbolId);
 	if (!record.graphNodeId.includes('r:') || !record.deriveSymbolId.includes('bound:'))
 		return symbol;
+	if (rowPlaced && typeof symbol === 'function') return rowPlaced.marklessRowPlacedDerive(symbol, record);
 	return Promise.all([symbol, import('./fns/row-placed-derive.ts')]).then(([derive, placed]) =>
-		placed.marklessRowPlacedDerive(derive, record),
+		(rowPlaced = placed).marklessRowPlacedDerive(derive, record),
 	);
+}
+
+/** The code deriving `record` still loads; `undefined` once a derive runs without a task hop. */
+export function pendingDeriveCode(
+	loadSymbol: ResumeRuntimeInput['loadSymbol'],
+	record: ResumeSyncComputedRecord,
+): Promise<unknown> | undefined {
+	const derive = loadDerive(loadSymbol, record);
+	const roster = pendingRosterResume();
+	return typeof derive === 'function' ? roster : Promise.all([derive, roster]);
 }
 
 type RefreshInput = Parameters<typeof refreshSyncComputed>[0];

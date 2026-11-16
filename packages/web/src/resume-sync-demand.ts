@@ -65,6 +65,12 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 					id: `sync-computed-demand:${computed.graphNodeId}:${computed.deriveSymbolId}:${dependency.graphNodeId}:${dependency.path.join('.')}`,
 					graphNodeId: dependency.graphNodeId,
 					path: dependency.path,
+					code: () =>
+						syncComputedModule
+							? syncComputedModule.pendingDeriveCode(input.loadSymbol, computed)
+							: import('./resume-sync-computed.ts').then((module) =>
+									(syncComputedModule = module).pendingDeriveCode(input.loadSymbol, computed),
+								),
 					async run() {
 						const done = graph.asyncPlane?.()?.startDerive(computed.graphNodeId);
 						const module = (syncComputedModule ??=
