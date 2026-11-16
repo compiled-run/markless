@@ -45,6 +45,30 @@
 			"delta": 23,
 			"reason": "the direct renderer now syncs writes made after the handler returned (timers, promises, view transitions); +110 B minified, +49 B gzip on the direct startup",
 			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 225,
+			"reason": "the direct renderer syncs writes made after the handler returned (timers, promises, view transitions)",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 225,
+			"reason": "the direct renderer syncs writes made after the handler returned (timers, promises, view transitions)",
+			"date": "2026-11-16"
 		}
 	]
 }
