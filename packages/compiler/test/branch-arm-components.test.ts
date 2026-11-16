@@ -129,3 +129,30 @@ export function Ledger() @{
 	const records = JSON.stringify(result.protocolView);
 	expect(records).toContain('"armComponents":[[],["c0:"]]');
 });
+
+test('an @if inside a keyed row names no components: its one record cannot say which rows show an arm', async () => {
+	const result = await compile(`
+import { computed, state } from '@markless/core';
+function Tag({ word }: { word: string }) @{ const label = computed(() => 'about ' + word); <b aria-label={label}>{word}</b> }
+export default function Page() @{
+	let open = state(true);
+	let parts = state([{ key: 'a', text: 'one', term: false }, { key: 'b', text: 'two', term: true }]);
+	<div>
+		<button onClick={() => (open = !open)}>Open</button>
+		@if (open) {
+			<p>
+				@for (const part of parts; key part.key) {
+					@if (part.term) {
+						<Tag word={part.text} />
+					} @else {
+						<>{part.text}</>
+					}
+				}
+			</p>
+		}
+	</div>
+}
+`);
+	expect(armComponents(result)).toEqual({ 'branch-site:0': [['c0:']], 'branch-site:1': undefined });
+	expect(result.semanticGraph.branchSites.map((site) => site.keyedRepeatId === undefined)).toEqual([true, false]);
+});

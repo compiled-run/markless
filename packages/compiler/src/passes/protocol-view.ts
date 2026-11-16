@@ -439,6 +439,9 @@ function branchArmSeedsField(input: ProtocolViewPayloadInput, branchSiteId: stri
 
 // Per arm, the instance segments of the components it holds that own a value to stop: their computeds stop when the arm leaves.
 function branchArmComponentsField(input: ProtocolViewPayloadInput, branchSiteId: string) {
+	// A site in a row takes its own arm per row, but its record is one for the page: it cannot say which rows show an arm.
+	if (input.semanticGraph?.branchSites.find((site) => site.id === branchSiteId)?.keyedRepeatId)
+		return {};
 	const edges = input.semanticGraph?.componentEdges ?? [];
 	const armComponents: string[][] = [];
 	for (const edge of edges) {
