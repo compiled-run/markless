@@ -69,10 +69,9 @@ const parts = {
 			(computed) => keys.has(computed.graphNodeId) && input.graph.read(computed.graphNodeId, []) === undefined,
 		);
 		if (unresolved.length === 0) return;
-		const { refreshSyncComputed } = await import('../resume-sync-computed.ts');
-		await Promise.all(
-			unresolved.map((computed) => refreshSyncComputed({ ...input, computed, records: all })),
-		);
+		const { refreshSyncComputed, indexRecordsByNode } = await import('../resume-sync-computed.ts');
+		const byNode = indexRecordsByNode(all);
+		await Promise.all(unresolved.map((computed) => refreshSyncComputed({ ...input, computed, byNode })));
 	},
 	// A removed row's components stop: a load in flight lands nothing, and a key that returns starts fresh.
 	dropRows(graph: RuntimeGraph, repeatId: string, rowPath: string, keys: ReadonlyArray<unknown>) {
@@ -111,17 +110,17 @@ type DependencyRecord = {
 // Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
 function awaitsAsyncAncestor(
 	computed: Pick<DependencyRecord, 'dependencies'>,
-	records: ReadonlyArray<DependencyRecord>,
+	byNode: ReadonlyMap<string, ReadonlyArray<DependencyRecord>>,
 	graph: RuntimeGraph,
 	visited = new Set<string>(),
 ): boolean {
 	for (const { graphNodeId } of computed.dependencies ?? []) {
 		if (visited.has(graphNodeId)) continue;
 		visited.add(graphNodeId);
-		const record = records.find((candidate) => candidate.graphNodeId === graphNodeId);
+		const record = byNode.get(graphNodeId)?.[0];
 		if (record?.async === true) {
 			if (!hasReadableValue(graph.read(graphNodeId, []))) return true;
-		} else if (record && awaitsAsyncAncestor(record, records, graph, visited)) return true;
+		} else if (record && awaitsAsyncAncestor(record, byNode, graph, visited)) return true;
 	}
 	return false;
 }

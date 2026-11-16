@@ -1,0 +1,156 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 340,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 50,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -5,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 340,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 50,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 9,
+			"reason": "refresh finds a computed's dependency records through one node-id index per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 150 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 99,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 112,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 112,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 92,
+			"reason": "a computed's dependency records are found through one node-id index per record list instead of a search over every record per dependency: a 1000-row first press drops from about 240 to 150 ms at 4x CPU",
+			"date": "2026-11-16"
+		}
+	]
+}
