@@ -93,11 +93,7 @@ export function indexRecordsByNode(
 	list: ReadonlyArray<RefreshRecord>,
 	into = new Map<string, RefreshRecord[]>(),
 ) {
-	for (const record of list) {
-		const named = into.get(record.graphNodeId);
-		if (named) named.push(record);
-		else into.set(record.graphNodeId, [record]);
-	}
+	for (const record of list) (into.get(record.graphNodeId) ?? into.set(record.graphNodeId, []).get(record.graphNodeId)!).push(record);
 	return into;
 }
 
@@ -177,11 +173,11 @@ export async function refreshSyncComputed(
 	},
 	deriving = new Set<string>(),
 ): Promise<void> {
-	const byNode = input.byNode ?? (input.records && indexRecordsByNode(input.records));
+	const byNode = input.byNode ?? indexRecordsByNode(input.records ?? []);
 	// No value is served for a computed only other computeds read: derive it before its reader.
 	deriving.add(input.computed.graphNodeId);
 	for (const { graphNodeId } of input.computed.dependencies ?? []) {
-		const record = byNode?.get(graphNodeId)?.find((r) => r.async === false && r.deriveSymbolId);
+		const record = byNode.get(graphNodeId)?.find((r) => r.async === false && r.deriveSymbolId);
 		if (record && !deriving.has(graphNodeId) && input.graph.read(graphNodeId, []) === undefined)
 			await refreshSyncComputed(
 				{ ...input, computed: record as ResumeSyncComputedRecord, derive: undefined, byNode },
@@ -189,7 +185,7 @@ export async function refreshSyncComputed(
 			);
 	}
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
-	if (byNode && asyncPlanes.awaitsAncestor?.(input.computed, byNode, input.graph)) return;
+	if (asyncPlanes.awaitsAncestor?.(input.computed, byNode, input.graph)) return;
 	const roster = await loadRosterResume();
 	const symbol = input.derive ?? (await loadDerive(input.loadSymbol, input.computed));
 	const result = await derive(input, symbol, roster);

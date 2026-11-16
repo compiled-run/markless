@@ -72,18 +72,15 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 							await import('./resume-sync-computed.ts'));
 						const refresh = {
 							computed,
+							byNode: (byNode ??= module.indexRecordsByNode(all)),
 							graph,
 							root: input.root,
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
 						};
-						await (
-							batches && computed.deriveOnRead
-								? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-								: module.refreshSyncComputed({
-										...refresh,
-										byNode: (byNode ??= module.indexRecordsByNode(all)),
-									})
+						await (batches && computed.deriveOnRead
+							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
+							: module.refreshSyncComputed(refresh)
 						).finally(done);
 					},
 				}),
