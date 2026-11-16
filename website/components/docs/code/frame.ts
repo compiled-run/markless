@@ -2,7 +2,7 @@
 // the compiled modules; this page links them to Blob URLs and renders the entry's
 // default export into its body.
 import { render, type RenderTarget } from '@markless/core';
-import { PACK_RESIDENT } from '@markless/web/fns/resident-load';
+import { PACK_RESIDENT } from '../../../../packages/web/src/fns/resident-load.ts';
 import { installRuntimeImport, runtimeImportCall, runtimeModuleUrl } from './frame-runtime.ts';
 import { blockStyles, createLinker, moduleKey } from './link.ts';
 import type { CodeDiagnostic, CompiledModule, FrameReply, FrameRequest } from './protocol.ts';

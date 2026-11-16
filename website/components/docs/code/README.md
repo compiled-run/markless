@@ -64,7 +64,7 @@ renders the entry, and reports runtime errors and its height back; each `import(
 included, goes through the run that linked it, and runtime imports go through a loader every
 later run can still call. Before it renders, the frame runs every module the compiler wrote (the
 component's handler and update code, marked `generated`), and a load of a module it has run
-answers in the caller's own task (`$mlNow`, `@markless/web/fns/resident-load`), as a build's
+answers in the caller's own task (`$mlNow`, `packages/web/src/fns/resident-load.ts`), as a build's
 packed code does, so the first write after Run again or an edit reaches the DOM before the
 writer returns.
 
