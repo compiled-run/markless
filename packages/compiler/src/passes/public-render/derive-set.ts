@@ -119,7 +119,9 @@ function moduleConstantComputedGraphNodeIds(input: PublicRenderModuleInput): Rea
 		...input.protocolState.computed.flatMap((computed) =>
 			computed.deriveOnRead ? [computed.graphNodeId] : [],
 		),
-		...keyedCollectionGraphNodeIds(input),
+		...keyedCollectionGraphNodeIds(input).filter(
+			(id) => !rowsComposeFromCollection(input, id),
+		),
 	]);
 	return new Set(
 		input.symbolResolver.symbols.flatMap((symbol) =>
@@ -129,6 +131,35 @@ function moduleConstantComputedGraphNodeIds(input: PublicRenderModuleInput): Rea
 			derivedByResume.has(symbol.graphNodeId)
 				? [symbol.graphNodeId]
 				: [],
+		),
+	);
+}
+
+// A component or a nested list in the rows wires from the served collection, before resume derives anything.
+function rowsComposeFromCollection(input: PublicRenderModuleInput, collectionId: string): boolean {
+	const chunks = new Map(input.renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	const repeatIds = new Set(
+		input.renderData.repeats.flatMap((repeat) =>
+			repeat.collectionGraphNodeId === collectionId ? [repeat.repeatId] : [],
+		),
+	);
+	const walked = new Set<string>();
+	const composes = (chunkId: string): boolean => {
+		if (walked.has(chunkId)) return false;
+		walked.add(chunkId);
+		return (chunks.get(chunkId)?.slots ?? []).some((slot) =>
+			slot.kind === 'child-component' || slot.kind === 'repeat'
+				? true
+				: slot.kind === 'dynamic-host'
+					? composes(slot.childChunkId)
+					: slot.kind === 'branch'
+						? slot.armTemplateIds.some(composes)
+						: false,
+		);
+	};
+	return input.renderData.chunks.some((chunk) =>
+		chunk.slots.some(
+			(slot) => slot.kind === 'repeat' && repeatIds.has(slot.repeatId) && composes(slot.rowTemplateId),
 		),
 	);
 }

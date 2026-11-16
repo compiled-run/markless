@@ -67,6 +67,88 @@
 			"delta": 2,
 			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
 			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-demand"
+			],
+			"delta": 394,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 56,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 108,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -155,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 52,
+			"reason": "resume-sync-demand learns to derive module constants at first read, so pages stop carrying imported art in their payload",
+			"date": "2026-11-16"
 		}
 	]
 }
