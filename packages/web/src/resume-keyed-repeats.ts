@@ -251,7 +251,7 @@ export function wireKeyedRepeats(
 				const item = from[rowIndex],
 					rowKey = repeatItemKey(item, repeat, rowIndex);
 				rowRootsByKey.set(rowKey, rowRoot);
-				served.set(rowKey, [repeat.rowComponent ? itemCopy(item) : item, rowIndex]);
+				served.set(rowKey, [repeat.rowComponent || !slots.ready ? itemCopy(item) : item, rowIndex]);
 				if (slots.ready)
 					slots.values.set(rowKey, servedSlotValues(repeat, item, rowIndex, input.graph, slots, moved));
 				registerRowEvents(rowRoot, rowKey);
