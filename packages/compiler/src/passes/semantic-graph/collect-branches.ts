@@ -79,6 +79,11 @@ function branchAsyncBoundary(
 	};
 }
 
+function branchRow(state: WalkState): { readonly keyedRepeatId?: string } {
+	const keyedRepeatId = state.currentKeyedRepeatScopeIds.at(-1);
+	return keyedRepeatId ? { keyedRepeatId } : {};
+}
+
 function branchKeywordSpan(node: AnyNode, keyword: string, state: WalkState) {
 	return typeof node.start === 'number'
 		? { keywordSpan: { filename: state.filename, start: node.start, end: node.start + keyword.length } }
@@ -113,6 +118,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			...branchKeywordSpan(node, '@if', state),
 			...branchAsyncBoundary(state),
+			...branchRow(state),
 		});
 		return;
 	}
@@ -143,6 +149,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
 			...branchKeywordSpan(node, '@switch', state),
 			...branchAsyncBoundary(state),
+			...branchRow(state),
 		});
 	}
 }
@@ -173,6 +180,7 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 		...branchKeywordSpan(node, '@if', state),
 		...branchAsyncBoundary(state),
+		...branchRow(state),
 	});
 }
 

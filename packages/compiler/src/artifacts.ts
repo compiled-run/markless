@@ -849,6 +849,8 @@ export type SemanticBranchSite = {
 	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
 	readonly testReadsRowItem?: true;
+	// The innermost keyed @for whose row holds the site: each row takes its own arm.
+	readonly keyedRepeatId?: string;
 	readonly anchorOrder: number;
 	// Inside an @try arm: excluded from the page comment-anchor stream; flip
 	// wiring (if any) lives in the owning boundary's arm coordinate space.

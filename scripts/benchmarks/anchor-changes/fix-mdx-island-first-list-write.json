@@ -1,0 +1,86 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 22,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 22,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 22,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 222,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 287,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 271,
+			"reason": "an MDX page loads the modules of islands holding a changing list before wiring it, so the list's first new row lands at the write",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": 74,
+			"reason": "resume asks the page to load the modules that name its lists' row code before wiring them, so an MDX island's first new row lands at the write",
+			"date": "2026-11-16"
+		}
+	]
+}

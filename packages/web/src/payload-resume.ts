@@ -247,6 +247,7 @@ async function startDecodedResume(
 		renderBranchHtml: input.renderBranchHtml,
 		renderAsyncBoundary: input.renderAsyncBoundary,
 		renderData: input.renderData,
+		loadRepeatModules: input.loadRepeatModules,
 	});
 	const retiring = runtime;
 	if (!swapped) {

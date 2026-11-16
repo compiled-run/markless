@@ -3,7 +3,7 @@ import {
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
-import { marklessWhenLoaded } from '../../../../web/src/fns/resident-load.ts';
+import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
 import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
@@ -16,6 +16,7 @@ import {
 } from '../../../../serializer/src/protocol-constants.ts';
 import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
+import type { ResumeKeyedRepeatRecord } from '../../../../web/src/resume-types.ts';
 export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
 export type MdxRoutePart =
@@ -65,6 +66,7 @@ export type MdxComponentArtifact = {
 export type MdxSymbolLoader = {
 	readonly prefix: string;
 	readonly loadSymbol: (symbolId: string) => unknown;
+	readonly loadModule?: () => Promise<unknown>;
 };
 
 type MdxIslandModule = {
@@ -74,6 +76,7 @@ type MdxIslandModule = {
 	) => MdxScopedAction | undefined | Promise<MdxScopedAction | undefined>;
 };
 type MdxScopedAction = { readonly scope: string };
+type ResidentLoad = Promise<unknown> & { [PACK_RESIDENT]?: () => unknown };
 
 /** One island's symbols, loaded once from its own module; a failed load is retried on the next ask. */
 export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxIslandModule>) {
@@ -81,13 +84,18 @@ export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxI
 	const loadModule = () => {
 		if (module) return module;
 		const loading = (module = importModule());
-		loading.catch(() => {
-			if (module === loading) module = undefined;
-		});
+		// An island in its own chunk loads without the pack's marker; once it has run, later symbols answer in the caller's task.
+		loading.then(
+			(mod) => void ((loading as ResidentLoad)[PACK_RESIDENT] ??= () => mod),
+			() => {
+				if (module === loading) module = undefined;
+			},
+		);
 		return loading;
 	};
 	return {
 		prefix,
+		loadModule,
 		loadSymbol: (symbolId: string) =>
 			marklessWhenLoaded(loadModule(), (mod: MdxIslandModule) =>
 				mod.loadSymbol(symbolId.slice(prefix.length)),
@@ -778,6 +786,21 @@ export function loadMdxSymbol(
 	}
 
 	return Promise.reject(new Error(`Unknown Markless MDX symbol ${symbolId}`));
+}
+
+// An island's own module names the row code its lists build with, and resume runs no island code; a list that changes needs it first.
+export function loadMdxRepeatModules(
+	repeats: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	loaders: readonly MdxSymbolLoader[],
+): Promise<unknown> {
+	const islands = new Set<MdxSymbolLoader>();
+	for (const repeat of repeats) {
+		if (!(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent)) continue;
+		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
+		const island = loaders.find((loader) => repeat.id.startsWith(loader.prefix));
+		if (island) islands.add(island);
+	}
+	return Promise.all([...islands].map((island) => island.loadModule?.())).catch(() => undefined);
 }
 
 type MdxInstanceScopedLoad = Parameters<typeof marklessInstanceScopedLoadSymbol>[0];
