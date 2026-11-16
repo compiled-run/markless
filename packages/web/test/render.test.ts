@@ -687,7 +687,7 @@ async function withCompiledCaptureDispatch(
 			/const marklessSymbolResolverModule = \(\) => import\(["']virtual:markless:resolver:/,
 		);
 		expect(transformed.code).toMatch(
-			/\.then\(\(mod\) => readMarklessSourceSymbol\(mod, ["']symbol_/,
+			/readMarklessSourceSymbol\(import\(["']virtual:markless:symbol:[^)]+\), ["']symbol_/,
 		);
 		expect(transformed.code).toContain('mod.init__virtual_markless_symbol?.();');
 	}

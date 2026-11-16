@@ -1,5 +1,7 @@
 import { protocolBoundSymbolPrefix } from '@markless/serializer';
 
+export const RESIDENT_LOAD_MODULE = '@markless/web/fns/resident-load';
+
 type BoundRoute = {
 	readonly prefix: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
@@ -38,6 +40,9 @@ export function emitSymbolRouteTable(input: {
 	);
 	return [
 		emitReboundSymbolImport(routes, reboundName),
+		sources.length > 0
+			? `import { marklessWhenLoaded as ${functionName}WhenLoaded } from '${RESIDENT_LOAD_MODULE}';`
+			: '',
 		`const ${functionName}Imports = [${sources.map((source) => `() => import(${JSON.stringify(source)})`).join(', ')}];`,
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
@@ -46,7 +51,7 @@ export function emitSymbolRouteTable(input: {
 		'\t\tif (!symbolId.startsWith(prefix)) continue;',
 		'\t\tconst rest = symbolId.slice(prefix.length);',
 		// A same-module child re-enters the table: what is left can carry another child's path.
-		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest${rebinds ? ', consumed + prefix' : ''}) : ${fallbackName}(rest)) : ${functionName}Imports[at]().then((mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
+		`\t\tconst unbound = () => at < 0 ? (prefix ? ${functionName}(rest${rebinds ? ', consumed + prefix' : ''}) : ${fallbackName}(rest)) : ${functionName}WhenLoaded(${functionName}Imports[at](), (mod) => mod.loadSymbol ? mod.loadSymbol(rest) : Promise.reject(new Error(\`Unknown child async symbol \${symbolId}\`)));`,
 		// A child symbol its edge binds goes through the edge's bound row, or a callback the
 		// child's own child invokes by instance path never sees the captures this edge supplies.
 		rebinds

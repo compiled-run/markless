@@ -15,10 +15,10 @@ describe('Vite preload cleanup', () => {
 	// writes no dependencies as `void 0`.
 	test('removes empty preload wrappers around packed same-chunk imports', () => {
 		const code =
-			'const a=()=>p(()=>Promise.resolve().then(()=>(init(),ns)),void 0);const b=()=>p(()=>(async()=>(await 0,__marklessPackedAb12()))(),void 0);const c=()=>p(()=>import("./pack.js").then(m=>m.__marklessPackedCd34()),[]);';
+			'const a=()=>p(()=>Promise.resolve().then(()=>(init(),ns)),void 0);const b=()=>p(()=>(async()=>(await 0,__marklessPackedAb12()))(),void 0);const d=()=>p(()=>h($mlAb12),void 0);const c=()=>p(()=>import("./pack.js").then(m=>m.__marklessPackedCd34()),[]);';
 
 		expect(stripEmptyVitePreloadWrappers(code)).toBe(
-			'const a=()=>Promise.resolve().then(()=>(init(),ns));const b=()=>(async()=>(await 0,__marklessPackedAb12()))();const c=()=>import("./pack.js").then(m=>m.__marklessPackedCd34());',
+			'const a=()=>Promise.resolve().then(()=>(init(),ns));const b=()=>(async()=>(await 0,__marklessPackedAb12()))();const d=()=>h($mlAb12);const c=()=>import("./pack.js").then(m=>m.__marklessPackedCd34());',
 		);
 	});
 

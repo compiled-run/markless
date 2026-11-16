@@ -210,13 +210,15 @@ import { runtimeDemandMap as payloadRuntimeDemandMap } from 'virtual:markless:pa
 globalThis.__mxLoadLog ||= () => import("virtual:markless:dev-log");
 
 function loadSymbol(symbolId) {
-	if (symbolId === "symbol:0") return import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:symbol%3A0')
-		.then((mod) => readMarklessSourceSymbol(mod, "symbol_0_740gat"));
+	if (symbolId === "symbol:0") return readMarklessSourceSymbol(import('virtual:markless:symbol:%2Fworkspace%2Fapp%2Fsrc%2FuntypedTone.tsrx:symbol%3A0'), "symbol_0_740gat");
 	return Promise.reject(new Error(\`Unknown async symbol \${symbolId}\`));
 }
-function readMarklessSourceSymbol(mod, exportName) {
-	mod.init__virtual_markless_symbol?.();
-	return mod[exportName];
+import { marklessWhenLoaded as readMarklessSourceSymbolWhenLoaded } from '@markless/web/fns/resident-load';
+function readMarklessSourceSymbol(loading, exportName) {
+	return readMarklessSourceSymbolWhenLoaded(loading, (mod) => {
+		mod.init__virtual_markless_symbol?.();
+		return mod[exportName];
+	});
 }
 
 
