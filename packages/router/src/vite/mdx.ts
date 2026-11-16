@@ -153,7 +153,7 @@ type MdxPart =
 
 function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): string {
 	return [
-		`import { createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader${resume ? ', tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader${resume ? ', loadMdxRepeatModules, tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
 		renderOverlayLoader(),
@@ -179,7 +179,7 @@ function renderOverlayLoader(): string {
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {
 	return [
-		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
+		`import { composeMdxState, composeMdxView, createMdxRenderDataSurface, loadMdxRepeatModules, loadMdxSymbol, mdxSymbolLoader, renderMdxChild, tryResumeMdxScalar } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		...route.imports,
 		'',
 		`const marklessMdxParts = ${JSON.stringify(route.parts)};`,
@@ -234,6 +234,7 @@ function renderMdxResumeHandler(): string[] {
 				'    root: input.root,',
 				'    loadSymbol: marklessMdxLoadSymbol,',
 				'    handoffDispatchOptions: marklessMdxDispatchOptions,',
+				'    loadRepeatModules: repeats => loadMdxRepeatModules(repeats, marklessMdxSymbolLoaders),',
 				'    renderData: marklessMdxRenderData,',
 				'  });',
 				'  await runtime.dispatch(input.event, marklessMdxDispatchOptions(input));',

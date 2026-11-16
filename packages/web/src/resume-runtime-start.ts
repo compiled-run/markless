@@ -172,6 +172,7 @@ export async function startResumeRuntime(input: {
 			loadSymbol: runtimeInput.loadSymbol,
 			elementHandles: prepared.elementHandles,
 		});
+		await runtimeInput.loadRepeatModules?.(runtimeInput.view.keyedRepeats!);
 		await keyedRepeats.wireKeyedRepeats(
 			{
 				graph: runtimeInput.graph,

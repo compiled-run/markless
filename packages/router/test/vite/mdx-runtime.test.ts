@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	composeMdxState,
 	composeMdxView,
+	loadMdxRepeatModules,
 	loadMdxSymbol,
 	mdxSymbolLoader,
 	type MdxChild,
@@ -153,6 +154,40 @@ describe('Markless Router MDX route runtime helpers', () => {
 		const loading = loadMdxSymbol('m2:symbol:0', [], [fetched]);
 		expect(loading).toBeInstanceOf(Promise);
 		expect(((await loading) as MdxTestSymbol)({})).toBe('island:symbol:0');
+	});
+});
+
+describe('loadMdxRepeatModules', () => {
+	it('loads, once each, the islands holding a list whose rows a write can build', async () => {
+		const loaded: string[] = [];
+		const loaders = ['m0:', 'm1:', 'm2:', 'm3:'].map((prefix) =>
+			mdxSymbolLoader(prefix, async () => {
+				loaded.push(prefix);
+				return { loadSymbol: () => undefined };
+			}),
+		);
+		const list = { collectionGraphNodeId: 'state:items', rowTemplate: { html: '<li></li>' } };
+		await loadMdxRepeatModules(
+			[
+				{ ...list, id: 'm1:repeat:0' },
+				{ ...list, id: 'm1:repeat:1' },
+				{ ...list, id: 'm0:repeat:0', fixed: true },
+				{ id: 'm2:repeat:0', collectionGraphNodeId: 'state:order' },
+				{ collectionGraphNodeId: 'state:items', rowComponent: { name: 'Row' }, id: 'm3:repeat:0' },
+			] as never,
+			loaders,
+		);
+		expect(loaded).toEqual(['m1:', 'm3:']);
+	});
+
+	it('leaves wiring to go on when an island module fails to load', async () => {
+		const failing = mdxSymbolLoader('m0:', () => Promise.reject(new Error('offline')));
+		await expect(
+			loadMdxRepeatModules(
+				[{ id: 'm0:repeat:0', collectionGraphNodeId: 'state:items', emptyArm: {} }] as never,
+				[failing],
+			),
+		).resolves.toBeUndefined();
 	});
 });
 

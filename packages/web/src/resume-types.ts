@@ -462,6 +462,10 @@ export type ResumeRuntimeInput = {
 	readonly onError?: ResumeRuntimeErrorHook;
 	readonly demandAsyncBoundaries?: boolean;
 	readonly renderData?: ResumeRenderDataThunk;
+	/** Loads the modules these repeats were compiled in, on a page that loads each part's module on demand (an MDX page's islands); those modules name the row code. */
+	readonly loadRepeatModules?: (
+		repeats: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	) => Promise<unknown> | undefined;
 };
 export type ResumeDispatchOptions = {
 	readonly syncPolicyAlreadyApplied?: boolean;

@@ -16,6 +16,7 @@ import {
 } from '../../../../serializer/src/protocol-constants.ts';
 import { isUncountedComment } from '../../../../web/src/resume-anchor-census.ts';
 import type { ProtocolViewPayload } from '../../../../serializer/src/protocol.ts';
+import type { ResumeKeyedRepeatRecord } from '../../../../web/src/resume-types.ts';
 export { tryResumeMdxScalar } from './mdx-scalar.ts';
 
 export type MdxRoutePart =
@@ -65,6 +66,7 @@ export type MdxComponentArtifact = {
 export type MdxSymbolLoader = {
 	readonly prefix: string;
 	readonly loadSymbol: (symbolId: string) => unknown;
+	readonly loadModule?: () => Promise<unknown>;
 };
 
 type MdxIslandModule = {
@@ -88,6 +90,7 @@ export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxI
 	};
 	return {
 		prefix,
+		loadModule,
 		loadSymbol: (symbolId: string) =>
 			marklessWhenLoaded(loadModule(), (mod: MdxIslandModule) =>
 				mod.loadSymbol(symbolId.slice(prefix.length)),
@@ -778,6 +781,21 @@ export function loadMdxSymbol(
 	}
 
 	return Promise.reject(new Error(`Unknown Markless MDX symbol ${symbolId}`));
+}
+
+// An island's own module names the row code its lists build with, and resume runs no island code; a list that changes needs it first.
+export function loadMdxRepeatModules(
+	repeats: ReadonlyArray<ResumeKeyedRepeatRecord>,
+	loaders: readonly MdxSymbolLoader[],
+): Promise<unknown> {
+	const islands = new Set<MdxSymbolLoader>();
+	for (const repeat of repeats) {
+		if (!(repeat.rowTemplate ?? repeat.emptyArm ?? repeat.rowComponent)) continue;
+		if (!repeat.collectionGraphNodeId || repeat.fixed) continue;
+		const island = loaders.find((loader) => repeat.id.startsWith(loader.prefix));
+		if (island) islands.add(island);
+	}
+	return Promise.all([...islands].map((island) => island.loadModule?.())).catch(() => undefined);
 }
 
 type MdxInstanceScopedLoad = Parameters<typeof marklessInstanceScopedLoadSymbol>[0];

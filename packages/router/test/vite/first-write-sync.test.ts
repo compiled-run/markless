@@ -77,6 +77,16 @@ const pages: ReadonlyArray<{ readonly path: string; readonly rows: string; reado
 	{ path: '/direct', rows: 'ol > li', seen: { dealt: [2, 3, 4], snapshots: [] } },
 	{ path: '/plain', rows: 'ol > li', seen: { dealt: [2, 3, 4], snapshots: [] } },
 	{ path: '/counted', rows: 'ul > li', seen: { dealt: [2, 3, 4], snapshots: [] } },
+	{
+		path: '/island',
+		rows: 'ol > li',
+		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
+	},
+	{
+		path: '/projected',
+		rows: 'ol > li',
+		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
+	},
 ];
 
 describe('production build', () => {
