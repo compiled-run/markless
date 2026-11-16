@@ -58,6 +58,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	const all = input.allComputed ?? input.computed;
 	const batches = graph.pullBeforeRead && (onReadBatches.get(graph) ?? []);
 	if (batches) onReadBatches.set(graph, [...batches, all]);
+	let byNode: import('./resume-sync-computed.ts').RecordsByNode | undefined;
 	for (const computed of records) {
 		for (const dependency of computed.dependencies ?? []) {
 			input.storeContainerSubscription(
@@ -71,15 +72,18 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 							await import('./resume-sync-computed.ts'));
 						const refresh = {
 							computed,
-							records: all,
 							graph,
 							root: input.root,
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
 						};
-						await (batches && computed.deriveOnRead
-							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-							: module.refreshSyncComputed(refresh)
+						await (
+							batches && computed.deriveOnRead
+								? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
+								: module.refreshSyncComputed({
+										...refresh,
+										byNode: (byNode ??= module.indexRecordsByNode(all)),
+									})
 						).finally(done);
 					},
 				}),

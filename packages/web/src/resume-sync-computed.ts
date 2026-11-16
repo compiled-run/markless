@@ -80,6 +80,27 @@ function loadDerive(
 
 type RefreshInput = Parameters<typeof refreshSyncComputed>[0];
 
+type RefreshRecord = Omit<ResumeSyncComputedRecord, 'deriveSymbolId'> & {
+	readonly async?: boolean;
+	readonly deriveSymbolId?: string;
+	readonly deriveOnRead?: true;
+};
+
+// Every record a node id names, in list order.
+export type RecordsByNode = ReadonlyMap<string, ReadonlyArray<RefreshRecord>>;
+
+export function indexRecordsByNode(
+	list: ReadonlyArray<RefreshRecord>,
+	into = new Map<string, RefreshRecord[]>(),
+) {
+	for (const record of list) {
+		const named = into.get(record.graphNodeId);
+		if (named) named.push(record);
+		else into.set(record.graphNodeId, [record]);
+	}
+	return into;
+}
+
 const HELD = Symbol('held');
 
 // `painted` turns the read into one that answers what the page shows.
@@ -131,7 +152,7 @@ export function deriveSyncComputedNow(
 	const roster = load && rosters.get(load);
 	if (
 		(load && !roster) ||
-		(input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph))
+		(input.byNode && asyncPlanes.awaitsAncestor?.(input.computed, input.byNode, input.graph))
 	)
 		return false;
 	const write = (value: unknown): boolean | Promise<unknown> =>
@@ -150,30 +171,25 @@ export async function refreshSyncComputed(
 		readonly loadSymbol: ResumeRuntimeInput['loadSymbol'];
 		readonly elementHandles: ElementHandleRegistry;
 		readonly derive?: ResumeSymbol;
-		readonly records?: ReadonlyArray<
-			Omit<ResumeSyncComputedRecord, 'deriveSymbolId'> & {
-				readonly async?: boolean;
-				readonly deriveSymbolId?: string;
-				readonly deriveOnRead?: true;
-			}
-		>;
+		readonly records?: ReadonlyArray<RefreshRecord>;
+		// The records by node, built once by whoever holds the list; a lone refresh builds its own.
+		readonly byNode?: RecordsByNode;
 	},
 	deriving = new Set<string>(),
 ): Promise<void> {
+	const byNode = input.byNode ?? (input.records && indexRecordsByNode(input.records));
 	// No value is served for a computed only other computeds read: derive it before its reader.
 	deriving.add(input.computed.graphNodeId);
 	for (const { graphNodeId } of input.computed.dependencies ?? []) {
-		const record = input.records?.find(
-			(r) => r.graphNodeId === graphNodeId && r.async === false && r.deriveSymbolId,
-		);
+		const record = byNode?.get(graphNodeId)?.find((r) => r.async === false && r.deriveSymbolId);
 		if (record && !deriving.has(graphNodeId) && input.graph.read(graphNodeId, []) === undefined)
 			await refreshSyncComputed(
-				{ ...input, computed: record as ResumeSyncComputedRecord, derive: undefined },
+				{ ...input, computed: record as ResumeSyncComputedRecord, derive: undefined, byNode },
 				deriving,
 			);
 	}
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
-	if (input.records && asyncPlanes.awaitsAncestor?.(input.computed, input.records, input.graph)) return;
+	if (byNode && asyncPlanes.awaitsAncestor?.(input.computed, byNode, input.graph)) return;
 	const roster = await loadRosterResume();
 	const symbol = input.derive ?? (await loadDerive(input.loadSymbol, input.computed));
 	const result = await derive(input, symbol, roster);
@@ -219,6 +235,7 @@ type OnReadGraph = {
 	readonly own: Map<string, number>;
 	// Read by an async computed, which the graph re-runs from the value itself.
 	readonly asyncRead: Set<string>;
+	readonly byNode: Map<string, RefreshRecord[]>;
 	scanned: number;
 };
 
@@ -243,6 +260,7 @@ export async function refreshWhenShown(
 				readers: new Map(),
 				own: new Map(),
 				asyncRead: new Set(),
+				byNode: new Map(),
 				scanned: 0,
 			}),
 		);
@@ -258,8 +276,8 @@ export async function refreshWhenShown(
 			run() {},
 		});
 	}
-	const { nodes, readers, own, asyncRead } = state;
-	const base = { ...input, records: batches.flat() };
+	const { nodes, readers, own, asyncRead, byNode } = state;
+	const base = { ...input, byNode };
 	const at = (record: OnReadRecord, derive?: ResumeSymbol) => ({
 		...base,
 		computed: record,
@@ -340,7 +358,8 @@ export async function refreshWhenShown(
 		for (const reader of readers.get(graphNodeId) ?? []) markStale(reader, seen);
 	};
 	const fresh: OnReadRecord[] = [];
-	for (const batch of batches.slice(state.scanned))
+	for (const batch of batches.slice(state.scanned)) {
+		indexRecordsByNode(batch, byNode);
 		for (const record of batch) {
 			if (record.async === true)
 				for (const { graphNodeId } of record.dependencies ?? []) asyncRead.add(graphNodeId);
@@ -361,6 +380,7 @@ export async function refreshWhenShown(
 				}
 			}
 		}
+	}
 	state.scanned = batches.length;
 	// No value is served for a computed only other computeds read: it derives at its first read.
 	for (const record of fresh.filter(

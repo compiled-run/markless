@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 390,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 64,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 6,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 390,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 64,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 9,
+			"reason": "refresh looks up a computed's dependency records through one index built per record list instead of searching every record per dependency; a 1000-row first press drops from about 240 to 140 ms at 4x",
+			"date": "2026-11-16"
+		}
+	]
+}
