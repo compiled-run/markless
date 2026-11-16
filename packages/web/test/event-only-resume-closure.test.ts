@@ -151,7 +151,9 @@ const resumeOnDemandEntries = [
 // async plane's slot, which only a page with async values fills: 35,910 -> 37,220 raw, nearly all of it
 // reconcile-plane-slot.ts, which resume-runtime.ts already loads; minified 11,586 -> 11,720, gzip 4,578 -> 4,621 bytes
 // with that slot inlined (rolldown, workspace packages and lazy imports external, same method both sides).
-const sourceByteLimit = 37220;
+// 2026-11-15: a row whose values wait for the reader keeps a copy of the item it was painted from, so a write into that
+// item in place before the reader arrives still repaints it: 37,220 -> 37,236 raw, one condition in resume-keyed-repeats.ts.
+const sourceByteLimit = 37236;
 
 const forbiddenClosureFiles = [
 	'packages/web/src/resume.ts',
