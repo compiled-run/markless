@@ -326,8 +326,9 @@ function startsWith(path: ReadonlyArray<string>, prefix: ReadonlyArray<string>):
 	return prefix.every((part, index) => path[index] === part);
 }
 
+// An event record's `writes` name what it changes, never what reads the node.
 function references(value: unknown, id: string): boolean {
 	if (value === id) return true;
 	if (!value || typeof value !== 'object') return false;
-	return Object.values(value).some((child) => references(child, id));
+	return Object.entries(value).some(([key, child]) => key !== 'writes' && references(child, id));
 }

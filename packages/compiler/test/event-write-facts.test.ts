@@ -10,7 +10,7 @@ const compile = (body: string, before = '') =>
 		source: `import { state } from '@markless/core'; ${before} export default function Hand() @{ ${body} }`,
 	});
 
-test('an event record names the cells its handler writes, a write inside a callback it hands a helper included', async () => {
+test('an event record names the cells its handler writes that update code reads, a write inside a callback it hands a helper included', async () => {
 	const compiled = await compile(
 		`let hand = state(['7s']); let clicks = state(0); let shown = state(true);
 		<section>
@@ -22,7 +22,7 @@ test('an event record names the cells its handler writes, a write inside a callb
 		'function glide(change: () => void) { change(); }',
 	);
 	const writes = compiled.protocolView.events.map((event) => event.writes);
-	expect(writes).toEqual([['state:hand'], ['state:clicks', 'state:shown'], undefined]);
+	expect(writes).toEqual([['state:hand'], ['state:clicks'], undefined]);
 });
 
 test('a row event names the cells its handler writes', async () => {

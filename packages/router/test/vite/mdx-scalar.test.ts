@@ -21,6 +21,7 @@ function fixture(scope = 'm3:c0:', cellName = 'count', initial = 2) {
 		hostNodeId: scope + 'h0',
 		eventName: 'click',
 		symbolIds: [scope + 'handler'],
+		writes: [cell],
 	};
 	const view: ProtocolViewPayload = {
 		version: ASYNC_PROTOCOL_VERSION,

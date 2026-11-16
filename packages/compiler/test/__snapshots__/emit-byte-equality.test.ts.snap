@@ -1804,9 +1804,6 @@ function createUnknownSymbolError(id) {
         "eventName": "click",
         "symbolIds": [
           "symbol:0"
-        ],
-        "writes": [
-          "state:chosen"
         ]
       }
     ],
@@ -1863,9 +1860,6 @@ function createUnknownSymbolError(id) {
             "eventName": "click",
             "symbolIds": [
               "symbol:0"
-            ],
-            "writes": [
-              "state:chosen"
             ]
           }
         ]
@@ -1875,7 +1869,7 @@ function createUnknownSymbolError(id) {
     "asyncBoundaries": []
   },
   "stateScript": "<script type=\\"markless/state\\">{\\"version\\":1,\\"cells\\":[{\\"graphNodeId\\":\\"state:entries\\",\\"name\\":\\"entries\\",\\"valueKind\\":\\"array\\",\\"value\\":{\\"version\\":1,\\"root\\":{\\"$ref\\":0},\\"records\\":[{\\"id\\":0,\\"type\\":\\"array\\",\\"items\\":[{\\"$ref\\":1}]},{\\"id\\":1,\\"type\\":\\"object\\",\\"fields\\":[[\\"code\\",\\"a\\"],[\\"title\\",\\"Alpha\\"]]}]}},{\\"graphNodeId\\":\\"state:chosen\\",\\"name\\":\\"chosen\\",\\"valueKind\\":\\"scalar\\",\\"value\\":{\\"version\\":1,\\"root\\":\\"a\\",\\"records\\":[]}}],\\"computed\\":[],\\"sharedDefinitions\\":[]}</script>",
-  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"section\\"},{\\"hostNodeId\\":\\"h4\\",\\"strategy\\":\\"dom-order\\",\\"index\\":4,\\"tagName\\":\\"button\\"}],\\"events\\":[{\\"hostNodeId\\":\\"h4\\",\\"eventName\\":\\"click\\",\\"symbolIds\\":[\\"symbol:0\\"],\\"writes\\":[\\"state:chosen\\"]}],\\"domUpdates\\":[],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[{\\"id\\":\\"repeat:0\\",\\"parentHostNodeId\\":\\"h1\\",\\"collectionGraphNodeId\\":\\"state:entries\\",\\"collectionPath\\":[],\\"keyPath\\":[\\"code\\"],\\"itemName\\":\\"entry\\",\\"rowElementCount\\":3,\\"rowTemplate\\":{\\"html\\":\\"<article class=\\\\\\"\\\\\\"><h2>\\\\u003C!--markless-slot:1-->\\\\u003C/h2><button>Choose\\\\u003C/button>\\\\u003C/article>\\",\\"componentName\\":\\"App\\",\\"textSlots\\":[{\\"path\\":[0,0,0],\\"itemPath\\":[\\"title\\"]}],\\"attributeSlots\\":[{\\"path\\":[0],\\"name\\":\\"class\\",\\"source\\":\\"chosen === entry.code ? 'picked' : 'plain'\\",\\"reads\\":[{\\"graphNodeId\\":\\"state:chosen\\",\\"path\\":[]}]}]},\\"rowEvents\\":[{\\"hostPath\\":[1],\\"eventName\\":\\"click\\",\\"symbolIds\\":[\\"symbol:0\\"],\\"writes\\":[\\"state:chosen\\"]}]}],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
+  "viewScript": "<script type=\\"markless/view\\">{\\"version\\":1,\\"locators\\":[{\\"hostNodeId\\":\\"h1\\",\\"strategy\\":\\"dom-order\\",\\"index\\":1,\\"tagName\\":\\"section\\"},{\\"hostNodeId\\":\\"h4\\",\\"strategy\\":\\"dom-order\\",\\"index\\":4,\\"tagName\\":\\"button\\"}],\\"events\\":[{\\"hostNodeId\\":\\"h4\\",\\"eventName\\":\\"click\\",\\"symbolIds\\":[\\"symbol:0\\"]}],\\"domUpdates\\":[],\\"behaviors\\":[],\\"elementHandles\\":[],\\"keyedRepeats\\":[{\\"id\\":\\"repeat:0\\",\\"parentHostNodeId\\":\\"h1\\",\\"collectionGraphNodeId\\":\\"state:entries\\",\\"collectionPath\\":[],\\"keyPath\\":[\\"code\\"],\\"itemName\\":\\"entry\\",\\"rowElementCount\\":3,\\"rowTemplate\\":{\\"html\\":\\"<article class=\\\\\\"\\\\\\"><h2>\\\\u003C!--markless-slot:1-->\\\\u003C/h2><button>Choose\\\\u003C/button>\\\\u003C/article>\\",\\"componentName\\":\\"App\\",\\"textSlots\\":[{\\"path\\":[0,0,0],\\"itemPath\\":[\\"title\\"]}],\\"attributeSlots\\":[{\\"path\\":[0],\\"name\\":\\"class\\",\\"source\\":\\"chosen === entry.code ? 'picked' : 'plain'\\",\\"reads\\":[{\\"graphNodeId\\":\\"state:chosen\\",\\"path\\":[]}]}]},\\"rowEvents\\":[{\\"hostPath\\":[1],\\"eventName\\":\\"click\\",\\"symbolIds\\":[\\"symbol:0\\"]}]}],\\"branches\\":[],\\"asyncBoundaries\\":[]}</script>"
 }",
     "protocolState": "{
   "version": 1,
@@ -1952,9 +1946,6 @@ function createUnknownSymbolError(id) {
       "eventName": "click",
       "symbolIds": [
         "symbol:0"
-      ],
-      "writes": [
-        "state:chosen"
       ]
     }
   ],
@@ -2011,9 +2002,6 @@ function createUnknownSymbolError(id) {
           "eventName": "click",
           "symbolIds": [
             "symbol:0"
-          ],
-          "writes": [
-            "state:chosen"
           ]
         }
       ]

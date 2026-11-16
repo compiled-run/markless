@@ -1,6 +1,7 @@
 import {
 	ASYNC_BOUNDARY_ARM,
 	ASYNC_PROTOCOL_VERSION,
+	protocolInstanceQualifies,
 	type ProtocolRowTemplateSlotValue,
 	type ProtocolEventWriteFacts,
 	type ProtocolSubmitEventFacts,
@@ -1786,9 +1787,31 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 	});
 }
 
-// The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+const loadedCodeReaders = new WeakMap<object, ReadonlySet<string>>();
+
+// Nodes a write to which can wake update code a press would have to load: a text or attribute
+// update, a sync computed's derive, or a component the node is passed to. Page-space nodes may be read anywhere.
+function readByLoadedCode(
+	input: Pick<ProtocolViewPayloadInput, 'symbolResolver' | 'semanticGraph'>,
+	graphNodeId: string,
+): boolean {
+	let readers = loadedCodeReaders.get(input.symbolResolver);
+	if (!readers) {
+		const ids = new Set<string>();
+		for (const symbol of input.symbolResolver.symbols)
+			if (symbol.kind === 'dom-update') ids.add(symbol.graphNodeId);
+			else if (symbol.kind === 'sync-computed-derive')
+				for (const dependency of symbol.dependencies ?? []) ids.add(dependency.graphNodeId);
+		for (const edge of input.semanticGraph?.componentEdges ?? [])
+			for (const prop of edge.props)
+				if ('graphNodeId' in prop && typeof prop.graphNodeId === 'string') ids.add(prop.graphNodeId);
+		loadedCodeReaders.set(input.symbolResolver, (readers = ids));
+	}
+	return readers.has(graphNodeId) || protocolInstanceQualifies(graphNodeId) !== true;
+}
+
 function eventWriteFacts(
-	input: Pick<ProtocolViewPayloadInput, 'symbolResolver'>,
+	input: Pick<ProtocolViewPayloadInput, 'symbolResolver' | 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },
 ): ProtocolEventWriteFacts {
 	const writes = new Set<string>();
@@ -1800,10 +1823,12 @@ function eventWriteFacts(
 			// An inlined foreign body writes another module's graph.
 			!symbol.crossModuleInline
 		)
-			for (const write of symbol.writes ?? []) writes.add(write.graphNodeId);
+			for (const write of symbol.writes ?? [])
+				if (readByLoadedCode(input, write.graphNodeId)) writes.add(write.graphNodeId);
 	return writes.size > 0 ? { writes: [...writes].sort() } : {};
 }
 
+// The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
 function submitEventFacts(
 	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },

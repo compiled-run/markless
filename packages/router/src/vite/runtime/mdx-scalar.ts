@@ -307,12 +307,13 @@ function readScript<T>(root: Element, type: RuntimePayloadType): T | undefined {
 	return text ? (decodeProtocolPayloadLists(type, JSON.parse(text)) as T) : undefined;
 }
 
+// An event record's `writes` name what it changes, never what reads the cell.
 function references(value: unknown, id: string): boolean {
 	return (
 		value === id ||
 		(!!value &&
 			typeof value === 'object' &&
-			Object.values(value).some((child) => references(child, id)))
+			Object.entries(value).some(([key, child]) => key !== 'writes' && references(child, id)))
 	);
 }
 
