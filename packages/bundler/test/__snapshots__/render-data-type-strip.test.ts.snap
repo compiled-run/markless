@@ -133,6 +133,7 @@ export const runtimeDemandMap = {
 		"web/fns/busy-elements",
 		"web/fns/held-inputs-plane",
 		"web/fns/refresh-announcer",
+		"web/fns/resident-load",
 		"web/fns/served-row-ranges",
 		"web/fns/shared-instances",
 		"web/form-send",

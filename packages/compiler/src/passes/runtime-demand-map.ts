@@ -50,6 +50,8 @@ import {
 	sharedCallbackSlotGraphNodeId,
 } from './semantic-graph/collect-shared.ts';
 
+// Every emitted symbol loader reads code already on the page through it.
+const SYMBOL_LOAD = ['web/fns/resident-load'];
 const DISPATCH_CORE_COMMON = [
 	'web/resume-runtime',
 	'web/resume-runtime-shared',
@@ -63,12 +65,14 @@ const DISPATCH_CORE_COMMON = [
 	'web/runtime-error-reporting',
 	// Payload resume applies every dispatch's DOM writes through the journal.
 	'web/dom-journal',
+	...SYMBOL_LOAD,
 ];
 const SCALAR_LEAN_DISPATCH_CORE = [
 	'web/fns/dom-order',
 	'web/fns/write-scalar',
 	'web/fns/update-text',
 	'web/runtime-error-reporting',
+	...SYMBOL_LOAD,
 	// Tiny generic helpers for emitted scalar dispatchers: DOM-order lookup,
 	// scalar-cell decode/validation, and fail-closed error creation.
 	...LEAN_DISPATCH_MARKER_MODULES.scalar,
@@ -76,6 +80,7 @@ const SCALAR_LEAN_DISPATCH_CORE = [
 const ROW_LEAN_DISPATCH_CORE = [
 	...LEAN_DISPATCH_MARKER_MODULES.row,
 	'web/event-only-lean/lean-shared',
+	...SYMBOL_LOAD,
 ];
 const CLOSURE_DISPATCH_CORE = [...SCALAR_LEAN_DISPATCH_CORE, 'web/fns/closure-action'];
 const SYNC_POLICY = ['web/inline/sync-policy-core'];
@@ -153,6 +158,7 @@ const FULL_TIER_COMMON = [
 	'web/payload-resume',
 	'web/payload-graph-construct',
 	'web/dom-journal',
+	...SYMBOL_LOAD,
 ];
 
 function payloadResumeModules(storageFree: boolean): string[] {

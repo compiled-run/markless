@@ -80,6 +80,17 @@
 			"delta": 54,
 			"reason": "symbol loaders read code already on the page in the caller's task, so the first write reaches the DOM before its handler returns",
 			"date": "2026-11-16"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "one runtime module, web/fns/resident-load, lets symbol loaders read code already on the page in the caller's task",
+			"date": "2026-11-16"
 		}
 	]
 }
