@@ -185,7 +185,7 @@ export type ProtocolStatePayload = {
 		readonly async: boolean;
 		// Sync computeds only: the update symbol that recomputes this node on resume.
 		readonly deriveSymbolId?: string;
-		// The render's derived value, served only where resume reads it before a dependency write: a handler, a flipped arm or a keyed @for.
+		// The render's derived value, served only where resume reads it before a dependency write (a handler, a flipped arm or a keyed @for) and never for a module constant.
 		readonly value?: unknown;
 		// The same value on the live channel cells use: a CSR mount hands it over
 		// in memory, so it never needs an envelope. Never served — payload
