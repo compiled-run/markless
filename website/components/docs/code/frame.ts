@@ -2,8 +2,9 @@
 // the compiled modules; this page links them to Blob URLs and renders the entry's
 // default export into its body.
 import { render, type RenderTarget } from '@markless/core';
+import { PACK_RESIDENT } from '../../../../packages/web/src/fns/resident-load.ts';
 import { installRuntimeImport, runtimeImportCall, runtimeModuleUrl } from './frame-runtime.ts';
-import { blockStyles, createLinker } from './link.ts';
+import { blockStyles, createLinker, moduleKey } from './link.ts';
 import type { CodeDiagnostic, CompiledModule, FrameReply, FrameRequest } from './protocol.ts';
 
 type Run = { load(specifier: string): Promise<unknown> };
@@ -40,6 +41,13 @@ function runtimeUrl(code: string): string {
 }
 installRuntimeImport(runtimeUrl);
 
+// A load of code already run answers in the caller's own task, the contract a build's packed loads keep.
+function resident(namespace: unknown): Promise<unknown> {
+	const loading: Promise<unknown> & { [PACK_RESIDENT]?: () => unknown } = Promise.resolve(namespace);
+	loading[PACK_RESIDENT] = () => namespace;
+	return loading;
+}
+
 function runtimeError(error: unknown): CodeDiagnostic {
 	const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 	return { file: '', line: 0, column: 0, message };
@@ -60,11 +68,18 @@ async function run(
 		dynamicImport: (expression, specifier) =>
 			runtimeImportCall(specifier) ?? `globalThis.${RUNS}.get(${id}).load(${expression})`,
 	});
+	const evaluated = new Map<string, unknown>();
+	// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
+	const evaluate = async (specifier: string) => {
+		const moduleUrl = await linker.url(specifier);
+		const namespace: unknown = await import(/* @vite-ignore */ moduleUrl);
+		evaluated.set(moduleKey(specifier), namespace);
+		return namespace;
+	};
 	runs.set(id, {
-		// Vite 8.3 wraps import() in a non-async preload arrow, so its argument must not await.
-		load: async (specifier) => {
-			const moduleUrl = await linker.url(specifier);
-			return import(/* @vite-ignore */ moduleUrl);
+		load: (specifier) => {
+			const key = moduleKey(specifier);
+			return evaluated.has(key) ? resident(evaluated.get(key)) : evaluate(specifier);
 		},
 	});
 	const mount = document.createElement('div');
@@ -74,6 +89,10 @@ async function run(
 		const entry = (await import(/* @vite-ignore */ entryUrl)) as {
 			default?: unknown;
 		};
+		// One that throws is left to throw where the component loads it.
+		await Promise.all(
+			modules.filter((module) => module.generated).map((module) => evaluate(module.id).catch(() => {})),
+		);
 		if (id !== latest) return;
 		if (!entry.default)
 			throw new Error(

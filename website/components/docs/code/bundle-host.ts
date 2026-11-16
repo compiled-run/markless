@@ -12,6 +12,7 @@ import { loadHook, resolveIdHook } from '../../../../packages/bundler/src/hooks/
 import { transformHook } from '../../../../packages/bundler/src/hooks/transform-hook.ts';
 import { createPluginState } from '../../../../packages/bundler/src/plugin-state.ts';
 import { stripEmittedTypes } from '../../../../packages/bundler/src/transform.ts';
+import { isMarklessVirtualId } from '../../../../packages/bundler/src/virtual-ids.ts';
 import { importSites } from './import-sites.ts';
 import type { CodeFile, CompiledModule, ImportSite } from './protocol.ts';
 
@@ -399,7 +400,13 @@ export function createBlockBuilder(host: SourceHost, buildId: string): BlockBuil
 					const target = await resolve(named!, id, walker);
 					if (target && !target.external) pending.push(target.id);
 				}
-				modules.set(key, { id: key, kind: 'script', code, imports });
+				modules.set(key, {
+					id: key,
+					kind: 'script',
+					code,
+					imports,
+					...(isMarklessVirtualId(key) && { generated: true as const }),
+				});
 			}
 			return [...modules.values()];
 		}

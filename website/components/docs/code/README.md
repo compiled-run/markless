@@ -62,7 +62,11 @@ Every block keeps its own result frame. The session reports compile errors itsel
 compiled modules to the frame (`code:modules`); `frame.ts` links every module to a Blob URL,
 renders the entry, and reports runtime errors and its height back; each `import()`, computed ones
 included, goes through the run that linked it, and runtime imports go through a loader every
-later run can still call.
+later run can still call. Before it renders, the frame runs every module the compiler wrote (the
+component's handler and update code, marked `generated`), and a load of a module it has run
+answers in the caller's own task (`$mlNow`, `packages/web/src/fns/resident-load.ts`), as a build's
+packed code does, so the first write after Run again or an edit reaches the DOM before the
+writer returns.
 
 `@markless/ui` families compile from the package source the worker bundles as text
 (`worker-sources.ts`); the bundler reads it through the in-memory `source-fs.ts`. Import a
