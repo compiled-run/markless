@@ -3,7 +3,7 @@ import {
 	marklessIslandSpacedSymbol,
 } from '../../../../web/src/fns/instance-scope.ts';
 import { marklessThen } from '../../../../web/src/ssr-data/awaitable.ts';
-import { marklessWhenLoaded } from '../../../../web/src/fns/resident-load.ts';
+import { marklessWhenLoaded, PACK_RESIDENT } from '../../../../web/src/fns/resident-load.ts';
 import { type StructureToken, withProjectionSpan } from '../../../../web/src/ssr-data/renderer.ts';
 import { marklessSsrRosterPositionContext } from '../../../../web/src/fns/roster-position.ts';
 import { STORAGE_RENDER_CONTEXT_READER } from '../../../../serializer/src/storage-cookie.ts';
@@ -76,6 +76,7 @@ type MdxIslandModule = {
 	) => MdxScopedAction | undefined | Promise<MdxScopedAction | undefined>;
 };
 type MdxScopedAction = { readonly scope: string };
+type ResidentLoad = Promise<unknown> & { [PACK_RESIDENT]?: () => unknown };
 
 /** One island's symbols, loaded once from its own module; a failed load is retried on the next ask. */
 export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxIslandModule>) {
@@ -83,9 +84,13 @@ export function mdxSymbolLoader(prefix: string, importModule: () => Promise<MdxI
 	const loadModule = () => {
 		if (module) return module;
 		const loading = (module = importModule());
-		loading.catch(() => {
-			if (module === loading) module = undefined;
-		});
+		// An island in its own chunk loads without the pack's marker; once it has run, later symbols answer in the caller's task.
+		loading.then(
+			(mod) => void ((loading as ResidentLoad)[PACK_RESIDENT] ??= () => mod),
+			() => {
+				if (module === loading) module = undefined;
+			},
+		);
 		return loading;
 	};
 	return {

@@ -155,6 +155,19 @@ describe('Markless Router MDX route runtime helpers', () => {
 		expect(loading).toBeInstanceOf(Promise);
 		expect(((await loading) as MdxTestSymbol)({})).toBe('island:symbol:0');
 	});
+
+	// An island packed in a chunk of its own: the import() carries no marker, and the first write's update code loads after its handler.
+	it('answers in the caller task once an island loaded from its own chunk has run', async () => {
+		const island = { loadSymbol: (symbolId: string) => () => `island:${symbolId}` };
+		const ownChunk = mdxSymbolLoader('m14:', () => Promise.resolve(island));
+		const first = loadMdxSymbol('m14:symbol:0', [], [ownChunk]);
+		expect(first).toBeInstanceOf(Promise);
+		await first;
+
+		const later = loadMdxSymbol('m14:symbol:1', [], [ownChunk]) as MdxTestSymbol;
+		expect(typeof later).toBe('function');
+		expect(later({})).toBe('island:symbol:1');
+	});
 });
 
 describe('loadMdxRepeatModules', () => {
