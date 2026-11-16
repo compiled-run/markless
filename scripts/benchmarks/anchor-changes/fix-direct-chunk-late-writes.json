@@ -1,0 +1,50 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/direct"
+			],
+			"delta": 213,
+			"reason": "the direct renderer now syncs writes made after the handler returned (timers, promises, view transitions); +110 B minified, +49 B gzip on the direct startup",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 17,
+			"reason": "the direct renderer now syncs writes made after the handler returned (timers, promises, view transitions); +110 B minified, +49 B gzip on the direct startup",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/direct"
+			],
+			"delta": 213,
+			"reason": "the direct renderer now syncs writes made after the handler returned (timers, promises, view transitions); +110 B minified, +49 B gzip on the direct startup",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 23,
+			"reason": "the direct renderer now syncs writes made after the handler returned (timers, promises, view transitions); +110 B minified, +49 B gzip on the direct startup",
+			"date": "2026-11-16"
+		}
+	]
+}
