@@ -724,6 +724,12 @@ function componentResidueLocals(
 	);
 	const candidates = asNodes((componentAst?.body as AnyNode | undefined)?.body).flatMap(
 		(statement) => {
+			if (statement.type === 'FunctionDeclaration') {
+				const name = getIdentifierName(statement.id as AnyNode | undefined);
+				return name && !graphNames.has(name) && !sharedNames.has(name)
+					? [{ name, source: `(${expressionSource(statement, input.source.source)})` }]
+					: [];
+			}
 			if (statement.type !== 'VariableDeclaration' || statement.kind !== 'const') return [];
 			return asNodes(statement.declarations).flatMap((declaration) => {
 				const name = getIdentifierName(declaration.id as AnyNode | undefined);
