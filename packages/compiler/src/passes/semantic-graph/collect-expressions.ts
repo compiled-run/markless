@@ -17,6 +17,7 @@ import { getFrameworkApiForCall } from './imports.ts';
 import type {
 	FunctionParameterWrites,
 	ParameterWrite,
+	SemanticGraphBinding,
 	SemanticStateWrite,
 } from '../../artifacts.ts';
 import type { DeferredComputedWrite, WalkState } from './types.ts';
@@ -301,12 +302,24 @@ function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only'
 			: null
 		: resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
 	if (!resolved) return null;
+	if (!direct && startsPrimitive(resolved.binding, resolved.path)) return null;
 	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
 	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
 	if (writeThroughLocal(value, state, 'call')) return null;
 	return resolved.binding.kind === 'state' && resolved.binding.writable
 		? 'writable'
 		: 'read-only';
+}
+
+// A call cannot change a string, number or boolean it is handed.
+function startsPrimitive(binding: SemanticGraphBinding, path: ReadonlyArray<string>): boolean {
+	if (binding.initialValueKnown !== true) return false;
+	let value: unknown = binding.initialValue;
+	for (const segment of path) {
+		if (typeof value !== 'object' || value === null) return false;
+		value = (value as Record<string, unknown>)[segment];
+	}
+	return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
 }
 
 export function collectCollectionCall(node: AnyNode, state: WalkState): void {

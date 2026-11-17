@@ -124,3 +124,44 @@ export default function Library() @{
 	const handler = library.symbolModules.modules.find((item) => item.kind === 'event-handler');
 	expect(handler?.source).toContain('[["shared:src/shelf.tsrx#shelf/state:rack", ["books"]]]');
 });
+
+// A field that starts as a string, number or boolean cannot change in the callee, so nothing is marked.
+test('a function given a field that starts as a primitive marks nothing changed', async () => {
+	const results = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/bar.tsrx',
+			importSource: './bar.tsrx',
+			source: `
+import { shared, state } from '@markless/core';
+
+export const bar = shared(() => {
+	const cell = state({ timer: 0, delay: 40, label: 'menu' });
+	return { ...cell, close() { cell.timer = 0; } };
+}, { scope: 'app' });
+`,
+		},
+		{
+			filename: 'src/menu.tsrx',
+			source: `
+import { bar } from './bar.tsrx';
+
+export default function Menu() @{
+	const b = bar();
+	<button
+		onClick={() => {
+			window.clearTimeout(b.timer);
+			b.timer = window.setTimeout(() => {}, Math.max(b.delay, 10));
+			console.log(['x'].includes(b.label));
+		}}
+	>{b.label}</button>
+}
+`,
+		},
+	]);
+
+	const menu = results.at(-1)!;
+	expect(errors(menu)).toEqual([]);
+	const handler = menu.symbolModules.modules.find((item) => item.kind === 'event-handler');
+	expect(handler?.source).toContain('clearTimeout(');
+	expect(handler?.source).not.toContain('marklessChanged');
+});
