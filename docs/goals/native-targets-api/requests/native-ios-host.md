@@ -39,3 +39,12 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
 10. **Export `/1` (per-state assignments).** Dragon's `native-dragon-styles` branch emits `dragon.native-style-export/1`. The
    iOS host reads only `/0` and refuses `/1` by schema. Change needed before rung 4: the journal entry that tells a host to
    switch assignment (`next[a][s][v]`), so hosts stay "changed only by journal entries".
+11. **Zero-argument `String()` and `Number()`.** The reference's builtins pass `undefined` when there is no argument, so
+    `String()` is `"undefined"` and `Number()` is `NaN`; JavaScript gives `""` and `0`. The iOS host mirrors the reference
+    (the reference defines the meaning). Change needed: fix the reference or have the compiler refuse zero-argument calls.
+12. **When storage is written.** The contract says "after every op that changes the cell"; the reference writes after every
+    op on a storage cell, changed or not. The iOS host follows the reference. A `null` value removes the `UserDefaults` key,
+    so after a relaunch the cell reads its `initial`, not `null` (UserDefaults cannot hold null). Change needed: the
+    contract says which, and what a kept `null` means.
+13. **Variants dropped.** The iOS host removed the `variants` reading after the contract replaced it with export `/1`; the
+    `/0` reader rejects a `variants` field again.

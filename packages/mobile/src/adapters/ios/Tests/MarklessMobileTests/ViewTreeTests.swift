@@ -11,8 +11,10 @@ private let mobilePackage: URL = {
 	return url
 }()
 
-private func counterPayload() throws -> Data {
-	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: mobilePackage.appendingPathComponent("conformance/counter.json"))),
+private func counterPayload() throws -> Data { try vectorPayload("counter") }
+
+private func vectorPayload(_ name: String) throws -> Data {
+	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: mobilePackage.appendingPathComponent("conformance/\(name).json"))),
 		let payload = fields.first(where: { $0.0 == "payload" })?.1
 	else { throw HostError("no payload in the counter vector") }
 	return Data(payload.jsonText.utf8)
@@ -56,8 +58,75 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(heading.text == "Counter")
 }
 
+@MainActor @Test func attributesFollowStateAsPlatformState() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("attributes"))
+	let views = try tree(controller)
+	let heart = try #require(views.elements["h2"] as? UIButton)
+	let clear = try #require(views.elements["h3"] as? UIButton)
+	#expect(heart.accessibilityLabel == "Like")
+	#expect(!heart.accessibilityTraits.contains(.selected))
+	#expect(!clear.isEnabled)
+	#expect(clear.accessibilityTraits.contains(.notEnabled))
+	heart.sendActions(for: .touchUpInside)
+	#expect(heart.accessibilityLabel == "Unlike")
+	#expect(heart.accessibilityTraits.contains(.selected))
+	#expect(clear.isEnabled)
+	#expect(!clear.accessibilityTraits.contains(.notEnabled))
+	clear.sendActions(for: .touchUpInside)
+	#expect(heart.accessibilityLabel == "Like")
+	#expect(!clear.isEnabled)
+}
+
+@MainActor @Test func armsAreBuiltAndRemovedInPlace() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("if"))
+	let views = try tree(controller)
+	let main = try #require(views.elements["h0"])
+	let visible = { main.subviews.filter { !$0.isHidden }.map { $0.accessibilityIdentifier ?? "" } }
+	#expect(visible() == ["h1", "h2", "h4"])
+	#expect(views.labels["h3:text0"] == nil)
+	controller.perform(NativeAction(event: .activate, host: "h2"))
+	#expect(visible() == ["h1", "h2", "h3"])
+	#expect(views.labels["h3:text0"]?.text == "The details are here")
+	#expect(views.labels["h4:text0"] == nil)
+	#expect(views.labels["h2:text0"]?.text == "Hide details")
+	controller.perform(NativeAction(event: .activate, host: "h2"))
+	#expect(visible() == ["h1", "h2", "h4"])
+	#expect(throws: HostError.self) { try views.apply([.text(node: "h3:text0", value: "gone")]) }
+}
+
+@Test func userDefaultsKeepEachValueAsItsOwnType() throws {
+	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
+	defaults.removePersistentDomain(forName: "markless-ios-host-tests")
+	let store = UserDefaultsStore(defaults)
+	for value: NativeScalar in [.string("1"), .number(1), .bool(true), .number(-2.5), .string("")] {
+		store.write("k", value)
+		#expect(store.read("k") == value)
+	}
+	store.write("k", .null)
+	#expect(store.read("k") == nil)
+}
+
+@MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("input"), store: MemoryStore())
+	let views = try tree(controller)
+	let field = try #require(views.elements["h2"] as? UITextField)
+	#expect(field.text == "Sam")
+	#expect(field.accessibilityLabel == "Name")
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	#expect(field.frame.height > 20)
+	field.text = "Samantha"
+	field.sendActions(for: .editingChanged)
+	#expect(views.labels["h3:text0"]?.text == "Hello Samantha")
+	#expect(field.text == "Samantha")
+	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
+	#expect(field.text == "Bo")
+	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
-	let views = try tree(try MarklessViewController(payload: counterPayload()))
+	let controller = try MarklessViewController(payload: counterPayload())
+	let views = try tree(controller)
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h9:text0", value: "x")]) }
 }
 
