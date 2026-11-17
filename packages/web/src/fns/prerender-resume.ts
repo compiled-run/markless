@@ -5,6 +5,7 @@ import {
 	type ResumeRecordSet,
 } from '@markless/serializer/resume-record-merge';
 import type { ResumePayloadScriptsInput } from '../payload-full.ts';
+import type { ResumeDomElement } from '../resume-types.ts';
 import {
 	documentTemplateBranchHtml,
 	readPayloadScriptsFromDocument,
@@ -45,7 +46,7 @@ export async function renderPrerenderBranch(
 	graph: { readonly read: (graphNodeId: string, path?: ReadonlyArray<string>) => unknown },
 	propsOrLoadSymbol?: unknown,
 	pageBranchId?: string,
-	root?: { readonly __marklessShownAsyncArm?: (boundaryId: string) => number | undefined },
+	root?: Pick<ResumeDomElement, '__marklessShownAsyncArm'>,
 ) {
 	const evaluator = await loadPrerenderEvaluator();
 	return evaluator.renderPrerenderBranch(

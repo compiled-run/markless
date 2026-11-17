@@ -60,7 +60,7 @@ export type ResumeDomElement = ResumeDomNode & {
 	__marklessComments?: ResumeDomComment[];
 	// The arm each flipping branch shows, for rows written straight into an arm.
 	__marklessBranchArms?: Map<string, ResumeBranchArmEntry>;
-	__marklessShownAsyncArm?: (boundaryId: string) => number | undefined;
+	__marklessShownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 	// Set on a keyed row's root when its repeat wires the row: the items that row names, read at dispatch.
 	__marklessRowLocals?: () => Record<string, unknown>;
 	// Resume reads the host document off the root element (streamed arm patch
@@ -513,3 +513,6 @@ export type ResumePreparedCore = {
 	readonly elementHandles: ElementHandleRegistry;
 	readonly asyncBoundariesById: Map<string, ResumeAsyncBoundaryRecord>;
 };
+
+/** The arm a @try's range shows on the live page; a shown @catch carries the error it drew. */
+export type ShownAsyncArm = number | { readonly arm: number; readonly error: unknown };

@@ -10,9 +10,9 @@ import {
 	type StructureToken,
 } from '../ssr-data/renderer.ts';
 import type { SsrRenderable, SsrRenderOutput } from '../render-to-string.ts';
-import type { ResumeArmRecordSet } from '../resume-types.ts';
+import type { ResumeArmRecordSet, ShownAsyncArm } from '../resume-types.ts';
 import type { RuntimeGraph, RuntimeGraphAsyncSnapshot } from '@markless/runtime';
-import { keysEqual, lastGood } from '@markless/runtime/graph-kept';
+import { ASYNC_BOUNDARY_ARM } from '@markless/serializer/async-boundary-arm';
 import type { ComposedBranchGraph } from '../resume-branches.ts';
 import type { ProtocolStatePayload } from '@markless/serializer';
 import { SERIALIZED_NULL_GRAPH_PAYLOAD } from '../../../serializer/src/value-constants.ts';
@@ -415,7 +415,7 @@ export async function renderPrerenderBranch(
 	graph: RuntimeGraph,
 	propsOrLoadSymbol?: unknown | PrerenderLoadSymbol,
 	pageBranchId?: string,
-	shownAsyncArm?: (boundaryId: string) => number | undefined,
+	shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined,
 ): Promise<{
 	readonly html: string;
 	readonly armRecords: ResumeArmRecordSet;
@@ -642,7 +642,7 @@ async function evaluatePrerenderDataSurface(
 		readonly drawnAt?: string;
 		// A @catch drawn after shown @try content: the instances that content placed stay on the page.
 		readonly keepsShown?: true;
-		readonly shownAsyncArm?: (boundaryId: string) => number | undefined;
+		readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 	},
 ): Promise<SsrRenderOutput & { readonly structure?: SsrDataStructure }> {
 	const rootName =
@@ -976,7 +976,7 @@ export function evaluatePrerenderDataComponent(input: {
 	// Set on a render rooted at a flip's owner its own file places.
 	readonly placedAbove?: OwnerRootedRender['placedAbove'];
 	// The arm the live page shows for a @try, by its page id.
-	readonly shownAsyncArm?: (boundaryId: string) => number | undefined;
+	readonly shownAsyncArm?: (boundaryId: string) => ShownAsyncArm | undefined;
 }): Awaitable<
 	SsrRenderOutput & {
 		// The render-data path emits the full ssr-data structure, not just anchors.
@@ -1059,11 +1059,13 @@ export function evaluatePrerenderDataComponent(input: {
 			)
 				? ['value', ...path]
 				: path;
-		if (input.graph)
-			return input.graph.read(
-				instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId,
-				graphPath,
-			);
+		const graph = input.graph;
+		if (graph) {
+			const id = instanceCellIds?.has(graphNodeId) ? input.symbolPrefix + graphNodeId : graphNodeId;
+			// Markup lands on the page, so it reads a state a save's hold shows as the page paints it.
+			const hold = graph.paintHold?.();
+			return hold ? hold.asShown(() => graph.read(id, graphPath)) : graph.read(id, graphPath);
+		}
 		if (input.boundGraphValues?.has(graphNodeId))
 			return readPath(input.boundGraphValues.get(graphNodeId), path);
 		return readPath(values.get(graphNodeId), path);
@@ -1413,7 +1415,7 @@ export function evaluatePrerenderDataComponent(input: {
 									input.freshInstance || context.freshInstances
 										? undefined
 										: input.shownAsyncArm?.(input.idPrefix + slot.boundaryId);
-								if (shown === 0 || shown === 1) return shown;
+								if (shown !== undefined) return shown;
 								status = runnerStatus(runner!, state.computed, true);
 							}
 							if (status === 'rejected') {
@@ -1424,9 +1426,9 @@ export function evaluatePrerenderDataComponent(input: {
 									fresh.add(input.symbolPrefix + shown);
 									caughtErrors.set(fresh, (caughtErrors.get(fresh) ?? new Map()).set(input.symbolPrefix + shown, error));
 								}
-								return { arm: 2, error };
+								return { arm: ASYNC_BOUNDARY_ARM.catch, error };
 							}
-							return status === 'fulfilled' ? 0 : 1;
+							return status === 'fulfilled' ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending;
 						},
 						seedChild: (slot, context) =>
 							marklessRosterSeedPass(context.sharedSeeds, () =>
@@ -1684,10 +1686,8 @@ function runnerStatus(
 	visited.add(graphNodeId);
 	const record = computed.find((candidate) => candidate.graphNodeId === graphNodeId);
 	const snapshot = record?.snapshot as RuntimeGraphAsyncSnapshot | undefined;
-	const kept = keptShows && lastGood(snapshot);
-	// A re-run that keeps an answer for the key it runs with shows that answer (spec D8).
 	if (!record || record.async)
-		return snapshot?.status === 'pending' && kept && keysEqual(kept.valueKey, snapshot.key) ? 'fulfilled' : snapshot?.status;
+		return keptShows && asyncPlanes.showsKept?.(snapshot) ? 'fulfilled' : snapshot?.status;
 	let status = 'fulfilled';
 	for (const dependency of record.dependencies ?? []) {
 		if (visited.has(dependency.graphNodeId)) continue;

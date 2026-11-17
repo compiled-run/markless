@@ -1,9 +1,11 @@
 import { beforeEach, expect, test } from 'vitest';
 import { render, renderSSR } from '../../src/index.ts';
-import { boardRequest, installServer, release, resetServer, saveRequest, waitingRequests } from './grid-server.ts';
+import { boardRequest, installServer, refuse, release, resetServer, saveRequest, waitingRequests } from './grid-server.ts';
 import ArmTryPage from './k-arm-try-page.tsrx';
+import CatchArmPage from './k-catch-arm-page.tsrx';
 import SavingArmPage from './k-saving-arm-page.tsrx';
 import SavingNestedPage from './k-saving-nested-page.tsrx';
+import SavingShownPage from './k-saving-shown-page.tsrx';
 import { lines } from './timeline.ts';
 
 // A save's handler opens an @if holding a component from another file, inside the @try whose value the save reloads,
@@ -150,3 +152,44 @@ for (const [mode, mount] of [
 			await expect.poll(() => lines(), poll).toEqual(['title: a round 1']);
 		}));
 }
+
+for (const [mode, mount] of [
+	['CSR', () => render(CatchArmPage)],
+	['SSR', () => renderSSR(CatchArmPage)],
+] as const)
+	test(`${mode}: an @if in the @catch arm a @try shows opens while its retry loads`, () =>
+		noErrors(async () => {
+			await mount();
+			if (mode === 'CSR') {
+				await expect.poll(waitingRequests, poll).toContain(boardRequest('a', 0));
+				refuse(boardRequest('a', 0));
+			}
+			const failed = ['failed: The board broke'];
+			await expect.poll(() => lines(), poll).toEqual(failed);
+			click('[data-retry]');
+			await expect.poll(waitingRequests, poll).toContain(boardRequest('a', 0));
+			click('[data-more]');
+			await expect.poll(() => lines(), poll).toEqual([...failed, 'saving: more']);
+			release(boardRequest('a', 0));
+			await expect.poll(() => lines(), poll).toEqual(['title: a round 0']);
+		}));
+
+for (const [mode, mount] of [
+	['CSR', () => render(SavingShownPage)],
+	['SSR', () => renderSSR(SavingShownPage)],
+] as const)
+	test(`${mode}: an arm a press opens while a save's hold still shows a state reads it as the page shows it`, () =>
+		noErrors(async () => {
+			await mount();
+			await firstLoad(mode);
+			await expect.poll(() => lines(), poll).toEqual(loaded);
+			click('[data-grid-save]');
+			await expect.poll(() => lines(), poll).toEqual([...loaded, 'saving: a']);
+			await answer(saveRequest('a'));
+			await expect.poll(waitingRequests, poll).toContain(boardRequest('a', 0));
+			expect(lines()).toEqual([...loaded, 'saving: a']);
+			click('[data-more]');
+			await expect.poll(() => lines(), poll).toEqual([...loaded, 'saving: a', 'saving: also a']);
+			release(boardRequest('a', 0));
+			await expect.poll(() => lines(), poll).toEqual([...loaded, 'row: a saved 1', 'saving: also idle']);
+		}));

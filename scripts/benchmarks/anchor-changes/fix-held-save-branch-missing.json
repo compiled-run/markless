@@ -5,17 +5,6 @@
 			"path": [
 				"modules",
 				"@fixtures/vite-csr",
-				"runtime/graph-kept"
-			],
-			"set": 660,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-csr",
 				"web/fns/ssr"
 			],
 			"delta": -718,
@@ -29,9 +18,9 @@
 				"@fixtures/vite-csr",
 				"web/prerender/evaluator"
 			],
-			"delta": 635,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
+			"delta": 778,
+			"reason": "measured against the merge-base on this Mac: 635 -> 778 B rendered (+143 B this round): arm numbers from ASYNC_BOUNDARY_ARM and reads through the paint hold, less the graph-kept import",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -40,9 +29,9 @@
 				"@fixtures/vite-csr",
 				"web/resume-async-wiring"
 			],
-			"delta": 332,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
+			"delta": 1087,
+			"reason": "measured against the merge-base on this Mac: 332 -> 1087 B rendered (+755 B this round): one shown-arm record that carries a shown @catch error, a named plain-@try state and the served @catch seed",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "fixture-runtime",
@@ -62,98 +51,78 @@
 				"@fixtures/vite-csr",
 				"maxEmittedRuntimeGzipBytes",
 				"measured"
-			],
-			"delta": 3,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"runtime/graph-kept"
-			],
-			"set": 660,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/fns/ssr"
-			],
-			"delta": -718,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/prerender/evaluator"
-			],
-			"delta": 635,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/resume-async-wiring"
-			],
-			"delta": 332,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"modules",
-				"@fixtures/vite-plus",
-				"web/ssr-data/renderer"
-			],
-			"delta": 27,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "fixture-runtime",
-			"path": [
-				"walls",
-				"@fixtures/vite-plus",
-				"maxEmittedRuntimeGzipBytes",
-				"measured"
-			],
-			"delta": 3,
-			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
-			"date": "2026-11-14"
-		},
-		{
-			"surface": "build-scale",
-			"path": [
-				"budgets",
-				"clientModules",
-				"value"
 			],
 			"delta": 1,
-			"reason": "runtime/graph-kept: one shared kept-answer rule for the runtime, the async plane and the evaluator (PR run 43621345293)",
+			"reason": "measured against the merge-base on this Mac: emitted runtime gzip moves with the evaluator and async-wiring changes above",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": -718,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
 		},
 		{
-			"surface": "perf-guards",
+			"surface": "fixture-runtime",
 			"path": [
-				"runtimeModules",
-				"runtime/graph-kept"
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
 			],
-			"set": 672,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
+			"delta": 778,
+			"reason": "measured against the merge-base on this Mac: 635 -> 778 B rendered (+143 B this round): arm numbers from ASYNC_BOUNDARY_ARM and reads through the paint hold, less the graph-kept import",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 1087,
+			"reason": "measured against the merge-base on this Mac: 332 -> 1087 B rendered (+755 B this round): one shown-arm record that carries a shown @catch error, a named plain-@try state and the served @catch seed",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 27,
+			"reason": "an arm the browser re-renders draws each @try as the live page shows it; one kept-answer rule shared by the runtime, the async plane and the evaluator",
 			"date": "2026-11-14"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 14,
+			"reason": "measured against the merge-base on this Mac: emitted runtime gzip moves with the evaluator and async-wiring changes above",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "measured against the merge-base on this Mac: the largest runtime chunk gzip grows 2 B with the async-wiring change above",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "perf-guards",
@@ -161,9 +130,9 @@
 				"runtimeModules",
 				"web/prerender/evaluator"
 			],
-			"delta": 635,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
-			"date": "2026-11-14"
+			"delta": 787,
+			"reason": "measured +152 B rendered over the recorded +635 (CI run 44028302284 on 9231684d3, linux-x64): ASYNC_BOUNDARY_ARM constants and reads through the paint hold, less the graph-kept import",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "perf-guards",
@@ -171,9 +140,9 @@
 				"runtimeModules",
 				"web/resume-async-wiring"
 			],
-			"delta": 332,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
-			"date": "2026-11-14"
+			"delta": 1103,
+			"reason": "measured +771 B rendered over the recorded +332 (CI run 44028302284 on 9231684d3, linux-x64): one shown-arm record carrying a shown @catch error, the plain-@try state and the served @catch seed",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "perf-guards",
@@ -183,9 +152,9 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 149,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
-			"date": "2026-11-14"
+			"delta": 251,
+			"reason": "measured +102 B gzip over the recorded +149 (CI run 44028302284 on 9231684d3, linux-x64): the evaluator and async-wiring growth above",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "perf-guards",
@@ -195,9 +164,9 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 149,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
-			"date": "2026-11-14"
+			"delta": 251,
+			"reason": "measured +102 B gzip over the recorded +149 (CI run 44028302284 on 9231684d3, linux-x64): the evaluator and async-wiring growth above",
+			"date": "2026-11-17"
 		},
 		{
 			"surface": "perf-guards",
@@ -207,9 +176,9 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 197,
-			"reason": "a re-rendered arm draws each @try as the page shows it, with one shared kept-answer rule (PR run 43621345293 against main run 43600814200)",
-			"date": "2026-11-14"
+			"delta": 84,
+			"reason": "measured +84 B gzip in total (CI run 44028302284 on 9231684d3, linux-x64), down from the recorded +197 now that the evaluator no longer imports graph-kept",
+			"date": "2026-11-17"
 		}
 	]
 }
