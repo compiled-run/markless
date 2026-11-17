@@ -233,7 +233,6 @@ final class ViewTree {
 				label.text = try runtime.text(of: parts, in: context.scope)
 				if context.button != nil {
 					label.isAccessibilityElement = false
-					if layout == nil { label.textColor = .tintColor }
 				} else if context.heading {
 					label.accessibilityTraits.insert(.header)
 				}

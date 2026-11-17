@@ -49,6 +49,7 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(!count.isAccessibilityElement)
 	#expect(!count.isUserInteractionEnabled)
 	#expect(count.superview === button)
+	#expect(count.textColor == .label)
 
 	button.sendActions(for: .touchUpInside)
 	#expect(count.text == "Count 1")
