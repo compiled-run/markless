@@ -57,3 +57,17 @@ test('a list spread of a one-shot iterable replays the same items on the shown l
 	});
 	expect(result).toEqual({ value: ['a', 'x'], painted: ['x'] });
 });
+
+test('a list spread of a call runs the call once and replays its items on the shown list', async () => {
+	let calls = 0;
+	const handler = await compiledHandler('let items = state<string[]>([]);', 'items = [...items, ...event.many()];');
+	const result = await runWhileShown('items', [], ['a'], handler, { many: () => [`id${++calls}`] });
+	expect(calls).toBe(1);
+	expect(result).toEqual({ value: ['a', 'id1'], painted: ['id1'] });
+});
+
+test('a compound assignment calling a handler function that resets the state adds to the value read before the call', async () => {
+	const handler = await compiledHandler('let count = state(0);', 'const bump = () => { count = 0; return 1; }; count += bump();');
+	const result = await runWhileShown('count', 2, 5, handler, {});
+	expect(result).toEqual({ value: 6, painted: 6 });
+});
