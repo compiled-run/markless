@@ -54,7 +54,8 @@ export async function bootSimulator(name: string): Promise<BootedSimulator> {
 	}
 	const bootedHere = device.state !== 'Booted';
 	if (bootedHere) await exec('xcrun', ['simctl', 'boot', device.udid], { allowFailure: true });
-	await exec('xcrun', ['simctl', 'bootstatus', device.udid, '-b'], { timeoutMs: 180_000 });
+	// A fresh simulator's first boot on a GitHub macOS runner took over 180 s (native-proofs run 44044321098).
+	await exec('xcrun', ['simctl', 'bootstatus', device.udid, '-b'], { timeoutMs: 600_000 });
 	return { udid: device.udid, name, bootedHere };
 }
 

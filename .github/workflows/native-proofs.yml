@@ -55,7 +55,7 @@ jobs:
                   echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
             - name: Run the rungs on an iOS simulator
               env:
-                  MARKLESS_PROOF_IOS_DEVICE_TYPE: iPhone 16
+                  MARKLESS_PROOF_SIMULATOR: iPhone 16
               working-directory: packages/mobile
               run: node src/harness/cli.ts --platform ios --report "$RUNNER_TEMP/proof-reports" $RUNGS
             - uses: actions/upload-artifact@v4
@@ -111,6 +111,7 @@ jobs:
                   path: |
                       ${{ runner.temp }}/proof-reports/android.json
                       packages/mobile/proofs/*/screenshots/android/
+                      ~/.cache/markless-proof/logs/
 
     verdict:
         needs: [ios, android]

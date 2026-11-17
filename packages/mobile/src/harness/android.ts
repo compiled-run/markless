@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
 import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
@@ -14,6 +14,16 @@ export type BootedEmulator = {
 
 const adb = (tools: AndroidTools, serial: string, args: string[], timeoutMs = 120_000) =>
 	exec(tools.adb, ['-s', serial, ...args], { timeoutMs });
+
+async function waitForBoot(tools: AndroidTools, serial: string): Promise<void> {
+	await adb(tools, serial, ['wait-for-device'], 180_000);
+	await adb(
+		tools,
+		serial,
+		['shell', 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'],
+		300_000,
+	);
+}
 
 /** Starts the AVD called `avd` on `port` (creating the AVD when missing) unless an emulator already serves that port. */
 export async function bootEmulator(
@@ -48,10 +58,10 @@ export async function bootEmulator(
 				),
 			);
 		}
-		const logDir = join(cacheRoot(), 'logs');
-		mkdirSync(logDir, { recursive: true });
-		const log = openSync(join(logDir, `emulator-${port}.log`), 'w');
-		spawn(
+		const logFile = join(cacheRoot(), 'logs', `emulator-${port}.log`);
+		mkdirSync(join(logFile, '..'), { recursive: true });
+		const log = openSync(logFile, 'w');
+		const emulator = spawn(
 			tools.emulator,
 			[
 				'-avd',
@@ -66,15 +76,26 @@ export async function bootEmulator(
 				'-no-snapshot',
 			],
 			{ detached: true, stdio: ['ignore', log, log] },
-		).unref();
+		);
+		emulator.unref();
+		const logTail = () => readFileSync(logFile, 'utf8').split('\n').slice(-40).join('\n');
+		const exited = new Promise<{ readonly code: number | null }>((resolve) =>
+			emulator.on('exit', (code) => resolve({ code })),
+		);
+		let ended: { readonly code: number | null } | undefined;
+		try {
+			ended = await Promise.race([waitForBoot(tools, serial).then(() => undefined), exited]);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`${message}\nthe emulator log ends:\n${logTail()}`);
+		}
+		if (ended)
+			throw new Error(
+				`the emulator exited (${ended.code}) before booting; its log ends:\n${logTail()}`,
+			);
+		return { serial, avd, bootedHere };
 	}
-	await adb(tools, serial, ['wait-for-device'], 180_000);
-	await adb(
-		tools,
-		serial,
-		['shell', 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'],
-		300_000,
-	);
+	await waitForBoot(tools, serial);
 	return { serial, avd, bootedHere };
 }
 
