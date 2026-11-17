@@ -196,6 +196,8 @@ async function asyncComputedFromRecord(
 				});
 			// A run superseded while its code loaded never starts: its result is dropped, and its body would still send requests.
 			if (signal.aborted) throw signal.reason;
+			// Nor one whose arm closed in the meantime: it would read the value that closed it.
+			if (graph.armShown?.(computed.graphNodeId) === false) throw new DOMException('Arm closed', 'AbortError');
 			return runRecipe(graph.asyncPlane?.()?.nodes.get(computed.graphNodeId), () =>
 				runner({
 					// Inputs held at what the screen shows reach the runner, which reads through the graph.
