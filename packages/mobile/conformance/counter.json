@@ -1,0 +1,123 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Counter",
+		"cells": [
+			{
+				"id": "state:count",
+				"name": "count",
+				"initial": 0
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null,
+				"attributes": {
+					"class": "screen mk-uclxwk"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"attributes": {
+					"class": "title mk-uclxwk"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Counter"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0",
+				"attributes": {
+					"class": "tap mk-uclxwk"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Count "
+					},
+					{
+						"cell": "state:count"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "add",
+						"cell": "state:count",
+						"value": 1
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Counter"
+		],
+		[
+			"h2:text0",
+			"Count 0"
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Count 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "Count 2"
+				}
+			]
+		}
+	]
+}

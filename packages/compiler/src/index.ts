@@ -101,6 +101,11 @@ export { emitPublicRenderModule } from './passes/public-render/module.ts';
 export { planPublicRender } from './passes/public-render/plan.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
+export {
+	createNativeViewPayload,
+	NATIVE_UNSUPPORTED_CODE,
+	type NativeViewArtifact,
+} from './passes/native-view.ts';
 export { createRenderData } from './passes/render-data/index.ts';
 export {
 	RENDER_DATA_MODULE_PASS_ID,

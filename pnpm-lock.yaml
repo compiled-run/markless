@@ -1063,6 +1063,15 @@ importers:
         specifier: npm:@voidzero-dev/vite-plus-core@1.3.0
         version: '@voidzero-dev/vite-plus-core@1.3.0(@types/node@24.12.2)(@volar/typescript@2.4.28)(esbuild@0.28.2)(jiti@2.7.0)(typescript@5.9.3)(yaml@2.9.1)'
 
+  packages/mobile:
+    dependencies:
+      '@markless/compiler':
+        specifier: workspace:*
+        version: link:../compiler
+      '@markless/serializer':
+        specifier: workspace:*
+        version: link:../serializer
+
   packages/router:
     dependencies:
       '@markless/bundler':

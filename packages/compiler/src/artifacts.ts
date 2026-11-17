@@ -1079,6 +1079,10 @@ export type SemanticStateWrite = {
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
+	/** A plain `=` whose value a host can apply without a script engine: a literal, or `!` of the target itself. */
+	readonly valueShape?:
+		| { readonly kind: 'literal'; readonly value: string | number | boolean }
+		| { readonly kind: 'not-target' };
 	readonly optional?: boolean;
 	readonly prefix?: boolean;
 	readonly updateOperator?: '++' | '--';
@@ -1537,6 +1541,12 @@ export type SemanticMarkupChunk = {
 	readonly texts?: ReadonlyArray<{
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
 		readonly text: string;
+	}>;
+	/** Attributes whose value is fixed at build time, as written to the element (a scoped class included); absent when none. */
+	readonly attributes?: ReadonlyArray<{
+		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
+		readonly name: string;
+		readonly value: string;
 	}>;
 };
 

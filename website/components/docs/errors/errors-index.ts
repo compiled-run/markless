@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 317,
+	total: 318,
 	guided: 51,
 	groups: [
 		{
@@ -2562,6 +2562,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'the server sent an @if branch that does not exist markless_ssr_data_served_arm_invalid a markless runtime error from @markless/web.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_UNSUPPORTED',
+					title: 'This component cannot be built for a native target yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this component cannot be built for a native target yet markless_native_unsupported this component cannot be built for a native target yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_RESUME_ALREADY_RESUMED',
