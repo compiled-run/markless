@@ -74,16 +74,15 @@ export function emitPrerenderTriggerGroupModule(input: {
 	});
 	// Keep routes exhaustive while demand-loading only their symbols.
 	// This group's resolver holds only its own bound rows.
-	const routes = (input.symbolRoutes ?? []).map((route) =>
-		route.boundSymbols
-			? {
-					...route,
-					boundSymbols: Object.fromEntries(
-						Object.entries(route.boundSymbols).filter(([, rowId]) => ids.has(rowId)),
-					),
-				}
-			: route,
-	);
+	const ownRows = (rows: Readonly<Record<string, string>>) =>
+		Object.fromEntries(Object.entries(rows).filter(([, rowId]) => ids.has(rowId)));
+	const routes = (input.symbolRoutes ?? []).map((route) => ({
+		...route,
+		...(route.boundSymbols ? { boundSymbols: ownRows(route.boundSymbols) } : {}),
+		...('forwardedSymbols' in route && route.forwardedSymbols
+			? { forwardedSymbols: ownRows(route.forwardedSymbols) }
+			: {}),
+	}));
 	if (routes.length > 0) {
 		source = source.replaceAll('loadSymbol(', 'marklessLoadLocalSymbol(');
 		source +=

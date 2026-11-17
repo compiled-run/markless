@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { expect, test } from 'vitest';
+import { emitSymbolRouteTable } from '../src/rebound-symbol-route.ts';
 import { markless } from '../src/vite/index.ts';
 import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 
@@ -115,4 +116,57 @@ test('each copy of a same-module owner reaches the bound row of its own instance
 		expect(routed.prefix).toBe(`c${copy}:c3:`);
 		expect(routed.loaded).toMatch(new RegExp(`^local bound:symbol%3A1:${copy}/3\\[`));
 	}
+});
+
+test("a child's answer goes through the table's forwarded rows, and a bound row names the id it stands for", async () => {
+	const source = emitSymbolRouteTable({
+		routes: [
+			{
+				prefix: 'c1:',
+				importSource: '/own.tsrx',
+				boundSymbols: { 'symbol:0': 'bound:symbol%3A0:1' },
+			},
+			{
+				prefix: 'c0:',
+				importSource: '/list.tsrx',
+				forwardedSymbols: { 'bound:symbol%3A0:0': 'bound:(bound:symbol%3A0:0):0' },
+			},
+		],
+		functionName: 'route',
+		fallbackName: 'local',
+		reboundName: 'rebound',
+	})
+		.split('\n')
+		.filter((line) => !line.startsWith('import '))
+		.join('\n');
+	const route = new Function(
+		'__mxImport',
+		'local',
+		'rebound',
+		'reboundForwarded',
+		'routeWhenLoaded',
+		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn route;`,
+	)(
+		async (specifier: string) => ({
+			loadSymbol: (symbolId: string) => `${specifier} ${symbolId}`,
+		}),
+		(symbolId: string) => `local ${symbolId}`,
+		(...args: unknown[]) => ({ rebound: args.filter((arg) => typeof arg === 'string') }),
+		async (loaded: unknown, forwarded: unknown, prefix: string) => ({
+			forwarded,
+			prefix,
+			child: await loaded,
+		}),
+		marklessWhenLoaded,
+	) as (symbolId: string) => unknown;
+
+	expect(await route('c0:c0:symbol:0')).toEqual({
+		forwarded: { 'bound:symbol%3A0:0': 'bound:(bound:symbol%3A0:0):0' },
+		prefix: 'c0:',
+		child: '/list.tsrx c0:symbol:0',
+	});
+	expect(await route('c1:symbol:0')).toEqual({
+		rebound: ['local bound:symbol%3A0:1', 'c1:', 'bound:symbol%3A0:1'],
+	});
+	expect(await route('c1:symbol:4')).toBe('/own.tsrx symbol:4');
 });

@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { compileTsrxModule } from '../src/index.ts';
 import type { CaptureAnalysisArtifact, LinkedSymbolClaimManifest } from '../src/artifacts.ts';
+import { componentEdgeSymbolRoutes } from '../src/component-edge-instance.ts';
 import { linkedImportedSymbolInputs } from '../src/passes/link/module-link.ts';
 
 type Compiled = Awaited<ReturnType<typeof compileTsrxModule>>;
@@ -491,5 +492,84 @@ export function Top() @{
 		]);
 		expect(topRow?.instancePath).toBe(`c0:${middleRow.instancePath}`);
 		expect(top.captureAnalysis.diagnostics.filter((d) => d.severity === 'error')).toEqual([]);
+	}
+});
+
+test("the edge to a middle module routes the row it answers for a forwarded callback to the composer's row", async () => {
+	for (const [leafName, middleName, outerProp, innerProp, leafFile, middleFile, topFile] of [
+		[
+			'Panel',
+			'List',
+			'onSave',
+			'onSave',
+			'/w/src/panel.tsrx',
+			'/w/src/list.tsrx',
+			'/w/src/page.tsrx',
+		],
+		[
+			'Slot',
+			'Tray',
+			'onTake',
+			'onPress',
+			'/x/parts/slot.tsrx',
+			'/x/parts/tray.tsrx',
+			'/x/app.tsrx',
+		],
+	] as const) {
+		const { middle, top } = await compileChain({
+			leaf: {
+				file: leafFile,
+				source: `
+export function ${leafName}({ item, ${innerProp} }) @{
+	<button type="button" onClick={() => ${innerProp}(item)}>{item}</button>
+}
+`,
+			},
+			middle: {
+				file: middleFile,
+				source: `
+import { ${leafName} } from '${leafFile}';
+
+export function ${middleName}({ items, ${outerProp} }) @{
+	<div>
+		@for (const item of items; key item) {
+			<${leafName} item={item} ${innerProp}={${outerProp}} />
+		}
+	</div>
+}
+`,
+			},
+			top: {
+				file: topFile,
+				source: `
+import { state } from '@markless/core';
+import { ${middleName} } from '${middleFile}';
+
+export function Top() @{
+	let last = state('');
+	<main>
+		<${middleName} items={['a', 'b']} ${outerProp}={(item) => (last = item)} />
+		<p>{last}</p>
+	</main>
+}
+`,
+			},
+			topLeafEdgeIds: [],
+			topMiddleEdgeId: 'component-edge:0',
+		});
+		const middleRow = middle.captureAnalysis.boundResolverRows!.find((row) =>
+			row.captureSlots.some((slot) => slot.route.kind === 'passthrough-route'),
+		)!;
+		const topRow = top.captureAnalysis.boundResolverRows!.find((row) =>
+			row.captureSlots.some((slot) => slot.route.kind === 'callback-route'),
+		)!;
+		const [route] = componentEdgeSymbolRoutes(top, undefined);
+		expect(route).toEqual(
+			expect.objectContaining({
+				prefix: 'c0:',
+				forwardedSymbols: { [middleRow.id]: topRow.id },
+			}),
+		);
+		expect(route?.boundSymbols).toBeUndefined();
 	}
 });

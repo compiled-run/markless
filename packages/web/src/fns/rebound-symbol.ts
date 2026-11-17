@@ -1,8 +1,20 @@
-import type { MarklessRescopingSymbol, MarklessScopedGraph } from './instance-scope.ts';
+import {
+	marklessInstanceSegments,
+	type MarklessRescopingSymbol,
+	type MarklessScopedGraph,
+} from './instance-scope.ts';
 import { marklessThen } from '../ssr-data/awaitable.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 type LoadedSymbol = ResumeSymbol | Promise<ResumeSymbol>;
+
+/** The path above the module that rebound a symbol, or undefined when the asking path did not come through it. */
+type OuterPath = (instancePath: string) => string | undefined;
+
+type ReboundSymbol = MarklessRescopingSymbol & {
+	readonly marklessBoundId?: string;
+	readonly marklessBoundOuter?: OuterPath;
+};
 
 /**
  * A composed child's symbol that its edge binds, answered by the edge's bound row so
@@ -14,17 +26,66 @@ export function marklessReboundSymbol(
 	loaded: LoadedSymbol,
 	prefix: string,
 	loadUnbound: () => LoadedSymbol,
+	boundId?: string,
 ): LoadedSymbol {
-	return marklessThen(loaded, (bound): MarklessRescopingSymbol => {
+	return reboundAt(
+		loaded,
+		(instancePath) => withoutSuffix(instancePath, prefix),
+		loadUnbound,
+		boundId,
+	);
+}
+
+/**
+ * A child module's answer for a row it binds to a callback prop of its own, which this
+ * module handed it to forward: this module's row binds that callback, so it answers
+ * instead. The row is spelled from this module's root, so it applies above the child's
+ * path, the child's own rows, and the prefix this module's table consumed.
+ */
+export function marklessForwardedSymbol(
+	loaded: LoadedSymbol,
+	forwarded: Readonly<Record<string, string>>,
+	prefix: string,
+	loadLocal: (symbolId: string) => LoadedSymbol,
+): LoadedSymbol {
+	return marklessThen(loaded, (symbol): LoadedSymbol => {
+		const { marklessBoundId: childId, marklessBoundOuter: childOuter } =
+			symbol as ReboundSymbol;
+		if (childId === undefined || !childOuter || !Object.hasOwn(forwarded, childId))
+			return symbol;
+		const boundId = forwarded[childId]!;
+		const outer: OuterPath = (instancePath) => {
+			const above = childOuter(instancePath);
+			if (above === undefined) return undefined;
+			const segments = marklessInstanceSegments(above);
+			while (segments.at(-1)?.startsWith('r:')) segments.pop();
+			return withoutSuffix(segments.join(''), prefix);
+		};
+		return reboundAt(loadLocal(boundId), outer, () => symbol, boundId);
+	});
+}
+
+function withoutSuffix(path: string, suffix: string): string | undefined {
+	return path.endsWith(suffix) ? path.slice(0, path.length - suffix.length) : undefined;
+}
+
+function reboundAt(
+	loaded: LoadedSymbol,
+	outerOf: OuterPath,
+	loadUnbound: () => LoadedSymbol,
+	boundId: string | undefined,
+): LoadedSymbol {
+	return marklessThen(loaded, (bound): ReboundSymbol => {
 		const run = (context: ResumeSymbolContext) => bound(context);
 		return Object.assign(run, {
+			...(boundId === undefined
+				? {}
+				: { marklessBoundId: boundId, marklessBoundOuter: outerOf }),
 			marklessRescope: (
 				instancePath: string,
 				scope: (symbol: ResumeSymbol, instancePath: string) => ResumeSymbol,
 			): ResumeSymbol => {
-				const outer = instancePath.endsWith(prefix)
-					? instancePath.slice(0, instancePath.length - prefix.length)
-					: undefined;
+				const outer = outerOf(instancePath);
 				if (outer === undefined)
 					return (context) =>
 						marklessThen(loadUnbound(), (raw) => scope(raw, instancePath)(context));
