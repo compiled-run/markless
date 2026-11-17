@@ -1,0 +1,134 @@
+name: Native proofs
+
+# The native ladder on devices: each rung's App.tsrx built by the real compiler, installed in the iOS and Android proof
+# shells, and its one Maestro flow run on an iOS simulator (macOS runner) and an Android emulator (Linux runner with KVM;
+# GitHub's Apple silicon runners cannot run the Android emulator). Each platform job writes a report; the verdict job
+# fails unless both reports exist and every rung passed on both. Proposal: runs on pull requests into cw/native-targets
+# and by hand, not on main.
+
+on:
+    workflow_dispatch:
+    pull_request:
+        branches: [cw/native-targets]
+        paths:
+            - packages/mobile/**
+            - packages/compiler/**
+            - packages/serializer/**
+            - .github/workflows/native-proofs.yml
+
+concurrency:
+    group: native-proofs-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+env:
+    # The rungs green on devices today; a rung joins in the change that makes both hosts pass it (03-counter: the assign op).
+    RUNGS: proofs/01-static-text
+    MAESTRO_VERSION: 2.12.1
+
+jobs:
+    ios:
+        runs-on: macos-15
+        timeout-minutes: 45
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: 21
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Install Maestro
+              run: |
+                  curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
+                  echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+            - name: Run the rungs on an iOS simulator
+              env:
+                  MARKLESS_PROOF_IOS_DEVICE_TYPE: iPhone 16
+              working-directory: packages/mobile
+              run: node src/harness/cli.ts --platform ios --report "$RUNNER_TEMP/proof-reports" $RUNGS
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: native-proof-ios
+                  path: |
+                      ${{ runner.temp }}/proof-reports/ios.json
+                      packages/mobile/proofs/*/screenshots/ios/
+
+    android:
+        runs-on: ubuntu-26.04
+        timeout-minutes: 45
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - uses: actions/setup-java@v4
+              with:
+                  distribution: temurin
+                  java-version: 21
+            - name: Install dependencies
+              run: pnpm install --frozen-lockfile
+            - name: Let the emulator use KVM
+              run: |
+                  echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+                  sudo udevadm control --reload-rules
+                  sudo udevadm trigger --name-match=kvm
+            - name: Install the Android SDK parts, Kotlin and Maestro
+              run: |
+                  yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+                  "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "emulator" "platforms;android-36" "build-tools;36.0.0" "system-images;android-36;google_apis;x86_64"
+                  curl -fsSL -o "$RUNNER_TEMP/kotlin.zip" https://github.com/JetBrains/kotlin/releases/download/v2.4.21/kotlin-compiler-2.4.21.zip
+                  unzip -q "$RUNNER_TEMP/kotlin.zip" -d "$RUNNER_TEMP"
+                  echo "KOTLIN_HOME=$RUNNER_TEMP/kotlinc" >> "$GITHUB_ENV"
+                  echo "$RUNNER_TEMP/kotlinc/bin" >> "$GITHUB_PATH"
+                  curl -fsSL "https://get.maestro.mobile.dev" | MAESTRO_VERSION="$MAESTRO_VERSION" bash
+                  echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+            - name: Run the rungs on an Android emulator
+              working-directory: packages/mobile
+              run: node src/harness/cli.ts --platform android --report "$RUNNER_TEMP/proof-reports" $RUNGS
+            - uses: actions/upload-artifact@v4
+              if: always()
+              with:
+                  name: native-proof-android
+                  path: |
+                      ${{ runner.temp }}/proof-reports/android.json
+                      packages/mobile/proofs/*/screenshots/android/
+
+    verdict:
+        needs: [ios, android]
+        if: always()
+        runs-on: ubuntu-26.04
+        timeout-minutes: 10
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  persist-credentials: false
+            - uses: actions/setup-node@v4
+              with:
+                  node-version: 24
+            - uses: actions/download-artifact@v4
+              with:
+                  pattern: native-proof-*
+                  path: ${{ runner.temp }}/artifacts
+            - name: Both platforms passed every rung
+              run: |
+                  reports=$(find "$RUNNER_TEMP/artifacts" -name '*.json' -path '*proof-reports*')
+                  node packages/mobile/src/harness/verdict.ts $reports

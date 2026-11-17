@@ -1,0 +1,16 @@
+{
+	"rung": 0,
+	"name": "Harness fixture: harness-wrong-text",
+	"steps": [
+		{
+			"visible": ["Harness", "Tap 0"]
+		},
+		{
+			"do": {
+				"tap": "Tap 0"
+			},
+			"visible": ["Harness", "Tap 2"],
+			"absent": ["Tap 1"]
+		}
+	]
+}
