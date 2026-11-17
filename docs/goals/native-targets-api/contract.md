@@ -432,12 +432,12 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
 | 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing**, with a visible defect: the title's last letter clips | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
-| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | failing (host has no lists yet) | passing | vectors `list.json`; not passed until iOS |
+| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
 | 7b | A component imported from another file | not started | compiler side done (test fixture) | not yet | not yet | waits on the ladder's `proofs/07b-imported-component/` |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
-| 10 | State from the URL and one route change | passing | passing | failing (hosts take no launch route yet) | failing (same) | vectors `route.json` |
+| 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
 
 **Device receipts (2026-11-17, tree `610f5f681` plus the harness's page fix):** the harness
