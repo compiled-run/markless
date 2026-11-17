@@ -17,7 +17,7 @@ sealed interface Node {
 	val id: String
 	val parent: String?
 
-	data class Element(override val id: String, val element: String, override val parent: String?) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap()) : Node
 	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>) : Node
 }
 
@@ -94,9 +94,10 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes"), what)
 					val parent = o.field("parent", what)
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"))
+					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (name, value) -> value.str("$what.attributes.$name") } ?: emptyMap()
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes)
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts"), what)

@@ -128,6 +128,9 @@ export function Counter() @{
 }
 ```
 
+  Committed files today: `counter.json` (add) and `switches.json` (toggle, set of a string and a negative integer, boolean
+  and string formatting, and a step whose journal is empty because the text did not change). A host must pass every file in
+  the folder; a new op or node kind always arrives with a new vector file first.
   A host passes the vectors when, loading `payload`, its mounted text nodes read exactly `initial` (same order) and, for each
   step in turn, dispatching `action` makes its runtime produce exactly `journal` (same entries, same order) and its views then
   show those strings. Hosts run this headless in their own unit tests (XCTest / a JVM test with no device) and may also run it

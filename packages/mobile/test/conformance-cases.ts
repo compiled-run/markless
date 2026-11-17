@@ -14,4 +14,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 		],
 	},
+	{
+		name: 'switches',
+		fixture: 'Switches.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
 ];
