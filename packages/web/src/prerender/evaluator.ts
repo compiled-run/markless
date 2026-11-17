@@ -1460,7 +1460,9 @@ export function evaluatePrerenderDataComponent(input: {
 								}
 								return { arm: ASYNC_BOUNDARY_ARM.catch, error };
 							}
-							return status === 'fulfilled' ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending;
+							return status === 'fulfilled' || boundary?.initiallyServedArm === ASYNC_BOUNDARY_ARM.try
+								? ASYNC_BOUNDARY_ARM.try
+								: ASYNC_BOUNDARY_ARM.pending;
 						},
 						seedChild: (slot, context) =>
 							marklessRosterSeedPass(context.sharedSeeds, () =>

@@ -908,7 +908,7 @@ function emitSsrDataLines(
 		.filter((boundary) => boundaryIds.has(boundary.boundaryId))
 		.flatMap((boundary) => {
 			const runner = asyncRunners.get(boundary.boundaryId);
-			if (!runner) return [`case ${JSON.stringify(boundary.boundaryId)}:return {arm:marklessSsrAsyncArm()};`];
+			if (!runner) return [`case ${JSON.stringify(boundary.boundaryId)}:return {arm:${boundary.initiallyServedArm}};`];
 			const extra = collectSsrAsyncRunnerDefinitions(input).size > 0
 				? ',marklessSsrAsyncRunnerDefinitions,marklessSsrAsyncRuns'
 				: '';

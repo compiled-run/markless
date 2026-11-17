@@ -54,6 +54,7 @@ export default function App() @{
 - A body is `@{ statements; one root element }`. Props follow the parent's state. A callback prop takes at most one parameter.
 - Every `@try`, `@pending`, `@catch`, `@if`, `@else` and `@for` block holds exactly one node; wrap siblings in an element or `<>…</>`.
 - `@try` needs `@pending` or `@catch` (or both, in that order). `@catch` may name `(error)` or `(error, reset)`.
+- A `@try` that reads no async value has nothing to wait for: it shows its content at once, and its `@catch` still opens when a handler inside it fails.
 - An async computed is typed as its resolved value and read only inside `@try`, including by handlers there.
 - It runs again when any state it reads changes (`reload;` is a read). Only the newest run's answer is shown; `signal` aborts the old request.
 - Each component instance has its own state and loads, so a row component gives each row its own `@try`.
