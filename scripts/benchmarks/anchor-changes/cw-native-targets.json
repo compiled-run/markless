@@ -8,8 +8,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 384,
-			"reason": "native targets: the analyzer now records static texts, static attributes, write-only handlers and assignment shapes (docs pages load the compile worker that carries the analyzer), and the new MARKLESS_NATIVE_UNSUPPORTED entry joins the error data every docs page loads",
+			"delta": 584,
+			"reason": "native targets: the analyzer records native-only facts (static texts and attributes; expression trees for values, tests, handler bodies, computeds and text interpolations, collected only when a native build asks) and the docs pages load the compile worker that carries those call sites; the new MARKLESS_NATIVE_UNSUPPORTED entry joins the error data every docs page loads",
 			"date": "2026-11-17"
 		},
 		{
@@ -20,8 +20,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 424,
-			"reason": "native targets: the analyzer now records static texts, static attributes, write-only handlers and assignment shapes (docs pages load the compile worker that carries the analyzer), and the new MARKLESS_NATIVE_UNSUPPORTED entry joins the error data every docs page loads",
+			"delta": 624,
+			"reason": "native targets: the analyzer records native-only facts (static texts and attributes; expression trees for values, tests, handler bodies, computeds and text interpolations, collected only when a native build asks) and the docs pages load the compile worker that carries those call sites; the new MARKLESS_NATIVE_UNSUPPORTED entry joins the error data every docs page loads",
 			"date": "2026-11-17"
 		}
 	]
