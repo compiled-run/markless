@@ -3,6 +3,19 @@
 Owner of this file: the lead on `cw/native-targets`. Every other native worker learns the contract from here; when it changes,
 this file changes in the same push. Status as of 2026-11-16, night one.
 
+## 0. What changed last (hosts: read this first)
+
+2026-11-17, `a989dc47f` and after; both hosts are merged into `cw/native-targets` (#741, #750, #751).
+
+1. **Ops are now one op, `assign`, with an expression tree** (section 4, "Handlers" and "Expressions"). `add`, `set` and
+   `toggle` are gone from payloads. Both hosts' decoders correctly refuse the new vectors today
+   (`test-jvm.sh`: 44 passed, 5 failed on unknown `assign`, `bindings` and `expr` parts). The host work next: an `NativeExpr`
+   evaluator with ECMAScript meaning (pinned by `arithmetic.json`), element `bindings` and the `attribute` journal entry
+   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells.
+2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
+   the older payload shape.
+3. Vectors to pass: every file in `packages/mobile/conformance/`.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read
