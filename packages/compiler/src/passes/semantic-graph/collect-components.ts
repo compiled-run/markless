@@ -480,6 +480,8 @@ function componentPropBindings(
 					scope: propScope,
 					methodCalls: true,
 					unaryOperators: true,
+					// A scoped class joins its value with the scope, so an array or object there stays opaque.
+					literalBranches: !(name === 'class' && state.currentStyleScopeClass),
 				})
 			: null;
 		if (composite) {
