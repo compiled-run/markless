@@ -14,6 +14,8 @@ export default function App() @{
 				color: #1d1b16;
 			}
 			.tap {
+				display: block;
+				font-family: inherit;
 				margin-top: 16px;
 				padding: 12px 20px;
 				border: 2px solid #1d1b16;

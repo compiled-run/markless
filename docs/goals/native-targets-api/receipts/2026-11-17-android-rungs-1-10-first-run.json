@@ -1,0 +1,78 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5560): device offline"
+			},
+			"installSeconds": 0.7537069170000005,
+			"flowSeconds": 4.3806
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.6448123749999995,
+			"flowSeconds": 12.606065834
+		},
+		{
+			"name": "05-if",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5560): device offline"
+			},
+			"installSeconds": 0.8020053329999973,
+			"flowSeconds": 3.937973082999997
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.5256329159999986,
+			"flowSeconds": 14.696940750000001
+		},
+		{
+			"name": "07-child-component",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5560): device offline"
+			},
+			"installSeconds": 0.6328504160000011,
+			"flowSeconds": 4.129469250000002
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.5125137920000052,
+			"flowSeconds": 20.295194457999997
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 3.882719458000007,
+			"flowSeconds": 32.789743583
+		},
+		{
+			"name": "10-url-route",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Fruit apple\" is visible"
+			},
+			"installSeconds": 1.793422207999989,
+			"flowSeconds": 24.279107458
+		}
+	]
+}

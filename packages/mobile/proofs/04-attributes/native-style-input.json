@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "mk-i4w2jc"
+				"class": "mk-1x9vgkx"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-i4w2jc"
+				"class": "mk-1x9vgkx"
 			}
 		},
 		{
@@ -37,13 +37,13 @@
 					"when": {
 						"state:liked": false
 					},
-					"value": "like mk-i4w2jc"
+					"value": "like mk-1x9vgkx"
 				},
 				{
 					"when": {
 						"state:liked": true
 					},
-					"value": "like on mk-i4w2jc"
+					"value": "like on mk-1x9vgkx"
 				}
 			]
 		},
@@ -59,7 +59,7 @@
 			"element": "button",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-i4w2jc"
+				"class": "mk-1x9vgkx"
 			}
 		},
 		{
@@ -69,7 +69,7 @@
 			"text": "Clear"
 		}
 	],
-	"css": ".like.on.mk-i4w2jc {\n\t\t\t\tbackground: #ef476f;\n\t\t\t}",
+	"css": "button.mk-1x9vgkx {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t}\n\t\t\t.like.on.mk-1x9vgkx {\n\t\t\t\tbackground: #ef476f;\n\t\t\t}",
 	"states": [
 		{
 			"cell": "state:liked",
