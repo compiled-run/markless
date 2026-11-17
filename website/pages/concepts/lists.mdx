@@ -204,6 +204,38 @@ export default function ReadFlags() @{
 
 A row component can't write to the object it was given. Pass it a function to call instead, as [Components](/build/components) shows.
 
+## Give a row component plain props
+
+To mark the picked row, pass the row its own value and the picked one as separate props, and compare them inside the row:
+
+```tsrx
+@for (const item of items; key item.id) {
+	<Row id={item.id} picked={picked} />
+}
+```
+
+```tsrx
+export function Row({
+	id,
+	picked,
+}: {
+	id: string;
+	picked: string;
+}) @{
+	<li
+		id={'item-' + id}
+		class={id === picked ? 'on' : ''}
+	>
+		{id}
+	</li>
+}
+```
+
+Two shapes that look the same do not build yet:
+
+- A prop that mixes the row's item with other state, like `<Row active={item.id === picked} />`, stops the build with `MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED`. A component row is built again only when its own item or place changes, so nothing would move it when `picked` does.
+- Inside the row, an expression that reads into a prop, like `id={'item-' + item.id}` when the row was given the whole `item`, warns with `MARKLESS_TEMPLATE_EXPRESSION_STATIC`, and the build stops when the list can change. The row holds each prop as one plain value, so it can't follow a member of an object. A plain read, `{item.id}` or `id={item.id}`, is fine.
+
 ## Filter and sort with a computed
 
 The rows you show are worked out from the full list, so put that in a `computed`. Type on the drawer's label: the cards that don't match sink, and the rest close up in their order.
