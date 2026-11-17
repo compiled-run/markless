@@ -2060,5 +2060,5 @@ function computedNativeExpression(
 				? (statements[0].argument as AnyNode | undefined)
 				: undefined
 			: inner;
-	return returned ? { nativeExpression: state.nativeFacts.expression(returned as never) } : {};
+	return returned ? { nativeExpression: state.nativeFacts.expression(returned as never, state.semantic() as never) } : {};
 }

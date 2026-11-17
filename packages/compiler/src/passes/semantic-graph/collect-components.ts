@@ -923,6 +923,6 @@ function nativeStatementsOf(
 	callback: AnyNode | undefined,
 	state: WalkState,
 ): { nativeStatements?: ReadonlyArray<SemanticHandlerStatement> } {
-	const nativeStatements = callback && state.nativeFacts?.handlerStatements(callback as never);
+	const nativeStatements = callback && state.nativeFacts?.handlerStatements(callback as never, state.semantic() as never);
 	return nativeStatements ? { nativeStatements } : {};
 }

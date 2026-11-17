@@ -2416,7 +2416,7 @@ function handlerStatementsField(
 	node: AnyNode | undefined,
 	state: WalkState,
 ): Pick<SemanticEvent, 'handlerStatements'> {
-	const handlerStatements = node && state.nativeFacts?.handlerStatements(node as never);
+	const handlerStatements = node && state.nativeFacts?.handlerStatements(node as never, state.semantic() as never);
 	return handlerStatements ? { handlerStatements } : {};
 }
 

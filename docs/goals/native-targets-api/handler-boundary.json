@@ -1,0 +1,3764 @@
+{
+	"note": "Written by `node packages/mobile/src/boundary/cli.ts`; classes from the analyzer native facts (handler statements and their gaps).",
+	"failures": [],
+	"total": {
+		"handlers": 1354,
+		"noInlineBody": 10,
+		"dataToday": 262,
+		"withExtensions": 700,
+		"generalJavaScript": 382,
+		"generalJavaScriptOffThePage": 62,
+		"eventOutsideVocabulary": 818
+	},
+	"totalWithoutDocsFigures": {
+		"handlers": 711,
+		"noInlineBody": 10,
+		"dataToday": 143,
+		"withExtensions": 304,
+		"generalJavaScript": 254,
+		"generalJavaScriptOffThePage": 34,
+		"eventOutsideVocabulary": 286
+	},
+	"perApp": {
+		"website (docs figures)": {
+			"handlers": 643,
+			"noInlineBody": 0,
+			"dataToday": 119,
+			"withExtensions": 396,
+			"generalJavaScript": 128,
+			"generalJavaScriptOffThePage": 28,
+			"eventOutsideVocabulary": 532
+		},
+		"website (rest)": {
+			"handlers": 227,
+			"noInlineBody": 0,
+			"dataToday": 86,
+			"withExtensions": 95,
+			"generalJavaScript": 46,
+			"generalJavaScriptOffThePage": 4,
+			"eventOutsideVocabulary": 51
+		},
+		"demos/async-waterfall": {
+			"handlers": 1,
+			"noInlineBody": 0,
+			"dataToday": 1,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/chat-stream": {
+			"handlers": 5,
+			"noInlineBody": 0,
+			"dataToday": 0,
+			"withExtensions": 2,
+			"generalJavaScript": 3,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/codegen-size": {
+			"handlers": 13,
+			"noInlineBody": 0,
+			"dataToday": 9,
+			"withExtensions": 4,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 3
+		},
+		"demos/computed-chain": {
+			"handlers": 13,
+			"noInlineBody": 0,
+			"dataToday": 12,
+			"withExtensions": 1,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/dbmon": {
+			"handlers": 5,
+			"noInlineBody": 0,
+			"dataToday": 0,
+			"withExtensions": 1,
+			"generalJavaScript": 4,
+			"generalJavaScriptOffThePage": 4,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/interaction-benchmark/apps/markless": {
+			"handlers": 26,
+			"noInlineBody": 0,
+			"dataToday": 6,
+			"withExtensions": 15,
+			"generalJavaScript": 5,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 7
+		},
+		"demos/interaction-benchmark/apps/markless-viewport": {
+			"handlers": 26,
+			"noInlineBody": 0,
+			"dataToday": 6,
+			"withExtensions": 15,
+			"generalJavaScript": 5,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 7
+		},
+		"demos/js-framework-benchmark": {
+			"handlers": 8,
+			"noInlineBody": 0,
+			"dataToday": 1,
+			"withExtensions": 5,
+			"generalJavaScript": 2,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/live-feed": {
+			"handlers": 2,
+			"noInlineBody": 0,
+			"dataToday": 2,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/live-feed-ssr": {
+			"handlers": 2,
+			"noInlineBody": 0,
+			"dataToday": 2,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/memo-wall": {
+			"handlers": 8,
+			"noInlineBody": 0,
+			"dataToday": 0,
+			"withExtensions": 6,
+			"generalJavaScript": 2,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/music-player": {
+			"handlers": 7,
+			"noInlineBody": 5,
+			"dataToday": 2,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/music-player-ssr": {
+			"handlers": 7,
+			"noInlineBody": 5,
+			"dataToday": 2,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/news": {
+			"handlers": 1,
+			"noInlineBody": 0,
+			"dataToday": 1,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/same-module-branch": {
+			"handlers": 1,
+			"noInlineBody": 0,
+			"dataToday": 1,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/static-router": {
+			"handlers": 1,
+			"noInlineBody": 0,
+			"dataToday": 1,
+			"withExtensions": 0,
+			"generalJavaScript": 0,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 0
+		},
+		"demos/todomvc": {
+			"handlers": 10,
+			"noInlineBody": 0,
+			"dataToday": 0,
+			"withExtensions": 5,
+			"generalJavaScript": 5,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 3
+		},
+		"headless families": {
+			"handlers": 252,
+			"noInlineBody": 0,
+			"dataToday": 0,
+			"withExtensions": 110,
+			"generalJavaScript": 142,
+			"generalJavaScriptOffThePage": 26,
+			"eventOutsideVocabulary": 188
+		},
+		"headless scenarios": {
+			"handlers": 96,
+			"noInlineBody": 0,
+			"dataToday": 11,
+			"withExtensions": 45,
+			"generalJavaScript": 40,
+			"generalJavaScriptOffThePage": 0,
+			"eventOutsideVocabulary": 27
+		}
+	},
+	"extensions": {
+		"locals": {
+			"what": "local names inside a handler (`const x = ...`)",
+			"neededByClass2": 213,
+			"onlyMissingPiece": 3,
+			"neededByClass3": 307
+		},
+		"control": {
+			"what": "`if`, early `return`, `switch` and `throw` in a handler",
+			"neededByClass2": 399,
+			"onlyMissingPiece": 4,
+			"neededByClass3": 320
+		},
+		"loop": {
+			"what": "a loop over a list",
+			"neededByClass2": 36,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 97
+		},
+		"await": {
+			"what": "statements after an `await` (continuation)",
+			"neededByClass2": 0,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 3
+		},
+		"ownFunction": {
+			"what": "a call to your own function, inlined at build time",
+			"neededByClass2": 379,
+			"onlyMissingPiece": 59,
+			"neededByClass3": 240
+		},
+		"sharedMethod": {
+			"what": "a method of `shared()` state, inlined at build time",
+			"neededByClass2": 92,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 115
+		},
+		"callbackArgs": {
+			"what": "calling a received callback with arguments, or `?.()`",
+			"neededByClass2": 124,
+			"onlyMissingPiece": 5,
+			"neededByClass3": 168
+		},
+		"fieldWrite": {
+			"what": "writing a field of a state object or list row (`row.done = true`)",
+			"neededByClass2": 164,
+			"onlyMissingPiece": 39,
+			"neededByClass3": 180
+		},
+		"listEdit": {
+			"what": "editing a list in place (`push`, `splice`, `sort`)",
+			"neededByClass2": 31,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 103
+		},
+		"methods": {
+			"what": "more string and array methods (`split`, `startsWith`, `reduce`...)",
+			"neededByClass2": 35,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 116
+		},
+		"stdlib": {
+			"what": "more standard functions (`Math.*`, `JSON.*`, `Object.keys`, `parseInt`...)",
+			"neededByClass2": 27,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 81
+		},
+		"dates": {
+			"what": "dates, the clock and locale formatting",
+			"neededByClass2": 16,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 38
+		},
+		"eventFields": {
+			"what": "reading the event (`event.key`, `event.target.checked`)",
+			"neededByClass2": 417,
+			"onlyMissingPiece": 6,
+			"neededByClass3": 319
+		},
+		"eventFlags": {
+			"what": "`event.preventDefault()` and `stopPropagation()`",
+			"neededByClass2": 131,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 90
+		},
+		"elementCommands": {
+			"what": "element commands (`focus`, `scrollIntoView`, position reads)",
+			"neededByClass2": 162,
+			"onlyMissingPiece": 77,
+			"neededByClass3": 145
+		},
+		"keyedRead": {
+			"what": "reading a key chosen at run time (`map[key]`)",
+			"neededByClass2": 80,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 133
+		},
+		"operators": {
+			"what": "more operators (`typeof`, `in`, `**`, `??=`, bitwise)",
+			"neededByClass2": 55,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 53
+		},
+		"objectSpread": {
+			"what": "object spread (`{ ...a, b }`)",
+			"neededByClass2": 19,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 20
+		},
+		"typeAssertions": {
+			"what": "type assertions (`x as T`), erased",
+			"neededByClass2": 184,
+			"onlyMissingPiece": 6,
+			"neededByClass3": 196
+		},
+		"framework": {
+			"what": "a Markless API call (router `navigate`, `flush`...)",
+			"neededByClass2": 1,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 0
+		},
+		"device": {
+			"what": "a device call (`@markless/device`)",
+			"neededByClass2": 0,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 0
+		},
+		"logging": {
+			"what": "`console.*` (dropped or forwarded)",
+			"neededByClass2": 0,
+			"onlyMissingPiece": 0,
+			"neededByClass3": 0
+		}
+	},
+	"reasonGroups": {
+		"browser": {
+			"what": "the page itself: DOM elements, `document`, `window`, browser classes and DOM type tests",
+			"handlers": 266,
+			"onlyReason": 129
+		},
+		"objects": {
+			"what": "values of unknown shape: class instances, your own classes, objects a library or another module hands back",
+			"handlers": 158,
+			"onlyReason": 31
+		},
+		"timers": {
+			"what": "timers (`setTimeout`, `setInterval`, `requestAnimationFrame`)",
+			"handlers": 82,
+			"onlyReason": 22
+		},
+		"closure": {
+			"what": "a function passed or kept as a value (a closure)",
+			"handlers": 65,
+			"onlyReason": 7
+		},
+		"regex": {
+			"what": "regular expressions",
+			"handlers": 57,
+			"onlyReason": 18
+		},
+		"other": {
+			"what": "other syntax",
+			"handlers": 10,
+			"onlyReason": 6
+		},
+		"recursion": {
+			"what": "a function the build cannot follow (recursive or deeply nested)",
+			"handlers": 7,
+			"onlyReason": 0
+		},
+		"network": {
+			"what": "a network request (`fetch`)",
+			"handlers": 4,
+			"onlyReason": 0
+		}
+	},
+	"reasonDetails": {
+		"timers: timers (`setTimeout`, `requestAnimationFrame`)": 82,
+		"browser: a DOM method on the event target (`closest`, `getAttribute`...)": 73,
+		"closure: a function passed or kept as a value (closure)": 65,
+		"regex: a regular expression": 57,
+		"browser: an `instanceof` test (DOM or class types)": 51,
+		"browser: a browser API (`window.matchMedia`)": 31,
+		"browser: writing to a DOM element or event": 30,
+		"browser: a browser or built-in class (`new FormData`)": 28,
+		"browser: a browser global (`document`)": 27,
+		"browser: a browser global (`HTMLElement`)": 23,
+		"browser: a browser API (`window.getComputedStyle`)": 19,
+		"browser: a browser global (`Element`)": 18,
+		"browser: a browser or built-in class (`new IntersectionObserver`)": 16,
+		"objects: a call on a value of unknown shape (`watcher.observe`)": 16,
+		"objects: a call through an expression (`getAttribute`)": 15,
+		"objects: a call into an imported value whose body the build cannot see": 13,
+		"browser: a browser API (`document.getElementById`)": 12,
+		"objects: a call on a value of unknown shape (`row.getAttribute`)": 11,
+		"browser: a browser global (`DOMException`)": 11,
+		"objects: a call through an expression (`resolvedOptions`)": 11,
+		"objects: a call on a value of unknown shape (`engine.setAxis`)": 9,
+		"objects: a call on a value of unknown shape (`engine.setViewport`)": 9,
+		"objects: constructing your own or a library class (`new`)": 9,
+		"objects: a call on a value of unknown shape (`doc.createRange`)": 8,
+		"objects: a call on a value of unknown shape (`own.selectNode`)": 8,
+		"objects: a call on a value of unknown shape (`token.getAttribute`)": 8,
+		"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)": 8,
+		"objects: a call on a value of unknown shape (`upTo.setEndBefore`)": 8,
+		"objects: a call on a value of unknown shape (`whole.selectNodeContents`)": 8,
+		"objects: a call through an expression (`querySelector`)": 7,
+		"other: `ArrayPattern`": 7,
+		"objects: a call on a value of unknown shape (`el.setAttribute`)": 7,
+		"browser: a browser or built-in class (`new KeyboardEvent`)": 7,
+		"recursion: a function the build cannot follow (recursive or deeply nested)": 7,
+		"browser: a browser API (`getComputedStyle`)": 6,
+		"objects: a call on a value of unknown shape (`engine.showIndex`)": 6,
+		"objects: a call through an expression (`formatToParts`)": 6,
+		"browser: a browser or built-in class (`new MouseEvent`)": 5,
+		"objects: a call on a value of unknown shape (`surface.dispatchEvent`)": 5,
+		"objects: a call on a value of unknown shape (`upTo.setEnd`)": 5,
+		"browser: a browser API (`performance.now`)": 4,
+		"browser: a browser or built-in class (`new DOMPoint`)": 4,
+		"objects: a call on a value of unknown shape (`m.inverse`)": 4,
+		"objects: a call on a value of unknown shape (`svg.getScreenCTM`)": 4,
+		"objects: a call through an expression (`matrixTransform`)": 4,
+		"objects: a call on a value of unknown shape (`hotspot.getAttribute`)": 4,
+		"browser: a browser API (`navigator.clipboard.writeText`)": 4,
+		"network: a network request (`fetch`)": 4,
+		"browser: a browser API (`document.querySelector`)": 4,
+		"browser: a browser or built-in class (`new MutationObserver`)": 4,
+		"objects: a call on a value of unknown shape (`observer.observe`)": 4,
+		"objects: a call on a value of unknown shape (`random`)": 4,
+		"browser: a browser global (`todo`)": 4,
+		"browser: a browser or built-in class (`new DataTransfer`)": 4,
+		"other: `ImportExpression`": 3,
+		"objects: a call on a value of unknown shape (`sheet.getAttribute`)": 3,
+		"objects: a call on a value of unknown shape (`key.getAttribute`)": 3,
+		"objects: a call on a value of unknown shape (`one.setAttribute`)": 3,
+		"browser: a browser or built-in class (`new CustomEvent`)": 3,
+		"objects: a call on a value of unknown shape (`leaving.dispatchEvent`)": 3,
+		"browser: a browser global (`Node`)": 3,
+		"objects: a call on a value of unknown shape (`control.getAttribute`)": 3,
+		"objects: a call on a value of unknown shape (`open.compareDocumentPosition`)": 3,
+		"objects: a call on a value of unknown shape (`root.setAttribute`)": 3,
+		"objects: a call on a value of unknown shape (`at.collapse`)": 3,
+		"objects: a call on a value of unknown shape (`at.selectNodeContents`)": 3,
+		"objects: a call on a value of unknown shape (`doc.defaultView.getSelection`)": 3,
+		"objects: a call on a value of unknown shape (`selection.addRange`)": 3,
+		"objects: a call on a value of unknown shape (`selection.removeAllRanges`)": 3,
+		"objects: a call on a value of unknown shape (`upToAnchor.selectNodeContents`)": 3,
+		"objects: a call on a value of unknown shape (`upToAnchor.setEnd`)": 3,
+		"objects: a call on a value of unknown shape (`upToFocus.selectNodeContents`)": 3,
+		"objects: a call on a value of unknown shape (`upToFocus.setEnd`)": 3,
+		"objects: a call on a value of unknown shape (`chip.getAttribute`)": 2,
+		"objects: a call on a value of unknown shape (`hit.getAttribute`)": 2,
+		"objects: a call on a value of unknown shape (`demo.querySelectorAll`)": 2,
+		"objects: a call on a value of unknown shape (`figure.querySelector`)": 2,
+		"objects: a call on a value of unknown shape (`box.querySelectorAll`)": 2,
+		"objects: a call on a value of unknown shape (`key.closest`)": 2,
+		"objects: a call on a value of unknown shape (`sidebar.querySelector`)": 2,
+		"objects: a call on a value of unknown shape (`loading.catch`)": 2,
+		"browser: a browser API (`matchMedia`)": 2,
+		"browser: a browser global (`HTMLInputElement`)": 2,
+		"objects: a call on a value of unknown shape (`response.json`)": 2,
+		"browser: a browser global (`row`)": 2,
+		"objects: a call on a value of unknown shape (`box.getAttribute`)": 2,
+		"browser: a browser API (`document.addEventListener`)": 2,
+		"objects: a call on a value of unknown shape (`option.getAttribute`)": 2,
+		"objects: a call on a value of unknown shape (`group.hasAttribute`)": 2,
+		"objects: a call on a value of unknown shape (`row.hasAttribute`)": 2,
+		"objects: a call on a value of unknown shape (`data.getAll`)": 2,
+		"objects: a call through an expression (`getAll`)": 2,
+		"objects: a call on a value of unknown shape (`runAt.getAttribute`)": 1,
+		"objects: a call on a value of unknown shape (`explore`)": 1,
+		"objects: a call on a value of unknown shape (`dot.getAttribute`)": 1,
+		"objects: a call on a value of unknown shape (`cap.closest`)": 1,
+		"objects: a call on a value of unknown shape (`cap.getAttribute`)": 1,
+		"objects: a call on a value of unknown shape (`target.dispatchEvent`)": 1,
+		"objects: a call on a value of unknown shape (`figure.querySelectorAll`)": 1,
+		"objects: a call on a value of unknown shape (`match.getAttribute`)": 1,
+		"browser: a browser API (`addEventListener`)": 1,
+		"browser: a browser global (`location`)": 1,
+		"browser: a browser API (`document.activeElement.getAttribute`)": 1,
+		"objects: a call through an expression (`dispatchEvent`)": 1,
+		"objects: a call on a value of unknown shape (`trigger.getAttribute`)": 1,
+		"browser: a browser global (`navigator`)": 1,
+		"browser: a browser or built-in class (`new Set`)": 1,
+		"objects: a call on a value of unknown shape (`practice.dispatchEvent`)": 1,
+		"objects: a call on a value of unknown shape (`key.dispatchEvent`)": 1,
+		"objects: a call on a value of unknown shape (`pages.querySelector`)": 1,
+		"objects: a call on a value of unknown shape (`branch.getAttribute`)": 1,
+		"objects: a call through an expression (`closest`)": 1,
+		"browser: a browser API (`document.querySelectorAll`)": 1,
+		"objects: a call on a value of unknown shape (`branch.querySelector`)": 1,
+		"browser: a browser API (`window.addEventListener`)": 1,
+		"browser: a browser API (`document.createRange`)": 1,
+		"browser: a browser API (`document.createTreeWalker`)": 1,
+		"browser: a browser global (`NodeFilter`)": 1,
+		"objects: a call on a value of unknown shape (`range.setEnd`)": 1,
+		"objects: a call on a value of unknown shape (`range.setStart`)": 1,
+		"objects: a call on a value of unknown shape (`walker.nextNode`)": 1,
+		"objects: a call on a value of unknown shape (`grid.setAttribute`)": 1,
+		"objects: a call on a value of unknown shape (`landing.getAttribute`)": 1,
+		"browser: a browser or built-in class (`new PointerEvent`)": 1,
+		"objects: a call on a value of unknown shape (`root.getAttribute`)": 1,
+		"browser: a browser or built-in class (`new Event`)": 1,
+		"browser: a browser or built-in class (`new File`)": 1,
+		"objects: a call on a value of unknown shape (`embed.querySelector`)": 1,
+		"objects: a call on a value of unknown shape (`field.dispatchEvent`)": 1,
+		"objects: a call on a value of unknown shape (`drawing.undo`)": 1,
+		"objects: a call on a value of unknown shape (`toasts.toast`)": 1
+	},
+	"computeds": {
+		"total": 634,
+		"dataToday": 313,
+		"withExtensions": 163,
+		"generalJavaScript": 158
+	},
+	"generalJavaScriptHandlers": [
+		{
+			"at": "website/components/figures/async/board-anatomy.tsrx:74",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/async/board-anatomy.tsrx:77",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/async/board-anatomy.tsrx:179",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/async/board-anatomy.tsrx:184",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/async/postcards-anatomy.tsrx:179",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/async/postcards-anatomy.tsrx:209",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/big-idea/seat-anatomy.tsrx:70",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/big-idea/seat-anatomy.tsrx:131",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/build-output/build-output-anatomy.tsrx:66",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ci/checks-figure.tsrx:116",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ci/checks-figure.tsrx:123",
+			"event": "keydown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ci/checks-figure.tsrx:153",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)",
+				"objects: a call on a value of unknown shape (`runAt.getAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ci/checks-figure.tsrx:166",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/cli/session-figure.tsrx:30",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/cli/session-figure.tsrx:58",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`chip.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/cli/session-figure.tsrx:72",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`chip.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/compiler/explorer-anatomy.tsrx:182",
+			"event": "input",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`explore`)",
+				"other: `ImportExpression`"
+			]
+		},
+		{
+			"at": "website/components/figures/computed/thermometer-anatomy.tsrx:33",
+			"event": "animationend",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/computed/thermometer-anatomy.tsrx:33",
+			"event": "animationend",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/create/create-anatomy.tsrx:59",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`sheet.getAttribute`)",
+				"objects: a call through an expression (`getAttribute`)",
+				"objects: a call through an expression (`querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/figures/create/create-anatomy.tsrx:99",
+			"event": "input",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/create/create-anatomy.tsrx:114",
+			"event": "keydown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/create/create-anatomy.tsrx:181",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`sheet.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/create/create-anatomy.tsrx:186",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`sheet.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/dev-server/dev-server-anatomy.tsrx:34",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call through an expression (`querySelector`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/dev-server/dev-server-anatomy.tsrx:55",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)",
+				"objects: a call through an expression (`querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/figures/dev-server/dev-server-anatomy.tsrx:176",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call into an imported value whose body the build cannot see",
+				"regex: a regular expression",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/dev-setup/terminal-figure.tsrx:35",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/docs-guide/compare-figure.tsrx:41",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/docs-guide/compare-figure.tsrx:48",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/docs-guide/explorer-figure.tsrx:44",
+			"event": "dragover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/docs-guide/explorer-figure.tsrx:53",
+			"event": "drop",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/editor-setup/editor-figure.tsrx:88",
+			"event": "pointermove",
+			"reasons": [
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/editor-setup/editor-figure.tsrx:95",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/events/keycard-anatomy.tsrx:16",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)"
+			]
+		},
+		{
+			"at": "website/components/figures/first-pr/review-figure.tsrx:52",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/how-index/coverage-anatomy.tsrx:35",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/how-index/race-anatomy.tsrx:34",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`performance.now`)",
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/how-index/race-anatomy.tsrx:86",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`performance.now`)",
+				"browser: a browser API (`window.matchMedia`)",
+				"objects: a call into an imported value whose body the build cannot see",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/how-index/race-anatomy.tsrx:92",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "website/components/figures/ink/desk-figure.tsrx:26",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/lazy-chunks/gallery-anatomy.tsrx:46",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/links/link-anatomy.tsrx:33",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/links/link-anatomy.tsrx:66",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/links/link-anatomy.tsrx:73",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/links/link-anatomy.tsrx:135",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:57",
+			"event": "pointerup",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:70",
+			"event": "keydown",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:127",
+			"event": "pointerup",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:140",
+			"event": "keydown",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:197",
+			"event": "pointerup",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/lists/tent-anatomy.tsrx:210",
+			"event": "keydown",
+			"reasons": [
+				"other: `ArrayPattern`"
+			]
+		},
+		{
+			"at": "website/components/figures/migrate/migrate-anatomy.tsrx:34",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/migrate/migrate-anatomy.tsrx:67",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)",
+				"objects: a call through an expression (`querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/figures/migrate/migrate-anatomy.tsrx:74",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/figures/migrate/migrate-anatomy.tsrx:92",
+			"event": "focus",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/migrate/migrate-anatomy.tsrx:113",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: writing to a DOM element or event",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/native/device-anatomy.tsrx:32",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/player/player-anatomy.tsrx:77",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/player/player-anatomy.tsrx:140",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser or built-in class (`new DOMPoint`)",
+				"browser: writing to a DOM element or event",
+				"objects: a call on a value of unknown shape (`m.inverse`)",
+				"objects: a call on a value of unknown shape (`svg.getScreenCTM`)",
+				"objects: a call through an expression (`matrixTransform`)"
+			]
+		},
+		{
+			"at": "website/components/figures/player/player-anatomy.tsrx:151",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a browser or built-in class (`new DOMPoint`)",
+				"objects: a call on a value of unknown shape (`m.inverse`)",
+				"objects: a call on a value of unknown shape (`svg.getScreenCTM`)",
+				"objects: a call through an expression (`matrixTransform`)"
+			]
+		},
+		{
+			"at": "website/components/figures/player/player-anatomy.tsrx:240",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser or built-in class (`new DOMPoint`)",
+				"browser: writing to a DOM element or event",
+				"objects: a call on a value of unknown shape (`m.inverse`)",
+				"objects: a call on a value of unknown shape (`svg.getScreenCTM`)",
+				"objects: a call through an expression (`matrixTransform`)"
+			]
+		},
+		{
+			"at": "website/components/figures/player/player-anatomy.tsrx:251",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a browser or built-in class (`new DOMPoint`)",
+				"objects: a call on a value of unknown shape (`m.inverse`)",
+				"objects: a call on a value of unknown shape (`svg.getScreenCTM`)",
+				"objects: a call through an expression (`matrixTransform`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:39",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:62",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:93",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser or built-in class (`new MouseEvent`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:351",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`performance.now`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call into an imported value whose body the build cannot see",
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:402",
+			"event": "pointerdown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:419",
+			"event": "pointermove",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:433",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/popup/popup-anatomy.tsrx:472",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`performance.now`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`el.setAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reading/printout-anatomy.tsrx:14",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reference/packages-figure.tsrx:43",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reference/packages-figure.tsrx:53",
+			"event": "keydown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reference/packages-figure.tsrx:72",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reference/packages-figure.tsrx:79",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reload/reload-anatomy.tsrx:68",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/reload/reload-anatomy.tsrx:221",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/repo-tour/tour-figure.tsrx:47",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`hit.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/repo-tour/tour-figure.tsrx:55",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`hit.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/repo-tour/tour-figure.tsrx:124",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`dot.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/resuming/resume-anatomy.tsrx:102",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/resuming/resume-anatomy.tsrx:126",
+			"event": "keydown",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "website/components/figures/resuming/resume-anatomy.tsrx:152",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/resuming/resume-anatomy.tsrx:156",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/resuming/resume-anatomy.tsrx:62",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "website/components/figures/routes/routes-anatomy.tsrx:76",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/routes/routes-anatomy.tsrx:142",
+			"event": "keydown",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/specs-rules/explorer-figure.tsrx:56",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/figures/state/state-anatomy.tsrx:29",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:113",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:221",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:234",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:290",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:305",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:385",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:400",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:480",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:495",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:575",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stickers/stickers-anatomy.tsrx:590",
+			"event": "pointermove",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/stream/stream-anatomy.tsrx:33",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"browser: a browser or built-in class (`new IntersectionObserver`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`watcher.observe`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stream/stream-anatomy.tsrx:50",
+			"event": "keydown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stream/stream-anatomy.tsrx:74",
+			"event": "click",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stream/stream-anatomy.tsrx:78",
+			"event": "keydown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/stream/stream-anatomy.tsrx:172",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/figures/testing/runner-figure.tsrx:75",
+			"event": "keydown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/type-checking/editor-figure.tsrx:58",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/type-checking/editor-figure.tsrx:102",
+			"event": "pointermove",
+			"reasons": [
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/type-checking/editor-figure.tsrx:108",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ui/accordion-anatomy.tsrx:28",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ui/accordion-anatomy.tsrx:55",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ui/accordion-keys.tsrx:13",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`document`)",
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"objects: a call on a value of unknown shape (`cap.closest`)",
+				"objects: a call on a value of unknown shape (`cap.getAttribute`)",
+				"objects: a call on a value of unknown shape (`demo.querySelectorAll`)",
+				"objects: a call on a value of unknown shape (`figure.querySelector`)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)",
+				"objects: a call on a value of unknown shape (`target.dispatchEvent`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/figures/ui/accordion-keys.tsrx:36",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`demo.querySelectorAll`)",
+				"objects: a call on a value of unknown shape (`figure.querySelectorAll`)",
+				"objects: a call on a value of unknown shape (`figure.querySelector`)",
+				"objects: a call on a value of unknown shape (`match.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:120",
+			"event": "keydown",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:134",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:139",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:144",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:149",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:154",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:159",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:164",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:169",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:174",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:179",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:184",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:189",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/figures/vending/vending-anatomy.tsrx:269",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "website/components/demos/ui/accordion/examples/scene.tsrx:60",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/demos/ui/checkbox/form.tsrx:9",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "website/components/demos/ui/overview/edit-address-demo.tsrx:19",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/docs/anatomy-table-view.tsrx:31",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`hotspot.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/anatomy-table-view.tsrx:57",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`hotspot.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/anatomy-table-view.tsrx:81",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`hotspot.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/anatomy-table-view.tsrx:107",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`hotspot.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/code.tsrx:88",
+			"event": "pointerdown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`box.querySelectorAll`)",
+				"other: `ImportExpression`"
+			]
+		},
+		{
+			"at": "website/components/docs/code.tsrx:89",
+			"event": "focusin",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`box.querySelectorAll`)",
+				"other: `ImportExpression`"
+			]
+		},
+		{
+			"at": "website/components/docs/copy-button.tsrx:17",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`navigator.clipboard.writeText`)"
+			]
+		},
+		{
+			"at": "website/components/docs/glossary-index.tsrx:30",
+			"event": "visible",
+			"reasons": [
+				"browser: a browser API (`addEventListener`)",
+				"browser: a browser global (`location`)",
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "website/components/docs/ink-cards.tsrx:32",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`navigator.clipboard.writeText`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard/accordion-practice.tsrx:10",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`document.activeElement.getAttribute`)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call through an expression (`querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard/accordion-practice.tsrx:34",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call through an expression (`dispatchEvent`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:45",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`trigger.getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:46",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser global (`navigator`)",
+				"browser: a browser or built-in class (`new Set`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:75",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`key.closest`)",
+				"objects: a call on a value of unknown shape (`key.getAttribute`)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:76",
+			"event": "pointerout",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:77",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`key.getAttribute`)",
+				"objects: a call on a value of unknown shape (`practice.dispatchEvent`)",
+				"objects: a call through an expression (`querySelector`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:87",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser or built-in class (`new MouseEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`key.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:92",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`key.closest`)",
+				"objects: a call on a value of unknown shape (`key.getAttribute`)",
+				"objects: a call through an expression (`getAttribute`)"
+			]
+		},
+		{
+			"at": "website/components/docs/keyboard-table.tsrx:93",
+			"event": "focusout",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "website/components/docs/navbar/site-navbar.tsrx:626",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)",
+				"objects: a call on a value of unknown shape (`pages.querySelector`)",
+				"objects: a call on a value of unknown shape (`sidebar.querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/docs/navbar/site-navbar.tsrx:655",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)",
+				"objects: a call on a value of unknown shape (`sidebar.querySelector`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/docs/search/docs-search.tsrx:167",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"network: a network request (`fetch`)",
+				"objects: a call on a value of unknown shape (`loading.catch`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/docs/search/docs-search.tsrx:179",
+			"event": "input",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"network: a network request (`fetch`)",
+				"objects: a call on a value of unknown shape (`loading.catch`)",
+				"other: `ArrayPattern`",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "website/components/docs/sidebar.tsrx:169",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`branch.getAttribute`)",
+				"objects: a call through an expression (`closest`)"
+			]
+		},
+		{
+			"at": "website/components/docs/sidebar.tsrx:178",
+			"event": "sidebararrive",
+			"reasons": [
+				"browser: a browser API (`document.querySelectorAll`)",
+				"objects: a call on a value of unknown shape (`branch.querySelector`)"
+			]
+		},
+		{
+			"at": "website/components/docs/sidebar.tsrx:183",
+			"event": "keydown",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "website/components/docs/sidebar.tsrx:199",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)",
+				"browser: a browser API (`document.querySelector`)",
+				"browser: a browser API (`getComputedStyle`)",
+				"browser: a browser API (`matchMedia`)",
+				"browser: a browser global (`document`)",
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/docs/sidebar.tsrx:220",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)",
+				"browser: a browser API (`document.querySelector`)",
+				"browser: a browser API (`getComputedStyle`)",
+				"browser: a browser API (`matchMedia`)",
+				"browser: a browser global (`document`)",
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/docs/start-with-agent.tsrx:52",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`navigator.clipboard.writeText`)",
+				"browser: a browser API (`window.addEventListener`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/docs/start-with-agent.tsrx:96",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`navigator.clipboard.writeText`)",
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/mascot/mug-studio.tsrx:449",
+			"event": "click",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:63",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a browser or built-in class (`new MutationObserver`)",
+				"objects: a call on a value of unknown shape (`observer.observe`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:64",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser or built-in class (`new MutationObserver`)",
+				"objects: a call on a value of unknown shape (`observer.observe`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:65",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:89",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a browser or built-in class (`new MutationObserver`)",
+				"objects: a call on a value of unknown shape (`observer.observe`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:90",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser or built-in class (`new MutationObserver`)",
+				"objects: a call on a value of unknown shape (`observer.observe`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/computed-sketch.tsrx:91",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/conditionals-sketch.tsrx:45",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser global (`Element`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/conditionals-sketch.tsrx:60",
+			"event": "input",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/events-sketch.tsrx:50",
+			"event": "input",
+			"reasons": [
+				"browser: a browser global (`HTMLInputElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/events-sketch.tsrx:57",
+			"event": "submit",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "website/components/sketch/concepts/lists-sketch.tsrx:109",
+			"event": "change",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "website/components/sketch/counter-sketch.tsrx:86",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser API (`document.createRange`)",
+				"browser: a browser API (`document.createTreeWalker`)",
+				"browser: a browser global (`Element`)",
+				"browser: a browser global (`NodeFilter`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`range.setEnd`)",
+				"objects: a call on a value of unknown shape (`range.setStart`)",
+				"objects: a call on a value of unknown shape (`walker.nextNode`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "demos/chat-stream/fixture/app.tsrx:39",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.querySelector`)",
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`random`)"
+			]
+		},
+		{
+			"at": "demos/chat-stream/fixture/app.tsrx:53",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`random`)"
+			]
+		},
+		{
+			"at": "demos/chat-stream/fixture/app.tsrx:61",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`document.querySelector`)",
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/dbmon/fixture/app.tsrx:14",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/dbmon/fixture/app.tsrx:15",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/dbmon/fixture/app.tsrx:16",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/dbmon/fixture/app.tsrx:17",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless/pages/index.tsrx:98",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless/pages/index.tsrx:117",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless/pages/index.tsrx:136",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless/pages/records.tsrx:112",
+			"event": "close",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless/pages/settings.tsrx:42",
+			"event": "submit",
+			"reasons": [
+				"network: a network request (`fetch`)",
+				"objects: a call on a value of unknown shape (`response.json`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless-viewport/pages/index.tsrx:98",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless-viewport/pages/index.tsrx:117",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless-viewport/pages/index.tsrx:136",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless-viewport/pages/records.tsrx:112",
+			"event": "close",
+			"reasons": [
+				"browser: a browser API (`document.getElementById`)"
+			]
+		},
+		{
+			"at": "demos/interaction-benchmark/apps/markless-viewport/pages/settings.tsrx:42",
+			"event": "submit",
+			"reasons": [
+				"network: a network request (`fetch`)",
+				"objects: a call on a value of unknown shape (`response.json`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "demos/js-framework-benchmark/frameworks/keyed/markless/src/root.tsrx:31",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`row`)"
+			]
+		},
+		{
+			"at": "demos/js-framework-benchmark/frameworks/keyed/markless/src/root.tsrx:32",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`row`)"
+			]
+		},
+		{
+			"at": "demos/memo-wall/fixture/app.tsrx:21",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`random`)"
+			]
+		},
+		{
+			"at": "demos/memo-wall/fixture/app.tsrx:22",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`random`)"
+			]
+		},
+		{
+			"at": "demos/todomvc/fixture/app.tsrx:31",
+			"event": "keydown",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "demos/todomvc/fixture/app.tsrx:61",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`todo`)",
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "demos/todomvc/fixture/app.tsrx:67",
+			"event": "dblclick",
+			"reasons": [
+				"browser: a browser global (`todo`)"
+			]
+		},
+		{
+			"at": "demos/todomvc/fixture/app.tsrx:68",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`todo`)"
+			]
+		},
+		{
+			"at": "demos/todomvc/fixture/app.tsrx:75",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`todo`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/accordion/accordion.tsrx:178",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:436",
+			"event": "focusin",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:447",
+			"event": "keydown",
+			"reasons": [
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:467",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:503",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:521",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:607",
+			"event": "click",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/calendar.tsrx:632",
+			"event": "click",
+			"reasons": [
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:262",
+			"event": "focusin",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:266",
+			"event": "pointerover",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:270",
+			"event": "pointerout",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:307",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:314",
+			"event": "pointermove",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:319",
+			"event": "pointerup",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:324",
+			"event": "wheel",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:381",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:385",
+			"event": "focus",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:389",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:413",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:431",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`engine.setAxis`)",
+				"objects: a call on a value of unknown shape (`engine.setViewport`)",
+				"objects: a call on a value of unknown shape (`engine.showIndex`)",
+				"objects: constructing your own or a library class (`new`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/carousel/carousel.tsrx:449",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`window.matchMedia`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:477",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:599",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:645",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:652",
+			"event": "pointermove",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:656",
+			"event": "pointerup",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:661",
+			"event": "pointercancel",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:714",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:721",
+			"event": "pointermove",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:725",
+			"event": "pointerup",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:729",
+			"event": "pointercancel",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:829",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:943",
+			"event": "keydown",
+			"reasons": [
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:958",
+			"event": "blur",
+			"reasons": [
+				"browser: writing to a DOM element or event",
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/colorpicker/colorpicker.tsrx:1012",
+			"event": "click",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/crop/crop.tsrx:570",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/crop/crop.tsrx:617",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/crop/crop.tsrx:623",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/crop/crop.tsrx:759",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/crop/crop.tsrx:773",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/datebox/datebox.tsrx:309",
+			"event": "keydown",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`box.getAttribute`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/datebox/datebox.tsrx:337",
+			"event": "blur",
+			"reasons": [
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:353",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:368",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:416",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:432",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:440",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:454",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/drawer/drawer.tsrx:522",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/fileupload/fileupload.tsrx:155",
+			"event": "drop",
+			"reasons": [
+				"browser: a browser or built-in class (`new DataTransfer`)",
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/fileupload/fileupload.tsrx:172",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/fileupload/fileupload.tsrx:196",
+			"event": "change",
+			"reasons": [
+				"browser: a browser or built-in class (`new DataTransfer`)",
+				"closure: a function passed or kept as a value (closure)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/fileupload/fileupload.tsrx:232",
+			"event": "click",
+			"reasons": [
+				"browser: a browser or built-in class (`new DataTransfer`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/gridlist/gridlist.tsrx:137",
+			"event": "focusin",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`grid.setAttribute`)",
+				"objects: a call on a value of unknown shape (`one.setAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/gridlist/gridlist.tsrx:168",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/gridlist/gridlist.tsrx:194",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`landing.getAttribute`)",
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/hovercard/hovercard.tsrx:72",
+			"event": "pointerover",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/hovercard/hovercard.tsrx:113",
+			"event": "pointerout",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/hovercard/hovercard.tsrx:156",
+			"event": "focusin",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/hovercard/hovercard.tsrx:190",
+			"event": "focusout",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/hovercard/hovercard.tsrx:257",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/ink/ink.tsrx:362",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/ink/ink.tsrx:374",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:288",
+			"event": "contextmenu",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser global (`document`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:333",
+			"event": "pointerdown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:353",
+			"event": "pointermove",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:363",
+			"event": "pointerup",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:398",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:532",
+			"event": "click",
+			"reasons": [
+				"browser: a browser or built-in class (`new CustomEvent`)",
+				"objects: a call on a value of unknown shape (`surface.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:584",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser or built-in class (`new CustomEvent`)",
+				"objects: a call on a value of unknown shape (`surface.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:629",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:642",
+			"event": "pointerover",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:683",
+			"event": "pointerout",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menu/menu.tsrx:755",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"browser: a browser or built-in class (`new CustomEvent`)",
+				"objects: a call on a value of unknown shape (`surface.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:126",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:143",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"browser: a browser or built-in class (`new MouseEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`leaving.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:200",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser or built-in class (`new MouseEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`leaving.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:261",
+			"event": "click",
+			"reasons": [
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"objects: a call on a value of unknown shape (`surface.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:284",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"objects: a call on a value of unknown shape (`surface.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:400",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/menubar/menubar.tsrx:415",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser or built-in class (`new KeyboardEvent`)",
+				"browser: a browser or built-in class (`new MouseEvent`)",
+				"browser: an `instanceof` test (DOM or class types)",
+				"objects: a call on a value of unknown shape (`leaving.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/modal/modal.tsrx:104",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/modal/modal.tsrx:119",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/modal/modal.tsrx:168",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:133",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:189",
+			"event": "pointerover",
+			"reasons": [
+				"browser: a browser API (`document.addEventListener`)",
+				"browser: a browser global (`Node`)",
+				"objects: a call on a value of unknown shape (`control.getAttribute`)",
+				"objects: a call on a value of unknown shape (`open.compareDocumentPosition`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:231",
+			"event": "pointerout",
+			"reasons": [
+				"browser: a browser API (`document.addEventListener`)",
+				"browser: a browser or built-in class (`new PointerEvent`)",
+				"closure: a function passed or kept as a value (closure)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:273",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`Node`)",
+				"objects: a call on a value of unknown shape (`control.getAttribute`)",
+				"objects: a call on a value of unknown shape (`open.compareDocumentPosition`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:285",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`getComputedStyle`)",
+				"browser: a browser global (`Node`)",
+				"objects: a call on a value of unknown shape (`control.getAttribute`)",
+				"objects: a call on a value of unknown shape (`open.compareDocumentPosition`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:355",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:375",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/navbar/navbar.tsrx:432",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:559",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:585",
+			"event": "input",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:593",
+			"event": "blur",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:619",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:623",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:627",
+			"event": "pointerleave",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:631",
+			"event": "pointercancel",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:659",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"recursion: a function the build cannot follow (recursive or deeply nested)",
+				"regex: a regular expression",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:663",
+			"event": "pointerup",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:667",
+			"event": "pointerleave",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/numberbox.tsrx:671",
+			"event": "pointercancel",
+			"reasons": [
+				"browser: a browser global (`document`)",
+				"objects: a call through an expression (`resolvedOptions`)",
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/otp/otp.tsrx:90",
+			"event": "focus",
+			"reasons": [
+				"browser: a browser global (`HTMLInputElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/pad/pad.tsrx:297",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/popover/popover.tsrx:114",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`document`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/rating/rating.tsrx:309",
+			"event": "pointermove",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/rating/rating.tsrx:314",
+			"event": "click",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/rating/rating.tsrx:320",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/resizable/resizable.tsrx:467",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/resizable/resizable.tsrx:492",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/select/select.tsrx:129",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`option.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/select/select.tsrx:138",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`option.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/slider/slider.tsrx:265",
+			"event": "pointerdown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)",
+				"browser: a browser global (`DOMException`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/slider/slider.tsrx:327",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser API (`window.getComputedStyle`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/table/table.tsrx:152",
+			"event": "focusin",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`one.setAttribute`)",
+				"objects: a call on a value of unknown shape (`root.setAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/table/table.tsrx:190",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/table/table.tsrx:219",
+			"event": "keydown",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`row.getAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/taglist/taglist.tsrx:223",
+			"event": "input",
+			"reasons": [
+				"browser: writing to a DOM element or event"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/taglist/taglist.tsrx:250",
+			"event": "paste",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/timebox/timebox.tsrx:362",
+			"event": "keydown",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`box.getAttribute`)",
+				"objects: a call through an expression (`formatToParts`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:290",
+			"event": "beforeinput",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`at.collapse`)",
+				"objects: a call on a value of unknown shape (`at.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`doc.defaultView.getSelection`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`selection.addRange`)",
+				"objects: a call on a value of unknown shape (`selection.removeAllRanges`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.setEnd`)",
+				"objects: a call on a value of unknown shape (`upToFocus.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToFocus.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:309",
+			"event": "paste",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"objects: a call on a value of unknown shape (`at.collapse`)",
+				"objects: a call on a value of unknown shape (`at.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`doc.defaultView.getSelection`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`selection.addRange`)",
+				"objects: a call on a value of unknown shape (`selection.removeAllRanges`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.setEnd`)",
+				"objects: a call on a value of unknown shape (`upToFocus.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToFocus.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:319",
+			"event": "input",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upTo.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:330",
+			"event": "compositionend",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upTo.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:337",
+			"event": "keyup",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upTo.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:341",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upTo.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:345",
+			"event": "focus",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upTo.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/tokenbox.tsrx:390",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`at.collapse`)",
+				"objects: a call on a value of unknown shape (`at.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`doc.createRange`)",
+				"objects: a call on a value of unknown shape (`doc.defaultView.getSelection`)",
+				"objects: a call on a value of unknown shape (`own.selectNode`)",
+				"objects: a call on a value of unknown shape (`selection.addRange`)",
+				"objects: a call on a value of unknown shape (`selection.removeAllRanges`)",
+				"objects: a call on a value of unknown shape (`token.getAttribute`)",
+				"objects: a call on a value of unknown shape (`upTo.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upTo.setEndBefore`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToAnchor.setEnd`)",
+				"objects: a call on a value of unknown shape (`upToFocus.selectNodeContents`)",
+				"objects: a call on a value of unknown shape (`upToFocus.setEnd`)",
+				"objects: a call on a value of unknown shape (`whole.selectNodeContents`)",
+				"regex: a regular expression"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toolbar/toolbar.tsrx:84",
+			"event": "focusin",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toolbar/toolbar.tsrx:100",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: a browser global (`document`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tooltip/tooltip.tsrx:64",
+			"event": "pointerover",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tooltip/tooltip.tsrx:96",
+			"event": "pointerout",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tooltip/tooltip.tsrx:139",
+			"event": "pointerdown",
+			"reasons": [
+				"timers: timers (`setTimeout`, `requestAnimationFrame`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:193",
+			"event": "focus",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:198",
+			"event": "keydown",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:215",
+			"event": "dismiss",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:322",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:345",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tour/tour.tsrx:359",
+			"event": "click",
+			"reasons": [
+				"browser: a browser global (`HTMLElement`)",
+				"browser: an `instanceof` test (DOM or class types)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tree/tree.tsrx:78",
+			"event": "focusin",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`group.hasAttribute`)",
+				"objects: a call on a value of unknown shape (`one.setAttribute`)",
+				"objects: a call on a value of unknown shape (`root.setAttribute`)",
+				"objects: a call on a value of unknown shape (`row.hasAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tree/tree.tsrx:108",
+			"event": "keydown",
+			"reasons": [
+				"closure: a function passed or kept as a value (closure)",
+				"objects: a call on a value of unknown shape (`group.hasAttribute`)",
+				"objects: a call on a value of unknown shape (`root.getAttribute`)",
+				"objects: a call on a value of unknown shape (`root.setAttribute`)",
+				"objects: a call on a value of unknown shape (`row.hasAttribute`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/accordion/scenarios/alibis.tsrx:46",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/buttongroup/scenarios/disabled-form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)",
+				"objects: a call on a value of unknown shape (`data.getAll`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/buttongroup/scenarios/form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)",
+				"objects: a call on a value of unknown shape (`data.getAll`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/calendar/scenarios/booking-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checkbox/scenarios/disabled-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checkbox/scenarios/form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checkbox/scenarios/partial-selection.tsrx:9",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checkbox/scenarios/prefilled-form.tsrx:9",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checklist/scenarios/condiments-form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/checklist/scenarios/unavailable-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/combobox/scenarios/prefilled-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/combobox/scenarios/signup-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/datebox/scenarios/booking-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/editable/scenarios/disabled-form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/editable/scenarios/rename-form.tsrx:15",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/fileupload/scenarios/multi-embed.tsrx:39",
+			"event": "click",
+			"reasons": [
+				"browser: a DOM method on the event target (`closest`, `getAttribute`...)",
+				"browser: a browser or built-in class (`new DataTransfer`)",
+				"browser: a browser or built-in class (`new Event`)",
+				"browser: a browser or built-in class (`new File`)",
+				"objects: a call on a value of unknown shape (`embed.querySelector`)",
+				"objects: a call on a value of unknown shape (`field.dispatchEvent`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/ink/scenarios/buttons.tsrx:31",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/ink/scenarios/method.tsrx:16",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`drawing.undo`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/numberbox/scenarios/form.tsrx:13",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/otp/scenarios/verification-form.tsrx:13",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/radio-group/scenarios/plan-picker-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/rating/scenarios/feedback-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/select/scenarios/signup-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/taglist/scenarios/disabled-form.tsrx:13",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)",
+				"objects: a call through an expression (`getAll`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/taglist/scenarios/topics-form.tsrx:14",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)",
+				"objects: a call through an expression (`getAll`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/timebox/scenarios/meeting-form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/basic.tsrx:17",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/basic.tsrx:24",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/basic.tsrx:36",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/basic.tsrx:69",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/held.tsrx:12",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/limits.tsrx:20",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/method.tsrx:13",
+			"event": "click",
+			"reasons": [
+				"objects: a call on a value of unknown shape (`toasts.toast`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/multi-embed.tsrx:22",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toaster/scenarios/over-modal.tsrx:17",
+			"event": "click",
+			"reasons": [
+				"objects: a call into an imported value whose body the build cannot see"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toggle/scenarios/disabled-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toggle/scenarios/notifications-form.tsrx:11",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/toggle/scenarios/saved-settings-form.tsrx:9",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/scenarios/disabled-form.tsrx:12",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		},
+		{
+			"at": "packages/headless/components/src/tokenbox/scenarios/prompt-form.tsrx:14",
+			"event": "submit",
+			"reasons": [
+				"browser: a browser or built-in class (`new FormData`)"
+			]
+		}
+	]
+}
