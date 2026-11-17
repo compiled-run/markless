@@ -101,6 +101,98 @@
 			"delta": 51,
 			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 166,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 89,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 28,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 84,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 84,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 84,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
 		}
 	]
 }
