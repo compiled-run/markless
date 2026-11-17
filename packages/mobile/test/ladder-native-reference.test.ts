@@ -14,14 +14,20 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 	const store = new Map<string, string | number | boolean | null>();
 	let runtime = createNativeRuntime(payload, store);
 	const texts = new Map(runtime.texts());
-	const attributes = new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value]));
+	const attributes = new Map(
+		runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value]),
+	);
+	const properties = new Map(runtime.properties().map(([node, , value]) => [node, value]));
 	const mount = () => {
 		texts.clear();
 		attributes.clear();
 		chosen.clear();
 		for (const [node, text] of runtime.texts()) texts.set(node, text);
-		for (const [node, name, value] of runtime.attributes()) attributes.set(`${node}\0${name}`, value);
+		for (const [node, name, value] of runtime.attributes())
+			attributes.set(`${node}\0${name}`, value);
 		for (const [node, index] of runtime.arms()) chosen.set(node, index);
+		properties.clear();
+		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	const chosen = new Map(runtime.arms());
@@ -46,58 +52,92 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 		const labelled = labels().find(([, label]) => label === text)?.[0];
 		if (labelled) return labelled;
 		const node = [...texts].find(([, shown]) => shown === text)?.[0];
-		return node ? nodeOf.get(node)?.parent ?? undefined : undefined;
+		return node ? (nodeOf.get(node)?.parent ?? undefined) : undefined;
 	};
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'relaunch' in action) {
 			runtime = createNativeRuntime(payload, store);
 			mount();
-		} else if (action && !('tap' in action))
+		} else if (action && !('tap' in action) && !('type' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action) {
-			const host = elementReading(action.tap);
-			if (!host) throw new Error(`step ${index}: nothing reads "${action.tap}" to tap`);
-			if (attributes.get(`${host}\0disabled`) != null) throw new Error(`step ${index}: "${action.tap}" is disabled`);
-			for (const entry of runtime.dispatch({ event: 'activate', host })) {
+			const name = 'tap' in action ? action.tap : action.type.field;
+			const host = elementReading(name);
+			if (!host)
+				throw new Error(
+					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
+				);
+			if (attributes.get(`${host}\0disabled`) != null)
+				throw new Error(`step ${index}: "${name}" is disabled`);
+			// Typing shows the text in the field at once; the input event then runs the handler.
+			if ('type' in action) properties.set(host, action.type.text);
+			const dispatched =
+				'tap' in action
+					? runtime.dispatch({ event: 'activate', host })
+					: runtime.dispatch({ event: 'input', host, value: action.type.text });
+			for (const entry of dispatched) {
 				if (entry.op === 'text') texts.set(entry.node, entry.value);
-				else if (entry.op === 'attribute') attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+				else if (entry.op === 'attribute')
+					attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+				else if (entry.op === 'property') properties.set(entry.node, entry.value);
 				else if (entry.op === 'arm') {
 					chosen.set(entry.node, entry.index);
 					for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
-					for (const key of attributes.keys()) if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
-					for (const [id, text] of runtime.texts()) if (inArm(id, entry.node)) texts.set(id, text);
+					for (const key of attributes.keys())
+						if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
+					for (const [id, text] of runtime.texts())
+						if (inArm(id, entry.node)) texts.set(id, text);
 					for (const [node, name, value] of runtime.attributes())
 						if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
 				}
 			}
 		}
-		if (step.fields) throw new Error(`step ${index}: the payload cannot show fields`);
+		for (const [field, value] of Object.entries(step.fields ?? {})) {
+			const host = elementReading(field);
+			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
+		}
 		const shown = [...texts.values(), ...labels().map(([, label]) => label)];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
-		if (step.order) expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
+		if (step.order)
+			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 		for (const text of step.disabled ?? []) {
 			const host = elementReading(text);
-			expect(host && attributes.get(`${host}\0disabled`), `step ${index}: "${text}" is disabled`).not.toBeNull();
+			expect(
+				host && attributes.get(`${host}\0disabled`),
+				`step ${index}: "${text}" is disabled`,
+			).not.toBeNull();
 		}
-		expect(new Map(runtime.texts()), `step ${index}: the journal left a text stale`).toEqual(texts);
+		expect(new Map(runtime.texts()), `step ${index}: the journal left a text stale`).toEqual(
+			texts,
+		);
 		expect(
 			new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value])),
 			`step ${index}: the journal left an attribute stale`,
 		).toEqual(attributes);
+		expect(
+			new Map(runtime.properties().map(([node, , value]) => [node, value])),
+			`step ${index}: the journal left a field stale`,
+		).toEqual(properties);
 	}
 }
 
-test.each(rungFolders())('%s: the native payload shows the web steps, or is refused by name', async (folder) => {
-	const filename = join(proofsDir, folder, 'App.tsrx');
-	const build = await compileNativeComponent({ filename, source: readFileSync(filename, 'utf8') });
-	if (build.payload === null) {
-		expect(build.diagnostics.length).toBeGreaterThan(0);
-		expect(build.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
-			build.diagnostics.map(() => NATIVE_UNSUPPORTED),
-		);
-		return;
-	}
-	walk(build.payload, readRung(folder).steps);
-});
+test.each(rungFolders())(
+	'%s: the native payload shows the web steps, or is refused by name',
+	async (folder) => {
+		const filename = join(proofsDir, folder, 'App.tsrx');
+		const build = await compileNativeComponent({
+			filename,
+			source: readFileSync(filename, 'utf8'),
+		});
+		if (build.payload === null) {
+			expect(build.diagnostics.length).toBeGreaterThan(0);
+			expect(build.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
+				build.diagnostics.map(() => NATIVE_UNSUPPORTED),
+			);
+			return;
+		}
+		walk(build.payload, readRung(folder).steps);
+	},
+);

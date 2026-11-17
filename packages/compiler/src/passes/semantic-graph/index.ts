@@ -133,6 +133,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 		routeRoot: input.routeRoot,
+		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);

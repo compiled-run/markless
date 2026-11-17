@@ -1,6 +1,7 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 import type {
+	NativeFactCollectors,
 	SemanticComponent,
 	SemanticComponentPropDeclaration,
 	SemanticComponentEdge,
@@ -149,6 +150,7 @@ export type WalkState = {
 	readonly importedFunctionWrites: Readonly<Record<string, ModuleFunctionWrites>>;
 	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
 	readonly routeRoot: boolean;
+	readonly nativeFacts: NativeFactCollectors | null;
 	/** Props the host provides only while rendering on the server, by component export. */
 	readonly serverOnlyProps: ReadonlyArray<{
 		readonly exportName: string;
@@ -317,6 +319,7 @@ export function createWalkState(input: {
 		readonly propName: string;
 	}>;
 	readonly routeRoot?: boolean;
+	readonly nativeFacts?: NativeFactCollectors;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -334,6 +337,7 @@ export function createWalkState(input: {
 		importedFunctionWrites: input.importedFunctionWrites ?? {},
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		routeRoot: input.routeRoot === true,
+		nativeFacts: input.nativeFacts ?? null,
 		hostIds: new WeakMap<object, string>(),
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),

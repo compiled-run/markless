@@ -32,7 +32,11 @@ export type NativeStyleInput = {
 	>;
 	readonly css: string;
 	/** The cells class bindings read; Dragon compiles one style assignment per combination (booleans only for now). */
-	readonly states: ReadonlyArray<{ readonly cell: string; readonly domain: readonly [false, true]; readonly initial: boolean }>;
+	readonly states: ReadonlyArray<{
+		readonly cell: string;
+		readonly domain: readonly [false, true];
+		readonly initial: boolean;
+	}>;
 };
 
 export function nativeStyleInput(
@@ -43,19 +47,30 @@ export function nativeStyleInput(
 	const states = payload.cells.flatMap((cell) => {
 		if (!cell.styled) return [];
 		if (typeof cell.initial !== 'boolean')
-			throw new Error(`${cell.name} decides a class but is not a boolean; Dragon needs a finite domain`);
+			throw new Error(
+				`${cell.name} decides a class but is not a boolean; Dragon needs a finite domain`,
+			);
 		return [{ cell: cell.id, domain: [false, true] as const, initial: cell.initial }];
 	});
 	const combinations: Record<string, boolean>[] = states.reduce<Record<string, boolean>[]>(
-		(all, state) => all.flatMap((partial) => state.domain.map((value) => ({ ...partial, [state.cell]: value }))),
+		(all, state) =>
+			all.flatMap((partial) =>
+				state.domain.map((value) => ({ ...partial, [state.cell]: value })),
+			),
 		[{}],
 	);
 	const initialCells = new Map(payload.cells.map((cell) => [cell.id, cell.initial]));
 	// A node in an arm not shown at mount still gets laid out: its literals and its cells' first values (an expression reads as '').
-	const unshownText = (parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts']) =>
+	const unshownText = (
+		parts: Extract<NativeViewPayload['nodes'][number], { kind: 'text' }>['parts'],
+	) =>
 		parts
 			.map((part) =>
-				'text' in part ? part.text : 'cell' in part ? formatNativeValue(initialCells.get(part.cell) ?? '') : '',
+				'text' in part
+					? part.text
+					: 'cell' in part
+						? formatNativeValue(initialCells.get(part.cell) ?? '')
+						: '',
 			)
 			.join('');
 	return {
@@ -65,14 +80,29 @@ export function nativeStyleInput(
 			const place = node.arm ? { arm: node.arm } : {};
 			if (node.kind === 'branch') return [];
 			if (node.kind === 'text')
-				return [{ kind: 'text', id: node.id, parent: node.parent, text: initial.get(node.id) ?? unshownText(node.parts), ...place }];
-			const classBinding = (node.bindings ?? []).find((binding) => binding.attribute === 'class');
+				return [
+					{
+						kind: 'text',
+						id: node.id,
+						parent: node.parent,
+						text: initial.get(node.id) ?? unshownText(node.parts),
+						...place,
+					},
+				];
+			const classBinding = (node.bindings ?? []).find(
+				(binding) => 'attribute' in binding && binding.attribute === 'class',
+			);
 			const classByState = classBinding
 				? combinations.map((when) => {
 						const value = evaluateNativeExpr(classBinding.value, (cell) =>
-							cell in when ? when[cell]! : (payload.cells.find((c) => c.id === cell)?.initial ?? null),
+							cell in when
+								? when[cell]!
+								: (payload.cells.find((c) => c.id === cell)?.initial ?? null),
 						);
-						return { when, value: value === null || value === false ? null : String(value) };
+						return {
+							when,
+							value: value === null || value === false ? null : String(value),
+						};
 					})
 				: undefined;
 			return [

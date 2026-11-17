@@ -1,6 +1,10 @@
 import type { AnyNode } from '../../ast/nodes.ts';
 import { asNodes } from '../../ast/nodes.ts';
-import type { SemanticExpression, SemanticHandlerStatement } from '../../artifacts.ts';
+import type {
+	NativeFactCollectors,
+	SemanticExpression,
+	SemanticHandlerStatement,
+} from '../../artifacts.ts';
 
 const UNARY = new Set(['!', '-', '+']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
@@ -162,3 +166,9 @@ export function handlerStatementsOf(node: AnyNode | undefined): ReadonlyArray<Se
 			: { kind: 'unsupported', construct: `a ${String(statement.type)}` },
 	);
 }
+
+/** What a native build passes as `nativeFacts`; nothing else imports this module. */
+export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
+	expression: expressionTreeOf as NativeFactCollectors['expression'],
+	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
+};
