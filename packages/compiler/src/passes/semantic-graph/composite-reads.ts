@@ -57,6 +57,8 @@ export type GraphReadScope = {
 export type CompositeReadOptions = {
 	readonly methodCalls?: boolean;
 	readonly unaryOperators?: boolean;
+	/** A component prop says yes: `rows ?? []` falls back to a literal that reads only what it is built from. */
+	readonly literalBranches?: boolean;
 };
 
 export function isCompositeTemplateExpression(
@@ -195,11 +197,17 @@ export function pureCompositeReadSources(
 	if (node.type === 'ConditionalExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.test as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.consequent as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.alternate as AnyNode | undefined, state, options),
+			branchReadSources(node.consequent as AnyNode | undefined, state, options),
+			branchReadSources(node.alternate as AnyNode | undefined, state, options),
 		]);
 	}
-	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+	if (node.type === 'LogicalExpression') {
+		return joinReadSources([
+			branchReadSources(node.left as AnyNode | undefined, state, options),
+			branchReadSources(node.right as AnyNode | undefined, state, options),
+		]);
+	}
+	if (node.type === 'BinaryExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.left as AnyNode | undefined, state, options),
 			pureCompositeReadSources(node.right as AnyNode | undefined, state, options),
@@ -215,6 +223,17 @@ export function pureCompositeReadSources(
 		);
 	}
 	return null;
+}
+
+function branchReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	return options.literalBranches === true &&
+		(node?.type === 'ArrayExpression' || node?.type === 'ObjectExpression')
+		? callOperandReadSources(node, state, options)
+		: pureCompositeReadSources(node, state, options);
 }
 
 // The receiver and the arguments are the whole dependency set of a method call:
