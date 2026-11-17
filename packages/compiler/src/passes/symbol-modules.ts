@@ -1212,6 +1212,9 @@ function sharedInstanceReferenceDiagnostic(
 			{
 				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
 			},
+			{
+				message: `To pass "${reference.name}" itself to a function, have its definition return only one state object (\`return { ...box }\`) with no methods. Then "${reference.name}" is that object, and the function's changes reach the page.`,
+			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
 	};
