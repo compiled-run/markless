@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: 07c-child-state
+---
+- launchApp:
+    clearState: true
+- assertVisible: Own state
+- assertVisible: Door is shut
+- assertVisible: Window is shut
+- assertNotVisible: Door is open
+- assertNotVisible: Window is open
+- tapOn: Window is shut
+- assertVisible: Window is open
+- assertVisible: Door is shut
+- assertVisible: Window is open
+- assertNotVisible: Door is open
+- tapOn: Door is shut
+- assertVisible: Door is open
+- assertNotVisible: Door is shut
+- assertVisible: Door is open
+- assertVisible: Window is open
+- assertNotVisible: Door is shut
