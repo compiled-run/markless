@@ -40,8 +40,10 @@ export function createNativeRuntime(payload: NativeViewPayload): NativeRuntime {
 			const before = new Map(texts());
 			for (const op of handlers.get(bound.handler) ?? []) {
 				const value = read(op.cell);
-				if (typeof value !== 'number') throw new Error(`add on ${op.cell}, which holds a ${typeof value}`);
-				values.set(op.cell, value + op.value);
+				if (op.op === 'set') values.set(op.cell, op.value);
+				else if (op.op === 'toggle') values.set(op.cell, !value);
+				else if (typeof value === 'number') values.set(op.cell, value + op.value);
+				else throw new Error(`add on ${op.cell}, which holds a ${typeof value}`);
 			}
 			return texts().flatMap(([node, text]): NativeJournalEntry[] =>
 				before.get(node) === text ? [] : [{ op: 'text', node, value: text }],
