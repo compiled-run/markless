@@ -1,6 +1,8 @@
 package dev.markless.mobile.test
 
+import dev.markless.mobile.core.AttributeValue
 import dev.markless.mobile.core.EventName
+import dev.markless.mobile.core.Scalar
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JsString
 import dev.markless.mobile.core.MarklessDecodeError
@@ -42,9 +44,15 @@ private fun runVector(file: File) {
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val runtime = Runtime(payload)
-	val mounted = payload.nodes.filterIsInstance<Node.Text>().joinToString(",", "[", "]") { "[${jsonString(it.id)},${jsonString(runtime.text(it.id))}]" }
+	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
+	val attributes = runtime.attributes().joinToString(",", "[", "]") { (n, a, v) -> "[${jsonString(n)},${jsonString(a)},${v?.let(::jsonString) ?: "null"}]" }
+	val initialAttributes = vector["initialAttributes"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialAttributes", attributes == initialAttributes) { "expected $initialAttributes\n  actual   $attributes" }
+	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
+	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
 	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
 		val s = step.obj("steps[$n]")
 		val action = field(s, "action", "steps[$n]").obj("action")
@@ -117,7 +125,21 @@ private fun ops() {
 	refuses("a set to a non-integer", payload.replace("\"value\":7", "\"value\":7.5"), "integers only")
 }
 
+private fun attributeRule() {
+	val t = Scalar.Bool(true); val f = Scalar.Bool(false)
+	val cases = listOf(
+		Triple("disabled", t, ""), Triple("disabled", f, null), Triple("aria-pressed", f, "false"), Triple("aria-pressed", t, "true"),
+		Triple("aria-hidden", f, null), Triple("aria-hidden", t, "true"), Triple("data-on", t, "true"), Triple("data-on", f, null),
+		Triple("draggable", f, "false"), Triple("spellcheck", t, "true"), Triple("title", Scalar.Num(2.0), "2"), Triple("title", Scalar.Str(""), ""),
+	)
+	for ((name, value, want) in cases) check("attribute $name=$value", AttributeValue.of(name, value) == want) { "got ${AttributeValue.of(name, value)}, want $want" }
+	check("=== is false across types", !Runtime.strictEquals(Scalar.Num(1.0), Scalar.Str("1"))) { "" }
+	check("=== holds 0 and -0 equal", Runtime.strictEquals(Scalar.Num(0.0), Scalar.Num(-0.0))) { "" }
+	check("=== holds NaN unequal", !Runtime.strictEquals(Scalar.Num(Double.NaN), Scalar.Num(Double.NaN))) { "" }
+}
+
 fun main(args: Array<String>) {
+	attributeRule()
 	ops()
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

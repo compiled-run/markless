@@ -8,17 +8,32 @@ sealed interface Scalar {
 	data class Bool(val value: Boolean) : Scalar
 }
 
+/** A value computed from cells: JavaScript truthiness for `not` and `if`, `===` for `equals`. */
+sealed interface Expr {
+	data class CellRef(val cell: String) : Expr
+	data class Literal(val value: Scalar) : Expr
+	data class Not(val operand: Expr) : Expr
+	data class If(val test: Expr, val whenTrue: Expr, val whenFalse: Expr) : Expr
+	data class Equals(val left: Expr, val right: Expr) : Expr
+}
+
 sealed interface TextPart {
 	data class Literal(val text: String) : TextPart
-	data class CellValue(val cell: String) : TextPart
+	data class Value(val expr: Expr) : TextPart
 }
+
+data class ArmPlace(val branch: String, val index: Int)
+
+data class Binding(val attribute: String, val value: Expr)
 
 sealed interface Node {
 	val id: String
 	val parent: String?
+	val arm: ArmPlace?
 
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap()) : Node
-	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null) : Node
+	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null) : Node
+	data class Branch(override val id: String, override val parent: String?, val test: Expr, val arms: Int, override val arm: ArmPlace? = null) : Node
 }
 
 enum class EventName(val wire: String) { Activate("activate") }
@@ -59,10 +74,19 @@ data class Payload(
 				val p = node.parent
 				if (p != null) {
 					val parent = seen[p] ?: throw MarklessDecodeError("node \"${node.id}\" names parent \"$p\" that does not precede it")
-					if (parent !is Node.Element) throw MarklessDecodeError("node \"${node.id}\" has a text node as its parent")
+					if (parent !is Node.Element) throw MarklessDecodeError("node \"${node.id}\" has a ${if (parent is Node.Text) "text" else "branch"} node as its parent")
 				} else if (node is Node.Text) throw MarklessDecodeError("text node \"${node.id}\" has no parent")
+				node.arm?.let { a ->
+					val b = seen[a.branch] as? Node.Branch ?: throw MarklessDecodeError("node \"${node.id}\" sits in an arm of \"${a.branch}\", which is not a preceding branch")
+					if (a.index < 0 || a.index >= b.arms) throw MarklessDecodeError("node \"${node.id}\" sits in arm ${a.index} of a branch with ${b.arms}")
+				}
 				if (seen.put(node.id, node) != null) throw MarklessDecodeError("duplicate node \"${node.id}\"")
-				if (node is Node.Text) for (part in node.parts) if (part is TextPart.CellValue && part.cell !in cellIds) throw MarklessDecodeError("text node \"${node.id}\" reads unknown cell \"${part.cell}\"")
+				val reads = when (node) {
+					is Node.Text -> node.parts.filterIsInstance<TextPart.Value>().map { it.expr }
+					is Node.Element -> node.bindings.map { it.value }
+					is Node.Branch -> listOf(node.test)
+				}
+				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
 			val handlers = root.field("handlers", "payload").arr("payload.handlers").mapIndexed { n, h -> handler(h, "handlers[$n]", cellIds) }
 			val handlerIds = HashSet<String>()
@@ -73,6 +97,36 @@ data class Payload(
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
 			return Payload(root.field("component", "payload").str("payload.component"), cells, nodes, events, handlers)
+		}
+
+		fun cellsOf(e: Expr): List<String> = when (e) {
+			is Expr.CellRef -> listOf(e.cell)
+			is Expr.Literal -> emptyList()
+			is Expr.Not -> cellsOf(e.operand)
+			is Expr.If -> cellsOf(e.test) + cellsOf(e.whenTrue) + cellsOf(e.whenFalse)
+			is Expr.Equals -> cellsOf(e.left) + cellsOf(e.right)
+		}
+
+		private fun expr(v: Json, what: String): Expr {
+			val o = v.obj(what)
+			return when {
+				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
+				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(scalar(o.field("literal", what), "$what.literal")) }
+				o.containsKey("not") -> { o.only(setOf("not"), what); Expr.Not(expr(o.field("not", what), "$what.not")) }
+				o.containsKey("if") -> { o.only(setOf("if", "whenTrue", "whenFalse"), what); Expr.If(expr(o.field("if", what), "$what.if"), expr(o.field("whenTrue", what), "$what.whenTrue"), expr(o.field("whenFalse", what), "$what.whenFalse")) }
+				o.containsKey("equals") -> {
+					o.only(setOf("equals"), what)
+					val pair = o.field("equals", what).arr("$what.equals")
+					if (pair.size != 2) throw MarklessDecodeError("$what.equals has ${pair.size} operands, not 2")
+					Expr.Equals(expr(pair[0], "$what.equals[0]"), expr(pair[1], "$what.equals[1]"))
+				}
+				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
+			}
+		}
+
+		private fun armPlace(o: Map<String, Json>, what: String): ArmPlace? = o["arm"]?.obj("$what.arm")?.let { a ->
+			a.only(setOf("branch", "index"), "$what.arm")
+			ArmPlace(a.field("branch", what).str("$what.arm.branch"), integer(a.field("index", what).num("$what.arm.index"), "$what.arm.index").toInt())
 		}
 
 		private fun scalar(v: Json, what: String): Scalar = when (v) {
@@ -98,15 +152,27 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes)
+					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
+						val bo = b.obj("$what.bindings[$n]")
+						bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
+						Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), expr(bo.field("value", what), "$what.bindings[$n].value"))
+					} ?: emptyList()
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what))
 				}
 				"text" -> {
-					o.only(setOf("kind", "id", "parent", "parts"), what)
+					o.only(setOf("kind", "id", "parent", "parts", "arm"), what)
 					val parts = o.field("parts", what).arr("$what.parts").mapIndexed { n, p -> part(p, "$what.parts[$n]") }
-					Node.Text(id, o.field("parent", what).str("$what.parent"), parts)
+					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what))
+				}
+				"branch" -> {
+					o.only(setOf("kind", "id", "parent", "test", "arms", "arm"), what)
+					val parent = o.field("parent", what)
+					val arms = integer(o.field("arms", what).num("$what.arms"), "$what.arms").toInt()
+					if (arms != 1 && arms != 2) throw MarklessDecodeError("$what has $arms arms; native-view/0 has 1 or 2")
+					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("test", what), "$what.test"), arms, armPlace(o, what))
 				}
 				else -> throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			}
@@ -116,8 +182,9 @@ data class Payload(
 			val o = v.obj(what)
 			return when {
 				o.containsKey("text") -> { o.only(setOf("text"), what); TextPart.Literal(o.field("text", what).str("$what.text")) }
-				o.containsKey("cell") -> { o.only(setOf("cell"), what); TextPart.CellValue(o.field("cell", what).str("$what.cell")) }
-				else -> throw MarklessDecodeError("$what is neither a text nor a cell part")
+				o.containsKey("cell") -> { o.only(setOf("cell"), what); TextPart.Value(Expr.CellRef(o.field("cell", what).str("$what.cell"))) }
+				o.containsKey("expr") -> { o.only(setOf("expr"), what); TextPart.Value(expr(o.field("expr", what), "$what.expr")) }
+				else -> throw MarklessDecodeError("$what is neither a text, cell nor expr part")
 			}
 		}
 

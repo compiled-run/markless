@@ -24,3 +24,11 @@
    number, and a `set` that leaves text unchanged, which must journal nothing).
 6. **`synthetic-bold` write.** The contract lists it but not its fields. The Android host refuses it loudly until its shape is
    written down (Android would map it to `Paint.isFakeBoldText`).
+7. **The attribute value rule is restated in Kotlin.** `marklessAttributeValue`'s name lists (`SPELLS_FALSE`,
+   `ENUMERATED_BOOLEAN_ATTRIBUTE`) are copied into `core/AttributeValue.kt`, because Kotlin cannot import them. To keep the
+   copy honest, please add a vector (or a generated JSON table under `packages/mobile/conformance/`) that writes `true`,
+   `false`, a string and a number to every name in both lists plus one plain, one `aria-` and one `data-` name; the JVM test
+   will then catch any drift.
+8. **Dragon exports per rung.** Rung 2 on the device is proven only with Dragon's hand-transcribed counter export. Rungs 2
+   and 4 need `proofs/<rung>/native-style.json` from the native-dragon-styles CLI, and rung 4's needs `variants`, before the
+   styled half of those rungs can be checked on Android.

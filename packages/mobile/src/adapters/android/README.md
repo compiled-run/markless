@@ -75,11 +75,20 @@ unstyled stack in `screenshots/counter-stack-*.png`.
 
 Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
 `maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
-AVD (android-36):
+AVD (android-36). The in-app conformance run over the same APK logged `pass` for `attributes.json`, `counter.json`,
+`if.json` and `switches.json`.
 
 | Rung | Result | Screenshot |
 |---|---|---|
 | 01-static-text | flow passes | `screenshots/rung-01-static-text.png` |
 | 02-styles | flow passes **without styles**: no Dragon export for this rung's component yet. Styles on device are proven only with Dragon's counter export (above). | `screenshots/rung-02-styles.png` |
 | 03-counter | flow passes | `screenshots/rung-03-counter.png` |
-| 04 to 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+| 04-attributes | flow passes (accessible name from `aria-label`, `enabled: false` from `disabled`); class variants are implemented but unproven on device: no export with `variants` yet | `screenshots/rung-04-attributes.png` |
+| 05-if | flow passes (arms removed and built by `arm` journal entries) | `screenshots/rung-05-if.png` |
+| 06 to 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+
+Bound attributes on Android: `aria-label` sets `contentDescription`; `disabled` present sets `isEnabled = false`;
+`aria-pressed`/`aria-selected` `"true"` sets `isSelected`; `aria-expanded` sets the accessibility expanded state (API 36) and
+the expand/collapse action; `class` picks the Dragon style variant whose `class` equals it. Other bound attributes are ignored.
+An `arm` entry removes the views of nodes no longer shown and builds every shown node without a view, in document order,
+from current values, each inserted at its document position among its parent's children.
