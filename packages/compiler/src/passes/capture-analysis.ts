@@ -846,16 +846,20 @@ function propReadForLazySymbol(
 	];
 }
 
-// A computed minted for one markup expression reads the props of the component that wrote it.
+// A computed minted for one markup expression or branch condition reads the props of the component that wrote it.
 function templateComputedPropDeclaration(
 	symbol: PlannedSymbol,
 	source: string,
 	input: CaptureAnalysisInput,
 ): SemanticComponentPropDeclaration | undefined {
 	if (symbol.kind !== 'sync-computed-derive') return undefined;
-	const componentName = input.semanticGraph.templateReads.find(
-		(read) => read.computedGraphNodeId === symbol.graphNodeId,
-	)?.componentName;
+	const componentName =
+		input.semanticGraph.templateReads.find(
+			(read) => read.computedGraphNodeId === symbol.graphNodeId,
+		)?.componentName ??
+		input.semanticGraph.branchSites.find(
+			(site) => site.testComputedGraphNodeId === symbol.graphNodeId,
+		)?.componentName;
 	const name = rootIdentifierName(source);
 	if (!componentName || !name) return undefined;
 	return input.semanticGraph.componentPropBindings.find(
