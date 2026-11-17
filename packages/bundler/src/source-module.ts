@@ -13,7 +13,12 @@ import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
 import { RESIDENT_LOAD_MODULE, emitSymbolRouteTable } from './rebound-symbol-route.ts';
-import { moduleLoads, type ModuleLoad, type ModuleLoads } from './module-loads.ts';
+import {
+	moduleLoads,
+	type HandlerReach,
+	type ModuleLoad,
+	type ModuleLoads,
+} from './module-loads.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -31,6 +36,8 @@ export type SourceSymbolRow = {
 export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
+	/** The compiled file the import names, on the dev server. */
+	readonly file?: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
@@ -310,6 +317,8 @@ export function emitSourceModule(input: {
 	readonly sharedDefinitionExports?: ReadonlyArray<string>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
+	/** On the dev server: the compiled files of the children whose symbols this module's bound rows load. */
+	readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
 	readonly prerenderRecords?: boolean;
 	readonly directCsr?: boolean;
 	/**
@@ -334,7 +343,10 @@ export function emitSourceModule(input: {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
-	const loads = moduleLoads(input.devResumeReexport === true);
+	const loads = moduleLoads(
+		input.devResumeReexport === true ? input.filename : undefined,
+		devDemand(input.runtimeDemandMap),
+	);
 	const load = loads.load ?? importLoad;
 	const canonicalRenderData =
 		input.environment === 'client' &&
@@ -867,9 +879,11 @@ export function emitResumeModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
-	/** Served by the dev server, which loads each module on first use. */
-	readonly devServer?: boolean;
+	/** The compiled file, when the dev server serves it and loads each module on first use. */
+	readonly devFilename?: string;
 	readonly hasBoundSymbols?: boolean;
+	/** On the dev server: the compiled files of the children whose symbols this module's bound rows load. */
+	readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
 	// Boundary-sized bound-symbol facts for the narrow settle path. Data only:
 	// nothing in this module reads them, so a page that never fills an arm pays
 	// their document bytes and no execution.
@@ -913,7 +927,7 @@ export function emitResumeModule(input: {
 	}>;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
-	const loads = moduleLoads(input.devServer === true);
+	const loads = moduleLoads(input.devFilename, devDemand(input.runtimeDemandMap));
 	const load = loads.load ?? importLoad;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	// Served-only plans answer only where the container serves its view, so they never reach the static dispatcher.
@@ -2332,6 +2346,7 @@ function emitLoadSymbol(
 		readonly resolverId: string;
 		readonly symbols: ReadonlyArray<SourceSymbolRow>;
 		readonly hasBoundSymbols?: boolean;
+		readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
 		readonly runtimeDemandMap?: unknown;
 	},
 	loads: ModuleLoads,
@@ -2347,13 +2362,11 @@ function emitLoadSymbol(
 			input.symbols,
 			loads.load ?? importLoad,
 			sourceReaderName,
-			handler &&
-				((symbol) =>
-					handler(symbol.chunk, actionRuntimeModuleIds(input.runtimeDemandMap, symbol.id))),
+			handler && ((symbol) => handler(symbol.chunk, handlerReach(input.runtimeDemandMap, symbol.id))),
 		);
 		if (!input.hasBoundSymbols) return direct;
 		return [
-			`const marklessSymbolResolverModule = () => ${handler ? handler(input.resolverId, actionRuntimeModuleIds(input.runtimeDemandMap)) : importLoad(input.resolverId)};`,
+			`const marklessSymbolResolverModule = () => ${handler ? handler(input.resolverId, handlerReach(input.runtimeDemandMap, undefined, input.devBoundChildren)) : importLoad(input.resolverId)};`,
 			direct.replace(
 				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -2369,42 +2382,92 @@ function emitLoadSymbol(
 	].join('\n');
 }
 
-// The runtime modules a handler's actions run and their writes reach, from the demand map; every action's without a handler.
-// A capability (behaviors, async planes, arm gates) installs on its own trigger, so only an action that runs it names it.
-function actionRuntimeModuleIds(runtimeDemandMap: unknown, symbolId?: string): string[] {
-	const map = runtimeDemandMap as
-		| {
-				readonly payloadRecords?: ReadonlyArray<{
-					readonly recordId: string;
-					readonly symbolIds?: ReadonlyArray<string>;
-				}>;
-				readonly actions?: ReadonlyArray<RuntimeDemandMapActionIds>;
-				readonly armActions?: ReadonlyArray<RuntimeDemandMapActionIds>;
-				readonly capabilityModuleIds?: ReadonlyArray<string>;
-		  }
-		| undefined;
+type RuntimeDemandMapReach = {
+	readonly payloadRecords?: ReadonlyArray<{
+		readonly recordId: string;
+		readonly symbolIds?: ReadonlyArray<string>;
+	}>;
+	readonly actions?: ReadonlyArray<RuntimeDemandMapActionReach>;
+	readonly armActions?: ReadonlyArray<RuntimeDemandMapActionReach>;
+	readonly capabilityModuleIds?: ReadonlyArray<string>;
+	readonly firstUsePage?: {
+		readonly pageSpaceReaders?: ReadonlyArray<unknown>;
+		readonly passedProps?: ReadonlyArray<unknown>;
+		readonly callbackSlots?: ReadonlyArray<unknown>;
+	};
+};
+
+type RuntimeDemandMapActionReach = {
+	readonly payloadRecordIds: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+	readonly firstUse?: { readonly runtimeModuleIds: ReadonlyArray<string> } | 'unknown';
+};
+
+// What the dev server's page join reads of this module's demand map: every action's first use and its page facts.
+function devDemand(runtimeDemandMap: unknown): unknown {
+	const map = runtimeDemandMap as RuntimeDemandMapReach | undefined;
+	if (!map?.actions) return undefined;
+	const page = map.firstUsePage;
+	return {
+		actions: [...map.actions, ...(map.armActions ?? [])].map(
+			(action) => action.firstUse ?? 'unknown',
+		),
+		capabilityModuleIds: map.capabilityModuleIds ?? [],
+		...(page
+			? {
+					page: {
+						pageSpaceReaders: page.pageSpaceReaders ?? [],
+						passedProps: page.passedProps ?? [],
+						callbackSlots: page.callbackSlots ?? [],
+					},
+				}
+			: {}),
+	};
+}
+
+// What a handler's actions run, from the demand map; every action's without a handler, with the children whose
+// bound symbols the load serves. A capability installs on its own trigger, so only an action that runs it names it.
+function handlerReach(
+	runtimeDemandMap: unknown,
+	symbolId?: string,
+	children?: ReadonlyArray<string> | 'unknown',
+): HandlerReach {
+	const map = runtimeDemandMap as RuntimeDemandMapReach | undefined;
 	const records = new Set(
 		(map?.payloadRecords ?? [])
 			.filter((record) => symbolId === undefined || record.symbolIds?.includes(symbolId))
 			.map((record) => record.recordId),
 	);
 	const capabilities = new Set(map?.capabilityModuleIds ?? []);
-	const ids = new Set<string>();
+	const runtimeModuleIds = new Set<string>();
+	const actions: unknown[] = [];
+	let bounded = children !== 'unknown';
 	for (const action of [...(map?.actions ?? []), ...(map?.armActions ?? [])]) {
 		if (!action.payloadRecordIds.some((id) => records.has(id))) continue;
-		for (const id of action.runtimeModuleIds) ids.add(id);
-		if (action.firstUse && action.firstUse !== 'unknown')
-			for (const id of action.firstUse.runtimeModuleIds)
-				if (!capabilities.has(id)) ids.add(id);
+		for (const id of action.runtimeModuleIds) runtimeModuleIds.add(id);
+		const reach = action.firstUse;
+		if (!reach || reach === 'unknown') {
+			bounded = false;
+			continue;
+		}
+		for (const id of reach.runtimeModuleIds)
+			if (!capabilities.has(id)) runtimeModuleIds.add(id);
+		actions.push(reach);
 	}
-	return [...ids];
+	// A handler no action names cannot be bounded.
+	if (symbolId !== undefined && actions.length === 0) bounded = false;
+	return {
+		runtimeModuleIds: [...runtimeModuleIds].sort(),
+		...(bounded
+			? {
+					actions,
+					...(children !== undefined && children !== 'unknown' && children.length > 0
+						? { children }
+						: {}),
+				}
+			: {}),
+	};
 }
-
-type RuntimeDemandMapActionIds = {
-	readonly payloadRecordIds: ReadonlyArray<string>;
-	readonly runtimeModuleIds: ReadonlyArray<string>;
-	readonly firstUse?: { readonly runtimeModuleIds: ReadonlyArray<string> } | 'unknown';
-};
 
 function emitDirectSourceSymbolLoader(
 	symbols: ReadonlyArray<SourceSymbolRow>,
@@ -2415,7 +2478,7 @@ function emitDirectSourceSymbolLoader(
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${symbol.eventHandler ? handler(symbol) : load(symbol.chunk)}, ${JSON.stringify(symbol.exportName)});`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${symbol.eventHandler ? handler(symbol) : load(symbol.chunk, { symbolId: symbol.id })}, ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',

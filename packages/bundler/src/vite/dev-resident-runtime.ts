@@ -60,10 +60,10 @@ export function devResidentRuntimeImports(
 			const named = modules
 				.map((module) => {
 					const id = runtimeModuleIdFromOrigin(pathname(module));
-					return `[${JSON.stringify(module)}, () => import(${JSON.stringify(module)})${id ? `, ${JSON.stringify(id)}` : ''}]`;
+					return `[${JSON.stringify(module)}, () => import(${JSON.stringify(module)}), ${JSON.stringify({ runtimeModuleId: id })}]`;
 				})
 				.join(', ');
-			return { code: `${code}\nmarklessDevWarm('', [${named}]);\n`, map: null };
+			return { code: `${code}\nmarklessDevWarm('', '', [${named}]);\n`, map: null };
 		}
 		if (!mayContainDynamicImport(code)) return null;
 		const found = readChunkDynamicImports(pathname(id), code);

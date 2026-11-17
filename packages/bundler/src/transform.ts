@@ -21,9 +21,11 @@ import {
 	type CompilerDiagnostic,
 	type CompileTsrxModuleInput,
 	type CompileTsrxModuleResult,
+	type ModuleGraphInterfaceArtifact,
 	type RenderDataArtifact,
 	type RuntimeDemandMapArtifact,
 	type RuntimeDemandMapRecordKind,
+	type SemanticComponentEdge,
 	type ServedRenderDataArtifact,
 } from '@markless/compiler';
 import {
@@ -397,6 +399,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		),
 	);
 	const behaviorSymbols = compilerSymbolRows.filter((symbol) => behaviorSymbolIds.has(symbol.id));
+	// A bound row loads a child's symbol straight from this module's resolver, so the child's actions join its warm.
+	const devBoundChildren =
+		input.devResumeReexport === true
+			? boundRowChildren(
+					compiled.boundSymbolResolver.rows,
+					compiled.semanticGraph.componentEdges,
+					input.importedModuleInterfaces,
+				)
+			: undefined;
 	const importedBoundRows = compiled.boundSymbolResolver.rows.map((row) =>
 		row.loaderSymbolId ? { ...row, baseSymbolId: row.loaderSymbolId } : row,
 	);
@@ -418,7 +429,18 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		}),
 		importedBoundRows.some((row) => row.loaderSymbolId !== undefined),
 	);
-	const symbolRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
+	const edgeRoutes = componentEdgeSymbolRoutes(compiled, input.artifactChildMaterializations);
+	// The dev server warms a composer's load of a child module for the actions of the file it compiles.
+	const symbolRoutes =
+		input.devResumeReexport === true
+			? edgeRoutes.map((route) => {
+					if (!('importSource' in route)) return route;
+					const file = route.selfRecursive
+						? input.filename
+						: input.importedModuleInterfaces?.[route.importSource]?.filename;
+					return file === undefined ? route : { ...route, file };
+				})
+			: edgeRoutes;
 	// Plan lookups follow only the edges whose module can answer one.
 	const closurePlanRoutes = symbolRoutes.filter(
 		(route) =>
@@ -711,11 +733,12 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				hasLiveSharedState,
 				storageCells,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+				devBoundChildren,
 				boundSymbolDescriptors,
 				symbols: symbolRows,
 				symbolRoutes,
 				closurePlanRoutes,
-				devServer: input.devResumeReexport === true,
+				devFilename: input.devResumeReexport === true ? input.filename : undefined,
 			}),
 		},
 		...(emitsPrerenderWakeVariant
@@ -745,10 +768,11 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							installResumeSummary: true,
 							recordsOnly: true,
 							hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+							devBoundChildren,
 							boundSymbolDescriptors,
 							symbols: symbolRows,
 							symbolRoutes,
-							devServer: input.devResumeReexport === true,
+							devFilename: input.devResumeReexport === true ? input.filename : undefined,
 						}),
 					},
 				]
@@ -942,6 +966,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 						(published) => published.exportName,
 					),
 					hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
+					devBoundChildren,
 					symbols: symbolRows,
 					behaviorSymbols,
 					symbolRoutes,
@@ -1740,4 +1765,21 @@ async function resolvedStylesheetImports(
 ): Promise<ReadonlyArray<string>> {
 	const ids = await Promise.all(requests.map(async (request) => (await resolve?.(request)) ?? request));
 	return [...new Set(ids)];
+}
+
+// The compiled files a module's bound rows load child symbols from; 'unknown' when an edge's module is not linked.
+function boundRowChildren(
+	rows: ReadonlyArray<BoundSymbolResolverRow>,
+	edges: ReadonlyArray<SemanticComponentEdge>,
+	interfaces: Readonly<Record<string, ModuleGraphInterfaceArtifact>> | undefined,
+): ReadonlyArray<string> | 'unknown' {
+	const files = new Set<string>();
+	for (const row of rows) {
+		if (!row.loaderSymbolId) continue;
+		const edge = edges.find((candidate) => candidate.id === row.componentEdgePath[0]);
+		const file = edge?.importSource ? interfaces?.[edge.importSource]?.filename : undefined;
+		if (file === undefined) return 'unknown';
+		files.add(file);
+	}
+	return [...files].sort();
 }

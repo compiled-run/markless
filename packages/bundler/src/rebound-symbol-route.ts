@@ -23,7 +23,9 @@ function hasBoundSymbols(route: BoundRoute): boolean {
  * instances of a child adds a row per instance, not a copy of the loader.
  */
 export function emitSymbolRouteTable(input: {
-	readonly routes: ReadonlyArray<BoundRoute & { readonly importSource?: string }>;
+	readonly routes: ReadonlyArray<
+		BoundRoute & { readonly importSource?: string; readonly file?: string }
+	>;
 	readonly functionName: string;
 	readonly fallbackName: string;
 	readonly reboundName: string;
@@ -34,6 +36,11 @@ export function emitSymbolRouteTable(input: {
 	const sources = [
 		...new Set(routes.flatMap((route) => (route.importSource ? [route.importSource] : []))),
 	];
+	const loadSource = (source: string) => {
+		if (!input.load) return `import(${JSON.stringify(source)})`;
+		const file = routes.find((route) => route.importSource === source)?.file;
+		return input.load(source, file === undefined ? undefined : { file });
+	};
 	const keyLists: string[] = [];
 	const rebinds = hasAnyBound(routes);
 	const table = routes.map(
@@ -45,7 +52,7 @@ export function emitSymbolRouteTable(input: {
 		sources.length > 0
 			? `import { marklessWhenLoaded as ${functionName}WhenLoaded } from '${RESIDENT_LOAD_MODULE}';`
 			: '',
-		`const ${functionName}Imports = [${sources.map((source) => `() => ${input.load ? input.load(source) : `import(${JSON.stringify(source)})`}`).join(', ')}];`,
+		`const ${functionName}Imports = [${sources.map((source) => `() => ${loadSource(source)}`).join(', ')}];`,
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
 		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId${rebinds ? ", consumed = ''" : ''}) {`,

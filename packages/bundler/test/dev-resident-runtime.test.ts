@@ -12,6 +12,7 @@ import {
 	runtimePackageRoots,
 } from '../src/vite/dev-resident-runtime.ts';
 import {
+	marklessDevDemand,
 	marklessDevLoad,
 	marklessDevWarm,
 	marklessDevWarmed,
@@ -100,10 +101,92 @@ test('an installed runtime the dependency optimizer pre-bundles makes the same i
 test('the same relative specifier in two modules names two modules once warmed', async () => {
 	const first = { name: 'first' };
 	const second = { name: 'second' };
-	marklessDevWarm('/a/page.tsrx', [['./row.tsrx', async () => first]]);
-	marklessDevWarm('/b/page.tsrx', [['./row.tsrx', async () => second]]);
+	marklessDevWarm('/a/page.tsrx', '/a/page.tsrx', [['./row.tsrx', async () => first]]);
+	marklessDevWarm('/b/page.tsrx', '/b/page.tsrx', [['./row.tsrx', async () => second]]);
 	await marklessDevWarmed();
 	const unloaded = async () => ({ name: 'fetched' });
 	expect(marklessWhenLoaded(marklessDevLoad('/a/page.tsrx', './row.tsrx', unloaded), (mod) => mod)).toBe(first);
 	expect(marklessWhenLoaded(marklessDevLoad('/b/page.tsrx', './row.tsrx', unloaded), (mod) => mod)).toBe(second);
+});
+
+const isLoaded = (scope: string, specifier: string) =>
+	marklessWhenLoaded(
+		marklessDevLoad(scope, specifier, async () => 'fetched'),
+		() => true,
+	) === true;
+
+test("a handler's warm loads what the page join closes over: the composer's passed callback and a page-space reader", async () => {
+	const composer = '/join/composer.tsrx';
+	const child = '/join/child.tsrx';
+	marklessDevDemand(composer, {
+		actions: [],
+		capabilityModuleIds: [],
+		page: {
+			pageSpaceReaders: [
+				{
+					graphNodeId: 'shared:join#s/state:open',
+					reach: { symbolIds: ['symbol:9'], runtimeModuleIds: [] },
+				},
+			],
+			passedProps: [
+				{
+					file: child,
+					prop: 'onPick',
+					reach: { symbolIds: ['symbol:1'], runtimeModuleIds: [] },
+				},
+			],
+			callbackSlots: [],
+		},
+	});
+	const module = (name: string) => async () => ({ name });
+	marklessDevWarm(composer, composer, [
+		['./passed.js', module('passed'), { symbolId: 'symbol:1' }],
+		['./reader.js', module('reader'), { symbolId: 'symbol:9' }],
+		['./other.js', module('other'), { symbolId: 'symbol:5' }],
+	]);
+	marklessDevWarm(child, child, [['./click.js', module('click'), { symbolId: 'symbol:0' }]]);
+	await marklessDevWarmed({
+		file: child,
+		runtimeModuleIds: [],
+		actions: [
+			{
+				symbolIds: ['symbol:0'],
+				runtimeModuleIds: [],
+				pageSpaceWrites: ['shared:join#s/state:open'],
+				calls: [{ prop: 'onPick' }],
+			},
+		],
+	});
+	expect(isLoaded(child, './click.js')).toBe(true);
+	expect(isLoaded(composer, './passed.js')).toBe(true);
+	expect(isLoaded(composer, './reader.js')).toBe(true);
+	expect(isLoaded(composer, './other.js')).toBe(false);
+});
+
+test("a composer's load of a child module warms for the child's handler, and a bound child that has not published loads first", async () => {
+	const composer = '/bound/composer.tsrx';
+	const child = '/bound/child.tsrx';
+	const childModule = async () => {
+		marklessDevDemand(child, {
+			actions: [{ symbolIds: ['symbol:2'], runtimeModuleIds: [] }],
+			capabilityModuleIds: [],
+		});
+		marklessDevWarm(child, child, [
+			['./run.js', async () => ({ name: 'run' }), { symbolId: 'symbol:2' }],
+			['./idle.js', async () => ({ name: 'idle' }), { symbolId: 'symbol:3' }],
+		]);
+		return { name: 'child' };
+	};
+	marklessDevWarm(composer, composer, [
+		['./child.tsrx?markless-symbols', childModule, { file: child }],
+	]);
+	await marklessDevWarmed({
+		file: composer,
+		runtimeModuleIds: [],
+		actions: [],
+		children: [child],
+	});
+	expect(isLoaded(composer, './child.tsrx?markless-symbols')).toBe(true);
+	expect(isLoaded(child, './run.js')).toBe(true);
+	expect(isLoaded(child, './idle.js')).toBe(false);
 });

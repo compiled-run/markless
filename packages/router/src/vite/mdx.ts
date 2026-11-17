@@ -161,7 +161,7 @@ function emitMdxClientRoute(
 	resume: boolean,
 	devServer: boolean,
 ): string {
-	const loads = moduleLoads(devServer);
+	const loads = moduleLoads(devServer ? parsePath(id).pathname : undefined);
 	return [
 		`import { createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader${resume ? ', loadMdxRepeatModules, tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
