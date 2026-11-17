@@ -55,6 +55,28 @@
 			"delta": -1,
 			"reason": "composition gives a child's relayed event the cancel its parent passed in that prop, for top-level, @if arm and @for row records and through middle components",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/fns/composition"
+			],
+			"delta": 595,
+			"reason": "composition gives a child's relayed event the cancel its parent passed in that prop, so a passed-through submit handler cancels through middle components and in @if arms and @for rows",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 152,
+			"reason": "composition gives a child's relayed event the cancel its parent passed in that prop, so a passed-through submit handler cancels through middle components and in @if arms and @for rows",
+			"date": "2026-11-17"
 		}
 	]
 }
