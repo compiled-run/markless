@@ -16,8 +16,6 @@ public struct ResolvedStyle: Equatable, Sendable {
 }
 
 public struct StyleLayout: Sendable {
-	/// Boxes Dragon laid out above the component's root (`html`, `body`), outermost first.
-	public let wrappers: [(id: String, style: ResolvedStyle)]
 	public let styles: [String: ResolvedStyle]
 	public let viewport: (width: Double, height: Double)
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
@@ -26,49 +24,42 @@ public struct StyleLayout: Sendable {
 }
 
 extension StyleExport {
-	/// Pairs every payload node with its export node; a node either side lacks, or a write this host cannot express, is an error.
+	/// Pairs every payload node with its export node. Export nodes the payload does not name (Dragon's `html`, `body`) paint
+	/// nothing and only offset their children; a payload node the export lacks, or a write this host cannot express, is an error.
 	public func resolve(for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]) throws -> StyleLayout {
-		if let anonymous = nodes.first(where: \.isAnonymous) {
-			throw styleError("\(anonymous.id): anonymous boxes are not implemented on iOS")
-		}
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		let payloadIds = Set(payload.nodes.map(\.id))
 		let texts = Dictionary(uniqueKeysWithValues: initialTexts.map { ($0.node, $0.text) })
 		var styles: [String: ResolvedStyle] = [:]
-		var wrapperIds: [String]?
 		for node in payload.nodes {
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
 			switch node {
 			case .element:
-				guard !styled.isText else { throw styleError("\(node.id) is an element in the payload and text in the style export") }
+				guard !styled.isText, !styled.isAnonymous else { throw styleError("\(node.id) is an element in the payload but not in the style export") }
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
 				guard styled.text == texts[node.id] else {
 					throw styleError("\(node.id) reads \(texts[node.id].map { "\"\($0)\"" } ?? "nothing") but the style export laid out \(styled.text.map { "\"\($0)\"" } ?? "nothing")")
 				}
 			}
-			if let parent = node.parent {
-				guard styled.parent == parent else { throw styleError("\(node.id)'s parent is \(parent) in the payload, \(styled.parent ?? "none") in the style export") }
-			} else {
-				var chain: [String] = []
-				var cursor = styled.parent
-				while let id = cursor {
-					guard let wrapper = byId[id], !payloadIds.contains(id), !wrapper.isText else { throw styleError("\(node.id) sits under \(id) in the style export") }
-					chain.insert(id, at: 0)
-					cursor = wrapper.parent
-				}
-				guard wrapperIds == nil || wrapperIds == chain else { throw styleError("payload roots sit under different style export boxes") }
-				wrapperIds = chain
+			var offset = (x: 0.0, y: 0.0)
+			var cursor = styled.parent
+			while let id = cursor, !payloadIds.contains(id) {
+				guard let skipped = byId[id] else { throw styleError("\(node.id)'s style parent \(id) is missing") }
+				offset.x += skipped.frame?.x ?? 0
+				offset.y += skipped.frame?.y ?? 0
+				cursor = skipped.parent
 			}
-			styles[node.id] = try resolve(styled)
+			guard cursor == node.parent else {
+				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
+			}
+			var style = try resolve(styled)
+			if let frame = style.frame {
+				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
+			}
+			styles[node.id] = style
 		}
-		let wrappers = wrapperIds ?? []
-		if let extra = nodes.first(where: { !payloadIds.contains($0.id) && !wrappers.contains($0.id) }) {
-			throw styleError("style export node \(extra.id) has no payload node")
-		}
-		return StyleLayout(
-			wrappers: try wrappers.map { (id: $0, style: try resolve(byId[$0]!)) }, styles: styles,
-			viewport: viewport, dpr: dpr, fontFiles: fonts)
+		return StyleLayout(styles: styles, viewport: viewport, dpr: dpr, fontFiles: fonts)
 	}
 
 	private func resolve(_ node: StyleNode) throws -> ResolvedStyle {

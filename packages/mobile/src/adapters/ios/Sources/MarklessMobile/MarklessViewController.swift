@@ -43,7 +43,7 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
-		if let layout, traitCollection.displayScale != layout.dpr {
+		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
 			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
 		}
 	}

@@ -24,7 +24,7 @@ window.rootViewController = controller
 ```
 
 `init` throws if the payload or the export holds anything this host does not implement. A style export laid out for
-another screen scale stops the app when the view appears. `controller.perform(NativeAction(event: .activate, host: "h2"))`
+another screen scale (more than 0.001 apart) stops the app when the view appears. `controller.perform(NativeAction(event: .activate, host: "h2"))`
 runs a handler exactly as a tap does.
 
 Accessibility: every view's `accessibilityIdentifier` is its node id (`h2`, `h2:text0`). A `<button>` is one accessibility

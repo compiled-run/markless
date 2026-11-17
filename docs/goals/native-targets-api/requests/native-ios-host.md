@@ -1,5 +1,8 @@
 # Requests from native-ios-host
 
+Answered by the lead on 2026-11-17 and adopted: 1 (write lengths are CSS px), 2 (unnamed export nodes only offset their
+children; the iOS host no longer builds them), the 0.001 pixel-ratio tolerance.
+
 Each item: the change I need in the contract, and the reading the iOS host uses until the lead decides.
 
 1. **Units inside Dragon's writes.** The export says "device px", which holds for `frame` and `borderWidths` (the counter's

@@ -24,14 +24,6 @@ final class ViewTree {
 	) throws {
 		self.layout = layout
 		let initial = Dictionary(uniqueKeysWithValues: texts.map { ($0.node, $0.text) })
-		var wrapper: UIView?
-		for (id, style) in layout?.wrappers ?? [] {
-			let box = UIView()
-			box.accessibilityIdentifier = id
-			try paint(box, style, faces: faces)
-			if let wrapper { wrapper.addSubview(box) } else { outermost.append(box) }
-			wrapper = box
-		}
 		var headingOf: [String: Bool] = [:]
 		var buttonOf: [String: UIButton] = [:]
 		for node in payload.nodes {
@@ -79,7 +71,7 @@ final class ViewTree {
 				view = label
 			}
 			if let style = layout?.styles[node.id] { try paint(view, style, faces: faces) }
-			if let parentView { parentView.addSubview(view) } else if let wrapper { wrapper.addSubview(view) } else { outermost.append(view) }
+			if let parentView { parentView.addSubview(view) } else { outermost.append(view) }
 		}
 		for button in buttonOfLabel.values { refreshLabel(of: button) }
 		for event in payload.events {
