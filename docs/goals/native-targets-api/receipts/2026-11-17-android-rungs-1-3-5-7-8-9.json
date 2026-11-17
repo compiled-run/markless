@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "launchAppCommand",
+				"message": "Command failed (host:transport:emulator-5560): device offline"
+			},
+			"installSeconds": 1.0726375000000001,
+			"flowSeconds": 4.3825495
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.664269792,
+			"flowSeconds": 12.027953708
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.7920224170000001,
+			"flowSeconds": 15.174425083
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 1.083226499999997,
+			"flowSeconds": 13.232355250000001
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 1.473527750000001,
+			"flowSeconds": 24.805095667
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 2.077358124999999,
+			"flowSeconds": 27.793738708000003
+		}
+	]
+}
