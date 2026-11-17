@@ -49,12 +49,13 @@ test('a plain prop attribute keeps its own prop read', async () => {
 	]);
 });
 
-test('an arm a flip still cannot rebuild warns, not errors, when an expression of props decides it', async () => {
+test('an arm a flip cannot rebuild, decided by an expression of props, ships where the page re-renders and warns, not errors, where it cannot', async () => {
 	const keeper = `function Keeper() @{
 	let hits = state(0);
 	<button onClick={() => hits++}>{hits}</button>
 }`;
-	const { diagnostics } = await compile('from <= 0', '<Keeper />', keeper);
+	expect((await compile('from <= 0', '<Keeper />', keeper)).diagnostics).toEqual([]);
+	const { diagnostics } = await compile('from <= 0', '<Keeper />', keeper + UNLINKED_RENDER);
 	expect(diagnostics.map((entry) => entry.severity)).toEqual(['warning']);
 });
 

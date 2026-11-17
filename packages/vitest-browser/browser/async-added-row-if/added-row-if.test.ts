@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import ImportedRows from './imported-rows.tsrx';
 import LocalRows from './local-rows.tsrx';
 import PlainRows from './plain-rows.tsrx';
+import PropHandlerRows from './prop-handler-rows.tsrx';
 import PropRows from './prop-rows.tsrx';
 
 // Component rows in a keyed @for over an async value inside @try, each row holding @if blocks:
@@ -152,4 +153,41 @@ test('CSR: rows from a plain state list (control)', async () => {
 test('SSR: rows from a plain state list (control)', async () => {
 	await renderSSR(PlainRows);
 	await rowsOpenTheirBlocks('own');
+});
+
+// The child given the open state also holds handlers inside its open block, for rows at load and rows added later.
+// A press that fails throws in the page, so each step reads the page errors beside the row's mark.
+const settled = (index: number) => () => ({ mark: markAt(index)(), pageErrors: [...pageErrors] });
+async function propArmHandlersRun(index: number) {
+	for (const [selector, mark] of [
+		['[data-expand]', 'n'],
+		['[data-deeper]', 'nd'],
+		['[data-close]', 'c'],
+		['[data-expand]', 'nd'],
+		['[data-close]', 'c'],
+	] as const) {
+		press(index, selector);
+		await expect.poll(settled(index)).toEqual({ mark, pageErrors: [] });
+	}
+}
+
+async function propRowsRunArmHandlers() {
+	await expect.poll(marks(3)).toBe(closedRows(3));
+	await propArmHandlersRun(0);
+	await propArmHandlersRun(2);
+	pressPage('[data-add]');
+	await expect.poll(marks(4)).toBe(closedRows(4));
+	await propArmHandlersRun(3);
+	await propArmHandlersRun(1);
+	expect(pageErrors).toEqual([]);
+}
+
+test('CSR: rows from an async list, a child given the open state holds handlers in its open block', async () => {
+	await render(PropHandlerRows);
+	await propRowsRunArmHandlers();
+});
+
+test('SSR: rows from an async list, a child given the open state holds handlers in its open block', async () => {
+	await renderSSR(PropHandlerRows);
+	await propRowsRunArmHandlers();
 });

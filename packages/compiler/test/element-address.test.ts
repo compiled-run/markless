@@ -48,30 +48,30 @@ export default function Page() @{
 
 test('a nested @if counts as one step, whatever its arm renders', async () => {
 	const compiled = await compile(`import { state } from '@markless/core';
-function Card({ shown }: { shown: boolean }) @{
+export default function Page() @{
+	let rows = state([{ id: 1 }]);
 	let extra = state(true);
 	let picks = state(0);
-	@if (shown) {
-		<article>
-			<h3>title</h3>
-			@if (extra) {
-				<>
-					<em>one</em>
-					<em>two</em>
-				</>
-			}
-			<input onInput={() => picks++} />
-			<span>{picks}</span>
-			<a onClick={() => (extra = !extra)}>toggle</a>
-		</article>
-	}
-}
-export default function Page() @{
-	<div><Card shown={true} /></div>
+	<div>
+		@for (const row of rows; key row.id) {
+			<article>
+				<h3>title</h3>
+				@if (extra) {
+					<>
+						<em>one</em>
+						<em>two</em>
+					</>
+				}
+				<input onInput={() => picks++} />
+				<span>{picks}</span>
+				<a onClick={() => (extra = !extra)}>toggle</a>
+			</article>
+		}
+	</div>
 }`);
-	expect(armEvents(compiled)).toEqual([
-		['input', [0, 2]],
-		['click', [0, 4]],
+	expect(rowEvents(compiled)).toEqual([
+		['input', [2]],
+		['click', [4]],
 	]);
 });
 
@@ -137,23 +137,22 @@ export default function Page() @{
 
 test('a control after a @for counts back from the parent end', async () => {
 	const compiled = await compile(`import { state } from '@markless/core';
-function Panel({ open }: { open: boolean }) @{
-	let items = state([{ id: 1 }]);
-	let hits = state(0);
-	@if (open) {
-		<section>
-			<h3>list</h3>
-			@for (const item of items; key item.id) { <p>{item.id}</p> }
-			<button onClick={() => hits++}>hit</button>
-			@if (hits > 2) { <em>many</em> }
-			<span>{hits}</span>
-		</section>
-	}
-}
 export default function Page() @{
-	<main><Panel open={true} /></main>
+	let rows = state([{ id: 1, items: [{ id: 1 }] }]);
+	let hits = state(0);
+	<main>
+		@for (const row of rows; key row.id) {
+			<section>
+				<h3>list</h3>
+				@for (const item of row.items; key item.id) { <p>{item.id}</p> }
+				<button onClick={() => hits++}>hit</button>
+				@if (hits > 2) { <em>many</em> }
+				<span>{hits}</span>
+			</section>
+		}
+	</main>
 }`);
-	expect(armEvents(compiled)).toEqual([['click', [0, -3]]]);
+	expect(rowEvents(compiled)).toEqual([['click', [-3]]]);
 	expect(refusals(compiled)).toEqual([]);
 });
 

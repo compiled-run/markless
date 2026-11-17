@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { collectTsrxModuleDiagnostics, compileTsrxModule } from '../src/index.ts';
+import { UNLINKED_RENDER } from './support/unlinked-render.ts';
 
 // A test that reads no state or prop can never change, so its arms are never rebuilt.
 const UNSUPPORTED = 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED';
@@ -32,7 +33,8 @@ test.each([
 	expect(await diagnose(declaration, condition)).toEqual([]);
 });
 
-test('the same arm decided by a prop still warns', async () => {
-	const diagnostics = await diagnose('', 'route');
+test('the same arm decided by a prop renders in the browser where the page re-renders, and warns where it cannot', async () => {
+	expect(await diagnose('', 'route')).toEqual([]);
+	const diagnostics = await diagnose(UNLINKED_RENDER, 'route');
 	expect(diagnostics.map((entry) => entry.severity)).toEqual(['warning']);
 });

@@ -447,10 +447,11 @@ export function App() @{
 	).toBe(false);
 });
 
-test('a prop-decided @if with the same content warns instead of blocking the build', async () => {
-	const result = await compileTsrxModule({
+test('a prop-decided @if with the same content renders in the browser where the page re-renders, and warns where it cannot', async () => {
+	const compileWith = (unlinked: string) => compileTsrxModule({
 		filename: 'src/PropPanel.tsrx',
-		source: `
+		source:
+			`
 import { state } from '@markless/core';
 
 function Panel({ label }) @{
@@ -463,15 +464,24 @@ export function Frame({ info }) @{
 		@if (info) { <Panel label={info.label} /> } @else { <em class="none">none</em> }
 	</div>
 }
-`,
+` + unlinked,
 		symbols: [],
 	});
-	const diagnostic = result.symbolModules.diagnostics.find(
-		(candidate) => candidate.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED',
-	);
+	const codes = (result: Awaited<ReturnType<typeof compileWith>>) =>
+		result.symbolModules.diagnostics
+			.filter((candidate) => candidate.code.startsWith('MARKLESS_BRANCH_ARM_'))
+			.map((candidate) => [candidate.code, candidate.severity]);
+	const linked = await compileWith('');
+	expect(codes(linked)).toEqual([['MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER', 'warning']]);
+	expect(linked.symbolModules.armEscalationCandidates?.map((candidate) => candidate.symbolId)).toEqual([
+		linked.protocolView.branches?.[0]?.symbolId,
+	]);
 	// The caller decides whether `info` ever changes, so a caller that passes a
 	// fixed value ships correctly; blocking every such file would be a false red.
-	expect(diagnostic?.severity).toBe('warning');
+	expect(codes(await compileWith(UNLINKED_RENDER))).toEqual([
+		['MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED', 'warning'],
+		['MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER', 'warning'],
+	]);
 });
 
 // T057 wall 3: a function the caller hands the child is not markup — it wires
@@ -605,10 +615,11 @@ export function App() @{
 });
 
 
-test('an @if decided by props alone that cannot rebuild names its component and props for the build to check callers', async () => {
-	const result = await compileTsrxModule({
+test('an @if decided by props alone names its component and props for the build to check callers only where the page cannot re-render', async () => {
+	const compileWith = (unlinked: string) => compileTsrxModule({
 		filename: 'src/Panel.tsrx',
-		source: `
+		source:
+			`
 import { state, computed } from '@markless/core';
 
 function Counter() @{
@@ -624,10 +635,11 @@ export function Panel({ open, mode }) @{
 		}
 	</section>
 }
-`,
+` + unlinked,
 		symbols: [],
 	});
-	const decided = result.symbolModules.propDecidedBranches ?? [];
+	expect((await compileWith('')).symbolModules.propDecidedBranches).toBeUndefined();
+	const decided = (await compileWith(UNLINKED_RENDER)).symbolModules.propDecidedBranches ?? [];
 	expect(decided.map(({ componentName, props }) => ({ componentName, props }))).toEqual([
 		{ componentName: 'Panel', props: ['open', 'mode'] },
 	]);
@@ -636,7 +648,7 @@ export function Panel({ open, mode }) @{
 	);
 });
 
-// The build refuses any caller that can change a prop-decided @if, so its flip, which ships no code, never runs.
+// The build refuses any caller that can change a prop-decided @if no browser render answers, so its flip, which ships no code, never runs.
 test.each([
 	{
 		name: 'computed over two props',
@@ -645,16 +657,16 @@ test.each([
 		source: `
 import { state, computed } from '@markless/core';
 
-function Counter() @{
-	let count = state(0);
-	<button type="button" onClick={() => count++}>{count}</button>
-}
-
 export function Panel({ open, mode }) @{
+	let items = state([]);
+	let count = state(0);
 	const shown = computed(() => open && mode !== 'off');
 	<section>
+		<button type="button" onClick={() => count++}>{count}</button>
 		@if (shown) {
-			<Counter />
+			<ul>
+				@for (const item of items; key item) { <li>{item}</li> } @empty { <li>{count}</li> }
+			</ul>
 		}
 	</section>
 }
@@ -667,24 +679,26 @@ export function Panel({ open, mode }) @{
 		source: `
 import { state } from '@markless/core';
 
-function Tally({ label }) @{
-	let taps = state(0);
-	<em onClick={() => taps++}>{label}{taps}</em>
-}
-
 export default function Toggle({ inBar }) @{
+	let items = state([]);
+	let taps = state(0);
 	<div>
+		<em onClick={() => taps++}>{taps}</em>
 		@if (inBar) {
-			<Tally label="bar" />
+			<ul>
+				@for (const item of items; key item) { <li>{item}</li> } @empty { <li>bar {taps}</li> }
+			</ul>
 		} @else {
-			<Tally label="page" />
+			<ul>
+				@for (const item of items; key item) { <li>{item}</li> } @empty { <li>page {taps}</li> }
+			</ul>
 		}
 	</div>
 }
 `,
 	},
 ])(
-	'a prop-decided @if names no flip symbol in its demand map: $name',
+	'a prop-decided @if no browser render answers names no flip symbol in its demand map: $name',
 	async ({ source, component, props }) => {
 		const result = await compileTsrxModule({
 			filename: 'src/Decided.tsrx',

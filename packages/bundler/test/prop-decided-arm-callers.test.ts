@@ -26,10 +26,32 @@ export function Panel({ open }) @{
 }
 `;
 
-async function buildPage(name: string, files: Readonly<Record<string, string>>) {
+// A child handed children and a function has to run, and the browser cannot render it in the arm.
+const refusedPanel = `
+import { state } from '@markless/core';
+
+function Line({ children, onPick }) @{
+	<li onClick={onPick}>{children}</li>
+}
+
+export function Panel({ open }) @{
+	let count = state(0);
+	<section>
+		@if (open) {
+			<Line onPick={() => count++}><b>{count}</b></Line>
+		}
+	</section>
+}
+`;
+
+async function buildPage(
+	name: string,
+	files: Readonly<Record<string, string>>,
+	panelSource: string = panel,
+) {
 	const directory = await mkdtemp(resolve(root, `.prop-decided-${name}-`));
 	try {
-		for (const [file, source] of Object.entries({ 'panel.tsrx': panel, ...files }))
+		for (const [file, source] of Object.entries({ 'panel.tsrx': panelSource, ...files }))
 			await writeFile(resolve(directory, file), source);
 		await viteBuild({
 			configFile: false,
@@ -67,7 +89,7 @@ export default function Page() @{
 	).resolves.toBeUndefined();
 });
 
-test('the build fails when a caller passes state to the prop that decides the @if', async () => {
+test('the build fails when a caller passes state to the prop that decides an @if no browser render answers', async () => {
 	await expect(
 		buildPage('changing', {
 			'page.tsrx': `
@@ -82,7 +104,7 @@ export default function Page() @{
 	</main>
 }
 `,
-		}),
+		}, refusedPanel),
 	).rejects.toThrow(
 		/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: .*panel\.tsrx:\d+:\d+: <Panel>: .*Its test reads the prop `open`, and <Page> in .*page\.tsrx passes it `shown`, which changes\./,
 	);
@@ -112,8 +134,27 @@ export default function Page() @{
 	</main>
 }
 `,
-		}),
+		}, refusedPanel),
 	).rejects.toThrow(
 		/<Middle> in .*middle\.tsrx hands it its own prop `open`; <Page> in .*page\.tsrx passes it `shown`, which changes\./,
 	);
+});
+
+test('an @if decided by a prop whose arm the browser renders builds when a caller passes state', async () => {
+	await expect(
+		buildPage('rendered', {
+			'page.tsrx': `
+import { state } from '@markless/core';
+import { Panel } from './panel.tsrx';
+
+export default function Page() @{
+	let shown = state(false);
+	<main>
+		<button type="button" onClick={() => (shown = !shown)}>toggle</button>
+		<Panel open={shown} />
+	</main>
+}
+`,
+		}),
+	).resolves.toBeUndefined();
 });

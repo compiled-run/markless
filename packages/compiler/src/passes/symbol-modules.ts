@@ -284,6 +284,10 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 
 	const foreignScope = foreignFactoryScopeCarry(input, emittedModules, captureSlotsBySymbol);
 	const modules = foreignScope.modules;
+	const acceptedEscalations = acceptedArmEscalations(input, branchArms, modules);
+	const propDecided = branchArms.propDecided.filter(
+		(branch) => !acceptedEscalations.has(branch.symbolId),
+	);
 	const refusedRowItemNames = readOnlyRowWriteNames(input.semanticGraph);
 
 	return {
@@ -292,12 +296,10 @@ export function emitSymbolModules(input: SymbolModulesInput): SymbolModulesArtif
 		...(branchArms.escalationCandidates.length > 0
 			? { armEscalationCandidates: branchArms.escalationCandidates }
 			: {}),
-		...(branchArms.propDecided.length > 0
-			? { propDecidedBranches: branchArms.propDecided }
-			: {}),
+		...(propDecided.length > 0 ? { propDecidedBranches: propDecided } : {}),
 		diagnostics: [
 			...input.captureAnalysis.diagnostics,
-			...withoutAcceptedArmRefusals(input, branchArms, modules),
+			...withoutAcceptedArmRefusals(branchArms.diagnostics, acceptedEscalations),
 			...unaddressableElementDiagnostics(input),
 			...foreignScope.diagnostics,
 			...divergentModuleInstanceCarries(modules).map(divergentModuleInstanceDiagnostic),
@@ -1382,30 +1384,36 @@ type ArmPartsContext = {
 	readonly refusals?: ArmRefusal[];
 };
 
-// An arm a page re-render answers ships, so its refusal goes; the warning that it renders in the browser stays.
-function withoutAcceptedArmRefusals(
+// The branch-update symbols a page re-render answers: their arms ship, so their refusals go.
+function acceptedArmEscalations(
 	input: SymbolModulesInput,
-	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'diagnostics' | 'escalationCandidates'>,
+	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'escalationCandidates'>,
 	modules: ReadonlyArray<GeneratedSymbolModule>,
-): ReadonlyArray<SymbolModulesDiagnostic> {
+): ReadonlySet<string> {
 	if (
 		branchArms.escalationCandidates.length === 0 ||
 		!input.publicRenderModule?.renderDataModuleSource ||
 		!input.semanticGraph ||
 		!prerenderInterfacesComplete({ semanticGraph: input.semanticGraph }, input.source ?? {})
 	)
-		return branchArms.diagnostics;
+		return new Set();
 	const emitted = new Set(modules.map((module) => module.symbolId));
-	const accepted = new Set(
+	return new Set(
 		branchArms.escalationCandidates
 			.filter((candidate) => !emitted.has(candidate.symbolId))
 			.map((candidate) => candidate.symbolId),
 	);
-	return branchArms.diagnostics.filter(
+}
+
+// The warning that an accepted arm renders in the browser stays.
+function withoutAcceptedArmRefusals(
+	diagnostics: ReadonlyArray<SymbolModulesDiagnostic>,
+	accepted: ReadonlySet<string>,
+): ReadonlyArray<SymbolModulesDiagnostic> {
+	return diagnostics.filter(
 		(diagnostic) =>
 			!(
 				diagnostic.code === 'MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED' &&
-				diagnostic.severity === 'error' &&
 				typeof diagnostic.symbolId === 'string' &&
 				accepted.has(diagnostic.symbolId)
 			),
@@ -1524,13 +1532,8 @@ function renderBranchArms(
 				if (decided)
 					propDecided.push({ componentName, props, symbolId: symbol.id, diagnostic });
 				// Every refusal escalatable, or none: a branch that also holds a shape
-				// no re-render answers stays plainly refused. A refusal that only warns
-				// blocks no build, so its branch keeps shipping the plan it ships today.
-				if (
-					diagnostic.severity === 'error' &&
-					refusals.length > 0 &&
-					refusals.every((refusal) => refusal.escalatable)
-				) {
+				// no re-render answers stays plainly refused.
+				if (refusals.length > 0 && refusals.every((refusal) => refusal.escalatable)) {
 					escalationCandidates.push({
 						branchSiteId: branch.branchSiteId,
 						symbolId: symbol.id,
