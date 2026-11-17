@@ -74,6 +74,81 @@
 			"delta": -38332,
 			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground"
+			],
+			"set": {
+				"jsGzipBytes": 1197338
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -1197299,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground"
+			],
+			"set": {
+				"jsGzipBytes": 1671913
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -1671874,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion playground"
+			],
+			"set": {
+				"jsGzipBytes": 38332
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -38332,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; this PR's CI run 44078786011 against the docs pages' reference run 43956962200 (710c44d48), which includes #742's unrecorded +39 B in the frame runtime",
+			"date": "2026-11-17"
 		}
 	]
 }
