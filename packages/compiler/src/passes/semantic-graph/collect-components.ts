@@ -1,6 +1,6 @@
 import { componentExportPath, linkedComponentTarget } from '../link/component-target.ts';
 import { isEventAttribute } from '../../ast/events.ts';
-import { asNodes, getIdentifierName, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, getIdentifierName, unwrapTypeAssertion, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, expressionSourceOrFallback, sourceSpan } from '../../ast/source.ts';
 import type {
 	SemanticAsyncArmPlacement,
@@ -229,7 +229,8 @@ function componentPropBindings(
 		if (!name) continue;
 
 		const value = attribute.value as AnyNode | undefined;
-		const expression = unwrapExpressionContainer(value);
+		// `id={selected!}` hands the child the same value as `id={selected}`.
+		const expression = unwrapTypeAssertion(unwrapExpressionContainer(value));
 		const source = expression
 			? expressionSource(expression, state.source)
 			: expressionSourceOrFallback(value, state.source, 'true');

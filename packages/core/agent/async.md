@@ -146,7 +146,7 @@ export default function Name() @{
 | `MARKLESS_STATE_HELPER_RETURN_UNSUPPORTED` | A helper that makes `state()` or `computed()`: return the binding directly, or declare it in the component body. |
 | `MARKLESS_ASYNC_ARIA_BUSY_MANAGED` | Remove your `aria-busy`; Markless sets it. |
 
-Do not keep class instances or functions in `state()`. Do not write `id={x!}` on a prop: pass `id={x}` and type the prop `number | null`.
+Do not keep class instances or functions in `state()`.
 
 ## Runtime error: `render(App) requires a compiled TSRX artifact`
 
