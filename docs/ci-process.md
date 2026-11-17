@@ -248,6 +248,31 @@ The measurements come from the `perf-guards-measurement` artifacts (kept 14 days
 4. Record every page your change grows, even by a few bytes. A page you leave out counts against the 48 B shared with every other change that left it out.
 5. You do not need to accept again when another pull request lands first, unless both change the same code: your recorded change is added to the measurement of the last change recorded ahead of it.
 
+### The page's own code and the playground's prefetch
+
+**The problem.** On 2026-11-17 about twenty pull requests (#709, #738 to #782) went red on G16 for `docs /` and `docs /concepts/state`, and most recorded +35 B to +1,713 B of "accepted growth" there, though few of them changed code any docs page runs. Every `<Code>` block on a page renders a `<link rel="prefetch">` for its session, editor, compile worker, result frame and the frame's runtime (`website/components/docs/code.tsrx`, listed by the build in `_code-prefetch.json`). The browser fetches them at idle, inside G16's window, so they made up most of what G16 weighed on those pages. On `docs /` that was 1.20 MB of the 1.71 MB gzip it weighed: CI measured 1,197,338 B of playground and 510,709 B of the page's own code at `ae49000ea` (#787's run). The compile worker alone is 1.04 MB gzip, and it bundles the compiler and the bundler. So any compiler or bundler change moved the page's number, even when no app's client code changed.
+
+Two builds of the same tree at the same path emit the same bytes, so the deltas below are exact. The files they compare come from the build's byte-attribution manifest and `_code-prefetch.json`:
+
+| change | files that changed on `docs /` | page's own code | playground prefetch |
+| --- | --- | --- | --- |
+| #777 (`packages/bundler/src/prop-flow.ts` only) | the compile worker (1,042,121 to 1,042,267 B), plus one frame chunk renamed at the same size | 0 B | +146 B |
+| #742 (`packages/web/src/fns/async-plane.ts`) | the result frame's runtime chunk (9,836 to 9,875 B) | 0 B | +39 B |
+| sum: CI's +185 B on #777 against its 710c44d48 reference | | 0 B | +185 B |
+
+The pages embed no repository data at load. The `@markless/ui` source the compile worker compiles from is bundled as text, but each file is a separate `/assets/*.js` chunk that the worker loads only when a compile asks for it.
+
+**What happens now.** G16 weighs two figures per page:
+
+- **`docs /`**, the page's own code: every JS file fetched at load except the files `_code-prefetch.json` lists for the playground. A file the playground lists still counts here when the page's own HTML preloads it. Nothing else changes for this figure: 48 B shared allowance, judged against the reference measurement, and the same accept command.
+- **`docs / playground`**, what the page's `<Code>` blocks prefetch. It is judged the same way, against the CI measurement of the last commit that recorded a nonzero change to it plus every change recorded since, but with its own allowance of 16 KB (`loadPlaygroundGrowthBytes`). That covers ordinary compiler, bundler and runtime work: tonight's 24 open pull requests moved `docs /` by -71 B to +1,713 B each, about 6 KB in all. A change that pulls a dependency or a second copy of a module into the compile worker still fails, since that costs tens of kilobytes or more. When the figure fails, the pull request that crosses the limit records it with `pnpm perf:guard:accept load "docs / playground" --from <its run> --base <the reference run the message names> --reason "..."`. That record also takes in the growth the earlier pull requests left unrecorded, and starts a new 16 KB allowance.
+
+The framework runtime the result frame imports is also weighed elsewhere: G10 holds each runtime module to +128 B, and the bench pages' G16 counts it whenever an app loads it. The page figure fails exactly as before when a docs page's own code grows.
+
+**Not changed.** The page still prefetches the playground at idle. That is a real cost: 1.20 MB gzip on `docs /` and 1.67 MB on `docs /concepts/state`, fetched even when the reader never opens a playground. It was chosen so that a first edit fetches nothing (G2, see section 1). Loading it later, for example when a block scrolls into view, trades G2 against bytes on every visit. That is an owner decision and is not taken here.
+
+**Switch-over.** The change that brought in the split records, for each docs page, the page figure minus the old total, measured on CI, plus a new `playground` anchor. A change file entry from before the split that recorded docs-page growth from the playground (most of tonight's) now loosens the page's own limit by that amount on its own run. Drop those entries, or rerun accept after rebasing: it then records nothing for the page.
+
 **Client module and compile counts.** These are the same on every run, so the build-scale guard now holds them exactly: the count must equal the budget with every change file applied. A change that adds or removes a client module records it with `node scripts/benchmarks/build-scale/guard.mjs accept --reason "<one line>"` (it builds the app once at 180 pages; pass `--client-modules <n> --compiles <n>` to use the numbers from the CI log instead). A count above the record is growth nobody recorded; a count below it is a win to record. There is no spare slot to use up, and two changes that each add a module record +1 each.
 
 **Not changed yet.** The `fixture-builds` walls (#645) are limited by the same absolute anchor plus margin and fail for the same reason. Their check is in `packages/bundler/test/fixture-budget.ts`, outside this change; moving them onto measurements needs the unit lane to upload its fixture measurements first.
