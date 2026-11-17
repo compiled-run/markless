@@ -140,6 +140,8 @@ private fun ops() {
 	check("a storage cell writes its store", store.get("visits") == JsValue.Num(1.0)) { "${store.get("visits")}" }
 	val again = Runtime(decoded, store)
 	check("a storage cell reads its store at mount", again.text("h0:text0") == "1/<a>") { again.text("h0:text0") }
+	val nulls = Runtime(Payload.decode("""{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":null}],"nodes":[{"kind":"element","id":"h0","element":"p","parent":null},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"text":"a"},{"cell":"n"},{"expr":{"template":["<",{"cell":"n"},">"]}}]}],"events":[],"handlers":[]}""".toByteArray()))
+	check("a null text part renders empty, a null inside a template reads null", nulls.text("h0:text0") == "a<null>") { nulls.text("h0:text0") }
 	refuses("an unknown builtin", payload.replace("\"template\":[", "\"call\":\"eval\",\"arguments\":[{\"literal\":1}],\"x\":[").replace(",\"x\":[\"<\",{\"cell\":\"s\"},\">\"]", ""), "unknown call \"eval\"")
 	refuses("an unknown binary operator", payload.replace("\"binary\":\"+\",\"left\":{\"unary\"", "\"binary\":\"**\",\"left\":{\"unary\""), "unknown binary \"**\"")
 }

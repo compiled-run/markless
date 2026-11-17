@@ -113,6 +113,8 @@ proofs/01-static-text ... proofs/10-url-route` through `~/.claude/bin/heavy`: bo
 | Rung | Android | iOS |
 |---|---|---|
 | 01 to 05, 07 to 10 | PASS | PASS |
+| 05b-choices (`@else if`, `@switch`) | PASS (06:20 run) | FAIL at launch (branch `tests` pending in the iOS host) |
+| 07c-child-state | PASS (06:20 run) | PASS |
 | 06-keyed-for | PASS on rerun (exit 0, both platforms); in the full run Maestro lost the emulator before the flow (`Device emulator-5600 was requested, but it is not connected`) at machine load 40 to 110 | PASS |
 
 Text Dragon styles is drawn with subpixel positioning, linear metrics and hinting off, as Dragon shapes it (like Chrome):
