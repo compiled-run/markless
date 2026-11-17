@@ -188,16 +188,19 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		}
 		return writes.flatMap((write): NativeOp[] => {
 			const cell = cellOfName.get(write.target);
-			if (
-				cell === undefined ||
-				write.operation !== 'update' ||
-				write.through !== undefined ||
-				write.passedTo !== undefined
-			) {
-				refuse(`a ${write.operation} write to \`${write.target}\` needs a script engine`, write.targetSpan);
-				return [];
+			if (cell !== undefined && write.through === undefined && write.passedTo === undefined) {
+				if (write.operation === 'update') {
+					return [{ op: 'add', cell, value: write.updateOperator === '--' ? -1 : 1 }];
+				}
+				if (write.operation === 'assign' && write.valueShape?.kind === 'literal') {
+					return [{ op: 'set', cell, value: write.valueShape.value }];
+				}
+				if (write.operation === 'assign' && write.valueShape?.kind === 'not-target') {
+					return [{ op: 'toggle', cell }];
+				}
 			}
-			return [{ op: 'add', cell, value: write.updateOperator === '--' ? -1 : 1 }];
+			refuse(`a ${write.operation} write to \`${write.target}\` needs a script engine`, write.targetSpan);
+			return [];
 		});
 	};
 

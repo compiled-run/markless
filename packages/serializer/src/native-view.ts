@@ -27,7 +27,10 @@ export type NativeNode =
 export type NativeEventName = 'activate';
 
 /** A state write a host runs as data, with no script engine. */
-export type NativeOp = { readonly op: 'add'; readonly cell: string; readonly value: number };
+export type NativeOp =
+	| { readonly op: 'add'; readonly cell: string; readonly value: number }
+	| { readonly op: 'set'; readonly cell: string; readonly value: NativeScalar }
+	| { readonly op: 'toggle'; readonly cell: string };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;

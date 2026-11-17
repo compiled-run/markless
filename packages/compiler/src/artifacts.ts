@@ -1079,6 +1079,10 @@ export type SemanticStateWrite = {
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
+	/** A plain `=` whose value a host can apply without a script engine: a literal, or `!` of the target itself. */
+	readonly valueShape?:
+		| { readonly kind: 'literal'; readonly value: string | number | boolean }
+		| { readonly kind: 'not-target' };
 	readonly optional?: boolean;
 	readonly prefix?: boolean;
 	readonly updateOperator?: '++' | '--';

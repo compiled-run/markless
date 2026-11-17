@@ -2400,12 +2400,17 @@ function eventHandlerExpression(
 function writeStatementCount(node: AnyNode | undefined): { handlerWriteStatements?: number } {
 	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression')) return {};
 	const body = node.body as AnyNode | undefined;
-	const expressions =
+	const unwrap = (expression: AnyNode | null): AnyNode | null =>
+		expression?.type === 'ParenthesizedExpression'
+			? unwrap((expression.expression as AnyNode | undefined) ?? null)
+			: expression;
+	const expressions = (
 		body?.type === 'BlockStatement'
 			? asNodes(body.body).map((statement) =>
 					statement.type === 'ExpressionStatement' ? (statement.expression as AnyNode) : null,
 				)
-			: [body ?? null];
+			: [body ?? null]
+	).map(unwrap);
 	const writes = expressions.every(
 		(expression) =>
 			expression !== null &&

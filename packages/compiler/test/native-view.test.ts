@@ -83,6 +83,35 @@ export function Tally() @{
 		expect(span?.class).toBe(article?.class.split(' ')[1]);
 	});
 
+	it('lowers literal assignments and self-negation to set and toggle', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Panel() @{
+	let open = state(false);
+	let tab = state('a');
+	let size = state(1);
+	<div>
+		<p>{tab} {open} {size}</p>
+		<button onClick={() => { open = !open; tab = 'b'; size = 3; }}>Go</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'toggle', cell: 'state:open' },
+			{ op: 'set', cell: 'state:tab', value: 'b' },
+			{ op: 'set', cell: 'state:size', value: 3 },
+		]);
+	});
+
+	it('refuses an assignment whose value needs evaluating', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Sum() @{
+	let total = state(1);
+	<button onClick={() => (total = total * 2)}>Total {total}</button>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual(['a assign write to `total` needs a script engine']);
+	});
+
 	it('refuses a handler that does more than write state', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Logger() @{

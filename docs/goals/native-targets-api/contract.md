@@ -94,7 +94,9 @@ export function Counter() @{
   (so integer `1` is `"1"`, never `"1.0"`; hosts must implement this exactly; non-integer numbers are refused in v0).
 - **Events** are semantic. Authored `onClick` lowers to `activate`. Platform mapping (owned by each adapter): web `click`,
   iOS `UIControl.Event.touchUpInside`, Android `View.OnClickListener`.
-- **Handlers** are lists of ops. v0 has one op, `add` (`x++` is `+1`, `x--` is `-1`). A handler is lowered only when the
+- **Handlers** are lists of ops: `{ op: 'add', cell, value }` (`x++` is `+1`, `x--` is `-1`; numbers only),
+  `{ op: 'set', cell, value }` (`x = 'b'`, `x = 3`, `x = true`: a literal string, integer or boolean) and
+  `{ op: 'toggle', cell }` (`x = !x`). Anything else (`x = x * 2`, a call, a member write) is refused for now. A handler is lowered only when the
   analyzer proves its body is nothing but state writes (`handlerWriteStatements`); otherwise the compiler refuses with a
   diagnostic instead of guessing. Ops run in order; then every text node reading a changed cell is recomputed.
 - **Journal:** after a handler, the runtime emits `{ "op": "text", "node": "h2:text0", "value": "Count 1" }` for each text
