@@ -2322,9 +2322,10 @@ function emitLoadSymbol(
 	}
 
 	return [
+		`import { marklessWhenLoaded as marklessSymbolResolverWhenLoaded } from '${RESIDENT_LOAD_MODULE}';`,
 		`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
 		'function loadSymbol(symbolId) {',
-		'	return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'	return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		'}',
 	].join('\n');
 }
