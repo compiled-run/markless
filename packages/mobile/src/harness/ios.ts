@@ -1,7 +1,7 @@
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
-import { PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
+import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_URL_SCHEME } from './proof-app.ts';
 import type { ProofAssets } from './rung.ts';
 import { cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -180,6 +180,7 @@ const infoPlist = (minimumOs: string) => `<?xml version="1.0" encoding="UTF-8"?>
 <key>UILaunchScreen</key><dict/>
 <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
 <key>UIApplicationSceneManifest</key><dict><key>UIApplicationSupportsMultipleScenes</key><false/></dict>
+<key>CFBundleURLTypes</key><array><dict><key>CFBundleURLName</key><string>${PROOF_APP_ID}</string><key>CFBundleURLSchemes</key><array><string>${PROOF_URL_SCHEME}</string></array></dict></array>
 </dict></plist>
 `;
 

@@ -16,13 +16,22 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 	func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options: UIScene.ConnectionOptions) {
 		guard let scene = scene as? UIWindowScene else { return }
 		let window = UIWindow(windowScene: scene)
-		window.rootViewController = Self.root()
+		window.rootViewController = Self.root(path: options.urlContexts.first.map { MarklessRoot.path(of: $0.url) })
 		window.makeKeyAndVisible()
 		self.window = window
 	}
 
+	func scene(_ scene: UIScene, openURLContexts contexts: Set<UIOpenURLContext>) {
+		guard let url = contexts.first?.url, let root = window?.rootViewController else { return }
+		do {
+			try MarklessRoot.open(MarklessRoot.path(of: url), in: root)
+		} catch {
+			NSLog("markless-shell: %@", "\(error)")
+		}
+	}
+
 	@MainActor
-	private static func root() -> UIViewController {
+	private static func root(path: String?) -> UIViewController {
 		do {
 			let bundle = Bundle.main.bundleURL
 			let payload = try Data(contentsOf: bundle.appending(path: "markless/payload.json"))
@@ -32,7 +41,7 @@ final class ShellSceneDelegate: UIResponder, UIWindowSceneDelegate {
 			for file in (try? FileManager.default.contentsOfDirectory(at: fontFolder, includingPropertiesForKeys: nil)) ?? [] {
 				fonts["sha256:" + file.deletingPathExtension().lastPathComponent] = try Data(contentsOf: file)
 			}
-			return try MarklessViewController(payload: payload, style: style, fonts: fonts)
+			return try MarklessRoot.controller(payload: payload, style: style, fonts: fonts, path: path)
 		} catch {
 			NSLog("markless-shell: %@", "\(error)")
 			let controller = UIViewController()

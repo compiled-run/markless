@@ -21,6 +21,8 @@ public final class MarklessViewController: UIViewController {
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
 	private(set) var tree: ViewTree?
+	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
+	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
 
 	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
 	public init(
@@ -45,6 +47,17 @@ public final class MarklessViewController: UIViewController {
 		try buildPage()
 	}
 
+	/// One screen of an app: the page for a route, opened with its params; no styles yet (one export covers one page).
+	init(page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore) throws {
+		payload = page
+		style = nil
+		fonts = [:]
+		self.store = store
+		runtime = NativeRuntime(payload: page, store: store, params: params)
+		super.init(nibName: nil, bundle: nil)
+		try buildPage()
+	}
+
 	/// The `-route <path>` launch argument (Maestro's `launchApp: arguments: { route: ... }`).
 	public nonisolated static func launchRoute() -> String? {
 		let arguments = ProcessInfo.processInfo.arguments
@@ -58,6 +71,7 @@ public final class MarklessViewController: UIViewController {
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
 		}
+		navigationItem.title = try runtime.title()
 	}
 
 	@available(*, unavailable)
@@ -80,12 +94,16 @@ public final class MarklessViewController: UIViewController {
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
 	public func perform(_ action: NativeAction) {
 		do {
-			let journal = try runtime.dispatch(action)
-			if case let .navigate(route, params)? = journal.last {
-				try navigate(route, params)
-			} else {
-				try tree?.apply(journal)
+			var journal = try runtime.dispatch(action)
+			if case let .navigate(route, params, replace)? = journal.last {
+				if let navigator { try navigator(route, params, replace) } else { try navigate(route, params) }
+				return
 			}
+			if case let .title(value)? = journal.last {
+				navigationItem.title = value
+				journal.removeLast()
+			}
+			try tree?.apply(journal)
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}

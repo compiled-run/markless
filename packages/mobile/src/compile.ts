@@ -3,6 +3,7 @@ import {
 	compileTsrxModule,
 	buildSemanticGraph,
 	createNativeViewPayload,
+	nativeUnsupported,
 	NATIVE_FACT_COLLECTORS,
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
@@ -122,16 +123,7 @@ export async function compileNativeApp(input: {
 		});
 		if (build.styles.some((style) => style.cssText.length > 0))
 			diagnostics.push({
-				code: 'MARKLESS_NATIVE_UNSUPPORTED',
-				severity: 'error',
-				phase: 'serialization',
-				title: 'This component cannot be built for a native target yet',
-				message:
-					'styles in an app of several pages (one Dragon style export covers one component today)',
-				why: 'Native hosts take styles from a Dragon export made per component; an app build has no per-page export yet.',
-				passId: 'native-view',
-				suggestions: [],
-				docsUrl: 'https://markless.dev/errors/MARKLESS_NATIVE_UNSUPPORTED',
+				...nativeUnsupported('styles in an app of several pages (one Dragon style export covers one component today)'),
 				page: page.page,
 			});
 		diagnostics.push(

@@ -30,9 +30,16 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"rows\",\"node\":${jsonString(node)},\"keys\":${keys.joinToString(",", "[", "]", transform = ::jsonString)}}"
 	}
 
-	/** Leave this page: the host builds the page at [route] from scratch with [params]; [node] is the route. */
-	data class Navigate(override val node: String, val params: Map<String, String>) : JournalEntry {
-		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
+	/** Leave this page for the page at [route] with [params]: pushed as a new screen, or in this one's place when [replace]. */
+	data class Navigate(override val node: String, val params: Map<String, String>, val replace: Boolean = false) : JournalEntry {
+		val route get() = node
+		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}${if (replace) ",\"replace\":true" else ""}}"
+	}
+
+	/** The page's title text changed; [node] is empty. */
+	data class Title(val value: String) : JournalEntry {
+		override val node get() = ""
+		override fun toJson() = "{\"op\":\"title\",\"value\":${jsonString(value)}}"
 	}
 
 	/** Shows arm [index] of a branch (null: none). */
@@ -167,8 +174,10 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item)), it.key) }
 	}
 
-	fun text(t: Node.Text, scope: Scope): String = buildString {
-		for (p in t.parts) when (p) {
+	fun text(t: Node.Text, scope: Scope): String = text(t.parts, scope)
+
+	fun text(parts: List<TextPart>, scope: Scope): String = buildString {
+		for (p in parts) when (p) {
 			is TextPart.Literal -> append(p.text)
 			is TextPart.Value -> evaluate(p.expr, scope).let { if (it != JsValue.Null) append(JsString.of(it)) }
 		}
@@ -209,10 +218,25 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
-	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
+	/** The page's `<title>` text, null when it has none. */
+	fun title(): String? = payload.title?.let { text(it, Scope.EMPTY) }
+
+	/** The node an action host names and the scope its handler runs in: a row instance (`h6@42`) reads its row's item. */
+	private fun scopeOf(host: String): Pair<String, Scope> {
+		val at = host.indexOf('@')
+		if (at < 0) return host to Scope.EMPTY
+		val id = host.substring(0, at)
+		val key = host.substring(at + 1)
+		val repeat = byId[id]?.row?.let { byId[it] as? Node.Repeat }
+		val row = repeat?.takeIf { isShown(it) }?.let { r -> rowsOf(r).firstOrNull { it.key == key } } ?: throw MarklessRuntimeError("\"$host\" is not a shown row instance")
+		return id to Scope(items = mapOf(repeat.id to row.item))
+	}
+
+	/** Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole text as [value]. */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
-		val handlerId = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
+		val (node, scope) = scopeOf(host)
+		val handlerId = handlerFor(node, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
@@ -222,12 +246,13 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		if (value != null) beforeProperties[host to "value"] = value
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
+		val beforeTitle = title()
 		eventValue = value
 		try {
 			for (op in handler.ops) when (op) {
-				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
+				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace))
 				is Op.Assign -> {
-					val v = evaluate(op.value)
+					val v = evaluate(op.value, scope)
 					values[op.cell] = v
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
@@ -259,6 +284,8 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
 			}
 		}
+		val afterTitle = title()
+		if (afterTitle != null && afterTitle != beforeTitle) journal.add(JournalEntry.Title(afterTitle))
 		return journal
 	}
 }

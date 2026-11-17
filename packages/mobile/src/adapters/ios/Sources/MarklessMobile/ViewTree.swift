@@ -104,8 +104,8 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
 				applyAttributes(node, view)
-			case .navigate:
-				throw HostError("a navigate entry reaches the page's controller, not its views")
+			case .navigate, .title:
+				throw HostError("navigate and title entries reach the screen's controller, not its views")
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -217,7 +217,7 @@ final class ViewTree {
 				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
-				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
+				try wire(events[template] ?? [], on: view, element: element, id: id)
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
 					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
@@ -271,10 +271,9 @@ final class ViewTree {
 		return built
 	}
 
-	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String, inRow: Bool) throws {
+	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String) throws {
 		let onAction = onAction
 		for event in bound {
-			if inRow { throw HostError("a \(event.event.rawValue) handler on a list row (\(id)) has no iOS host support yet") }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
 				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)

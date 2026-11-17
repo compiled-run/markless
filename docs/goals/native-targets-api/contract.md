@@ -22,6 +22,12 @@ this file changes in the same push. Status as of 2026-11-16, night one.
    `{ route: 'params' }` expression, a payload `route`, vectors carrying `params`; `route.json`). Rung 11 is stopped on an
    owner decision. Android passes every vector but `list.json` and `route.json` as of `d88b8011a`.
 
+## 0a. Navigation (2026-11-17, `cw/native-nav`)
+
+An app of several routes is `markless.native-app/0`; links push or replace screens in the platform's own stack, Back
+is the platform's and journals nothing, and a page's `<title>` is its navigation bar title. Everything for hosts is in
+`nav-contract.md`; single-page payloads are unchanged.
+
 ## 0b. Next items per worker (2026-11-17, 04:10)
 
 - **native-ios-host:** `/1` is done (the lead added `readiness` as an optional field the decoder reads past, in

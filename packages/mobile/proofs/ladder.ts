@@ -162,6 +162,8 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 					{ launchApp: { clearState: true } },
 					'stopApp',
 					{ openLink: `${PROOF_URL_SCHEME}://app${rung.start ?? '/'}` },
+					// iOS asks the person before an outside caller opens an app by its URL scheme.
+					onPlatform('iOS', [{ tapOn: 'Open' }]),
 				]
 			: [
 					{

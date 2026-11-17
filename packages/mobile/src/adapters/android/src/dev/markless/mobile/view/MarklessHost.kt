@@ -51,14 +51,22 @@ class AssetFonts(private val context: Context) : FontSource {
  */
 class MarklessHost(
 	private val context: Context,
-	payloadBytes: ByteArray,
+	val payload: Payload,
 	styleExportBytes: ByteArray? = null,
 	private val fonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
 ) {
-	val payload: Payload = Payload.decode(payloadBytes)
+	constructor(
+		context: Context,
+		payloadBytes: ByteArray,
+		styleExportBytes: ByteArray? = null,
+		fonts: FontSource = AssetFonts(context),
+		store: Store = PreferencesStore(context),
+		params: Map<String, String> = emptyMap(),
+	) : this(context, Payload.decode(payloadBytes), styleExportBytes, fonts, store, params)
+
 	val runtime = Runtime(payload, store, params)
 	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
@@ -78,8 +86,11 @@ class MarklessHost(
 	var rootFrame: Rect? = null
 		private set
 
-	/** Builds the page a `navigate` entry names, from scratch; required for a payload with links. */
-	var onNavigate: ((route: String, params: Map<String, String>) -> Unit)? = null
+	/** Opens the page a `navigate` entry names; required for a payload with links. */
+	var onNavigate: ((JournalEntry.Navigate) -> Unit)? = null
+
+	/** Shows the page's new title; required for a payload with a title that follows state. */
+	var onTitle: ((String) -> Unit)? = null
 
 	/** Called with each journal after it is applied. */
 	var onJournal: ((List<JournalEntry>) -> Unit)? = null
@@ -125,9 +136,10 @@ class MarklessHost(
 				is JournalEntry.Navigate -> {
 					Log.i(TAG, "journal ${entry.toJson()}")
 					onJournal?.invoke(journal)
-					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
+					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry)
 					return
 				}
+				is JournalEntry.Title -> (onTitle ?: throw MarklessHostError("title \"${entry.value}\" with no title bar")).invoke(entry.value)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -225,7 +237,7 @@ class MarklessHost(
 	}
 
 	private fun element(node: Node.Element, inst: Instance): View {
-		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
+		if (node.row != null && events[node.id].orEmpty().any { it.event == EventName.Input }) throw MarklessHostError("\"${node.id}\" handles input inside a list row, which this host does not implement")
 		val view = when (node.element) {
 			"button" -> Button(context).apply {
 				background = null
@@ -248,7 +260,7 @@ class MarklessHost(
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}

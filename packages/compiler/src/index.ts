@@ -104,6 +104,7 @@ export { createProtocolViewPayload } from './passes/protocol-view.ts';
 export { NATIVE_FACT_COLLECTORS } from './passes/semantic-graph/expression-tree.ts';
 export {
 	createNativeViewPayload,
+	nativeUnsupported,
 	NATIVE_UNSUPPORTED_CODE,
 	type NativeViewArtifact,
 	type NativeViewOptions,

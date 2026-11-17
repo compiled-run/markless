@@ -5,6 +5,11 @@ name: n4-deep-link
       clearState: true
 - stopApp
 - openLink: markless-proof://app/orders/42
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn: Open
 - assertVisible: Details for order 42
 - assertNotVisible: Your orders
 - assertNotVisible: Shop front

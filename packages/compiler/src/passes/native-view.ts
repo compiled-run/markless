@@ -227,24 +227,29 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 	};
 }
 
+/** The refusal a native build reports for a construct with no native lowering yet, named in `message`. */
+export function nativeUnsupported(message: string, span?: SourceSpan): CompilerDiagnostic {
+	return {
+		code: NATIVE_UNSUPPORTED_CODE,
+		severity: 'error',
+		phase: 'serialization',
+		title: 'This component cannot be built for a native target yet',
+		message,
+		why: 'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
+		...(span ? { primarySpan: span } : {}),
+		passId: 'native-view',
+		suggestions: [],
+		docsUrl: `https://markless.dev/errors/${NATIVE_UNSUPPORTED_CODE}`,
+	};
+}
+
 export function createNativeViewPayload(
 	graph: SemanticGraphArtifact,
 	options: NativeViewOptions = {},
 ): NativeViewArtifact {
 	const diagnostics: CompilerDiagnostic[] = [];
 	const refuse = (message: string, span?: SourceSpan): null => {
-		diagnostics.push({
-			code: NATIVE_UNSUPPORTED_CODE,
-			severity: 'error',
-			phase: 'serialization',
-			title: 'This component cannot be built for a native target yet',
-			message,
-			why: 'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
-			...(span ? { primarySpan: span } : {}),
-			passId: 'native-view',
-			suggestions: [],
-			docsUrl: `https://markless.dev/errors/${NATIVE_UNSUPPORTED_CODE}`,
-		});
+		diagnostics.push(nativeUnsupported(message, span));
 		return null;
 	};
 	const done = (payload: NativeViewPayload | null): NativeViewArtifact => ({
