@@ -224,7 +224,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectElementRosterPositions(state);
 	collectElementRosterCounts(state);
 	collectElementHandleDiagnostics(graph, state.pendingElementHandleIdrefs);
-	collectAsyncBoundaryDiagnostics(graph);
+	collectAsyncBoundaryDiagnostics(graph, state.repeatCollectionSpans);
 	collectAsyncInputBesideValueDiagnostics(graph);
 	markControlWrittenInputs(graph, state.hostParents);
 	collectManagedAriaBusyDiagnostics(graph, state.authoredAriaBusy);

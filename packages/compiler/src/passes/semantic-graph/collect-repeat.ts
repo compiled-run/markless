@@ -241,6 +241,8 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 	}
 
 	const repeatIndex = state.graph.keyedRepeats.length;
+	const collectionSpan = collectionNode && sourceSpan(collectionNode, state.filename);
+	if (collectionSpan) state.repeatCollectionSpans.set(`repeat:${repeatIndex}`, collectionSpan);
 	state.graph.keyedRepeats.push({
 		id: `repeat:${repeatIndex}`,
 		// Projected repeats are retargeted after markup collection; top-level rows live in the container.

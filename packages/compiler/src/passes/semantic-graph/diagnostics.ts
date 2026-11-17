@@ -813,7 +813,7 @@ export function asyncPostAwaitDependentReadDiagnostic(
 }
 
 export function asyncBoundaryRequiredDiagnostic(
-	read: SemanticTemplateRead,
+	read: Pick<SemanticTemplateRead, 'source' | 'sourceSpan'>,
 	binding: SemanticGraphBinding,
 ): SemanticGraphDiagnostic {
 	const computedLabel = binding.async === true ? 'async computed' : 'async-capable computed';
