@@ -117,3 +117,30 @@ describe('native style input', () => {
 		expect(input.css).toContain(`.tap.${scope}`);
 	});
 });
+
+describe('imported components', () => {
+	it('builds a component imported from another file in place, its callback resolved to the caller', async () => {
+		const read = (specifier: string) => {
+			const filename = join(import.meta.dirname, 'fixtures', specifier);
+			return { filename, source: readFileSync(filename, 'utf8') };
+		};
+		const build = await compileNativeComponent({
+			filename: join(import.meta.dirname, 'fixtures', 'Basket.tsrx'),
+			source: fixture('Basket.tsrx'),
+			readModule: read,
+		});
+		expect(build.diagnostics).toEqual([]);
+		const runtime = createNativeRuntime(build.payload!);
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['Apples 0', 'Add one Apples']);
+		const button = build.payload!.events[0]!.host;
+		expect(runtime.dispatch({ event: 'activate', host: button })).toEqual([
+			{ op: 'text', node: 'component-edge:0/h1:text0', value: 'Apples 1' },
+		]);
+	});
+
+	it('refuses an imported component when the build cannot read its module', async () => {
+		const build = await compileNativeComponent({ filename: 'src/Basket.tsrx', source: fixture('Basket.tsrx') });
+		expect(build.payload).toBeNull();
+		expect(build.diagnostics.map((d) => d.message)).toContain('<Stepper>, a component from another module');
+	});
+});
