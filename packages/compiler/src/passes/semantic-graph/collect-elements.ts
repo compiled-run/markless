@@ -1352,6 +1352,11 @@ function collectAttribute(
 
 	if (attributeName === 'attach') {
 		if (expressionValue) {
+			const readsBefore = state.graph.stateReads.length;
+			collectExpressionReads(expressionValue, state);
+			const readSources = [
+				...new Set(state.graph.stateReads.slice(readsBefore).map((read) => read.source)),
+			];
 			for (const behavior of behaviorExpressions(expressionValue)) {
 				const parts = behaviorSourceParts(behavior, state);
 				const catchResets = parts.functionSpan ? catchResetUses(behavior, state) : [];
@@ -1362,9 +1367,9 @@ function collectAttribute(
 					...(state.currentKeyedRepeatScopeIds.length > 0
 						? { keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds] }
 						: {}),
+					...(readSources.length > 0 ? { readSources } : {}),
 				});
 			}
-			collectExpressionReads(expressionValue, state);
 			walk(expressionValue, state);
 		}
 		return;
