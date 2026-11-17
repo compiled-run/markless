@@ -111,7 +111,7 @@ test('the fact follows an aliased, a default and a namespace import of the idle 
 	expect(await pageWith(`import { Plain as Ticker } from './child.tsrx';`, '<Ticker />')).toBeUndefined();
 });
 
-// Open: a component handed over as a prop value renders through no edge, so its idle record is not seen.
+// Open until a component passed as a prop value can render: the build refuses the shape (MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED), and no edge carries its idle record.
 test.fails('the fact follows a component passed as a prop value', async () => {
 	const frame = await compile(
 		'/w/src/frame.tsrx',

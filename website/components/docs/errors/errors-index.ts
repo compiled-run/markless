@@ -1052,6 +1052,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a component part was served as a page markless_component_part_as_page a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+					title: 'A component passed as a prop is rendered as a tag',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'a component passed as a prop is rendered as a tag markless_component_prop_tag_unsupported a component passed as a prop is rendered as a tag: a markless build error.',
+				},
+				{
 					code: 'MARKLESS_COMPONENT_BARREL_UNRESOLVED',
 					title: 'A component re-export points nowhere',
 					chip: 'error',
