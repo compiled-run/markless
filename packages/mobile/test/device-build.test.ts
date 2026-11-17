@@ -115,10 +115,39 @@ export default function App() @{
 		]);
 	});
 
-	it('refuses a statement after an await', async () => {
-		expect(await refusal('async () => { await haptics.tap(); n++; }')).toEqual([
-			'the click handler has a statement after an `await`; a handler as data may await only in its last statement',
+	it("runs the statements after an await as the call's continuation, still data", async () => {
+		const result = await build(handler('async () => { await haptics.tap(); n++; }'));
+		expect(result.diagnostics).toEqual([]);
+		expect(result.payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'call',
+				call: 'haptics.tap',
+				arguments: [],
+				after: {
+					id: 'handler:event:0:after:0',
+					as: '$0',
+					ops: [
+						{
+							op: 'assign',
+							cell: 'state:n',
+							value: {
+								binary: '+',
+								left: { unary: '+', value: { cell: 'state:n' } },
+								right: { literal: 1 },
+							},
+						},
+					],
+				},
+			},
 		]);
+	});
+
+	it('refuses two awaits in one statement', async () => {
+		expect(
+			await refusal(
+				'async () => { n = (await location.current()).latitude + (await location.current()).longitude; }',
+			),
+		).toEqual(['the click handler awaits more than once in one statement']);
 	});
 
 	it('refuses an async value read outside @try', async () => {

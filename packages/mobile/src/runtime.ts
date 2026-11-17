@@ -3,6 +3,7 @@ import type {
 	NativeExpr,
 	NativeJournalEntry,
 	NativeNode,
+	NativeOp,
 	NativeTextPart,
 	NativeValue,
 	NativeViewPayload,
@@ -18,6 +19,8 @@ export type NativeAction =
 	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
 	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
 	| { readonly event: 'settle'; readonly cell: string; readonly value: Value }
+	/** A device call made from a handler answered: its continuation runs with the answer. */
+	| { readonly event: 'resume'; readonly continuation: string; readonly value: Value }
 	| {
 			readonly event: 'settle';
 			readonly cell: string;
@@ -220,6 +223,16 @@ export function createNativeRuntime(
 		),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
+	/** Every `after` of every call op, by id: what runs when a host resumes it. */
+	const continuations = new Map<string, NonNullable<Extract<NativeOp, { op: 'call' }>['after']>>();
+	const collectThen = (ops: ReadonlyArray<NativeOp>): void => {
+		for (const op of ops)
+			if (op.op === 'call' && op.after) {
+				continuations.set(op.after.id, op.after);
+				collectThen(op.after.ops);
+			}
+	};
+	for (const handler of payload.handlers) collectThen(handler.ops);
 	const branches = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'branch' ? [[node.id, node] as const] : [])),
 	);
@@ -347,6 +360,12 @@ export function createNativeRuntime(
 		arms,
 		rows,
 		dispatch(action) {
+			if (action.event === 'resume') {
+				const continuation = continuations.get(action.continuation);
+				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
+				const scope: NativeScope = { ...base, locals: new Map([...base.locals, [continuation.as, action.value]]) };
+				return change(undefined, undefined, () => run(continuation.ops, undefined, scope));
+			}
 			if (action.event === 'device' || action.event === 'settle') {
 				const cell = payload.cells.find((candidate) => candidate.id === action.cell);
 				if (action.event === 'device' ? !cell?.device : !cell?.task)
@@ -369,29 +388,7 @@ export function createNativeRuntime(
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
-			return change(action.host, eventValue, () => {
-				const calls: NativeJournalEntry[] = [];
-				for (const op of handlers.get(event.handler) ?? []) {
-					if (op.op === 'navigate')
-						return [{ op: 'navigate', route: op.route, params: op.params }];
-					if (op.op === 'call') {
-						calls.push({
-							op: 'call',
-							call: op.call,
-							arguments: op.arguments.map((argument) =>
-								evaluate(argument, eventValue),
-							),
-							...(op.result !== undefined ? { result: op.result } : {}),
-						});
-						continue;
-					}
-					const value = evaluate(op.value, eventValue);
-					values.set(op.cell, value);
-					const key = storageKeys.get(op.cell);
-					if (key !== undefined) store.set(key, value);
-				}
-				return calls;
-			});
+			return change(action.host, eventValue, () => run(handlers.get(event.handler) ?? [], eventValue, base));
 		},
 		tasks: () =>
 			payload.cells.flatMap((cell) =>
@@ -409,6 +406,30 @@ export function createNativeRuntime(
 					: [],
 			),
 	};
+
+	/** Runs ops in order: writes cells, collects the calls (a continuation's id rides on its call), stops at a navigation. */
+	function run(ops: ReadonlyArray<NativeOp>, eventValue: string | undefined, scope: NativeScope): NativeJournalEntry[] {
+		const calls: NativeJournalEntry[] = [];
+		for (const op of ops) {
+			if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
+			if (op.op === 'call') {
+				calls.push({
+					op: 'call',
+					call: op.call,
+					...(op.object !== undefined ? { object: op.object } : {}),
+					arguments: op.arguments.map((argument) => evaluate(argument, eventValue, scope)),
+					...(op.result !== undefined ? { result: op.result } : {}),
+					...(op.after ? { resume: op.after.id } : {}),
+				});
+				continue;
+			}
+			const value = evaluate(op.value, eventValue, scope);
+			values.set(op.cell, value);
+			const key = storageKeys.get(op.cell);
+			if (key !== undefined) store.set(key, value);
+		}
+		return calls;
+	}
 
 	/**
 	 * Runs `apply` (which writes cells and returns the calls it made, or a navigation that ends the page) and returns the

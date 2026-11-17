@@ -49,6 +49,18 @@ func reproducesConformanceVector(file: URL) throws {
 		if case let .object(stepFields) = step,
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
+			eventName == "resume",
+			case let .string(continuation)? = actionFields.first(where: { $0.0 == "continuation" })?.1,
+			let value = actionFields.first(where: { $0.0 == "value" })?.1,
+			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
+		{
+			let journal = try runtime.resume(continuation, value: NativeValue(json: value))
+			#expect(Array(JSONValue.array(journal.map(\.json)).jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) resume \(continuation)")
+			continue
+		}
+		if case let .object(stepFields) = step,
+			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
+			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			eventName == "device" || eventName == "settle",
 			case let .string(cell)? = actionFields.first(where: { $0.0 == "cell" })?.1,
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1

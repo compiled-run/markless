@@ -130,4 +130,22 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			},
 		],
 	},
+	{
+		name: 'camera',
+		fixture: 'test/fixtures/Camera.tsrx',
+		device: { usage: { camera: 'Takes the photo you ask for.' } },
+		actions: [
+			{ event: 'device', cell: 'device:camera.access', value: 'granted' },
+			{ event: 'device', cell: 'object:component-edge:1/cam:ready', value: true },
+			{ event: 'activate', host: 'component-edge:1/h5' },
+			{
+				event: 'resume',
+				continuation: 'handler:component-edge:1/event:2:after:0',
+				value: { url: 'file:///photo.png', width: 640, height: 480 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{ event: 'device', cell: 'object:component-edge:1/cam:facing', value: 'back' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
+		],
+	},
 ];

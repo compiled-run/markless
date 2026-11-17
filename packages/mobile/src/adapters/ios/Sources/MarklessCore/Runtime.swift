@@ -27,8 +27,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// Leave this page: the host builds the page at `route` from scratch with `params`.
 	case navigate(route: String, params: [NativeRouteParam])
-	/// Run a device call now; with `result`, settle that task cell with what it gives.
-	case call(call: String, arguments: [NativeValue], result: String?)
+	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
+	/// `resume`, answer with `resume(_:value:)` once the call settles.
+	case call(call: String, object: String?, arguments: [NativeValue], result: String?, resume: String?)
 
 	public var json: JSONValue {
 		switch self {
@@ -45,8 +46,11 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .navigate(route, params):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
-		case let .call(call, arguments, result):
-			return .object([("op", .string("call")), ("call", .string(call)), ("arguments", .array(arguments.map(\.json)))] + (result.map { [("result", JSONValue.string($0))] } ?? []))
+		case let .call(call, object, arguments, result, resume):
+			return .object(
+				[("op", .string("call")), ("call", .string(call))] + (object.map { [("object", JSONValue.string($0))] } ?? [])
+					+ [("arguments", .array(arguments.map(\.json)))] + (result.map { [("result", JSONValue.string($0))] } ?? [])
+					+ (resume.map { [("resume", JSONValue.string($0))] } ?? []))
 		}
 	}
 }
@@ -89,6 +93,7 @@ public final class NativeRuntime {
 	private let store: NativeStore
 	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
+	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
 	private var eventValue: String?
@@ -103,6 +108,15 @@ public final class NativeRuntime {
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
+		var continuations: [String: NativeContinuation] = [:]
+		func collect(_ ops: [NativeOp]) {
+			for case let .call(_, _, _, _, then?) in ops {
+				continuations[then.id] = then
+				collect(then.ops)
+			}
+		}
+		for handler in payload.handlers { collect(handler.ops) }
+		self.continuations = continuations
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 	}
 
@@ -289,21 +303,32 @@ public final class NativeRuntime {
 		}
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
-		return try change(host: action.host) {
-			var calls: [NativeJournalEntry] = []
-			for op in self.handlers[bound.handler] ?? [] {
-				switch op {
-				case let .navigate(route, params): return [.navigate(route: route, params: params)]
-				case let .assign(cell, expr):
-					let value = try self.evaluate(expr)
-					self.values[cell] = value
-					if let key = self.storageKeys[cell] { self.store.write(key, value) }
-				case let .call(call, arguments, result):
-					calls.append(.call(call: call, arguments: try arguments.map { try self.evaluate($0) }, result: result))
-				}
+		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: .empty) }
+	}
+
+	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
+	public func resume(_ continuation: String, value: NativeValue) throws -> [NativeJournalEntry] {
+		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
+		var scope = NativeScope.empty
+		scope.locals[then.as] = value
+		return try change(host: nil) { try self.run(then.ops, in: scope) }
+	}
+
+	/// Runs ops in order: writes cells and collects the calls (a continuation's id rides on its call); stops at a navigation.
+	private func run(_ ops: [NativeOp], in scope: NativeScope) throws -> [NativeJournalEntry] {
+		var calls: [NativeJournalEntry] = []
+		for op in ops {
+			switch op {
+			case let .navigate(route, params): return [.navigate(route: route, params: params)]
+			case let .assign(cell, expr):
+				let value = try evaluate(expr, in: scope)
+				values[cell] = value
+				if let key = storageKeys[cell] { store.write(key, value) }
+			case let .call(call, object, arguments, result, then):
+				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
 			}
-			return calls
 		}
+		return calls
 	}
 
 	/// A live device value changed: writes its device cell and returns the journal.
@@ -331,7 +356,7 @@ public final class NativeRuntime {
 	public func tasks() throws -> [NativeJournalEntry] {
 		try payload.cells.compactMap { cell in
 			guard let task = cell.task else { return nil }
-			return .call(call: task.call, arguments: try task.arguments.map { try evaluate($0) }, result: cell.id)
+			return .call(call: task.call, object: nil, arguments: try task.arguments.map { try evaluate($0) }, result: cell.id, resume: nil)
 		}
 	}
 

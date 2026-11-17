@@ -996,6 +996,9 @@ importers:
       '@markless/core':
         specifier: workspace:*
         version: link:../../core
+      '@markless/device':
+        specifier: workspace:*
+        version: link:../../device
       '@markless/icons':
         specifier: workspace:*
         version: link:../icons

@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/w4/${name}.tsrx`, import.meta.url), 'utf8');
 
-const web = (source: string, deviceWebAnswers: 'build-error' | 'reject' = 'build-error') =>
+const web = (
+	source: string,
+	deviceWebAnswers: 'build-error' | 'platform-only' | 'reject' = 'build-error',
+) =>
 	compileTsrxModule({
 		filename: 'src/App.tsrx',
 		source,
@@ -70,4 +73,51 @@ describe('candidate b: the web module rejects, and the build says nothing', () =
 			);
 		},
 	);
+});
+
+describe('candidate c: only a platform check rules a use out on the web', () => {
+	it.each(['location-c', 'photo-c'])(
+		'%s, behind a platform check, builds with no device code',
+		async (name) => {
+			const compiled = await web(fixture(name), 'platform-only');
+			expect(codes(compiled)).toEqual([]);
+			expect(clientCode(compiled)).not.toContain('@markless/device');
+		},
+	);
+
+	it.each(['location-a', 'photo-a'])(
+		'%s, behind a supported check, is refused naming a platform check',
+		async (name) => {
+			const compiled = await web(fixture(name), 'platform-only');
+			expect(codes(compiled)).toContain('MARKLESS_DEVICE_WEB_ABSENT');
+			expect(compiled.semanticGraph.diagnostics[0]!.message).toContain(
+				'put it inside a `platform` check',
+			);
+		},
+	);
+});
+
+describe('W2: a device element renders nothing on the web', () => {
+	const part = readFileSync(
+		new URL('../../headless/components/src/base/camera.tsrx', import.meta.url),
+		'utf8',
+	);
+
+	it('base.camera compiles to no markup on a web build, and keeps it for a phone', async () => {
+		const onWeb = await web(part);
+		expect(codes(onWeb)).toEqual([]);
+		expect(
+			onWeb.semanticGraph.markup.chunks.flatMap((chunk) => chunk.statics).join(''),
+		).not.toContain('ui-camera');
+		const onPhone = await compileTsrxModule({
+			filename: 'src/camera.tsrx',
+			source: part,
+			symbols: [],
+			target: 'ios',
+			deviceTargetFacts: DEVICE_TARGET_FACTS,
+		});
+		expect(
+			onPhone.semanticGraph.markup.chunks.flatMap((chunk) => chunk.statics).join(''),
+		).toContain('ui-camera');
+	});
 });

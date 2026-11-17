@@ -20,23 +20,29 @@ import java.io.FileNotFoundException
  * The proof build's device: the phone's own, except that it lists every call it receives in the view
  * `markless-device-calls`, and that a `markless-proof://device/<value>?value=<json>` link sets a live value.
  */
-class ProofDevice(private val platform: NativeDevice, private val label: TextView) : NativeDevice {
+class ProofDevice(private val platform: NativeDevice, private val label: TextView, private val cameraLabel: TextView) : NativeDevice {
 	private val calls = ArrayList<String>()
 	private val faked = HashMap<String, JsValue>()
 	private val watchers = HashMap<String, MutableList<(JsValue) -> Unit>>()
 
-	override fun read(name: String): JsValue = faked[name] ?: platform.read(name)
+	override fun read(name: String, obj: String?): JsValue = faked[name] ?: platform.read(name, obj)
 
-	override fun watch(name: String, changed: (JsValue) -> Unit) {
+	override fun watch(name: String, obj: String?, changed: (JsValue) -> Unit) {
 		watchers.getOrPut(name) { ArrayList() }.add(changed)
-		platform.watch(name) { if (name !in faked) changed(it) }
+		platform.watch(name, obj) {
+			// The emulator's camera is real: the label only reports whether its session runs.
+			if (name == "camera.ready") cameraLabel.text = if (it == JsValue.Bool(true)) "camera on" else "camera off"
+			if (name !in faked) changed(it)
+		}
 	}
 
-	override fun call(name: String, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
+	override fun call(name: String, obj: String?, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
 		calls.add(name)
 		label.text = "calls: " + calls.joinToString(", ")
-		platform.call(name, arguments, settle)
+		platform.call(name, obj, arguments, settle)
 	}
+
+	override fun view(obj: String, device: String): android.view.View = platform.view(obj, device)
 
 	override fun permissionsAnswered(requestCode: Int) = platform.permissionsAnswered(requestCode)
 
@@ -47,21 +53,22 @@ class ProofDevice(private val platform: NativeDevice, private val label: TextVie
 }
 
 class ShellActivity : MarklessActivity() {
-	private val label by lazy {
-		TextView(this).apply {
-			text = "calls: none"
-			textSize = 12f
-			setTextColor(Color.GRAY)
-			accessibilityDelegate = object : View.AccessibilityDelegate() {
-				override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
-					super.onInitializeAccessibilityNodeInfo(host, info)
-					info.viewIdResourceName = "markless-device-calls"
-				}
+	private fun testLabel(id: String, initial: String) = TextView(this).apply {
+		text = initial
+		textSize = 12f
+		setTextColor(Color.GRAY)
+		accessibilityDelegate = object : View.AccessibilityDelegate() {
+			override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
+				super.onInitializeAccessibilityNodeInfo(host, info)
+				info.viewIdResourceName = id
 			}
 		}
 	}
 
-	override val device: ProofDevice by lazy { ProofDevice(PlatformDevice(this), label) }
+	private val label by lazy { testLabel("markless-device-calls", "calls: none") }
+	private val cameraLabel by lazy { testLabel("markless-camera", "camera off") }
+
+	override val device: ProofDevice by lazy { ProofDevice(PlatformDevice(this), label, cameraLabel) }
 
 	override fun payloadBytes(): ByteArray = assets.open("markless/payload.json").use { it.readBytes() }
 
@@ -77,6 +84,9 @@ class ShellActivity : MarklessActivity() {
 		val bottom = (32 * resources.displayMetrics.density).toInt()
 		addContentView(label, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
 			setMargins(bottom / 2, 0, 0, bottom)
+		})
+		addContentView(cameraLabel, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM or Gravity.START).apply {
+			setMargins(bottom / 2, 0, 0, bottom * 2)
 		})
 		open(intent)
 	}

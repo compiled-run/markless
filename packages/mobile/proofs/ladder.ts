@@ -22,7 +22,7 @@ export const deviceLink = (name: string, value: unknown): string =>
 
 /** The prompt button each answer taps, as Maestro text patterns matching iOS's and Android's own wording. */
 export const PERMISSION_BUTTONS = {
-	allow: 'Allow While Using App|While using the app',
+	allow: 'Allow While Using App|While using the app|Allow',
 	deny: 'Don.t Allow|Don.t allow',
 } as const;
 
@@ -49,7 +49,9 @@ export type LadderStep = {
 	 * the prompt's window, so on phones the step asserts the prompt and its screenshot shows the rest; the web and the
 	 * reference runtime check every expectation.
 	 */
-	readonly prompt?: 'location';
+	readonly prompt?: 'location' | 'camera';
+	/** Phones only: whether the page's camera session runs, from the test build's label `CAMERA_STATE_ID`. */
+	readonly camera?: 'on' | 'off';
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
 };
@@ -57,10 +59,13 @@ export type LadderStep = {
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
 export const PERMISSION_PROMPTS = {
 	location: 'Allow .?Proof.? to (use your|access this device.s) location\\?',
+	camera: 'Allow .?Proof.? to (access your camera|take pictures and record video)\\?',
 } as const;
 
 /** The test-build label where a phone shell lists the device calls it received; its text is `callsText(calls)`. */
 export const DEVICE_CALLS_ID = 'markless-device-calls';
+/** The test-build label where a phone shell shows whether a camera session runs: `camera on` or `camera off`. */
+export const CAMERA_STATE_ID = 'markless-camera';
 export const callsText = (calls: readonly string[]): string =>
 	`calls: ${calls.length === 0 ? 'none' : calls.join(', ')}`;
 
@@ -75,7 +80,7 @@ export type LadderRung = {
 	/** Where the device says it is, set before launch (Maestro `setLocation`; the web test's geolocation). */
 	readonly location?: { readonly latitude: number; readonly longitude: number };
 	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
-	readonly permissions?: Readonly<Record<'location', 'allow' | 'deny' | 'unset'>>;
+	readonly permissions?: Readonly<Partial<Record<'location' | 'camera', 'allow' | 'deny' | 'unset'>>>;
 	/**
 	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
 	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
@@ -120,6 +125,7 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(order && { order }),
 		...(Object.keys(fields).length > 0 && { fields }),
 		...(calls && { calls }),
+		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 	};
 }
 
@@ -128,7 +134,8 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.absent?.length ?? 0) +
 	(witness.order ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length +
-	(witness.calls ? 1 : 0);
+	(witness.calls ? 1 : 0) +
+	(witness.camera ? 1 : 0);
 
 const assertions = (step: LadderStep): unknown[] =>
 	step.prompt
@@ -165,6 +172,7 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.calls
 		? [{ assertVisible: { id: DEVICE_CALLS_ID, text: selector(callsText(step.calls)) } }]
 		: []),
+	...(step.camera ? [{ assertVisible: { id: CAMERA_STATE_ID, text: `camera ${step.camera}` } }] : []),
 ];
 
 const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {

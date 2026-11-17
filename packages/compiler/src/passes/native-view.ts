@@ -13,7 +13,9 @@ import type {
 import { NATIVE_VIEW_VERSION } from '@markless/serializer/native-view';
 import {
 	DEVICE_CALLS,
+	DEVICE_ELEMENTS,
 	DEVICE_MODULE,
+	DEVICE_OBJECTS,
 	DEVICE_VALUES,
 	type NativeDeviceCall,
 	type NativeDeviceFeature,
@@ -69,6 +71,7 @@ const PORTABLE_ELEMENTS = new Set([
 	'button',
 	'input',
 	'a',
+	'img',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
@@ -148,6 +151,8 @@ type Scope = {
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
+	/** This instance's device objects by local name (`cam`), each with its payload id. */
+	readonly objects: ReadonlyMap<string, { readonly id: string; readonly device: 'camera' }>;
 	/** Inside a `@try` arm: the boundary, whose task cells its reads collect, and the name `@catch` binds its error to. */
 	readonly boundary?: {
 		readonly tasks: Set<string>;
@@ -321,6 +326,7 @@ export function createNativeViewPayload(
 		props: new Map<string, Prop>(
 			options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
 		),
+		objects: new Map(),
 	};
 	const importedModuleFacts = new Map<string, ModuleFacts>();
 	const importedFacts = (specifier: string, imported: SemanticGraphArtifact): ModuleFacts => {
@@ -398,6 +404,29 @@ export function createNativeViewPayload(
 		scope.boundary.tasks.add(id);
 		return { member: { cell: id }, property: 'value' };
 	};
+	const objects: NonNullable<NativeViewPayload['objects']>[number][] = [];
+	/** A component instance's device objects (`const cam = camera()`), each one per instance. */
+	const instanceObjects = (module: ModuleFacts, component: string, prefix: string) =>
+		new Map(
+			(module.graph.deviceObjects ?? []).flatMap((fact) => {
+				if (fact.componentName !== component || !Object.hasOwn(DEVICE_OBJECTS, fact.device)) return [];
+				const object = { id: `object:${prefix}${fact.name}`, device: fact.device as 'camera' };
+				if (!objects.some((known) => known.id === object.id)) objects.push(object);
+				features.add(DEVICE_OBJECTS[object.device].feature);
+				return [[fact.name, object] as const];
+			}),
+		);
+	/** A device object's field (`cam.ready`) as its device cell. */
+	const objectFieldCell = (local: string, object: { id: string; device: 'camera' }, field: string, what: string): string | null => {
+		const name = `${object.device}.${field}`;
+		if (!isDeviceValue(name) || !('object' in DEVICE_VALUES[name]))
+			return refuse(`${what} reads \`${local}.${field}\`, which a ${object.device} has no native field for yet`);
+		const id = `${object.id}:${field}`;
+		if (!cells.some((cell) => cell.id === id))
+			cells.push({ id, name: `${local}.${field}`, initial: DEVICE_VALUES[name].initial, device: name, object: object.id });
+		return id;
+	};
+	(TOP as { objects: Scope['objects'] }).objects = instanceObjects(rootModule, root.componentName, '');
 	const isDeviceValue = (name: string): name is NativeDeviceValue =>
 		Object.hasOwn(DEVICE_VALUES, name);
 	const isDeviceCall = (name: string): name is NativeDeviceCall =>
@@ -416,6 +445,8 @@ export function createNativeViewPayload(
 		switch (expression.kind) {
 			case 'read': {
 				if (scope.locals.has(expression.name)) return { local: expression.name };
+				if (scope.objects.has(expression.name))
+					return refuse(`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`);
 				if (
 					scope.boundary?.arm === 'catch' &&
 					expression.name === scope.boundary.errorName
@@ -498,6 +529,10 @@ export function createNativeViewPayload(
 					holder.object.name === scope.event
 				)
 					return { event: 'value' };
+				if (holder.kind === 'read' && !scope.locals.has(holder.name) && scope.objects.has(holder.name)) {
+					const cell = objectFieldCell(holder.name, scope.objects.get(holder.name)!, expression.property, what);
+					return cell === null ? null : { cell };
+				}
 				if (holder.kind === 'read') {
 					const device = deviceName([holder.name, expression.property], scope);
 					if (
@@ -796,7 +831,7 @@ export function createNativeViewPayload(
 					}
 					const handler = `handler:${scope.prefix}${event.id}`;
 					events.push({ host: id, event: semantic, handler });
-					handlers.push({ id: handler, ops: handlerOps(event, scope) });
+					handlers.push({ id: handler, ops: handlerOps(event, scope, handler) });
 				}
 				continue;
 			}
@@ -826,6 +861,24 @@ export function createNativeViewPayload(
 					: scope.module.chunks.get(item.template);
 				if (!edge) {
 					refuse(`the component call ${item.edge}`);
+					continue;
+				}
+				const deviceElement = DEVICE_ELEMENTS.find(
+					(candidate) =>
+						edge.importSource === candidate.module &&
+						edge.importedName === candidate.export &&
+						edge.importedMemberPath?.length === 1 &&
+						edge.importedMemberPath[0] === candidate.member,
+				);
+				if (deviceElement) {
+					const el = edge.props.find((prop) => prop.name === 'el');
+					const named = el && 'nativeExpression' in el ? el.nativeExpression : undefined;
+					const object = named?.kind === 'read' ? scope.objects.get(named.name) : undefined;
+					if (!object || object.device !== deviceElement.device || edge.props.some((prop) => prop.name !== 'el')) {
+						refuse(`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`);
+						continue;
+					}
+					nodes.push({ kind: 'element', id: scope.prefix + edge.id, element: deviceElement.element, object: object.id, parent, ...place });
 					continue;
 				}
 				if (isRouterLink(scope, edge.childComponentName)) {
@@ -889,6 +942,7 @@ export function createNativeViewPayload(
 					locals: new Set(),
 					items: new Map(),
 					props,
+					objects: instanceObjects(childModule, childComponent, childPrefix),
 				});
 				continue;
 			}
@@ -1022,7 +1076,7 @@ export function createNativeViewPayload(
 		}
 		close();
 	};
-	function handlerOps(event: SemanticEvent, scope: Scope): NativeOp[] {
+	function handlerOps(event: SemanticEvent, scope: Scope, handlerId: string): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
 		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {
@@ -1039,7 +1093,64 @@ export function createNativeViewPayload(
 			what,
 			event.handlerSpan,
 			0,
+			{ base: handlerId, next: 0 },
 		);
+	}
+
+	/** The one device call a statement awaits, and the statement's value with that await replaced by `as`. */
+	function splitAwait(
+		expression: SemanticExpression,
+		as: string,
+	): { readonly call: Extract<SemanticExpression, { kind: 'call' }> | null; readonly rest: SemanticExpression; readonly count: number } {
+		let call: Extract<SemanticExpression, { kind: 'call' }> | null = null;
+		let count = 0;
+		const walk = (node: SemanticExpression): SemanticExpression => {
+			if (node.kind === 'await') {
+				count++;
+				if (node.value.kind === 'call') call = node.value;
+				return { kind: 'read', name: as };
+			}
+			const copy: Record<string, unknown> = {};
+			for (const [key, value] of Object.entries(node))
+				copy[key] = Array.isArray(value)
+					? value.map((item) =>
+							Array.isArray(item)
+								? item.map((inner) => (inner && typeof inner === 'object' && 'kind' in inner ? walk(inner as SemanticExpression) : inner))
+								: item && typeof item === 'object' && 'kind' in item
+									? walk(item as SemanticExpression)
+									: item && typeof item === 'object' && 'value' in item && typeof (item as { value: unknown }).value === 'object'
+										? { ...item, value: walk((item as { value: SemanticExpression }).value) }
+										: item,
+						)
+					: value && typeof value === 'object' && 'kind' in value
+						? walk(value as SemanticExpression)
+						: value;
+			return copy as SemanticExpression;
+		};
+		const rest = walk(expression);
+		return { call, rest, count };
+	}
+
+	/** A device call by its callee: an import's (`haptics.tap`) or a device object's (`cam.takePhoto`). */
+	function deviceCallOf(
+		value: Extract<SemanticExpression, { kind: 'call' }>,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+	): { readonly call: NativeDeviceCall; readonly object?: string } | null {
+		const [local, method, ...more] = value.calleePath;
+		const object = local !== undefined && !scope.locals.has(local) ? scope.objects.get(local) : undefined;
+		const device = object && method !== undefined && more.length === 0 ? `${object.device}.${method}` : deviceName(value.calleePath, scope);
+		if (device === undefined) {
+			refuse(`${what} uses a call to \`${value.callee}\`, which needs a script engine`, span);
+			return null;
+		}
+		if (!isDeviceCall(device) || ('object' in DEVICE_CALLS[device]) !== (object !== undefined)) {
+			refuse(`${what} calls \`${device}\`, which ${DEVICE_MODULE} has no native call for yet`, span);
+			return null;
+		}
+		features.add(DEVICE_CALLS[device].feature);
+		return { call: device, ...(object ? { object: object.id } : {}) };
 	}
 
 	function statementOps(
@@ -1048,43 +1159,82 @@ export function createNativeViewPayload(
 		what: string,
 		span: SourceSpan | undefined,
 		depth: number,
+		continuations: { readonly base: string; next: number },
 	): NativeOp[] {
-		let awaited = false;
-		return statements.flatMap((statement): NativeOp[] => {
-			if (awaited) {
-				refuse(
-					`${what} has a statement after an \`await\`; a handler as data may await only in its last statement`,
-					span,
-				);
-				return [];
+		const ops: NativeOp[] = [];
+		for (const [index, statement] of statements.entries()) {
+			// A statement that awaits a device call: the call, then the rest of the handler as its continuation.
+			const awaited =
+				statement.kind === 'effect' && statement.value.kind === 'await'
+					? splitAwait(statement.value, '')
+					: statement.kind === 'assign' || statement.kind === 'assign-field'
+						? splitAwait(statement.value, `$${continuations.next}`)
+						: null;
+			if (awaited && awaited.count > 0) {
+				if (awaited.count > 1 || !awaited.call) {
+					refuse(`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : 'something other than a call'}`, span);
+					return ops;
+				}
+				const target = deviceCallOf(awaited.call, scope, what, span);
+				if (!target) return ops;
+				const as = `$${continuations.next}`;
+				const id = `${continuations.base}:after:${continuations.next++}`;
+				const inner: Scope = { ...scope, locals: new Set([...scope.locals, as]) };
+				const remaining: SemanticHandlerStatement[] = [
+					...(statement.kind === 'effect' ? [] : [{ ...statement, value: awaited.rest } as SemanticHandlerStatement]),
+					...statements.slice(index + 1),
+				];
+				const args = awaited.call.arguments.map((argument) => exprOf(argument, what, scope));
+				if (!args.every((argument) => argument !== null)) return ops;
+				ops.push({
+					op: 'call',
+					...target,
+					arguments: args as NativeExpr[],
+					after: { id, as, ops: statementOps(remaining, inner, what, span, depth, continuations) },
+				});
+				return ops;
 			}
+			ops.push(...statementOp(statement, scope, what, span, depth, continuations));
+		}
+		return ops;
+	}
+
+	function statementOp(
+		statement: SemanticHandlerStatement,
+		scope: Scope,
+		what: string,
+		span: SourceSpan | undefined,
+		depth: number,
+		continuations: { readonly base: string; next: number },
+	): NativeOp[] {
+		{
 			if (statement.kind === 'effect') {
-				const value =
-					statement.value.kind === 'await' ? statement.value.value : statement.value;
-				awaited = statement.value.kind === 'await';
-				if (value.kind !== 'call') {
-					refuse(`${what} awaits something other than a call`, span);
+				if (statement.value.kind !== 'call') {
+					refuse(`${what} uses ${statement.value.kind === 'await' ? 'an `await` of something other than a call' : 'an expression statement'}, which needs a script engine`, span);
 					return [];
 				}
-				const device = deviceName(value.calleePath, scope);
-				if (device === undefined) {
-					refuse(
-						`${what} uses a call to \`${value.callee}\`, which needs a script engine`,
-						span,
-					);
-					return [];
-				}
-				if (!isDeviceCall(device)) {
-					refuse(
-						`${what} calls \`${device}\`, which ${DEVICE_MODULE} has no native call for yet`,
-						span,
-					);
-					return [];
-				}
-				features.add(DEVICE_CALLS[device].feature);
+				const value = statement.value;
+				const target = deviceCallOf(value, scope, what, span);
+				if (!target) return [];
 				const args = value.arguments.map((argument) => exprOf(argument, what, scope));
 				return args.every((argument) => argument !== null)
-					? [{ op: 'call', call: device, arguments: args as NativeExpr[] }]
+					? [{ op: 'call', ...target, arguments: args as NativeExpr[] }]
+					: [];
+			}
+			if (statement.kind === 'assign-field') {
+				const object = !scope.locals.has(statement.target) ? scope.objects.get(statement.target) : undefined;
+				const field = `${object?.device}.${statement.field}`;
+				if (!object || !isDeviceValue(field) || !('writable' in DEVICE_VALUES[field])) {
+					refuse(`${what} writes \`${statement.target}.${statement.field}\`, which is not a setting of a device object`, span);
+					return [];
+				}
+				const cell = objectFieldCell(statement.target, object, statement.field, what);
+				const value = exprOf(statement.value, what, scope);
+				return cell && value
+					? [
+							{ op: 'assign', cell, value },
+							{ op: 'call', call: field as NativeDeviceCall, object: object.id, arguments: [{ cell }] },
+						]
 					: [];
 			}
 			if (statement.kind === 'unsupported') {
@@ -1097,7 +1247,7 @@ export function createNativeViewPayload(
 					refuse(`${what} uses a call to \`${statement.name}\`, which needs a script engine`, span);
 					return [];
 				}
-				return statementOps(prop.statements, prop.scope, what, span, depth + 1);
+				return statementOps(prop.statements, prop.scope, what, span, depth + 1, continuations);
 			}
 			const cell = cellOf(statement.target, scope);
 			if (!cell) {
@@ -1106,7 +1256,7 @@ export function createNativeViewPayload(
 			}
 			const value = exprOf(statement.value, what, scope);
 			return value ? [{ op: 'assign', cell, value }] : [];
-		});
+		}
 	}
 
 	lowerChunk(rootChunk, null, {}, TOP);
@@ -1142,5 +1292,6 @@ export function createNativeViewPayload(
 		nodes,
 		events,
 		handlers,
+		...(objects.length > 0 ? { objects } : {}),
 	});
 }

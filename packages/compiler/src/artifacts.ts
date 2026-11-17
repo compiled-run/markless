@@ -59,7 +59,7 @@ export type SemanticGraphInput = {
 	 * On the web, what a device use that needs an answer does: `build-error` refuses it unless a `supported` check the
 	 * build can see rules it out (candidate a); `reject` leaves it to the web module, which rejects (candidate b).
 	 */
-	readonly deviceWebAnswers?: 'build-error' | 'reject';
+	readonly deviceWebAnswers?: 'build-error' | 'platform-only' | 'reject';
 	/**
 	 * Folds `@markless/device` and `platform` to the target's constants and makes features absent on the web. Passed by
 	 * Node builds (the bundler, native builds); the browser's in-page compiler leaves it out and folds nothing.
@@ -75,8 +75,20 @@ export type DeviceTargetFacts = {
 	readonly collectWebDeviceAbsence: (
 		ast: never,
 		state: never,
-		answers: 'build-error' | 'reject',
+		answers: 'build-error' | 'platform-only' | 'reject',
 	) => ReadonlyArray<{ readonly start: number; readonly end: number; readonly text: string }>;
+	readonly deviceObjectOf: (init: never, state: never) => string | null;
+	readonly collectDeviceObjects: (statements: never, state: never) => ReadonlyArray<SemanticDeviceObject>;
+};
+
+/** A device object a component makes (`const cam = camera()`): owned by that component instance. */
+export type SemanticDeviceObject = {
+	readonly name: string;
+	readonly componentName: string;
+	/** The `@markless/device` export that made it: `camera`. */
+	readonly device: string;
+	/** Where its name is declared, so a read of it resolves to this object. */
+	readonly bindingStart: number;
 };
 
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
@@ -192,6 +204,8 @@ export type SemanticComponentPropBinding =
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			/** An opaque prop's value as a tree, for native builds only (`nativeFacts`). */
+			readonly nativeExpression?: SemanticExpression;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
 			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
@@ -272,6 +286,8 @@ export type SemanticComponentEdge = SemanticAsyncArmPlacement & {
 	readonly importSource?: string;
 	readonly importKind?: SemanticModuleImport['kind'];
 	readonly importedName?: string;
+	/** A member tag's path past its import: `['camera']` for `<base.camera>`. */
+	readonly importedMemberPath?: ReadonlyArray<string>;
 	readonly sourceSpan?: SourceSpan;
 	readonly props: ReadonlyArray<SemanticComponentPropBinding>;
 	readonly children: {
@@ -1265,6 +1281,8 @@ export type SemanticHandlerStatement =
 	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
 	/** `name()`: calls a function the component received, such as a callback prop. */
 	| { readonly kind: 'invoke'; readonly name: string }
+	/** `name.field = value`: a write to a field of an object the component holds (`cam.facing = 'front'`). */
+	| { readonly kind: 'assign-field'; readonly target: string; readonly field: string; readonly value: SemanticExpression }
 	/** Any other call or awaited call whose value is not kept (`haptics.tap()`, `await save()`). */
 	| { readonly kind: 'effect'; readonly value: SemanticExpression }
 	| { readonly kind: 'unsupported'; readonly construct: string };
@@ -1681,6 +1699,8 @@ export type SemanticGraphArtifact = {
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
 	/** Web builds only: device calls removed from handler code and target constants written in place, by source span. */
+	/** The device objects components make; collected when the build passes `deviceTargetFacts`. */
+	readonly deviceObjects?: ReadonlyArray<SemanticDeviceObject>;
 	readonly webDeviceEdits?: ReadonlyArray<{
 		readonly start: number;
 		readonly end: number;

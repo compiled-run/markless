@@ -4,7 +4,7 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
+	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -25,6 +25,8 @@ final class ViewTree {
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
 	private let onAction: (NativeAction) -> Void
+	/// The view of a device object (a camera's preview), made by the page's device.
+	private let objectView: (_ object: String, _ device: String) throws -> UIView
 	private let nodes: [String: NativeNode]
 	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
@@ -41,9 +43,11 @@ final class ViewTree {
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
-		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
+		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
+		objectView: @escaping (_ object: String, _ device: String) throws -> UIView = { object, _ in throw HostError("no device to show \(object)") }
 	) throws {
 		self.runtime = runtime
+		self.objectView = objectView
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
@@ -198,6 +202,25 @@ final class ViewTree {
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
+				} else if element == "camera" {
+					guard let object = nodes[template]?.object, let device = runtime.payload.objects.first(where: { $0.id == object })?.device else {
+						throw HostError("<camera> \(id) shows no device object")
+					}
+					view = try objectView(object, device)
+					if layout == nil {
+						view.widthAnchor.constraint(equalToConstant: 240).isActive = true
+						view.heightAnchor.constraint(equalToConstant: 180).isActive = true
+					}
+				} else if element == "img" {
+					let image = UIImageView()
+					image.contentMode = .scaleAspectFit
+					image.isAccessibilityElement = true
+					image.accessibilityTraits = .image
+					if layout == nil {
+						image.widthAnchor.constraint(equalToConstant: 120).isActive = true
+						image.heightAnchor.constraint(equalToConstant: 90).isActive = true
+					}
+					view = image
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
@@ -320,6 +343,9 @@ final class ViewTree {
 			button.isEnabled = current["disabled"] == nil
 			if button.isEnabled { button.accessibilityTraits.remove(.notEnabled) } else { button.accessibilityTraits.insert(.notEnabled) }
 			refreshLabel(of: button)
+		} else if let image = view as? UIImageView {
+			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
+			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}

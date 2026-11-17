@@ -92,10 +92,10 @@ class MarklessHost(
 		val top = payload.nodes.firstOrNull() as? Node.Element ?: throw MarklessHostError("payload does not start with its root element")
 		if (top.parent != null || top.arm != null) throw MarklessHostError("the root element has a parent or sits in an arm")
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
-		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it)) }
+		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it, cell.obj)) }
 		buildShown()
 		root = views.getValue(top.id)
-		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name) { if (!released) apply(runtime.device(cell.id, it)) } }
+		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
 	}
 
@@ -106,14 +106,19 @@ class MarklessHost(
 
 	private fun runCall(call: JournalEntry.Call) {
 		val cell = call.result
-		needDevice().call(call.node, call.arguments, cell?.let {
-			{ outcome: DeviceOutcome ->
+		val continuation = call.resume
+		val settle: ((DeviceOutcome) -> Unit)? = when {
+			cell != null -> { outcome ->
 				if (!released) apply(when (outcome) {
-					is DeviceOutcome.Value -> runtime.settle(it, outcome.value)
-					is DeviceOutcome.Error -> runtime.settleError(it, outcome.name, outcome.message)
+					is DeviceOutcome.Value -> runtime.settle(cell, outcome.value)
+					is DeviceOutcome.Error -> runtime.settleError(cell, outcome.name, outcome.message)
 				})
 			}
-		})
+			// An awaited call from a handler: the rest of the handler runs with the answer; a refusal ends it.
+			continuation != null -> { outcome -> if (!released && outcome is DeviceOutcome.Value) apply(runtime.resume(continuation, outcome.value)) }
+			else -> null
+		}
+		needDevice().call(call.node, call.obj, call.arguments, settle)
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -260,6 +265,12 @@ class MarklessHost(
 				gravity = Gravity.TOP or Gravity.START
 				named(this, inst.id)
 			}
+			"camera" -> {
+				val obj = node.obj ?: throw MarklessHostError("<camera> \"${node.id}\" shows no device object")
+				val device = payload.objects.firstOrNull { it.id == obj }?.device ?: throw MarklessHostError("<camera> \"${node.id}\" names unknown object \"$obj\"")
+				needDevice().view(obj, device).also { named(it, inst.id) }
+			}
+			"img" -> SizedImage(context).also { named(it, inst.id) }
 			"input" -> EditText(context).apply {
 				isSingleLine = true
 				includeFontPadding = false
@@ -309,6 +320,8 @@ class MarklessHost(
 		val view = view(id)
 		when (name) {
 			"aria-label" -> view.contentDescription = value
+			"alt" -> if (view is SizedImage) view.contentDescription = value
+			"src" -> (view as? SizedImage)?.show(value)
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }

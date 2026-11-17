@@ -26,7 +26,7 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 			if (fields[key] !== undefined && !isStringList(fields[key]))
 				fail(`step ${index} "${key}" is not a text list`);
 		}
-		if (fields.prompt !== undefined && fields.prompt !== 'location')
+		if (fields.prompt !== undefined && fields.prompt !== 'location' && fields.prompt !== 'camera')
 			fail(`step ${index} "prompt" names no known permission`);
 		if (index === 0 && fields.do !== undefined) fail('step 0 is the launch and takes no "do"');
 		if (index > 0 && (typeof fields.do !== 'object' || fields.do === null))

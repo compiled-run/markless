@@ -33,8 +33,20 @@ export const DEVICE_FEATURES: {
 export const DEVICE_VALUES = {
 	'network.online': { feature: 'network', initial: true },
 	'location.access': { feature: 'location', initial: 'unknown' },
+	'camera.access': { feature: 'camera', initial: 'unknown' },
+	/** Fields of a camera object (`cam.ready`); `facing` is a setting a handler may write. */
+	'camera.ready': { feature: 'camera', initial: false, object: true },
+	'camera.facing': { feature: 'camera', initial: 'back', object: true, writable: true },
 } as const satisfies Readonly<
-	Record<string, { readonly feature: NativeDeviceFeature; readonly initial: boolean | string }>
+	Record<
+		string,
+		{
+			readonly feature: NativeDeviceFeature;
+			readonly initial: boolean | string;
+			readonly object?: true;
+			readonly writable?: true;
+		}
+	>
 >;
 
 export type NativeDeviceValue = keyof typeof DEVICE_VALUES;
@@ -43,8 +55,15 @@ export type NativeDeviceValue = keyof typeof DEVICE_VALUES;
 export const DEVICE_CALLS = {
 	'haptics.tap': { feature: 'haptics', async: false },
 	'location.current': { feature: 'location', async: true },
+	/** A camera object's photo from its own preview, once it is ready: `{ url, width, height }`. */
+	'camera.takePhoto': { feature: 'camera', async: true, object: true },
 } as const satisfies Readonly<
-	Record<string, { readonly feature: NativeDeviceFeature; readonly async: boolean }>
+	Record<string, { readonly feature: NativeDeviceFeature; readonly async: boolean; readonly object?: true }>
+>;
+
+/** Device objects a component makes, by the `@markless/device` export that makes them. */
+export const DEVICE_OBJECTS = { camera: { feature: 'camera' } } as const satisfies Readonly<
+	Record<string, { readonly feature: NativeDeviceFeature }>
 >;
 
 export type NativeDeviceCall = keyof typeof DEVICE_CALLS;
@@ -92,3 +111,8 @@ export function targetConstants(
 		sharesheet: { supported },
 	};
 }
+
+/** Elements that show a device object, by the `@markless/ui` part authors write: `<base.camera el={cam} />`. */
+export const DEVICE_ELEMENTS = [
+	{ module: '@markless/ui', export: 'base', member: 'camera', element: 'camera', device: 'camera' },
+] as const;

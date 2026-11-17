@@ -24,12 +24,14 @@ sealed interface DeviceOutcome {
  * thread. A host throws on a name its device does not implement, so a payload is never half run.
  */
 interface NativeDevice {
-	/** The live value [name] now (`network.online`). */
-	fun read(name: String): JsValue
-	/** Calls [changed] with each new value of [name]. */
-	fun watch(name: String, changed: (JsValue) -> Unit)
-	/** Runs the call [name]; [settle], when given, receives how it ended. */
-	fun call(name: String, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?)
+	/** The live value [name] now (`network.online`), of [obj] when it is a device object's field (`camera.ready`). */
+	fun read(name: String, obj: String? = null): JsValue
+	/** Calls [changed] with each new value of [name] (of [obj]). */
+	fun watch(name: String, obj: String? = null, changed: (JsValue) -> Unit)
+	/** Runs the call [name], on [obj] when it names one; [settle], when given, receives how it ended. */
+	fun call(name: String, obj: String? = null, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?)
+	/** The view that shows a device object (a camera's preview); it runs while attached to a window and releases after. */
+	fun view(obj: String, device: String): android.view.View
 	/** The activity's permission answer, forwarded by [MarklessActivity]. */
 	fun permissionsAnswered(requestCode: Int) {}
 }
@@ -39,6 +41,39 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	private val main = Handler(Looper.getMainLooper())
 	private val connectivity = activity.getSystemService(ConnectivityManager::class.java)
 	private val watchers = HashMap<String, MutableList<(JsValue) -> Unit>>()
+	private val cameras = HashMap<String, CameraObject>()
+	private var askedCamera = activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).getBoolean("asked-camera", false)
+
+	private fun key(name: String, obj: String?) = obj?.let { "$it#$name" } ?: name
+
+	private fun emit(key: String, value: JsValue) {
+		for (changed in watchers[key].orEmpty()) changed(value)
+	}
+
+	private fun camera(obj: String): CameraObject = cameras.getOrPut(obj) {
+		CameraObject(activity) { field, value -> emit(key("camera.$field", obj), value) }
+	}
+
+	private fun cameraAccess(): String = when {
+		activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> "granted"
+		!askedCamera -> "unknown"
+		activity.shouldShowRequestPermissionRationale(Manifest.permission.CAMERA) -> "denied"
+		else -> "blocked"
+	}
+
+	override fun view(obj: String, device: String): android.view.View {
+		if (device != "camera") throw MarklessHostError("this device has no view for a $device")
+		val camera = camera(obj)
+		return CameraPreview(activity) { attached, preview ->
+			if (!attached) return@CameraPreview camera.hidden(preview)
+			camera.shown(preview)
+			if (cameraAccess() != "granted" && cameraAccess() != "blocked") {
+				askedCamera = true
+				activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).edit().putBoolean("asked-camera", true).apply()
+				activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_REQUEST)
+			}
+		}
+	}
 	private var online: Boolean? = null
 	private val waitingForAccess = ArrayList<() -> Unit>()
 	private var askedLocation = activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).getBoolean("asked-location", false)
@@ -57,7 +92,7 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	private fun setOnline(now: Boolean) {
 		if (now == online) return
 		online = now
-		for (changed in watchers["network.online"].orEmpty()) changed(JsValue.Bool(now))
+		emit("network.online", JsValue.Bool(now))
 	}
 
 	private fun locationGranted() = LOCATION.any { activity.checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
@@ -70,18 +105,29 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 		else -> "blocked"
 	}
 
-	override fun read(name: String): JsValue = when (name) {
-		"network.online" -> JsValue.Bool(networkOnline())
-		"location.access" -> JsValue.Str(locationAccess())
+	override fun read(name: String, obj: String?): JsValue = when {
+		name == "network.online" && obj == null -> JsValue.Bool(networkOnline())
+		name == "location.access" && obj == null -> JsValue.Str(locationAccess())
+		name == "camera.access" && obj == null -> JsValue.Str(cameraAccess())
+		name == "camera.ready" && obj != null -> JsValue.Bool(camera(obj).ready)
+		name == "camera.facing" && obj != null -> JsValue.Str(camera(obj).facing)
 		else -> throw MarklessHostError("this device has no live value $name")
 	}
 
-	override fun watch(name: String, changed: (JsValue) -> Unit) {
-		read(name)
-		watchers.getOrPut(name) { ArrayList() }.add(changed)
+	override fun watch(name: String, obj: String?, changed: (JsValue) -> Unit) {
+		read(name, obj)
+		watchers.getOrPut(key(name, obj)) { ArrayList() }.add(changed)
 	}
 
-	override fun call(name: String, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
+	override fun call(name: String, obj: String?, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
+		if (obj != null) {
+			when (name) {
+				"camera.takePhoto" -> camera(obj).takePhoto { settle?.invoke(it) }
+				"camera.facing" -> camera(obj).setFacing((arguments.firstOrNull() as? JsValue.Str)?.value ?: throw MarklessHostError("camera.facing takes one string"))
+				else -> throw MarklessHostError("this device has no call $name on an object")
+			}
+			return
+		}
 		when (name) {
 			"haptics.tap" -> {
 				activity.window.decorView.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
@@ -117,8 +163,13 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	}
 
 	override fun permissionsAnswered(requestCode: Int) {
+		if (requestCode == CAMERA_REQUEST) {
+			emit("camera.access", JsValue.Str(cameraAccess()))
+			for (camera in cameras.values) camera.open()
+			return
+		}
 		if (requestCode != LOCATION_REQUEST) return
-		for (changed in watchers["location.access"].orEmpty()) changed(JsValue.Str(locationAccess()))
+		emit("location.access", JsValue.Str(locationAccess()))
 		val waiting = ArrayList(waitingForAccess)
 		waitingForAccess.clear()
 		for (resume in waiting) resume()
@@ -127,6 +178,7 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	companion object {
 		private val LOCATION = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 		private const val LOCATION_REQUEST = 4101
+		private const val CAMERA_REQUEST = 4102
 		private val REFUSED = DeviceOutcome.Error("NotAllowedError", "Location was refused")
 	}
 }

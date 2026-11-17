@@ -47,7 +47,7 @@ public final class MarklessViewController: UIViewController {
 		try buildPage()
 		for cell in self.payload.cells {
 			guard let name = cell.device else { continue }
-			try self.device.watch(name) { [weak self] value in
+			try self.device.watch(name, object: cell.object) { [weak self] value in
 				guard let self else { return }
 				self.apply { try self.runtime.device(cell.id, value) }
 			}
@@ -64,22 +64,24 @@ public final class MarklessViewController: UIViewController {
 	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
 		for cell in payload.cells {
-			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name)) }
+			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name, object: cell.object)) }
 		}
 		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
-		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
-			self?.perform(action)
-		}
+		let device = self.device
+		tree = try ViewTree(
+			runtime: runtime, layout: layout, faces: faces, onAction: { [weak self] action in self?.perform(action) },
+			objectView: { object, kind in try device.view(for: object, device: kind) })
 		try runCalls(try runtime.tasks())
 	}
 
 	/// Hands `call` entries to the device; a call with a result settles its task cell when the device answers.
 	private func runCalls(_ calls: [NativeJournalEntry]) throws {
-		for case let .call(name, arguments, result) in calls {
+		for case let .call(name, object, arguments, result, resume) in calls {
 			let runtime = self.runtime
-			try device.call(name, arguments, settle: result.map { cell in
-				{ [weak self] outcome in
+			let answer: (@MainActor (DeviceOutcome) -> Void)?
+			if let cell = result {
+				answer = { [weak self] outcome in
 					guard let self, self.runtime === runtime else { return }
 					self.apply {
 						switch outcome {
@@ -88,7 +90,16 @@ public final class MarklessViewController: UIViewController {
 						}
 					}
 				}
-			})
+			} else if let continuation = resume {
+				// An awaited call from a handler: the rest of the handler runs with the answer; a refusal ends it.
+				answer = { [weak self] outcome in
+					guard let self, self.runtime === runtime, case let .value(value) = outcome else { return }
+					self.apply { try runtime.resume(continuation, value: value) }
+				}
+			} else {
+				answer = nil
+			}
+			try device.call(name, object: object, arguments, settle: answer)
 		}
 	}
 
@@ -158,8 +169,8 @@ private func registerFaces(_ files: [(id: String, file: String)], fonts: [String
 	return faces
 }
 
-struct HostError: Error, CustomStringConvertible {
-	let description: String
-	init(_ description: String) { self.description = description }
+public struct HostError: Error, CustomStringConvertible {
+	public let description: String
+	public init(_ description: String) { self.description = description }
 }
 #endif

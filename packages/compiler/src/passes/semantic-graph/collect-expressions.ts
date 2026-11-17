@@ -34,6 +34,8 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 	const operator = typeof node.operator === 'string' ? node.operator : '=';
 	const value = node.right as AnyNode | undefined;
 	if (diagnoseBannedWriteSite(node, target, state)) return;
+	// `cam.facing = 'front'` sets a device object's field: the device owns it, so it is no state write.
+	if (writesDeviceObject(target, state)) return;
 
 	state.graph.stateWrites.push({
 		target: expressionSource(target, state.source),
@@ -1179,4 +1181,17 @@ function isMutatingDateMethod(name: string): boolean {
 		name === 'setUTCSeconds' ||
 		name === 'setYear'
 	);
+}
+
+/** True when an assignment target is a field of a device object a component made (`cam.facing`). */
+function writesDeviceObject(target: AnyNode, state: WalkState): boolean {
+	const objects = state.graph.deviceObjects;
+	if (!objects?.length || target.type !== 'MemberExpression') return false;
+	let root = target.object as AnyNode | undefined;
+	while (root?.type === 'MemberExpression') root = root.object as AnyNode | undefined;
+	if (root?.type !== 'Identifier' || typeof root.start !== 'number') return false;
+	const semantic = state.semantic();
+	const symbol = resolvedSymbolAt(semantic, root.start);
+	const declared = symbol === null ? undefined : semantic.bindings[symbol]?.declarations[0]?.start;
+	return declared !== undefined && objects.some((object) => object.bindingStart === declared);
 }

@@ -136,6 +136,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
 		...(input.target ? { target: input.target } : {}),
 		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
+		...(input.deviceWebAnswers === 'platform-only' ? { platformGuardsOnly: true } : {}),
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);
@@ -160,6 +161,8 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	collectSharedFactoryGraph(statements, state, walk);
 	collectSharedCallbackInvocations(statements, state);
 
+	const deviceObjects = state.deviceTarget?.collectDeviceObjects(statements as never, state as never) ?? [];
+	if (deviceObjects.length > 0) graph.deviceObjects = deviceObjects;
 	const absentComponents =
 		state.deviceTarget?.componentsAbsentOnTarget(statements as never, state as never) ?? new Set<string>();
 	for (const statement of statements) {

@@ -24,20 +24,24 @@ function walk(
 	steps: readonly LadderStep[],
 	params: Readonly<Record<string, string>>,
 	position: LadderRung['location'],
+	target: 'ios' | 'android',
 ) {
 	const store = new Map<string, NativeValue>();
 	const calls: string[] = [];
 	// A fake device, as a host's: location permission, where it is, and the calls waiting on the person's answer.
 	let permission: 'unknown' | 'granted' | 'denied' = 'unknown';
+	let cameraPermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let waiting: string[] = [];
-	const deviceValue = (name: string): NativeValue =>
-		name === 'location.access'
-			? permission
-			: name === 'network.online'
-				? true
-				: (() => {
-						throw new Error(`no fake ${name}`);
-					})();
+	// The emulator's camera faces back only; the simulator's test camera faces either way.
+	const facings = target === 'android' ? ['back'] : ['back', 'front'];
+	const deviceValue = (name: string): NativeValue => {
+		if (name === 'location.access') return permission;
+		if (name === 'camera.access') return cameraPermission;
+		if (name === 'camera.ready') return cameraPermission === 'granted';
+		if (name === 'camera.facing') return 'back';
+		if (name === 'network.online') return true;
+		throw new Error(`no fake ${name}`);
+	};
 	const answer = (cell: string) =>
 		permission === 'granted'
 			? runtime.dispatch({ event: 'settle', cell, value: { ...position!, accuracy: 5 } })
@@ -93,7 +97,10 @@ function walk(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const label =
+				bound !== undefined
+					? bound
+					: (node.attributes?.['aria-label'] ?? (node.element === 'img' ? node.attributes?.alt : undefined) ?? null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	const elementReading = (text: string) => {
@@ -103,8 +110,26 @@ function walk(
 		return node ? (nodeOf.get(node)?.parent ?? undefined) : undefined;
 	};
 	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number) {
+		const answered: Array<() => ReadonlyArray<NativeJournalEntry>> = [];
 		for (const entry of dispatched) {
-			if (entry.op === 'call') calls.push(entry.call);
+			if (entry.op === 'call') {
+				calls.push(entry.call);
+				if (entry.call === 'camera.takePhoto' && entry.resume) {
+					const continuation = entry.resume;
+					answered.push(() =>
+						runtime.dispatch({
+							event: 'resume',
+							continuation,
+							value: { url: 'file:///proof/photo.png', width: 640, height: 480 },
+						}),
+					);
+				}
+				if (entry.call === 'camera.facing' && !facings.includes(String(entry.arguments[0]))) {
+					// The device has no camera facing that way: the setting snaps back to the camera it uses.
+					const cell = payload.cells.find((candidate) => candidate.device === 'camera.facing' && candidate.object === entry.object);
+					if (cell) answered.push(() => runtime.dispatch({ event: 'device', cell: cell.id, value: 'back' }));
+				}
+			}
 			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
@@ -147,6 +172,7 @@ function walk(
 					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
 			}
 		}
+		for (const next of answered) apply(next(), index);
 	}
 	startTasks();
 	for (const [index, step] of steps.entries()) {
@@ -162,11 +188,13 @@ function walk(
 					if (cell.device === name)
 						apply(runtime.dispatch({ event: 'device', cell: cell.id, value }), index);
 		} else if (action && 'answer' in action) {
-			permission = action.answer === 'allow' ? 'granted' : 'denied';
+			const given = action.answer === 'allow' ? 'granted' : 'denied';
+			if (payload.cells.some((cell) => cell.device?.startsWith('camera.'))) cameraPermission = given;
+			else permission = given;
 			for (const cell of payload.cells)
-				if (cell.device === 'location.access')
+				if (cell.device === 'location.access' || cell.device === 'camera.access' || cell.device === 'camera.ready')
 					apply(
-						runtime.dispatch({ event: 'device', cell: cell.id, value: permission }),
+						runtime.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) }),
 						index,
 					);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
@@ -194,6 +222,12 @@ function walk(
 			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
+		if (step.camera) {
+			const running =
+				cameraPermission === 'granted' &&
+				payload.nodes.some((node) => node.kind === 'element' && node.element === 'camera' && shownNode(node.id));
+			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
+		}
 		const shown = [...texts.values(), ...labels().map(([, label]) => label)];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
@@ -266,6 +300,6 @@ test.each(
 			...step,
 			visible: [...step.visible, ...(step.visibleOn?.[target] ?? [])],
 		}));
-		walk(build.payload, steps, opened?.params ?? {}, rung.location);
+		walk(build.payload, steps, opened?.params ?? {}, rung.location, target);
 	},
 );

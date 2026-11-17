@@ -72,8 +72,10 @@ export async function compileNativeComponent(input: {
 			: {}),
 		importedModules,
 	});
+	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
-		(diagnostic) => diagnostic.severity === 'error',
+		(diagnostic) =>
+			diagnostic.severity === 'error' && (diagnostic.phase === 'parse' || diagnostic.phase === 'semantic-graph'),
 	);
 	const { manifest, diagnostics: usage } = deviceManifest(native.features, input.device);
 	return {

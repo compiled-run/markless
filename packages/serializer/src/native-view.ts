@@ -102,6 +102,8 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
+				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
+				readonly object?: string;
 				/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
 				readonly bindings?: ReadonlyArray<
 					| { readonly attribute: string; readonly value: NativeExpr }
@@ -151,8 +153,15 @@ export type NativeOp =
 	| {
 			readonly op: 'call';
 			readonly call: NativeDeviceCall;
+			/** The device object the call is made on (`object:cam`). */
+			readonly object?: string;
 			readonly arguments: ReadonlyArray<NativeExpr>;
 			readonly result?: string;
+			/**
+			 * What the handler does once the call answers: `ops` run with the answer read as `{ local: as }`. The host
+			 * answers the journal entry's `resume` with a `resume` action.
+			 */
+			readonly after?: { readonly id: string; readonly as: string; readonly ops: ReadonlyArray<NativeOp> };
 	  }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| {
@@ -176,6 +185,8 @@ export type NativeViewPayload = {
 		readonly styled?: true;
 		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
 		readonly device?: NativeDeviceValue;
+		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
+		readonly object?: string;
 		/**
 		 * An async value from a device call: the host starts the call at mount and settles the cell. Its value is
 		 * `{ state: 'pending' }`, `{ state: 'value', value }` or `{ state: 'error', error: { name, message } }`.
@@ -196,6 +207,8 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly ops: ReadonlyArray<NativeOp>;
 	}>;
+	/** Device objects the page's components make; each lives while the page does, its picture while its element is shown. */
+	readonly objects?: ReadonlyArray<{ readonly id: string; readonly device: 'camera' }>;
 };
 
 /** One change a host applies to its retained views after a handler runs. */
@@ -227,9 +240,13 @@ export type NativeJournalEntry =
 	/** Run a device call now; with `result`, settle that task cell with what it gives (an action `settle`). */
 	| {
 			readonly op: 'call';
-			readonly call: NativeDeviceCall;
+			/** A device call, or a writable device setting the handler wrote (`camera.facing`). */
+			readonly call: NativeDeviceCall | NativeDeviceValue;
+			readonly object?: string;
 			readonly arguments: ReadonlyArray<NativeValue>;
 			readonly result?: string;
+			/** Answer with a `resume` action naming this continuation once the call settles. */
+			readonly resume?: string;
 	  }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
 	| {

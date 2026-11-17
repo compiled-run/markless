@@ -70,6 +70,7 @@ export function targetValue(node: AnyNode | undefined, state: WalkState): Target
 			const property = (node.property as AnyNode | undefined)?.name;
 			const exported = deviceExportOf(node.object as AnyNode | undefined, state);
 			if (node.computed || typeof property !== 'string' || exported === null) return UNKNOWN;
+			if (state.platformGuardsOnly && state.target === 'web' && exported !== 'platform') return UNKNOWN;
 			const fields = targetConstants(state.target)[exported];
 			return fields && Object.hasOwn(fields, property)
 				? { known: true, value: fields[property] }
@@ -186,7 +187,7 @@ function exits(node: AnyNode | undefined): boolean {
 export function collectWebDeviceAbsence(
 	ast: AnyNode,
 	state: WalkState,
-	answers: 'build-error' | 'reject',
+	answers: 'build-error' | 'platform-only' | 'reject',
 ): WebDeviceEdit[] {
 	const edits: WebDeviceEdit[] = [];
 	const at = (node: AnyNode) => ({ start: node.start as number, end: node.end as number });
@@ -284,7 +285,7 @@ export function collectWebDeviceAbsence(
 					edits.push({ ...at(node), text: JSON.stringify(value.value) });
 					return;
 				}
-				if (answers === 'build-error') refuseOnWeb(node, state);
+				if (answers !== 'reject') refuseOnWeb(node, state);
 				return;
 			}
 		}
@@ -357,7 +358,7 @@ function refuseOnWeb(node: AnyNode, state: WalkState): void {
 		severity: 'error',
 		phase: 'semantic-graph',
 		title: 'A device feature is absent on the web',
-		message: `\`${expressionSource(node, state.source)}\` needs an answer from \`${name}\`, which a web build does not have; check \`${name}.supported\` first`,
+		message: `\`${expressionSource(node, state.source)}\` needs an answer from \`${name}\`, which a web build does not have; ${state.platformGuardsOnly ? 'put it inside a `platform` check, such as `@if (!platform.web)`' : `check \`${name}.supported\` first`}`,
 		why: 'On the web, @markless/device features are absent: there is no value to show or wait for.',
 		primarySpan: { filename: state.filename, start, end: node.end as number },
 		passId: 'tsrx-semantic-graph',
@@ -447,4 +448,45 @@ export const DEVICE_TARGET_FACTS: DeviceTargetFacts = {
 		componentsAbsentOnTarget as DeviceTargetFacts['componentsAbsentOnTarget'],
 	collectWebDeviceAbsence:
 		collectWebDeviceAbsence as DeviceTargetFacts['collectWebDeviceAbsence'],
+	deviceObjectOf: deviceObjectOf as DeviceTargetFacts['deviceObjectOf'],
+	collectDeviceObjects: collectDeviceObjects as DeviceTargetFacts['collectDeviceObjects'],
 };
+
+/** A device object a component makes (`const cam = camera()`): owned by that component, never rebuilt by a handler. */
+export type DeviceObjectFact = {
+	readonly name: string;
+	readonly componentName: string;
+	/** The `@markless/device` export that made it: `camera`. */
+	readonly device: string;
+	readonly bindingStart: number;
+};
+
+/** The device export a declarator's initializer calls to make a device object, or null. */
+export function deviceObjectOf(init: AnyNode | undefined, state: WalkState): string | null {
+	if (init?.type !== 'CallExpression') return null;
+	const callee = init.callee as AnyNode | undefined;
+	return callee?.type === 'Identifier' ? deviceExportOf(callee, state) : null;
+}
+
+/** Every component's device objects, from its body's `const name = device()` declarations. */
+export function collectDeviceObjects(statements: ReadonlyArray<AnyNode>, state: WalkState): DeviceObjectFact[] {
+	const facts: DeviceObjectFact[] = [];
+	for (const statement of statements) {
+		const declaration = statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
+			? (statement.declaration as AnyNode | undefined)
+			: statement;
+		const componentName = (declaration?.id as AnyNode | undefined)?.name;
+		const body = (declaration?.body as AnyNode | undefined)?.body as AnyNode[] | undefined;
+		if (declaration?.type !== 'FunctionDeclaration' || typeof componentName !== 'string' || !body) continue;
+		for (const inner of body) {
+			if (inner.type !== 'VariableDeclaration' || inner.kind !== 'const') continue;
+			for (const declarator of (inner.declarations as AnyNode[] | undefined) ?? []) {
+				const id = declarator.id as AnyNode | undefined;
+				const device = deviceObjectOf(declarator.init as AnyNode | undefined, state);
+				if (device && id?.type === 'Identifier' && typeof id.name === 'string' && typeof id.start === 'number')
+					facts.push({ name: id.name, componentName, device, bindingStart: id.start });
+			}
+		}
+	}
+	return facts;
+}

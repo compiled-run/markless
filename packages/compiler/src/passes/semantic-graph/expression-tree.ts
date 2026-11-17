@@ -190,6 +190,10 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 	}
 	if (expression.type === 'AssignmentExpression') {
 		const target = expression.left as AnyNode | undefined;
+		const holder = target?.type === 'MemberExpression' && !target.computed ? (target.object as AnyNode | undefined) : undefined;
+		const field = (target?.property as AnyNode | undefined)?.name;
+		if (holder?.type === 'Identifier' && typeof holder.name === 'string' && typeof field === 'string' && expression.operator === '=')
+			return { kind: 'assign-field', target: holder.name, field, value: expressionTreeOf(expression.right as AnyNode | undefined) };
 		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
 			return { kind: 'unsupported', construct: 'an assignment to something other than a name' };
 		const value = expressionTreeOf(expression.right as AnyNode | undefined);

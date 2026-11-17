@@ -11,7 +11,7 @@ name: d3-location
 - assertVisible:
       text: Allow .?Proof.? to (use your|access this device.s) location\?
 - tapOn:
-      text: Allow While Using App|While using the app
+      text: Allow While Using App|While using the app|Allow
 - assertVisible: 51\.5, -0\.125
 - assertNotVisible: Locating
 - assertNotVisible: Access unknown
