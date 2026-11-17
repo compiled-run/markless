@@ -17,6 +17,8 @@ import { readExecutionDemandAsset } from '../src/build/execution-demand.ts';
 import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import { moduleIdFor } from '../src/module-id.ts';
+import { RESIDENT_LOAD_MODULE } from '../src/rebound-symbol-route.ts';
+import { marklessWhenLoaded } from '@markless/web/fns/resident-load';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -710,7 +712,7 @@ let active = state(true);
 			'const marklessSymbolResolverModule = () => import("virtual:markless:resolver:',
 		);
 		expect(result.code).toContain(
-			'return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+			'return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		);
 	});
 
@@ -1899,7 +1901,11 @@ export function App() @{
 		)!;
 		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerModule.source)}`;
 		const resolverUrl = `data:text/javascript,${encodeURIComponent(
-			resolver.source.split(childHandlerModule.id).join(childHandlerUrl),
+			resolver.source
+				.split(childHandlerModule.id)
+				.join(childHandlerUrl)
+				.split(RESIDENT_LOAD_MODULE)
+				.join(`data:text/javascript,${encodeURIComponent(`export ${marklessWhenLoaded}`)}`),
 		)}`;
 		const loadedResolver = (await import(resolverUrl)) as {
 			loadSymbol(id: string): Promise<(context: unknown) => unknown>;

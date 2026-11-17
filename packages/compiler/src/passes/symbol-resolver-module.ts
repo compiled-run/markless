@@ -94,19 +94,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		...boundRowLookup(input.boundSymbols ?? []),
 		'const callbackRoute = "callback-route";',
 		'',
-		'export async function loadSymbol(id) {',
-		'	const bound = boundRow(id);',
-		'	if (bound) return loadBoundSymbol(bound);',
-		'	const row = symbolRows[id];',
-		'	if (!row) throw createUnknownSymbolError(id);',
-		input.literalImports
-			? '\treturn moduleLoads[id]()'
-			: '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'		.then((mod) => {',
-		'			runGeneratedSymbolChunkInitializers(mod);',
-		'			return mod[exportNames[row[1]]];',
-		'		});',
-		'}',
+		...emitLoadSymbolFunction(input.literalImports === true, true),
 		'',
 		'async function loadBoundSymbol(bound) {',
 		scopesInstances
@@ -376,17 +364,7 @@ function emitTableSymbolResolverModule(
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
-		'export async function loadSymbol(id) {',
-		'\tconst row = symbolRows[id];',
-		'\tif (!row) throw createUnknownSymbolError(id);',
-		literalImports
-			? '\treturn moduleLoads[id]()'
-			: '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'\t\t.then((mod) => {',
-		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
-		'\t\t\treturn mod[exportNames[row[1]]];',
-		'\t\t});',
-		'}',
+		...emitLoadSymbolFunction(literalImports, false),
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
 		'\tfor (const name of Reflect.ownKeys(mod)) {',
@@ -406,6 +384,36 @@ function emitTableSymbolResolverModule(
 		'}',
 		'',
 	].join('\n');
+}
+
+// A packed load already on the page answers in the caller's task, as a direct symbol load does.
+function emitLoadSymbolFunction(literalImports: boolean, bound: boolean): string[] {
+	const head = [
+		literalImports ? 'export function loadSymbol(id) {' : 'export async function loadSymbol(id) {',
+		...(bound ? ['\tconst bound = boundRow(id);', '\tif (bound) return loadBoundSymbol(bound);'] : []),
+		'\tconst row = symbolRows[id];',
+	];
+	if (!literalImports)
+		return [
+			...head,
+			'\tif (!row) throw createUnknownSymbolError(id);',
+			'\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+			'\t\t.then((mod) => {',
+			'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
+			'\t\t\treturn mod[exportNames[row[1]]];',
+			'\t\t});',
+			'}',
+		];
+	return [
+		`import { marklessWhenLoaded } from '@markless/web/fns/resident-load';`,
+		...head,
+		'\tif (!row) return Promise.reject(createUnknownSymbolError(id));',
+		'\treturn marklessWhenLoaded(moduleLoads[id](), (mod) => {',
+		'\t\trunGeneratedSymbolChunkInitializers(mod);',
+		'\t\treturn mod[exportNames[row[1]]];',
+		'\t});',
+		'}',
+	];
 }
 
 function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {

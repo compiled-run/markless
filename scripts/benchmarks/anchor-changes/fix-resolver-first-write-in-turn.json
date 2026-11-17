@@ -1,0 +1,38 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 239,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 239,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		}
+	]
+}

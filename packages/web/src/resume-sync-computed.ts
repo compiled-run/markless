@@ -42,9 +42,13 @@ type RosterResumeHost = {
 // One import per loader: every import() of an evaluated module still resolves a task later.
 const rosterLoads = new WeakMap<() => Promise<RosterResumeModule>, Promise<RosterResumeModule>>();
 const rosters = new WeakMap<() => Promise<RosterResumeModule>, RosterResumeModule>();
-function loadRosterResume(): Promise<RosterResumeModule> | undefined {
+// Only an element-binding read gets a roster reader (the compiler's spelling, as fns/roster-resume.ts reads it).
+const readsRoster = (record: ResumeSyncComputedRecord) =>
+	record.dependencies?.some((dependency) => dependency.graphNodeId.includes('/element:'));
+
+function loadRosterResume(record: ResumeSyncComputedRecord): Promise<RosterResumeModule> | undefined {
 	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
-	if (!load) return undefined;
+	if (!load || !readsRoster(record)) return undefined;
 	let pending = rosterLoads.get(load);
 	if (!pending) {
 		pending = load().then(
@@ -60,9 +64,9 @@ function loadRosterResume(): Promise<RosterResumeModule> | undefined {
 }
 
 /** The roster reader a synchronous derive still waits for; `undefined` when none is needed or it is here. */
-export function pendingRosterResume(): Promise<unknown> | undefined {
+export function pendingRosterResume(record: ResumeSyncComputedRecord): Promise<unknown> | undefined {
 	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
-	return load && !rosters.has(load) ? loadRosterResume() : undefined;
+	return load && !rosters.has(load) ? loadRosterResume(record) : undefined;
 }
 
 // Only a bound derive inside a keyed row needs its row placed; the loaded module decides exactly.
@@ -147,7 +151,7 @@ export function deriveSyncComputedNow(
 	const load = (globalThis as RosterResumeHost).__marklessRosterResume;
 	const roster = load && rosters.get(load);
 	if (
-		(load && !roster) ||
+		(load && !roster && readsRoster(input.computed)) ||
 		(input.byNode && asyncPlanes.awaitsAncestor?.(input.computed, input.byNode, input.graph))
 	)
 		return false;
@@ -186,7 +190,7 @@ export async function refreshSyncComputed(
 	}
 	// Spec 03: a sync computed over an unsettled async ancestor stays pending instead of running.
 	if (asyncPlanes.awaitsAncestor?.(input.computed, byNode, input.graph)) return;
-	const roster = await loadRosterResume();
+	const roster = await loadRosterResume(input.computed);
 	const symbol = input.derive ?? (await loadDerive(input.loadSymbol, input.computed));
 	const result = await derive(input, symbol, roster);
 	const written = result === HELD ? undefined : writeDerived(input, symbol, roster, result);
@@ -292,11 +296,11 @@ export async function refreshWhenShown(
 			if (typeof symbol !== 'function')
 				return track(
 					node,
-					symbol.then((derive) => ((node.derive = derive), pendingRosterResume())),
+					symbol.then((derive) => ((node.derive = derive), pendingRosterResume(node.record))),
 				);
 			node.derive = symbol;
 		}
-		const roster = pendingRosterResume();
+		const roster = pendingRosterResume(node.record);
 		return roster && track(node, roster);
 	};
 	const shown = (graphNodeId: string, seen = new Set<string>()): boolean => {
