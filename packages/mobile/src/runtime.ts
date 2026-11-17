@@ -201,8 +201,14 @@ export function createNativeRuntime(
 	};
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
-	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null =>
-		evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
+		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+		const tests = branch.tests ?? [];
+		const chosen = tests.findIndex((test) => test !== null && evaluate(test));
+		if (chosen >= 0) return chosen;
+		const fallback = tests.indexOf(null);
+		return fallback >= 0 ? fallback : null;
+	};
 	const shown = (node: NativeNode): boolean => {
 		if (!node.arm) return true;
 		const branch = branches.get(node.arm.branch);

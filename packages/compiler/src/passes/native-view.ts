@@ -685,18 +685,33 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const site = scope.module.branchSites.get(item.id);
-				if (!site || site.kind !== 'if' || site.armIndexSource !== undefined) {
-					refuse('@else if chains and @switch');
+				if (!site) {
+					refuse(`the branch ${item.id}`);
 					continue;
 				}
-				const test = exprOf(site.testExpression, 'the @if test', scope);
-				if (!test) continue;
+				const plain = site.kind === 'if' && site.armIndexSource === undefined;
+				const test = plain ? exprOf(site.testExpression, 'the @if test', scope) : undefined;
+				const recorded = site.armTestExpressions?.map((expression) =>
+					expression === null ? null : exprOf(expression, `the @${site.kind} test`, scope),
+				);
+				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
+				const tests =
+					plain || !recorded
+						? undefined
+						: recorded.length === item.arms.length - 1 && !recorded.includes(null)
+							? [...recorded, null]
+							: recorded;
+				if (plain ? !test : !tests || tests.length !== item.arms.length) {
+					if (!plain && !tests) refuse(`a @${site.kind} whose arm tests the compiler did not record`);
+					if (tests && tests.length !== item.arms.length) refuse(`a @${site.kind} with an empty arm`);
+					continue;
+				}
 				const branchId = scope.prefix + item.id;
 				nodes.push({
 					kind: 'branch',
 					id: branchId,
 					parent,
-					test,
+					...(test ? { test } : { tests: tests! as (NativeExpr | null)[] }),
 					arms: item.arms.length,
 					...place,
 				});

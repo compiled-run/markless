@@ -150,6 +150,21 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 			armTests: literalArmTests ?? asNodes(node.cases).map((_, index) => index),
+			...(state.nativeFacts && discriminant
+				? {
+						armTestExpressions: asNodes(node.cases).map((switchCase) => {
+							const test = switchCase.test as AnyNode | undefined;
+							return test
+								? {
+										kind: 'binary' as const,
+										operator: '===' as const,
+										left: state.nativeFacts!.expression(discriminant as never),
+										right: state.nativeFacts!.expression(test as never),
+									}
+								: null;
+						}),
+					}
+				: {}),
 			...branchKeywordSpan(node, '@switch', state),
 			...branchAsyncBoundary(state),
 			...branchRow(state),
@@ -179,6 +194,14 @@ function collectIfChainSite(node: AnyNode, state: WalkState): void {
 		armIndexSource: indexSource,
 		...armIndexTest(chain.tests, indexSource, state),
 		armTests: chain.arms.map((_, index) => index),
+		...(state.nativeFacts
+			? {
+					armTestExpressions: [
+						...chain.tests.map((test) => state.nativeFacts!.expression(test as never)),
+						...(chain.arms[chain.arms.length - 1] ? [null] : []),
+					],
+				}
+			: {}),
 		anchorOrder: state.nextAnchorOrder++,
 		...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
 		...branchKeywordSpan(node, '@if', state),

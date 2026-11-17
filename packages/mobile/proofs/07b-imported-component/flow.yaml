@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: 07b-imported-component
+---
+- launchApp:
+    clearState: true
+- assertVisible: Imported parts
+- assertVisible: "Plums: 1"
+- assertVisible: "Figs: 0"
+- assertVisible: Fruit 1
+- assertNotVisible: Fruit 2
+- tapOn: More Plums
+- assertVisible: Fruit 2
+- assertNotVisible: "Plums: 1"
+- assertVisible: "Plums: 2"
+- assertVisible: "Figs: 0"
+- assertVisible: Fruit 2
+- assertNotVisible: "Plums: 1"
+- tapOn: More Figs
+- assertNotVisible: "Figs: 0"
+- assertVisible: "Plums: 2"
+- assertVisible: "Figs: 2"
+- assertVisible: Fruit 4
+- assertNotVisible: "Figs: 0"

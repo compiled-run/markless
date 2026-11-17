@@ -1,0 +1,9 @@
+{
+	"rung": 7.5,
+	"name": "A component imported from another file",
+	"steps": [
+		{ "visible": ["Imported parts", "Plums: 1", "Figs: 0", "Fruit 1"], "absent": ["Fruit 2"] },
+		{ "do": { "tap": "More Plums" }, "visible": ["Plums: 2", "Figs: 0", "Fruit 2"], "absent": ["Plums: 1"] },
+		{ "do": { "tap": "More Figs" }, "visible": ["Plums: 2", "Figs: 2", "Fruit 4"], "absent": ["Figs: 0"] }
+	]
+}

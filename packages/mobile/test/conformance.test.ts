@@ -144,3 +144,59 @@ describe('imported components', () => {
 		expect(build.diagnostics.map((d) => d.message)).toContain('<Stepper>, a component from another module');
 	});
 });
+
+describe('@else if chains and @switch', () => {
+	const arms = async (source: string, clicks: number) => {
+		const build = await compileNativeComponent({ filename: 'src/Pick.tsrx', source });
+		expect(build.diagnostics).toEqual([]);
+		const runtime = createNativeRuntime(build.payload!);
+		const shown = [runtime.texts().map(([, text]) => text).join(' | ')];
+		for (let i = 0; i < clicks; i++) {
+			runtime.dispatch({ event: 'activate', host: build.payload!.events[0]!.host });
+			shown.push(runtime.texts().map(([, text]) => text).join(' | '));
+		}
+		return shown;
+	};
+
+	it('shows the first arm whose test holds, and none when a chain has no @else', async () => {
+		expect(
+			await arms(
+				`import { state } from '@markless/core';
+export function Pick() @{
+	let n = state(0);
+	<div>
+		<button onClick={() => n++}>Next</button>
+		@if (n === 1) { <p>one</p> } @else if (n === 2) { <p>two</p> } @else if (n < 1) { <p>none yet</p> }
+	</div>
+}`,
+				3,
+			),
+		).toEqual(['Next | none yet', 'Next | one', 'Next | two', 'Next']);
+	});
+
+	it('matches @switch cases with ===, and falls to @default wherever it is written', async () => {
+		expect(
+			await arms(
+				`import { state } from '@markless/core';
+export function Pick() @{
+	let tab = state('a');
+	<div>
+		<button onClick={() => (tab = tab === 'a' ? 'b' : tab === 'b' ? 'z' : 'a')}>Next</button>
+		@switch (tab) {
+			@default: {
+				<p>other</p>
+			}
+			@case 'a': {
+				<p>first</p>
+			}
+			@case 'b': {
+				<p>second</p>
+			}
+		}
+	</div>
+}`,
+				3,
+			),
+		).toEqual(['Next | first', 'Next | second', 'Next | other', 'Next | first']);
+	});
+});

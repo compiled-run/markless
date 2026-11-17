@@ -36,6 +36,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'choices',
+		fixture: 'test/fixtures/Choices.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h1' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
 		name: 'attributes',
 		fixture: 'proofs/04-attributes/App.tsrx',
 		actions: [
