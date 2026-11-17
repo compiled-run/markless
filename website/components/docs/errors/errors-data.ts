@@ -7810,6 +7810,31 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_UNSUPPORTED',
+		title: 'This component cannot be built for a native target yet',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description:
+			'This component cannot be built for a native target yet: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_UNSUPPORTED: This component cannot be built for a native target yet',
+			'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_UNSUPPORTED',
+		],
+		structured: true,
+		why: 'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NODE_IN_BROWSER',
 		title: 'Node-only code reaches the browser',
 		area: 'build',
