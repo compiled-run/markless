@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 36,
+			"reason": "compiler emits the request's shared() seed map for sibling renders; only the docs playground's compile worker grows (CI run 44062312975 vs merge-queue run 44033740868)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 36,
+			"reason": "compiler emits the request's shared() seed map for sibling renders; only the docs playground's compile worker grows (CI run 44062312975 vs merge-queue run 44033740868)",
+			"date": "2026-11-17"
+		}
+	]
+}
