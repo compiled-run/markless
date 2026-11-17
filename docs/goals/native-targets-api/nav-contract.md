@@ -110,13 +110,19 @@ the system kills while in the background starts its screens over (saving runtime
 Folders `packages/mobile/proofs/n<n>-<name>/`, each an app (`pages/`), `expected.json`, `flow.yaml` (written from it),
 screenshots. Columns as in `contract.md` section 5.
 
-| # | Rung | Web | Native reference | iOS | Android |
-|---|---|---|---|---|---|
-| N1 | Two routes; a link pushes; back gesture and back button return; first screen's state as left | see section 7 | see section 7 | see section 7 | see section 7 |
-| N2 | `/orders/[id]` from a keyed list; title in the navigation bar | | | | |
-| N3 | `navigate()` from a handler; push then replace | | | | |
-| N4 | Opening at a deep link: right route, synthesized back stack | | | | |
-| N5 | A modal sheet | not built: owner decision (section 6) | | | |
+| # | Rung | Web | Native reference | iOS | Android | Ran as data |
+|---|---|---|---|---|---|---|
+| N1 | Two routes; a link pushes; back gesture and back button return; first screen's state as left | passing, with Back measured as different: the counter reads `Taps 0` after Back (`onWeb`) | passing | **passing** | **passing** | the counter's ops and the link's `navigate` op; push and Back are the platform's stack, no data needed |
+| N2 | `/orders/[id]` from a keyed list after reversing it; title in the navigation bar | passing (`document.title`); Back restores the list in its server order (`onWeb`) | passing | **passing** | **passing** | the reverse is an `assign` op; the row link's param is an expression over the row item, evaluated on tap; the title is text parts over `params` |
+| N3 | `navigate()` from a handler: push, then `{ replace: true }` | passing | passing | **passing** | **passing** | `navigate(path)` resolved at build time to `route` + `params`; `replace` is a flag on the op |
+| N4 | Opening at a deep link (`markless-proof://app/orders/42`): `Order 42` with Orders and Shop below it | passing up to Back, which leaves the site as a browser does (`onWeb`, `leaves`) | passing | **passing** | **passing** | the stack is derived from route facts; iOS shows its own "Open in Proof?" confirmation the first time a scheme is opened, which the flow taps when shown |
+| N5 | A modal sheet | not built: owner decision (section 6) | | | | |
+
+Vectors both hosts pass headless: `navigation.json` (N2's app), `navigation-replace.json` (N3), `navigation-deep-link.json` (N4):
+Swift `swift test` 22 tests (3 navigation vectors, 10 one-page vectors); Kotlin `test-jvm.sh` 254 checks, 0 failed.
+
+"Needed more than data": nothing. Every handler on these rungs ran as ops; the stack itself is the platform's container,
+which is host code by design (as view building is), not something the payload describes.
 
 ## 6. Not built, with options
 
@@ -170,4 +176,13 @@ Platform differences inside a tab (icons) would be plain conditionals over `plat
 
 ## 7. Receipts
 
-Filled in by the rungs as they pass; see the PR description for the run.
+One harness run per platform on tree `25aa26c93` (mini-2; simulator `markless-nav`, iPhone 17 on iOS 27.2; AVD
+`markless_nav`, Pixel 7, API 36, gesture navigation), all four navigation rungs plus the fourteen one-screen rungs
+(1, 2, 3, 4, 5, 5b, 6, 7, 7b, 7c, 7d, 8, 9, 10) to show the hosts' changes broke none of them: 18 of 18 on each, verdict
+"proof passed on iOS and Android". Reports: `receipts/2026-11-17-nav-*.json`, `receipts/2026-11-17-nav-verdict.txt`.
+Screenshots: `packages/mobile/proofs/n<n>-<name>/screenshots/{ios,android}/`. Devices were shut down after the run.
+
+What is real and what is a stand-in: the compiler, the router's manifest, the web build (Chromium, production server),
+the iOS simulator and the Android emulator with the real hosts are real. The deep link is a real URL opened by the system
+(`simctl openurl` / an Android VIEW intent through Maestro's `openLink`). The reference column is the TypeScript runtime
+with a mirror host, not a device. Nothing is a test double on devices.
