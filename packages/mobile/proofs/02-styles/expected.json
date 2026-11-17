@@ -1,0 +1,12 @@
+{
+	"rung": 2,
+	"name": "Styles through Dragon",
+	"steps": [
+		{ "visible": ["Styled counter", "Count 0"] },
+		{
+			"do": { "tap": "Count 0" },
+			"visible": ["Styled counter", "Count 1"],
+			"absent": ["Count 0"]
+		}
+	]
+}

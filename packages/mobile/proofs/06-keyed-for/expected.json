@@ -1,0 +1,19 @@
+{
+	"rung": 6,
+	"name": "Keyed @for: add, remove, reorder",
+	"steps": [
+		{ "visible": ["Fruits", "Apple", "Pear"], "absent": ["Plum"], "order": ["Apple", "Pear"] },
+		{
+			"do": { "tap": "Add plum" },
+			"visible": ["Apple", "Pear", "Plum"],
+			"order": ["Apple", "Pear", "Plum"]
+		},
+		{
+			"do": { "tap": "Remove apple" },
+			"visible": ["Pear", "Plum"],
+			"absent": ["Apple"],
+			"order": ["Pear", "Plum"]
+		},
+		{ "do": { "tap": "Reverse" }, "visible": ["Plum", "Pear"], "order": ["Plum", "Pear"] }
+	]
+}

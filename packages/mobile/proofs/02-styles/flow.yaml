@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+name: 02-styles
+---
+- launchApp:
+      clearState: true
+- assertVisible: Styled counter
+- assertVisible: Count 0
+- tapOn: Count 0
+- assertNotVisible: Count 0
+- assertVisible: Styled counter
+- assertVisible: Count 1
+- assertNotVisible: Count 0

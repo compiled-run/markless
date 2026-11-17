@@ -1,0 +1,19 @@
+{
+	"rung": 8,
+	"name": "Text input and two-way state",
+	"steps": [
+		{ "visible": ["Greeting", "Hello Sam"], "fields": { "Name": "Sam" } },
+		{
+			"do": { "type": { "field": "Name", "text": "Ada" } },
+			"visible": ["Hello Ada"],
+			"absent": ["Hello Sam"],
+			"fields": { "Name": "Ada" }
+		},
+		{
+			"do": { "tap": "Use Bo" },
+			"visible": ["Hello Bo"],
+			"absent": ["Hello Ada"],
+			"fields": { "Name": "Bo" }
+		}
+	]
+}

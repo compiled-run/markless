@@ -1,0 +1,25 @@
+appId: ${APP_ID}
+name: 04-attributes
+---
+- launchApp:
+      clearState: true
+- assertVisible: Attributes
+- assertVisible: Like
+- assertNotVisible: Unlike
+- assertVisible:
+      text: Clear
+      enabled: false
+- tapOn: Like
+- assertVisible: Unlike
+- assertNotVisible: Like
+- assertVisible: Unlike
+- assertVisible: Clear
+- assertNotVisible: Like
+- tapOn: Clear
+- assertVisible: Like
+- assertNotVisible: Unlike
+- assertVisible: Like
+- assertNotVisible: Unlike
+- assertVisible:
+      text: Clear
+      enabled: false
