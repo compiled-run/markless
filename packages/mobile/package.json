@@ -19,6 +19,7 @@
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
-		"@markless/serializer": "workspace:*"
+		"@markless/serializer": "workspace:*",
+		"@markless/web": "workspace:*"
 	}
 }

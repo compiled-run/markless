@@ -845,6 +845,8 @@ export type SemanticBranchSite = {
 	// site tests THAT node; `testSource` stays the authored text so a diagnostic
 	// quotes what the file says rather than a generated name.
 	readonly testComputedGraphNodeId?: string;
+	/** A plain `@if` test as data a native host can evaluate; absent for chains, `@switch` and tests that need script. */
+	readonly testShape?: SemanticValueShape;
 	// An `@else if` chain or a non-literal-case `@switch` answers its arm index here, evaluated in place of `testSource`.
 	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
@@ -1165,8 +1167,23 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/** A template value or test as data a native host can evaluate: names are the component's bindings. */
+export type SemanticValueShape =
+	| { readonly kind: 'read'; readonly name: string }
+	| { readonly kind: 'literal'; readonly value: string | number | boolean }
+	| { readonly kind: 'not'; readonly value: SemanticValueShape }
+	| {
+			readonly kind: 'conditional';
+			readonly test: SemanticValueShape;
+			readonly consequent: SemanticValueShape;
+			readonly alternate: SemanticValueShape;
+	  }
+	| { readonly kind: 'equals'; readonly left: SemanticValueShape; readonly right: SemanticValueShape };
+
 export type SemanticTemplateRead = {
 	readonly source: string;
+	/** The read's value as data (for a conditional class, its test); absent when it needs script. */
+	readonly valueShape?: SemanticValueShape;
 	readonly sourceSpan?: SourceSpan;
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;

@@ -100,6 +100,7 @@ import {
 	handlerReadsRenderLocalDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
+import { valueShapeOf } from './value-shape.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	catchResetUses,
@@ -276,6 +277,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
+		...shapeField(joined ? undefined : expression),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1450,6 +1452,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
+			...shapeField(conditionalClass.test),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1526,6 +1529,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			...templateReadSource(composite, expressionValue, state),
+			...shapeField(expressionValue),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -2394,6 +2398,11 @@ function eventHandlerExpression(
 	}
 
 	return { node: resolved.node, source: resolved.source, span: resolved.span };
+}
+
+function shapeField(expression: AnyNode | undefined): { valueShape?: SemanticTemplateRead['valueShape'] } {
+	const valueShape = valueShapeOf(expression);
+	return valueShape ? { valueShape } : {};
 }
 
 // A body of bare `x++`, `x--` or `x = ...` statements: its effects are its state writes, which a host can run as data.
