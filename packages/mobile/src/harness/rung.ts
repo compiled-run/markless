@@ -79,6 +79,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		const build = await compileNativeComponent({
 			filename: component,
 			source: readFileSync(component, 'utf8'),
+			// A rung that is a page compiles as its page file, so the router derives its route.
+			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 		});
 		if (!build.payload) {
 			const lines = build.diagnostics.map(

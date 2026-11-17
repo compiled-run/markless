@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 0.747794167,
+			"flowSeconds": 5.735876584
+		}
+	]
+}
