@@ -18,7 +18,19 @@ object DeviceConformance {
 		val vector = Json.parse(vectorBytes).obj("vector")
 		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore())
 		val failures = ArrayList<String>()
-		fun shownTexts(): String = host.payload.nodes.filter { it is Node.Text && host.hasView(it.id) }.joinToString(",", "[", "]") { "[${jsonString(it.id)},${jsonString(host.textView(it.id).text.toString())}]" }
+		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.textView(id).text.toString() else "<no view>")}]" }
+		fun structure(where: String) {
+			val wanted = host.payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(host.runtime::instances).mapTo(HashSet()) { it.id }
+			if (host.viewIds() != wanted) failures.add("$where: views exist for ${(host.viewIds() - wanted).sorted()} and are missing for ${(wanted - host.viewIds()).sorted()}")
+			for ((repeat, keys) in host.runtime.rows()) {
+				val r = host.runtime.node(repeat)
+				val top = host.payload.nodes.first { it.row == repeat && it.parent == r.parent }
+				val parent = host.view(r.parent ?: continue) as android.view.ViewGroup
+				val at = keys.map { k -> parent.indexOfChild(host.view("${top.id}@$k")) }
+				if (at != at.sorted() || at.any { it < 0 }) failures.add("$where: rows of $repeat sit at child indexes $at for keys $keys")
+			}
+		}
+		structure("initial")
 		val initial = canonical(vector.field("initial", "vector"))
 		if (shownTexts() != initial) failures.add("initial: views show ${shownTexts()}, expected $initial")
 		for (item in vector["initialAttributes"]?.arr("initialAttributes").orEmpty()) {
@@ -52,7 +64,7 @@ object DeviceConformance {
 			}
 			val runtimeTexts = host.runtime.texts().joinToString(",", "[", "]") { (id, t) -> "[${jsonString(id)},${jsonString(t)}]" }
 			if (shownTexts() != runtimeTexts) failures.add("steps[$n]: views show ${shownTexts()}, the runtime shows $runtimeTexts")
-			for (node in host.payload.nodes) if (node !is Node.Branch && host.hasView(node.id) != host.runtime.isShown(node)) failures.add("steps[$n]: \"${node.id}\" ${if (host.hasView(node.id)) "has a view but is hidden" else "is shown but has no view"}")
+			structure("steps[$n]")
 		}
 		return failures
 	}

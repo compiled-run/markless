@@ -4,7 +4,7 @@ import dev.markless.mobile.core.AttributeValue
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Js
 import dev.markless.mobile.core.MemoryStore
-import dev.markless.mobile.core.Scalar
+import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JsString
 import dev.markless.mobile.core.MarklessDecodeError
@@ -13,6 +13,7 @@ import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.jsonString
+import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.StyleExport
@@ -55,6 +56,9 @@ private fun runVector(file: File) {
 	val properties = runtime.properties().joinToString(",", "[", "]") { (n, a, v) -> "[${jsonString(n)},${jsonString(a)},${jsonString(v)}]" }
 	val initialProperties = vector["initialProperties"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialProperties", properties == initialProperties) { "expected $initialProperties\n  actual   $properties" }
+	val rows = runtime.rows().joinToString(",", "[", "]") { (n, keys) -> "[${jsonString(n)},${keys.joinToString(",", "[", "]", transform = ::jsonString)}]" }
+	val initialRows = vector["initialRows"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialRows", rows == initialRows) { "expected $initialRows\n  actual   $rows" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
@@ -107,9 +111,9 @@ private fun styleExport(fixtures: File) {
 	check("decodes Dragon's /1 toggle export", toggle.isSuccess) { toggle.exceptionOrNull().toString() }
 	toggle.getOrNull()?.let { t ->
 		val s = t.stateFor("selected")
-		val on = t.next(t.initial, s, Scalar.Bool(true))
-		check("/1 next moves to the selected assignment", t.assignments[on].values.values.single() == Scalar.Bool(true)) { "${t.assignments[on].values}" }
-		check("/1 next moves back", t.next(on, s, Scalar.Bool(false)) == t.initial) { "" }
+		val on = t.next(t.initial, s, JsValue.Bool(true))
+		check("/1 next moves to the selected assignment", t.assignments[on].values.values.single() == JsValue.Bool(true)) { "${t.assignments[on].values}" }
+		check("/1 next moves back", t.next(on, s, JsValue.Bool(false)) == t.initial) { "" }
 		val err = runCatching { t.stateFor("other") }.exceptionOrNull()?.message
 		check("/1 refuses a cell with no state", err?.contains("0 states") == true) { "$err" }
 	}
@@ -132,7 +136,7 @@ private fun ops() {
 	val step = r.dispatch("h1", EventName.Activate).joinToString(",") { it.toJson() }
 	check("each assign reads the values before it", step == """{"op":"text","node":"h0:text0","value":"1/<a1>"}""") { step }
 	check("an assign that changes nothing journals nothing", r.dispatch("h2", EventName.Activate).isEmpty()) { "" }
-	check("a storage cell writes its store", store.get("visits") == Scalar.Num(1.0)) { "${store.get("visits")}" }
+	check("a storage cell writes its store", store.get("visits") == JsValue.Num(1.0)) { "${store.get("visits")}" }
 	val again = Runtime(decoded, store)
 	check("a storage cell reads its store at mount", again.text("h0:text0") == "1/<a>") { again.text("h0:text0") }
 	refuses("an unknown builtin", payload.replace("\"template\":[", "\"call\":\"eval\",\"arguments\":[{\"literal\":1}],\"x\":[").replace(",\"x\":[\"<\",{\"cell\":\"s\"},\">\"]", ""), "unknown call \"eval\"")
@@ -140,45 +144,81 @@ private fun ops() {
 }
 
 private fun jsOps() {
-	fun n(x: Double) = Scalar.Num(x)
-	fun str(x: String) = Scalar.Str(x)
+	fun n(x: Double) = JsValue.Num(x)
+	fun str(x: String) = JsValue.Str(x)
 	val cases = listOf(
-		Js.binary("+", str("5"), n(1.0)) to str("51"), Js.binary("+", n(1.0), Scalar.Bool(true)) to n(2.0), Js.binary("+", Scalar.Null, str("x")) to str("nullx"),
-		Js.binary("-", str("5"), n(2.0)) to n(3.0), Js.binary("<", str("10"), str("9")) to Scalar.Bool(true), Js.binary("<", str("10"), n(9.0)) to Scalar.Bool(false),
-		Js.binary("<=", n(Double.NaN), n(1.0)) to Scalar.Bool(false), Js.binary(">=", Scalar.Null, n(0.0)) to Scalar.Bool(true), Js.binary("%", n(-5.0), n(3.0)) to n(-2.0),
+		Js.binary("+", str("5"), n(1.0)) to str("51"), Js.binary("+", n(1.0), JsValue.Bool(true)) to n(2.0), Js.binary("+", JsValue.Null, str("x")) to str("nullx"),
+		Js.binary("-", str("5"), n(2.0)) to n(3.0), Js.binary("<", str("10"), str("9")) to JsValue.Bool(true), Js.binary("<", str("10"), n(9.0)) to JsValue.Bool(false),
+		Js.binary("<=", n(Double.NaN), n(1.0)) to JsValue.Bool(false), Js.binary(">=", JsValue.Null, n(0.0)) to JsValue.Bool(true), Js.binary("%", n(-5.0), n(3.0)) to n(-2.0),
 		Js.call("Number", listOf(str(" 12 "))) to n(12.0), Js.call("Number", listOf(str("5x"))) to n(Double.NaN), Js.call("Number", listOf(str(""))) to n(0.0),
 		Js.call("Number", listOf(str("0x1F"))) to n(31.0), Js.call("Number", listOf(str("-0x1F"))) to n(Double.NaN), Js.call("Number", listOf(str("1e3"))) to n(1000.0),
 		Js.call("Number", listOf(str("1f"))) to n(Double.NaN), Js.call("Number", listOf(str(".5"))) to n(0.5), Js.call("Number", listOf(str("5."))) to n(5.0), Js.call("Number", listOf(str("-Infinity"))) to n(Double.NEGATIVE_INFINITY),
 		Js.call("Math.round", listOf(n(-2.5))) to n(-2.0), Js.call("Math.round", listOf(n(2.5))) to n(3.0), Js.call("Math.round", listOf(n(0.49999999999999994))) to n(0.0),
 		Js.call("Math.round", listOf(n(4503599627370497.0))) to n(4503599627370497.0), Js.call("Math.max", listOf()) to n(Double.NEGATIVE_INFINITY), Js.call("Math.max", listOf(n(1.0), n(Double.NaN))) to n(Double.NaN),
-		Js.call("String", listOf()) to str(""), Js.call("Boolean", listOf(str("0"))) to Scalar.Bool(true), Js.call("Math.abs", listOf(str("-3"))) to n(3.0),
+		Js.call("String", listOf()) to str(""), Js.call("Boolean", listOf(str("0"))) to JsValue.Bool(true), Js.call("Math.abs", listOf(str("-3"))) to n(3.0),
 	)
 	for ((n2, pair) in cases.withIndex()) {
 		val (got, want) = pair
-		val same = if (got is Scalar.Num && want is Scalar.Num) got.value.equals(want.value) else got == want
+		val same = if (got is JsValue.Num && want is JsValue.Num) got.value.equals(want.value) else got == want
 		check("js op $n2", same) { "got $got, want $want" }
 	}
-	val negZero = Js.call("Math.min", listOf(n(0.0), n(-0.0))) as Scalar.Num
+	val negZero = Js.call("Math.min", listOf(n(0.0), n(-0.0))) as JsValue.Num
 	check("Math.min(0, -0) is -0", 1 / negZero.value < 0) { "${negZero.value}" }
-	val posZero = Js.call("Math.max", listOf(n(-0.0), n(0.0))) as Scalar.Num
+	val posZero = Js.call("Math.max", listOf(n(-0.0), n(0.0))) as JsValue.Num
 	check("Math.max(-0, 0) is 0", 1 / posZero.value > 0) { "${posZero.value}" }
 	check("round keeps -0 for -0.4", 1 / Js.round(-0.4) < 0) { "${Js.round(-0.4)}" }
 }
 
 private fun attributeRule() {
-	val t = Scalar.Bool(true); val f = Scalar.Bool(false)
+	val t = JsValue.Bool(true); val f = JsValue.Bool(false)
 	val cases = listOf(
 		Triple("disabled", t, ""), Triple("disabled", f, null), Triple("aria-pressed", f, "false"), Triple("aria-pressed", t, "true"),
 		Triple("aria-hidden", f, null), Triple("aria-hidden", t, "true"), Triple("data-on", t, "true"), Triple("data-on", f, null),
-		Triple("draggable", f, "false"), Triple("spellcheck", t, "true"), Triple("title", Scalar.Num(2.0), "2"), Triple("title", Scalar.Str(""), ""),
+		Triple("draggable", f, "false"), Triple("spellcheck", t, "true"), Triple("title", JsValue.Num(2.0), "2"), Triple("title", JsValue.Str(""), ""),
 	)
 	for ((name, value, want) in cases) check("attribute $name=$value", AttributeValue.of(name, value) == want) { "got ${AttributeValue.of(name, value)}, want $want" }
-	check("=== is false across types", !Runtime.strictEquals(Scalar.Num(1.0), Scalar.Str("1"))) { "" }
-	check("=== holds 0 and -0 equal", Runtime.strictEquals(Scalar.Num(0.0), Scalar.Num(-0.0))) { "" }
-	check("=== holds NaN unequal", !Runtime.strictEquals(Scalar.Num(Double.NaN), Scalar.Num(Double.NaN))) { "" }
+	check("=== is false across types", !Js.strictEquals(JsValue.Num(1.0), JsValue.Str("1"))) { "" }
+	check("=== holds 0 and -0 equal", Js.strictEquals(JsValue.Num(0.0), JsValue.Num(-0.0))) { "" }
+	check("=== holds NaN unequal", !Js.strictEquals(JsValue.Num(Double.NaN), JsValue.Num(Double.NaN))) { "" }
+}
+
+private fun arrays() {
+	fun n(x: Double) = JsValue.Num(x)
+	fun str(x: String) = JsValue.Str(x)
+	fun arr(vararg v: JsValue) = JsValue.Arr(v.toMutableList())
+	fun v(x: JsValue) = Js.Arg.Value(x)
+	fun show(x: JsValue) = jsonValue(x)
+	val a = arr(n(1.0), arr(n(2.0), JsValue.Null), str("x"))
+	val cases = listOf(
+		"String([1,[2,null],'x'])" to (JsString.of(a) to "1,2,,x"),
+		"[1]+1" to (show(Js.binary("+", arr(n(1.0)), n(1.0))) to "\"11\""),
+		"[]+[]" to (show(Js.binary("+", arr(), arr())) to "\"\""),
+		"Number([5])" to (show(Js.call("Number", listOf(arr(n(5.0))))) to "5"),
+		"Number({})" to (show(Js.call("Number", listOf(JsValue.Obj(LinkedHashMap())))) to "null"),
+		"[2] < [10]" to (show(Js.binary("<", arr(n(2.0)), arr(n(10.0)))) to "false"),
+		"[NaN].includes(NaN)" to (show(Js.method("includes", arr(n(Double.NaN)), listOf(v(n(Double.NaN))))) to "true"),
+		"[NaN].indexOf(NaN)" to (show(Js.method("indexOf", arr(n(Double.NaN)), listOf(v(n(Double.NaN))))) to "-1"),
+		"[1,2,3].slice(-2)" to (show(Js.method("slice", arr(n(1.0), n(2.0), n(3.0)), listOf(v(n(-2.0))))) to "[2,3]"),
+		"[1,2,3].slice(2,1)" to (show(Js.method("slice", arr(n(1.0), n(2.0), n(3.0)), listOf(v(n(2.0)), v(n(1.0))))) to "[]"),
+		"[1,null].join('-')" to (show(Js.method("join", arr(n(1.0), JsValue.Null), listOf(v(str("-"))))) to "\"1-\""),
+		"[1].concat(2,[3,[4]])" to (show(Js.method("concat", arr(n(1.0)), listOf(v(n(2.0)), v(arr(n(3.0), arr(n(4.0))))))) to "[1,2,3,[4]]"),
+		"map with index" to (show(Js.method("map", arr(str("a"), str("b")), listOf(Js.Arg.Callback { (item, i) -> Js.binary("+", item, i) }))) to "[\"a0\",\"b1\"]"),
+		"'abc'.slice(-2)" to (show(Js.method("slice", str("abc"), listOf(v(n(-2.0))))) to "\"bc\""),
+		"'abc'.includes('')" to (show(Js.method("includes", str("abc"), listOf(v(str(""))))) to "true"),
+		"'  a '.trim()" to (show(Js.method("trim", str("\u00a0 a \n"), listOf())) to "\"a\""),
+		"'ß'.toUpperCase()" to (show(Js.method("toUpperCase", str("ß"), listOf())) to "\"SS\""),
+		"'a'.concat(1,null)" to (show(Js.method("concat", str("a"), listOf(v(n(1.0)), v(JsValue.Null)))) to "\"a1null\""),
+	)
+	for ((name, pair) in cases) check(name, pair.first == pair.second) { "got ${pair.first}, want ${pair.second}" }
+	val fresh = arr(n(1.0), n(2.0))
+	check("reverse is in place and returns its array", Js.method("reverse", fresh, listOf()) === fresh && show(fresh) == "[2,1]") { show(fresh) }
+	check("arrays compare by identity", !Js.strictEquals(arr(), arr()) && Js.strictEquals(fresh, fresh)) { "" }
+	val err = runCatching { Js.method("toUpperCase", arr(), listOf()) }.exceptionOrNull()?.message
+	check("a method the target lacks is an error", err == ".toUpperCase() of a array") { "$err" }
 }
 
 fun main(args: Array<String>) {
+	arrays()
 	attributeRule()
 	ops()
 	jsOps()

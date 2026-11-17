@@ -3,7 +3,7 @@ package dev.markless.mobile.style
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.MarklessDecodeError
 import dev.markless.mobile.core.Js
-import dev.markless.mobile.core.Scalar
+import dev.markless.mobile.core.JsValue
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
@@ -36,11 +36,11 @@ sealed interface StyleWrite {
 data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
 
 /** One reachable combination of style states: every node's frame and writes, complete. */
-data class Assignment(val values: Map<String, Scalar>, val nodes: List<StyledNode>) {
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
-data class StyleState(val key: String, val domain: List<Scalar>)
+data class StyleState(val key: String, val domain: List<JsValue>)
 
 /**
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
@@ -56,7 +56,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 	}
 
 	/** The assignment reached from [current] when state [state] takes [value]; an unreachable or unknown value is an error. */
-	fun next(current: Int, state: Int, value: Scalar): Int {
+	fun next(current: Int, state: Int, value: JsValue): Int {
 		val v = states[state].domain.indexOfFirst { Js.strictEquals(it, value) }
 		if (v < 0) throw MarklessDecodeError("style state \"${states[state].key}\" has no value $value in its domain")
 		val to = next[current][state][v]
@@ -110,11 +110,11 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			return StyledNode(id, parent, kind, frame, bw, writes)
 		}
 
-		private fun scalar(v: Json, what: String): Scalar = when (v) {
-			is Json.Bool -> Scalar.Bool(v.value)
-			is Json.Num -> Scalar.Num(v.value)
-			is Json.Str -> Scalar.Str(v.value)
-			Json.Null -> Scalar.Null
+		private fun scalar(v: Json, what: String): JsValue = when (v) {
+			is Json.Bool -> JsValue.Bool(v.value)
+			is Json.Num -> JsValue.Num(v.value)
+			is Json.Str -> JsValue.Str(v.value)
+			Json.Null -> JsValue.Null
 			else -> throw MarklessDecodeError("$what is not a scalar")
 		}
 

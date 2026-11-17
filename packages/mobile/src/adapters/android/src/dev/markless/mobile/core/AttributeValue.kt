@@ -8,9 +8,9 @@ object AttributeValue {
 		"multiline", "multiselectable", "pressed", "readonly", "required", "selected",
 	).map { "aria-$it" }
 
-	fun of(name: String, value: Scalar): String? {
-		if (value == Scalar.Null || (value is Scalar.Bool && !value.value && name !in SPELLS_FALSE)) return null
-		if (value is Scalar.Bool && value.value && name !in ENUMERATED_BOOLEAN && !name.startsWith("aria-") && !name.startsWith("data-")) return ""
+	fun of(name: String, value: JsValue): String? {
+		if (value == JsValue.Null || (value is JsValue.Bool && !value.value && name !in SPELLS_FALSE)) return null
+		if (value is JsValue.Bool && value.value && name !in ENUMERATED_BOOLEAN && !name.startsWith("aria-") && !name.startsWith("data-")) return ""
 		return JsString.of(value)
 	}
 }
