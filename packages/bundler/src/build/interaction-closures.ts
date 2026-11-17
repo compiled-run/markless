@@ -10,6 +10,7 @@ import {
 import { PROTOCOL_EVENT_ACTION_KIND } from '@markless/serializer';
 import type { RuntimeDemandMapManifest } from '../types.ts';
 import { runtimeModuleIdFromOrigin } from './bundle-graph.ts';
+import { joinFirstUse } from '@markless/web/fns/first-use-join';
 import {
 	CARRIES_UNLISTED_RECORDS,
 	undemandedRuntimeModules,
@@ -425,7 +426,7 @@ export function computeInteractionClosures(input: {
 		};
 		// Boot holds what resume start and the records that run before input need; a symbol only some control's
 		// first use or no known path loads is left to that control's closure or to on-demand fetch.
-		const resume = joinPage(page.resume, page);
+		const resume = joinFirstUse(page.resume, page);
 		const bootSeeds = new Set(bootRoots);
 		let bootBounded =
 			resume !== 'unknown' && [...files].every((file) => !demand.get(file)!.replaced);
@@ -491,7 +492,7 @@ export function computeInteractionClosures(input: {
 				const firstUse = merged.replaced ? null : served.firstUse;
 				// Resume start runs page-wide, so every bounded control joins what it runs.
 				const joined = firstUse
-					? joinPage(
+					? joinFirstUse(
 							[...firstUse.map((reach) => ({ file, reach })), ...page.resume],
 							page,
 						)
@@ -810,70 +811,6 @@ function pageIndex(files: Iterable<string>, demand: ReadonlyMap<string, MergedDe
 			for (const prop of props) push(index.slots, slot, { file, prop });
 	}
 	return { ...index, resumeUnknown };
-}
-
-// Closes a first use over the page: what every module re-runs for the page-space cells it
-// writes, and what the modules that compose it pass for the values it calls.
-function joinPage(
-	start: ReadonlyArray<OwnedReach>,
-	page: PageIndex,
-):
-	| { readonly symbols: Map<string, Set<string>>; readonly runtimeModuleIds: Set<string> }
-	| 'unknown' {
-	if (page.resumeUnknown) return 'unknown';
-	const symbols = new Map<string, Set<string>>();
-	const runtimeModuleIds = new Set<string>();
-	const joinedCells = new Set<string>();
-	const joinedProps = new Set<string>();
-	const pending = [...start];
-	while (pending.length) {
-		const { file, reach } = pending.pop()!;
-		for (const id of reach.symbolIds) addTo(symbols, file, id);
-		for (const foreign of reach.foreign ?? [])
-			for (const id of foreign.symbolIds) addTo(symbols, foreign.file, id);
-		for (const id of reach.runtimeModuleIds) runtimeModuleIds.add(id);
-		for (const graphNodeId of reach.pageSpaceWrites ?? []) {
-			if (joinedCells.has(graphNodeId)) continue;
-			joinedCells.add(graphNodeId);
-			for (const reader of page.readers.get(graphNodeId) ?? []) {
-				if (reader.reach === 'unknown') return 'unknown';
-				pending.push({ file: reader.file, reach: reader.reach });
-			}
-		}
-		const props = (reach.calls ?? []).flatMap((call) =>
-			'slot' in call
-				? (page.slots.get(call.slot) ?? [])
-				: [{ file: call.file ?? file, prop: call.prop }],
-		);
-		for (const called of props) {
-			const key = `${called.file}\0${called.prop}`;
-			if (joinedProps.has(key)) continue;
-			joinedProps.add(key);
-			for (const { file: publisher, prop: passed } of page.passed) {
-				const receiver = passed.file === null ? null : (passed.file ?? publisher);
-				if (receiver !== null && receiver !== called.file) continue;
-				if (
-					passed.prop !== undefined
-						? passed.prop !== called.prop
-						: (passed.excludeNames ?? []).includes(called.prop)
-				)
-					continue;
-				if (passed.reach === 'unknown') return 'unknown';
-				pending.push({
-					file: publisher,
-					reach:
-						passed.reach === 'same-prop'
-							? {
-									symbolIds: [],
-									runtimeModuleIds: [],
-									calls: [{ prop: called.prop }],
-								}
-							: passed.reach,
-				});
-			}
-		}
-	}
-	return { symbols, runtimeModuleIds };
 }
 
 function isSymbolModule(id: string): boolean {

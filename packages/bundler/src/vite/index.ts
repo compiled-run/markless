@@ -41,6 +41,7 @@ import { collapseInitFacadeImports } from '../build/init-facade-imports.ts';
 import { deferredRuntimePlugin } from '../build/deferred-runtime.ts';
 import { clearChunkFactCaches } from '../build/chunk-ast.ts';
 import { prefetchChunkDynamicImports } from '../build/chunk-workers.ts';
+import { devResidentRuntimePlugin } from './dev-resident-runtime.ts';
 import { nativePackingPlugins } from '../build/native-packing.ts';
 import { DEPRECATED_NATIVE_PACKING_WARNING, nativePackingEnabled } from '../packing-option.ts';
 import {
@@ -547,6 +548,7 @@ export function markless(options: MarklessViteOptions = {}): Plugin[] {
 	return [
 		marklessPlugin,
 		browserNodeGuard(),
+		devResidentRuntimePlugin(),
 		constantSlicesPlugin(),
 		{
 			name: 'markless:shared-render-data-reach',

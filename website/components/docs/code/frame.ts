@@ -93,6 +93,11 @@ async function run(
 		await Promise.all(
 			modules.filter((module) => module.generated).map((module) => evaluate(module.id).catch(() => {})),
 		);
+		// The dev server serves the runtime's lazy modules one by one; a build packs them beside the frame.
+		if (import.meta.env.DEV)
+			await import('../../../../packages/web/src/fns/dev-resident.ts').then((helper) =>
+				helper.marklessDevWarmed(),
+			);
 		if (id !== latest) return;
 		if (!entry.default)
 			throw new Error(

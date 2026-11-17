@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 import { expect, test } from 'vitest';
 import { markless } from '../src/vite/index.ts';
 import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
+import { marklessDevLoad } from '../../web/src/fns/dev-resident.ts';
 
 // The page composes RelayRow twice; each RelayRow hands its Row an arrow that calls
 // RelayRow's own `onPicked` prop. Row invokes that arrow by instance path, so the
@@ -40,10 +41,11 @@ function runRoute(source: string) {
 	const calls: string[] = [];
 	const route = new Function(
 		'__mxImport',
+		'marklessDevLoad',
 		'marklessLoadLocalSymbol',
 		'marklessSsrLoadSymbolRouteRebound',
 		'marklessSsrLoadSymbolRouteWhenLoaded',
-		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
+		`${source.replace(/\bimport\.meta\.url\b/g, "''").replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
 	)(
 		async (specifier: string) => ({
 			loadSymbol: (symbolId: string) => {
@@ -51,6 +53,7 @@ function runRoute(source: string) {
 				return `child ${symbolId}`;
 			},
 		}),
+		marklessDevLoad,
 		(symbolId: string) => {
 			calls.push(`local ${symbolId}`);
 			return `local ${symbolId}`;

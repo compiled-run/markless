@@ -13,6 +13,12 @@ import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
 import { RESIDENT_LOAD_MODULE, emitSymbolRouteTable } from './rebound-symbol-route.ts';
+import {
+	moduleLoads,
+	type HandlerReach,
+	type ModuleLoad,
+	type ModuleLoads,
+} from './module-loads.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -24,11 +30,14 @@ export type SourceSymbolRow = {
 	readonly id: string;
 	readonly chunk: string;
 	readonly exportName: string;
+	readonly eventHandler?: boolean;
 };
 
 export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
+	/** The compiled file the import names, on the dev server. */
+	readonly file?: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
 };
 
@@ -308,6 +317,8 @@ export function emitSourceModule(input: {
 	readonly sharedDefinitionExports?: ReadonlyArray<string>;
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly hasBoundSymbols?: boolean;
+	/** On the dev server: the compiled files of the children whose symbols this module's bound rows load. */
+	readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
 	readonly prerenderRecords?: boolean;
 	readonly directCsr?: boolean;
 	/**
@@ -332,6 +343,11 @@ export function emitSourceModule(input: {
 	if (input.directCsr && input.prerenderRecords) input = { ...input, prerenderRecords: false };
 	const symbolsOnly = input.environment === 'client' && input.clientOutput === 'symbols-only';
 	const routeSymbols = input.environment === 'client' && input.symbolRoutes.length > 0;
+	const loads = moduleLoads(
+		input.devResumeReexport === true ? input.filename : undefined,
+		devDemand(input.runtimeDemandMap),
+	);
+	const load = loads.load ?? importLoad;
 	const canonicalRenderData =
 		input.environment === 'client' &&
 		!symbolsOnly &&
@@ -405,16 +421,16 @@ export function emitSourceModule(input: {
 		// would never be renumbered. The line is page-agnostic, so a resumed page
 		// writing it twice is the same assignment.
 		input.environment === 'client' && input.hasComputedState === true
-			? emitRosterResumeLoaderInstall()
+			? emitRosterResumeLoaderInstall(load)
 			: null,
 		// Same split for elevation, and for the same reason: a CSR mount reaches the
 		// runtime's start without ever loading a resume module, so a marked CSR app
 		// has to name the behaviour here or it would never install.
 		input.environment === 'client' && input.hasOverlayMarks === true
-			? emitOverlayLoaderInstall()
+			? emitOverlayLoaderInstall(load)
 			: null,
 		input.environment === 'client' && input.hasLiveSharedState === true
-			? emitSharedInstancesLoaderInstall()
+			? emitSharedInstancesLoaderInstall(load)
 			: null,
 		// And for `onIdle`: a CSR mount gets the idle wake only from an app module with an idle record.
 		input.environment === 'client' && input.hasIdleEvents === true && !symbolsOnly
@@ -426,9 +442,9 @@ export function emitSourceModule(input: {
 		// production - dev only worked because the dev-only resume re-export below
 		// dragged the resume module in. The line is page-agnostic, so installing it
 		// twice on a resumed page is the same assignment, not a second page's.
-		input.environment === 'client' ? clientRowMintLoader(input) : null,
+		input.environment === 'client' ? clientRowMintLoader({ ...input, load }) : null,
 		'',
-		emitLoadSymbol(input),
+		emitLoadSymbol(input, loads),
 		symbolsOnly && input.scalarActions
 			? emitScalarPlanLoader(
 					input.scalarActions,
@@ -450,6 +466,7 @@ export function emitSourceModule(input: {
 		input.behaviorSymbols?.length
 			? emitDirectSourceSymbolLoader(
 					input.behaviorSymbols,
+					load,
 					'readMarklessBehaviorSourceSymbol',
 				).replace('function loadSymbol(', 'function loadBehaviorSymbol(')
 			: '',
@@ -485,6 +502,7 @@ export function emitSourceModule(input: {
 					'marklessSsrLoadSymbolRoute',
 					'marklessLoadLocalSymbol',
 					input.scalarActions !== undefined,
+					loads.load,
 				)
 			: '',
 		routeSymbols && !symbolsOnly && input.directCsr === true
@@ -522,6 +540,7 @@ export function emitSourceModule(input: {
 			input.sharedDefinitionExports ?? [],
 			input.publicRenderSsrComponentExports ?? [],
 		),
+		loads.imports(),
 		'',
 	]
 		.filter((line): line is string => line !== null)
@@ -622,11 +641,11 @@ export function emitIdleTriggerInstall(): string {
  * for the same reason - a slot module is bytes every app pays for a capability
  * most of them do not have. Nothing is fetched until the runtime calls it.
  */
-export function emitOverlayLoaderInstall(): string {
+export function emitOverlayLoaderInstall(load: ModuleLoad = importLoad): string {
 	return [
 		'globalThis.__marklessOverlay = (root) =>',
 		"\troot.querySelector('[overlay]')",
-		"\t\t? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root))",
+		`\t\t? ${load('@markless/web/fns/overlay')}.then((m) => m.installOverlayBehavior(root))`,
 		'\t\t: undefined;',
 	].join('\n');
 }
@@ -645,17 +664,17 @@ export function emitOverlayLoaderInstall(): string {
  * construction, resume start and CSR mount sit in modules every app loads, so the
  * specifier lives only in a module whose state declares a non-widget definition.
  */
-export function emitSharedInstancesLoaderInstall(): string {
-	return "globalThis.__marklessSharedInstances ??= () => import('@markless/web/fns/shared-start');";
+export function emitSharedInstancesLoaderInstall(load: ModuleLoad = importLoad): string {
+	return `globalThis.__marklessSharedInstances ??= () => ${load('@markless/web/fns/shared-start')};`;
 }
 
 // An MDX page's islands never load before its resume builds the graph, so its route installs their planes on demand.
-export function emitAsyncPlanesLoaderInstall(): string {
-	return "globalThis.__marklessAsyncPlanes ??= (state) => state.computed.some((c) => c.async) && Promise.all([import('@markless/web/fns/async-plane').then((m) => m.installMarklessAsyncPlane()), state.computed.some((c) => c.holds) && import('@markless/web/fns/held-inputs-plane').then((m) => m.installMarklessHeldInputs())]);";
+export function emitAsyncPlanesLoaderInstall(load: ModuleLoad = importLoad): string {
+	return `globalThis.__marklessAsyncPlanes ??= (state) => state.computed.some((c) => c.async) && Promise.all([${load('@markless/web/fns/async-plane')}.then((m) => m.installMarklessAsyncPlane()), state.computed.some((c) => c.holds) && ${load('@markless/web/fns/held-inputs-plane')}.then((m) => m.installMarklessHeldInputs())]);`;
 }
 
-export function emitRosterResumeLoaderInstall(): string {
-	return "globalThis.__marklessRosterResume ??= () => import('@markless/web/fns/roster-resume');";
+export function emitRosterResumeLoaderInstall(load: ModuleLoad = importLoad): string {
+	return `globalThis.__marklessRosterResume ??= () => ${load('@markless/web/fns/roster-resume')};`;
 }
 
 /**
@@ -667,19 +686,23 @@ export function emitRosterResumeLoaderInstall(): string {
  * recorded a mintable repeat for; the repeat runtime reads the loader off the
  * global and refuses to build without one.
  */
-function emitRowMintLoaderInstall(): string {
-	return "globalThis.__marklessRowMint ??= () => import('@markless/web/fns/row-mint');";
+function emitRowMintLoaderInstall(load: ModuleLoad): string {
+	return `globalThis.__marklessRowMint ??= () => ${load('@markless/web/fns/row-mint')};`;
 }
 
 /**
  * The same one line for per-enclosing-row wiring: only a page holding a `@for`
  * inside another `@for`'s rows names the module, so no other app emits its chunk.
  */
-function nestedRepeatsLoader(runtimeDemandMap: unknown, linked = false): string | null {
+function nestedRepeatsLoader(
+	runtimeDemandMap: unknown,
+	linked: boolean | undefined,
+	load: ModuleLoad,
+): string | null {
 	return linked || demandsKeyedRepeatModule(runtimeDemandMap, NESTED_REPEATS_RUNTIME_MODULE_ID)
 		? [
 				'globalThis.__marklessNestedRepeats ??= (...input) =>',
-				"\timport('@markless/web/fns/nested-repeats').then((nested) => nested.wireNestedRepeats(...input));",
+				`\t${load('@markless/web/fns/nested-repeats')}.then((nested) => nested.wireNestedRepeats(...input));`,
 			].join('\n')
 		: null;
 }
@@ -719,10 +742,10 @@ function demandsRowMint(runtimeDemandMap: unknown): boolean {
  * whichever is evaluated last. The surface travels on the runtime input instead
  * and arrives as the loader's first argument.
  */
-function emitRowComponentMintLoaderInstall(): string {
+function emitRowComponentMintLoaderInstall(load: ModuleLoad): string {
 	return [
 		'globalThis.__marklessRowMint = Object.assign(',
-		"\t(...input) => import('@markless/web/fns/row-component-mint').then((mint) => mint.marklessRowComponentMint(...input)),",
+		`\t(...input) => ${load('@markless/web/fns/row-component-mint')}.then((mint) => mint.marklessRowComponentMint(...input)),`,
 		'\t{ components: true },',
 		');',
 	].join('\n');
@@ -731,6 +754,7 @@ function emitRowComponentMintLoaderInstall(): string {
 // Fail closed: without a canonical render-data module there is no surface to
 // render a row against, so naming the bridge would only fetch a dead chunk.
 function componentRowLoader(input: {
+	readonly load?: ModuleLoad;
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
@@ -745,22 +769,27 @@ function componentRowLoader(input: {
 		input.linkedRowComponents ||
 		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_COMPONENT_MINT_RUNTIME_MODULE_ID)
 	)
-		return emitRowComponentMintLoaderInstall();
+		return emitRowComponentMintLoaderInstall(input.load ?? importLoad);
 	return input.linkedRowSlotReaders ||
 		demandsKeyedRepeatModule(input.runtimeDemandMap, ROW_SLOT_MINT_RUNTIME_MODULE_ID)
-		? emitRowSlotMintLoaderInstall()
+		? emitRowSlotMintLoaderInstall(input.load ?? importLoad)
 		: undefined;
 }
 
 // Beside the mint loader, only on a page whose rows flip an @if of their own.
-function rowBranchesLoader(runtimeDemandMap: unknown, linked = false): string | null {
+function rowBranchesLoader(
+	runtimeDemandMap: unknown,
+	linked: boolean | undefined,
+	load: ModuleLoad,
+): string | null {
 	return linked || demandsKeyedRepeatModule(runtimeDemandMap, ROW_BRANCH_MINT_RUNTIME_MODULE_ID)
-		? "globalThis.__marklessRowBranches ??= () => import('@markless/web/fns/row-branch-mint').then((branches) => branches.marklessRowBranches());"
+		? `globalThis.__marklessRowBranches ??= () => ${load('@markless/web/fns/row-branch-mint')}.then((branches) => branches.marklessRowBranches());`
 		: null;
 }
 
 // Whichever mint this page's repeats demand, for client output that has no resume module.
 function clientRowMintLoader(input: {
+	readonly load: ModuleLoad;
 	readonly renderDataId?: string;
 	readonly runtimeDemandMap?: unknown;
 	readonly linkedRowSlotReaders?: boolean;
@@ -770,25 +799,25 @@ function clientRowMintLoader(input: {
 	readonly linkedRowBranches?: boolean;
 }): string | null {
 	const mint = demandsRowComponentMint(input.runtimeDemandMap)
-		? emitRowComponentMintLoaderInstall()
+		? emitRowComponentMintLoaderInstall(input.load)
 		: (componentRowLoader(input) ??
 			(input.linkedRowTemplates || demandsRowMint(input.runtimeDemandMap)
-				? emitRowMintLoaderInstall()
+				? emitRowMintLoaderInstall(input.load)
 				: null));
 	// Nested repeats and row branches wire through the same client module, for the same reason.
 	const lines = [
 		mint,
-		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
-		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
+		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats, input.load),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches, input.load),
 	].filter((line): line is string => line !== null);
 	return lines.length > 0 ? lines.join('\n') : null;
 }
 
 // Assigned over a plain mint, which cannot read a row's expressions, but never over the component mint, which can.
-function emitRowSlotMintLoaderInstall(): string {
+function emitRowSlotMintLoaderInstall(load: ModuleLoad): string {
 	return [
 		'if (!globalThis.__marklessRowMint?.components) globalThis.__marklessRowMint = (...input) =>',
-		"\timport('@markless/web/fns/row-slot-mint').then((mint) => mint.marklessRowSlotMint(...input));",
+		`\t${load('@markless/web/fns/row-slot-mint')}.then((mint) => mint.marklessRowSlotMint(...input));`,
 	].join('\n');
 }
 
@@ -850,7 +879,11 @@ export function emitResumeModule(input: {
 	readonly symbolRoutes: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly closurePlanRoutes?: ReadonlyArray<SourceLazySymbolRoute>;
 	readonly executionLog?: MarklessExecutionLogMode;
+	/** The compiled file, when the dev server serves it and loads each module on first use. */
+	readonly devFilename?: string;
 	readonly hasBoundSymbols?: boolean;
+	/** On the dev server: the compiled files of the children whose symbols this module's bound rows load. */
+	readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
 	// Boundary-sized bound-symbol facts for the narrow settle path. Data only:
 	// nothing in this module reads them, so a page that never fills an arm pays
 	// their document bytes and no execution.
@@ -894,6 +927,8 @@ export function emitResumeModule(input: {
 	}>;
 }) {
 	const routeSymbols = input.symbolRoutes.length > 0;
+	const loads = moduleLoads(input.devFilename, devDemand(input.runtimeDemandMap));
+	const load = loads.load ?? importLoad;
 	const resumeSymbolLoader = routeSymbols ? 'marklessSsrLoadSymbolRoute' : 'loadSymbol';
 	// Served-only plans answer only where the container serves its view, so they never reach the static dispatcher.
 	const servedPlansOnly =
@@ -968,20 +1003,20 @@ export function emitResumeModule(input: {
 			? [
 					"import { installMarklessDerivedReconcile } from '@markless/web/fns/reconcile-plane';",
 					'installMarklessDerivedReconcile();',
-					emitRosterResumeLoaderInstall(),
+					emitRosterResumeLoaderInstall(load),
 				].join('\n')
 			: input.rosterDerivation === true
-				? emitRosterResumeLoaderInstall()
+				? emitRosterResumeLoaderInstall(load)
 				: null,
 		// Elevation is pay-per-use the same way, but one step further: this module
 		// is the ONLY place the overlay behaviour's specifier is written, so an app
 		// the compiler recorded no `overlay` demand for never emits its chunk at
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
-		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall(load) : null,
 		input.hasLiveSharedState === true ||
 		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
-			? emitSharedInstancesLoaderInstall()
+			? emitSharedInstancesLoaderInstall(load)
 			: null,
 		input.hasIdleEvents ? emitIdleTriggerInstall() : null,
 		// Row building is pay-per-use the same way: this module is the ONLY place
@@ -991,12 +1026,12 @@ export function emitResumeModule(input: {
 		// mintable repeat somewhere is still not fetching it.
 		// One global, so a page whose rows are components installs the bridge that
 		// re-exports the template mint instead of a second loader beside it.
-		componentRowLoader(input) ??
+		componentRowLoader({ ...input, load }) ??
 			(input.linkedRowTemplates || demandsRowMint(input.runtimeDemandMap)
-				? emitRowMintLoaderInstall()
+				? emitRowMintLoaderInstall(load)
 				: null),
-		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats),
-		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches),
+		nestedRepeatsLoader(input.runtimeDemandMap, input.linkedNestedRepeats, load),
+		rowBranchesLoader(input.runtimeDemandMap, input.linkedRowBranches, load),
 		scalarSpecializations.length > 0
 			? [
 					"import { marklessDecodeScalarCell, marklessReadScalarCell, marklessScalarSpecializedError } from '@markless/web/fns/scalar-specialized';",
@@ -1024,13 +1059,15 @@ export function emitResumeModule(input: {
 			? 'if (globalThis.__mxLog) globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
 			: null,
 		'',
-		emitLoadSymbol(input, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
+		emitLoadSymbol(input, loads, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		routeSymbols
 			? emitLazySymbolRouteFunction(
 					input.symbolRoutes,
 					'marklessSsrLoadSymbolRoute',
 					'marklessLoadLocalSymbol',
+					false,
+					loads.load,
 				)
 			: '',
 		routeSymbols ? 'export { marklessSsrLoadSymbolRoute as loadSymbol };' : '',
@@ -1040,6 +1077,7 @@ export function emitResumeModule(input: {
 			? emitClosurePlanRoute(input.closurePlanRoutes ?? [], 'marklessClosurePlanRoute', [])
 			: null,
 		resumeContainerEvent,
+		loads.imports(),
 		'',
 	]
 		.filter((line): line is string => line !== null)
@@ -1129,6 +1167,7 @@ function emitLazySymbolRouteFunction(
 	functionName: string,
 	fallbackName = 'loadSymbol',
 	includeScalarActionPlans = false,
+	load?: ModuleLoad,
 ): string {
 	if (routes.length === 0) return '';
 	// A projected child's path nests under the component it was projected into,
@@ -1149,6 +1188,7 @@ function emitLazySymbolRouteFunction(
 		functionName,
 		fallbackName,
 		reboundName: `${functionName}Rebound`,
+		load,
 	});
 }
 
@@ -2306,14 +2346,27 @@ function emitLoadSymbol(
 		readonly resolverId: string;
 		readonly symbols: ReadonlyArray<SourceSymbolRow>;
 		readonly hasBoundSymbols?: boolean;
+		readonly devBoundChildren?: ReadonlyArray<string> | 'unknown';
+		readonly runtimeDemandMap?: unknown;
 	},
+	loads: ModuleLoads,
 	sourceReaderName?: string,
 ) {
-	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT) {
-		const direct = emitDirectSourceSymbolLoader(input.symbols, sourceReaderName);
+	// On the dev server each symbol is named for the first interaction's load, so none goes through the resolver.
+	if (
+		input.symbols.length > 0 &&
+		(input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT || loads.load !== undefined)
+	) {
+		const handler = loads.handler;
+		const direct = emitDirectSourceSymbolLoader(
+			input.symbols,
+			loads.load ?? importLoad,
+			sourceReaderName,
+			handler && ((symbol) => handler(symbol.chunk, handlerReach(input.runtimeDemandMap, symbol.id))),
+		);
 		if (!input.hasBoundSymbols) return direct;
 		return [
-			`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
+			`const marklessSymbolResolverModule = () => ${handler ? handler(input.resolverId, handlerReach(input.runtimeDemandMap, undefined, input.devBoundChildren)) : importLoad(input.resolverId)};`,
 			direct.replace(
 				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -2329,14 +2382,103 @@ function emitLoadSymbol(
 	].join('\n');
 }
 
+type RuntimeDemandMapReach = {
+	readonly payloadRecords?: ReadonlyArray<{
+		readonly recordId: string;
+		readonly symbolIds?: ReadonlyArray<string>;
+	}>;
+	readonly actions?: ReadonlyArray<RuntimeDemandMapActionReach>;
+	readonly armActions?: ReadonlyArray<RuntimeDemandMapActionReach>;
+	readonly capabilityModuleIds?: ReadonlyArray<string>;
+	readonly firstUsePage?: {
+		readonly pageSpaceReaders?: ReadonlyArray<unknown>;
+		readonly passedProps?: ReadonlyArray<unknown>;
+		readonly callbackSlots?: ReadonlyArray<unknown>;
+	};
+};
+
+type RuntimeDemandMapActionReach = {
+	readonly payloadRecordIds: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+	readonly firstUse?: { readonly runtimeModuleIds: ReadonlyArray<string> } | 'unknown';
+};
+
+// What the dev server's page join reads of this module's demand map: every action's first use and its page facts.
+function devDemand(runtimeDemandMap: unknown): unknown {
+	const map = runtimeDemandMap as RuntimeDemandMapReach | undefined;
+	if (!map?.actions) return undefined;
+	const page = map.firstUsePage;
+	return {
+		actions: [...map.actions, ...(map.armActions ?? [])].map(
+			(action) => action.firstUse ?? 'unknown',
+		),
+		capabilityModuleIds: map.capabilityModuleIds ?? [],
+		...(page
+			? {
+					page: {
+						pageSpaceReaders: page.pageSpaceReaders ?? [],
+						passedProps: page.passedProps ?? [],
+						callbackSlots: page.callbackSlots ?? [],
+					},
+				}
+			: {}),
+	};
+}
+
+// What a handler's actions run, from the demand map; every action's without a handler, with the children whose
+// bound symbols the load serves. A capability installs on its own trigger, so only an action that runs it names it.
+function handlerReach(
+	runtimeDemandMap: unknown,
+	symbolId?: string,
+	children?: ReadonlyArray<string> | 'unknown',
+): HandlerReach {
+	const map = runtimeDemandMap as RuntimeDemandMapReach | undefined;
+	const records = new Set(
+		(map?.payloadRecords ?? [])
+			.filter((record) => symbolId === undefined || record.symbolIds?.includes(symbolId))
+			.map((record) => record.recordId),
+	);
+	const capabilities = new Set(map?.capabilityModuleIds ?? []);
+	const runtimeModuleIds = new Set<string>();
+	const actions: unknown[] = [];
+	let bounded = children !== 'unknown';
+	for (const action of [...(map?.actions ?? []), ...(map?.armActions ?? [])]) {
+		if (!action.payloadRecordIds.some((id) => records.has(id))) continue;
+		for (const id of action.runtimeModuleIds) runtimeModuleIds.add(id);
+		const reach = action.firstUse;
+		if (!reach || reach === 'unknown') {
+			bounded = false;
+			continue;
+		}
+		for (const id of reach.runtimeModuleIds)
+			if (!capabilities.has(id)) runtimeModuleIds.add(id);
+		actions.push(reach);
+	}
+	// A handler no action names cannot be bounded.
+	if (symbolId !== undefined && actions.length === 0) bounded = false;
+	return {
+		runtimeModuleIds: [...runtimeModuleIds].sort(),
+		...(bounded
+			? {
+					actions,
+					...(children !== undefined && children !== 'unknown' && children.length > 0
+						? { children }
+						: {}),
+				}
+			: {}),
+	};
+}
+
 function emitDirectSourceSymbolLoader(
 	symbols: ReadonlyArray<SourceSymbolRow>,
+	load: ModuleLoad,
 	readerName = 'readMarklessSourceSymbol',
+	handler: (symbol: SourceSymbolRow) => string = (symbol) => importLoad(symbol.chunk),
 ): string {
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(import(${singleQuoted(symbol.chunk)}), ${JSON.stringify(symbol.exportName)});`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${symbol.eventHandler ? handler(symbol) : load(symbol.chunk, { symbolId: symbol.id })}, ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
@@ -2364,6 +2506,8 @@ function stringHash(value: string): string {
 	}
 	return (hash >>> 0).toString(36);
 }
+
+const importLoad: ModuleLoad = (specifier) => `import(${singleQuoted(specifier)})`;
 
 // A module id can hold any file-name character, an apostrophe included; ordinary ids keep their exact bytes.
 function singleQuoted(value: string | undefined): string {

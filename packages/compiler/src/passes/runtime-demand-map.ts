@@ -110,6 +110,8 @@ const BEHAVIOR = ['web/resume-behaviors'];
 const SHARED_INSTANCES = ['web/fns/shared-instances'];
 // A form's busy mark and repeat guard, for a submit whose handler may return a promise; a form sent in place also needs its sender.
 const SUBMIT_HOLD = ['web/submit-hold'];
+// What runs a sync computed's derive in the browser, with the roster reader its write waits for; the symbol imports neither.
+const SYNC_COMPUTED_DERIVE = ['web/resume-sync-computed', 'web/fns/roster-resume'];
 const IN_PLACE_SUBMIT = ['web/form-send', ...SUBMIT_HOLD];
 // The router's swap binders: no record demands them, so they stay off every page until a navigation imports them.
 const SHARED_SWAP = ['web/shared-swap', 'web/kept-swap'];
@@ -255,7 +257,12 @@ export function createRuntimeDemandMap(
 		]),
 	}));
 	const symbolDemand = new Map(
-		symbols.map((symbol) => [symbol.symbolId, symbol.runtimeModuleIds]),
+		symbols.map((symbol) => [
+			symbol.symbolId,
+			symbol.kind === 'sync-computed-derive'
+				? unique([...symbol.runtimeModuleIds, ...SYNC_COMPUTED_DERIVE])
+				: symbol.runtimeModuleIds,
+		]),
 	);
 	const closedSymbolDemand = transitiveSymbolDemand(symbolDemand, input.captureAnalysis);
 	const scalarEventKeys = scalarCoreEventKeys(

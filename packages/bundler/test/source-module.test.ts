@@ -4,6 +4,11 @@ import { marklessWriteScalar } from '../../web/src/fns/write-scalar.ts';
 import { marklessUpdateText } from '../../web/src/fns/update-text.ts';
 import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
 import {
+	marklessDevLoad,
+	marklessDevWarm,
+	marklessDevWarmed,
+} from '../../web/src/fns/dev-resident.ts';
+import {
 	marklessDecodeScalarCell,
 	marklessReadScalarCell,
 	marklessScalarSpecializedError,
@@ -496,6 +501,142 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 		await resume({ root, event: { type: 'click', target: host } });
 		expect(label.textContent).toBe(`Count: ${value} units`);
 	}
+});
+
+test('on the dev server a first handler load brings the code its writes reach, and nothing loads before it', async () => {
+	const onClick = () => undefined;
+	const update = () => undefined;
+	const loaded: string[] = [];
+	const source = emitResumeModule({
+		...baseInput,
+		devFilename: '/workspace/app/src/App.tsrx',
+		symbols: [
+			{ id: 'symbol:click', chunk: './click.js', exportName: 'onClick', eventHandler: true },
+			{ id: 'symbol:update', chunk: './update.js', exportName: 'update' },
+		],
+	})
+		.replace(/^import .*;$/gm, '')
+		.replace(/export /g, '')
+		.replace(/\bimport\(/g, 'loadModule(')
+		.replace(/\bimport\.meta\b/g, '({ env: {} })');
+	const loadSymbol = new Function(
+		'loadModule',
+		'marklessDevLoad',
+		'marklessDevWarm',
+		'marklessDevWarmed',
+		'readMarklessSourceSymbolWhenLoaded',
+		`${source}\nreturn loadSymbol;`,
+	)(
+		async (specifier: string) => {
+			loaded.push(specifier);
+			return specifier === './click.js' ? { onClick } : { update };
+		},
+		marklessDevLoad,
+		marklessDevWarm,
+		marklessDevWarmed,
+		marklessWhenLoaded,
+	) as (symbolId: string) => unknown;
+	expect(loaded).toEqual([]);
+	expect(await loadSymbol('symbol:click')).toBe(onClick);
+	expect(loaded).toEqual(['./click.js', './update.js']);
+	expect(loadSymbol('symbol:update')).toBe(update);
+});
+
+test('on the dev server a handler warms the runtime code its action runs and its writes reach, not a capability it never runs', () => {
+	const code = emitResumeModule({
+		...baseInput,
+		devFilename: '/workspace/app/src/App.tsrx',
+		symbols: [
+			{ id: 'symbol:click', chunk: './click.js', exportName: 'onClick', eventHandler: true },
+		],
+		runtimeDemandMap: {
+			payloadRecords: [{ recordId: 'event:h1:click', symbolIds: ['symbol:click'] }],
+			capabilityModuleIds: ['web/resume-behaviors'],
+			actions: [
+				{
+					payloadRecordIds: ['event:h1:click'],
+					runtimeModuleIds: ['web/resume-events'],
+					firstUse: {
+						symbolIds: ['symbol:click'],
+						runtimeModuleIds: ['web/resume-behaviors', 'web/resume-sync-computed'],
+					},
+				},
+				{ payloadRecordIds: ['event:h2:click'], runtimeModuleIds: ['web/submit-hold'] },
+			],
+		},
+	});
+	expect(code).toContain(
+		`Promise.all([import("./click.js"), marklessDevWarmed(${JSON.stringify({
+			file: '/workspace/app/src/App.tsrx',
+			runtimeModuleIds: ['web/resume-events', 'web/resume-sync-computed'],
+			actions: [
+				{
+					symbolIds: ['symbol:click'],
+					runtimeModuleIds: ['web/resume-behaviors', 'web/resume-sync-computed'],
+				},
+			],
+		})})]).then(([mod]) => mod)`,
+	);
+});
+
+test('on the dev server a module publishes its actions and page facts to the page join, and its resolver serves its bound children', () => {
+	const firstUsePage = {
+		resume: { symbolIds: [], runtimeModuleIds: [] },
+		pageSpaceReaders: [
+			{
+				graphNodeId: 'shared:a#s/state:open',
+				reach: { symbolIds: ['symbol:2'], runtimeModuleIds: [] },
+			},
+		],
+		passedProps: [
+			{
+				file: '/workspace/app/src/Child.tsrx',
+				prop: 'onPick',
+				reach: { symbolIds: ['symbol:3'], runtimeModuleIds: [] },
+			},
+		],
+		callbackSlots: [],
+	};
+	const code = emitResumeModule({
+		...baseInput,
+		devFilename: '/workspace/app/src/App.tsrx',
+		hasBoundSymbols: true,
+		devBoundChildren: ['/workspace/app/src/Child.tsrx'],
+		symbols: [
+			{ id: 'symbol:click', chunk: './click.js', exportName: 'onClick', eventHandler: true },
+		],
+		runtimeDemandMap: {
+			payloadRecords: [{ recordId: 'event:h1:click', symbolIds: ['symbol:click'] }],
+			capabilityModuleIds: [],
+			actions: [
+				{
+					payloadRecordIds: ['event:h1:click'],
+					runtimeModuleIds: [],
+					firstUse: { symbolIds: ['symbol:click'], runtimeModuleIds: [] },
+				},
+			],
+			firstUsePage,
+		},
+	});
+	expect(code).toContain(
+		`marklessDevDemand("/workspace/app/src/App.tsrx", ${JSON.stringify({
+			actions: [{ symbolIds: ['symbol:click'], runtimeModuleIds: [] }],
+			capabilityModuleIds: [],
+			page: {
+				pageSpaceReaders: firstUsePage.pageSpaceReaders,
+				passedProps: firstUsePage.passedProps,
+				callbackSlots: [],
+			},
+		})});`,
+	);
+	expect(code).toContain(
+		`const marklessSymbolResolverModule = () => Promise.all([import("virtual:markless:resolver"), marklessDevWarmed(${JSON.stringify({
+			file: '/workspace/app/src/App.tsrx',
+			runtimeModuleIds: [],
+			actions: [{ symbolIds: ['symbol:click'], runtimeModuleIds: [] }],
+			children: ['/workspace/app/src/Child.tsrx'],
+		})})]).then(([mod]) => mod)`,
+	);
 });
 
 test('scalar dispatch and staged wake share one neutral DOM-order helper import', () => {
@@ -1419,4 +1560,17 @@ test('served-only scalar dispatch never substitutes the compiled initial value f
 		'marklessDecodeScalarCell(marklessReadScalarCell(input.root, "state:count"), ',
 	);
 	expect(resumeCode).not.toContain('?? {"graphNodeId":"state:count"');
+});
+
+test("on the dev server a composer names its load of a child module by the child's compiled file", () => {
+	const code = emitResumeModule({
+		...baseInput,
+		devFilename: '/workspace/app/src/App.tsrx',
+		symbolRoutes: [
+			{ prefix: 'c0:', importSource: './Child.tsrx', file: '/workspace/app/src/Child.tsrx' },
+		],
+	});
+	expect(code).toContain(
+		`["./Child.tsrx?markless-symbols", () => import("./Child.tsrx?markless-symbols"), {"file":"/workspace/app/src/Child.tsrx"}]`,
+	);
 });

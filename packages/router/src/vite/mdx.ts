@@ -22,6 +22,7 @@ import {
 	emitRosterResumeLoaderInstall,
 	emitSharedInstancesLoaderInstall,
 } from '../../../bundler/src/source-module.ts';
+import { moduleLoads, type ModuleLoad } from '../../../bundler/src/module-loads.ts';
 import { scalarPlanSourceReference } from '../../../bundler/src/scalar-plan-source.ts';
 import { servedRenderDataSourceReference } from '../../../bundler/src/served-render-data.ts';
 
@@ -36,10 +37,12 @@ type LiteralInstanceRecorder = (
 
 export function mdxTransformPlugin(): Plugin {
 	let recordInstances: LiteralInstanceRecorder | undefined;
+	let serving = false;
 	return {
 		name: 'markless-router:mdx',
 		enforce: 'pre',
 		config(config, env) {
+			serving = env.command === 'serve';
 			if (env.command !== 'serve') return undefined;
 			const include = optimizedDepsToInclude([MDX_ROUTE_RUNTIME_SPECIFIER], config);
 			return include.length > 0 ? { optimizeDeps: { include } } : undefined;
@@ -75,7 +78,7 @@ export function mdxTransformPlugin(): Plugin {
 				}
 
 				return {
-					code: await transformMdxRoute(code, id, route),
+					code: await transformMdxRoute(code, id, route, serving),
 					map: null,
 				};
 			},
@@ -87,6 +90,7 @@ export async function transformMdxRoute(
 	source: string,
 	id: string,
 	route: MdxRoute = parseMdxRoute(source, id),
+	devServer = false,
 ) {
 	const html = route.parts.map((part) => (part.kind === 'html' ? part.html : '')).join('');
 	if (route.components.length === 0) {
@@ -108,7 +112,7 @@ export async function transformMdxRoute(
 
 	const query = new URLSearchParams(parsePath(id).search);
 	if (query.has('markless-route') || query.has('markless-resume')) {
-		return emitMdxClientRoute(route, id, query.has('markless-resume'));
+		return emitMdxClientRoute(route, id, query.has('markless-resume'), devServer);
 	}
 	return emitComposedMdxRoute(route, id);
 }
@@ -151,15 +155,21 @@ type MdxPart =
 			readonly componentIndex: number;
 	  };
 
-function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): string {
+function emitMdxClientRoute(
+	route: MdxRoute,
+	id: string,
+	resume: boolean,
+	devServer: boolean,
+): string {
+	const loads = moduleLoads(devServer ? parsePath(id).pathname : undefined);
 	return [
 		`import { createMdxRenderDataSurface, loadMdxSymbol, mdxSymbolLoader${resume ? ', loadMdxRepeatModules, tryResumeMdxScalar' : ''} } from '${MDX_ROUTE_RUNTIME_SPECIFIER}';`,
 		`const marklessMdxSymbolLoaders = ${renderSymbolLoaders(route.components)};`,
 		`const marklessMdxRenderData = ${renderMdxRenderDataLoader(route.components, id, route.parts, resume)};`,
-		renderOverlayLoader(),
-		emitRosterResumeLoaderInstall(),
-		emitSharedInstancesLoaderInstall(),
-		...(resume ? [emitAsyncPlanesLoaderInstall()] : []),
+		renderOverlayLoader(loads.load),
+		emitRosterResumeLoaderInstall(loads.load),
+		emitSharedInstancesLoaderInstall(loads.load),
+		...(resume ? [emitAsyncPlanesLoaderInstall(loads.load)] : []),
 		'const marklessMdxPage = {',
 		'  renderData: marklessMdxRenderData,',
 		'  loadSymbol: marklessMdxLoadSymbol,',
@@ -169,12 +179,15 @@ function emitMdxClientRoute(route: MdxRoute, id: string, resume: boolean): strin
 		'function marklessMdxLoadSymbol(symbolId, children = []) {',
 		'  return loadMdxSymbol(symbolId, children, marklessMdxSymbolLoaders);',
 		'}',
+		loads.imports(),
 		'',
-	].join('\n');
+	]
+		.filter((line) => line !== null)
+		.join('\n');
 }
 
-function renderOverlayLoader(): string {
-	return "globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? import('@markless/web/fns/overlay').then((m) => m.installOverlayBehavior(root)) : undefined;";
+function renderOverlayLoader(load?: ModuleLoad): string {
+	return `globalThis.__marklessOverlay ??= (root) => root.querySelector('[overlay]') ? ${load ? load('@markless/web/fns/overlay') : "import('@markless/web/fns/overlay')"}.then((m) => m.installOverlayBehavior(root)) : undefined;`;
 }
 
 function emitComposedMdxRoute(route: MdxRoute, id: string): string {

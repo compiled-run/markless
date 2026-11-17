@@ -4,12 +4,13 @@ import { join, resolve } from 'pathe';
 import { chromium, type Browser } from '@playwright/test';
 import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import { buildFixture } from '../support/fixture-build.ts';
+import { startFixtureDev, type FixtureDevServer } from '../support/fixture-dev.ts';
 import { startBuiltServer, type BuiltServer } from '../../../../scripts/test-utils/built-server.ts';
 import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 // A write has reached the DOM by the time the code that wrote it returns, the page's first write included, so a
-// view transition's "after" snapshot or a layout read right after the write sees the new page. Production only:
-// the dev server fetches each module on first use, so its first write still lands after the handler.
+// view transition's "after" snapshot or a layout read right after the write sees the new page, on a production build
+// and on the dev server alike.
 
 vi.setConfig({ testTimeout: 60_000 });
 
@@ -96,6 +97,11 @@ const pages: ReadonlyArray<{ readonly path: string; readonly rows: string; reado
 		rows: 'ol > li',
 		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
 	},
+	{
+		path: '/again',
+		rows: 'ol > li',
+		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
+	},
 ];
 
 describe('production build', () => {
@@ -123,4 +129,18 @@ describe('production build', () => {
 			expect(await seenAfterWrites(server!.origin, path, rows)).toEqual(seen);
 		});
 	}
+});
+
+describe('dev server', () => {
+	let server: FixtureDevServer | undefined;
+	beforeAll(async () => {
+		server = await startFixtureDev(await copyFixture());
+		for (const { path } of pages) await fetch(`${server.origin}${path}`);
+	}, 120_000);
+	afterAll(() => server?.close());
+
+	for (const { path, rows, seen } of pages)
+		test(`${path}: every write, the first included, has reached the page when the handler returns`, async () => {
+			expect(await seenAfterWrites(server!.origin, path, rows)).toEqual(seen);
+		});
 });

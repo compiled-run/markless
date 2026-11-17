@@ -335,8 +335,8 @@ export const calendarState = shared(
 			/** Focus reached the month while a page key was crossing into it; hand it to the day it was headed for. */
 			land() {
 				if (calendar.landing !== true) return;
-				calendar.landing = false;
-				landFocusOn(() => dayEls, calendar.focusAt);
+				// With no day for that date the month keeps focus, or dropping its stop would send focus to the page.
+				if (landFocusOn(() => dayEls, calendar.focusAt)) calendar.landing = false;
 			},
 
 			setOpen(next: boolean) {
