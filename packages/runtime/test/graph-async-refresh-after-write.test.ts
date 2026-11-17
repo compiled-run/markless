@@ -138,3 +138,23 @@ test('a reader listed before its async input waits for the input and runs once, 
 	await tick();
 	expect(count.settles.map((run) => run.key)).toEqual([1, 2]);
 });
+
+test("a save's mark that lands after the writes settled is not a new run, so the value is re-asked", async () => {
+	const { graph, people } = await settledChain();
+	const settledAt = versions(graph, 'computed:people');
+	graph.asyncPlane!()!.markEntry('computed:people', true);
+	graph.asyncPlane!()!.refreshAfterWrite(settledAt);
+	expect(people.settles).toHaveLength(2);
+	expect(people.settles[1]!.key).toBe('blue');
+});
+
+test('a value that ran again before a late mark is still left to its own run', async () => {
+	const { graph, people } = await settledChain();
+	const settledAt = versions(graph, 'computed:people');
+	graph.write({ graphNodeId: 'state:team', path: [], value: 'red' });
+	await graph.flush();
+	expect(people.settles).toHaveLength(2);
+	graph.asyncPlane!()!.markEntry('computed:people', true);
+	graph.asyncPlane!()!.refreshAfterWrite(settledAt);
+	expect(people.settles).toHaveLength(2);
+});

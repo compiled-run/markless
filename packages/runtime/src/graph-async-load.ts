@@ -193,6 +193,12 @@ function createNode(asyncComputed: RuntimeGraphAsyncComputed): RuntimeAsyncCompu
 	};
 }
 
+/** The version a value had before an entry mark moved it with no run since (`markEntry` in graph-async-refresh.ts). */
+function markedFrom(node: RuntimeAsyncComputedNode): number | undefined {
+	const hold = node.entryHold;
+	return hold?.version === node.version && hold.previous.status !== 'pending' ? node.version - 1 : undefined;
+}
+
 function peek(node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>): unknown {
 	const head = path[0];
 	return head === undefined || isAsyncSnapshotMetaKey(head)
@@ -384,8 +390,8 @@ export function createAsyncPlane(
 			const due: RuntimeAsyncComputedNode[] = [];
 			for (const [graphNodeId, version] of versions) {
 				const node = nodes.get(graphNodeId);
-				// A value that ran again since the writes settled already has their answer.
-				if (node?.version !== version) continue;
+				// A value that ran again since the writes settled already has their answer; a save's mark is not a run.
+				if (!node || (node.version !== version && markedFrom(node) !== version)) continue;
 				if (node.phase === NODE_SETTLED) moveNode(node, NODE_PLANNED);
 				// A read still in flight from before the writes settled may carry the old answer, so it starts over.
 				if (node.phase === NODE_PLANNED || node.phase === NODE_RUNNING) due.push(node);
