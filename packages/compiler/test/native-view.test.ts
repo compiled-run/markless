@@ -242,14 +242,50 @@ export function Logger() @{
 	});
 
 	it('refuses constructs with no native lowering yet', async () => {
-		const { payload, diagnostics } = await nativeView(`function Label({ text }) @{
-	<span>{text}</span>
-}
-export function Page() @{
-	<div><Label text="a" /></div>
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Pick() @{
+	let tab = state('a');
+	<div>
+		@switch (tab) {
+			@case 'a': {
+				<p>A</p>
+			}
+			@default: {
+				<p>B</p>
+			}
+		}
+	</div>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain('child components');
+		expect(diagnostics.map((d) => d.message)).toContain('@else if chains and @switch');
+	});
+
+	it('inlines each component instance with its props, and resolves a called callback to the writes of its caller', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Chip({ label, onPick }) @{
+	<button onClick={() => onPick()}>{label}</button>
+}
+export function Bar() @{
+	let picked = state('none');
+	<nav>
+		<Chip label="One" onPick={() => (picked = 'one')} />
+		<p>{picked}</p>
+	</nav>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.map((node) => node.id)).toEqual([
+			'h1',
+			'component-edge:0/h0',
+			'component-edge:0/h0:text0',
+			'h2',
+			'h2:text0',
+		]);
+		expect(payload?.events).toEqual([
+			{ host: 'component-edge:0/h0', event: 'activate', handler: 'handler:component-edge:0/event:0' },
+		]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: 'state:picked', value: { literal: 'one' } },
+		]);
 	});
 
 	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {

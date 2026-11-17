@@ -199,6 +199,20 @@ export function Counter() @{
 - **Vectors:** `initialRows: [[repeat, keys]]` when present; new file `list.json` (rung 6: add, remove, reverse). Text
   nodes in rows appear in `initial` as instances.
 
+### Additions for rung 7: child components (pushed 2026-11-17)
+
+- A component defined in the same module is **inlined at each call site**: its nodes appear in the parent's place with
+  ids prefixed by the call site (`component-edge:0/h2`, `component-edge:0/h1:text0`); handler ids likewise
+  (`handler:component-edge:0/event:0`). Hosts see one flat tree, as before; no new node kind.
+- Props are substituted at build time: a literal prop becomes `{ literal }`, a prop bound to state becomes `{ cell }`.
+  A callback prop called from the child (`onClick={() => onStep()}`) lowers to the caller's own statements, so the
+  child's handler is the parent's `assign` ops. The analyzer records callback bodies (`nativeStatements`) and `name()`
+  calls (`invoke` statements) for native builds only.
+- Not yet (each refused by name): state declared in a child component (instance-local cells), children passed into a
+  component (`{children}`), components from another module (`<Link>` included), a callback called with arguments or used
+  as a value.
+- Vectors: `components.json` (rung 7).
+
 ### Where the native facts are collected (pushed 2026-11-17)
 
 The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
@@ -360,7 +374,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
 | 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | not yet | not yet | vectors `list.json` |
-| 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
+| 7 | Child component with props and a callback | passing | passing | not yet | not yet | vectors `components.json` |
 | 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
 | 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
