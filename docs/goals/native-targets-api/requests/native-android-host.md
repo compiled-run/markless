@@ -38,3 +38,11 @@
    Dragon write for a Markless cell (simplest: the cell id itself, `state:liked`).
 10. **A `/1` export for a ladder rung.** Style changes driven by `state` entries are checked on the JVM against Dragon's
     `ms-toggle` export only; the device check needs a `/1` export whose node ids are a rung payload's (rung 4's).
+11. **Rung 2 on device is blocked on its export (2026-11-17, ~03:45).** `cw/native-targets` has no
+    `packages/mobile/proofs/02-styles/native-style.json`, and `origin/cw/native-dragon-styles` (head `d6a4da5f0d`) has no
+    command that reads `markless.native-style-input/0`; its `/1` exports are for Dragon's own `ms-*` fixtures, with Dragon ids.
+    The Android host needs exactly: `dragon.native-style-export/1` for the 02-styles payload, `targets.android` at
+    `dpr` 2.625 (Pixel 7, 411 x 818 dp), node ids equal to the payload's (`h0`, `h1:text0`...), every face it names listed in
+    `fonts` with a file under the Dragon checkout, and (for rung 4) a state whose key the host can map to `state:liked`
+    (request 9). The host reads it today: `/0` and `/1` decode, frames are checked on device by the frame report
+    (`frames max gap ... device px`), and `state` entries move through `next`. Owner of the Dragon side: native-dragon-styles.

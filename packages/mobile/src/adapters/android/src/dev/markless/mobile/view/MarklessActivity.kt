@@ -6,6 +6,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
 import android.widget.FrameLayout
+import dev.markless.mobile.core.Payload
 
 /** An Activity that shows one Markless component: override [payloadBytes], and [styleExportBytes] to apply Dragon's styles. */
 abstract class MarklessActivity : Activity() {
@@ -16,9 +17,26 @@ abstract class MarklessActivity : Activity() {
 
 	open fun styleExportBytes(): ByteArray? = null
 
+	/** The params of the launch `route` extra (`/apple`), matched against the payload's route pattern. */
+	private fun launchParams(payload: ByteArray): Map<String, String> {
+		val path = intent.getStringExtra("route") ?: return emptyMap()
+		val route = Payload.decode(payload).route ?: throw MarklessHostError("launched at $path, but the payload is not a page")
+		return route.match(path) ?: throw MarklessHostError("launched at $path, which does not match ${route.pattern}")
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
-		host = MarklessHost(this, payloadBytes(), styleExportBytes())
+		open(launchParams(payloadBytes()))
+	}
+
+	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
+	private fun open(params: Map<String, String>) {
+		val bytes = payloadBytes()
+		host = MarklessHost(this, bytes, styleExportBytes(), params = params)
+		host.onNavigate = { route, next ->
+			if (route != host.payload.route?.pattern) throw MarklessHostError("navigate to $route; this app holds only ${host.payload.route?.pattern}")
+			open(next)
+		}
 		val viewport = object : FrameLayout(this) {
 			override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
 				val f = host.rootFrame

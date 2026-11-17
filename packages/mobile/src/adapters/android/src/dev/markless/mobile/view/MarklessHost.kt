@@ -54,9 +54,11 @@ class MarklessHost(
 	styleExportBytes: ByteArray? = null,
 	private val fonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
+	/** The route params the page opens with. */
+	params: Map<String, String> = emptyMap(),
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
-	val runtime = Runtime(payload, store)
+	val runtime = Runtime(payload, store, params)
 	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
@@ -74,6 +76,9 @@ class MarklessHost(
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
 		private set
+
+	/** Builds the page a `navigate` entry names, from scratch; required for a payload with links. */
+	var onNavigate: ((route: String, params: Map<String, String>) -> Unit)? = null
 
 	/** Called with each journal after it is applied. */
 	var onJournal: ((List<JournalEntry>) -> Unit)? = null
@@ -115,6 +120,12 @@ class MarklessHost(
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
+				}
+				is JournalEntry.Navigate -> {
+					Log.i(TAG, "journal ${entry.toJson()}")
+					onJournal?.invoke(journal)
+					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
+					return
 				}
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
@@ -197,13 +208,14 @@ class MarklessHost(
 		for (v in wanted) box.addView(v)
 	}
 
-	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false) {
+	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false, link: Boolean = false) {
 		view.isAccessibilityHeading = heading
 		view.accessibilityDelegate = object : View.AccessibilityDelegate() {
 			override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
 				super.onInitializeAccessibilityNodeInfo(host, info)
 				info.viewIdResourceName = id
 				if (control) info.className = Button::class.java.name
+				if (link) info.extras.putCharSequence("AccessibilityNodeInfo.roleDescription", "link")
 				val state = expanded[host] ?: return
 				if (Build.VERSION.SDK_INT >= 36) info.expandedState = if (state) AccessibilityNodeInfo.EXPANDED_STATE_FULL else AccessibilityNodeInfo.EXPANDED_STATE_COLLAPSED
 				info.addAction(if (state) AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE else AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND)
@@ -230,7 +242,7 @@ class MarklessHost(
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
 				named(this, inst.id)
 			}
-			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }) }
+			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a") }
 		}
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
