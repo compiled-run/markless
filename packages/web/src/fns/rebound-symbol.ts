@@ -57,9 +57,12 @@ export function marklessForwardedSymbol(
 		const outer: OuterPath = (instancePath) => {
 			const above = childOuter(instancePath);
 			if (above === undefined) return undefined;
-			const segments = marklessInstanceSegments(above);
-			while (segments.at(-1)?.startsWith('r:')) segments.pop();
-			return withoutSuffix(segments.join(''), prefix);
+			let path = above;
+			for (const segment of marklessInstanceSegments(above).reverse()) {
+				if (!segment.startsWith('r:') || !path.endsWith(segment)) break;
+				path = path.slice(0, path.length - segment.length);
+			}
+			return withoutSuffix(path, prefix);
 		};
 		return reboundAt(loadLocal(boundId), outer, () => symbol, boundId);
 	});
