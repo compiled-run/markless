@@ -12,6 +12,20 @@ const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
 const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round']);
+/** Array and string methods with exact JavaScript meaning that return a new value and change nothing. */
+const METHODS = new Set([
+	'filter', 'map', 'find', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
+	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
+]);
+
+const lambdaOf = (node: AnyNode): SemanticExpression => {
+	const parameters = asNodes(node.params);
+	if (node.async || parameters.some((parameter) => parameter.type !== 'Identifier'))
+		return unsupported('a function with a pattern or async parameters');
+	const body = node.body as AnyNode | undefined;
+	if (!body || body.type === 'BlockStatement') return unsupported('a function with a block body');
+	return { kind: 'lambda', parameters: parameters.map((parameter) => String(parameter.name)), body: expressionTreeOf(body) };
+};
 
 const unsupported = (construct: string): SemanticExpression => ({ kind: 'unsupported', construct });
 
@@ -92,7 +106,19 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				: unsupported('a computed member read');
 		}
 		case 'CallExpression': {
-			const name = calleeName(node.callee as AnyNode | undefined);
+			const callee = node.callee as AnyNode | undefined;
+			const method = callee?.type === 'MemberExpression' && !callee.computed ? (callee.property as AnyNode | undefined)?.name : undefined;
+			if (typeof method === 'string' && METHODS.has(method) && !BUILTINS.has(calleeName(callee) ?? '')) {
+				return {
+					kind: 'method',
+					method,
+					object: expressionTreeOf(callee!.object as AnyNode),
+					arguments: asNodes(node.arguments).map((argument) =>
+						argument.type === 'ArrowFunctionExpression' ? lambdaOf(argument) : expressionTreeOf(argument),
+					),
+				};
+			}
+			const name = calleeName(callee);
 			return name && BUILTINS.has(name)
 				? { kind: 'call', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) }
 				: unsupported(`a call to \`${name ?? 'a computed function'}\``);
@@ -103,8 +129,25 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		case 'FunctionExpression':
 			return unsupported('a function value');
 		case 'ArrayExpression':
-		case 'ObjectExpression':
-			return unsupported(node.type === 'ArrayExpression' ? 'an array value' : 'an object value');
+			return {
+				kind: 'array',
+				items: asNodes(node.elements).map((element) =>
+					element?.type === 'SpreadElement'
+						? { spread: true, value: expressionTreeOf(element.argument as AnyNode) }
+						: { spread: false, value: expressionTreeOf(element ?? undefined) },
+				),
+			};
+		case 'ObjectExpression': {
+			const entries: (readonly [string, SemanticExpression])[] = [];
+			for (const property of asNodes(node.properties)) {
+				const key = property.key as AnyNode | undefined;
+				const name = key?.type === 'Identifier' ? key.name : key?.type === 'Literal' ? key.value : undefined;
+				if (property.type !== 'Property' || property.computed || property.kind !== 'init' || typeof name !== 'string')
+					return unsupported('an object with a spread, computed key or method');
+				entries.push([name, expressionTreeOf(property.value as AnyNode)]);
+			}
+			return { kind: 'object', entries };
+		}
 		default:
 			return unsupported(`a ${String(node.type)}`);
 	}

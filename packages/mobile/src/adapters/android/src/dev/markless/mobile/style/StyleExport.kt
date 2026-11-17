@@ -30,7 +30,12 @@ sealed interface StyleWrite {
 	data class TextColor(val color: Rgba) : StyleWrite
 }
 
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
+data class Variant(val className: String, val writes: List<StyleWrite>)
+
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val variants: List<Variant> = emptyList()) {
+	/** The base writes, then the variant whose class equals [className], if any. */
+	fun writesFor(className: String?): List<StyleWrite> = writes + (variants.firstOrNull { it.className == className }?.writes ?: emptyList())
+}
 
 /** One platform's slice of a Dragon style export: frames (device px, relative to the parent box) and lowered writes per node id. */
 data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val nodes: List<StyledNode>) {
@@ -60,7 +65,11 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
 			val writes = o.field("writes", what).arr("$what.writes").mapIndexed { n, w -> write(w, "$id writes[$n]") }
-			return StyledNode(id, parent, kind, frame, bw, writes)
+			val variants = o["variants"]?.arr("$what.variants")?.mapIndexed { n, v ->
+				val vo = v.obj("$id variants[$n]")
+				Variant(vo.field("class", what).str("$id variants[$n].class"), vo.field("writes", what).arr("$id variants[$n].writes").mapIndexed { k, w -> write(w, "$id variants[$n] writes[$k]") })
+			} ?: emptyList()
+			return StyledNode(id, parent, kind, frame, bw, writes, variants)
 		}
 
 		private fun color(v: Json, what: String): Rgba {

@@ -11,7 +11,9 @@ this file changes in the same push. Status as of 2026-11-16, night one.
    `toggle` are gone from payloads. Both hosts' decoders correctly refuse the new vectors today
    (`test-jvm.sh`: 44 passed, 5 failed on unknown `assign`, `bindings` and `expr` parts). The host work next: an `NativeExpr`
    evaluator with ECMAScript meaning (pinned by `arithmetic.json`), element `bindings` and the `attribute` journal entry
-   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells.
+   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells, the
+   `input` element and `property` entry (`input.json`), `state` entries for Dragon's per-state export, and lists:
+   JSON values, array methods, `repeat` nodes and `rows` entries (`list.json`).
 2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
    the older payload shape.
 3. Vectors to pass: every file in `packages/mobile/conformance/`.
@@ -53,6 +55,7 @@ Spec `specs/framework/11-platform-organization.md` is the authority: no package 
 | `packages/mobile/src/adapters/ios/` | Swift package `MarklessMobile` (UIKit host runtime: payload decoder, view factory, op interpreter, journal applier) and the iOS app shell. Built with `swiftc`/`xcrun`, no Xcode project required. | native-ios-host |
 | `packages/mobile/src/adapters/android/` | Kotlin host runtime (`dev.markless.mobile`: same four parts on Android Views) and the APK shell, built from SDK tools alone (aapt2, kotlinc, d8, zipalign, apksigner), as Dragon does. | native-android-host |
 | `packages/mobile/proofs/<nn>-<name>/` | One ladder rung: `App.tsrx`, `flow.yaml` (one Maestro flow run on both platforms), `expected.json` (the visible texts before and after each step, checked against the web build), screenshots under `screenshots/{ios,android,web}/`. | native-ladder (component + web check), native-proof-harness (flows, shells, screenshots, CI placement) |
+| `packages/mobile/src/harness/` (README there) | The proof harness: `pnpm --filter @markless/mobile proof <rung>...` compiles a rung, builds the iOS and Android app shells around the hosts (no Xcode project, no Gradle), runs the rung's one Maestro flow on both, screenshots each step and fails unless both pass. `.github/workflows/native-proofs.yml` is its CI proposal. | native-proof-harness |
 | Dragon repo `examples/markless-counter/` (branch `cw/native-targets`) | Component CSS to native paint and frames as data, plus the Chrome comparison. | native-dragon-styles |
 
 Shared vs per platform: the payload, the op semantics, the journal semantics and the conformance vectors are written once
@@ -176,6 +179,26 @@ export function Counter() @{
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
 
+### Additions for rung 6: keyed lists (pushed 2026-11-17)
+
+- **Values:** a cell's `initial` may be any JSON (`NativeValue`): arrays and objects too.
+- **Expressions** gain `{ array: [{ spread, value }] }`, `{ object: [[key, expr]] }`, `{ member: expr, property }`
+  (`length` of a string or array, or an own property of an object; anything else is a runtime error),
+  `{ method, target, arguments }` for `filter`, `map`, `findIndex`, `some`, `every`, `includes`, `indexOf`, `join`,
+  `concat`, `slice`, `reverse` (only on a fresh array such as `[...list]`; reversing state in place is refused),
+  `toReversed`, `toUpperCase`, `toLowerCase`, `trim`, all with JavaScript meaning (a method giving `undefined` is a runtime
+  error); `{ lambda: [params], body }` only as a method argument, its parameters read as `{ local }`; and `{ item: <repeat
+  id> }`, the current row's item.
+- **List region:** `{ kind: 'repeat', id: 'repeat:0', parent, list: { cell }, key: ['id'] }`. The row template's nodes
+  follow it with `row: 'repeat:0'`. Each row is an instance keyed by `String()` of the item at `key`; an instance's id is
+  `<node>@<key>` (`h6:text0@pear`). Not yet: `@empty`, a list inside an arm or another list, `@if` inside a row, and
+  handlers on row elements (each refused by name).
+- **Journal:** `{ op: 'rows', node: 'repeat:0', keys: [...] }` when the key order changes: remove rows whose key left,
+  build new rows from current values, move the rest into this order. `text`/`attribute` entries for kept rows name the
+  instance (`h6:text0@pear`).
+- **Vectors:** `initialRows: [[repeat, keys]]` when present; new file `list.json` (rung 6: add, remove, reverse). Text
+  nodes in rows appear in `initial` as instances.
+
 ### Where the native facts are collected (pushed 2026-11-17)
 
 The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
@@ -263,6 +286,13 @@ Answered requests (native-ios-host, 2026-11-17):
   refusing is right.
 - **10, export `/1`:** adopted, with the `state` journal entry above.
 
+Answered requests (native-proof-harness, 2026-11-17): **1** the harness row is in the table above. **2** the host entry
+points it calls (`MarklessViewController(payload:style:fonts:)`, `MarklessActivity` with `payloadBytes()` and
+`styleExportBytes()`) are the contract; a host that changes one says so here first. **3** one app id on both,
+`dev.markless.proof`, adopted. **4** `flowSteps()` in `proofs/ladder.ts`, adopted. **5** `fonts[].file` in a Dragon export is
+relative to the root of the Dragon checkout it came from (`vendor/fonts/...`); the harness's SHA-256 check stays. **6**
+routes at launch arrive with rung 10. **7** rung screenshots are committed under `proofs/<rung>/screenshots/{ios,android}/`.
+
 **Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
 `nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
 refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
@@ -324,12 +354,12 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 
 | # | Rung | Web | Native reference | iOS | Android | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Static elements and text | passing | passing | not yet | not yet |  |
+| 1 | Static elements and text | passing | passing | **passing** | **passing** | harness, both platforms, one flow; `proofs/01-static-text/screenshots/` |
 | 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | not yet | not yet | style: Dragon Chrome compare green |
-| 3 | A state write updates text | passing | passing | not yet | not yet | vectors `counter.json` |
+| 3 | A state write updates text | passing | passing | not yet (host moving to `assign`) | flow passes from the host's own shell | vectors `counter.json`; passed on both through the harness before the `assign` change |
 | 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
 | 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
-| 6 | Keyed `@for` (add, remove, reorder) | passing | refused | not yet | not yet | needs list regions and array-op facts |
+| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | not yet | not yet | vectors `list.json` |
 | 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
 | 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
