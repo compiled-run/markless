@@ -59,6 +59,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'components',
+		fixture: 'proofs/07-child-component/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:1/h2' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
 		name: 'input',
 		fixture: 'proofs/08-text-input/App.tsrx',
 		actions: [

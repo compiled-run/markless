@@ -1346,7 +1346,7 @@ function collectAttribute(
 				hasSyncPolicyCandidate,
 				syncPolicy,
 				...handlerStatementsField(
-					handler && !relayed && !factoryCall ? handler.node : undefined,
+					handler && !factoryCall ? handler.node : undefined,
 					state,
 				),
 			});

@@ -6,6 +6,7 @@ import type {
 	SemanticAsyncArmPlacement,
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
+	SemanticHandlerStatement,
 } from '../../artifacts.ts';
 import {
 	getComponentFunction,
@@ -353,6 +354,7 @@ function componentPropBindings(
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
+				...nativeStatementsOf(factoryCall ? undefined : callback, state),
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
@@ -915,4 +917,12 @@ function asyncArmPlacement(state: WalkState): SemanticAsyncArmPlacement {
 				asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
 			}
 		: {};
+}
+
+function nativeStatementsOf(
+	callback: AnyNode | undefined,
+	state: WalkState,
+): { nativeStatements?: ReadonlyArray<SemanticHandlerStatement> } {
+	const nativeStatements = callback && state.nativeFacts?.handlerStatements(callback as never);
+	return nativeStatements ? { nativeStatements } : {};
 }
