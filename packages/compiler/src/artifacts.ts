@@ -936,6 +936,8 @@ export type SemanticEvent = {
 	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
 	readonly dispatchCatchBoundaryId?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
+	/** Set when the handler body is only this many bare `x++`, `x--` or `x = ...` statements, so its writes are all it does. */
+	readonly handlerWriteStatements?: number;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
 	/** A submit event whose form has a submit control with an author-written aria-disabled, which a submitting form then leaves alone. */
@@ -1531,6 +1533,11 @@ export type SemanticMarkupChunk = {
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
 	}>;
 	readonly slots: ReadonlyArray<SemanticMarkupSlot>;
+	/** Static text nodes at their child-index positions, for hosts that build views instead of parsing HTML; absent when none. */
+	readonly texts?: ReadonlyArray<{
+		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
+		readonly text: string;
+	}>;
 };
 
 export type SemanticMarkupArtifact = {

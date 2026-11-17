@@ -1343,6 +1343,7 @@ function collectAttribute(
 						: [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
+				...writeStatementCount(handler && !relayed && !factoryCall ? handler.node : undefined),
 			});
 		}
 		collectExpressionReads(expressionValue, state);
@@ -2393,6 +2394,27 @@ function eventHandlerExpression(
 	}
 
 	return { node: resolved.node, source: resolved.source, span: resolved.span };
+}
+
+// A body of bare `x++`, `x--` or `x = ...` statements: its effects are its state writes, which a host can run as data.
+function writeStatementCount(node: AnyNode | undefined): { handlerWriteStatements?: number } {
+	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression')) return {};
+	const body = node.body as AnyNode | undefined;
+	const expressions =
+		body?.type === 'BlockStatement'
+			? asNodes(body.body).map((statement) =>
+					statement.type === 'ExpressionStatement' ? (statement.expression as AnyNode) : null,
+				)
+			: [body ?? null];
+	const writes = expressions.every(
+		(expression) =>
+			expression !== null &&
+			((expression.type === 'UpdateExpression' &&
+				(expression.argument as AnyNode | undefined)?.type === 'Identifier') ||
+				(expression.type === 'AssignmentExpression' &&
+					(expression.left as AnyNode | undefined)?.type === 'Identifier')),
+	);
+	return writes && expressions.length > 0 ? { handlerWriteStatements: expressions.length } : {};
 }
 
 function handlerParameterNames(node: AnyNode): string[] {

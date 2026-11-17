@@ -108,6 +108,7 @@ type ChunkBuilder = {
 	readonly statics: string[];
 	readonly hosts: SemanticMarkupChunk['hosts'][number][];
 	readonly slots: SemanticMarkupSlot[];
+	readonly texts: NonNullable<SemanticMarkupChunk['texts']>[number][];
 };
 
 type WithoutStaticIndex<Slot> = Slot extends unknown ? Omit<Slot, 'staticIndex'> : never;
@@ -204,11 +205,12 @@ function createChunk(
 	kind: SemanticMarkupChunk['kind'],
 	componentName: string,
 ): ChunkBuilder {
-	return { id, kind, componentName, statics: [''], hosts: [], slots: [] };
+	return { id, kind, componentName, statics: [''], hosts: [], slots: [], texts: [] };
 }
 
 function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
-	return { ...builder };
+	const { texts, ...chunk } = builder;
+	return texts.length > 0 ? { ...chunk, texts } : chunk;
 }
 
 function append(builder: ChunkBuilder, value: string): void {
@@ -296,6 +298,7 @@ function emitNode(
 		const text = staticTextValue(node);
 		if (!text) return 0;
 		append(builder, escapeHtml(text));
+		builder.texts.push({ coordinate: { kind: 'child-index', path }, text });
 		return 1;
 	}
 
@@ -303,6 +306,7 @@ function emitNode(
 	if (literal !== null) {
 		if (!literal) return 0;
 		append(builder, escapeHtml(literal));
+		builder.texts.push({ coordinate: { kind: 'child-index', path }, text: literal });
 		return 1;
 	}
 

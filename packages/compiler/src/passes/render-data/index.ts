@@ -45,7 +45,8 @@ export function createRenderData(input: {
 		passId: 'render-data',
 		filename: semanticGraph.moduleId,
 		root: semanticGraph.markup.root,
-		chunks: semanticGraph.markup.chunks,
+		// Static text positions serve native hosts; the browser reads statics, so they stay out of its module.
+		chunks: semanticGraph.markup.chunks.map(({ texts: _texts, ...chunk }) => chunk),
 		hosts: semanticGraph.hostNodes.map((host) => ({ ...host, hostNodeId: host.id })),
 		initialValues: semanticGraph.graphBindings.flatMap((binding) =>
 			initialValue(binding, symbolResolver),
