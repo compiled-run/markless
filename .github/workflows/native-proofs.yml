@@ -111,6 +111,7 @@ jobs:
                   path: |
                       ${{ runner.temp }}/proof-reports/android.json
                       packages/mobile/proofs/*/screenshots/android/
+                      ~/.cache/markless-proof/logs/
 
     verdict:
         needs: [ios, android]
