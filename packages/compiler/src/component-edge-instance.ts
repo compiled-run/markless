@@ -9,6 +9,7 @@ import type {
 	BoundSymbolResolverRow,
 	CaptureAnalysisArtifact,
 	ExtractedCaptureSymbol,
+	SemanticComponent,
 	SemanticComponentEdge,
 } from './artifacts.ts';
 
@@ -120,6 +121,35 @@ export function componentEdgeInstancePath(
 	edges: ReadonlyArray<SemanticComponentEdge>,
 ): string {
 	return chain.map((edge) => componentEdgeInstanceSegment(edge, edges)).join('');
+}
+
+/**
+ * Every chain of this module's edges that renders down to `edge`: from each component
+ * nothing here places, and from each exported component, which an importer renders
+ * as its own entry and so names its instances from itself down.
+ */
+export function componentEdgePathsEndingAt(
+	edge: SemanticComponentEdge,
+	graph: {
+		readonly components: ReadonlyArray<SemanticComponent>;
+		readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
+	},
+	seen: ReadonlySet<string> = new Set(),
+): ReadonlyArray<ReadonlyArray<SemanticComponentEdge>> {
+	if (seen.has(edge.id)) return [];
+	const nextSeen = new Set(seen).add(edge.id);
+	const incoming = graph.componentEdges.filter(
+		(candidate) =>
+			candidate.childComponentName === edge.parentComponentName && !nextSeen.has(candidate.id),
+	);
+	if (incoming.length === 0) return [[edge]];
+	const placed = incoming.flatMap((parent) =>
+		componentEdgePathsEndingAt(parent, graph, nextSeen).map((path) => [...path, edge]),
+	);
+	const entry = graph.components.some(
+		(component) => component.name === edge.parentComponentName && component.exportName !== undefined,
+	);
+	return entry ? [[edge], ...placed] : placed;
 }
 
 /**
