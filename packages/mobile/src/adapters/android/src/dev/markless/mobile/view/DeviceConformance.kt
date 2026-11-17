@@ -15,7 +15,7 @@ import dev.markless.mobile.core.str
 object DeviceConformance {
 	fun run(context: Context, vectorBytes: ByteArray): List<String> {
 		val vector = Json.parse(vectorBytes).obj("vector")
-		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray())
+		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore())
 		val failures = ArrayList<String>()
 		fun shownTexts(): String = host.payload.nodes.filter { it is Node.Text && host.hasView(it.id) }.joinToString(",", "[", "]") { "[${jsonString(it.id)},${jsonString(host.textView(it.id).text.toString())}]" }
 		val initial = canonical(vector.field("initial", "vector"))

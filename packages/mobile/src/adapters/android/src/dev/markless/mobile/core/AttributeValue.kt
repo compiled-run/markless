@@ -9,7 +9,7 @@ object AttributeValue {
 	).map { "aria-$it" }
 
 	fun of(name: String, value: Scalar): String? {
-		if (value is Scalar.Bool && !value.value && name !in SPELLS_FALSE) return null
+		if (value == Scalar.Null || (value is Scalar.Bool && !value.value && name !in SPELLS_FALSE)) return null
 		if (value is Scalar.Bool && value.value && name !in ENUMERATED_BOOLEAN && !name.startsWith("aria-") && !name.startsWith("data-")) return ""
 		return JsString.of(value)
 	}

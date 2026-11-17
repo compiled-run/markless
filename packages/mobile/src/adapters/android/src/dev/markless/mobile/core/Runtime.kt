@@ -21,9 +21,21 @@ sealed interface JournalEntry {
 	}
 }
 
+/** Where cells with a storage key keep their values across launches. */
+interface Store {
+	fun get(key: String): Scalar?
+	fun set(key: String, value: Scalar)
+}
+
+class MemoryStore(private val values: MutableMap<String, Scalar> = HashMap()) : Store {
+	override fun get(key: String): Scalar? = values[key]
+	override fun set(key: String, value: Scalar) { values[key] = value }
+}
+
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
-class Runtime(val payload: Payload) {
-	private val values = LinkedHashMap<String, Scalar>().apply { for (c in payload.cells) put(c.id, c.initial) }
+class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
+	private val values = LinkedHashMap<String, Scalar>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
+	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
 	private val byId = payload.nodes.associateBy { it.id }
 
@@ -32,9 +44,23 @@ class Runtime(val payload: Payload) {
 	fun evaluate(e: Expr): Scalar = when (e) {
 		is Expr.CellRef -> value(e.cell)
 		is Expr.Literal -> e.value
-		is Expr.Not -> Scalar.Bool(!JsString.truthy(evaluate(e.operand)))
-		is Expr.If -> if (JsString.truthy(evaluate(e.test))) evaluate(e.whenTrue) else evaluate(e.whenFalse)
-		is Expr.Equals -> Scalar.Bool(strictEquals(evaluate(e.left), evaluate(e.right)))
+		is Expr.Unary -> Js.unary(e.op, evaluate(e.value))
+		is Expr.Binary -> { val l = evaluate(e.left); Js.binary(e.op, l, evaluate(e.right)) }
+		is Expr.Logical -> {
+			val l = evaluate(e.left)
+			when (e.op) {
+				"&&" -> if (Js.truthy(l)) evaluate(e.right) else l
+				"||" -> if (Js.truthy(l)) l else evaluate(e.right)
+				else -> if (l == Scalar.Null) evaluate(e.right) else l
+			}
+		}
+		is Expr.If -> if (Js.truthy(evaluate(e.test))) evaluate(e.whenTrue) else evaluate(e.whenFalse)
+		is Expr.Template -> Scalar.Str(e.parts.joinToString("") { if (it is String) it else Js.toStr(evaluate(it as Expr)) })
+		is Expr.Length -> when (val v = evaluate(e.value)) {
+			is Scalar.Str -> Scalar.Num(v.value.length.toDouble())
+			else -> throw MarklessRuntimeError(".length of a ${if (v == Scalar.Null) "null" else v::class.simpleName}")
+		}
+		is Expr.Call -> Js.call(e.name, e.arguments.map(::evaluate))
 	}
 
 	fun armOf(branch: Node.Branch): Int? = if (JsString.truthy(evaluate(branch.test))) 0 else if (branch.arms > 1) 1 else null
@@ -78,12 +104,11 @@ class Runtime(val payload: Payload) {
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeArms = arms().toMap()
-		for (op in handler.ops) {
-			val before = value(op.cell)
-			values[op.cell] = when (op) {
-				is Op.Add -> Scalar.Num((before as? Scalar.Num ?: throw MarklessRuntimeError("add on \"${op.cell}\", which does not hold a number")).value + op.value)
-				is Op.Set -> op.value
-				is Op.Toggle -> Scalar.Bool(!JsString.truthy(before))
+		for (op in handler.ops) when (op) {
+			is Op.Assign -> {
+				val v = evaluate(op.value)
+				values[op.cell] = v
+				storageKeys[op.cell]?.let { store.set(it, v) }
 			}
 		}
 		val afterTexts = texts().toMap()
@@ -105,12 +130,6 @@ class Runtime(val payload: Payload) {
 	}
 
 	companion object {
-		/** JavaScript's `===` on scalars: NaN is unequal to itself, 0 equals -0. */
-		fun strictEquals(a: Scalar, b: Scalar): Boolean = when {
-			a is Scalar.Num && b is Scalar.Num -> a.value == b.value
-			a is Scalar.Str && b is Scalar.Str -> a.value == b.value
-			a is Scalar.Bool && b is Scalar.Bool -> a.value == b.value
-			else -> false
-		}
+		fun strictEquals(a: Scalar, b: Scalar): Boolean = Js.strictEquals(a, b)
 	}
 }

@@ -3,18 +3,24 @@ package dev.markless.mobile.core
 const val NATIVE_VIEW_VERSION = "markless.native-view/0"
 
 sealed interface Scalar {
+	data object Null : Scalar
 	data class Num(val value: Double) : Scalar
 	data class Str(val value: String) : Scalar
 	data class Bool(val value: Boolean) : Scalar
 }
 
-/** A value computed from cells: JavaScript truthiness for `not` and `if`, `===` for `equals`. */
+/** A value computed from cells with ECMAScript's meaning (see [Js]). */
 sealed interface Expr {
 	data class CellRef(val cell: String) : Expr
 	data class Literal(val value: Scalar) : Expr
-	data class Not(val operand: Expr) : Expr
+	data class Unary(val op: String, val value: Expr) : Expr
+	data class Binary(val op: String, val left: Expr, val right: Expr) : Expr
+	data class Logical(val op: String, val left: Expr, val right: Expr) : Expr
 	data class If(val test: Expr, val whenTrue: Expr, val whenFalse: Expr) : Expr
-	data class Equals(val left: Expr, val right: Expr) : Expr
+	/** Each part is a literal string or an expression read with `String(value)`. */
+	data class Template(val parts: List<Any>) : Expr
+	data class Length(val value: Expr) : Expr
+	data class Call(val name: String, val arguments: List<Expr>) : Expr
 }
 
 sealed interface TextPart {
@@ -41,12 +47,11 @@ enum class EventName(val wire: String) { Activate("activate") }
 sealed interface Op {
 	val cell: String
 
-	data class Add(override val cell: String, val value: Double) : Op
-	data class Set(override val cell: String, val value: Scalar) : Op
-	data class Toggle(override val cell: String) : Op
+	/** The cell takes the expression's value, evaluated before the write. */
+	data class Assign(override val cell: String, val value: Expr) : Op
 }
 
-data class Cell(val id: String, val name: String, val initial: Scalar)
+data class Cell(val id: String, val name: String, val initial: Scalar, val storageKey: String? = null)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -102,23 +107,48 @@ data class Payload(
 		fun cellsOf(e: Expr): List<String> = when (e) {
 			is Expr.CellRef -> listOf(e.cell)
 			is Expr.Literal -> emptyList()
-			is Expr.Not -> cellsOf(e.operand)
+			is Expr.Unary -> cellsOf(e.value)
+			is Expr.Binary -> cellsOf(e.left) + cellsOf(e.right)
+			is Expr.Logical -> cellsOf(e.left) + cellsOf(e.right)
 			is Expr.If -> cellsOf(e.test) + cellsOf(e.whenTrue) + cellsOf(e.whenFalse)
-			is Expr.Equals -> cellsOf(e.left) + cellsOf(e.right)
+			is Expr.Template -> e.parts.filterIsInstance<Expr>().flatMap(::cellsOf)
+			is Expr.Length -> cellsOf(e.value)
+			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 		}
 
-		private fun expr(v: Json, what: String): Expr {
+		private val UNARY = setOf("!", "-", "+")
+		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
+		private val LOGICAL = setOf("&&", "||", "??")
+		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round")
+
+		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
+			val v = o.field(key, what).str("$what.$key")
+			if (v !in allowed) throw MarklessDecodeError("$what has unknown $key \"$v\"")
+			return v
+		}
+
+		fun expr(v: Json, what: String): Expr {
 			val o = v.obj(what)
+			fun sub(k: String) = expr(o.field(k, what), "$what.$k")
 			return when {
 				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
-				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(scalar(o.field("literal", what), "$what.literal")) }
-				o.containsKey("not") -> { o.only(setOf("not"), what); Expr.Not(expr(o.field("not", what), "$what.not")) }
-				o.containsKey("if") -> { o.only(setOf("if", "whenTrue", "whenFalse"), what); Expr.If(expr(o.field("if", what), "$what.if"), expr(o.field("whenTrue", what), "$what.whenTrue"), expr(o.field("whenFalse", what), "$what.whenFalse")) }
-				o.containsKey("equals") -> {
-					o.only(setOf("equals"), what)
-					val pair = o.field("equals", what).arr("$what.equals")
-					if (pair.size != 2) throw MarklessDecodeError("$what.equals has ${pair.size} operands, not 2")
-					Expr.Equals(expr(pair[0], "$what.equals[0]"), expr(pair[1], "$what.equals[1]"))
+				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) Scalar.Null else scalar(it, "$what.literal") }) }
+				o.containsKey("unary") -> { o.only(setOf("unary", "value"), what); Expr.Unary(oneOf(o, "unary", UNARY, what), sub("value")) }
+				o.containsKey("binary") -> { o.only(setOf("binary", "left", "right"), what); Expr.Binary(oneOf(o, "binary", BINARY, what), sub("left"), sub("right")) }
+				o.containsKey("logical") -> { o.only(setOf("logical", "left", "right"), what); Expr.Logical(oneOf(o, "logical", LOGICAL, what), sub("left"), sub("right")) }
+				o.containsKey("if") -> { o.only(setOf("if", "whenTrue", "whenFalse"), what); Expr.If(sub("if"), sub("whenTrue"), sub("whenFalse")) }
+				o.containsKey("template") -> {
+					o.only(setOf("template"), what)
+					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
+				}
+				o.containsKey("member") -> {
+					o.only(setOf("member", "property"), what)
+					oneOf(o, "property", setOf("length"), what)
+					Expr.Length(sub("member"))
+				}
+				o.containsKey("call") -> {
+					o.only(setOf("call", "arguments"), what)
+					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
@@ -130,7 +160,7 @@ data class Payload(
 		}
 
 		private fun scalar(v: Json, what: String): Scalar = when (v) {
-			is Json.Num -> Scalar.Num(integer(v.value, what))
+			is Json.Num -> Scalar.Num(v.value)
 			is Json.Str -> Scalar.Str(v.value)
 			is Json.Bool -> Scalar.Bool(v.value)
 			else -> throw MarklessDecodeError("$what must be a number, string or boolean")
@@ -143,8 +173,9 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial"), what)
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), scalar(o.field("initial", what), "$what.initial"))
+			o.only(setOf("id", "name", "initial", "storage"), what)
+			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), scalar(o.field("initial", what), "$what.initial"), storage)
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -206,23 +237,13 @@ data class Payload(
 		private fun op(v: Json, what: String, cells: Set<String>): Op {
 			val o = v.obj(what)
 			val name = o.field("op", what).str("$what.op")
+			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
+			o.only(setOf("op", "cell", "value"), what)
 			val cell = o.field("cell", what).str("$what.cell")
-			if (name in setOf("add", "set", "toggle") && cell !in cells) throw MarklessDecodeError("$what writes unknown cell \"$cell\"")
-			return when (name) {
-				"add" -> {
-					o.only(setOf("op", "cell", "value"), what)
-					Op.Add(cell, integer(o.field("value", what).num("$what.value"), "$what.value"))
-				}
-				"set" -> {
-					o.only(setOf("op", "cell", "value"), what)
-					Op.Set(cell, scalar(o.field("value", what), "$what.value"))
-				}
-				"toggle" -> {
-					o.only(setOf("op", "cell"), what)
-					Op.Toggle(cell)
-				}
-				else -> throw MarklessDecodeError("$what has unknown op \"$name\"")
-			}
+			if (cell !in cells) throw MarklessDecodeError("$what writes unknown cell \"$cell\"")
+			val value = expr(o.field("value", what), "$what.value")
+			for (c in cellsOf(value)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+			return Op.Assign(cell, value)
 		}
 	}
 }

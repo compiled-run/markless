@@ -18,6 +18,7 @@ import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
+import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.StyleWrite
 import dev.markless.mobile.style.StyledNode
@@ -48,9 +49,10 @@ class MarklessHost(
 	payloadBytes: ByteArray,
 	styleExportBytes: ByteArray? = null,
 	private val fonts: FontSource = AssetFonts(context),
+	store: Store = PreferencesStore(context),
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
-	val runtime = Runtime(payload)
+	val runtime = Runtime(payload, store)
 	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }

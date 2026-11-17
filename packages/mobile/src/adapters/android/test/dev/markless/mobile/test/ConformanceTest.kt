@@ -2,6 +2,8 @@ package dev.markless.mobile.test
 
 import dev.markless.mobile.core.AttributeValue
 import dev.markless.mobile.core.EventName
+import dev.markless.mobile.core.Js
+import dev.markless.mobile.core.MemoryStore
 import dev.markless.mobile.core.Scalar
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JsString
@@ -80,14 +82,13 @@ private fun refuses(name: String, json: String, fragment: String) {
 }
 
 private fun decoderStrictness() {
-	val ok = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":0}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"c"}]}],"events":[{"host":"h0","event":"activate","handler":"x"}],"handlers":[{"id":"x","ops":[{"op":"add","cell":"c","value":1}]}]}"""
+	val ok = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"c","name":"c","initial":0}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"c"}]}],"events":[{"host":"h0","event":"activate","handler":"x"}],"handlers":[{"id":"x","ops":[{"op":"assign","cell":"c","value":{"literal":1}}]}]}"""
 	check("decodes a minimal payload", runCatching { Payload.decode(ok.toByteArray()) }.isSuccess) { runCatching { Payload.decode(ok.toByteArray()) }.exceptionOrNull().toString() }
 	refuses("an unknown version", ok.replace("native-view/0", "native-view/9"), "unknown payload version")
 	refuses("an unknown node kind", ok.replace("\"kind\":\"text\"", "\"kind\":\"image\""), "unknown node kind \"image\"")
-	refuses("an unknown op", ok.replace("\"op\":\"add\"", "\"op\":\"multiply\""), "unknown op \"multiply\"")
+	refuses("an unknown op", ok.replace("\"op\":\"assign\"", "\"op\":\"multiply\""), "unknown op \"multiply\"")
 	refuses("an unknown event", ok.replace("\"activate\"", "\"hover\""), "unknown event \"hover\"")
 	refuses("an unknown field", ok.replace("\"component\":\"C\"", "\"component\":\"C\",\"extra\":1"), "unknown field \"extra\"")
-	refuses("a non-integer initial", ok.replace("\"initial\":0", "\"initial\":0.5"), "integers only")
 	refuses("a parent that does not precede", ok.replace("\"parent\":\"h0\"", "\"parent\":\"h9\""), "does not precede")
 	refuses("an unknown cell read", ok.replace("\"parts\":[{\"cell\":\"c\"}]", "\"parts\":[{\"cell\":\"d\"}]"), "unknown cell \"d\"")
 	refuses("trailing bytes", "$ok x", "trailing data")
@@ -108,21 +109,46 @@ private fun styleExport(fixtures: File) {
 }
 
 private fun ops() {
-	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":0},{"id":"s","name":"s","initial":"a"},{"id":"b","name":"b","initial":false}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"attributes":{"class":"x mk-1"}},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"n"},{"text":"/"},{"cell":"s"},{"text":"/"},{"cell":"b"}]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"t"},{"host":"h2","event":"activate","handler":"s"},{"host":"h3","event":"activate","handler":"same"}],"handlers":[{"id":"t","ops":[{"op":"toggle","cell":"b"},{"op":"toggle","cell":"n"}]},{"id":"s","ops":[{"op":"set","cell":"s","value":"b"},{"op":"set","cell":"n","value":7}]},{"id":"same","ops":[{"op":"set","cell":"s","value":"b"}]}]}"""
+	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":0,"storage":{"key":"visits"}},{"id":"s","name":"s","initial":"a"}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"attributes":{"class":"x mk-1"}},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"n"},{"text":"/"},{"expr":{"template":["<",{"cell":"s"},">"]}}]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"t"},{"host":"h2","event":"activate","handler":"same"}],"handlers":[{"id":"t","ops":[{"op":"assign","cell":"n","value":{"binary":"+","left":{"unary":"+","value":{"cell":"n"}},"right":{"literal":1}}},{"op":"assign","cell":"s","value":{"binary":"+","left":{"cell":"s"},"right":{"cell":"n"}}}]},{"id":"same","ops":[{"op":"assign","cell":"s","value":{"cell":"s"}}]}]}"""
 	val decoded = Payload.decode(payload.toByteArray())
 	check("element attributes decode", (decoded.nodes[0] as Node.Element).attributes == mapOf("class" to "x mk-1")) { "${decoded.nodes[0]}" }
-	val r = Runtime(decoded)
-	check("initial mixed scalars", r.text("h0:text0") == "0/a/false") { r.text("h0:text0") }
-	val toggled = r.dispatch("h1", EventName.Activate).joinToString(",") { it.toJson() }
-	check("toggle uses JavaScript truthiness (!0 is true)", toggled == """{"op":"text","node":"h0:text0","value":"true/a/true"}""") { toggled }
-	val set = r.dispatch("h2", EventName.Activate).joinToString(",") { it.toJson() }
-	check("set writes literals", set == """{"op":"text","node":"h0:text0","value":"7/b/true"}""") { set }
-	val same = r.dispatch("h3", EventName.Activate)
-	check("a set that changes nothing journals nothing", same.isEmpty()) { "$same" }
-	val add = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"s","name":"s","initial":"a"}],"nodes":[{"kind":"element","id":"h0","element":"button","parent":null}],"events":[{"host":"h0","event":"activate","handler":"x"}],"handlers":[{"id":"x","ops":[{"op":"add","cell":"s","value":1}]}]}"""
-	val err = runCatching { Runtime(Payload.decode(add.toByteArray())).dispatch("h0", EventName.Activate) }.exceptionOrNull()
-	check("add on a string is an error", err?.message?.contains("does not hold a number") == true) { "$err" }
-	refuses("a set to a non-integer", payload.replace("\"value\":7", "\"value\":7.5"), "integers only")
+	val store = MemoryStore()
+	val r = Runtime(decoded, store)
+	check("initial template", r.text("h0:text0") == "0/<a>") { r.text("h0:text0") }
+	val step = r.dispatch("h1", EventName.Activate).joinToString(",") { it.toJson() }
+	check("each assign reads the values before it", step == """{"op":"text","node":"h0:text0","value":"1/<a1>"}""") { step }
+	check("an assign that changes nothing journals nothing", r.dispatch("h2", EventName.Activate).isEmpty()) { "" }
+	check("a storage cell writes its store", store.get("visits") == Scalar.Num(1.0)) { "${store.get("visits")}" }
+	val again = Runtime(decoded, store)
+	check("a storage cell reads its store at mount", again.text("h0:text0") == "1/<a>") { again.text("h0:text0") }
+	refuses("an unknown builtin", payload.replace("\"template\":[", "\"call\":\"eval\",\"arguments\":[{\"literal\":1}],\"x\":[").replace(",\"x\":[\"<\",{\"cell\":\"s\"},\">\"]", ""), "unknown call \"eval\"")
+	refuses("an unknown binary operator", payload.replace("\"binary\":\"+\",\"left\":{\"unary\"", "\"binary\":\"**\",\"left\":{\"unary\""), "unknown binary \"**\"")
+}
+
+private fun jsOps() {
+	fun n(x: Double) = Scalar.Num(x)
+	fun str(x: String) = Scalar.Str(x)
+	val cases = listOf(
+		Js.binary("+", str("5"), n(1.0)) to str("51"), Js.binary("+", n(1.0), Scalar.Bool(true)) to n(2.0), Js.binary("+", Scalar.Null, str("x")) to str("nullx"),
+		Js.binary("-", str("5"), n(2.0)) to n(3.0), Js.binary("<", str("10"), str("9")) to Scalar.Bool(true), Js.binary("<", str("10"), n(9.0)) to Scalar.Bool(false),
+		Js.binary("<=", n(Double.NaN), n(1.0)) to Scalar.Bool(false), Js.binary(">=", Scalar.Null, n(0.0)) to Scalar.Bool(true), Js.binary("%", n(-5.0), n(3.0)) to n(-2.0),
+		Js.call("Number", listOf(str(" 12 "))) to n(12.0), Js.call("Number", listOf(str("5x"))) to n(Double.NaN), Js.call("Number", listOf(str(""))) to n(0.0),
+		Js.call("Number", listOf(str("0x1F"))) to n(31.0), Js.call("Number", listOf(str("-0x1F"))) to n(Double.NaN), Js.call("Number", listOf(str("1e3"))) to n(1000.0),
+		Js.call("Number", listOf(str("1f"))) to n(Double.NaN), Js.call("Number", listOf(str(".5"))) to n(0.5), Js.call("Number", listOf(str("5."))) to n(5.0), Js.call("Number", listOf(str("-Infinity"))) to n(Double.NEGATIVE_INFINITY),
+		Js.call("Math.round", listOf(n(-2.5))) to n(-2.0), Js.call("Math.round", listOf(n(2.5))) to n(3.0), Js.call("Math.round", listOf(n(0.49999999999999994))) to n(0.0),
+		Js.call("Math.round", listOf(n(4503599627370497.0))) to n(4503599627370497.0), Js.call("Math.max", listOf()) to n(Double.NEGATIVE_INFINITY), Js.call("Math.max", listOf(n(1.0), n(Double.NaN))) to n(Double.NaN),
+		Js.call("String", listOf()) to str(""), Js.call("Boolean", listOf(str("0"))) to Scalar.Bool(true), Js.call("Math.abs", listOf(str("-3"))) to n(3.0),
+	)
+	for ((n2, pair) in cases.withIndex()) {
+		val (got, want) = pair
+		val same = if (got is Scalar.Num && want is Scalar.Num) got.value.equals(want.value) else got == want
+		check("js op $n2", same) { "got $got, want $want" }
+	}
+	val negZero = Js.call("Math.min", listOf(n(0.0), n(-0.0))) as Scalar.Num
+	check("Math.min(0, -0) is -0", 1 / negZero.value < 0) { "${negZero.value}" }
+	val posZero = Js.call("Math.max", listOf(n(-0.0), n(0.0))) as Scalar.Num
+	check("Math.max(-0, 0) is 0", 1 / posZero.value > 0) { "${posZero.value}" }
+	check("round keeps -0 for -0.4", 1 / Js.round(-0.4) < 0) { "${Js.round(-0.4)}" }
 }
 
 private fun attributeRule() {
@@ -141,6 +167,7 @@ private fun attributeRule() {
 fun main(args: Array<String>) {
 	attributeRule()
 	ops()
+	jsOps()
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
