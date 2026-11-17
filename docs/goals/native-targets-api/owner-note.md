@@ -58,10 +58,16 @@ are not true/false; such components are refused at build time with the reason, n
 
 ## What the compiler must learn next
 
-An app's whole route table (several pages, back stack, how a page is presented), then async values (rung 11, needs your
-decision below). After that: state inside child components (one set of cells per
-instance), `{children}`, components imported from other modules, `@switch` and `@else if`, and re-running layout on the
-phone when text changes (linking Dragon's layout engine on the device).
+Done tonight beyond the first ten rungs: `@else if` and `@switch`, state inside reused components, `{children}`, and
+components imported from other files. Still refused by name (each one is a build error that says so):
+
+- an app's whole route table (several pages, a back stack, how a page is presented);
+- async values (rung 11, your decision below), and any handler that calls your own functions or awaits;
+- components from packages (other than the router's `Link`), and `storage()` inside a reused component;
+- events other than tap and text input (keys, focus, pointer), and `element()` handles, which the headless library needs;
+- styles on elements inside an `@if` branch or a `@for` row, and state that is not true/false, on Dragon's side;
+- laying text out again on the phone when its length changes (today a longer string keeps the box Dragon measured at build
+  time); the fix is linking Dragon's layout engine on the device.
 
 ## Device features (camera, location, notifications)
 
