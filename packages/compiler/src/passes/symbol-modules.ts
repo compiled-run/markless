@@ -7657,6 +7657,17 @@ function readsAssignedNode(node: AnyNode, target: AssignedTarget, rewrite: Event
 	return false;
 }
 
+// Whether the handler writes the assigned path, or a path holding or inside it, anywhere but this assignment: a once
+// part run ahead of the update could reach that write, which JavaScript runs after reading the value it replaces.
+function writesOverlapElsewhere(authored: LoweredStateWrite, target: AssignedTarget, rewrite: EventHandlerRewrite): boolean {
+	return (rewrite.symbol.writes ?? []).some((other) => {
+		if (other === authored || other.graphNodeId !== target.graphNodeId) return false;
+		const path = other.through ? other.through.path : other.path;
+		const shared = Math.min(path.length, target.path.length);
+		return path.slice(0, shared).every((segment, index) => segment === target.path[index]);
+	});
+}
+
 // The value with each once part standing as the parameter that carries its result.
 function withOnceParameters(node: AnyNode, parts: ReadonlyArray<OncePart>, names: ReadonlyArray<string>): AnyNode {
 	const index = parts.findIndex((part) => part.node === node);
@@ -7867,13 +7878,14 @@ function loweredEventWriteNode(
 		const logical = write.assignmentOperator === '&&=' || write.assignmentOperator === '||=' || write.assignmentOperator === '??=';
 		const replayable = !containsWriteExpression(right) && !pausesOutsideFunctions(right);
 		// A plain assignment whose value reads exactly what it replaces is an update, so a page still showing an earlier value applies it there too.
-		const parts = !replayable
+		const onceParts = !replayable
 			? null
 			: write.assignmentOperator
 				? replayedValueParts(right, write, rewrite, logical)
 				: !write.row && !write.through && readsAssignedState(right, write, rewrite)
 					? replayedValueParts(right, write, rewrite)
 					: null;
+		const parts = !onceParts || (onceParts.length > 0 && writesOverlapElsewhere(authored, write, rewrite)) ? null : onceParts;
 		const names = parts ? onceParameterNames(right, parts.length) : [];
 		const replayed = parts && parts.length > 0 ? withOnceParameters(right, parts, names) : right;
 		const updaterRead =
