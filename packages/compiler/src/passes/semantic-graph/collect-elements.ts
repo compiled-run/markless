@@ -20,6 +20,7 @@ import type {
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
 	SemanticElementHandleBinding,
+	SemanticEvent,
 	SemanticGraphDiagnostic,
 	SemanticGraphBinding,
 	SemanticTemplateBindingTarget,
@@ -100,6 +101,7 @@ import {
 	handlerReadsRenderLocalDiagnostic,
 } from './diagnostics.ts';
 import { acceptsIdrefList, isCssAnchorAttribute, isIdrefAttribute } from './idref-attributes.ts';
+import { expressionTreeOf, handlerStatementsOf } from './expression-tree.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	catchResetUses,
@@ -276,6 +278,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
+		...expressionField(joined ? undefined : expression),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1343,7 +1346,7 @@ function collectAttribute(
 						: [],
 				hasSyncPolicyCandidate,
 				syncPolicy,
-				...writeStatementCount(handler && !relayed && !factoryCall ? handler.node : undefined),
+				...handlerStatementsField(handler && !relayed && !factoryCall ? handler.node : undefined),
 			});
 		}
 		collectExpressionReads(expressionValue, state);
@@ -1450,6 +1453,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			source: expressionSource(conditionalClass.test, state.source),
+			...expressionField(conditionalClass.test),
 			sourceSpan: sourceSpan(conditionalClass.test, state.filename),
 			target: conditionalClass.target,
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -1526,6 +1530,7 @@ function collectAttribute(
 			...rowScope(state),
 			hostNodeId,
 			...templateReadSource(composite, expressionValue, state),
+			...expressionField(expressionValue),
 			sourceSpan: sourceSpan(expressionValue, state.filename),
 			target: bindingTargetForAttribute(attributeName, state.currentStyleScopeClass),
 			asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -2396,30 +2401,13 @@ function eventHandlerExpression(
 	return { node: resolved.node, source: resolved.source, span: resolved.span };
 }
 
-// A body of bare `x++`, `x--` or `x = ...` statements: its effects are its state writes, which a host can run as data.
-function writeStatementCount(node: AnyNode | undefined): { handlerWriteStatements?: number } {
-	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression')) return {};
-	const body = node.body as AnyNode | undefined;
-	const unwrap = (expression: AnyNode | null): AnyNode | null =>
-		expression?.type === 'ParenthesizedExpression'
-			? unwrap((expression.expression as AnyNode | undefined) ?? null)
-			: expression;
-	const expressions = (
-		body?.type === 'BlockStatement'
-			? asNodes(body.body).map((statement) =>
-					statement.type === 'ExpressionStatement' ? (statement.expression as AnyNode) : null,
-				)
-			: [body ?? null]
-	).map(unwrap);
-	const writes = expressions.every(
-		(expression) =>
-			expression !== null &&
-			((expression.type === 'UpdateExpression' &&
-				(expression.argument as AnyNode | undefined)?.type === 'Identifier') ||
-				(expression.type === 'AssignmentExpression' &&
-					(expression.left as AnyNode | undefined)?.type === 'Identifier')),
-	);
-	return writes && expressions.length > 0 ? { handlerWriteStatements: expressions.length } : {};
+function expressionField(expression: AnyNode | undefined): Pick<SemanticTemplateRead, 'expression'> {
+	return expression ? { expression: expressionTreeOf(expression) } : {};
+}
+
+function handlerStatementsField(node: AnyNode | undefined): Pick<SemanticEvent, 'handlerStatements'> {
+	const handlerStatements = handlerStatementsOf(node);
+	return handlerStatements ? { handlerStatements } : {};
 }
 
 function handlerParameterNames(node: AnyNode): string[] {

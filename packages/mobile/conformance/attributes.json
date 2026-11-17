@@ -1,0 +1,301 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "App",
+		"cells": [
+			{
+				"id": "state:liked",
+				"name": "liked",
+				"initial": false
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null,
+				"attributes": {
+					"class": "mk-1fsdhn3"
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "h1",
+				"parent": "h0",
+				"attributes": {
+					"class": "mk-1fsdhn3"
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Attributes"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0",
+				"bindings": [
+					{
+						"attribute": "class",
+						"value": {
+							"if": {
+								"cell": "state:liked"
+							},
+							"whenTrue": {
+								"literal": "like on mk-1fsdhn3"
+							},
+							"whenFalse": {
+								"literal": "like mk-1fsdhn3"
+							}
+						}
+					},
+					{
+						"attribute": "aria-label",
+						"value": {
+							"if": {
+								"cell": "state:liked"
+							},
+							"whenTrue": {
+								"literal": "Unlike"
+							},
+							"whenFalse": {
+								"literal": "Like"
+							}
+						}
+					},
+					{
+						"attribute": "aria-pressed",
+						"value": {
+							"cell": "state:liked"
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Heart"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "button",
+				"parent": "h0",
+				"attributes": {
+					"class": "mk-1fsdhn3"
+				},
+				"bindings": [
+					{
+						"attribute": "disabled",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:liked"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "Clear"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h3",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:liked",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:liked"
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:liked",
+						"value": {
+							"literal": false
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Attributes"
+		],
+		[
+			"h2:text0",
+			"Heart"
+		],
+		[
+			"h3:text0",
+			"Clear"
+		]
+	],
+	"initialAttributes": [
+		[
+			"h2",
+			"class",
+			"like mk-1fsdhn3"
+		],
+		[
+			"h2",
+			"aria-label",
+			"Like"
+		],
+		[
+			"h2",
+			"aria-pressed",
+			"false"
+		],
+		[
+			"h3",
+			"disabled",
+			""
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "class",
+					"value": "like on mk-1fsdhn3"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-label",
+					"value": "Unlike"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-pressed",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "disabled",
+					"value": null
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h3"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "class",
+					"value": "like mk-1fsdhn3"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-label",
+					"value": "Like"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-pressed",
+					"value": "false"
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "disabled",
+					"value": ""
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "class",
+					"value": "like on mk-1fsdhn3"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-label",
+					"value": "Unlike"
+				},
+				{
+					"op": "attribute",
+					"node": "h2",
+					"name": "aria-pressed",
+					"value": "true"
+				},
+				{
+					"op": "attribute",
+					"node": "h3",
+					"name": "disabled",
+					"value": null
+				}
+			]
+		}
+	]
+}

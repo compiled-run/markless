@@ -8,6 +8,10 @@ export type NativeConformance = {
 	readonly version: typeof NATIVE_CONFORMANCE_VERSION;
 	readonly payload: NativeViewPayload;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
+	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
+	readonly initialAttributes?: ReadonlyArray<readonly [node: string, name: string, value: string | null]>;
+	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
+	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	readonly steps: ReadonlyArray<{
 		readonly action: NativeAction;
 		readonly journal: ReadonlyArray<NativeJournalEntry>;
@@ -20,10 +24,14 @@ export function nativeConformance(
 ): NativeConformance {
 	const runtime = createNativeRuntime(payload);
 	const initial = runtime.texts();
+	const initialAttributes = runtime.attributes();
+	const initialArms = runtime.arms();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
 		initial,
+		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
+		...(initialArms.length > 0 ? { initialArms } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }

@@ -30,7 +30,7 @@ sealed interface StyleWrite {
 	data class TextColor(val color: Rgba) : StyleWrite
 }
 
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame, val borderWidths: Edges?, val writes: List<StyleWrite>)
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
 
 /** One platform's slice of a Dragon style export: frames (device px, relative to the parent box) and lowered writes per node id. */
 data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val nodes: List<StyledNode>) {
@@ -55,11 +55,12 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val o = v.obj(what)
 			val id = o.field("id", what).str("$what.id")
 			val parent = o.field("parent", what).let { if (it == Json.Null) null else it.str("$what.parent") }
-			val f = o.field("frame", what).obj("$what.frame")
-			val frame = Frame(f.field("x", what).num("x"), f.field("y", what).num("y"), f.field("width", what).num("width"), f.field("height", what).num("height"))
+			val frame = o.field("frame", what).takeIf { it != Json.Null }?.obj("$what.frame")?.let { f -> Frame(f.field("x", what).num("x"), f.field("y", what).num("y"), f.field("width", what).num("width"), f.field("height", what).num("height")) }
+			val kind = o.field("kind", what).str("$what.kind")
+			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
 			val writes = o.field("writes", what).arr("$what.writes").mapIndexed { n, w -> write(w, "$id writes[$n]") }
-			return StyledNode(id, parent, o.field("kind", what).str("$what.kind"), frame, bw, writes)
+			return StyledNode(id, parent, kind, frame, bw, writes)
 		}
 
 		private fun color(v: Json, what: String): Rgba {

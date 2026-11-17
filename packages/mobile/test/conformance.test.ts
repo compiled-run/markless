@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { compileNativeComponent, createNativeRuntime, nativeConformance, nativeStyleInput } from '../src/index.ts';
 import { CONFORMANCE_CASES } from './conformance-cases.ts';
@@ -10,7 +11,7 @@ const committed = (name: string) =>
 describe('native conformance vectors', () => {
 	it('the committed counter vectors are what the compiler and the reference runtime produce today', async () => {
 		const { payload, diagnostics } = await compileNativeComponent({
-			filename: 'src/Counter.tsrx',
+			filename: 'src/counter.tsrx',
 			source: fixture('Counter.tsrx'),
 		});
 		expect(diagnostics).toEqual([]);
@@ -29,8 +30,8 @@ describe('native conformance vectors', () => {
 	it('every committed vector file matches a fresh build (rewrite with test/write-conformance.ts)', async () => {
 		for (const entry of CONFORMANCE_CASES) {
 			const { payload } = await compileNativeComponent({
-				filename: `src/${entry.fixture}`,
-				source: fixture(entry.fixture),
+				filename: `src/${entry.name}.tsrx`,
+				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(nativeConformance(payload!, entry.actions));
 		}
@@ -54,8 +55,8 @@ describe('native conformance vectors', () => {
 				{
 					id: 'handler:x',
 					ops: [
-						{ op: 'add', cell: 'state:a', value: -1 },
-						{ op: 'add', cell: 'state:a', value: -1 },
+						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
+						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
 					],
 				},
 			],
@@ -68,7 +69,7 @@ describe('native conformance vectors', () => {
 
 describe('native style input', () => {
 	it('hands Dragon the counter tree, its first texts and the scoped CSS the compiler wrote', async () => {
-		const build = await compileNativeComponent({ filename: 'src/Counter.tsrx', source: fixture('Counter.tsrx') });
+		const build = await compileNativeComponent({ filename: 'src/counter.tsrx', source: fixture('Counter.tsrx') });
 		const input = nativeStyleInput(build.payload!, build.styles);
 		expect(input.nodes.filter((node) => node.kind === 'text')).toEqual([
 			{ kind: 'text', id: 'h1:text0', parent: 'h1', text: 'Counter' },

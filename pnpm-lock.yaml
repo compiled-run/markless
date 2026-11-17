@@ -1071,9 +1071,16 @@ importers:
       '@markless/serializer':
         specifier: workspace:*
         version: link:../serializer
+      '@markless/web':
+        specifier: workspace:*
+        version: link:../web
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+    devDependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/router:
     dependencies:

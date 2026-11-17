@@ -12,6 +12,13 @@ object JsString {
 		is Scalar.Bool -> if (value.value) "true" else "false"
 	}
 
+	/** JavaScript's ToBoolean. */
+	fun truthy(value: Scalar): Boolean = when (value) {
+		is Scalar.Num -> !(value.value == 0.0 || value.value.isNaN())
+		is Scalar.Str -> value.value.isNotEmpty()
+		is Scalar.Bool -> value.value
+	}
+
 	fun number(m: Double): String {
 		if (m.isNaN()) return "NaN"
 		if (m == 0.0) return "0"
