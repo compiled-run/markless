@@ -4,6 +4,7 @@ import { expect, test } from 'vitest';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type { NativeValue, NativeViewPayload } from '@markless/serializer';
 import { compileNativeComponent, createNativeRuntime } from '../src/index.ts';
+import { readRelativeModule } from '../src/harness/rung.ts';
 import { proofsDir, readRung, rungFolders, type LadderStep } from '../proofs/ladder.ts';
 
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
@@ -163,6 +164,7 @@ test.each(rungFolders())(
 			filename,
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
+			readModule: readRelativeModule,
 		});
 		if (build.payload === null) {
 			expect(build.diagnostics.length).toBeGreaterThan(0);
