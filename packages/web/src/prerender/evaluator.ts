@@ -358,7 +358,9 @@ export async function renderPrerenderBoundary(
 	readonly cells?: ReadonlyArray<{ readonly graphNodeId: string; readonly value: unknown }>;
 	readonly moduleRootPath?: string;
 }> {
-	const drawnAt = pagePrefix(pageBoundaryId, boundaryId);
+	// A @try in a keyed row is named by its row; the owner stands at what precedes the row.
+	const rows = ownRows(pagePrefix(pageBoundaryId, boundaryId));
+	const drawnAt = pagePrefix(pageBoundaryId, rows + boundaryId);
 	if (isPrerenderDataSurface(page)) {
 		if (!isPrerenderLoadSymbol(propsOrLoadSymbol)) {
 			throw new TypeError('Prerender render data requires a symbol loader.');
@@ -384,7 +386,7 @@ export async function renderPrerenderBoundary(
 				...(pageBoundaryId && { settling: boundaryId }),
 			},
 		);
-		const settled = await settledBoundaryResult(output, drawnAt + boundaryId, boundaryId);
+		const settled = await settledBoundaryResult(output, drawnAt + rows + boundaryId, rows + boundaryId);
 		const cells = freshArmCells(output, freshCellIds);
 		return { ...settled, ...(cells.length > 0 && { cells }), ...(owner && { moduleRootPath: owner.moduleRootPath }) };
 	}
@@ -400,6 +402,11 @@ function unplacedOwnerError(pageId: string): Error {
 // Where the render root stands on the page: the page id of what it renders, less its own id.
 function pagePrefix(pageId: string | undefined, localId: string): string {
 	return pageId?.endsWith(localId) ? pageId.slice(0, pageId.length - localId.length) : '';
+}
+
+// The row segments a prefix ends in are its owner's own rows: a placed component's segment follows the rows it sits in.
+function ownRows(prefix: string): string {
+	return /(?:r:[^:]*:)*$/.exec(prefix)![0];
 }
 
 /**
@@ -1338,6 +1345,7 @@ export function evaluatePrerenderDataComponent(input: {
 						attributeName: definition.attributeName,
 						idPrefix: input.idPrefix,
 						projectionSegment: definition.rowHosts?.segment,
+						rowSegment: marklessRowPath,
 						...(input.freshBranchSiteId
 							? { freshBranchSiteId: input.freshBranchSiteId }
 							: {}),

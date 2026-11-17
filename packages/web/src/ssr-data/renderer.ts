@@ -220,6 +220,8 @@ export type SsrDataStructure = {
 		readonly arm?: number;
 		/** The id of the anchor this one renders directly inside. */
 		readonly outer?: string;
+		/** A @try in a keyed row: the boundary's own id, which `id` qualifies with the row. */
+		readonly site?: string;
 	}>;
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
@@ -249,6 +251,8 @@ export type RenderSsrDataInput = {
 	readonly attributeName?: (name: string) => string;
 	// Only an owner whose keyed rows project elements passes it: the row segment those elements take.
 	readonly projectionSegment?: (context: SsrDataReadContext) => { readonly hostSegment?: string };
+	// Only an owner with a @try inside a keyed row passes it: the rows that name each row's boundary.
+	readonly rowSegment?: (context: SsrDataReadContext) => string | undefined;
 	readonly idPrefix?: string;
 	// The repeat row the root chunk renders inside, for a caller that starts the
 	// render partway down a component's tree: a `@for` row's projection chunk.
@@ -316,6 +320,7 @@ export type StructureToken =
 			readonly edge: 'start' | 'end';
 			readonly anchorHtml?: string;
 			readonly arm?: number;
+			readonly site?: string;
 	  };
 
 type RenderedPart = { readonly html: string; readonly tokens: ReadonlyArray<StructureToken> };
@@ -927,7 +932,9 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 				);
 			}
 			case 'async': {
-				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, slot.boundaryId));
+				// Each keyed row's @try is its own boundary, so its anchor carries the row it renders in.
+				const rows = input.rowSegment?.(context) ?? '';
+				anchors.push(anchorRecord(idPrefix, context.chunkId, slot, rows + slot.boundaryId));
 				const boundary = input.renderData.boundaries.find(
 					(candidate) => candidate.boundaryId === slot.boundaryId,
 				);
@@ -965,11 +972,11 @@ export function renderSsrData(input: RenderSsrDataInput): Awaitable<RenderSsrDat
 									context,
 									true,
 								);
-								const id = `${idPrefix}${slot.boundaryId}`;
+								const id = `${idPrefix}${rows}${slot.boundaryId}`;
 								return {
 									html: `<!--markless:async:${id}-->${body.html}<!--/markless:async:${id}-->`,
 									tokens: [
-										commentToken('async', id, 'start', body.html, arm),
+										commentToken('async', id, 'start', body.html, arm, rows ? idPrefix + slot.boundaryId : undefined),
 										...body.tokens,
 										commentToken('async', id, 'end'),
 									],
@@ -1072,6 +1079,7 @@ function commentToken(
 	edge: 'start' | 'end',
 	anchorHtml?: string,
 	arm?: number,
+	site?: string,
 ): StructureToken {
 	return {
 		kind: 'comment',
@@ -1080,6 +1088,7 @@ function commentToken(
 		edge,
 		...(anchorHtml === undefined ? {} : { anchorHtml }),
 		arm,
+		site,
 	};
 }
 
@@ -1100,7 +1109,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 	let elementCount = 0;
 	const starts = new Map<
 		string,
-		{ readonly comment: number; readonly element: number; readonly html: string; readonly arm?: number }
+		{ readonly comment: number; readonly element: number; readonly html: string; readonly arm?: number; readonly site?: string }
 	>();
 	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
 	const open: string[] = [];
@@ -1124,6 +1133,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				element: elementCount,
 				html: token.anchorHtml ?? '',
 				arm: token.arm,
+				site: token.site,
 			});
 			open.push(token.anchorId);
 		} else {
@@ -1141,6 +1151,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				html: start.html,
 				arm: start.arm,
 				outer: open.at(-1),
+				site: start.site,
 			});
 		}
 		if (token.anchorKind !== 'arm-branch') commentIndex++;

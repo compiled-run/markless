@@ -1,0 +1,94 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 268,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/prerender/evaluator"
+			],
+			"delta": 32,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/ssr-data/renderer"
+			],
+			"delta": 175,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 268,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/prerender/evaluator"
+			],
+			"delta": 32,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/ssr-data/renderer"
+			],
+			"delta": 175,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 1,
+			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row",
+			"date": "2026-11-17"
+		}
+	]
+}

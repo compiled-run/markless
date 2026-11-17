@@ -1091,28 +1091,46 @@ export function spreadsAttributes(chunks: ReadonlyArray<RenderDataChunk>): boole
 	);
 }
 
+// The chunks a slot renders inside itself.
+function nestedChunkIds(slot: RenderDataChunk['slots'][number]): ReadonlyArray<string> {
+	switch (slot.kind) {
+		case 'repeat':
+			return [
+				slot.rowTemplateId,
+				...(slot.emptyTemplateId ? [slot.emptyTemplateId] : []),
+			];
+		case 'branch':
+			return slot.armTemplateIds;
+		case 'async':
+			return Object.values(slot.armTemplateIds).filter((id): id is string => !!id);
+		case 'dynamic-host':
+			return [slot.childChunkId];
+		case 'child-component':
+			return slot.projectionChunkId ? [slot.projectionChunkId] : [];
+		default:
+			return [];
+	}
+}
+
+// Each keyed row's @try is its own boundary, named by the rows it renders in.
+export function rendersTryInRows(chunks: ReadonlyArray<RenderDataChunk>): boolean {
+	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
+	const holdsTry = (chunkId: string, seen: Set<string>): boolean => {
+		const chunk = byId.get(chunkId);
+		if (!chunk || seen.has(chunkId)) return false;
+		seen.add(chunkId);
+		return chunk.slots.some(
+			(slot) => slot.kind === 'async' || nestedChunkIds(slot).some((id) => holdsTry(id, seen)),
+		);
+	};
+	return chunks.some((chunk) =>
+		chunk.slots.some((slot) => slot.kind === 'repeat' && holdsTry(slot.rowTemplateId, new Set())),
+	);
+}
+
 // A keyed row renders its projected elements under the row's segment, so the owner's records for them are filed per row.
 export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>): boolean {
 	const byId = new Map(chunks.map((chunk) => [chunk.id, chunk]));
-	const nestedIds = (slot: RenderDataChunk['slots'][number]): ReadonlyArray<string> => {
-		switch (slot.kind) {
-			case 'repeat':
-				return [
-					slot.rowTemplateId,
-					...(slot.emptyTemplateId ? [slot.emptyTemplateId] : []),
-				];
-			case 'branch':
-				return slot.armTemplateIds;
-			case 'async':
-				return Object.values(slot.armTemplateIds).filter((id): id is string => !!id);
-			case 'dynamic-host':
-				return [slot.childChunkId];
-			case 'child-component':
-				return slot.projectionChunkId ? [slot.projectionChunkId] : [];
-			default:
-				return [];
-		}
-	};
 	const placesElements = (chunkId: string, seen: Set<string>): boolean => {
 		const chunk = byId.get(chunkId);
 		if (!chunk || seen.has(chunkId)) return false;
@@ -1122,7 +1140,7 @@ export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>)
 			chunk.slots.some(
 				(slot) =>
 					slot.kind === 'dynamic-host' ||
-					nestedIds(slot).some((id) => placesElements(id, seen)),
+					nestedChunkIds(slot).some((id) => placesElements(id, seen)),
 			)
 		);
 	};
@@ -1133,7 +1151,7 @@ export function projectsElementsIntoRows(chunks: ReadonlyArray<RenderDataChunk>)
 		return chunk.slots.some((slot) =>
 			slot.kind === 'child-component' && slot.projectionChunkId
 				? placesElements(slot.projectionChunkId, new Set())
-				: nestedIds(slot).some((id) => projectsInRow(id, seen)),
+				: nestedChunkIds(slot).some((id) => projectsInRow(id, seen)),
 		);
 	};
 	return chunks.some((chunk) =>
