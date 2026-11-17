@@ -1,6 +1,6 @@
 import Foundation
 
-public let dragonStyleExportSchema = "dragon.native-style-export/0"
+public let dragonStyleExportSchemas = ["dragon.native-style-export/0", "dragon.native-style-export/1"]
 private let dragonStyleExportUnits = "device px; frames relative to the parent box"
 
 public struct RGBA: Equatable, Sendable {
@@ -34,21 +34,36 @@ public struct StyleNode: Sendable {
 	public let writes: [StyleWrite]
 }
 
-/// One target of a decoded `dragon.native-style-export/0` file.
+/// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
+public struct StyleState: Sendable {
+	public let key: String
+	public let domain: [NativeValue]
+
+	/// The key names a payload cell when it is the cell's id or ends in `#<cell id>`.
+	public func names(_ cell: String) -> Bool { key == cell || key.hasSuffix("#\(cell)") }
+}
+
+/// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
 	public let viewport: (width: Double, height: Double)
 	public let dpr: Double
-	public let nodes: [StyleNode]
+	public let states: [StyleState]
+	public let initial: Int
+	/// Every reachable combination of states, each a complete node list, with each state's value in it.
+	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
+	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
+	public let next: [[[Int]]]
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "source", "warnings"])
+		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings"])
 		let schema = try fields["schema"].string()
-		guard schema == dragonStyleExportSchema else {
-			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchema)")
+		guard dragonStyleExportSchemas.contains(schema) else {
+			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchemas)")
 		}
+		let perState = schema == dragonStyleExportSchemas[1]
 		let units = try fields["units"].string()
 		guard units == dragonStyleExportUnits else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
 		let fonts = try fields["fonts"].array().map { font in
@@ -56,23 +71,56 @@ public struct StyleExport: Sendable {
 			return (id: try field["id"].string(), file: try field["file"].string())
 		}
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(["backend", "viewport", "dpr", "nodes"])
+		let targetFields = try chosen.object(perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"])
 		let actualBackend = try targetFields["backend"].string()
 		guard actualBackend == backend else {
 			throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)")
 		}
 		let viewport = try targetFields["viewport"].object(["width", "height"])
-		let nodes = try targetFields["nodes"].array().map(decodeNode)
-		var seen = Set<String>()
-		for node in nodes {
-			guard seen.insert(node.id).inserted else { throw PayloadError(path: chosen.path, reason: "duplicate node \(node.id)") }
-			if let parent = node.parent, !seen.contains(parent) {
-				throw PayloadError(path: chosen.path, reason: "\(node.id)'s parent \(parent) is not an earlier node")
+		let checkedNodes = { (reader: Reader) throws -> [StyleNode] in
+			let nodes = try reader.array().map(decodeNode)
+			var seen = Set<String>()
+			for node in nodes {
+				guard seen.insert(node.id).inserted else { throw PayloadError(path: reader.path, reason: "duplicate node \(node.id)") }
+				if let parent = node.parent, !seen.contains(parent) {
+					throw PayloadError(path: reader.path, reason: "\(node.id)'s parent \(parent) is not an earlier node")
+				}
 			}
+			return nodes
+		}
+		var states: [StyleState] = []
+		var initial = 0
+		var assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
+		var next: [[[Int]]] = [[]]
+		if perState {
+			states = try targetFields["states"].array().map { state in
+				let f = try state.object(["key", "domain"])
+				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
+			}
+			assignments = try targetFields["assignments"].array().map { assignment in
+				let f = try assignment.object(["values", "nodes"])
+				let valuesReader = try f["values"]
+				var values: [String: NativeValue] = [:]
+				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
+				guard Set(values.keys) == Set(states.map(\.key)) else { throw PayloadError(path: valuesReader.path, reason: "an assignment's values must name every state") }
+				return (values, try checkedNodes(try f["nodes"]))
+			}
+			initial = Int(try targetFields["initial"].number())
+			next = try targetFields["next"].array().map { row in try row.array().map { column in try column.array().map { Int(try $0.number()) } } }
+			let shapeIsRight = next.count == assignments.count && next.allSatisfy { row in
+				row.count == states.count && zip(row, states).allSatisfy { column, state in
+					column.count == state.domain.count && column.allSatisfy { $0 == -1 || assignments.indices.contains($0) }
+				}
+			}
+			guard shapeIsRight, assignments.indices.contains(initial) else {
+				throw PayloadError(path: chosen.path, reason: "the next table and initial do not match the assignments and states")
+			}
+		} else {
+			assignments = [([:], try checkedNodes(try targetFields["nodes"]))]
 		}
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), nodes: nodes)
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next)
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
