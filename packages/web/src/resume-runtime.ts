@@ -470,18 +470,12 @@ export function createResumeRuntime(
 		return ids;
 	}
 	async function start(): Promise<void> {
-		// A stored value read here lands once the computeds it feeds are wired, or they never hear of it.
-		const releaseFlush = input.graph.holdFlush?.();
-		try {
-			if (hasStorageCells && !storagePlane)
-				storagePlane = (await import('./storage-plane.ts')).createStoragePlane({
-					graph: input.graph,
-					state: input.state,
-				});
-			await registerComputedRefreshes(input.state?.computed ?? [], input.state?.sharedSeeds);
-		} finally {
-			releaseFlush?.();
-		}
+		if (hasStorageCells && !storagePlane)
+			storagePlane = (await import('./storage-plane.ts')).createStoragePlane({
+				graph: input.graph,
+				state: input.state,
+			});
+		await registerComputedRefreshes(input.state?.computed ?? [], input.state?.sharedSeeds);
 		const servedBehaviors: string[] = [];
 		settleTracker = await (
 			await import('./resume-runtime-start.ts')

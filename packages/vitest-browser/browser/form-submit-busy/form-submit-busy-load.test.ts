@@ -6,16 +6,29 @@ import { SeveralForms } from '../form-in-place/several-forms.tsrx';
 import { NoteForm } from './note-form.tsrx';
 import { SyncForm } from './sync-form.tsrx';
 
-// The hold's module is held back here, so a press can land while it is still on its way, as on a slow first load.
+// The hold is held back here, so a press can land before it starts, as on a slow first load of its module.
 const arrival = vi.hoisted(() => {
 	let open!: () => void;
 	const gate = new Promise<void>((resolve) => (open = resolve));
 	return { gate, open, asked: 0 };
 });
 vi.mock('../../../web/src/submit-hold.ts', async (importOriginal) => {
-	arrival.asked++;
-	await arrival.gate;
-	return importOriginal();
+	const hold = await importOriginal<typeof import('../../../web/src/submit-hold.ts')>();
+	return {
+		...hold,
+		holdSubmit: (...input: Parameters<typeof hold.holdSubmit>) => {
+			arrival.asked++;
+			let end: (() => void) | undefined;
+			let ended = false;
+			void arrival.gate.then(() => {
+				if (!ended) end = hold.holdSubmit(...input);
+			});
+			return () => {
+				ended = true;
+				end?.();
+			};
+		},
+	};
 });
 
 installServer();
@@ -29,9 +42,7 @@ test('a submit whose handler returns no promise never asks for the hold', async 
 	submitter.click();
 	await expect.poll(() => container.querySelector('[data-sent]')!.textContent, poll).toBe('1');
 	await new Promise((resolve) => setTimeout(resolve, 50));
-	// The dev server loads the hold with a page that has a submit; there the form must still never be held.
-	if (import.meta.env.DEV) expect(container.querySelector('form')!.hasAttribute('aria-busy')).toBe(false);
-	else expect(arrival.asked).toBe(0);
+	expect(arrival.asked).toBe(0);
 });
 
 // Known gap: a press is held only once its handler has returned a promise and the hold has loaded, so a repeat before that is sent.
@@ -67,7 +78,9 @@ test('an edit made while the hold is still loading is sent when submitted after 
 	arrival.open();
 	await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
 	submitter.click();
-	await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
+	await expect
+		.poll(() => server.posts, poll)
+		.toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
 	answer.resolve();
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
@@ -111,7 +124,9 @@ test('a handler form sends what it holds when its handler runs, and a repeat of 
 	submitter.click();
 	field.value = 'Hopper';
 	try {
-		await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
+		await expect
+			.poll(() => server.posts, poll)
+			.toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
 		await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
 		submitter.click();
 		await new Promise((resolve) => setTimeout(resolve, 50));

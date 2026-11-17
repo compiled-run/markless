@@ -3,10 +3,12 @@ export type ModuleLoad = (specifier: string) => string;
 
 export type ModuleLoads = { readonly load?: ModuleLoad; imports(): string | null };
 
+export const DEV_RESIDENT_MODULE = '@markless/web/fns/dev-resident';
+
 const nativeLoads: ModuleLoads = { imports: () => null };
 
 // The dev server imports what a build would pack, so a first write finds its code loaded, as packed code is in a build.
-function residentModuleLoads(): ModuleLoads {
+function residentModuleLoads(helper: string): ModuleLoads {
 	const aliases = new Map<string, string>();
 	return {
 		load(specifier) {
@@ -18,15 +20,16 @@ function residentModuleLoads(): ModuleLoads {
 			aliases.size === 0
 				? null
 				: [
-						"import { marklessDevResident } from '@markless/web/fns/dev-resident';",
+						`import { marklessDevResident } from ${JSON.stringify(helper)};`,
 						...[...aliases].map(
-							([specifier, alias]) => `import * as ${alias} from ${JSON.stringify(specifier)};`,
+							([specifier, alias]) =>
+								`import * as ${alias} from ${JSON.stringify(specifier)};`,
 						),
 					].join('\n'),
 	};
 }
 
 /** Without a `load`, each emitter writes its own native `import()`, so a build's bytes stay as they are. */
-export function moduleLoads(devServer: boolean): ModuleLoads {
-	return devServer ? residentModuleLoads() : nativeLoads;
+export function moduleLoads(devServer: boolean, helper = DEV_RESIDENT_MODULE): ModuleLoads {
+	return devServer ? residentModuleLoads(helper) : nativeLoads;
 }

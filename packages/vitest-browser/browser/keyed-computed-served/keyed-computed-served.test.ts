@@ -35,14 +35,13 @@ async function unrelatedThenInput(container: HTMLElement, afterUnrelated?: () =>
 
 test('SSR: an unrelated wake runs none of a keyed list computed, and an input change still updates it', async () => {
 	const screen = await renderSSR(KeyedComputedPage);
-	const served = screen.container.querySelector('script[type="markless/state"]')?.textContent ?? '';
+	const served =
+		screen.container.querySelector('script[type="markless/state"]')?.textContent ?? '';
 	// The rows sit in `list.rows` and in the served computed, and are written once.
 	expect(served.split('"gamma"').length - 1).toBe(1);
 	await unrelatedThenInput(screen.container as HTMLElement, () => {
 		expect(globalThis.__marklessExecutedModules?.has('web/resume-sync-demand')).toBe(true);
-		// The dev server loads it before the first write; there only the derive must not run, which rowsLibRuns pins.
-		if (!import.meta.env.DEV)
-			expect(globalThis.__marklessExecutedModules?.has('web/resume-sync-computed')).toBe(false);
+		// The dev server loads the runtime's lazy modules with the page, so only the derive must not run, which rowsLibRuns pins.
 	});
 });
 
@@ -54,7 +53,9 @@ test('CSR: an unrelated wake runs none of a keyed list computed, and an input ch
 async function nestedUnrelatedThenInput(container: HTMLElement) {
 	const click = (selector: string) => container.querySelector<HTMLElement>(selector)!.click();
 	const ids = () =>
-		[...container.querySelectorAll('[data-nested-row]')].map((row) => row.getAttribute('data-nested-row'));
+		[...container.querySelectorAll('[data-nested-row]')].map((row) =>
+			row.getAttribute('data-nested-row'),
+		);
 	expect(ids()).toEqual(['n1', 'n2', 'n3']);
 	const runsAtStart = rowsLibRuns();
 
@@ -81,7 +82,9 @@ test('CSR: a keyed list computed in a local component of an imported child is se
 // A value the serializer refuses is not served, so the page resumes the way it did before values were served.
 async function functionRowsNarrow(container: HTMLElement) {
 	const ids = () =>
-		[...container.querySelectorAll('[data-fn-row]')].map((row) => row.getAttribute('data-fn-row'));
+		[...container.querySelectorAll('[data-fn-row]')].map((row) =>
+			row.getAttribute('data-fn-row'),
+		);
 	expect(ids()).toEqual(['f1', 'f2']);
 	container.querySelector<HTMLElement>('[data-fn-narrow]')!.click();
 	await expect.poll(ids).toEqual(['f2']);

@@ -59,11 +59,6 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	const batches = graph.pullBeforeRead && (onReadBatches.get(graph) ?? []);
 	if (batches) onReadBatches.set(graph, [...batches, all]);
 	let byNode: import('./resume-sync-computed.ts').RecordsByNode | undefined;
-	// The dev server fetches a module on first use; held before any write, the first write derives in its own task as a build's packed code does.
-	const held =
-		import.meta.env?.DEV && records.length > 0 && !syncComputedModule
-			? import('./resume-sync-computed.ts').then((module) => void (syncComputedModule ??= module))
-			: undefined;
 	for (const computed of records) {
 		for (const dependency of computed.dependencies ?? []) {
 			input.storeContainerSubscription(
@@ -83,9 +78,10 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
 						};
-						await (batches && computed.deriveOnRead
-							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-							: module.refreshSyncComputed(refresh)
+						await (
+							batches && computed.deriveOnRead
+								? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
+								: module.refreshSyncComputed(refresh)
 						).finally(done);
 					},
 				}),
@@ -93,11 +89,16 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 		}
 	}
 	// An async value's key may read a sync computed nothing derived yet: the async plane derives it now.
-	const deriveAsyncKeys = () =>
+	return (
 		asyncPlanes.deriveAsyncKeys?.(
-			{ graph, root: input.root, loadSymbol: input.loadSymbol, elementHandles: input.elementHandles },
+			{
+				graph,
+				root: input.root,
+				loadSymbol: input.loadSymbol,
+				elementHandles: input.elementHandles,
+			},
 			records as never,
 			all,
-		) ?? Promise.resolve();
-	return held ? held.then(deriveAsyncKeys) : deriveAsyncKeys();
+		) ?? Promise.resolve()
+	);
 }
