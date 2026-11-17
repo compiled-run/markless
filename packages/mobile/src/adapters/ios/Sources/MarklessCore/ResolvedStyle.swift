@@ -32,12 +32,13 @@ extension StyleExport {
 		let texts = Dictionary(uniqueKeysWithValues: initialTexts.map { ($0.node, $0.text) })
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payload.nodes {
-			if case .branch = node { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
+			if case .branch = node.kind { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
+			if case .repeat = node.kind { throw styleError("\(node.id): @for is not styled on iOS yet, the style export lays out one state") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
-			switch node {
+			switch node.kind {
 			case .element:
 				guard !styled.isText, !styled.isAnonymous else { throw styleError("\(node.id) is an element in the payload but not in the style export") }
-			case .branch: break
+			case .branch, .repeat: break
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
 				guard styled.text == texts[node.id] else {

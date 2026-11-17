@@ -8,7 +8,7 @@ public final class UserDefaultsStore: NativeStore {
 
 	public init(_ defaults: UserDefaults = .standard) { self.defaults = defaults }
 
-	public func read(_ key: String) -> NativeScalar? {
+	public func read(_ key: String) -> NativeValue? {
 		switch defaults.object(forKey: key) {
 		case let text as String: return .string(text)
 		case let number as NSNumber where CFGetTypeID(number) == CFBooleanGetTypeID(): return .bool(number.boolValue)
@@ -17,7 +17,7 @@ public final class UserDefaultsStore: NativeStore {
 		}
 	}
 
-	public func write(_ key: String, _ value: NativeScalar) {
+	public func write(_ key: String, _ value: NativeValue) {
 		// UserDefaults keeps the old object when the new one isEqual to it, and NSNumber 1 equals true.
 		defaults.removeObject(forKey: key)
 		switch value {
