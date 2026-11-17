@@ -1553,6 +1553,7 @@ function emitResumeContainerEvent(
 					'\tconst { runtime } = await resumePrerenderTriggerGroup({',
 					'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
 					'\t\troot: handoff.root, loadSymbol: group.loadSymbol, prepareBoundaryArm: group.prepareBoundaryArm, renderBoundaryArm: group.renderBoundaryArm,',
+					...renderDataEntry('\t\t', 'marklessLoadPrerenderData()'),
 					'\t});',
 					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'}',
