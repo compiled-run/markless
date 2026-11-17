@@ -143,6 +143,78 @@
 			"delta": 1103,
 			"reason": "measured +771 B rendered over the recorded +332 (CI run 44028302284 on 9231684d3, linux-x64): one shown-arm record carrying a shown @catch error, the plain-@try state and the served @catch seed",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 85,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 67,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 67,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 162,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 180,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion playground",
+				"jsGzipBytes"
+			],
+			"delta": 18,
+			"reason": "a component arm opened while a save is held renders from the prerender evaluator and resume wiring, which docs pages load; measured on CI runs 44130618189 vs 44120506068",
+			"date": "2026-11-17"
 		}
 	]
 }
