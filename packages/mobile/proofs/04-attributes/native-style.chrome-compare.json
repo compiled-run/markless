@@ -1,0 +1,331 @@
+{
+ "gateDevicePx": 1,
+ "compared": 36,
+ "failed": 0,
+ "rows": [
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h1",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h1:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h2",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h1",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h1:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h2",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "ios",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h1",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h1:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h2",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": false
+   },
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "html",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "body",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h1",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h1:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h2",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h2:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h3",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  },
+  {
+   "target": "android",
+   "values": {
+    "state:liked": true
+   },
+   "id": "h3:text0",
+   "maxDeltaDevicePx": 0,
+   "pass": true
+  }
+ ]
+}

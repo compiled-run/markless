@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
+import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
 import { PROOF_FONTS_FOLDER, PROOF_PAYLOAD_PATH, PROOF_STYLE_PATH } from './proof-app.ts';
@@ -22,9 +23,8 @@ export type ProofRung = {
 const COMPONENT_FILE = 'App.tsrx';
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
-/** Written here for Dragon; Dragon's export comes back as STYLE_EXPORT, committed with the rung. */
+/** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
 const STYLE_INPUT = 'native-style-input.json';
-const STYLE_EXPORT = 'native-style.json';
 
 type StyleExportFonts = {
 	readonly fonts?: ReadonlyArray<{ readonly id: string; readonly file: string }>;
@@ -32,22 +32,19 @@ type StyleExportFonts = {
 
 /** The style export and every font face it names, checked against the face's `sha256:` id. */
 function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
-	const exportPath = join(dir, STYLE_EXPORT);
-	const bytes = readFileSync(exportPath);
-	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
-	const fonts = (JSON.parse(bytes.toString('utf8')) as StyleExportFonts).fonts ?? [];
-	const dragon = process.env.MARKLESS_DRAGON_DIR;
-	if (fonts.length > 0 && !dragon) {
-		throw new Error(
-			`${name}: ${STYLE_EXPORT} names fonts; set MARKLESS_DRAGON_DIR to the Dragon checkout it came from`,
-		);
+	const dragon = dragonDir();
+	let bytes: Uint8Array;
+	try {
+		bytes = dragonStyleExport(join(dir, STYLE_INPUT), dragon);
+	} catch (error) {
+		throw new Error(`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`);
 	}
+	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
+	const fonts = (JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts).fonts ?? [];
 	for (const font of fonts) {
-		const file = resolve(dragon!, font.file);
+		const file = resolve(dragon, font.file);
 		if (!existsSync(file)) {
-			throw new Error(
-				`${name}: font ${font.id} is not at ${file}; MARKLESS_DRAGON_DIR must be the Dragon checkout the export came from`,
-			);
+			throw new Error(`${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`);
 		}
 		const face = readFileSync(file);
 		const digest = `sha256:${createHash('sha256').update(face).digest('hex')}`;
@@ -94,11 +91,6 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				join(dir, STYLE_INPUT),
 				`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
 			);
-			if (!existsSync(join(dir, STYLE_EXPORT))) {
-				throw new Error(
-					`${name}: the component has styles but no ${STYLE_EXPORT}; run Dragon's export on ${STYLE_INPUT}`,
-				);
-			}
 			assets.push(...styleAssets(dir, name));
 		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
