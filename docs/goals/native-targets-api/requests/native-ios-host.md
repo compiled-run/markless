@@ -58,3 +58,9 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
     (Dragon's own keys look like `doc/app/chip#selected`). The iOS host also refuses an export whose states do not cover
     every `styled` cell, and starts at the assignment whose values match the cells at mount (so a stored value starts in
     the right style). Change needed: the contract states the key rule, or the style input hands Dragon the cell id as the key.
+17. **`readiness` in export `/1`.** Dragon's current exports carry `targets.<t>.readiness` (`ready`, or `analysis-only` with
+    a `reason`), and Dragon says a host must not ship an `analysis-only` export as proven. Every export is `analysis-only`
+    today. The iOS host reads the field strictly, applies the export anyway and logs the reason. Change needed: the
+    contract names the field and says whether a proof may pass on an `analysis-only` export.
+18. **`synthetic-bold` is now real.** Dragon's `ms-text` export uses it (`keys`/`values` per font size). The iOS host still
+    refuses it when resolving. Change needed: its meaning in the contract (which stroke width at which size, in what unit).

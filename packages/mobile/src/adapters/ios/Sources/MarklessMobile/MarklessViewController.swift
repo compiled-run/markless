@@ -29,6 +29,7 @@ public final class MarklessViewController: UIViewController {
 	) throws {
 		self.payload = try NativeViewPayload.decode(payload)
 		self.style = try style.map { try StyleExport.decode($0) }
+		if let reason = self.style?.notReady { NSLog("Markless iOS host: applying a style export Dragon marks analysis-only: %@", reason) }
 		self.fonts = fonts
 		self.store = store
 		var params: [NativeRouteParam] = []

@@ -122,3 +122,11 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	let stored = try StyleExport.decode(export).resolve(for: payload, initialTexts: texts) { _ in .bool(true) }
 	#expect(stored.start == 1)
 }
+
+// Dragon's own export of its ms-text ladder fixture (examples/markless-styles/out on Dragon's native-dragon-styles branch).
+@Test func readsDragonsCurrentPerStateExport() throws {
+	let export = try StyleExport.decode(Data(contentsOf: try #require(Bundle.module.url(forResource: "Fixtures/ms-text.native-style", withExtension: "json"))))
+	#expect(export.assignments.count == 1)
+	#expect(export.notReady?.contains("analysis-only") == true)
+	#expect(export.assignments[0].nodes.contains { $0.isText })
+}

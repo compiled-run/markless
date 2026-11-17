@@ -54,6 +54,8 @@ public struct StyleExport: Sendable {
 	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
+	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
+	public let notReady: String?
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -71,7 +73,18 @@ public struct StyleExport: Sendable {
 			return (id: try field["id"].string(), file: try field["file"].string())
 		}
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"])
+		let targetFields = try chosen.object(
+			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
+			optional: perState ? ["readiness"] : [])
+		var notReady: String?
+		if targetFields.has("readiness") {
+			let readiness = try targetFields["readiness"]
+			switch try readiness.field("kind").string() {
+			case "ready": _ = try readiness.object(["kind"])
+			case "analysis-only": notReady = try readiness.object(["kind", "reason"])["reason"].string()
+			case let kind: throw PayloadError(path: readiness.path + ".kind", reason: "unknown readiness \"\(kind)\"")
+			}
+		}
 		let actualBackend = try targetFields["backend"].string()
 		guard actualBackend == backend else {
 			throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)")
@@ -120,7 +133,7 @@ public struct StyleExport: Sendable {
 		}
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next)
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady)
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
