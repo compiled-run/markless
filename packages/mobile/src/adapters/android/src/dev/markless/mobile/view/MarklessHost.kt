@@ -17,6 +17,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.TextView
 import dev.markless.mobile.core.EventName
+import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
@@ -60,6 +61,7 @@ class MarklessHost(
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
+	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
 	private var assignment = style?.initial ?: 0
 	private val expanded = HashMap<View, Boolean?>()
@@ -90,6 +92,9 @@ class MarklessHost(
 
 	fun hasView(id: String): Boolean = id in views
 
+	/** Every instance id that has a retained view. */
+	fun viewIds(): Set<String> = built.keys.toSet()
+
 	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
@@ -104,13 +109,16 @@ class MarklessHost(
 				}
 				is JournalEntry.State -> style?.let { st ->
 					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
-					for (node in payload.nodes) if (node !is Node.Branch) views[node.id]?.let { place(node, it, st) }
+					for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
 					root.requestLayout()
 				}
 				is JournalEntry.Arm -> {
-					if (payload.nodes.none { it.id == entry.node && it is Node.Branch }) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
-					removeHidden()
-					buildShown()
+					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
+					rebuild()
+				}
+				is JournalEntry.Rows -> {
+					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
+					rebuild()
 				}
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
@@ -118,12 +126,23 @@ class MarklessHost(
 		onJournal?.invoke(journal)
 	}
 
+	/** After an arm or rows entry: drop instances no longer shown, build the new ones from current values, then put each parent's children in order. */
+	private fun rebuild() {
+		removeHidden()
+		buildShown()
+		for (v in views.values.toList()) if (v is MarklessBox) reorder(v)
+	}
+
+	private fun shownInstances(): List<Instance> = payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(runtime::instances)
+
 	private fun removeHidden() {
-		for (node in payload.nodes.asReversed()) {
-			if (runtime.isShown(node) || node.id !in views) continue
-			val view = views.remove(node.id)!!
-			textViews.remove(node.id)
-			if (node is Node.Text && view is Button) continue
+		val live = shownInstances().mapTo(HashSet()) { it.id }
+		for (inst in built.values.sortedByDescending { order.getValue(it.node.id) }) {
+			if (inst.id in live) continue
+			val view = views.remove(inst.id)!!
+			built.remove(inst.id)
+			textViews.remove(inst.id)
+			if (inst.node is Node.Text && view is Button) continue
 			expanded.remove(view)
 			(view.parent as? ViewGroup)?.let { p ->
 				(p as? MarklessBox)?.frames?.remove(view)
@@ -133,29 +152,49 @@ class MarklessHost(
 	}
 
 	private fun buildShown() {
-		for (node in payload.nodes) {
-			if (node is Node.Branch || node.id in views || !runtime.isShown(node)) continue
-			val view = when (node) {
-				is Node.Element -> element(node)
-				is Node.Text -> text(node)
-				is Node.Branch -> continue
+		for (inst in shownInstances()) {
+			if (inst.id in views) continue
+			val view = when (val node = inst.node) {
+				is Node.Element -> element(node, inst)
+				is Node.Text -> text(node, inst)
+				else -> continue
 			}
-			views[node.id] = view
-			val parentId = node.parent
-			if (parentId != null && view !== views[parentId]) insert(parentId, node.id, view)
-			style?.let { place(node, view, it) }
+			views[inst.id] = view
+			built[inst.id] = inst
+			val parentId = parentOf(inst)
+			if (parentId != null && view !== views[parentId]) {
+				val parent = views[parentId] as? MarklessBox ?: throw MarklessHostError("\"${inst.id}\" is inside \"$parentId\", which cannot hold children on Android")
+				parent.addView(view)
+				reorder(parent)
+			}
+			style?.let { place(inst, view, it) }
 		}
 	}
 
-	private fun insert(parentId: String, id: String, view: View) {
-		val parent = views[parentId] as? MarklessBox ?: throw MarklessHostError("\"$id\" is inside \"$parentId\", which cannot hold children on Android")
-		val mine = order.getValue(id)
-		var at = parent.childCount
-		for (i in 0 until parent.childCount) {
-			val sibling = views.entries.firstOrNull { it.value === parent.getChildAt(i) }?.key ?: continue
-			if (order.getValue(sibling) > mine) { at = i; break }
+	/** The instance id of [inst]'s parent: in the same row when the parent is a row node too. */
+	private fun parentOf(inst: Instance): String? {
+		val p = inst.node.parent ?: return null
+		return if (runtime.node(p).row != null) "$p@${inst.rowKey ?: throw MarklessHostError("\"${inst.id}\" is outside the rows of its parent \"$p\"")}" else p
+	}
+
+	/** Where an instance sits among its siblings: document order, with a list's rows at the list's place, in row order. */
+	private fun position(inst: Instance, rowIndex: Map<String, Map<String, Int>>): List<Int> {
+		val r = inst.node.row ?: return listOf(order.getValue(inst.node.id))
+		return listOf(order.getValue(r), rowIndex.getValue(r).getValue(inst.rowKey!!), order.getValue(inst.node.id))
+	}
+
+	/** Moves [box]'s retained children into position order; the views are kept, only their places change. */
+	private fun reorder(box: MarklessBox) {
+		val rowIndex = runtime.rows().associate { (id, keys) -> id to keys.withIndex().associate { it.value to it.index } }
+		val ids = HashMap<View, Instance>().apply { for ((id, v) in views) if (v.parent === box) put(v, built.getValue(id)) }
+		val current = (0 until box.childCount).map { box.getChildAt(it) }
+		val wanted = current.sortedWith { a, b ->
+			val pa = position(ids.getValue(a), rowIndex); val pb = position(ids.getValue(b), rowIndex)
+			(0 until minOf(pa.size, pb.size)).map { pa[it].compareTo(pb[it]) }.firstOrNull { it != 0 } ?: pa.size.compareTo(pb.size)
 		}
-		parent.addView(view, at)
+		if (wanted == current) return
+		box.removeAllViews()
+		for (v in wanted) box.addView(v)
 	}
 
 	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false) {
@@ -172,7 +211,8 @@ class MarklessHost(
 		}
 	}
 
-	private fun element(node: Node.Element): View {
+	private fun element(node: Node.Element, inst: Instance): View {
+		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
 		val view = when (node.element) {
 			"button" -> Button(context).apply {
 				background = null
@@ -182,18 +222,18 @@ class MarklessHost(
 				includeFontPadding = false
 				setPadding(0, 0, 0, 0)
 				gravity = Gravity.TOP or Gravity.START
-				named(this, node.id)
+				named(this, inst.id)
 			}
 			"input" -> EditText(context).apply {
 				isSingleLine = true
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
-				named(this, node.id)
+				named(this, inst.id)
 			}
-			else -> MarklessBox(context).apply { named(this, node.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }) }
+			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }) }
 		}
-		views[node.id] = view
-		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b))
+		views[inst.id] = view
+		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
@@ -207,13 +247,13 @@ class MarklessHost(
 				}
 			})
 		}
-		for ((name, value) in node.attributes) if (name != "class") attribute(node.id, name, value)
-		for (b in node.bindings) if (!b.property) attribute(node.id, b.name, runtime.attribute(b))
+		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
+		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		return view
 	}
 
-	private fun text(node: Node.Text): View {
-		val parent = views.getValue(node.parent)
+	private fun text(node: Node.Text, inst: Instance): View {
+		val parent = views.getValue(parentOf(inst)!!)
 		val view: TextView = if (parent is Button) {
 			if (textViews.values.any { it === parent }) throw MarklessHostError("button \"${node.parent}\" has more than one text run; Android holds one per button")
 			parent
@@ -221,10 +261,10 @@ class MarklessHost(
 			includeFontPadding = false
 			isClickable = false
 			isFocusable = false
-			named(this, node.id, heading = parent.isAccessibilityHeading)
+			named(this, inst.id, heading = parent.isAccessibilityHeading)
 		}
-		view.text = runtime.text(node.id)
-		textViews[node.id] = view
+		view.text = runtime.text(node, inst.scope)
+		textViews[inst.id] = view
 		return view
 	}
 
@@ -239,17 +279,18 @@ class MarklessHost(
 		}
 	}
 
-	private fun place(node: Node, view: View, style: StyleExport) {
+	private fun place(inst: Instance, view: View, style: StyleExport) {
+		val node = inst.node
 		val styled = style.assignments[assignment]
-		val s = styled.byId[node.id] ?: throw MarklessHostError("style export has no node \"${node.id}\"")
-		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${node.id}\" is a ${s.kind}")
-		val frame = s.frame ?: throw MarklessHostError("style node \"${node.id}\" has no frame")
+		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
+		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
+		val frame = s.frame ?: throw MarklessHostError("style node \"${inst.id}\" has no frame")
 		val absolute = absolutes[assignment]
-		val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${node.id}\" sits inside a box with no frame")
-		val parentId = node.parent
+		val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${inst.id}\" sits inside a box with no frame")
+		val parentId = parentOf(inst)
 		if (node is Node.Text && view is Button) {
-			val (bx, by) = absolute.getValue(node.parent)
-			val box = styled.byId.getValue(node.parent).frame!!
+			val (bx, by) = absolute.getValue(parentId!!)
+			val box = styled.byId.getValue(parentId).frame!!
 			view.setPadding((ax - bx).roundToInt(), (ay - by).roundToInt(), (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
 		} else {
 			val (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
@@ -272,17 +313,18 @@ class MarklessHost(
 		val origin = absolute.getValue(payload.nodes.first().id)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
-		for (node in payload.nodes) {
-			val view = views[node.id] ?: continue
-			val frame = styled.byId.getValue(node.id).frame!!
-			val a = absolute.getValue(node.id)
+		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) {
+			val node = inst.node
+			val view = views.getValue(inst.id)
+			val frame = styled.byId.getValue(inst.id).frame!!
+			val a = absolute.getValue(inst.id)
 			val at = IntArray(2).also { view.getLocationInWindow(it) }
 			var x = (at[0] - rootAt[0]).toDouble(); var y = (at[1] - rootAt[1]).toDouble()
 			var w = view.width.toDouble(); var h = view.height.toDouble()
 			if (node is Node.Text && view is Button) { x += view.paddingLeft; y += view.paddingTop; w -= view.paddingLeft + view.paddingRight; h -= view.paddingTop + view.paddingBottom }
 			val left = a.first - origin.first; val top = a.second - origin.second
 			val gap = maxOf(maxOf(Math.abs(x - left), Math.abs(y - top)), maxOf(Math.abs(x + w - left - frame.width), Math.abs(y + h - top - frame.height)))
-			Log.i(TAG, "frame ${node.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon $left,$top ${frame.width}x${frame.height} gap $gap")
+			Log.i(TAG, "frame ${inst.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon $left,$top ${frame.width}x${frame.height} gap $gap")
 			worst = maxOf(worst, gap)
 		}
 		return worst
