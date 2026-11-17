@@ -7,17 +7,13 @@ import java.math.RoundingMode
 /** JavaScript's `String(value)` (ECMA-262 Number::toString, radix 10) for the scalars a cell holds. */
 object JsString {
 	fun of(value: Scalar): String = when (value) {
+		Scalar.Null -> "null"
 		is Scalar.Num -> number(value.value)
 		is Scalar.Str -> value.value
 		is Scalar.Bool -> if (value.value) "true" else "false"
 	}
 
-	/** JavaScript's ToBoolean. */
-	fun truthy(value: Scalar): Boolean = when (value) {
-		is Scalar.Num -> !(value.value == 0.0 || value.value.isNaN())
-		is Scalar.Str -> value.value.isNotEmpty()
-		is Scalar.Bool -> value.value
-	}
+	fun truthy(value: Scalar): Boolean = Js.truthy(value)
 
 	fun number(m: Double): String {
 		if (m.isNaN()) return "NaN"
