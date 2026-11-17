@@ -1178,6 +1178,11 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// On a joined text inside a flipped arm: the computed each composite interpolation rebuilds from.
+	readonly armHoles?: ReadonlyArray<{
+		readonly sourceSpan: SourceSpan;
+		readonly computedGraphNodeId: string;
+	}>;
 	// Names a composite read with no route reads, resolved by scope analysis.
 	readonly readNames?: ReadonlyArray<string>;
 	// The reads into a prop's members that kept the composite from a computed, such as `label.length`.

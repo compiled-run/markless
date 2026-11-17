@@ -1186,10 +1186,20 @@ function sourceResidue(
 	// wakes the update once the count is a live number.
 	// A row minted in the browser reads its slots before any synthetic computed has
 	// derived, so a row keeps the expression - unless only the computed can answer it.
-	return computedRead?.computedGraphNodeId &&
+	if (
+		computedRead?.computedGraphNodeId &&
 		(!repeat || loweredStyle || readsSharedInstance(context, componentName, source)) &&
 		!spendsRosterCount(context, componentName, source)
-		? { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] }
+	)
+		return { kind: 'graph-read', graphNodeId: computedRead.computedGraphNodeId, path: [] };
+	const armHole =
+		repeat || spendsRosterCount(context, componentName, source)
+			? undefined
+			: context.graph.templateReads
+					.flatMap((read) => read.armHoles ?? [])
+					.find((hole) => hole.sourceSpan.start === span?.start);
+	return armHole
+		? { kind: 'graph-read', graphNodeId: armHole.computedGraphNodeId, path: [] }
 		: { kind: 'authored-expression', source };
 }
 
