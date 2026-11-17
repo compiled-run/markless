@@ -542,6 +542,32 @@ test('on the dev server a first handler load brings the code its writes reach, a
 	expect(loadSymbol('symbol:update')).toBe(update);
 });
 
+test('on the dev server a handler warms the runtime code its action runs and its writes reach, not a capability it never runs', () => {
+	const code = emitResumeModule({
+		...baseInput,
+		devServer: true,
+		symbols: [{ id: 'symbol:click', chunk: './click.js', exportName: 'onClick', eventHandler: true }],
+		runtimeDemandMap: {
+			payloadRecords: [{ recordId: 'event:h1:click', symbolIds: ['symbol:click'] }],
+			capabilityModuleIds: ['web/resume-behaviors'],
+			actions: [
+				{
+					payloadRecordIds: ['event:h1:click'],
+					runtimeModuleIds: ['web/resume-events'],
+					firstUse: {
+						symbolIds: ['symbol:click'],
+						runtimeModuleIds: ['web/resume-behaviors', 'web/resume-sync-computed'],
+					},
+				},
+				{ payloadRecordIds: ['event:h2:click'], runtimeModuleIds: ['web/submit-hold'] },
+			],
+		},
+	});
+	expect(code).toContain(
+		'marklessDevWarmed(["web/resume-events","web/resume-sync-computed"]).then(() => import("./click.js"))',
+	);
+});
+
 test('scalar dispatch and staged wake share one neutral DOM-order helper import', () => {
 	const resumeCode = emitResumeModule({
 		...scalarResumeInput(),

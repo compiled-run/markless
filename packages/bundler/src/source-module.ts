@@ -2370,6 +2370,7 @@ function emitLoadSymbol(
 }
 
 // The runtime modules a handler's actions run and their writes reach, from the demand map; every action's without a handler.
+// A capability (behaviors, async planes, arm gates) installs on its own trigger, so only an action that runs it names it.
 function actionRuntimeModuleIds(runtimeDemandMap: unknown, symbolId?: string): string[] {
 	const map = runtimeDemandMap as
 		| {
@@ -2379,6 +2380,7 @@ function actionRuntimeModuleIds(runtimeDemandMap: unknown, symbolId?: string): s
 				}>;
 				readonly actions?: ReadonlyArray<RuntimeDemandMapActionIds>;
 				readonly armActions?: ReadonlyArray<RuntimeDemandMapActionIds>;
+				readonly capabilityModuleIds?: ReadonlyArray<string>;
 		  }
 		| undefined;
 	const records = new Set(
@@ -2386,16 +2388,15 @@ function actionRuntimeModuleIds(runtimeDemandMap: unknown, symbolId?: string): s
 			.filter((record) => symbolId === undefined || record.symbolIds?.includes(symbolId))
 			.map((record) => record.recordId),
 	);
+	const capabilities = new Set(map?.capabilityModuleIds ?? []);
 	const ids = new Set<string>();
-	for (const action of [...(map?.actions ?? []), ...(map?.armActions ?? [])])
-		if (action.payloadRecordIds.some((id) => records.has(id)))
-			for (const id of [
-				...action.runtimeModuleIds,
-				...(action.firstUse && action.firstUse !== 'unknown'
-					? action.firstUse.runtimeModuleIds
-					: []),
-			])
-				ids.add(id);
+	for (const action of [...(map?.actions ?? []), ...(map?.armActions ?? [])]) {
+		if (!action.payloadRecordIds.some((id) => records.has(id))) continue;
+		for (const id of action.runtimeModuleIds) ids.add(id);
+		if (action.firstUse && action.firstUse !== 'unknown')
+			for (const id of action.firstUse.runtimeModuleIds)
+				if (!capabilities.has(id)) ids.add(id);
+	}
 	return [...ids];
 }
 
