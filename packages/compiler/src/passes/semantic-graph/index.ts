@@ -25,6 +25,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
+import { componentsRenderedProps } from './prop-components.ts';
 import { componentsWithIdleRecords } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
@@ -286,7 +287,12 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const handlerProps = moduleHandlerProps(state);
 	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
-	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
+	const renderedProps = componentsRenderedProps(graph, input.importedModuleInterfaces);
+	const idleComponents = componentsWithIdleRecords(
+		graph,
+		input.importedModuleInterfaces,
+		renderedProps,
+	);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -349,6 +355,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...armMaterialField(graph, component.name, chunks),
 						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(idleComponents.has(component.name) ? { idleRecords: true as const } : {}),
+						...(renderedProps.get(component.name)?.size
+							? { renderedProps: [...renderedProps.get(component.name)!].sort() }
+							: {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),

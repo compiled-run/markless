@@ -89,10 +89,12 @@ export function markupInterpolationExpression(node: AnyNode): AnyNode | undefine
 	return statement.expression as AnyNode | undefined;
 }
 
+export function getElementTagNode(node: AnyNode): AnyNode | undefined {
+	return (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as AnyNode | undefined;
+}
+
 export function getElementTagName(node: AnyNode): string | null {
-	const name = (node.id ?? (node.openingElement as AnyNode | undefined)?.name) as
-		| AnyNode
-		| undefined;
+	const name = getElementTagNode(node);
 	return getIdentifierName(name) ?? memberTagName(name);
 }
 

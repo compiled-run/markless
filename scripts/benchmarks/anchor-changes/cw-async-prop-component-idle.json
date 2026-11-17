@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 558,
+			"reason": "proposal: the analyzer's prop-passed component facts in the docs playground's compile worker (CI run 44071099732 vs merge-queue run 44033740868)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 558,
+			"reason": "proposal: the analyzer's prop-passed component facts in the docs playground's compile worker (CI run 44071099732 vs merge-queue run 44033740868)",
+			"date": "2026-11-17"
+		}
+	]
+}

@@ -176,6 +176,8 @@ export type SemanticComponentPropBinding =
 				readonly source: string;
 				readonly exportName: string;
 			}>;
+			// The value names a module-scope binding, which the child may render as a component.
+			readonly component?: SemanticPropComponent;
 			// A consumer's event callback becomes a real event record on whatever
 			// element the child spreads it onto, so its browser-critical policy has
 			// to cross the edge with it or the default action wins.
@@ -252,7 +254,15 @@ export type SemanticComponentEdge = SemanticAsyncArmPlacement & {
 	/** Which arm of each enclosing @if/@switch the edge sits in, outermost first. */
 	readonly branchArms?: ReadonlyArray<SemanticBranchArm>;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
+	/** The parent's prop this tag renders, when the tag resolves to one of the parent's props. */
+	readonly renderedProp?: ReadonlyArray<string>;
 };
+
+/** The component a prop value names, spelled the way an edge names its child. */
+export type SemanticPropComponent = Pick<
+	SemanticComponentEdge,
+	'childComponentName' | 'importSource' | 'importKind' | 'importedName'
+>;
 
 // Present when the component renders inside an @try: its graph-reference props are boundary
 // reads, and the arm (0 = @try, 1 = @pending, 2 = @catch) is where its records are filed.
@@ -447,6 +457,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rejectingHandlers?: true;
 			/** This component or one it renders has an `onIdle` record. */
 			readonly idleRecords?: true;
+			/** Props this component renders as a component, itself or through a child it hands them to. */
+			readonly renderedProps?: ReadonlyArray<string>;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
