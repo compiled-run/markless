@@ -66,7 +66,7 @@ export async function androidTools(): Promise<AndroidTools> {
 			`the ${ANDROID_PLATFORM} platform`,
 		),
 		kotlinStdlib: await kotlinStdlib(),
-		systemImage: `system-images;${ANDROID_PLATFORM};google_apis;arm64-v8a`,
+		systemImage: `system-images;${ANDROID_PLATFORM};google_apis;${process.arch === 'arm64' ? 'arm64-v8a' : 'x86_64'}`,
 	};
 }
 

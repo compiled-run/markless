@@ -9,7 +9,8 @@ pnpm --filter @markless/mobile proof proofs/03-counter [proofs/01-static-text ..
 For each rung folder it compiles `App.tsrx` with `compileNativeComponent()`, builds (or reuses from cache) the iOS app and the
 Android APK around the hosts in `src/adapters/`, embeds the payload, installs both on a simulator and an emulator it boots
 itself (and shuts down afterwards unless `--keep-devices`), runs the rung's `flow.yaml` with Maestro on each, saves a
-screenshot before and after every step to `<rung>/screenshots/{ios,android}/`, and checks every step of `expected.json`.
+screenshot after every step and before every action to `<rung>/screenshots/{ios,android}/`, and checks every step of
+`expected.json`.
 It exits 1 unless every rung passes on both platforms; there is no way to run one platform alone.
 
 | What                     | Where                                                                                                                                                                                                                                                                                                                       |
@@ -19,19 +20,22 @@ It exits 1 unless every rung passes on both platforms; there is no way to run on
 | iOS shell                | `shells/ios/Shell.swift`: a scene delegate that hands the bytes to `MarklessViewController(payload:style:fonts:)`                                                                                                                                                                                                           |
 | Android shell            | `shells/android/.../ShellActivity.kt`: a `MarklessActivity` that reads the bytes from assets                                                                                                                                                                                                                                |
 | Building                 | iOS: each library target of the host's Swift package (from `swift package describe`) becomes a static module, then `swiftc` links the shell; no Xcode project. Android: `kotlinc`, `d8`, `aapt2`, `zipalign`, `apksigner`; no Gradle. Shell builds are cached under `~/.cache/markless-proof` by the hash of their sources. |
+| Host overrides           | `--ios-host <swift package>`, `--android-host <kotlin src folder>`: prove a host branch before it merges                                                                                                                                                                                                                    |
 | Devices                  | `--simulator`, `--avd`, `--port` (or `MARKLESS_PROOF_SIMULATOR`, `MARKLESS_PROOF_AVD`, `MARKLESS_PROOF_EMULATOR_PORT`); a missing simulator or AVD is created. Devices already running are reused and left running.                                                                                                         |
 
 ## How a flow is checked
 
-A step is one action command of the flow (`launchApp`, `tapOn`, `inputText`...) with the checks that follow it. Step `n`
-lines up with `expected.json`'s `steps[n]`; a count mismatch is an error. The harness runs an instrumented copy of the flow:
-`takeScreenshot` before and after each step, and after the flow's own checks, `assertVisible` for each `visible` text,
-`assertNotVisible` for each `absent` one and a disabled `assertVisible` for each `disabled` one, matched literally. A
-failure is named from Maestro's own record of the run (`commands.json`): the step, its action, and whether a flow command or
-an `expected.json` text failed. `order` and `fields` in `expected.json` are not checked by the harness yet; the flow checks them.
+`flow.yaml` must be exactly what `renderFlow()` in `proofs/ladder.ts` writes from `expected.json` (regenerate with
+`node packages/mobile/proofs/write-flows.ts`); the harness refuses a flow that drifted, so the flow's checks are the
+rung's expected texts, including `order` and `fields`. `flowSteps()` gives each step's commands, and the harness runs an
+instrumented copy with a `takeScreenshot` after each step and before each action (none before the launch: no app is on
+screen yet). A failure is named from Maestro's own record of the run (`commands.json`): the step, its action, the Maestro
+command and Maestro's message, plus Maestro's screenshot at the failure.
 
-The two platforms' Maestro runs go one after the other: Android's on-device driver died when a second Maestro process ran
-beside it.
+The two platforms' Maestro runs go one after the other: with an iOS Maestro run beside it, Android's run lost its device
+connection in 4 of 8 tries on mini-2 (0 of 3 alone). On a loaded machine (load 20 to 45 on 18 cores) an Android run can still
+drop with `device offline` or `Device server died`; that message names a device failure, not a wrong text, and nothing
+retries it.
 
 ## Proving the harness itself
 
@@ -43,4 +47,18 @@ pnpm --filter @markless/mobile proof --host stub src/harness/fixture/00-harness 
 pnpm --filter @markless/mobile proof --host stub src/harness/fixture/00-harness-wrong-text        # fails on both: expected.json is wrong
 pnpm --filter @markless/mobile proof --host stub src/harness/fixture/00-harness-ios-differs       # fails on iOS only, exit 1
 pnpm --filter @markless/mobile proof --host stub src/harness/fixture/00-harness-android-differs   # fails on Android only, exit 1
+```
+
+## On CI
+
+`.github/workflows/native-proofs.yml` (pull requests into `cw/native-targets`, and by hand; not on main) runs iOS on a
+macOS runner and Android on a Linux runner with KVM, since GitHub's Apple silicon runners cannot run the Android emulator.
+Each job runs `--platform <ios|android> --report <dir>`, which exits on its own platform's result but says it is not a
+proof; the `verdict` job runs `node src/harness/verdict.ts ios.json android.json`, which fails unless both reports exist,
+cover the same rungs and passed every one. The same split works locally:
+
+```sh
+pnpm --filter @markless/mobile proof --platform ios --report /tmp/r proofs/03-counter
+pnpm --filter @markless/mobile proof --platform android --report /tmp/r proofs/03-counter
+pnpm --filter @markless/mobile proof verdict /tmp/r/ios.json /tmp/r/android.json
 ```

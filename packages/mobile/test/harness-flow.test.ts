@@ -20,17 +20,16 @@ const flow = renderFlow('03-counter', rung);
 const documents = (yaml: string) => parseAllDocuments(yaml).map((document) => document.toJS());
 
 describe('instrumentFlow', () => {
-	it('wraps each step of the rendered flow in a screenshot before and after it, at the step boundaries', () => {
+	it('screenshots after every step and before every action, at the step boundaries of the rendered flow', () => {
 		const instrumented = instrumentFlow(flow, rung, 'flow.yaml');
 		expect(instrumented.steps.map((step) => [step.before, step.after])).toEqual([
-			['00-launch-before', '00-launch-after'],
+			[null, '00-launch-after'],
 			['01-tap-before', '01-tap-after'],
 			['02-relaunch-before', '02-relaunch-after'],
 		]);
 		const [config, commands] = documents(instrumented.yaml);
 		expect(config).toEqual({ appId: '${APP_ID}', name: '03-counter' });
 		expect(commands).toEqual([
-			{ takeScreenshot: '00-launch-before' },
 			{ launchApp: { clearState: true } },
 			{ assertVisible: 'Counter' },
 			{ assertVisible: 'Count 0' },
@@ -50,8 +49,8 @@ describe('instrumentFlow', () => {
 		]);
 		expect(
 			instrumented.commands.filter((command) => command.role === 'screenshot'),
-		).toHaveLength(6);
-		expect(instrumented.commands[12]).toEqual({ step: 2, role: 'flow' });
+		).toHaveLength(5);
+		expect(instrumented.commands[11]).toEqual({ step: 2, role: 'flow' });
 	});
 
 	it('refuses a flow.yaml that drifted from its expected.json', () => {

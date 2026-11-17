@@ -6,7 +6,8 @@ import { PROOF_APP_ID, PROOF_APP_ID_VARIABLE } from './proof-app.ts';
 export type ProofFlowStep = {
 	/** `launch`, or the step's `do` action (`tap`, `type`, `relaunch`, `wait`). */
 	readonly action: string;
-	readonly before: string;
+	/** No screenshot before the launch: no app is on screen yet. */
+	readonly before: string | null;
 	readonly after: string;
 };
 
@@ -24,7 +25,7 @@ const pad = (index: number) => String(index).padStart(2, '0');
 
 /**
  * Checks that a rung's flow.yaml is the flow its expected.json renders to (so the flow checks every expected text), then
- * rewrites it for one platform run with a screenshot before and after each step.
+ * rewrites it for one platform run with a screenshot after each step and before each action.
  */
 export function instrumentFlow(
 	flowText: string,
@@ -61,9 +62,9 @@ export function instrumentFlow(
 	};
 	const named = steps.map((commands, index): ProofFlowStep => {
 		const action = index === 0 ? 'launch' : Object.keys(rung.steps[index]!.do!)[0]!;
-		const before = `${pad(index)}-${action}-before`;
+		const before = index > 0 ? `${pad(index)}-${action}-before` : null;
 		const after = `${pad(index)}-${action}-after`;
-		push(index, 'screenshot', { takeScreenshot: before });
+		if (index > 0) push(index, 'screenshot', { takeScreenshot: before });
 		for (const command of commands) push(index, 'flow', command);
 		push(index, 'screenshot', { takeScreenshot: after });
 		return { action, before, after };
