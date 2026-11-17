@@ -79,6 +79,16 @@
 			"delta": 15,
 			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-async-wiring"
+			],
+			"delta": 677,
+			"reason": "a keyed row's @try re-renders its shown arm when state its text reads is written, so wiring subscribes each row boundary to those values; +677 B rendered measured by perf:guard:accept on this tree, +693 B on CI run 44050462426",
+			"date": "2026-11-17"
 		}
 	]
 }
