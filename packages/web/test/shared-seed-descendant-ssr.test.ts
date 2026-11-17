@@ -122,3 +122,47 @@ test('one render does not leak its seed into the next', async () => {
 		'second',
 	]);
 });
+
+const SIBLINGS = `
+import { shared, state } from '@markless/core';
+
+const locale = shared(() => {
+	const l = state({ tag: 'en' });
+	return { ...l };
+}, { scope: 'container' });
+
+function Picker({ tag }) @{
+	const l = locale();
+	l.tag = tag;
+	<span data-picked>{l.tag}</span>
+}
+
+function Toolbar({ tag }) @{
+	<nav>
+		<Picker tag={tag} />
+	</nav>
+}
+
+function Greeting() @{
+	const l = locale();
+	<p data-greeting>{l.tag}</p>
+}
+
+export default function Shell({ tag }) @{
+	<div>
+		<Toolbar tag={tag} />
+		<Greeting />
+		<Greeting />
+	</div>
+}
+`;
+
+test('a component rendered after the seeding sibling, from a body that reads nothing shared, reads the seed', async () => {
+	const { html } = await serverRender(SIBLINGS, { tag: 'fr' });
+
+	expect(html.match(/data-picked="">([^<]*)</)?.[1]).toBe('fr');
+	expect([...html.matchAll(/data-greeting="">([^<]*)</g)].map((match) => match[1])).toEqual([
+		'fr',
+		'fr',
+	]);
+});

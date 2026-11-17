@@ -14,6 +14,7 @@ import {
 	componentSharedSeeds,
 	sharedSeedConsumeLine,
 	sharedInstanceValuesConsumeLine,
+	sharedInstanceValuesOpenLine,
 	sharedSeedMarkerLine,
 	sharedSeedPassLines,
 	widgetRootDefinitionIds,
@@ -148,6 +149,7 @@ export function emitSameModuleSsrComponents(
 				'marklessSsrRenderStateValues',
 				'marklessSsrPayloadState',
 			),
+			sharedInstanceValuesOpenLine(input, componentName),
 			...dataLines.carriedSeed,
 			...renderBodyLines(
 				input,

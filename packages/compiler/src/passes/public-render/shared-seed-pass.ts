@@ -756,6 +756,22 @@ export function sharedSeedMarkerLine(
 /** The render-context field carrying the request's seeded values of shared instances that are not subtree-scoped. */
 export const MARKLESS_SHARED_INSTANCE_VALUES_KEY = 'marklessSharedInstanceValues';
 
+/** The request's seeded-values map, opened on this body's render context when no enclosing body opened it. */
+export function sharedInstanceValuesMapSource(): string {
+	const key = MARKLESS_SHARED_INSTANCE_VALUES_KEY;
+	return `(marklessSsrRenderContext?.${key} ?? (marklessSsrRenderContext = { ...marklessSsrRenderContext, ${key}: new Map() }).${key})`;
+}
+
+/** A body that renders child components opens the map first, so a seed one child writes reaches the children rendered after it. */
+export function sharedInstanceValuesOpenLine(
+	input: PublicRenderModuleInput,
+	componentName: string,
+): string | null {
+	return input.semanticGraph.componentEdges.some((edge) => edge.parentComponentName === componentName)
+		? `	${sharedInstanceValuesMapSource()};`
+		: null;
+}
+
 /** The non-subtree shared state nodes a component's body resolves an instance of. */
 function sharedInstanceStateNodeIds(
 	input: PublicRenderModuleInput,
