@@ -239,7 +239,11 @@ export type DomJournalEntry =
 
 export type DomJournalResult = DomJournalEntry | ReadonlyArray<DomJournalEntry>;
 
-export type DomJournalListener = (entries: ReadonlyArray<DomJournalEntry>) => void | Promise<void>;
+export type DomJournalListener = {
+	(entries: ReadonlyArray<DomJournalEntry>): void | Promise<void>;
+	/** The code applying `entries` needs, a promise while it still loads: a pass waits for it before its commits land. */
+	readonly code?: (entries: ReadonlyArray<DomJournalEntry>) => unknown;
+};
 
 export type RuntimeGraphInput = {
 	readonly cells: ReadonlyArray<RuntimeGraphCell>;
@@ -697,6 +701,14 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			}),
 		);
 
+	const codeTheJournalWaitsOn = (): PromiseLike<unknown>[] =>
+		journal.length === 0
+			? []
+			: journalListeners.flatMap((listener) => {
+					const code = listener.code?.(journal) as PromiseLike<unknown> | undefined;
+					return typeof code?.then === 'function' ? [code] : [];
+				});
+
 	const openPass = (): void => {
 		let start!: () => void;
 		moveFlush(FLUSH_SCHEDULED);
@@ -837,8 +849,8 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 							else appendJournalResult(journal, entries);
 						}
 					if (commits.length > 0) {
-						// The next round's code loads first, so its journal paints in the task these commits do.
-						const waits = codeThePassWaitsOn();
+						// The next round's code and the journal's own load first, so the journal paints in the task these commits do.
+						const waits = [...codeThePassWaitsOn(), ...codeTheJournalWaitsOn()];
 						if (waits.length > 0) await Promise.all(waits.map((code) => code.then(undefined, () => {})));
 						const landing = paint(() => commits.map((commit) => landCommit(commit)));
 						await notifyJournalListeners();

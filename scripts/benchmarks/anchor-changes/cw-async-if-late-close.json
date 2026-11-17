@@ -1,0 +1,172 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-journal-load"
+			],
+			"set": 721,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 242,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-journal-direct"
+			],
+			"delta": -131,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": -27,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": -114,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 70,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 113,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-journal-load"
+			],
+			"set": 721,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 242,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-journal-direct"
+			],
+			"delta": -131,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": -27,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": -114,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 70,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 4,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 87,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		}
+	]
+}
