@@ -1,0 +1,14 @@
+{
+	"rung": 1,
+	"name": "Static elements and text",
+	"steps": [
+		{
+			"visible": [
+				"Ladder",
+				"Static text on every platform",
+				"First rung",
+				"Elements nest inside elements"
+			]
+		}
+	]
+}
