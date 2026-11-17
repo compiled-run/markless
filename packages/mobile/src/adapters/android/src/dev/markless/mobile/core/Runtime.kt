@@ -170,7 +170,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	fun text(t: Node.Text, scope: Scope): String = buildString {
 		for (p in t.parts) when (p) {
 			is TextPart.Literal -> append(p.text)
-			is TextPart.Value -> append(JsString.of(evaluate(p.expr, scope)))
+			is TextPart.Value -> evaluate(p.expr, scope).let { if (it != JsValue.Null) append(JsString.of(it)) }
 		}
 	}
 
