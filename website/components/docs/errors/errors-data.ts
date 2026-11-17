@@ -4012,6 +4012,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+		title: 'A component passed as a prop is rendered as a tag',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A component passed as a prop is rendered as a tag: a Markless build error.',
+		printed: [
+			'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED: `<<tagName> />` in `<componentName>` renders the prop `<propName>`, and a component passed as a prop value cannot be rendered as a tag.',
+			'The compiler links every child component to the module it comes from at build time. A component that arrives as a prop value is only known when the page renders, so the build has no code to render it with.',
+			'Import the component in `<componentName>` and render it there, or have the caller place it inside `<<componentName>>` as children and render `{children}` instead of `<<tagName> />`.',
+			'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+		],
+		structured: true,
+		why: 'The compiler links every child component to the module it comes from at build time. A component that arrives as a prop value is only known when the page renders, so the build has no code to render it with.',
+		suggestion:
+			'Import the component in `<componentName>` and render it there, or have the caller place it inside `<<componentName>>` as children and render `{children}` instead of `<<tagName> />`.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_COMPONENT_ROOT_CONDITIONAL',
 		title: 'A component returns markup from two places',
 		area: 'components',

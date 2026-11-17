@@ -11,6 +11,7 @@ import {
 	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
+	getElementTagNode,
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isMemberTagName,
@@ -28,6 +29,7 @@ import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { rowItemRead } from './row-item-read.ts';
+import { tagRenderedProp } from './prop-tag.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -48,6 +50,7 @@ import {
 	memberTagNestedPartDiagnostic,
 	memberTagPartMissingDiagnostic,
 	memberTagUnresolvedDiagnostic,
+	componentPropTagDiagnostic,
 } from './diagnostics.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
 import { isIdrefAttribute } from './idref-attributes.ts';
@@ -172,6 +175,18 @@ export function collectComponentEdge(
 			}),
 		);
 	}
+
+	const renderedProp = importSource.importSource ? undefined : tagRenderedProp(getElementTagNode(node), state);
+	if (renderedProp?.[0] !== undefined)
+		state.graph.diagnostics.push(
+			componentPropTagDiagnostic({
+				tagName,
+				componentName: state.currentComponentName,
+				propName: renderedProp[0],
+				node,
+				filename: state.filename,
+			}),
+		);
 
 	const props = componentPropBindings(node, state, tagName, {
 		childComponentName,
