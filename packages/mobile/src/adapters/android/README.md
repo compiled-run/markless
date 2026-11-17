@@ -70,3 +70,16 @@ Last run (Pixel 7 AVD, android-36, 2026-11-17), counter payload from `packages/m
 `frames max gap 0.984375 device px`; two taps on `h2` logged `journal {"op":"text","node":"h2:text0","value":"Count 1"}` then
 `"Count 2"`. Screenshots: `screenshots/counter-styled-before.png`, `screenshots/counter-styled-after-two-taps.png`, and the
 unstyled stack in `screenshots/counter-stack-*.png`.
+
+## Ladder flows on Android (2026-11-17)
+
+Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
+`maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
+AVD (android-36):
+
+| Rung | Result | Screenshot |
+|---|---|---|
+| 01-static-text | flow passes | `screenshots/rung-01-static-text.png` |
+| 02-styles | flow passes **without styles**: no Dragon export for this rung's component yet. Styles on device are proven only with Dragon's counter export (above). | `screenshots/rung-02-styles.png` |
+| 03-counter | flow passes | `screenshots/rung-03-counter.png` |
+| 04 to 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
