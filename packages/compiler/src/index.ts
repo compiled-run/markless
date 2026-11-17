@@ -106,6 +106,7 @@ export {
 	createNativeViewPayload,
 	NATIVE_UNSUPPORTED_CODE,
 	type NativeViewArtifact,
+	type NativeViewOptions,
 } from './passes/native-view.ts';
 export { createRenderData } from './passes/render-data/index.ts';
 export {

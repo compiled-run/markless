@@ -7,6 +7,8 @@ export const NATIVE_CONFORMANCE_VERSION = 'markless.native-conformance/0';
 export type NativeConformance = {
 	readonly version: typeof NATIVE_CONFORMANCE_VERSION;
 	readonly payload: NativeViewPayload;
+	/** Present for a page: the route params it opens with. */
+	readonly params?: Readonly<Record<string, string>>;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
 	readonly initialAttributes?: ReadonlyArray<
@@ -29,8 +31,9 @@ export type NativeConformance = {
 export function nativeConformance(
 	payload: NativeViewPayload,
 	actions: ReadonlyArray<NativeAction>,
+	params?: Readonly<Record<string, string>>,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload);
+	const runtime = createNativeRuntime(payload, new Map(), params);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -39,6 +42,7 @@ export function nativeConformance(
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
+		...(params ? { params } : {}),
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),

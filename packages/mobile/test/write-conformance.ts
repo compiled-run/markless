@@ -8,6 +8,7 @@ for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
 	const { payload, diagnostics } = await compileNativeComponent({
 		filename: `src/${entry.name}.tsrx`,
+				...(entry.page ? { page: entry.page } : {}),
 		source,
 	});
 	if (!payload)
@@ -15,6 +16,6 @@ for (const entry of CONFORMANCE_CASES) {
 	const file = new URL(`../conformance/${entry.name}.json`, import.meta.url);
 	writeFileSync(
 		file,
-		`${JSON.stringify(nativeConformance(payload, entry.actions), null, '\t')}\n`,
+		`${JSON.stringify(nativeConformance(payload, entry.actions, entry.params), null, '\t')}\n`,
 	);
 }

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
-import type { NativeViewPayload } from '@markless/serializer';
+import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
+import type { NativeValue, NativeViewPayload } from '@markless/serializer';
 import { compileNativeComponent, createNativeRuntime } from '../src/index.ts';
 import { proofsDir, readRung, rungFolders, type LadderStep } from '../proofs/ladder.ts';
 
@@ -10,9 +11,13 @@ import { proofsDir, readRung, rungFolders, type LadderStep } from '../proofs/lad
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
-function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
-	const store = new Map<string, string | number | boolean | null>();
-	let runtime = createNativeRuntime(payload, store);
+function walk(
+	payload: NativeViewPayload,
+	steps: readonly LadderStep[],
+	params: Readonly<Record<string, string>>,
+) {
+	const store = new Map<string, NativeValue>();
+	let runtime = createNativeRuntime(payload, store, params);
 	const texts = new Map(runtime.texts());
 	const attributes = new Map(
 		runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value]),
@@ -57,7 +62,7 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'relaunch' in action) {
-			runtime = createNativeRuntime(payload, store);
+			runtime = createNativeRuntime(payload, store, params);
 			mount();
 		} else if (action && !('tap' in action) && !('type' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
@@ -81,7 +86,12 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 				else if (entry.op === 'attribute')
 					attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 				else if (entry.op === 'property') properties.set(entry.node, entry.value);
-				else if (entry.op === 'rows') {
+				else if (entry.op === 'navigate') {
+					// One page per rung: a navigation opens this page again with the link's params.
+					expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
+					runtime = createNativeRuntime(payload, store, entry.params);
+					mount();
+				} else if (entry.op === 'rows') {
 					const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
 					const instanceOf = (id: string) => {
 						const at = id.indexOf('@');
@@ -147,9 +157,12 @@ test.each(rungFolders())(
 	'%s: the native payload shows the web steps, or is refused by name',
 	async (folder) => {
 		const filename = join(proofsDir, folder, 'App.tsrx');
+		const rung = readRung(folder);
+		const page = rung.route === undefined ? undefined : `pages/${rung.route}.tsrx`;
 		const build = await compileNativeComponent({
 			filename,
 			source: readFileSync(filename, 'utf8'),
+			...(page ? { page } : {}),
 		});
 		if (build.payload === null) {
 			expect(build.diagnostics.length).toBeGreaterThan(0);
@@ -158,6 +171,10 @@ test.each(rungFolders())(
 			);
 			return;
 		}
-		walk(build.payload, readRung(folder).steps);
+		const opened = page
+			? matchRouteManifest(rung.start ?? '/', buildRouteManifestFromFileIds([page]))
+			: undefined;
+		if (page && !opened) throw new Error(`${folder}: ${rung.start} is not a path of ${page}`);
+		walk(build.payload, rung.steps, opened?.params ?? {});
 	},
 );

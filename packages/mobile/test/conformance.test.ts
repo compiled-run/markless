@@ -37,10 +37,11 @@ describe('native conformance vectors', () => {
 		for (const entry of CONFORMANCE_CASES) {
 			const { payload } = await compileNativeComponent({
 				filename: `src/${entry.name}.tsrx`,
+				...(entry.page ? { page: entry.page } : {}),
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
 			expect(committed(`${entry.name}.json`), entry.name).toEqual(
-				nativeConformance(payload!, entry.actions),
+				nativeConformance(payload!, entry.actions, entry.params),
 			);
 		}
 	});

@@ -213,6 +213,22 @@ export function Counter() @{
   as a value.
 - Vectors: `components.json` (rung 7).
 
+### Additions for rung 10: routes and the URL (pushed 2026-11-17)
+
+- A page compiles with its page file (`compileNativeComponent({ ..., page: 'pages/[fruit].tsrx' })`); the router's own
+  `buildRouteManifestFromFileIds` derives its route. The payload carries `route: { pattern: '/[fruit]', params: ['fruit'] }`.
+- The page component's `params` prop reads the expression `{ route: 'params' }` (an object of strings), so
+  `params.fruit` is `{ member: { route: 'params' }, property: 'fruit' }`. Hosts open a page with params: the harness's
+  launch argument `route: "/apple"` is matched against the payload's `pattern` (a `[name]` segment matches one path
+  segment, URL-decoded; catch-all routes are not used yet).
+- A router `<Link href="/[fruit]" params={{ fruit: 'pear' }}>Go to pear</Link>` lowers to an `a` element (link trait on
+  iOS, `accessibilityClassName` `android.widget.Button` with a link role description on Android) holding its children,
+  and an `activate` handler with the op `{ op: 'navigate', route: '/[fruit]', params: { fruit: 'pear' } }`, resolved at
+  build time (the link's href and params must be fixed at build time). The journal entry `{ op: 'navigate', route, params }`
+  tells the host to build that page from scratch with those params; ops after it do not run.
+- One page per payload for now; an app's route table (several pages, back stack, presentation) is the next step.
+- Vectors: `route.json` (opens with `params: { fruit: 'apple' }`).
+
 ### Where the native facts are collected (pushed 2026-11-17)
 
 The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
@@ -377,8 +393,8 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 7 | Child component with props and a callback | passing | passing | not yet | not yet | vectors `components.json` |
 | 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
-| 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |
+| 10 | State from the URL and one route change | passing | passing | not yet | not yet | vectors `route.json` |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | stopped by design: the value comes from author JavaScript; owner decision (a declared fetch or a script engine) |
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the
