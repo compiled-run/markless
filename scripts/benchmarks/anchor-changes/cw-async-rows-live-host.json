@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 35,
+			"reason": "a @try serving its pending arm drops the lists under its other arms' branches from the page records, so a row built in the browser registers",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 35,
+			"reason": "a @try serving its pending arm drops the lists under its other arms' branches from the page records, so a row built in the browser registers",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 35,
+			"reason": "a @try serving its pending arm drops the lists under its other arms' branches from the page records, so a row built in the browser registers",
+			"date": "2026-11-17"
+		}
+	]
+}
