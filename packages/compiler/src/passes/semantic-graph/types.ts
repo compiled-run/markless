@@ -199,6 +199,7 @@ export type WalkState = {
 	currentFunctionSite: 'computed' | 'handler' | 'helper' | null;
 	deferredComputedWrites: DeferredComputedWrite[];
 	pendingElementHandleIdrefs: PendingElementHandleIdref[];
+	repeatCollectionSpans: Map<string, SourceSpan>;
 	authoredAriaBusy: AuthoredAriaBusy[];
 	// aria-disabled written on a control that submits its form.
 	authoredSubmitAriaDisabled: AuthoredAriaBusy[];
@@ -360,6 +361,7 @@ export function createWalkState(input: {
 		currentFunctionSite: null,
 		deferredComputedWrites: [],
 		pendingElementHandleIdrefs: [],
+		repeatCollectionSpans: new Map(),
 		authoredAriaBusy: [],
 		authoredSubmitAriaDisabled: [],
 		postForms: [],
