@@ -34,6 +34,10 @@ export function deviceExportOf(node: AnyNode | undefined, state: WalkState): str
 	return entry?.source === DEVICE_MODULE && entry.importedName ? entry.importedName : null;
 }
 
+/** Whether this module imports `@markless/device`: when it does not, nothing here has anything to fold or remove. */
+const importsDevice = (state: WalkState): boolean =>
+	state.graph.moduleImports.some((entry) => entry.source === DEVICE_MODULE && !entry.typeOnly);
+
 /** The root identifier of a member chain or call (`network` in `network.online`, `haptics` in `haptics.tap()`). */
 export function deviceRootOf(node: AnyNode | undefined): AnyNode | undefined {
 	let root = node;
@@ -145,6 +149,7 @@ export function readsTargetConstant(node: AnyNode | undefined, state: WalkState)
  */
 export function foldedIfArm(node: AnyNode, state: WalkState): number | null | undefined {
 	if (state.foldedIfs.has(node)) return state.foldedIfs.get(node);
+	if (!importsDevice(state)) return undefined;
 	const chain = ifChainOf(node);
 	if (!chain.tests.some((test) => readsTargetConstant(test, state))) return undefined;
 	let chosen: number | null | undefined;
@@ -190,6 +195,7 @@ export function collectWebDeviceAbsence(
 	answers: 'build-error' | 'platform-only' | 'reject',
 ): WebDeviceEdit[] {
 	const edits: WebDeviceEdit[] = [];
+	if (!importsDevice(state)) return edits;
 	const at = (node: AnyNode) => ({ start: node.start as number, end: node.end as number });
 	// Names the kept code mentions: a module function only they name runs on the web at all.
 	const named = new Set<string>();
@@ -380,6 +386,7 @@ export function componentsAbsentOnTarget(
 	statements: ReadonlyArray<AnyNode>,
 	state: WalkState,
 ): ReadonlySet<string> {
+	if (!importsDevice(state)) return new Set();
 	const kept = new Set<string>();
 	const removed = new Set<string>();
 	const names = (node: AnyNode | undefined, into: Set<string>): void => {
@@ -436,6 +443,7 @@ export function componentsAbsentOnTarget(
 export const DEVICE_TARGET_FACTS: DeviceTargetFacts = {
 	foldedIfArm: foldedIfArm as DeviceTargetFacts['foldedIfArm'],
 	foldedText: ((node: AnyNode, state: WalkState) => {
+		if (!importsDevice(state)) return undefined;
 		const expression = node.expression as AnyNode | undefined;
 		const value = targetValue(expression, state);
 		return value.known && readsTargetConstant(expression, state)
@@ -471,6 +479,7 @@ export function deviceObjectOf(init: AnyNode | undefined, state: WalkState): str
 /** Every component's device objects, from its body's `const name = device()` declarations. */
 export function collectDeviceObjects(statements: ReadonlyArray<AnyNode>, state: WalkState): DeviceObjectFact[] {
 	const facts: DeviceObjectFact[] = [];
+	if (!importsDevice(state)) return facts;
 	for (const statement of statements) {
 		const declaration = statement.type === 'ExportNamedDeclaration' || statement.type === 'ExportDefaultDeclaration'
 			? (statement.declaration as AnyNode | undefined)
