@@ -1,0 +1,62 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 179,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 5,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 179,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
+			"date": "2026-11-17"
+		}
+	]
+}
