@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 664,
+			"reason": "shared() methods across files and shared() values passed to functions (PR #756): the playground's compile worker carries the compiler, which grew by the method read/write facts on the module interface and the instance-state-node resolution; no page's own JS changed (website builds diffed with chunk and symbol hashes normalized); measured on CI run 44052842214 against main's merge-queue run 44033740868",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 664,
+			"reason": "shared() methods across files and shared() values passed to functions (PR #756): the playground's compile worker carries the compiler, which grew by the method read/write facts on the module interface and the instance-state-node resolution; no page's own JS changed (website builds diffed with chunk and symbol hashes normalized); measured on CI run 44052842214 against main's merge-queue run 44033740868",
+			"date": "2026-11-17"
+		}
+	]
+}
