@@ -242,22 +242,14 @@ export function Logger() @{
 	});
 
 	it('refuses constructs with no native lowering yet', async () => {
-		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
-export function Pick() @{
-	let tab = state('a');
-	<div>
-		@switch (tab) {
-			@case 'a': {
-				<p>A</p>
-			}
-			@default: {
-				<p>B</p>
-			}
-		}
-	</div>
+		const { payload, diagnostics } = await nativeView(`function Card({ children }) @{
+	<section>{children}</section>
+}
+export function Page() @{
+	<div><Card><p>Inside</p></Card></div>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain('@else if chains and @switch');
+		expect(diagnostics.map((d) => d.message)).toContain('children passed to <Card>');
 	});
 
 	it('inlines each component instance with its props, and resolves a called callback to the writes of its caller', async () => {

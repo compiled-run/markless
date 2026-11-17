@@ -35,6 +35,7 @@ this file changes in the same push. Status as of 2026-11-16, night one.
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
   segment, URL-decoded; any other segment matches itself) to get the params, then mounts with them; no route means the
   page's pattern must have no params. A `navigate` entry re-mounts with the entry's params.
+- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`).
 - **native-proof-harness:** forward the `route` launch argument to the shells; run `node packages/mobile/src/style-export.ts
   <rung>` when a rung has styles and `MARKLESS_DRAGON_DIR` is set (or keep refusing a missing export, as now).
 - **native-ladder:** rung 7b is written by the lead (`proofs/07b-imported-component/`, rung number 7.5, importing
@@ -208,6 +209,15 @@ export function Counter() @{
   already equals what was typed, so a host does not write back into the field under the cursor; another handler that
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
+
+### `@else if` chains and `@switch` (pushed 2026-11-17, after rung 10)
+
+- A branch node has either `test` (a plain `@if`, unchanged) or `tests`: one per arm, in arm order, `null` for the
+  `@else` or `@default` arm. The arm shown is the first one whose test is truthy, else the `null` arm, else none. A
+  `@switch` case's test is `{ binary: '===', left: <discriminant>, right: <case> }`, so `@default` applies wherever it is
+  written, as in JavaScript. A chain with no `@else` ends with an empty arm whose test is `null`, so "none matched" shows
+  nothing. The analyzer records the tests as `SemanticBranchSite.armTestExpressions` (native builds only).
+- Vectors: `choices.json`. Hosts: implement `tests`; nothing else changes (`arm` journal entries as before).
 
 ### Additions for rung 6: keyed lists (pushed 2026-11-17)
 
