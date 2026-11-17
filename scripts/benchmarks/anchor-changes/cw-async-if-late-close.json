@@ -296,42 +296,6 @@
 			"delta": 161,
 			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
 			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 154,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 154,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 146,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
-			"date": "2026-11-17"
 		}
 	]
 }
