@@ -1,5 +1,5 @@
 import Foundation
-import MarklessCore
+@testable import MarklessCore
 import Testing
 
 private let conformanceDirectory: URL = {
@@ -24,10 +24,11 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "initial", "initialAttributes", "initialProperties", "initialArms", "initialRows", "steps"]
+	let known = ["version", "payload", "params", "initial", "initialAttributes", "initialProperties", "initialArms", "initialRows", "steps"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
-	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(try #require(field("payload"))))
+	let params = try field("params").map { try NativeViewPayload.decodeParams(try Reader($0, at: "params")) } ?? []
+	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(try #require(field("payload"))), params: params)
 
 	let initial = JSONValue.array(try runtime.texts().map { .array([.string($0.node), .string($0.text)]) })
 	#expect(initial.jsonText == field("initial")?.jsonText)

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Throwaway simulator shell: builds MarklessShell.app from a .tsrx (or payload JSON), an optional Dragon style export and its fonts.
-# usage: build.sh <component.tsrx|payload.json> [style.json fonts-dir]
+# usage: [MARKLESS_PAGE=pages/<route>.tsrx] build.sh <component.tsrx|payload.json> [style.json fonts-dir]
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 package="$(dirname "$here")"
@@ -18,7 +18,7 @@ xcrun --sdk iphonesimulator swiftc "${common[@]}" -parse-as-library -static -emi
 xcrun --sdk iphonesimulator swiftc "${common[@]}" -parse-as-library -module-name MarklessShell -lMarklessCore -lMarklessMobile \
 	-o "$app/MarklessShell" "$here/App.swift"
 case "$input" in
-	*.tsrx) node "$here/payload.ts" "$input" > "$app/payload.json" ;;
+	*.tsrx) node "$here/payload.ts" "$input" ${MARKLESS_PAGE:-} > "$app/payload.json" ;;
 	*) cp "$input" "$app/payload.json" ;;
 esac
 if [ -n "$style" ]; then

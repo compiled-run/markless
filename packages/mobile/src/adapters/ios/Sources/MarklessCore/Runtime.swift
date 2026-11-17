@@ -25,6 +25,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case rows(node: String, keys: [String])
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
 	case arm(node: String, index: Int?)
+	/// Leave this page: the host builds the page at `route` from scratch with `params`.
+	case navigate(route: String, params: [NativeRouteParam])
 
 	public var json: JSONValue {
 		switch self {
@@ -39,6 +41,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("rows")), ("node", .string(node)), ("keys", .array(keys.map(JSONValue.string)))])
 		case let .arm(node, index):
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
+		case let .navigate(route, params):
+			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		}
 	}
 }
@@ -82,10 +86,13 @@ public final class NativeRuntime {
 	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
 	private let nodesById: [String: NativeNode]
+	private let params: [NativeRouteParam]
 	private var eventValue: String?
 
-	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore()) {
+	/// `params`: the route params the page opened with.
+	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = []) {
 		self.payload = payload
+		self.params = params
 		self.store = store
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
 			(cell.id, cell.storageKey.flatMap(store.read) ?? cell.initial)
@@ -136,6 +143,7 @@ public final class NativeRuntime {
 				}
 			}
 			return try callMethod(method, on: targetValue, args)
+		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
 		case .eventValue:
 			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
 			return .string(eventValue)
@@ -282,9 +290,13 @@ public final class NativeRuntime {
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		for op in handlers[bound.handler] ?? [] {
-			let value = try evaluate(op.value)
-			values[op.cell] = value
-			if let key = storageKeys[op.cell] { store.write(key, value) }
+			switch op {
+			case let .navigate(route, params): return [.navigate(route: route, params: params)]
+			case let .assign(cell, expr):
+				let value = try evaluate(expr)
+				values[cell] = value
+				if let key = storageKeys[cell] { store.write(key, value) }
+			}
 		}
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())

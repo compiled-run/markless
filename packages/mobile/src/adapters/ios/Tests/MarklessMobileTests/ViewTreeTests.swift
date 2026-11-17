@@ -145,6 +145,22 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(views.labels["h6:text0@pear"] === pear)
 }
 
+@MainActor @Test func aPageOpensAtItsRouteAndNavigatesFromScratch() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple")
+	let before = try tree(controller)
+	#expect(before.labels["h1:text0"]?.text == "Fruit apple")
+	let link = try #require(before.elements["component-edge:1"] as? UIButton)
+	#expect(link.accessibilityTraits.contains(.link))
+	#expect(link.accessibilityLabel == "Go to pear")
+	link.sendActions(for: .touchUpInside)
+	let after = try #require(controller.tree)
+	#expect(after !== before)
+	#expect(after.labels["h1:text0"]?.text == "Fruit pear")
+	#expect(after.root.superview === controller.view)
+	#expect(before.root.superview == nil)
+	#expect(throws: HostError.self) { try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple/seeds") }
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
 	let controller = try MarklessViewController(payload: counterPayload())
 	let views = try tree(controller)

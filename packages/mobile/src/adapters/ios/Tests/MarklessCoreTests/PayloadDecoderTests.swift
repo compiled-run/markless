@@ -1,5 +1,5 @@
 import Foundation
-import MarklessCore
+@testable import MarklessCore
 import Testing
 
 private let counter = """
@@ -50,4 +50,13 @@ func rejectsWhatItDoesNotKnow(find: String, replace: String, reason: String) thr
 @Test func attributesMustBeStrings() {
 	let payload = #"{"version":"markless.native-view/0","component":"A","cells":[],"nodes":[{"kind":"element","id":"h0","element":"p","parent":null,"attributes":{"hidden":true}}],"events":[],"handlers":[]}"#
 	#expect(rejection(payload)?.contains("attributes.hidden: expected a string") == true)
+}
+
+@Test func routesMatchOneDecodedSegmentPerParam() {
+	let route = NativeRoute(pattern: "/fruits/[fruit]", params: ["fruit"])
+	#expect(route.match("/fruits/apple") == [NativeRouteParam(name: "fruit", value: "apple")])
+	#expect(route.match("/fruits/blood%20orange/") == [NativeRouteParam(name: "fruit", value: "blood orange")])
+	#expect(route.match("/fruits") == nil)
+	#expect(route.match("/veg/apple") == nil)
+	#expect(route.match("/fruits/a/b") == nil)
 }

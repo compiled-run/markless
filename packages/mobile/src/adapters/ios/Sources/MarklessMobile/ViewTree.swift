@@ -4,7 +4,7 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"a", "audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
+	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -95,6 +95,8 @@ final class ViewTree {
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
 				applyAttributes(node, view)
+			case .navigate:
+				throw HostError("a navigate entry reaches the page's controller, not its views")
 			case .state:
 				if layout != nil { throw HostError("a styled cell changed, and switching styles needs dragon.native-style-export/1") }
 			case let .arm(node, index):
@@ -170,11 +172,11 @@ final class ViewTree {
 			case let .element(element, staticAttributes, bindings):
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
-				if element == "button" {
-					if context.button != nil { throw HostError("<button> \(id) is inside another button") }
+				if element == "button" || element == "a" {
+					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
-					control.accessibilityTraits = .button
+					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }

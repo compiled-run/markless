@@ -34,11 +34,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case call(NativeBuiltin, [NativeExpr])
 	/// In an `input` handler: the field's text after the edit.
 	case eventValue
+	/// The page's route params, an object of strings.
+	case routeParams
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item: return []
+		case .literal, .eventValue, .local, .item, .routeParams: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
@@ -112,10 +114,39 @@ public enum NativeEventName: String, Sendable {
 	case input
 }
 
-/// A state write: the cell takes the expression's value, evaluated before the write.
-public struct NativeOp: Equatable, Sendable {
-	public let cell: String
-	public let value: NativeExpr
+public enum NativeOp: Equatable, Sendable {
+	/// The cell takes the expression's value, evaluated before the write.
+	case assign(cell: String, value: NativeExpr)
+	/// Opens the page at `route` with these params; ops after it do not run.
+	case navigate(route: String, params: [NativeRouteParam])
+}
+
+public struct NativeRouteParam: Equatable, Sendable {
+	public let name: String
+	public let value: String
+}
+
+/// A page's route as the router spells it (`/[fruit]`) and its param names.
+public struct NativeRoute: Equatable, Sendable {
+	public let pattern: String
+	public let params: [String]
+
+	/// The params a path opens this page with: a `[name]` segment matches one URL-decoded segment; nil when it does not match.
+	public func match(_ path: String) -> [NativeRouteParam]? {
+		let want = pattern.split(separator: "/", omittingEmptySubsequences: true)
+		let have = path.split(separator: "/", omittingEmptySubsequences: true)
+		guard want.count == have.count else { return nil }
+		var found: [NativeRouteParam] = []
+		for (segment, actual) in zip(want, have) {
+			if segment.hasPrefix("["), segment.hasSuffix("]") {
+				guard let decoded = String(actual).removingPercentEncoding else { return nil }
+				found.append(NativeRouteParam(name: String(segment.dropFirst().dropLast()), value: decoded))
+			} else if segment != actual {
+				return nil
+			}
+		}
+		return found
+	}
 }
 
 public struct NativeCell: Equatable, Sendable {
@@ -142,6 +173,7 @@ public struct NativeHandler: Equatable, Sendable {
 /// A decoded and cross-checked `markless.native-view/0` payload.
 public struct NativeViewPayload: Equatable, Sendable {
 	public let component: String
+	public let route: NativeRoute?
 	public let cells: [NativeCell]
 	public let nodes: [NativeNode]
 	public let events: [NativeEvent]
@@ -153,7 +185,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(["version", "component", "cells", "nodes", "events", "handlers"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -238,17 +270,28 @@ public struct NativeViewPayload: Equatable, Sendable {
 				switch name {
 				case "assign":
 					let opField = try op.object(["op", "cell", "value"])
-					return NativeOp(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
+					return .assign(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
+				case "navigate":
+					let opField = try op.object(["op", "route", "params"])
+					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
 			}
 			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
+		let route: NativeRoute? = fields.has("route") ? try {
+			let r = try fields["route"].object(["pattern", "params"])
+			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
+		}() : nil
 		let payload = NativeViewPayload(
-			component: try fields["component"].string(), cells: cells, nodes: nodes, events: events, handlers: handlers)
+			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers)
 		try payload.check()
 		return payload
+	}
+
+	static func decodeParams(_ reader: Reader) throws -> [NativeRouteParam] {
+		try reader.keys().map { NativeRouteParam(name: $0, value: try reader.field($0).string()) }
 	}
 
 	private static func decodeRow(_ fields: Fields) throws -> String? {
@@ -315,6 +358,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 		case ["body", "lambda"]:
 			return .lambda(parameters: try field("lambda").array().map { try $0.string() }, body: try decodeExpr(try field("body")))
 		case ["local"]: return .local(try field("local").string())
+		case ["route"]:
+			let name = try field("route").string()
+			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
+			return .routeParams
 		case ["item"]: return .item(try field("item").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
@@ -376,7 +423,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard handlerIds.insert(handler.id).inserted else {
 				throw PayloadError(path: "payload.handlers", reason: "duplicate handler \(handler.id)")
 			}
-			for op in handler.ops where !cellIds.contains(op.cell) || !op.value.cells.allSatisfy(cellIds.contains) {
+			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
 			}
 		}
