@@ -104,17 +104,16 @@ Views are kept per instance (`h6:text0@pear` inside a list row). An `arm` or `ro
 longer shown, builds every shown instance without a view from current values, and moves each parent's retained children
 into place: document order, with a list's rows at the list's place in key order.
 
-## Through the shared harness (2026-11-17, 04:45)
+## Through the shared harness (2026-11-17, 05:10)
 
-`MARKLESS_DRAGON_DIR=<dragon checkout> pnpm --filter @markless/mobile proof --simulator native-android-host --avd
-native_android_host --port 5600 proofs/01-static-text ... proofs/10-url-route`: one run, both platforms, the harness's own
-shells, Dragon's `/1` export made at proof time for rungs 2 and 4.
+`pnpm --filter @markless/mobile proof --simulator native-android-host --avd native_android_host --port 5600
+proofs/01-static-text ... proofs/10-url-route` through `~/.claude/bin/heavy`: both platforms, the harness's own shells, Dragon's
+`/1` export made at proof time for rungs 2 and 4 from the default Dragon checkout.
 
 | Rung | Android | iOS |
 |---|---|---|
-| 01, 03, 05, 07, 08, 09 | PASS | PASS |
-| 02-styles, 04-attributes | PASS, styled (rung 4's Heart turns to Dragon's `state:liked` assignment on tap) | FAIL at launch (the iOS host's export `/1` reader is pending) |
-| 06-keyed-for, 10-url-route | PASS | FAIL at launch (lists and the launch route are pending on iOS) |
+| 01 to 05, 07 to 10 | PASS | PASS |
+| 06-keyed-for | PASS on rerun (exit 0, both platforms); in the full run Maestro lost the emulator before the flow (`Device emulator-5600 was requested, but it is not connected`) at machine load 40 to 110 | PASS |
 
 Text Dragon styles is drawn with subpixel positioning, linear metrics and hinting off, as Dragon shapes it (like Chrome):
 with the platform default (whole-pixel hinted advances) rung 4's "Attributes" in Inter Bold at 84 px ran 412 px against
