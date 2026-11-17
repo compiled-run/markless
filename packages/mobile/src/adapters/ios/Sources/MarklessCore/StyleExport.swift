@@ -71,7 +71,10 @@ public struct StyleExport: Sendable {
 			return (id: try field["id"].string(), file: try field["file"].string())
 		}
 		let chosen = try fields["targets"].field(target)
-		let targetFields = try chosen.object(perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"])
+		// readiness is Dragon's verdict on its own device lanes; the proof does not depend on it, so it is read past.
+		let targetFields = try chosen.object(
+			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
+			optional: ["readiness"])
 		let actualBackend = try targetFields["backend"].string()
 		guard actualBackend == backend else {
 			throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)")
