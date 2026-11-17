@@ -24,7 +24,7 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	let known = ["version", "payload", "initial", "initialAttributes", "initialArms", "steps"]
+	let known = ["version", "payload", "initial", "initialAttributes", "initialProperties", "initialArms", "steps"]
 	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(try #require(field("payload"))))
@@ -33,6 +33,8 @@ func reproducesConformanceVector(file: URL) throws {
 	#expect(initial.jsonText == field("initial")?.jsonText)
 	let attributes = try runtime.attributes().map { JSONValue.array([.string($0.node), .string($0.name), $0.value.map(JSONValue.string) ?? .null]) }
 	#expect(attributes.isEmpty ? field("initialAttributes") == nil : JSONValue.array(attributes).jsonText == field("initialAttributes")?.jsonText)
+	let properties = try runtime.properties().map { JSONValue.array([.string($0.node), .string($0.name), .string($0.value)]) }
+	#expect(properties.isEmpty ? field("initialProperties") == nil : JSONValue.array(properties).jsonText == field("initialProperties")?.jsonText)
 	let arms = try runtime.arms().map { JSONValue.array([.string($0.node), $0.index.map { .number(Double($0)) } ?? .null]) }
 	#expect(arms.isEmpty ? field("initialArms") == nil : JSONValue.array(arms).jsonText == field("initialArms")?.jsonText)
 
@@ -42,10 +44,12 @@ func reproducesConformanceVector(file: URL) throws {
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			case let .string(host)? = actionFields.first(where: { $0.0 == "host" })?.1,
+			actionFields.allSatisfy({ ["event", "host", "value"].contains($0.0) }),
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
 		else { Issue.record("malformed step \(step.jsonText)"); return }
 		let event = try #require(NativeEventName(rawValue: eventName))
-		let journal = JSONValue.array(try runtime.dispatch(NativeAction(event: event, host: host)).map(\.json))
+		let typed: String? = if case let .string(text)? = actionFields.first(where: { $0.0 == "value" })?.1 { text } else { nil }
+		let journal = JSONValue.array(try runtime.dispatch(NativeAction(event: event, host: host, value: typed)).map(\.json))
 		#expect(Array(journal.jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) \(eventName) on \(host)")
 	}
 }

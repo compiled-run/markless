@@ -106,8 +106,27 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(store.read("k") == nil)
 }
 
+@MainActor @Test func aTextFieldSendsItsTextAndTakesWritesFromOtherHandlers() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("input"), store: MemoryStore())
+	let views = try tree(controller)
+	let field = try #require(views.elements["h2"] as? UITextField)
+	#expect(field.text == "Sam")
+	#expect(field.accessibilityLabel == "Name")
+	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
+	controller.view.layoutIfNeeded()
+	#expect(field.frame.height > 20)
+	field.text = "Samantha"
+	field.sendActions(for: .editingChanged)
+	#expect(views.labels["h3:text0"]?.text == "Hello Samantha")
+	#expect(field.text == "Samantha")
+	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
+	#expect(field.text == "Bo")
+	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
-	let views = try tree(try MarklessViewController(payload: counterPayload()))
+	let controller = try MarklessViewController(payload: counterPayload())
+	let views = try tree(controller)
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h9:text0", value: "x")]) }
 }
 

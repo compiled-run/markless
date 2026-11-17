@@ -2,10 +2,13 @@
 public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
 	public let host: String
+	/// For `input`: the field's whole text after the edit.
+	public let value: String?
 
-	public init(event: NativeEventName, host: String) {
+	public init(event: NativeEventName, host: String, value: String? = nil) {
 		self.event = event
 		self.host = host
+		self.value = value
 	}
 }
 
@@ -16,6 +19,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case state(cell: String, value: NativeScalar)
 	/// nil removes the attribute; "" is a bare attribute.
 	case attribute(node: String, name: String, value: String?)
+	/// An input's text; never sent to the field whose edit caused it while it already shows that text.
+	case property(node: String, name: String, value: String)
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
 	case arm(node: String, index: Int?)
 
@@ -26,6 +31,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("state")), ("cell", .string(cell)), ("value", value.json)])
 		case let .attribute(node, name, value):
 			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
+		case let .property(node, name, value):
+			return .object([("op", .string("property")), ("node", .string(node)), ("name", .string(name)), ("value", .string(value))])
 		case let .arm(node, index):
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		}
@@ -58,6 +65,7 @@ public final class NativeRuntime {
 	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
 	private let branches: [String: (test: NativeExpr, arms: Int, arm: NativeArmPlace?)]
+	private var eventValue: String?
 
 	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore()) {
 		self.payload = payload
@@ -113,6 +121,9 @@ public final class NativeRuntime {
 			guard case let .string(text) = value else { throw RuntimeError(reason: ".length of a \(value == .null ? "null" : "non-string")") }
 			return .number(Double(text.utf16.count))
 		case let .call(builtin, arguments): return evaluateCall(builtin, try arguments.map(evaluate))
+		case .eventValue:
+			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
+			return .string(eventValue)
 		}
 	}
 
@@ -150,7 +161,18 @@ public final class NativeRuntime {
 	public func attributes() throws -> [(node: String, name: String, value: String?)] {
 		try payload.nodes.flatMap { node -> [(node: String, name: String, value: String?)] in
 			guard case let .element(id, _, _, _, bindings, arm) = node, try isShown(arm) else { return [] }
-			return try bindings.map { (id, $0.attribute, marklessAttributeValue($0.attribute, try evaluate($0.value))) }
+			return try bindings.filter { !$0.isProperty }.map { (id, $0.name, marklessAttributeValue($0.name, try evaluate($0.value))) }
+		}
+	}
+
+	/// Every shown element's bound properties (an input's `value`) as `String(value)`, null reading "".
+	public func properties() throws -> [(node: String, name: String, value: String)] {
+		try payload.nodes.flatMap { node -> [(node: String, name: String, value: String)] in
+			guard case let .element(id, _, _, _, bindings, arm) = node, try isShown(arm) else { return [] }
+			return try bindings.filter(\.isProperty).map { binding in
+				let value = try evaluate(binding.value)
+				return (id, binding.name, value == .null ? "" : value.text)
+			}
 		}
 	}
 
@@ -167,9 +189,13 @@ public final class NativeRuntime {
 		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
+		eventValue = action.event == .input ? action.value ?? "" : nil
+		defer { eventValue = nil }
 		let cellsBefore = values
 		let beforeTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
 		let beforeAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
+		var beforeProperties = Dictionary(uniqueKeysWithValues: try properties().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
+		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		for op in handlers[bound.handler] ?? [] {
 			let value = try evaluate(op.value)
@@ -178,6 +204,7 @@ public final class NativeRuntime {
 		}
 		let afterTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
 		let afterAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
+		let afterProperties = Dictionary(uniqueKeysWithValues: try properties().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
 		let afterArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let styles = payload.cells.compactMap { cell -> NativeJournalEntry? in
 			guard cell.styled, let before = cellsBefore[cell.id], let after = values[cell.id], !before.strictlyEquals(after) else { return nil }
@@ -193,9 +220,13 @@ public final class NativeRuntime {
 				return [.arm(node: id, index: after)]
 			case let .element(id, _, _, _, bindings, _):
 				return bindings.compactMap { binding in
-					let key = "\(id)\u{0}\(binding.attribute)"
+					let key = "\(id)\u{0}\(binding.name)"
+					if binding.isProperty {
+						guard let before = beforeProperties[key], let after = afterProperties[key], before != after else { return nil }
+						return .property(node: id, name: binding.name, value: after)
+					}
 					guard let before = beforeAttributes[key], let after = afterAttributes[key], before != after else { return nil }
-					return .attribute(node: id, name: binding.attribute, value: after)
+					return .attribute(node: id, name: binding.name, value: after)
 				}
 			}
 		}

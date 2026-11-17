@@ -55,11 +55,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	case length(NativeExpr)
 	case call(NativeBuiltin, [NativeExpr])
+	/// In an `input` handler: the field's text after the edit.
+	case eventValue
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal: return []
+		case .literal, .eventValue: return []
 		case let .unary(_, inner), let .length(inner): return inner.cells
 		case let .binary(_, a, b), let .logical(_, a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
@@ -87,7 +89,9 @@ public struct NativeArmPlace: Equatable, Hashable, Sendable {
 }
 
 public struct NativeBinding: Equatable, Sendable {
-	public let attribute: String
+	/// The attribute's name, or `value` for the input property.
+	public let name: String
+	public let isProperty: Bool
 	public let value: NativeExpr
 }
 
@@ -119,6 +123,7 @@ public enum NativeNode: Equatable, Sendable {
 
 public enum NativeEventName: String, Sendable {
 	case activate
+	case input
 }
 
 /// A state write: the cell takes the expression's value, evaluated before the write.
@@ -191,8 +196,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 					for key in try reader.keys() { attributes[key] = try reader.field(key).string() }
 				}
 				let bindings: [NativeBinding] = field.has("bindings") ? try field["bindings"].array().map { binding -> NativeBinding in
+					if try binding.keys().contains("property") {
+						let b = try binding.object(["property", "value"])
+						let property = try b["property"].string()
+						guard property == "value" else { throw PayloadError(path: binding.path, reason: "unknown property \"\(property)\"") }
+						return NativeBinding(name: property, isProperty: true, value: try decodeExpr(try b["value"]))
+					}
 					let b = try binding.object(["attribute", "value"])
-					return NativeBinding(attribute: try b["attribute"].string(), value: try decodeExpr(try b["value"]))
+					return NativeBinding(name: try b["attribute"].string(), isProperty: false, value: try decodeExpr(try b["value"]))
 				} : []
 				return .element(
 					id: try field["id"].string(), element: try field["element"].string(),
@@ -266,6 +277,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		switch keys.sorted() {
 		case ["cell"]: return .cell(try field("cell").string())
+		case ["event"]:
+			let name = try field("event").string()
+			guard name == "value" else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
+			return .eventValue
 		case ["literal"]: return .literal(try field("literal").scalar())
 		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:

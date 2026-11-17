@@ -4,7 +4,7 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"a", "audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "input", "label", "object", "option",
+	"a", "audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -79,6 +79,9 @@ final class ViewTree {
 				if let button = buttonOf[node] { refreshLabel(of: button) }
 			case .state:
 				if layout != nil { throw HostError("a styled cell changed, and switching styles needs dragon.native-style-export/1") }
+			case let .property(node, _, value):
+				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
+				field.text = value
 			case let .attribute(node, name, value):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
@@ -118,6 +121,14 @@ final class ViewTree {
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = .button
 					view = control
+				} else if element == "input" {
+					if button != nil { throw HostError("<input> \(id) is inside a button") }
+					let field = UITextField()
+					if layout == nil {
+						field.borderStyle = .roundedRect
+						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
+					}
+					view = field
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = button == nil
@@ -131,17 +142,25 @@ final class ViewTree {
 				if let style = layout?.styles[id] { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
+				let onAction = onAction
 				for event in events[id] ?? [] {
-					guard let control = view as? UIButton else {
-						throw HostError("\(event.event.rawValue) on \(id): only <button> is activatable on iOS yet")
+					switch (event.event, view) {
+					case let (.activate, control as UIButton):
+						control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
+					case let (.input, field as UITextField):
+						field.addAction(
+							UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
+							for: .editingChanged)
+					default:
+						throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
 					}
-					let action = NativeAction(event: event.event, host: id)
-					let onAction = onAction
-					control.addAction(UIAction { _ in onAction(action) }, for: .touchUpInside)
 				}
 				var current = staticAttributes
-				for binding in bindings {
-					current[binding.attribute] = marklessAttributeValue(binding.attribute, try runtime.evaluate(binding.value))
+				for binding in bindings where !binding.isProperty {
+					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value))
+				}
+				if let field = view as? UITextField {
+					field.text = try runtime.properties().first { $0.node == id && $0.name == "value" }?.value ?? staticAttributes["value"]
 				}
 				attributes[id] = current
 				var inner = 0
@@ -226,8 +245,9 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
+		guard !(view is UILabel || view is UITextField) else { return }
 		stack(view)
-		for child in view.subviews where !(child is UILabel) && !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
+		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
 
 	/// The temporary layout for rungs without Dragon: children top to bottom, start-aligned.
