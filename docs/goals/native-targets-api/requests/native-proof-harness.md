@@ -61,3 +61,10 @@ same repo-relative filename.
 
 With the export made at proof time, rungs 2 and 4 pass on Android; the iOS shell shows `style: unknown field "component"`:
 the iOS decoder does not read `dragon.native-style-export/1` yet.
+
+## 10. Rung 8 on the CI runner's iOS (native-ios-host)
+
+On GitHub's `macos-15` runner (its default Xcode and `iPhone 16` simulator) rung 8 fails at the flow's `hideKeyboard`:
+"Couldn't hide the keyboard. This can happen if the app uses a custom input or doesn't expose a standard dismiss action"
+(native-proofs run 44068173427). It passes on mini-2's iOS 27.2 simulator. Likely fix: the text field resigns first
+responder on Return (`textFieldShouldReturn`), which Maestro uses to dismiss. Rung 8 is out of the CI list until it passes there.
