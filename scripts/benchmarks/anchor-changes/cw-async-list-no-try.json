@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 130,
+			"reason": "The docs playground ships the compiler, which now also checks that a keyed @for over an async value sits inside @try",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 130,
+			"reason": "The docs playground ships the compiler, which now also checks that a keyed @for over an async value sits inside @try",
+			"date": "2026-11-17"
+		}
+	]
+}
