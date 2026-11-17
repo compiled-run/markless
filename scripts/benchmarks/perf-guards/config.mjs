@@ -2,6 +2,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { siteBase } from '../../../website/site-base.ts';
+import { CODE_PREFETCH_FILE } from '../../../website/tooling/code-client.ts';
 
 export const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 export const GUARD_DIR = join(ROOT_DIR, 'scripts/benchmarks/perf-guards');
@@ -31,6 +32,8 @@ export const BUDGETS = {
 	loadExecutionSwingChars: 256,
 	// Gzip is not additive: a PR's download growth measured up to 48 B more in the merge queue than on its own run (42 queue runs, 2026-10-30 to 11-11).
 	loadDownloadCompositionBytes: 48,
+	// The <Code> playground's prefetch moves with every compiler, bundler and runtime change: 24 open PRs on 2026-11-17 moved docs / by -71 to +1,713 B each, about 6 KB together.
+	loadPlaygroundGrowthBytes: 16 * 1024,
 	runtimeModuleGrowthBytes: 128,
 	constructGlueGrowthBytes: 24,
 	resumeRowGrowthBytes: 16,
@@ -66,6 +69,8 @@ export const SITES = {
 		label: 'docs site',
 		base: siteBase,
 		routes: [siteBase, `${siteBase}concepts/state`, `${siteBase}ui/accordion`],
+		// The build's list of what a <Code> block downloads before a reader opens it; G16 weighs it apart from the page's own code.
+		playgroundPrefetch: CODE_PREFETCH_FILE,
 	},
 };
 

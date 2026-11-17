@@ -1,0 +1,79 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs / playground"
+			],
+			"set": {
+				"jsGzipBytes": 1197339
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state playground"
+			],
+			"set": {
+				"jsGzipBytes": 1673400
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion playground"
+			],
+			"set": {
+				"jsGzipBytes": 38332
+			},
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": -1197339,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -1673400,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -38332,
+			"reason": "G16 weighs a docs page's own code apart from the <Code> playground's idle prefetch (compile worker, session, editor, result frame), which moves with every compiler change; both figures from one Mac measurement of this tree, the old total being their sum",
+			"date": "2026-11-17"
+		}
+	]
+}
