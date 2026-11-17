@@ -26,6 +26,8 @@ export type ModulePropFlow = {
 		readonly props: ReadonlyArray<string>;
 		readonly message: string;
 		readonly docsUrl?: string;
+		/** The @if ships no code to change what it shows, so a caller that changes the prop leaves the browser asking for code nobody wrote. */
+		readonly shipsNoFlip?: true;
 		/** Where the read is written, in the source this module compiled. */
 		readonly position?: { readonly line: number; readonly column: number };
 	}>;
@@ -68,6 +70,7 @@ export function modulePropFlow(
 	source?: string,
 ): ModulePropFlow {
 	const graph = compiled.semanticGraph;
+	const flipless = new Set((compiled.symbolModules.propDecidedBranches ?? []).map((branch) => branch.symbolId));
 	const liveChildren = new Map(
 		(compiled.projectionArms?.liveChildren ?? []).map(({ componentEdgeId, ...live }) => [
 			componentEdgeId,
@@ -97,6 +100,9 @@ export function modulePropFlow(
 							props: diagnostic.decidedByProps.props,
 							message: diagnostic.message,
 							...(diagnostic.docsUrl ? { docsUrl: diagnostic.docsUrl } : {}),
+							...(typeof diagnostic.symbolId === 'string' && flipless.has(diagnostic.symbolId)
+								? { shipsNoFlip: true as const }
+								: {}),
 							...(source !== undefined && diagnostic.primarySpan
 								? { position: sourcePosition(source, diagnostic.primarySpan.start) }
 								: {}),
@@ -219,6 +225,7 @@ export type PropFlowRefusal = {
 	readonly source: string;
 	readonly position?: { readonly line: number; readonly column: number };
 	readonly message: string;
+	readonly shipsNoFlip?: true;
 	/** Every file the verdict reads; an edit to any of them can change it. */
 	readonly sources: ReadonlySet<string>;
 };
@@ -369,6 +376,7 @@ export class PropFlowRegistry {
 							source,
 							...(decided.position ? { position: decided.position } : {}),
 							message: refusalMessage(decided, source, prop, reason),
+							...(decided.shipsNoFlip ? { shipsNoFlip: true as const } : {}),
 							sources,
 						});
 				}
@@ -614,11 +622,11 @@ function projectionRefusalMessage(
 	return `${arm.code}: <${caller.edge.parentComponentName}> in ${caller.source} passes <${arm.componentName}> children that respond to events or show changing state (${live}), and <${arm.componentName}> in ${source} renders its children inside ${arm.construct}.${why} When that arm changes, the browser redraws it from fixed HTML, and the children stop responding. Move the state into <${arm.componentName}>, or render {children} outside the ${arm.construct.split(' ')[0]} and hide it with an attribute. If the arm never changes after the page loads, write \`// markless-allow ${arm.code}: reason\` above it.`;
 }
 
-/** Throws the refusals the build would raise whose verdict reads `source`, as a dev overlay error. */
+/** Throws, as a dev overlay error, the build refusals whose verdict reads `source` and that would otherwise fail in the browser. */
 export function throwDevPropFlowRefusals(registry: PropFlowRegistry, source: string): void {
 	const diagnostics = [
 		...registry.decidedRefusals().flatMap((refusal) =>
-			refusal.sources.has(source)
+			refusal.shipsNoFlip && refusal.sources.has(source)
 				? [
 						{
 							code: refusal.code,
