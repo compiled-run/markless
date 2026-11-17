@@ -26,7 +26,7 @@ public final class MarklessViewController: UIViewController {
 		layout = try style.map { try StyleExport.decode($0).resolve(for: decoded, initialTexts: texts) }
 		faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		super.init(nibName: nil, bundle: nil)
-		tree = try ViewTree(payload: decoded, texts: texts, layout: layout, faces: faces) { [weak self] action in
+		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
 		}
 	}
