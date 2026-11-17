@@ -11,6 +11,7 @@ import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
+import dev.markless.mobile.style.StyleExport
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -84,8 +85,23 @@ private fun decoderStrictness() {
 	refuses("trailing bytes", "$ok x", "trailing data")
 }
 
+private fun styleExport(fixtures: File) {
+	val bytes = File(fixtures, "counter.native-style.json").readBytes()
+	val export = runCatching { StyleExport.decode(bytes) }
+	check("decodes Dragon's counter export", export.isSuccess) { export.exceptionOrNull().toString() }
+	export.getOrNull()?.let { e -> check("counter export button frame", e.byId["h2"]?.frame?.width == 311.953125) { "${e.byId["h2"]}" } }
+	val text = String(bytes, Charsets.UTF_8)
+	fun refusesStyle(name: String, changed: String, fragment: String) {
+		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
+	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/1"), "unknown style export schema")
+}
+
 fun main(args: Array<String>) {
 	numberFormatting()
+	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

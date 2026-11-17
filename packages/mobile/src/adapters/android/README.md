@@ -49,3 +49,16 @@ Java 21, and `ANDROID_HOME` (default `~/Library/Android/sdk`) with build-tools 3
   harness; to embed this runtime elsewhere, compile `src/**/*.kt` with your own sources against `android.jar`.
 
 Outputs go to `.build/` (ignored), or `$MARKLESS_ANDROID_OUT`.
+
+## Checks on a device
+
+With a style export, `MarklessActivity` logs `frames max gap <n> device px` after the first layout: the largest distance
+between any edge of a laid-out view and its Dragon frame (`MarklessHost.frameDeviation()`), with one `frame ...` line per
+node. Text frames round outward (a run a fraction of a pixel narrower than its frame would wrap), so a text edge can sit up to
+one device pixel outside Dragon's.
+
+Last run (Pixel 7 AVD, android-36, 2026-11-17), counter payload from `packages/mobile/conformance/counter.json` with Dragon's
+`examples/markless-counter/out/counter.native-style.json` (copied to `test/fixtures/`) and Inter Regular and Bold:
+`frames max gap 0.984375 device px`; two taps on `h2` logged `journal {"op":"text","node":"h2:text0","value":"Count 1"}` then
+`"Count 2"`. Screenshots: `screenshots/counter-styled-before.png`, `screenshots/counter-styled-after-two-taps.png`, and the
+unstyled stack in `screenshots/counter-stack-*.png`.

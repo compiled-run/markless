@@ -148,17 +148,45 @@ class MarklessHost(
 				view.setPadding(l, t, (bx + box.width).roundToInt() - (ax + s.frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + s.frame.height).roundToInt())
 			} else {
 				val parentId = node.parent
-				val rect = if (parentId == null) {
-					Rect(ax.roundToInt(), ay.roundToInt(), (ax + s.frame.width).roundToInt(), (ay + s.frame.height).roundToInt())
+				val (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
+				// Text rounds outward: a run a fraction of a pixel narrower than its frame wraps.
+				val rect = if (node is Node.Text) {
+					Rect(Math.floor(ax).toInt() - ox, Math.floor(ay).toInt() - oy, Math.ceil(ax + s.frame.width).toInt() - ox, Math.ceil(ay + s.frame.height).toInt() - oy)
 				} else {
-					val (px, py) = absolute.getValue(parentId)
-					val ox = px.roundToInt(); val oy = py.roundToInt()
 					Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + s.frame.width).roundToInt() - ox, (ay + s.frame.height).roundToInt() - oy)
 				}
 				if (parentId == null) rootFrame = rect else (views.getValue(parentId) as MarklessBox).frames[view] = rect
 			}
 			paint(view, s, fonts, dpr)
 		}
+	}
+
+	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
+	fun frameDeviation(): Double {
+		val style = style ?: throw MarklessHostError("no style export to compare frames with")
+		val absolute = HashMap<String, DoubleArray>()
+		for (s in style.nodes) {
+			val p = s.parent?.let { absolute.getValue(it) } ?: doubleArrayOf(0.0, 0.0)
+			absolute[s.id] = doubleArrayOf(p[0] + s.frame.x, p[1] + s.frame.y)
+		}
+		val rootId = payload.nodes.first().id
+		val origin = absolute.getValue(rootId)
+		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
+		var worst = 0.0
+		for (node in payload.nodes) {
+			val s = style.byId.getValue(node.id)
+			val a = absolute.getValue(node.id)
+			val view = views.getValue(node.id)
+			val at = IntArray(2).also { view.getLocationInWindow(it) }
+			var x = (at[0] - rootAt[0]).toDouble(); var y = (at[1] - rootAt[1]).toDouble()
+			var w = view.width.toDouble(); var h = view.height.toDouble()
+			if (node is Node.Text && view is Button) { x += view.paddingLeft; y += view.paddingTop; w -= view.paddingLeft + view.paddingRight; h -= view.paddingTop + view.paddingBottom }
+			val left = a[0] - origin[0]; val top = a[1] - origin[1]
+			val gap = maxOf(maxOf(Math.abs(x - left), Math.abs(y - top)), maxOf(Math.abs(x + w - left - s.frame.width), Math.abs(y + h - top - s.frame.height)))
+			Log.i(TAG, "frame ${node.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon ${a[0] - origin[0]},${a[1] - origin[1]} ${s.frame.width}x${s.frame.height} gap $gap")
+			worst = maxOf(worst, gap)
+		}
+		return worst
 	}
 
 	/** The root's frame inside the viewport, when a style export placed it. */
