@@ -40,9 +40,12 @@ errors but not TypeScript ones. Request: add `packages/mobile/proofs/**/*.ts` an
 
 The check is `packages/mobile/test/ladder-web.test.ts` (in the node test project, listed in `scripts/ci/heavy-tests.json`
 because it builds apps and launches Chromium). It imports `buildFixture` from `packages/router/test/support` and the
-browser and server helpers from `scripts/test-utils`. `packages/mobile/package.json` does not exist yet (the lead owns
-`packages/mobile/src`); the tests use `node:path` and root dev dependencies so they run without one. When the manifest
-lands, nothing here needs to change.
+browser and server helpers from `scripts/test-utils`. The tests use `node:path` and root dev dependencies, so
+`packages/mobile/package.json` needs no new dependencies for them. A second check,
+`packages/mobile/test/ladder-native-reference.test.ts` (unit lane, no build), runs every rung through
+`compileNativeComponent` and `createNativeRuntime` against the same `expected.json`: a rung that compiles must show what
+the web build shows, and a rung that does not must be refused only with `MARKLESS_NATIVE_UNSUPPORTED`. When the native
+pass learns a new construct, that rung's proof starts being checked with no change on my side.
 
 ## 5. Rung 2's web column
 

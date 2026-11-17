@@ -17,21 +17,29 @@ I did not read the styles pass, so where `<style>` text lives is not answered he
 
 Web column: `packages/mobile/test/ladder-web.test.ts` builds each App.tsrx as the page of a real router app (production
 build, its own Nitro server), opens it in Chromium and walks the rung's `expected.json`. All 11 pass. Mutation check: with
-the last step of every expected.json made wrong, all 11 fail. iOS and Android columns belong to the host workers.
+the last step of every expected.json made wrong, all 11 fail.
 
-| # | Rung | Web | iOS | Android | Proof |
-|---|---|---|---|---|---|
-| 1 | Static elements and text | passing | not started | not started | `proofs/01-static-text` |
-| 2 | Styles through Dragon | passing (texts only) | not started | not started | `proofs/02-styles` |
-| 3 | A state write updates text | passing | not started | not started | `proofs/03-counter` |
-| 4 | Attributes and classes that follow state | passing | not started | not started | `proofs/04-attributes` |
-| 5 | `@if` | passing | not started | not started | `proofs/05-if` |
-| 6 | Keyed `@for`: add, remove, reorder | passing | not started | not started | `proofs/06-keyed-for` |
-| 7 | Child component with props and a callback | passing | not started | not started | `proofs/07-child-component` |
-| 8 | Text input and two-way state | passing | not started | not started | `proofs/08-text-input` |
-| 9 | Storage | passing | not started | not started | `proofs/09-storage` |
-| 10 | State from the URL and one route change | passing | not started | not started | `proofs/10-url-route` |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | not started | not started | `proofs/11-async` |
+Native reference column: `packages/mobile/test/ladder-native-reference.test.ts` compiles each App.tsrx with the lead's
+`compileNativeComponent` and walks the same `expected.json` through the reference runtime (`createNativeRuntime`): tap a
+text, dispatch `activate` on its element, apply the journal, compare the texts. A rung that yields no payload must be
+refused only with `MARKLESS_NATIVE_UNSUPPORTED`. This is not a device result; it shows the payload means what the web
+build shows, which is what the hosts are then held to. Mutation check: a wrong text in rung 1 or 3 fails it.
+
+iOS and Android columns belong to the host and harness workers; nothing is claimed for them here.
+
+| # | Rung | Web | Native reference | Refused because (compiler message, merged `abaae1adc`) |
+|---|---|---|---|---|
+| 1 | Static elements and text | passing | passing | |
+| 2 | Styles through Dragon | passing (texts and counter) | passing (texts and counter) | |
+| 3 | A state write updates text | passing | passing | |
+| 4 | Attributes and classes that follow state | passing | refused | four attribute bindings (class, aria-label, aria-pressed, disabled) |
+| 5 | `@if` | passing | refused | `@if`; markup outside the root template |
+| 6 | Keyed `@for`: add, remove, reorder | passing | refused | `@for`; markup outside the root template |
+| 7 | Child component with props and a callback | passing | refused | more than one component in the module; child components |
+| 8 | Text input and two-way state | passing | refused | the `value` binding; the input event has no native meaning yet |
+| 9 | Storage | passing | refused | the assign write to `visits` needs a script engine |
+| 10 | State from the URL and one route change | passing | refused | child components (`Link`) |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | more than one component; child components; `@for`; `@try` |
 
 ## One gap that crosses rungs: parenthesized handler bodies
 
