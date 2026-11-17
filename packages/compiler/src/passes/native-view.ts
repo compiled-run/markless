@@ -1,11 +1,11 @@
-import {
-	NATIVE_VIEW_VERSION,
-	type NativeNode,
-	type NativeOp,
-	type NativeScalar,
-	type NativeTextPart,
-	type NativeViewPayload,
+import type {
+	NativeNode,
+	NativeOp,
+	NativeScalar,
+	NativeTextPart,
+	NativeViewPayload,
 } from '@markless/serializer';
+import { NATIVE_VIEW_VERSION } from '@markless/serializer/native-view';
 import type {
 	CompilerDiagnostic,
 	SemanticEvent,
