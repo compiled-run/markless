@@ -2,6 +2,7 @@ import { expect, test } from 'vitest';
 import type { RuntimeGraph } from '@markless/runtime';
 import { marklessInstanceScopedLoadSymbol } from '../src/fns/instance-scope.ts';
 import { marklessForwardedSymbol, marklessReboundSymbol } from '../src/fns/rebound-symbol.ts';
+import { MARKLESS_SYMBOL_UNKNOWN } from '../src/fns/symbol-unknown.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../src/resume-types.ts';
 
 // The page places List at `c0:`; List places Panel in its keyed rows at `c0:` and hands it
@@ -9,7 +10,7 @@ import type { ResumeSymbol, ResumeSymbolContext } from '../src/resume-types.ts';
 const childRow = 'bound:symbol%3A0:0[b=;k=repeat%3A0]';
 const pageRow = `bound:(${childRow}):0`;
 
-function loaders(forwarded: Readonly<Record<string, string>>) {
+function loaders(forwarded: string | Readonly<Record<string, string>>, held = [pageRow]) {
 	const ran: string[] = [];
 	const rowSymbol =
 		(name: string): ResumeSymbol =>
@@ -27,7 +28,9 @@ function loaders(forwarded: Readonly<Record<string, string>>) {
 			: rowSymbol(`list ${symbolId}`);
 	const pageTable = (symbolId: string) =>
 		marklessForwardedSymbol(childTable(symbolId.slice('c0:'.length)), forwarded, 'c0:', (id) =>
-			rowSymbol(id === pageRow ? 'page row' : id),
+			held.includes(id)
+				? rowSymbol('page row')
+				: Promise.reject(Object.assign(new Error(id), { code: MARKLESS_SYMBOL_UNKNOWN })),
 		);
 	return { load: marklessInstanceScopedLoadSymbol(pageTable), ran };
 }
@@ -51,5 +54,17 @@ test("a row the child answers for a forwarded callback runs as the composer's ro
 test('a row the composer does not forward stays with the child', async () => {
 	const { load, ran } = loaders({ 'bound:symbol%3A9:0': pageRow });
 	await click(load, 'c0:r:right:c0:symbol:0');
+	expect(ran).toEqual(['list row page graph']);
+});
+
+test("an edge's suffix names the composer's row for the child's id", async () => {
+	const { load, ran } = loaders('0');
+	await click(load, 'c0:r:left:c0:symbol:0');
+	expect(ran).toEqual(['page row page graph']);
+});
+
+test('a child row the composer did not republish under the suffix stays with the child', async () => {
+	const { load, ran } = loaders('0', []);
+	await click(load, 'c0:r:left:c0:symbol:0');
 	expect(ran).toEqual(['list row page graph']);
 });

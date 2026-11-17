@@ -161,7 +161,7 @@ test("a child's answer goes through the table's forwarded rows, and a bound row 
 	) as (symbolId: string) => unknown;
 
 	expect(await route('c0:c0:symbol:0')).toEqual({
-		forwarded: { 'bound:symbol%3A0:0': 'bound:(bound:symbol%3A0:0):0' },
+		forwarded: '0',
 		prefix: 'c0:',
 		child: '/list.tsrx c0:symbol:0',
 	});

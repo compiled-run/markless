@@ -49,7 +49,7 @@ export function emitSymbolRouteTable(input: {
 	const rebinds = binds || forwards;
 	const table = routes.map(
 		(route) =>
-			`[${JSON.stringify(route.prefix)}, ${route.importSource ? sources.indexOf(route.importSource) : -1}, ${hasBoundSymbols(route) ? boundEntry(route.boundSymbols!, keyLists) : 0}${hasForwardedSymbols(route) ? `, ${JSON.stringify(route.forwardedSymbols)}` : ''}]`,
+			`[${JSON.stringify(route.prefix)}, ${route.importSource ? sources.indexOf(route.importSource) : -1}, ${hasBoundSymbols(route) ? boundEntry(route.boundSymbols!, keyLists) : 0}${hasForwardedSymbols(route) ? `, ${forwardedEntry(route.forwardedSymbols!)}` : ''}]`,
 	);
 	return [
 		emitReboundSymbolImport(routes, reboundName),
@@ -109,6 +109,18 @@ function boundEntry(boundSymbols: Readonly<Record<string, string>>, keyLists: st
 	let index = keyLists.indexOf(keys);
 	if (index < 0) index = keyLists.push(keys) - 1;
 	return `[${JSON.stringify(suffix)}, ${index}]`;
+}
+
+// The composer's row for a forwarded child row is the child's id under the edge's suffix, so a table ships only that suffix when every row agrees.
+function forwardedEntry(forwardedSymbols: Readonly<Record<string, string>>): string {
+	const entries = Object.entries(forwardedSymbols);
+	const [firstKey, firstId] = entries[0]!;
+	const head = `${protocolBoundSymbolPrefix(firstKey)}:`;
+	const suffix = firstId.startsWith(head) ? firstId.slice(head.length) : undefined;
+	return suffix !== undefined &&
+		entries.every(([key, id]) => id === `${protocolBoundSymbolPrefix(key)}:${suffix}`)
+		? JSON.stringify(suffix)
+		: JSON.stringify(forwardedSymbols);
 }
 
 function hasAnyBound(routes: ReadonlyArray<BoundRoute>): boolean {

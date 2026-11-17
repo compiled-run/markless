@@ -1,4 +1,5 @@
 import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
+import { MARKLESS_SYMBOL_UNKNOWN } from '@markless/web/fns/symbol-unknown';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 import { decodeBoundRow, factorBoundRows, type JsonBoundRow } from './bound-row-table.ts';
 
@@ -202,10 +203,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function createUnknownSymbolError(id) {',
 		'	return Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'		code: "MARKLESS_SYMBOL_UNKNOWN",',
+		`		code: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'		phase: "resume",',
 		'		symbolId: String(id),',
-		'		docsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`		docsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'	});',
 		'}',
 		'',
@@ -376,10 +377,10 @@ function emitTableSymbolResolverModule(
 		'',
 		'function createUnknownSymbolError(id) {',
 		'\treturn Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'\t\tcode: "MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tcode: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t\tphase: "resume",',
 		'\t\tsymbolId: String(id),',
-		'\t\tdocsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tdocsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t});',
 		'}',
 		'',

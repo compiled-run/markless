@@ -3,7 +3,9 @@ import {
 	type MarklessRescopingSymbol,
 	type MarklessScopedGraph,
 } from './instance-scope.ts';
+import { protocolBoundSymbolPrefix } from '@markless/serializer';
 import { marklessThen } from '../ssr-data/awaitable.ts';
+import { MARKLESS_SYMBOL_UNKNOWN } from './symbol-unknown.ts';
 import type { ResumeSymbol, ResumeSymbolContext } from '../resume-types.ts';
 
 type LoadedSymbol = ResumeSymbol | Promise<ResumeSymbol>;
@@ -41,19 +43,27 @@ export function marklessReboundSymbol(
  * module handed it to forward: this module's row binds that callback, so it answers
  * instead. The row is spelled from this module's root, so it applies above the child's
  * path, the child's own rows, and the prefix this module's table consumed.
+ *
+ * `forwarded` is the edge's suffix when every such row is the child's id under it, and
+ * the resolver holds only the rows this module republished, so any other id stays the child's.
  */
 export function marklessForwardedSymbol(
 	loaded: LoadedSymbol,
-	forwarded: Readonly<Record<string, string>>,
+	forwarded: string | Readonly<Record<string, string>>,
 	prefix: string,
 	loadLocal: (symbolId: string) => LoadedSymbol,
 ): LoadedSymbol {
 	return marklessThen(loaded, (symbol): LoadedSymbol => {
 		const { marklessBoundId: childId, marklessBoundOuter: childOuter } =
 			symbol as ReboundSymbol;
-		if (childId === undefined || !childOuter || !Object.hasOwn(forwarded, childId))
-			return symbol;
-		const boundId = forwarded[childId]!;
+		if (childId === undefined || !childOuter) return symbol;
+		const boundId =
+			typeof forwarded === 'string'
+				? `${protocolBoundSymbolPrefix(childId)}:${forwarded}`
+				: Object.hasOwn(forwarded, childId)
+					? forwarded[childId]!
+					: undefined;
+		if (boundId === undefined) return symbol;
 		const outer: OuterPath = (instancePath) => {
 			const above = childOuter(instancePath);
 			if (above === undefined) return undefined;
@@ -64,7 +74,14 @@ export function marklessForwardedSymbol(
 			}
 			return withoutSuffix(path, prefix);
 		};
-		return reboundAt(loadLocal(boundId), outer, () => symbol, boundId);
+		return Promise.resolve(loadLocal(boundId)).then(
+			(bound) => reboundAt(bound, outer, () => symbol, boundId),
+			(error: unknown) => {
+				if ((error as { readonly code?: unknown } | undefined)?.code === MARKLESS_SYMBOL_UNKNOWN)
+					return symbol;
+				throw error;
+			},
+		);
 	});
 }
 
