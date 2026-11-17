@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { compileNativeComponent, createNativeRuntime, nativeConformance, nativeStyleInput } from '../src/index.ts';
+import {
+	compileNativeComponent,
+	createNativeRuntime,
+	nativeConformance,
+	nativeStyleInput,
+} from '../src/index.ts';
 import { CONFORMANCE_CASES } from './conformance-cases.ts';
 
-const fixture = (name: string) => readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+const fixture = (name: string) =>
+	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
 const committed = (name: string) =>
 	JSON.parse(readFileSync(new URL(`../conformance/${name}`, import.meta.url), 'utf8')) as unknown;
 
@@ -33,7 +39,9 @@ describe('native conformance vectors', () => {
 				filename: `src/${entry.name}.tsrx`,
 				source: readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8'),
 			});
-			expect(committed(`${entry.name}.json`), entry.name).toEqual(nativeConformance(payload!, entry.actions));
+			expect(committed(`${entry.name}.json`), entry.name).toEqual(
+				nativeConformance(payload!, entry.actions),
+			);
 		}
 	});
 
@@ -48,15 +56,36 @@ describe('native conformance vectors', () => {
 			nodes: [
 				{ kind: 'element', id: 'h0', element: 'div', parent: null },
 				{ kind: 'text', id: 'h0:text0', parent: 'h0', parts: [{ cell: 'state:b' }] },
-				{ kind: 'text', id: 'h0:text1', parent: 'h0', parts: [{ text: 'a=' }, { cell: 'state:a' }] },
+				{
+					kind: 'text',
+					id: 'h0:text1',
+					parent: 'h0',
+					parts: [{ text: 'a=' }, { cell: 'state:a' }],
+				},
 			],
 			events: [{ host: 'h0', event: 'activate', handler: 'handler:x' }],
 			handlers: [
 				{
 					id: 'handler:x',
 					ops: [
-						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
-						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
+						{
+							op: 'assign',
+							cell: 'state:a',
+							value: {
+								binary: '-',
+								left: { cell: 'state:a' },
+								right: { literal: 1 },
+							},
+						},
+						{
+							op: 'assign',
+							cell: 'state:a',
+							value: {
+								binary: '-',
+								left: { cell: 'state:a' },
+								right: { literal: 1 },
+							},
+						},
 					],
 				},
 			],
@@ -69,14 +98,21 @@ describe('native conformance vectors', () => {
 
 describe('native style input', () => {
 	it('hands Dragon the counter tree, its first texts and the scoped CSS the compiler wrote', async () => {
-		const build = await compileNativeComponent({ filename: 'src/counter.tsrx', source: fixture('Counter.tsrx') });
+		const build = await compileNativeComponent({
+			filename: 'src/counter.tsrx',
+			source: fixture('Counter.tsrx'),
+		});
 		const input = nativeStyleInput(build.payload!, build.styles);
 		expect(input.nodes.filter((node) => node.kind === 'text')).toEqual([
 			{ kind: 'text', id: 'h1:text0', parent: 'h1', text: 'Counter' },
 			{ kind: 'text', id: 'h2:text0', parent: 'h2', text: 'Count 0' },
 		]);
 		const scope = build.styles[0]!.scopeId;
-		expect(input.nodes[3]).toMatchObject({ id: 'h2', element: 'button', attributes: { class: `tap ${scope}` } });
+		expect(input.nodes[3]).toMatchObject({
+			id: 'h2',
+			element: 'button',
+			attributes: { class: `tap ${scope}` },
+		});
 		expect(input.css).toContain(`.tap.${scope}`);
 	});
 });

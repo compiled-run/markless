@@ -55,10 +55,12 @@ const PORTABLE_ELEMENTS = new Set([
 	'ol',
 	'li',
 	'button',
+	'input',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
+	input: 'input',
 };
 
 type Item =
@@ -145,10 +147,11 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	const exprOf = (
 		expression: SemanticExpression | undefined,
 		what: string,
+		eventParameter?: string,
 	): NativeExpr | null => {
 		if (!expression) return refuse(`${what} has no expression the compiler recorded`);
 		const all = (list: ReadonlyArray<SemanticExpression>): NativeExpr[] | null => {
-			const lowered = list.map((item) => exprOf(item, what));
+			const lowered = list.map((item) => exprOf(item, what, eventParameter));
 			return lowered.every((item) => item !== null) ? (lowered as NativeExpr[]) : null;
 		};
 		switch (expression.kind) {
@@ -163,36 +166,46 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			case 'literal':
 				return { literal: expression.value };
 			case 'unary': {
-				const value = exprOf(expression.value, what);
+				const value = exprOf(expression.value, what, eventParameter);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
 			case 'logical': {
-				const left = exprOf(expression.left, what);
-				const right = exprOf(expression.right, what);
+				const left = exprOf(expression.left, what, eventParameter);
+				const right = exprOf(expression.right, what, eventParameter);
 				if (!left || !right) return null;
 				return expression.kind === 'binary'
 					? { binary: expression.operator, left, right }
 					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(expression.test, what);
-				const whenTrue = exprOf(expression.consequent, what);
-				const whenFalse = exprOf(expression.alternate, what);
+				const test = exprOf(expression.test, what, eventParameter);
+				const whenTrue = exprOf(expression.consequent, what, eventParameter);
+				const whenFalse = exprOf(expression.alternate, what, eventParameter);
 				return test && whenTrue && whenFalse ? { if: test, whenTrue, whenFalse } : null;
 			}
 			case 'template': {
 				const parts = expression.parts.map((part) =>
-					typeof part === 'string' ? part : exprOf(part, what),
+					typeof part === 'string' ? part : exprOf(part, what, eventParameter),
 				);
 				return parts.every((part) => part !== null)
 					? { template: parts as (string | NativeExpr)[] }
 					: null;
 			}
 			case 'member': {
+				const holder = expression.object;
+				if (
+					eventParameter !== undefined &&
+					expression.property === 'value' &&
+					holder.kind === 'member' &&
+					(holder.property === 'currentTarget' || holder.property === 'target') &&
+					holder.object.kind === 'read' &&
+					holder.object.name === eventParameter
+				)
+					return { event: 'value' };
 				if (expression.property !== 'length')
 					return refuse(`${what} reads \`.${expression.property}\` of a value`);
-				const object = exprOf(expression.object, what);
+				const object = exprOf(expression.object, what, eventParameter);
 				return object && { member: object, property: 'length' };
 			}
 			case 'call': {
@@ -214,6 +227,10 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		(readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
 			const target = read.target;
 			if (target.kind === 'text') return [];
+			if (target.kind === 'property' && target.name === 'value') {
+				const value = exprOf(read.expression, 'the `value` property');
+				return value ? [{ property: 'value' as const, value }] : [];
+			}
 			if (target.kind === 'attribute') {
 				const value = exprOf(read.expression, `the \`${target.name}\` attribute`);
 				return value ? [{ attribute: target.name, value }] : [];
@@ -415,7 +432,8 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 
 	const handlerOps = (event: SemanticEvent): NativeOp[] => {
 		const what = `the ${event.eventName} handler`;
-		if (event.handlerParameters.length > 0) {
+		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
+		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {
 			refuse(`${what} reads its event`, event.handlerSpan);
 			return [];
 		}
@@ -442,7 +460,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				);
 				return [];
 			}
-			const value = exprOf(statement.value, what);
+			const value = exprOf(statement.value, what, eventParameter);
 			return value ? [{ op: 'assign', cell, value }] : [];
 		});
 	};
@@ -474,7 +492,8 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	for (const node of nodes)
 		if (node.kind === 'element')
 			for (const binding of node.bindings ?? [])
-				if (binding.attribute === 'class') collectCells(binding.value);
+				if ('attribute' in binding && binding.attribute === 'class')
+					collectCells(binding.value);
 
 	return done({
 		version: NATIVE_VIEW_VERSION,

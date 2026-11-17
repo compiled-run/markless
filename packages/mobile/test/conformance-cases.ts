@@ -49,4 +49,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 		],
 	},
+	{
+		name: 'input',
+		fixture: 'proofs/08-text-input/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'Samantha' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: '' },
+		],
+	},
 ];

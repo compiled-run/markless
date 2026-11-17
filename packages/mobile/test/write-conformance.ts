@@ -6,8 +6,15 @@ import { CONFORMANCE_CASES } from './conformance-cases.ts';
 
 for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
-	const { payload, diagnostics } = await compileNativeComponent({ filename: `src/${entry.name}.tsrx`, source });
-	if (!payload) throw new Error(`${entry.fixture}: ${diagnostics.map((d) => d.message).join('; ')}`);
+	const { payload, diagnostics } = await compileNativeComponent({
+		filename: `src/${entry.name}.tsrx`,
+		source,
+	});
+	if (!payload)
+		throw new Error(`${entry.fixture}: ${diagnostics.map((d) => d.message).join('; ')}`);
 	const file = new URL(`../conformance/${entry.name}.json`, import.meta.url);
-	writeFileSync(file, `${JSON.stringify(nativeConformance(payload, entry.actions), null, '\t')}\n`);
+	writeFileSync(
+		file,
+		`${JSON.stringify(nativeConformance(payload, entry.actions), null, '\t')}\n`,
+	);
 }

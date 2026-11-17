@@ -164,6 +164,18 @@ export function Counter() @{
   `class`. The style input gives Dragon `states: [{ cell, domain: [false, true], initial }]` and, per element,
   `classByState: [{ when: { <cell>: boolean }, value }]`; non-boolean styled cells are refused for now.
 
+### Additions for rung 8: text input (pushed 2026-11-17)
+
+- `input` joins the portable elements: iOS `UITextField`, Android `EditText`; its accessible name is `aria-label`.
+- Semantic event `input` (iOS `.editingChanged`, Android a `TextWatcher`), dispatched with the field's whole text:
+  action `{ event: 'input', host, value }`. In its handler, `event.currentTarget.value` (or `event.target.value`) lowers
+  to the expression `{ event: 'value' }`; any other read of the event is refused.
+- An element binding may be `{ property: 'value', value: expr }`. Journal entry `{ op: 'property', node, name: 'value',
+  value: string }` (`String(value)`, null reads `''`). The runtime never journals the edited field's own value when it
+  already equals what was typed, so a host does not write back into the field under the cursor; another handler that
+  changes the cell (rung 8's `Use Bo`) does journal it.
+- Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
+
 ### Building a payload and the conformance vectors (pushed)
 
 - Compile: `compileNativeComponent({ filename, source })` from `@markless/mobile` (`packages/mobile/src/compile.ts`) returns
@@ -310,7 +322,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | refused | not yet | not yet | needs list regions and array-op facts |
 | 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
-| 8 | Text input and two-way state | passing | refused | not yet | not yet | needs input element, `value` property, input event |
+| 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
 | 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |
