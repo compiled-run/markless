@@ -77,7 +77,7 @@ unstyled stack in `screenshots/counter-stack-*.png`.
 Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
 `maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
 AVD (android-36), from the `assign`-shaped payloads (`a989dc47f` and later). The in-app conformance run logged `pass` for
-`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json`, `list.json` and `switches.json`; it also checks
+`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json`, `list.json`, `components.json` and `switches.json`; it also checks
 that views exist for exactly the shown instances and that each list's rows sit in their parent in key order.
 
 | Rung | Result | Screenshot |
@@ -88,9 +88,10 @@ that views exist for exactly the shown instances and that each list's rows sit i
 | 04-attributes | flow passes (accessible name from `aria-label`, `enabled: false` from `disabled`); styles that follow the class (`state` entries over a `/1` export) are implemented and checked on the JVM against Dragon's toggle export, but unproven on device: no `/1` export with Markless ids exists yet | `screenshots/rung-04-attributes.png` |
 | 05-if | flow passes (arms removed and built by `arm` journal entries) | `screenshots/rung-05-if.png` |
 | 06-keyed-for | flow passes (add, remove, reverse: `rows` entries keep each row's retained views and move them; new keys are built, gone keys removed) | `screenshots/rung-06-keyed-for.png` |
+| 07-child-component | flow passes; no host change (the compiler inlines same-module components into the flat tree) | `screenshots/rung-07-child-component.png` |
 | 08-text-input | flow passes (`EditText`; typing dispatches `input` with the whole text through a `TextWatcher`; `Use Bo` writes the field through a `property` entry) | `screenshots/rung-08-text-input.png` |
 | 09-storage | flow passes, including `stopApp` then `launchApp` reading `Kept 2` back (`SharedPreferences`, `PreferencesStore`) | `screenshots/rung-09-storage.png` |
-| 07, 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+| 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
 
 Bound attributes on Android: `aria-label` sets `contentDescription`; `disabled` present sets `isEnabled = false`;
 `aria-pressed`/`aria-selected` `"true"` sets `isSelected`; `aria-expanded` sets the accessibility expanded state (API 36) and
