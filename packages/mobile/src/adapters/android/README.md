@@ -104,15 +104,19 @@ Views are kept per instance (`h6:text0@pear` inside a list row). An `arm` or `ro
 longer shown, builds every shown instance without a view from current values, and moves each parent's retained children
 into place: document order, with a list's rows at the list's place in key order.
 
-## Through the shared harness (2026-11-17)
+## Through the shared harness (2026-11-17, 04:45)
 
-`pnpm --filter @markless/mobile proof --simulator native-android-host --avd native_android_host --port 5600 <rungs>` (both
-platforms, the harness's own shells). The lead's receipts on `cw/native-targets` record rungs 1, 3, 5, 7, 8 and 9 passing on
-both platforms. This host's runs:
+`MARKLESS_DRAGON_DIR=<dragon checkout> pnpm --filter @markless/mobile proof --simulator native-android-host --avd
+native_android_host --port 5600 proofs/01-static-text ... proofs/10-url-route`: one run, both platforms, the harness's own
+shells, Dragon's `/1` export made at proof time for rungs 2 and 4.
 
 | Rung | Android | iOS |
 |---|---|---|
-| 01, 03, 05, 07, 08, 09 | PASS | PASS in the lead's receipts (failed at launch on `unknown op "assign"` before the iOS host moved to `assign`) |
-| 06-keyed-for | PASS (04:15 run; an earlier two-platform run lost the Android device before the flow, `Device emulator-5600 was requested, but it is not connected`, and passed alone) | FAIL at launch: the iOS host has no lists yet |
-| 10-url-route | PASS (opened at `/apple`, navigates to pear) | FAIL at launch: the iOS host has no routes yet |
-| 02, 04 | refused by the harness: no Dragon `native-style.json` for the rung (request 11) | same |
+| 01, 03, 05, 07, 08, 09 | PASS | PASS |
+| 02-styles, 04-attributes | PASS, styled (rung 4's Heart turns to Dragon's `state:liked` assignment on tap) | FAIL at launch (the iOS host's export `/1` reader is pending) |
+| 06-keyed-for, 10-url-route | PASS | FAIL at launch (lists and the launch route are pending on iOS) |
+
+Text Dragon styles is drawn with subpixel positioning, linear metrics and hinting off, as Dragon shapes it (like Chrome):
+with the platform default (whole-pixel hinted advances) rung 4's "Attributes" in Inter Bold at 84 px ran 412 px against
+Dragon's 410.66 px box and its last letter wrapped out of view; with the change its run advance is 410.64 px. The frame
+report logs each text node's run advance.

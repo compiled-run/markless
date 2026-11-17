@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -336,7 +337,8 @@ class MarklessHost(
 			if (node is Node.Text && view is Button) { x += view.paddingLeft; y += view.paddingTop; w -= view.paddingLeft + view.paddingRight; h -= view.paddingTop + view.paddingBottom }
 			val left = a.first - origin.first; val top = a.second - origin.second
 			val gap = maxOf(maxOf(Math.abs(x - left), Math.abs(y - top)), maxOf(Math.abs(x + w - left - frame.width), Math.abs(y + h - top - frame.height)))
-			Log.i(TAG, "frame ${inst.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon $left,$top ${frame.width}x${frame.height} gap $gap")
+			val run = (view as? TextView)?.takeIf { node is Node.Text }?.let { t -> " run ${t.paint.getRunAdvance(t.text, 0, t.text.length, 0, t.text.length, false, t.text.length)}" } ?: ""
+			Log.i(TAG, "frame ${inst.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon $left,$top ${frame.width}x${frame.height} gap $gap$run")
 			worst = maxOf(worst, gap)
 		}
 		return worst
@@ -368,6 +370,9 @@ class MarklessHost(
 			is StyleWrite.BorderColors -> colors = w.colors.map { it.argb }
 			is StyleWrite.BorderRadius -> radii = w.radii.map { it * dpr }
 			is StyleWrite.Font -> (view as? TextView ?: throw MarklessHostError("font on \"${s.id}\", which is not text")).apply {
+				// Dragon shapes with fractional, unhinted advances, as Chrome does; hinted whole-pixel advances run wider and wrap.
+				paintFlags = paintFlags or Paint.SUBPIXEL_TEXT_FLAG or Paint.LINEAR_TEXT_FLAG
+				paint.hinting = Paint.HINTING_OFF
 				typeface = fonts.typeface(w.family)
 				setTextSize(TypedValue.COMPLEX_UNIT_PX, (w.size * dpr).toFloat())
 			}
