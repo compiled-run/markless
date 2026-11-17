@@ -1,0 +1,83 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-i4w2jc"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-i4w2jc"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Attributes"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {},
+			"classByState": [
+				{
+					"when": {
+						"state:liked": false
+					},
+					"value": "like mk-i4w2jc"
+				},
+				{
+					"when": {
+						"state:liked": true
+					},
+					"value": "like on mk-i4w2jc"
+				}
+			]
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Heart"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "button",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-i4w2jc"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "Clear"
+		}
+	],
+	"css": ".like.on.mk-i4w2jc {\n\t\t\t\tbackground: #ef476f;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "state:liked",
+			"domain": [
+				false,
+				true
+			],
+			"initial": false
+		}
+	]
+}
