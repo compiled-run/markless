@@ -93,42 +93,6 @@
 		{
 			"surface": "perf-guards",
 			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 300,
-			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row; the evaluator reads from render data how many of the owner's keyed rows enclose a @try; measured on CI run 44039491759 against the merge-base run 43956962200 (main 710c44d48)",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 300,
-			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row; the evaluator reads from render data how many of the owner's keyed rows enclose a @try; measured on CI run 44039491759 against the merge-base run 43956962200 (main 710c44d48)",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 241,
-			"reason": "each keyed row's @try gets its own boundary id: the renderer names its anchor with the row and page composition emits one boundary record per row; the evaluator reads from render data how many of the owner's keyed rows enclose a @try; measured on CI run 44039491759 against the merge-base run 43956962200 (main 710c44d48)",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
 				"runtimeModules",
 				"web/ssr-data/renderer"
 			],
