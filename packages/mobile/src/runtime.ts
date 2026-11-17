@@ -44,8 +44,8 @@ export type NativeRuntime = {
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 };
 
-/** How a value reads in text: JavaScript's `String(value)`, which every host reproduces exactly. */
-export const formatNativeValue = (value: Value): string => String(value);
+/** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
+export const formatNativeValue = (value: Value): string => (value === null ? '' : String(value));
 
 const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value } = {
 	String: (value) => String(value),

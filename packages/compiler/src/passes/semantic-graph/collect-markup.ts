@@ -28,6 +28,7 @@ import {
 	semanticAliasMap,
 } from '../../artifact-helpers/graph-paths.ts';
 import type {
+	NativeFactCollectors,
 	SemanticMarkupArtifact,
 	SemanticMarkupChunk,
 	SemanticMarkupResidue,
@@ -99,6 +100,7 @@ type CollectionContext = {
 	// identifier carries consumer props; any other object is the author's own.
 	restName: string | null;
 	readonly nestedLocalSource: ((expression: AnyNode) => string | null) | null;
+	readonly nativeFacts: NativeFactCollectors | null;
 };
 
 type ChunkBuilder = {
@@ -133,6 +135,7 @@ export function collectSemanticMarkup(input: {
 	readonly graph: MutableSemanticGraphArtifact;
 	readonly hostIds: WeakMap<object, string>;
 	readonly nestedLocalSource?: (expression: AnyNode) => string | null;
+	readonly nativeFacts?: NativeFactCollectors | null;
 }): SemanticMarkupArtifact {
 	const chunks: SemanticMarkupChunk[] = [];
 	const context: CollectionContext = {
@@ -149,6 +152,7 @@ export function collectSemanticMarkup(input: {
 		destructuredNames: [],
 		restName: null,
 		nestedLocalSource: input.nestedLocalSource ?? null,
+		nativeFacts: input.nativeFacts ?? null,
 	};
 	const components: Array<{
 		readonly name: string;
@@ -277,7 +281,16 @@ function emitTextSlot(
 	const raw =
 		getIdentifierName(expression) === PROJECTION_PROP_NAME ||
 		readsOwnChildrenProp(residue, context, builder.componentName);
-	addAnchorSlot(builder, { kind: 'text', residue, ...(raw ? { raw: true } : {}) }, path);
+	addAnchorSlot(
+		builder,
+		{
+			kind: 'text',
+			residue,
+			...(raw ? { raw: true } : {}),
+			...(context.nativeFacts ? { nativeExpression: context.nativeFacts.expression(expression as never) } : {}),
+		},
+		path,
+	);
 	return 1;
 }
 

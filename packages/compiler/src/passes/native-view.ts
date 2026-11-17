@@ -108,6 +108,11 @@ type Scope = {
 	/** The analysis of the module whose template is being lowered. */
 	readonly module: ModuleFacts;
 	readonly component: string;
+	/** This instance's cells by state name and by the analyzer's binding id. */
+	readonly cells: {
+		readonly byName: ReadonlyMap<string, string>;
+		readonly byBinding: ReadonlyMap<string, string>;
+	};
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
 	readonly event?: string;
@@ -213,37 +218,46 @@ export function createNativeViewPayload(
 	const rootChunk = rootModule.chunks.get(root.templateId);
 	if (!rootChunk) return done(refuse('the root template has no markup'));
 
-	const cells = graph.graphBindings.flatMap((binding) => {
-		if (binding.kind !== 'state') return [];
-		const value = binding.initialValue;
-		if (binding.initialValueKnown !== true || !isNativeValue(value)) {
-			refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
-			return [];
-		}
-		return [
-			{
-				id: binding.id,
+	const cells: NativeViewPayload['cells'][number][] = [];
+	/** A component instance's cells: its own state, named by its prefix, plus its module's top-level state, shared. */
+	const instanceCells = (module: ModuleFacts, component: string, prefix: string, shared: boolean) => {
+		const byName = new Map<string, string>();
+		const byBinding = new Map<string, string>();
+		for (const binding of module.graph.graphBindings) {
+			if (binding.kind !== 'state') continue;
+			const moduleLevel = binding.componentName === undefined;
+			if (!moduleLevel && binding.componentName !== component) continue;
+			if (moduleLevel && !shared) {
+				refuse(`top-level state \`${binding.name}\` in an imported module`);
+				continue;
+			}
+			if (!moduleLevel && prefix !== '' && binding.storage) {
+				refuse(`storage \`${binding.name}\` declared inside the child component ${component}`);
+				continue;
+			}
+			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
+			byName.set(binding.name, id);
+			byBinding.set(binding.id, id);
+			if (cells.some((cell) => cell.id === id)) continue;
+			const value = binding.initialValue;
+			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+				refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
+				continue;
+			}
+			cells.push({
+				id,
 				name: binding.name,
 				initial: value,
 				...(binding.storage ? { storage: { key: binding.storage.key } } : {}),
-			},
-		];
-	});
-	const cellIds = new Set(cells.map((cell) => cell.id));
-	const cellsByComponent = new Map<string, Map<string, string>>();
-	for (const binding of graph.graphBindings) {
-		if (binding.kind !== 'state' || !cellIds.has(binding.id)) continue;
-		const owner = binding.componentName ?? root.componentName;
-		if (owner !== root.componentName) refuse(`state \`${binding.name}\` declared in the child component ${owner}`);
-		const names = cellsByComponent.get(owner) ?? new Map<string, string>();
-		names.set(binding.name, binding.id);
-		cellsByComponent.set(owner, names);
-	}
-	const cellOf = (name: string, scope: Scope): string | undefined =>
-		(cellsByComponent.get(scope.component) ?? cellsByComponent.get(root.componentName))?.get(name);
+			});
+		}
+		return { byName, byBinding };
+	};
+	const cellOf = (name: string, scope: Scope): string | undefined => scope.cells.byName.get(name);
 	const TOP: Scope = {
 		module: rootModule,
 		component: root.componentName,
+		cells: instanceCells(rootModule, root.componentName, '', true),
 		prefix: '',
 		locals: new Set(),
 		items: new Map(),
@@ -257,8 +271,6 @@ export function createNativeViewPayload(
 		if (known) return known;
 		const facts = moduleFactsOf(imported);
 		importedModuleFacts.set(specifier, facts);
-		for (const binding of imported.graphBindings)
-			if (binding.kind === 'state') refuse(`state \`${binding.name}\` declared in the imported module ${specifier}`);
 		return facts;
 	};
 	const isRouterLink = (scope: Scope, name: string): boolean => {
@@ -414,7 +426,8 @@ export function createNativeViewPayload(
 			return [];
 		});
 	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
-		if (cellIds.has(graphNodeId)) return { cell: graphNodeId };
+		const cell = scope.cells.byBinding.get(graphNodeId);
+		if (cell) return { cell };
 		const read = scope.module.computedReads.get(graphNodeId);
 		const expr = read
 			? exprOf(read.expression, 'a text expression', scope)
@@ -476,6 +489,11 @@ export function createNativeViewPayload(
 			}
 			if (slot.kind !== 'text') {
 				refuse(`a ${slot.kind} binding`);
+				continue;
+			}
+			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
+				const expr = exprOf(slot.nativeExpression, 'a text expression', scope);
+				if (expr) items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
 				continue;
 			}
 			if (slot.residue.kind === 'repeat-item') {
@@ -645,16 +663,18 @@ export function createNativeViewPayload(
 						props.set(prop.name, { kind: 'callback', statements: prop.nativeStatements, scope });
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
 						props.set(prop.name, { kind: 'value', expr: { literal: prop.value as NativeScalar } });
-					} else if (prop.kind === 'graph-reference' && cellIds.has(prop.graphNodeId) && prop.path.length === 0) {
-						props.set(prop.name, { kind: 'value', expr: { cell: prop.graphNodeId } });
+					} else if (prop.kind === 'graph-reference' && scope.cells.byBinding.has(prop.graphNodeId) && prop.path.length === 0) {
+						props.set(prop.name, { kind: 'value', expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! } });
 					} else {
 						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`);
 					}
 				}
+				const childPrefix = `${scope.prefix}${edge.id}/`;
 				lowerChunk(template, parent, place, {
 					module: childModule,
 					component: childComponent,
-					prefix: `${scope.prefix}${edge.id}/`,
+					cells: instanceCells(childModule, childComponent, childPrefix, childModule === rootModule),
+					prefix: childPrefix,
 					locals: new Set(),
 					items: new Map(),
 					props,
@@ -669,12 +689,12 @@ export function createNativeViewPayload(
 					refuse('@for inside an @if arm or another @for');
 					continue;
 				}
-				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !cellIds.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
+				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !scope.cells.byBinding.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
 					refuse('a @for over something other than a state list keyed by a path of its item');
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				nodes.push({ kind: 'repeat', id: repeatId, parent, list: { cell: repeat.collectionGraphNodeId }, key: repeat.keyPath });
+				nodes.push({ kind: 'repeat', id: repeatId, parent, list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }, key: repeat.keyPath });
 				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });
 				continue;
 			}

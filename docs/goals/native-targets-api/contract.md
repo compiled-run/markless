@@ -26,16 +26,15 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 
 - **native-ios-host:** `/1` is done (the lead added `readiness` as an optional field the decoder reads past, in
   `StyleExport.swift`, so the documented format decodes). Next: anything rungs 6 and 10 still need on the shared harness.
-- **native-android-host:** (1) text drawn wider than Dragon's box clips: rung 4's `<h1>Attributes</h1>` (Inter Bold, 32 px)
-  shows "Attribute" in `proofs/04-attributes/screenshots/android/`. Find why Android's run is wider than Dragon's shaped
-  width (font padding, a second bold, letter spacing, text size units) and fix the cause; do not widen frames. (2) a launch
-  route, rung 10.
+- **native-android-host:** the clipped-title defect is fixed at its cause (text drawn with unhinted subpixel advances, as
+  Dragon shapes it; re-run green 2026-11-17 05:46). Next: branch `tests` (rung 5b).
 - **both hosts, launch route (rung 10):** the shell receives the Maestro launch argument `route` (iOS launch argument,
   Android intent extra) and passes it to the host entry point (`MarklessViewController(payload:style:fonts:route:)`,
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
   segment, URL-decoded; any other segment matches itself) to get the params, then mounts with them; no route means the
   page's pattern must have no params. A `navigate` entry re-mounts with the entry's params.
-- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`).
+- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`); `null` formats as
+  empty text, as on the web; child-component state arrives as ordinary cells with prefixed ids (nothing new to build).
 - **native-proof-harness:** forward the `route` launch argument to the shells; run `node packages/mobile/src/style-export.ts
   <rung>` when a rung has styles and `MARKLESS_DRAGON_DIR` is set (or keep refusing a missing export, as now).
 - **native-ladder:** rung 7b is written by the lead (`proofs/07b-imported-component/`, rung number 7.5, importing
@@ -137,7 +136,9 @@ export function Counter() @{
 - **Nodes** are in document order; a parent precedes its children. Element ids are the compiler's host ids (`h0`...), the same
   ids the web payload and Dragon use. A text node is one run of adjacent static text and bound values inside one element;
   its id is `<element>:text<n>` (n counts text runs in that element), which is also Dragon's text node id.
-- **Text parts:** `{ "text" }` is literal; `{ "cell" }` is the cell's current value formatted as JavaScript's `String(value)`
+- **Text parts:** `{ "text" }` is literal; `{ "cell" }` (and `{ "expr" }`) is the value formatted as the web writes text
+  (`marklessCsrText` in `@markless/web`): `null` is the empty string, anything else JavaScript's `String(value)`, so `false`
+  reads "false" exactly as on the web
   (so integer `1` is `"1"`, never `"1.0"`; hosts must implement this exactly; non-integer numbers are refused in v0).
 - **Events** are semantic. Authored `onClick` lowers to `activate`. Platform mapping (owned by each adapter): web `click`,
   iOS `UIControl.Event.touchUpInside`, Android `View.OnClickListener`.
@@ -209,6 +210,16 @@ export function Counter() @{
   already equals what was typed, so a host does not write back into the field under the cursor; another handler that
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
+
+### Several expressions in one text run, and state inside child components (pushed 2026-11-17)
+
+- The analyzer now records each text interpolation's expression on its markup slot (`nativeExpression`, native builds
+  only), so `{title} is {open ? 'open' : 'shut'}` in one element lowers to one text node with several parts, as the web
+  renders it, instead of being refused.
+- A component's own `state()` gets one set of cells per instance, ids prefixed by the call site
+  (`component-edge:0/state:open`); module-level state (a top-level `storage()`) stays one shared cell. Refused for now:
+  `storage()` declared inside a child component, and top-level state in an imported module.
+- Text formatting: `null` renders as empty text (the web's rule); vectors are unchanged.
 
 ### `@else if` chains and `@switch` (pushed 2026-11-17, after rung 10)
 
@@ -441,11 +452,13 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 1 | Static elements and text | passing | passing | **passing** | **passing** | screenshots in `proofs/01-static-text/screenshots/` |
 | 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | **passing** | **passing** | harness verdict passed on both; export made at proof time by Dragon's `markless:style-export`; styled screenshots in `proofs/02-styles/screenshots/` |
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
-| 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing**, with a visible defect: the title's last letter clips | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
+| 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing** (the clipped title is fixed: Android now draws Dragon-styled text at Dragon's unhinted advances) | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
+| 5b | `@else if` chains and `@switch` | passing | passing | not yet (host: branch `tests`) | not yet (host: branch `tests`) | `proofs/05b-choices/`; vectors `choices.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
 | 7b | A component imported from another file | passing | passing | **passing** | **passing** | `proofs/07b-imported-component/` imports `proofs/lib/Stepper.tsrx`; harness verdict passed on both |
+| 7c | State inside a reused component, one per instance (with joined text) | passing | passing | **passing** | **passing** | `proofs/07c-child-state/` uses `proofs/lib/Panel.tsrx` twice; harness verdict passed on both |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |

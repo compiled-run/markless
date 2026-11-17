@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
@@ -21,11 +21,14 @@ export type ProofRung = {
 };
 
 const COMPONENT_FILE = 'App.tsrx';
+const repoRoot = resolve(import.meta.dirname, '..', '..', '..', '..');
 
 /** Reads a module a rung imports by relative path (`./Stepper.tsrx`), so the build can lower its components in place. */
 export function readRelativeModule(specifier: string, importer: string) {
-	const filename = resolve(dirname(importer), specifier);
-	return existsSync(filename) ? { filename, source: readFileSync(filename, 'utf8') } : undefined;
+	const file = resolve(repoRoot, dirname(importer), specifier);
+	return existsSync(file)
+		? { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') }
+		: undefined;
 }
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
@@ -43,14 +46,18 @@ function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
 	try {
 		bytes = dragonStyleExport(join(dir, STYLE_INPUT), dragon);
 	} catch (error) {
-		throw new Error(`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`);
+		throw new Error(
+			`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`,
+		);
 	}
 	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
 	const fonts = (JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts).fonts ?? [];
 	for (const font of fonts) {
 		const file = resolve(dragon, font.file);
 		if (!existsSync(file)) {
-			throw new Error(`${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`);
+			throw new Error(
+				`${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`,
+			);
 		}
 		const face = readFileSync(file);
 		const digest = `sha256:${createHash('sha256').update(face).digest('hex')}`;
@@ -80,7 +87,8 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 	const assets: Array<[string, Uint8Array]> = [];
 	if (existsSync(component)) {
 		const build = await compileNativeComponent({
-			filename: component,
+			// Repo-relative: the scope class hashes the filename, so every checkout builds the same payload and style input.
+			filename: relative(repoRoot, component),
 			source: readFileSync(component, 'utf8'),
 			// A rung that is a page compiles as its page file, so the router derives its route.
 			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),

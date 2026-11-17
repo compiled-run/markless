@@ -200,3 +200,54 @@ export function Pick() @{
 		).toEqual(['Next | first', 'Next | second', 'Next | other', 'Next | first']);
 	});
 });
+
+describe('state inside child components', () => {
+	it('gives each instance its own cells', async () => {
+		const build = await compileNativeComponent({
+			filename: 'src/Panels.tsrx',
+			source: `import { state } from '@markless/core';
+function Panel({ title }) @{
+	let open = state(false);
+	<section>
+		<p>{title}</p>
+		<button onClick={() => (open = !open)}>{open ? 'open' : 'shut'}</button>
+	</section>
+}
+export function Panels() @{
+	<main>
+		<Panel title="A" />
+		<Panel title="B" />
+	</main>
+}`,
+		});
+		expect(build.diagnostics).toEqual([]);
+		expect(build.payload!.cells.map((cell) => cell.id)).toEqual([
+			'component-edge:0/state:open',
+			'component-edge:1/state:open',
+		]);
+		const runtime = createNativeRuntime(build.payload!);
+		runtime.dispatch({ event: 'activate', host: build.payload!.events[1]!.host });
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['A', 'shut', 'B', 'open']);
+	});
+});
+
+describe('several expressions in one text run', () => {
+	it('builds each part, as the web joins them', async () => {
+		const build = await compileNativeComponent({
+			filename: 'src/Joined.tsrx',
+			source: `import { state } from '@markless/core';
+function Panel({ title }) @{
+	let open = state(false);
+	<button onClick={() => (open = !open)}>{title} is {open ? 'open' : 'shut'}{open && '!'}{open ? null : '.'}</button>
+}
+export function Page() @{
+	<main><Panel title="Door" /></main>
+}`,
+		});
+		expect(build.diagnostics).toEqual([]);
+		const runtime = createNativeRuntime(build.payload!);
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['Door is shutfalse.']);
+		runtime.dispatch({ event: 'activate', host: build.payload!.events[0]!.host });
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['Door is open!']);
+	});
+});
