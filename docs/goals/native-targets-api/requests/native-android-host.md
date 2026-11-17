@@ -8,9 +8,19 @@
    or several runs are coming soon.
 2. **Units in `dragon.native-style-export/0`.** The export says "device px", which holds for frames and `borderWidths`, but
    the counter's `font.size` (20 and 24) and `border-radius` lengths (12) read as CSS px. I multiply both by the export's
-   `dpr`. Please have the export (or the contract) state the unit per field.
+   `dpr`. Please have the export (or the contract) state the unit per field. Update after the contract's handoff section
+   ("All lengths in device pixels"): that does not match the counter export. Read as device px, `font.size` 20 would be a
+   7.6 dp font, while Dragon's own text frame for it is 64 device px tall, which is Inter's normal line height at
+   20 CSS px x 2.625. Scaling `font.size` and radii by `dpr` gives every edge within 0.98 device px of Dragon's frames on the
+   Pixel 7 AVD. Please correct the contract (or Dragon's export) so iOS reads the same units.
 3. **The export carries `html` and `body` nodes** that are not in the payload. I add their frames into the root's position and
    ignore their writes. Please confirm that the document wrapper's paint (e.g. a `body` background) is not meant to reach the
    device, or name which node's background fills the screen.
 4. **Pixel ratio.** The host refuses an export whose `dpr` differs from the device's by more than 0.001, since frames are
    device px. If the harness needs one export for several devices, the export would need CSS px frames instead.
+5. **Vectors for `set` and `toggle`.** `packages/mobile/conformance/` has only the counter (`add`). The Android host implements
+   `set` and `toggle` (with JavaScript truthiness: `toggle` on `0` gives `true`) and checks them with its own JVM cases, but
+   only a shared vector holds iOS and Android to one meaning. Please add one (e.g. a toggle whose text reads a boolean and a
+   number, and a `set` that leaves text unchanged, which must journal nothing).
+6. **`synthetic-bold` write.** The contract lists it but not its fields. The Android host refuses it loudly until its shape is
+   written down (Android would map it to `Paint.isFakeBoldText`).

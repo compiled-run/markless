@@ -15,6 +15,7 @@ w=${MARKLESS_ANDROID_OUT:-$here/.build}/apk
 rm -rf "$w"; mkdir -p "$w/assets/markless" "$w/assets/markless-fonts" "$w/dex"
 cp "$payload" "$w/assets/markless/payload.json"
 if [ $# -ge 1 ]; then cp "$1" "$w/assets/markless/style.json"; shift; fi
+if [ -n "${MARKLESS_CONFORMANCE_DIR:-}" ]; then mkdir -p "$w/assets/markless/conformance"; cp "$MARKLESS_CONFORMANCE_DIR"/*.json "$w/assets/markless/conformance/"; fi
 for font in "$@"; do cp "$font" "$w/assets/markless-fonts/$(shasum -a 256 "$font" | cut -d' ' -f1).ttf"; done
 "$bt/aapt2" link --manifest "$here/shell/AndroidManifest.xml" -I "$jar" -A "$w/assets" --min-sdk-version 31 --target-sdk-version 36 -o "$w/base.apk"
 kotlinc -cp "$jar" -jvm-target 1.8 -nowarn -d "$w/classes.jar" $(find "$here/src" "$here/shell" -name '*.kt')

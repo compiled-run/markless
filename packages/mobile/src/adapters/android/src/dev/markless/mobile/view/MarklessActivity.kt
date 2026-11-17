@@ -38,6 +38,7 @@ abstract class MarklessActivity : Activity() {
 		}
 		viewport.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		setContentView(viewport)
+		if (host.style != null) viewport.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}
 
 	fun contentRoot(): View = host.root
