@@ -18,8 +18,10 @@ const cam = camera();                                           // a device obje
 ```
 
 - **Free values** are properties on the import (`network.online`); reading one never asks permission.
-- **One-time asks** are awaited functions (`location.current()`, `camera.takePhoto()`); a refused one rejects with an
-  error named `NotAllowedError`, which lands in `@catch`.
+- **One-time asks** are awaited functions (`location.current()`, `camera.takePhoto()`,
+  `sharesheet.open({ title, url })`); a refused one rejects with an error named `NotAllowedError`, which lands in
+  `@catch`. The system share panel is `sharesheet` (owner ruling, 2026-11-17), not `share`, which reads too close to
+  `shared()`. It is not built yet.
 - **Device objects** (`camera()`) are made in a component and released when it is hidden or leaves. Writable fields are
   settings (`cam.facing = 'front'`), live fields are what it knows (`cam.ready`).
 - **Permission**: no request call. Using a feature asks. Each feature that needs permission has the live field `access`
