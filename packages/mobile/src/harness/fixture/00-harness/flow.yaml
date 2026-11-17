@@ -4,5 +4,9 @@ name: 00-harness
 - launchApp:
       clearState: true
 - assertVisible: Harness
+- assertVisible: Tap 0
 - tapOn: Tap 0
+- assertNotVisible: Tap 0
+- assertVisible: Harness
 - assertVisible: Tap 1
+- assertNotVisible: Tap 0

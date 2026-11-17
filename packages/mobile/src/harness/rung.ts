@@ -1,8 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, join, resolve } from 'node:path';
+import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
-import { type ProofExpected, readProofExpected } from './expected.ts';
-import { PROOF_PAYLOAD_PATH } from './proof-app.ts';
+import { nativeStyleInput } from '../style-input.ts';
+import { readProofExpected } from './expected.ts';
+import { PROOF_FONTS_FOLDER, PROOF_PAYLOAD_PATH, PROOF_STYLE_PATH } from './proof-app.ts';
 
 /** Files a shell carries for one rung, by path inside the iOS bundle or the APK's assets. */
 export type ProofAssets = ReadonlyMap<string, Uint8Array>;
@@ -12,15 +15,47 @@ export type ProofRung = {
 	readonly dir: string;
 	readonly flowPath: string;
 	readonly flow: string;
-	readonly expected: ProofExpected;
+	readonly expected: LadderRung;
 	readonly assets: ProofAssets;
 };
 
 const COMPONENT_FILE = 'App.tsrx';
-/** A hand-made payload, only for the harness's own fixture rung that proves the machinery without the compiler. */
+/** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
+/** Written here for Dragon; Dragon's export comes back as STYLE_EXPORT, committed with the rung. */
+const STYLE_INPUT = 'native-style-input.json';
+const STYLE_EXPORT = 'native-style.json';
 
-/** Reads a rung folder and compiles its App.tsrx with the real compiler into the native payload both shells embed. */
+type StyleExportFonts = {
+	readonly fonts?: ReadonlyArray<{ readonly id: string; readonly file: string }>;
+};
+
+/** The style export and every font face it names, checked against the face's `sha256:` id. */
+function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
+	const exportPath = join(dir, STYLE_EXPORT);
+	const bytes = readFileSync(exportPath);
+	const fontRoot = process.env.MARKLESS_DRAGON_DIR ?? dir;
+	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
+	for (const font of (JSON.parse(bytes.toString('utf8')) as StyleExportFonts).fonts ?? []) {
+		const file = resolve(fontRoot, font.file);
+		if (!existsSync(file)) {
+			throw new Error(
+				`${name}: font ${font.id} is not at ${file}; set MARKLESS_DRAGON_DIR to the Dragon checkout`,
+			);
+		}
+		const face = readFileSync(file);
+		const digest = `sha256:${createHash('sha256').update(face).digest('hex')}`;
+		if (digest !== font.id)
+			throw new Error(`${name}: ${file} is ${digest}, not the export's ${font.id}`);
+		assets.push([`${PROOF_FONTS_FOLDER}/${digest.slice('sha256:'.length)}.ttf`, face]);
+	}
+	return assets;
+}
+
+/**
+ * Reads a rung folder and compiles its App.tsrx with the real compiler into the native payload both shells embed. A rung
+ * with styles also writes Dragon's input and needs Dragon's export beside it.
+ */
 export async function loadRung(dir: string): Promise<ProofRung> {
 	const name = basename(dir);
 	const flowPath = join(dir, 'flow.yaml');
@@ -33,21 +68,33 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		expectedPath,
 	);
 	const component = join(dir, COMPONENT_FILE);
-	let payload: Uint8Array;
+	const assets: Array<[string, Uint8Array]> = [];
 	if (existsSync(component)) {
-		const { payload: compiled, diagnostics } = await compileNativeComponent({
+		const build = await compileNativeComponent({
 			filename: component,
 			source: readFileSync(component, 'utf8'),
 		});
-		if (!compiled || diagnostics.some((diagnostic) => diagnostic.severity === 'error')) {
-			const lines = diagnostics.map(
+		if (!build.payload) {
+			const lines = build.diagnostics.map(
 				(diagnostic) => `  ${diagnostic.code}: ${diagnostic.message}`,
 			);
 			throw new Error(`${name}: ${COMPONENT_FILE} has no native build\n${lines.join('\n')}`);
 		}
-		payload = new TextEncoder().encode(JSON.stringify(compiled));
+		assets.push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))]);
+		if (build.styles.some((style) => style.cssText.length > 0)) {
+			writeFileSync(
+				join(dir, STYLE_INPUT),
+				`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
+			);
+			if (!existsSync(join(dir, STYLE_EXPORT))) {
+				throw new Error(
+					`${name}: the component has styles but no ${STYLE_EXPORT}; run Dragon's export on ${STYLE_INPUT}`,
+				);
+			}
+			assets.push(...styleAssets(dir, name));
+		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
-		payload = readFileSync(join(dir, HAND_MADE_PAYLOAD));
+		assets.push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);
 	} else {
 		throw new Error(`${name}: ${COMPONENT_FILE} is missing`);
 	}
@@ -57,6 +104,6 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		flowPath,
 		flow: readFileSync(flowPath, 'utf8'),
 		expected,
-		assets: new Map([[PROOF_PAYLOAD_PATH, payload]]),
+		assets: new Map(assets),
 	};
 }

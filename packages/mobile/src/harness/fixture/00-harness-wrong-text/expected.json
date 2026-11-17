@@ -1,4 +1,6 @@
 {
+	"rung": 0,
+	"name": "Harness fixture: harness-wrong-text",
 	"steps": [
 		{
 			"visible": ["Harness", "Tap 0"]

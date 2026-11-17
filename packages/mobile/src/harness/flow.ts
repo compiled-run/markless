@@ -1,21 +1,10 @@
+import { isDeepStrictEqual } from 'node:util';
 import { parseAllDocuments, stringify } from 'yaml';
-import type { ProofExpected, ProofExpectedStep } from './expected.ts';
+import { flowSteps, type LadderRung } from '../../proofs/ladder.ts';
 import { PROOF_APP_ID, PROOF_APP_ID_VARIABLE } from './proof-app.ts';
 
-/** Maestro commands that only look at the screen; every other top-level command is an action that starts a step. */
-const LOOKING_COMMANDS = new Set([
-	'assertVisible',
-	'assertNotVisible',
-	'assertTrue',
-	'extendedWaitUntil',
-	'waitForAnimationToEnd',
-	'takeScreenshot',
-]);
-
-type FlowCommand = string | Record<string, unknown>;
-
 export type ProofFlowStep = {
-	/** The action's command name (`launchApp`, `tapOn`...). */
+	/** `launch`, or the step's `do` action (`tap`, `type`, `relaunch`, `wait`). */
 	readonly action: string;
 	readonly before: string;
 	readonly after: string;
@@ -24,42 +13,22 @@ export type ProofFlowStep = {
 export type InstrumentedFlow = {
 	readonly yaml: string;
 	readonly steps: ReadonlyArray<ProofFlowStep>;
-	/** For each top-level command of `yaml` in order: the step it belongs to and what it is there for. */
+	/** For each top-level command of `yaml` in order: the step it belongs to and whether it is the rung's own or a screenshot. */
 	readonly commands: ReadonlyArray<{
 		readonly step: number;
-		readonly role: 'flow' | 'expected' | 'screenshot';
+		readonly role: 'flow' | 'screenshot';
 	}>;
 };
-
-const commandName = (command: FlowCommand): string => {
-	if (typeof command === 'string') return command;
-	const keys = Object.keys(command);
-	if (keys.length !== 1)
-		throw new Error(`a flow command has ${keys.length} keys: ${JSON.stringify(command)}`);
-	return keys[0]!;
-};
-
-/** Maestro reads a text selector as a regular expression over the whole label; this matches `text` literally. */
-export const literalSelector = (text: string): string =>
-	Array.from(text, (char) => ('\\^$.|?*+()[]{}'.includes(char) ? `\\${char}` : char)).join('');
-
-const expectedChecks = (step: ProofExpectedStep): FlowCommand[] => [
-	...step.visible.map((text) => ({ assertVisible: { text: literalSelector(text) } })),
-	...(step.absent ?? []).map((text) => ({ assertNotVisible: { text: literalSelector(text) } })),
-	...(step.disabled ?? []).map((text) => ({
-		assertVisible: { text: literalSelector(text), enabled: false },
-	})),
-];
 
 const pad = (index: number) => String(index).padStart(2, '0');
 
 /**
- * Rewrites a rung's flow for one platform run: a screenshot before and after each step, and after the flow's own checks
- * for a step, the rung's expected texts for it. A step is one action command plus the checks that follow it.
+ * Checks that a rung's flow.yaml is the flow its expected.json renders to (so the flow checks every expected text), then
+ * rewrites it for one platform run with a screenshot before and after each step.
  */
 export function instrumentFlow(
 	flowText: string,
-	expected: ProofExpected,
+	rung: LadderRung,
 	source: string,
 ): InstrumentedFlow {
 	const documents = parseAllDocuments(flowText);
@@ -71,46 +40,33 @@ export function instrumentFlow(
 			throw new Error(`${source}: ${document.errors[0]!.message}`);
 	}
 	const config = documents[0]!.toJS() as Record<string, unknown> | null;
-	const commands = documents[1]!.toJS() as FlowCommand[] | null;
 	const appId = config?.appId;
 	if (appId !== `\${${PROOF_APP_ID_VARIABLE}}` && appId !== PROOF_APP_ID) {
 		throw new Error(
 			`${source}: appId must be \${${PROOF_APP_ID_VARIABLE}} or ${PROOF_APP_ID}, found ${JSON.stringify(appId)}`,
 		);
 	}
-	if (!Array.isArray(commands) || commands.length === 0)
-		throw new Error(`${source}: the flow has no commands`);
-
-	const grouped: FlowCommand[][] = [];
-	for (const command of commands) {
-		const looking = LOOKING_COMMANDS.has(commandName(command));
-		if (!looking) grouped.push([command]);
-		else if (grouped.length === 0)
-			throw new Error(`${source}: the flow checks the screen before its first action`);
-		else grouped.at(-1)!.push(command);
-	}
-	if (grouped.length !== expected.steps.length) {
+	const steps = flowSteps(rung);
+	if (!isDeepStrictEqual(documents[1]!.toJS(), steps.flat())) {
 		throw new Error(
-			`${source}: the flow has ${grouped.length} actions but expected.json has ${expected.steps.length} steps; they must match one to one`,
+			`${source}: the flow is not what expected.json renders to; run node packages/mobile/proofs/write-flows.ts`,
 		);
 	}
 
-	const out: FlowCommand[] = [];
+	const out: unknown[] = [];
 	const roles: InstrumentedFlow['commands'][number][] = [];
-	const push = (step: number, role: 'flow' | 'expected' | 'screenshot', command: FlowCommand) => {
+	const push = (step: number, role: 'flow' | 'screenshot', command: unknown) => {
 		out.push(command);
 		roles.push({ step, role });
 	};
-	const steps = grouped.map((group, index): ProofFlowStep => {
-		const action = commandName(group[0]!);
+	const named = steps.map((commands, index): ProofFlowStep => {
+		const action = index === 0 ? 'launch' : Object.keys(rung.steps[index]!.do!)[0]!;
 		const before = `${pad(index)}-${action}-before`;
 		const after = `${pad(index)}-${action}-after`;
 		push(index, 'screenshot', { takeScreenshot: before });
-		for (const command of group) push(index, 'flow', command);
-		for (const command of expectedChecks(expected.steps[index]!))
-			push(index, 'expected', command);
+		for (const command of commands) push(index, 'flow', command);
 		push(index, 'screenshot', { takeScreenshot: after });
 		return { action, before, after };
 	});
-	return { yaml: `${stringify(config)}---\n${stringify(out)}`, steps, commands: roles };
+	return { yaml: `${stringify(config)}---\n${stringify(out)}`, steps: named, commands: roles };
 }

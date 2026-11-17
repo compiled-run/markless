@@ -181,11 +181,9 @@ async function main(argv: string[]): Promise<number> {
 				else {
 					const { step, action, role, message } = outcome.failure;
 					const what =
-						role === 'expected'
-							? 'expected.json does not hold'
-							: role === 'flow'
-								? 'a flow command failed'
-								: 'maestro failed';
+						role === 'flow'
+							? `${outcome.failure.command ?? 'a command'} failed`
+							: 'maestro failed';
 					console.log(
 						`FAIL ${rung.name} ${platform} at step ${step} (${action}): ${what} (${timing})\n  ${message.split('\n').join('\n  ')}`,
 					);

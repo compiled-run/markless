@@ -15,8 +15,10 @@ import { PROOF_APP_ID, PROOF_APP_ID_VARIABLE, type ProofPlatform } from './proof
 export type FlowFailure = {
 	readonly step: number;
 	readonly action: string;
-	/** `flow`: one of the rung's own flow commands failed; `expected`: a text from expected.json did not hold. */
-	readonly role: 'flow' | 'expected' | 'screenshot' | 'unknown';
+	/** `flow`: one of the rung's own commands (its action or an expected.json check) failed. */
+	readonly role: 'flow' | 'screenshot' | 'unknown';
+	/** The Maestro command that failed, as Maestro records it (`assertConditionCommand`, `tapOnElement`...). */
+	readonly command?: string;
 	readonly message: string;
 };
 
@@ -93,6 +95,7 @@ export async function runFlow(input: {
 				step,
 				action: input.flow.steps[step]?.action ?? 'unknown',
 				role: role?.role ?? 'unknown',
+				command: Object.keys(records[failedAt]!.command)[0],
 				message: records[failedAt]!.metadata.error?.message ?? 'no message recorded',
 			};
 			const failureShots = join(flowOut!, 'screenshots');

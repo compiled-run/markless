@@ -1,111 +1,71 @@
 import { parseAllDocuments } from 'yaml';
 import { describe, expect, it } from 'vitest';
+import { renderFlow, type LadderRung } from '../proofs/ladder.ts';
 import { readProofExpected } from '../src/harness/expected.ts';
-import { instrumentFlow, literalSelector } from '../src/harness/flow.ts';
+import { instrumentFlow } from '../src/harness/flow.ts';
 
-const flow = `appId: \${APP_ID}
-name: counter
----
-- launchApp:
-    clearState: true
-- assertVisible: Count 0
-- tapOn: Count 0
-- assertVisible: Count 1
-`;
-
-const expected = readProofExpected(
+const rung: LadderRung = readProofExpected(
 	{
+		rung: 3,
+		name: 'counter',
 		steps: [
 			{ visible: ['Counter', 'Count 0'] },
-			{
-				do: { tap: 'Count 0' },
-				visible: ['Count 1'],
-				absent: ['Count 0'],
-				disabled: ['Reset'],
-			},
+			{ do: { tap: 'Count 0' }, visible: ['Count 1'], absent: ['Count 0'] },
+			{ do: { relaunch: true }, visible: ['Count 0'] },
 		],
 	},
 	'expected.json',
 );
-
-const commandsOf = (yaml: string) =>
-	parseAllDocuments(yaml as string).map((document) => document.toJS())[1];
+const flow = renderFlow('03-counter', rung);
+const documents = (yaml: string) => parseAllDocuments(yaml).map((document) => document.toJS());
 
 describe('instrumentFlow', () => {
-	it('wraps each step in before and after screenshots and checks expected.json after the flow’s own checks', () => {
-		const instrumented = instrumentFlow(flow, expected, 'flow.yaml');
-		expect(instrumented.steps).toEqual([
-			{ action: 'launchApp', before: '00-launchApp-before', after: '00-launchApp-after' },
-			{ action: 'tapOn', before: '01-tapOn-before', after: '01-tapOn-after' },
+	it('wraps each step of the rendered flow in a screenshot before and after it, at the step boundaries', () => {
+		const instrumented = instrumentFlow(flow, rung, 'flow.yaml');
+		expect(instrumented.steps.map((step) => [step.before, step.after])).toEqual([
+			['00-launch-before', '00-launch-after'],
+			['01-tap-before', '01-tap-after'],
+			['02-relaunch-before', '02-relaunch-after'],
 		]);
-		expect(commandsOf(instrumented.yaml)).toEqual([
-			{ takeScreenshot: '00-launchApp-before' },
+		const [config, commands] = documents(instrumented.yaml);
+		expect(config).toEqual({ appId: '${APP_ID}', name: '03-counter' });
+		expect(commands).toEqual([
+			{ takeScreenshot: '00-launch-before' },
 			{ launchApp: { clearState: true } },
+			{ assertVisible: 'Counter' },
 			{ assertVisible: 'Count 0' },
-			{ assertVisible: { text: 'Counter' } },
-			{ assertVisible: { text: 'Count 0' } },
-			{ takeScreenshot: '00-launchApp-after' },
-			{ takeScreenshot: '01-tapOn-before' },
+			{ takeScreenshot: '00-launch-after' },
+			{ takeScreenshot: '01-tap-before' },
 			{ tapOn: 'Count 0' },
+			{ assertNotVisible: 'Count 0' },
 			{ assertVisible: 'Count 1' },
-			{ assertVisible: { text: 'Count 1' } },
-			{ assertNotVisible: { text: 'Count 0' } },
-			{ assertVisible: { text: 'Reset', enabled: false } },
-			{ takeScreenshot: '01-tapOn-after' },
+			{ assertNotVisible: 'Count 0' },
+			{ takeScreenshot: '01-tap-after' },
+			{ takeScreenshot: '02-relaunch-before' },
+			'stopApp',
+			'launchApp',
+			{ assertVisible: 'Count 0' },
+			{ assertVisible: 'Count 0' },
+			{ takeScreenshot: '02-relaunch-after' },
 		]);
-		expect(instrumented.commands.map((command) => `${command.step}:${command.role}`)).toEqual([
-			'0:screenshot',
-			'0:flow',
-			'0:flow',
-			'0:expected',
-			'0:expected',
-			'0:screenshot',
-			'1:screenshot',
-			'1:flow',
-			'1:flow',
-			'1:expected',
-			'1:expected',
-			'1:expected',
-			'1:screenshot',
-		]);
-		expect(parseAllDocuments(instrumented.yaml).map((document) => document.toJS())[0]).toEqual({
-			appId: '${APP_ID}',
-			name: 'counter',
-		});
+		expect(
+			instrumented.commands.filter((command) => command.role === 'screenshot'),
+		).toHaveLength(6);
+		expect(instrumented.commands[12]).toEqual({ step: 2, role: 'flow' });
 	});
 
-	it('refuses a flow whose actions do not line up one to one with expected.json steps', () => {
-		const oneAction = flow.split('- tapOn')[0]!;
-		expect(() => instrumentFlow(oneAction, expected, 'flow.yaml')).toThrow(
-			'the flow has 1 actions but expected.json has 2 steps',
+	it('refuses a flow.yaml that drifted from its expected.json', () => {
+		const drifted = flow.replace('- assertVisible: Count 1\n', '- assertVisible: Count 9\n');
+		expect(drifted).not.toBe(flow);
+		expect(() => instrumentFlow(drifted, rung, 'flow.yaml')).toThrow(
+			'not what expected.json renders to',
 		);
 	});
 
 	it('refuses a flow for another app id', () => {
 		expect(() =>
-			instrumentFlow(flow.replace('${APP_ID}', 'com.example.other'), expected, 'flow.yaml'),
+			instrumentFlow(flow.replace('${APP_ID}', 'com.example.other'), rung, 'flow.yaml'),
 		).toThrow('appId must be');
-	});
-
-	it('refuses a flow that checks the screen before its first action', () => {
-		expect(() =>
-			instrumentFlow(
-				flow.replace('- launchApp:\n    clearState: true\n', ''),
-				expected,
-				'flow.yaml',
-			),
-		).toThrow('before its first action');
-	});
-
-	it('matches expected texts literally, though Maestro reads selectors as regular expressions', () => {
-		expect(literalSelector('Total (2) $5.00 [a|b]?')).toBe(
-			'Total \\(2\\) \\$5\\.00 \\[a\\|b\\]\\?',
-		);
-		expect(
-			new RegExp(`^${literalSelector('Total (2) $5.00 [a|b]?')}$`).test(
-				'Total (2) $5.00 [a|b]?',
-			),
-		).toBe(true);
 	});
 });
 
