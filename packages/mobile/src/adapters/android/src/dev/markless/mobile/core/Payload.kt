@@ -73,7 +73,8 @@ sealed interface Node {
 	/** The `repeat` node whose rows this node is part of. */
 	val row: String?
 
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** [obj]: the device object a `camera` element shows. */
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null, val obj: String? = null) : Node
 	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
 	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
@@ -88,7 +89,13 @@ sealed interface Op {
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params]; ops after it do not run. */
 	data class Navigate(val route: String, val params: Map<String, String>) : Op
+	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
+	/** A device call on [obj] when it names one; [result] settles a task cell; [after] runs once the host resumes it. */
+	data class Call(val call: String, val arguments: List<Expr>, val result: String?, val obj: String? = null, val after: Continuation? = null) : Op
 }
+
+/** A device call a task cell starts at mount. */
+data class Task(val call: String, val arguments: List<Expr>)
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
 data class Route(val pattern: String, val params: List<String>) {
@@ -107,9 +114,16 @@ data class Route(val pattern: String, val params: List<String>) {
 	}
 }
 
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false)
+/** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null, val obj: String? = null)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
+
+/** What a handler does once a device call it awaited answers: [ops] with the answer read as `{ local: as }`. */
+data class Continuation(val id: String, val local: String, val ops: List<Op>)
+
+/** A device object a component makes (`const cam = camera()`). */
+data class DeviceObject(val id: String, val device: String)
 
 data class Payload(
 	val component: String,
@@ -118,13 +132,14 @@ data class Payload(
 	val nodes: List<Node>,
 	val events: List<Event>,
 	val handlers: List<Handler>,
+	val objects: List<DeviceObject> = emptyList(),
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "objects"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -164,7 +179,12 @@ data class Payload(
 				if (seen[e.host] !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers)
+			val objects = root["objects"]?.arr("payload.objects")?.mapIndexed { n, v ->
+				val o = v.obj("objects[$n]")
+				o.only(setOf("id", "device"), "objects[$n]")
+				DeviceObject(o.field("id", "objects[$n]").str("objects[$n].id"), o.field("device", "objects[$n]").str("objects[$n].device"))
+			} ?: emptyList()
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, objects)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -267,10 +287,14 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task", "object"), what)
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled)
+			val task = o["task"]?.obj("$what.task")?.let { t ->
+				t.only(setOf("call", "arguments"), "$what.task")
+				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
+			}
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task, o["object"]?.str("$what.object"))
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -278,7 +302,7 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row", "object"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
@@ -292,7 +316,7 @@ data class Payload(
 							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
 						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what))
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what), o["object"]?.str("$what.object"))
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
@@ -352,6 +376,18 @@ data class Payload(
 				o.only(setOf("op", "route", "params"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
 				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
+			if (name == "call") {
+				o.only(setOf("op", "call", "arguments", "result", "object", "after"), what)
+				val args = o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") }
+				for (c in args.flatMap(::cellsOf)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val result = o["result"]?.str("$what.result")
+				if (result != null && result !in cells) throw MarklessDecodeError("$what settles unknown cell \"$result\"")
+				val after = o["after"]?.obj("$what.after")?.let { t ->
+					t.only(setOf("id", "as", "ops"), "$what.after")
+					Continuation(t.field("id", what).str("$what.after.id"), t.field("as", what).str("$what.after.as"), t.field("ops", what).arr("$what.after.ops").mapIndexed { n, inner -> op(inner, "$what.after.ops[$n]", cells) })
+				}
+				return Op.Call(o.field("call", what).str("$what.call"), args, result, o["object"]?.str("$what.object"), after)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

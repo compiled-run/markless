@@ -156,7 +156,8 @@ async function main(argv: string[]): Promise<number> {
 						await installProofApp(
 							simulator!,
 							iosApp!,
-							rung.assets,
+							rung.assets.ios,
+							rung.manifest,
 							join(work, 'ios-app'),
 						);
 					} else {
@@ -164,7 +165,8 @@ async function main(argv: string[]): Promise<number> {
 							tools!,
 							emulator!,
 							androidDex!,
-							rung.assets,
+							rung.assets.android,
+							rung.manifest,
 							join(work, 'android-app'),
 						);
 					}

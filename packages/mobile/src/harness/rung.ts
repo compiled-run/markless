@@ -3,10 +3,17 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
+import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
-import { PROOF_FONTS_FOLDER, PROOF_PAYLOAD_PATH, PROOF_STYLE_PATH } from './proof-app.ts';
+import {
+	PROOF_FONTS_FOLDER,
+	PROOF_PAYLOAD_PATH,
+	PROOF_PLATFORMS,
+	PROOF_STYLE_PATH,
+	type ProofPlatform,
+} from './proof-app.ts';
 
 /** Files a shell carries for one rung, by path inside the iOS bundle or the APK's assets. */
 export type ProofAssets = ReadonlyMap<string, Uint8Array>;
@@ -17,8 +24,14 @@ export type ProofRung = {
 	readonly flowPath: string;
 	readonly flow: string;
 	readonly expected: LadderRung;
-	readonly assets: ProofAssets;
+	/** Each phone's own build: a `platform` check keeps a different arm on each. */
+	readonly assets: Readonly<Record<ProofPlatform, ProofAssets>>;
+	/** The Info.plist and AndroidManifest.xml entries the build derived from the device features the rung uses. */
+	readonly manifest: DeviceManifest;
 };
+
+/** A rung's app config, when it has one: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
+const APP_CONFIG = 'app.json';
 
 const COMPONENT_FILE = 'App.tsrx';
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..', '..');
@@ -84,32 +97,64 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		expectedPath,
 	);
 	const component = join(dir, COMPONENT_FILE);
-	const assets: Array<[string, Uint8Array]> = [];
+	const assets: Record<ProofPlatform, Array<[string, Uint8Array]>> = { ios: [], android: [] };
+	let manifest: DeviceManifest = { ios: [], android: [] };
+	const appConfig = existsSync(join(dir, APP_CONFIG))
+		? (JSON.parse(readFileSync(join(dir, APP_CONFIG), 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+			})
+		: {};
 	if (existsSync(component)) {
-		const build = await compileNativeComponent({
-			// Repo-relative: the scope class hashes the filename, so every checkout builds the same payload and style input.
-			filename: relative(repoRoot, component),
-			source: readFileSync(component, 'utf8'),
-			// A rung that is a page compiles as its page file, so the router derives its route.
-			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
-			readModule: readRelativeModule,
-		});
-		if (!build.payload) {
-			const lines = build.diagnostics.map(
-				(diagnostic) => `  ${diagnostic.code}: ${diagnostic.message}`,
-			);
-			throw new Error(`${name}: ${COMPONENT_FILE} has no native build\n${lines.join('\n')}`);
-		}
-		assets.push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))]);
-		if (build.styles.some((style) => style.cssText.length > 0)) {
-			writeFileSync(
-				join(dir, STYLE_INPUT),
-				`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
-			);
-			assets.push(...styleAssets(dir, name));
+		const payloads: Partial<Record<ProofPlatform, string>> = {};
+		for (const platform of PROOF_PLATFORMS) {
+			const build = await compileNativeComponent({
+				// Repo-relative: the scope class hashes the filename, so every checkout builds the same payload and style input.
+				filename: relative(repoRoot, component),
+				source: readFileSync(component, 'utf8'),
+				// A rung that is a page compiles as its page file, so the router derives its route.
+				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
+				readModule: readRelativeModule,
+				...(appConfig.device ? { device: appConfig.device } : {}),
+				target: platform,
+			});
+			if (!build.payload) {
+				const lines = build.diagnostics.map(
+					(diagnostic) => `  ${diagnostic.code}: ${diagnostic.message}`,
+				);
+				throw new Error(
+					`${name}: ${COMPONENT_FILE} has no ${platform} build\n${lines.join('\n')}`,
+				);
+			}
+			manifest = build.manifest;
+			payloads[platform] = JSON.stringify(build.payload);
+			assets[platform].push([
+				PROOF_PAYLOAD_PATH,
+				new TextEncoder().encode(payloads[platform]),
+			]);
+			if (build.styles.some((style) => style.cssText.length > 0)) {
+				// Dragon lays out one input for both phones, so both must build the same views.
+				if (
+					payloads.ios !== undefined &&
+					payloads.android !== undefined &&
+					payloads.ios !== payloads.android
+				)
+					throw new Error(
+						`${name}: a styled rung whose views differ per phone has no single style export yet`,
+					);
+				writeFileSync(
+					join(dir, STYLE_INPUT),
+					`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
+				);
+				if (platform === 'android') {
+					const styled = styleAssets(dir, name);
+					assets.ios.push(...styled);
+					assets.android.push(...styled);
+				}
+			}
 		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
-		assets.push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);
+		for (const platform of PROOF_PLATFORMS)
+			assets[platform].push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);
 	} else {
 		throw new Error(`${name}: ${COMPONENT_FILE} is missing`);
 	}
@@ -119,6 +164,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		flowPath,
 		flow: readFileSync(flowPath, 'utf8'),
 		expected,
-		assets: new Map(assets),
+		assets: { ios: new Map(assets.ios), android: new Map(assets.android) },
+		manifest,
 	};
 }

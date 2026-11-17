@@ -70,6 +70,16 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			]
 		},
 		{
+			"part": "camera",
+			"role": "",
+			"element": "div",
+			"ariaRole": "",
+			"hidden": false,
+			"hooks": [
+				"ui-camera"
+			]
+		},
+		{
 			"part": "label",
 			"role": "label",
 			"element": "label",

@@ -2051,7 +2051,7 @@ function computedNativeExpression(
 	body: AnyNode | undefined,
 	state: WalkState,
 ): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	if (!state.nativeFacts || !body || body.async) return {};
+	if (!state.nativeFacts || !body) return {};
 	const inner = body.body as AnyNode | undefined;
 	const statements = inner?.type === 'BlockStatement' ? (inner.body as AnyNode[] | undefined) : undefined;
 	const returned =

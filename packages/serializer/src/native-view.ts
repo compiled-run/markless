@@ -1,3 +1,5 @@
+import type { NativeDeviceCall, NativeDeviceValue } from './native-device.ts';
+
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
@@ -52,14 +54,22 @@ export type NativeExpr =
 			readonly left: NativeExpr;
 			readonly right: NativeExpr;
 	  }
-	| { readonly logical: '&&' | '||' | '??'; readonly left: NativeExpr; readonly right: NativeExpr }
+	| {
+			readonly logical: '&&' | '||' | '??';
+			readonly left: NativeExpr;
+			readonly right: NativeExpr;
+	  }
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
 	| { readonly template: ReadonlyArray<string | NativeExpr> }
 	/** `length` of a string or array, or an own property of an object; anything else is a runtime error. */
 	| { readonly member: NativeExpr; readonly property: string }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
-	| { readonly method: NativeMethod; readonly target: NativeExpr; readonly arguments: ReadonlyArray<NativeExpr> }
+	| {
+			readonly method: NativeMethod;
+			readonly target: NativeExpr;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+	  }
 	/** Only as a method argument: the parameters read as `{ local }` inside `body`. */
 	| { readonly lambda: ReadonlyArray<string>; readonly body: NativeExpr }
 	| { readonly local: string }
@@ -92,6 +102,8 @@ export type NativeNode = NativePlace &
 				readonly parent: string | null;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
+				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
+				readonly object?: string;
 				/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
 				readonly bindings?: ReadonlyArray<
 					| { readonly attribute: string; readonly value: NativeExpr }
@@ -134,8 +146,29 @@ export type NativeEventName = 'activate' | 'input';
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
 	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
+	/**
+	 * A device call (`haptics.tap`), its arguments evaluated in order; the host runs it when the `call` journal entry
+	 * arrives. With `result`, the host settles that task cell with what the call gives.
+	 */
+	| {
+			readonly op: 'call';
+			readonly call: NativeDeviceCall;
+			/** The device object the call is made on (`object:cam`). */
+			readonly object?: string;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+			readonly result?: string;
+			/**
+			 * What the handler does once the call answers: `ops` run with the answer read as `{ local: as }`. The host
+			 * answers the journal entry's `resume` with a `resume` action.
+			 */
+			readonly after?: { readonly id: string; readonly as: string; readonly ops: ReadonlyArray<NativeOp> };
+	  }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	| {
+			readonly op: 'navigate';
+			readonly route: string;
+			readonly params: Readonly<Record<string, string>>;
+	  };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -150,6 +183,18 @@ export type NativeViewPayload = {
 		readonly storage?: { readonly key: string };
 		/** A class binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
 		readonly styled?: true;
+		/** A live device value (`network.online`): the host fills it at mount and sends a `device` action when it changes. */
+		readonly device?: NativeDeviceValue;
+		/** For a device object's field (`cam.ready`): the object (`object:cam`). */
+		readonly object?: string;
+		/**
+		 * An async value from a device call: the host starts the call at mount and settles the cell. Its value is
+		 * `{ state: 'pending' }`, `{ state: 'value', value }` or `{ state: 'error', error: { name, message } }`.
+		 */
+		readonly task?: {
+			readonly call: NativeDeviceCall;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+		};
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -158,16 +203,31 @@ export type NativeViewPayload = {
 		readonly event: NativeEventName;
 		readonly handler: string;
 	}>;
-	readonly handlers: ReadonlyArray<{ readonly id: string; readonly ops: ReadonlyArray<NativeOp> }>;
+	readonly handlers: ReadonlyArray<{
+		readonly id: string;
+		readonly ops: ReadonlyArray<NativeOp>;
+	}>;
+	/** Device objects the page's components make; each lives while the page does, its picture while its element is shown. */
+	readonly objects?: ReadonlyArray<{ readonly id: string; readonly device: 'camera' }>;
 };
 
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
-	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
+	| {
+			readonly op: 'attribute';
+			readonly node: string;
+			readonly name: string;
+			readonly value: string | null;
+	  }
 	/** An input's text, as `String(value)`; never sent for the field whose edit caused it while it already shows that text. */
-	| { readonly op: 'property'; readonly node: string; readonly name: 'value'; readonly value: string }
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'value';
+			readonly value: string;
+	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
 	/**
@@ -177,5 +237,20 @@ export type NativeJournalEntry =
 	| { readonly op: 'rows'; readonly node: string; readonly keys: ReadonlyArray<string> }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
+	/** Run a device call now; with `result`, settle that task cell with what it gives (an action `settle`). */
+	| {
+			readonly op: 'call';
+			/** A device call, or a writable device setting the handler wrote (`camera.facing`). */
+			readonly call: NativeDeviceCall | NativeDeviceValue;
+			readonly object?: string;
+			readonly arguments: ReadonlyArray<NativeValue>;
+			readonly result?: string;
+			/** Answer with a `resume` action naming this continuation once the call settles. */
+			readonly resume?: string;
+	  }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	| {
+			readonly op: 'navigate';
+			readonly route: string;
+			readonly params: Readonly<Record<string, string>>;
+	  };

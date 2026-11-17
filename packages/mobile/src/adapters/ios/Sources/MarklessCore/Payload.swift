@@ -104,6 +104,8 @@ public struct NativeNode: Equatable, Sendable {
 	/// Set when the node belongs to a list row: the `repeat` node's id.
 	public let row: String?
 	public let kind: Kind
+	/// For a `camera` element: the device object it shows.
+	public var object: String? = nil
 
 	public var isElement: Bool { if case .element = kind { true } else { false } }
 	public var isText: Bool { if case .text = kind { true } else { false } }
@@ -119,6 +121,22 @@ public enum NativeOp: Equatable, Sendable {
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params; ops after it do not run.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
+	/// the host answers with `resume` and those ops run with the answer as a local.
+	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
+}
+
+/// What a handler does after a device call it awaited answers: `ops` with the answer read as `{ local: as }`.
+public struct NativeContinuation: Equatable, Sendable {
+	public let id: String
+	public let `as`: String
+	public let ops: [NativeOp]
+}
+
+/// A device call a task cell starts at mount.
+public struct NativeTask: Equatable, Sendable {
+	public let call: String
+	public let arguments: [NativeExpr]
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -157,6 +175,12 @@ public struct NativeCell: Equatable, Sendable {
 	public let storageKey: String?
 	/// A class binding reads this cell, so its changes are journalled as `state`.
 	public let styled: Bool
+	/// A live device value (`network.online`) the host fills at mount and on every change.
+	public var device: String? = nil
+	/// For a device object's field (`cam.ready`): the object.
+	public var object: String? = nil
+	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
+	public var task: NativeTask? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -178,6 +202,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let nodes: [NativeNode]
 	public let events: [NativeEvent]
 	public let handlers: [NativeHandler]
+	/// Device objects the page's components make.
+	public var objects: [NativeDeviceObject] = []
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -185,13 +211,13 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "objects"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object"])
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -200,14 +226,20 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			return NativeCell(
 				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
-				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled)
+				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled,
+				device: field.has("device") ? try field["device"].string() : nil,
+				object: field.has("object") ? try field["object"].string() : nil,
+				task: field.has("task") ? try {
+					let task = try field["task"].object(["call", "arguments"])
+					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
+				}() : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
 			let place = ["arm", "row"]
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings"] + place)
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "object"] + place)
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
@@ -225,7 +257,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				} : []
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
-					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings))
+					row: try decodeRow(field), kind: .element(element: try field["element"].string(), attributes: attributes, bindings: bindings),
+					object: field.has("object") ? try field["object"].string() : nil)
 			case "text":
 				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: place)
 				let parts = try field["parts"].array().map { part -> NativeTextPart in
@@ -276,7 +309,14 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		let handlers = try fields["handlers"].array().map { handler in
 			let field = try handler.object(["id", "ops"])
-			let ops = try field["ops"].array().map { op -> NativeOp in
+			let ops = try field["ops"].array().map(decodeOp)
+			return NativeHandler(id: try field["id"].string(), ops: ops)
+		}
+		let objects = fields.has("objects") ? try fields["objects"].array().map { object -> NativeDeviceObject in
+			let f = try object.object(["id", "device"])
+			return NativeDeviceObject(id: try f["id"].string(), device: try f["device"].string())
+		} : []
+		func decodeOp(_ op: Reader) throws -> NativeOp {
 				let name = try op.field("op").string()
 				switch name {
 				case "assign":
@@ -285,18 +325,27 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "navigate":
 					let opField = try op.object(["op", "route", "params"])
 					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+				case "call":
+					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result", "object", "after"])
+					let then: NativeContinuation? = opField.has("after") ? try {
+						let t = try opField["after"].object(["id", "as", "ops"])
+						return NativeContinuation(id: try t["id"].string(), as: try t["as"].string(), ops: try t["ops"].array().map(decodeOp))
+					}() : nil
+					return .call(
+						call: try opField["call"].string(), object: opField.has("object") ? try opField["object"].string() : nil,
+						arguments: try opField["arguments"].array().map(decodeExpr),
+						result: opField.has("result") ? try opField["result"].string() : nil, then: then)
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
-			}
-			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
 		let payload = NativeViewPayload(
-			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers)
+			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers,
+			objects: objects)
 		try payload.check()
 		return payload
 	}
@@ -437,6 +486,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
 			}
+			for case let .call(_, _, arguments, result, _) in handler.ops
+			where !arguments.flatMap(\.cells).allSatisfy(cellIds.contains) || !(result.map { id in cells.contains { $0.id == id && $0.task != nil } } ?? true) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) calls the device with an unknown cell or a result cell that is not a task")
+			}
 		}
 		for event in events {
 			guard elements.contains(event.host) else { throw PayloadError(path: "payload.events", reason: "event on unknown element \(event.host)") }
@@ -539,4 +592,10 @@ struct Fields {
 	}
 
 	func has(_ key: String) -> Bool { (try? reader.keys().contains(key)) ?? false }
+}
+
+/// A device object a component makes (`const cam = camera()`), by its payload id.
+public struct NativeDeviceObject: Equatable, Sendable {
+	public let id: String
+	public let device: String
 }

@@ -22,6 +22,8 @@ export type NativeConformance = {
 	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
+	/** Present when the payload has task cells: the calls a host starts at mount, in cell order. */
+	readonly tasks?: ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
 	readonly steps: ReadonlyArray<{
 		readonly action: NativeAction;
 		readonly journal: ReadonlyArray<NativeJournalEntry>;
@@ -39,6 +41,7 @@ export function nativeConformance(
 	const initialArms = runtime.arms();
 	const initialProperties = runtime.properties();
 	const initialRows = runtime.rows();
+	const tasks = runtime.tasks();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
@@ -48,6 +51,7 @@ export function nativeConformance(
 		...(initialProperties.length > 0 ? { initialProperties } : {}),
 		...(initialArms.length > 0 ? { initialArms } : {}),
 		...(initialRows.length > 0 ? { initialRows } : {}),
+		...(tasks.length > 0 ? { tasks } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }

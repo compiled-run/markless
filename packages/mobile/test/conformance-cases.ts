@@ -1,4 +1,5 @@
 import type { NativeAction } from '../src/index.ts';
+import type { DeviceAppConfig } from '../src/permissions.ts';
 
 /** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
@@ -7,6 +8,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	/** For a page: its page file (the router derives the route) and the params it opens with. */
 	readonly page?: string;
 	readonly params?: Readonly<Record<string, string>>;
+	/** The app config's usage text, for a component that uses a device feature that asks. */
+	readonly device?: DeviceAppConfig;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -96,6 +99,53 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'input', host: 'h2', value: 'Samantha' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'input', host: 'h2', value: '' },
+		],
+	},
+	{
+		name: 'device',
+		fixture: 'test/fixtures/Device.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'device', cell: 'device:network.online', value: false },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'device', cell: 'device:network.online', value: true },
+		],
+	},
+	{
+		name: 'location',
+		fixture: 'test/fixtures/Location.tsrx',
+		device: { usage: { location: 'Shows where you are.' } },
+		actions: [
+			{ event: 'device', cell: 'device:location.access', value: 'granted' },
+			{
+				event: 'settle',
+				cell: 'task:computed:here',
+				value: { latitude: 51.5, longitude: -0.125, accuracy: 5 },
+			},
+			{ event: 'device', cell: 'device:location.access', value: 'denied' },
+			{
+				event: 'settle',
+				cell: 'task:computed:here',
+				error: { name: 'NotAllowedError', message: 'Location was refused' },
+			},
+		],
+	},
+	{
+		name: 'camera',
+		fixture: 'test/fixtures/Camera.tsrx',
+		device: { usage: { camera: 'Takes the photo you ask for.' } },
+		actions: [
+			{ event: 'device', cell: 'device:camera.access', value: 'granted' },
+			{ event: 'device', cell: 'object:component-edge:1/cam:ready', value: true },
+			{ event: 'activate', host: 'component-edge:1/h5' },
+			{
+				event: 'resume',
+				continuation: 'handler:component-edge:1/event:2:after:0',
+				value: { url: 'file:///photo.png', width: 640, height: 480 },
+			},
+			{ event: 'activate', host: 'component-edge:1/h4' },
+			{ event: 'device', cell: 'object:component-edge:1/cam:facing', value: 'back' },
+			{ event: 'activate', host: 'component-edge:1/h1' },
 		],
 	},
 ];

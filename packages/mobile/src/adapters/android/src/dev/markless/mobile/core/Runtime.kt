@@ -35,6 +35,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
 	}
 
+	/** Run a device call now; [node] is the call's name. With [result], settle that task cell with what it gives. */
+	data class Call(override val node: String, val arguments: List<JsValue>, val result: String?, val obj: String? = null, val resume: String? = null) : JournalEntry {
+		override fun toJson() = "{\"op\":\"call\",\"call\":${jsonString(node)}${obj?.let { ",\"object\":${jsonString(it)}" } ?: ""},\"arguments\":${arguments.joinToString(",", "[", "]", transform = ::jsonValue)}${result?.let { ",\"result\":${jsonString(it)}" } ?: ""}${resume?.let { ",\"resume\":${jsonString(it)}" } ?: ""}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -80,6 +85,15 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+	private val continuations = HashMap<String, Continuation>().also { found ->
+		fun collect(ops: List<Op>) {
+			for (op in ops) if (op is Op.Call && op.after != null) {
+				found[op.after.id] = op.after
+				collect(op.after.ops)
+			}
+		}
+		for (h in payload.handlers) collect(h.ops)
+	}
 	private val byId = payload.nodes.associateBy { it.id }
 	private var eventValue: String? = null
 
@@ -214,27 +228,71 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
 		val handlerId = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		return change(host, value) {
+			eventValue = value
+			try {
+				run(handler.ops, Scope.EMPTY)
+			} finally {
+				eventValue = null
+			}
+		}
+	}
+
+	/** A device call a handler awaited answered: its continuation runs with the answer as its local. */
+	fun resume(continuation: String, value: JsValue): List<JournalEntry> {
+		val then = continuations[continuation] ?: throw MarklessRuntimeError("no continuation \"$continuation\"")
+		return change(null, null) { run(then.ops, Scope(locals = mapOf(then.local to value))) }
+	}
+
+	/** Runs ops in order: writes cells and collects the calls (a continuation's id rides on its call); stops at a navigation. */
+	private fun run(ops: List<Op>, scope: Scope): List<JournalEntry> {
+		val calls = ArrayList<JournalEntry>()
+		for (op in ops) when (op) {
+			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
+			is Op.Call -> calls.add(JournalEntry.Call(op.call, op.arguments.map { evaluate(it, scope) }, op.result, op.obj, op.after?.id))
+			is Op.Assign -> {
+				val v = evaluate(op.value, scope)
+				values[op.cell] = v
+				storageKeys[op.cell]?.let { store.set(it, v) }
+			}
+		}
+		return calls
+	}
+
+	/** A live device value changed: writes its device cell and returns the journal. */
+	fun device(cell: String, value: JsValue): List<JournalEntry> {
+		if (payload.cells.none { it.id == cell && it.device != null }) throw MarklessRuntimeError("\"$cell\" is not a device cell")
+		return change(null, null) { values[cell] = value; emptyList() }
+	}
+
+	/** A device call answered: the task cell takes `{ state: 'value', value }`. */
+	fun settle(cell: String, value: JsValue): List<JournalEntry> =
+		settleWith(cell, JsValue.Obj(linkedMapOf("state" to JsValue.Str("value"), "value" to value)))
+
+	/** A device call failed (`NotAllowedError` when refused): the task cell takes `{ state: 'error', error: { name, message } }`. */
+	fun settleError(cell: String, name: String, message: String): List<JournalEntry> =
+		settleWith(cell, JsValue.Obj(linkedMapOf("state" to JsValue.Str("error"), "error" to JsValue.Obj(linkedMapOf("name" to JsValue.Str(name), "message" to JsValue.Str(message))))))
+
+	private fun settleWith(cell: String, value: JsValue): List<JournalEntry> {
+		if (payload.cells.none { it.id == cell && it.task != null }) throw MarklessRuntimeError("\"$cell\" is not a task cell")
+		return change(null, null) { values[cell] = value; emptyList() }
+	}
+
+	/** The calls a host starts at mount, one per task cell. */
+	fun tasks(): List<JournalEntry.Call> = payload.cells.mapNotNull { c -> c.task?.let { t -> JournalEntry.Call(t.call, t.arguments.map { evaluate(it) }, c.id) } }
+
+	/** Runs [apply] (cell writes, returning its calls or a navigation) and journals styled cells, changed nodes, then the calls. */
+	private inline fun change(host: String?, value: String?, apply: () -> List<JournalEntry>): List<JournalEntry> {
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
 		// The edited field already shows what was typed, so its own value counts as written.
-		if (value != null) beforeProperties[host to "value"] = value
+		if (value != null && host != null) beforeProperties[host to "value"] = value
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
-		eventValue = value
-		try {
-			for (op in handler.ops) when (op) {
-				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
-				is Op.Assign -> {
-					val v = evaluate(op.value)
-					values[op.cell] = v
-					storageKeys[op.cell]?.let { store.set(it, v) }
-				}
-			}
-		} finally {
-			eventValue = null
-		}
+		val calls = apply()
+		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		val afterTexts = texts().toMap()
 		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }
@@ -259,6 +317,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
 			}
 		}
+		journal.addAll(calls)
 		return journal
 	}
 }

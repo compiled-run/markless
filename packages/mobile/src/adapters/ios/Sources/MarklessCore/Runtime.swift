@@ -27,6 +27,9 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// Leave this page: the host builds the page at `route` from scratch with `params`.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
+	/// `resume`, answer with `resume(_:value:)` once the call settles.
+	case call(call: String, object: String?, arguments: [NativeValue], result: String?, resume: String?)
 
 	public var json: JSONValue {
 		switch self {
@@ -43,6 +46,13 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		case let .navigate(route, params):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
+		case let .call(call, object, arguments, result, resume):
+			var fields: [(String, JSONValue)] = [("op", .string("call")), ("call", .string(call))]
+			if let object { fields.append(("object", .string(object))) }
+			fields.append(("arguments", .array(arguments.map(\.json))))
+			if let result { fields.append(("result", .string(result))) }
+			if let resume { fields.append(("resume", .string(resume))) }
+			return .object(fields)
 		}
 	}
 }
@@ -85,6 +95,7 @@ public final class NativeRuntime {
 	private let store: NativeStore
 	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
+	private let continuations: [String: NativeContinuation]
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
 	private var eventValue: String?
@@ -99,6 +110,15 @@ public final class NativeRuntime {
 		})
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
+		var continuations: [String: NativeContinuation] = [:]
+		func collect(_ ops: [NativeOp]) {
+			for case let .call(_, _, _, _, then?) in ops {
+				continuations[then.id] = then
+				collect(then.ops)
+			}
+		}
+		for handler in payload.handlers { collect(handler.ops) }
+		self.continuations = continuations
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 	}
 
@@ -285,6 +305,66 @@ public final class NativeRuntime {
 		}
 		eventValue = action.event == .input ? action.value ?? "" : nil
 		defer { eventValue = nil }
+		return try change(host: action.host) { try self.run(self.handlers[bound.handler] ?? [], in: .empty) }
+	}
+
+	/// A device call a handler awaited answered: its continuation runs with the answer as its local.
+	public func resume(_ continuation: String, value: NativeValue) throws -> [NativeJournalEntry] {
+		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
+		var scope = NativeScope.empty
+		scope.locals[then.as] = value
+		return try change(host: nil) { try self.run(then.ops, in: scope) }
+	}
+
+	/// Runs ops in order: writes cells and collects the calls (a continuation's id rides on its call); stops at a navigation.
+	private func run(_ ops: [NativeOp], in scope: NativeScope) throws -> [NativeJournalEntry] {
+		var calls: [NativeJournalEntry] = []
+		for op in ops {
+			switch op {
+			case let .navigate(route, params): return [.navigate(route: route, params: params)]
+			case let .assign(cell, expr):
+				let value = try evaluate(expr, in: scope)
+				values[cell] = value
+				if let key = storageKeys[cell] { store.write(key, value) }
+			case let .call(call, object, arguments, result, then):
+				calls.append(.call(call: call, object: object, arguments: try arguments.map { try evaluate($0, in: scope) }, result: result, resume: then?.id))
+			}
+		}
+		return calls
+	}
+
+	/// A live device value changed: writes its device cell and returns the journal.
+	public func device(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
+		guard payload.cells.contains(where: { $0.id == cell && $0.device != nil }) else { throw RuntimeError(reason: "\(cell) is not a device cell") }
+		return try change(host: nil) { self.values[cell] = value; return [] }
+	}
+
+	/// A device call answered: the task cell takes `{ state: 'value', value }`.
+	public func settle(_ cell: String, value: NativeValue) throws -> [NativeJournalEntry] {
+		try settle(cell, .object([("state", .string("value")), ("value", value)]))
+	}
+
+	/// A device call failed (`NotAllowedError` when refused): the task cell takes `{ state: 'error', error: { name, message } }`.
+	public func settle(_ cell: String, errorName: String, message: String) throws -> [NativeJournalEntry] {
+		try settle(cell, .object([("state", .string("error")), ("error", .object([("name", .string(errorName)), ("message", .string(message))]))]))
+	}
+
+	private func settle(_ cell: String, _ value: NativeValue) throws -> [NativeJournalEntry] {
+		guard payload.cells.contains(where: { $0.id == cell && $0.task != nil }) else { throw RuntimeError(reason: "\(cell) is not a task cell") }
+		return try change(host: nil) { self.values[cell] = value; return [] }
+	}
+
+	/// The calls a host starts at mount, one per task cell.
+	public func tasks() throws -> [NativeJournalEntry] {
+		try payload.cells.compactMap { cell in
+			guard let task = cell.task else { return nil }
+			return .call(call: task.call, object: nil, arguments: try task.arguments.map { try evaluate($0) }, result: cell.id, resume: nil)
+		}
+	}
+
+	/// Runs `apply` (cell writes, returning the calls it made or a navigation) and returns the journal: styled cells,
+	/// then every shown node whose output changed in document order, then the calls.
+	private func change(host: String?, _ apply: () throws -> [NativeJournalEntry]) throws -> [NativeJournalEntry] {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
 		}
@@ -292,18 +372,11 @@ public final class NativeRuntime {
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try attributes())
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
+		if let eventValue, let host { beforeProperties["\(host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
-		for op in handlers[bound.handler] ?? [] {
-			switch op {
-			case let .navigate(route, params): return [.navigate(route: route, params: params)]
-			case let .assign(cell, expr):
-				let value = try evaluate(expr)
-				values[cell] = value
-				if let key = storageKeys[cell] { store.write(key, value) }
-			}
-		}
+		let calls = try apply()
+		if case .navigate? = calls.first { return calls }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
@@ -337,6 +410,6 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries
+		return styles + entries + calls
 	}
 }

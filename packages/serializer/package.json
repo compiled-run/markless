@@ -24,10 +24,10 @@
 		"./record-templates": "./src/protocol-record-templates.ts",
 		"./render-data-hosts": "./src/render-data-hosts.ts",
 		"./native-view": "./src/native-view.ts",
+		"./native-device": "./src/native-device.ts",
 		"./protocol-validation": "./src/protocol-validation-storage.ts"
 	},
 	"publishConfig": {
-		"access": "public",
 		"exports": {
 			".": {
 				"types": "./dist/index.d.ts",
@@ -69,11 +69,16 @@
 				"types": "./dist/native-view.d.ts",
 				"default": "./dist/native-view.js"
 			},
+			"./native-device": {
+				"types": "./dist/native-device.d.ts",
+				"default": "./dist/native-device.js"
+			},
 			"./protocol-validation": {
 				"types": "./dist/protocol-validation.d.ts",
 				"default": "./dist/protocol-validation.js"
 			}
 		},
+		"access": "public",
 		"provenance": true
 	},
 	"scripts": {
