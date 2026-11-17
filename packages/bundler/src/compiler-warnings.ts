@@ -32,13 +32,14 @@ export function createCompilerWarningLog() {
 			input: { readonly filename: string; readonly source: string; readonly root?: string },
 			warnings: ReadonlyArray<CompilerDiagnostic> | undefined,
 		): void {
-			if (!warnings?.length || typeof pluginContext.warn !== 'function') return;
+			if (typeof pluginContext.warn !== 'function') return;
 			let seen = printed.get(input.filename);
 			// An edited source warns afresh; the same source compiled for another request or environment does not.
 			if (seen?.source !== input.source) {
 				seen = { source: input.source, lines: new Set() };
 				printed.set(input.filename, seen);
 			}
+			if (!warnings?.length) return;
 			for (const diagnostic of warnings) {
 				const line = formatCompilerWarning(diagnostic, input);
 				if (seen.lines.has(line)) continue;

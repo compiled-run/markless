@@ -83,7 +83,7 @@ test('a production build prints each compiler warning once, at its file and line
 	expect(printed[0]).toContain('https://markless.dev/errors/MARKLESS_REPEAT_KEY_IS_INDEX');
 });
 
-test('the dev server prints a warning once across environments, and again after an edit', async () => {
+test('the dev server prints a warning once across environments, and again after each edit, even one back from a warning-free source', async () => {
 	const root = await createFixture();
 	const { logger, warnings } = capturingLogger();
 	const server = await createServer({
@@ -110,6 +110,16 @@ test('the dev server prints a warning once across environments, and again after 
 		server.environments.client.moduleGraph.invalidateAll();
 		await server.environments.client.transformRequest('/src/root.tsrx');
 		expect(keyedByIndex(warnings)).toHaveLength(2);
+
+		await writeFile(join(root, 'src/root.tsrx'), ROOT_SOURCE.replace('index i; key i', 'key row'));
+		server.environments.client.moduleGraph.invalidateAll();
+		await server.environments.client.transformRequest('/src/root.tsrx');
+		expect(keyedByIndex(warnings)).toHaveLength(2);
+
+		await writeFile(join(root, 'src/root.tsrx'), ROOT_SOURCE.replace("['a', 'b']", "['a']"));
+		server.environments.client.moduleGraph.invalidateAll();
+		await server.environments.client.transformRequest('/src/root.tsrx');
+		expect(keyedByIndex(warnings)).toHaveLength(3);
 	} finally {
 		await server.close();
 	}
