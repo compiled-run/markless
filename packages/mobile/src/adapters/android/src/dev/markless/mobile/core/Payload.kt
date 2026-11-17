@@ -75,7 +75,8 @@ sealed interface Node {
 
 	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null) : Node
 	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
-	data class Branch(override val id: String, override val parent: String?, val test: Expr, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** An `@if` with [test] (arm 0 while truthy, arm 1 otherwise), or a chain with [tests]: the first truthy arm, else the `null` arm. */
+	data class Branch(override val id: String, override val parent: String?, val test: Expr?, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null, val tests: List<Expr?>? = null) : Node
 	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
 	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 }
@@ -150,7 +151,7 @@ data class Payload(
 				val reads = when (node) {
 					is Node.Text -> node.parts.filterIsInstance<TextPart.Value>().map { it.expr }
 					is Node.Element -> node.bindings.map { it.value }
-					is Node.Branch -> listOf(node.test)
+					is Node.Branch -> listOfNotNull(node.test) + node.tests.orEmpty().filterNotNull()
 					is Node.Repeat -> listOf(node.list)
 				}
 				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
@@ -299,11 +300,15 @@ data class Payload(
 					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
 				}
 				"branch" -> {
-					o.only(setOf("kind", "id", "parent", "test", "arms", "arm", "row"), what)
+					o.only(setOf("kind", "id", "parent", "test", "tests", "arms", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val arms = integer(o.field("arms", what).num("$what.arms"), "$what.arms").toInt()
-					if (arms != 1 && arms != 2) throw MarklessDecodeError("$what has $arms arms; native-view/0 has 1 or 2")
-					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("test", what), "$what.test"), arms, armPlace(o, what), rowPlace(o, what))
+					if (o.containsKey("test") == o.containsKey("tests")) throw MarklessDecodeError("$what has ${if (o.containsKey("test")) "both test and tests" else "neither test nor tests"}")
+					val test = o["test"]?.let { expr(it, "$what.test") }
+					val tests = o["tests"]?.arr("$what.tests")?.mapIndexed { n, t -> if (t == Json.Null) null else expr(t, "$what.tests[$n]") }
+					if (test != null && arms != 1 && arms != 2) throw MarklessDecodeError("$what has $arms arms; an @if has 1 or 2")
+					if (tests != null && (tests.size != arms || arms < 1)) throw MarklessDecodeError("$what has ${tests.size} tests for $arms arms")
+					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), test, arms, armPlace(o, what), rowPlace(o, what), tests)
 				}
 				"repeat" -> {
 					o.only(setOf("kind", "id", "parent", "list", "key", "arm", "row"), what)

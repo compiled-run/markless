@@ -137,7 +137,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		}
 	}
 
-	fun armOf(branch: Node.Branch): Int? = if (Js.truthy(evaluate(branch.test))) 0 else if (branch.arms > 1) 1 else null
+	fun armOf(branch: Node.Branch): Int? {
+		val tests = branch.tests ?: return if (Js.truthy(evaluate(branch.test!!))) 0 else if (branch.arms > 1) 1 else null
+		for ((i, t) in tests.withIndex()) if (t != null && Js.truthy(evaluate(t))) return i
+		return tests.indexOfFirst { it == null }.takeIf { it >= 0 }
+	}
 
 	fun isShown(node: Node): Boolean {
 		val a = node.arm ?: return true
