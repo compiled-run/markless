@@ -265,6 +265,8 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		moduleId,
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
+		stateReads: graph.stateReads,
+		stateWrites: graph.stateWrites,
 	});
 	// Answered here, where this module's chunks and its own imported interfaces
 	// are both in hand; an importer has neither.

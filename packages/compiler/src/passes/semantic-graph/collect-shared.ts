@@ -14,6 +14,9 @@ import type {
 	SemanticSharedModuleDeclaration,
 	SemanticSharedReturnProperty,
 	SemanticSharedScope,
+	SemanticStateRead,
+	SemanticStateWrite,
+	SourceSpan,
 } from '../../artifacts.ts';
 import {
 	graphBindingMap,
@@ -448,6 +451,12 @@ function adoptSharedDefinition(
 		if (state.graph.graphBindings.some((item) => item.id === binding.id)) continue;
 		state.graph.graphBindings.push(binding);
 	}
+	for (const read of published.methodStateReads ?? []) {
+		if (!state.graph.stateReads.includes(read)) state.graph.stateReads.push(read);
+	}
+	for (const write of published.methodStateWrites ?? []) {
+		if (!state.graph.stateWrites.includes(write)) state.graph.stateWrites.push(write);
+	}
 }
 
 /**
@@ -607,6 +616,8 @@ export function moduleInterfaceSharedDefinitions(input: {
 	readonly moduleId: string;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly stateReads: ReadonlyArray<SemanticStateRead>;
+	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 }): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
 	const exportNames = exportedLocalNames(input.statements);
 
@@ -616,14 +627,39 @@ export function moduleInterfaceSharedDefinitions(input: {
 		if (definition.id !== sharedDefinitionId(input.moduleId, definition.exportedName))
 			return [];
 
+		const inMethod = methodSpanTest(definition);
+		const methodStateReads = input.stateReads.filter(
+			(read) => read.sharedDefinitionId === definition.id && inMethod(read.sourceSpan),
+		);
+		const methodStateWrites = input.stateWrites.filter(
+			(write) => write.sharedDefinitionId === definition.id && inMethod(write.targetSpan),
+		);
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
 			definition,
 			graphBindings: input.graphBindings.filter(
 				(binding) => binding.sharedDefinitionId === definition.id,
 			),
+			...(methodStateReads.length > 0 ? { methodStateReads } : {}),
+			...(methodStateWrites.length > 0 ? { methodStateWrites } : {}),
 		}));
 	});
+}
+
+function methodSpanTest(
+	definition: SemanticSharedDefinition,
+): (span: SourceSpan | undefined) => boolean {
+	const methodSpans = (definition.returnProperties ?? []).flatMap((property) =>
+		property.kind === 'method' && property.sourceSpan ? [property.sourceSpan] : [],
+	);
+	return (span) =>
+		span !== undefined &&
+		methodSpans.some(
+			(method) =>
+				method.filename === span.filename &&
+				span.start >= method.start &&
+				span.end <= method.end,
+		);
 }
 
 // `export const pnl = ...` and `export { pnl as state }` — the names this
@@ -728,11 +764,38 @@ export function collectSharedFactoryGraph(
 		const index = state.graph.sharedDefinitions.findIndex((item) => item.id === definition.id);
 		if (index === -1) continue;
 
+		const instanceGraphNodeId = wholeStateReturn(returnProperties, state.graph.graphBindings);
 		state.graph.sharedDefinitions[index] = {
 			...state.graph.sharedDefinitions[index],
 			returnProperties,
+			...(instanceGraphNodeId ? { instanceGraphNodeId } : {}),
 		};
 	}
+}
+
+// `return box` and `return { ...box }`: every field of one state object, each under its own name.
+function wholeStateReturn(
+	properties: ReadonlyArray<SemanticSharedReturnProperty>,
+	bindings: ReadonlyArray<SemanticGraphBinding>,
+): string | undefined {
+	const first = properties[0];
+	if (first?.kind !== 'graph') return undefined;
+	const binding = bindings.find((item) => item.id === first.graphNodeId);
+	if (binding?.kind !== 'state' || binding.valueKind !== 'object') return undefined;
+	if (binding.initialValueKnown !== true) return undefined;
+	const initial = binding.initialValue;
+	if (typeof initial !== 'object' || initial === null || Array.isArray(initial)) return undefined;
+
+	const names = new Set<string>();
+	for (const property of properties) {
+		if (property.kind !== 'graph' || property.graphNodeId !== binding.id) return undefined;
+		if (property.path.length !== 1 || property.path[0] !== property.name) return undefined;
+		names.add(property.name);
+	}
+	const fields = Object.keys(initial);
+	return fields.length === names.size && fields.every((field) => names.has(field))
+		? binding.id
+		: undefined;
 }
 
 /**
@@ -1015,7 +1078,13 @@ export function resolveSharedInstanceGraphPath(
 			componentName,
 		);
 	}
-	if (segments.length < 2) return null;
+	if (segments.length === 1) {
+		if (source !== segments[0]) return null;
+		const nodeId = findSharedInstance(segments[0]!, graph, componentName)?.definition
+			.instanceGraphNodeId;
+		const binding = nodeId ? graph.graphBindings.find((item) => item.id === nodeId) : undefined;
+		return binding ? { binding, path: [] } : null;
+	}
 
 	const [localName, propertyName, ...propertyPath] = segments;
 	if (!localName || !propertyName) return null;

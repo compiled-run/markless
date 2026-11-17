@@ -401,6 +401,9 @@ export type ModuleGraphInterfaceSharedDefinition = {
 	readonly exportName: string;
 	readonly definition: SemanticSharedDefinition;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	/** State the definition's methods read and write, so a handler in another module that calls one lowers them. */
+	readonly methodStateReads?: ReadonlyArray<SemanticStateRead>;
+	readonly methodStateWrites?: ReadonlyArray<SemanticStateWrite>;
 };
 
 export type ModuleGraphInterfaceArtifact = {
@@ -748,6 +751,12 @@ export type SemanticSharedDefinition = {
 	 */
 	readonly factoryModuleImports?: ReadonlyArray<SemanticModuleImport>;
 	readonly factoryModuleScope?: ReadonlyArray<SemanticSharedModuleDeclaration>;
+	/**
+	 * The state node an instance IS, when the factory returns exactly one state
+	 * object's fields under their own names and nothing else. Only then does the
+	 * instance have a value to pass whole, such as `flip(s)`.
+	 */
+	readonly instanceGraphNodeId?: string;
 	readonly sourceSpan?: SourceSpan;
 };
 

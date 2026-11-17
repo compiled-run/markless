@@ -12,7 +12,7 @@ import {
 	templateAsValueDiagnostic,
 } from './diagnostics.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
-import { callsSharedInstanceMethod } from './collect-shared.ts';
+import { callsSharedInstanceMethod, resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import { getFrameworkApiForCall } from './imports.ts';
 import type {
 	FunctionParameterWrites,
@@ -290,12 +290,17 @@ function passedState(value: AnyNode, state: WalkState): 'writable' | 'read-only'
 		if (writeThroughLocal(value, state, 'call')) return null;
 		return rowWriteScope(value, state).rowRepeatId !== undefined ? 'writable' : null;
 	}
-	const resolved = resolveGraphPath(
+	const direct = resolveGraphPath(
 		source,
 		graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 		semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName),
 	);
-	if (!resolved || resolved.binding.sharedDefinitionId !== undefined) return null;
+	const resolved = direct
+		? direct.binding.sharedDefinitionId === undefined
+			? direct
+			: null
+		: resolveSharedInstanceGraphPath(source, state.graph, state.currentComponentName);
+	if (!resolved) return null;
 	if (resolved.binding.kind !== 'state' && resolved.binding.kind !== 'computed') return null;
 	if (resolved.path.length === 0 && resolved.binding.valueKind === 'scalar') return null;
 	if (writeThroughLocal(value, state, 'call')) return null;

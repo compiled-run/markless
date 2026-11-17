@@ -4,13 +4,12 @@ import { compileTsrxModulesWithInterfaces } from './multi-module-compile-support
 
 // Calling a shared() method compiles by copying the method's authored body into
 // the calling handler's own module. Inside the defining module that is sound:
-// the text lands back in the scope it was written in. Across modules it is not,
-// and it used to fail silently in two different ways — these tests are the
-// refusal, not the capability. Whether cross-module method calls become
-// supported (by carrying the definition's imports, or by dispatching to the
-// method at runtime) is an open design question; until it is answered the build
-// says so instead of shipping a handler that throws or misbehaves on the first
-// gesture.
+// the text lands back in the scope it was written in. Across modules the body's
+// state reads and writes travel with the definition, so a body that touches only
+// the definition's own state compiles. A body that names the definition's imports
+// or module scope does not: those stay behind, and it used to fail silently in two
+// different ways, so the build refuses it instead of shipping a handler that
+// throws or misbehaves on the first gesture.
 //
 // This is not the same question as `namespace-shared-call.test.ts`, which pins
 // resolving the DEFINITION from another module — `family.state()` reaching the
@@ -194,6 +193,57 @@ export default function Page() @{
 	const refusals = errors(results.at(-1)!).filter((item) => item.code === CROSS_MODULE_CODE);
 	expect(refusals.length).toBeGreaterThan(0);
 	expect(refusals.map((item) => item.message).join('\n')).toContain('"announce"');
+});
+
+// A body that touches only the definition's own state needs nothing this module
+// lacks: its reads and writes are lowered against the definition's nodes.
+test('a consumer calling a shared() method that only uses its own state compiles', async () => {
+	const results = await compileTsrxModulesWithInterfaces([
+		{
+			filename: 'src/tray.tsrx',
+			importSource: './tray.tsrx',
+			source: `
+import { shared, state } from '@markless/core';
+
+export const tray = shared(() => {
+	const slot = state({ shown: false, title: '' });
+	return {
+		...slot,
+		swap() {
+			const was = slot.shown;
+			slot.shown = !was;
+		},
+		retitle(next: string) {
+			slot.title = next;
+		},
+	};
+}, { scope: 'app' });
+`,
+		},
+		{
+			filename: 'src/desk.tsrx',
+			source: `
+import { tray } from './tray.tsrx';
+
+export default function Desk() @{
+	const t = tray();
+	<div>
+		<b>{t.shown ? t.title : ''}</b>
+		<button data-swap onClick={() => t.swap()}>swap</button>
+		<button data-retitle onClick={() => t.retitle('inbox')}>retitle</button>
+	</div>
+}
+`,
+		},
+	]);
+
+	const desk = results.at(-1)!;
+	expect(errors(desk)).toEqual([]);
+	const handlers = desk.symbolModules.modules.filter((item) => item.kind === 'event-handler');
+	expect(handlers).toHaveLength(2);
+	for (const handler of handlers) {
+		expect(handler.source).toContain('graphNodeId: "shared:src/tray.tsrx#tray/state:slot"');
+	}
 });
 
 // A module that calls no shared() method of another file is untouched: the

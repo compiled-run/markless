@@ -144,6 +144,16 @@ test('the family module publishes its exported definition on its interface', asy
 					initialValue: { open: false },
 				}),
 			],
+			methodStateReads: expect.arrayContaining([
+				expect.objectContaining({ source: 's.open', sharedDefinitionId: definitionId }),
+			]),
+			methodStateWrites: [
+				expect.objectContaining({
+					target: 's.open',
+					sharedDefinitionId: definitionId,
+					operation: 'assign',
+				}),
+			],
 		},
 	]);
 });
