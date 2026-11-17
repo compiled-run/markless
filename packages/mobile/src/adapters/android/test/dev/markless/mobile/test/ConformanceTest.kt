@@ -52,6 +52,9 @@ private fun runVector(file: File) {
 	val attributes = runtime.attributes().joinToString(",", "[", "]") { (n, a, v) -> "[${jsonString(n)},${jsonString(a)},${v?.let(::jsonString) ?: "null"}]" }
 	val initialAttributes = vector["initialAttributes"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialAttributes", attributes == initialAttributes) { "expected $initialAttributes\n  actual   $attributes" }
+	val properties = runtime.properties().joinToString(",", "[", "]") { (n, a, v) -> "[${jsonString(n)},${jsonString(a)},${jsonString(v)}]" }
+	val initialProperties = vector["initialProperties"]?.let(::canonical) ?: "[]"
+	check("${file.name} initialProperties", properties == initialProperties) { "expected $initialProperties\n  actual   $properties" }
 	val arms = runtime.arms().joinToString(",", "[", "]") { (n, i) -> "[${jsonString(n)},${i ?: "null"}]" }
 	val initialArms = vector["initialArms"]?.let(::canonical) ?: "[]"
 	check("${file.name} initialArms", arms == initialArms) { "expected $initialArms\n  actual   $arms" }
@@ -60,7 +63,8 @@ private fun runVector(file: File) {
 		val action = field(s, "action", "steps[$n]").obj("action")
 		val event = field(action, "event", "action").str("event")
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name).joinToString(",", "[", "]") { it.toJson() }
+		val value = action["value"]?.str("action.value")
+		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}
@@ -98,14 +102,24 @@ private fun styleExport(fixtures: File) {
 	val bytes = File(fixtures, "counter.native-style.json").readBytes()
 	val export = runCatching { StyleExport.decode(bytes) }
 	check("decodes Dragon's counter export", export.isSuccess) { export.exceptionOrNull().toString() }
-	export.getOrNull()?.let { e -> check("counter export button frame", e.byId["h2"]?.frame?.width == 311.953125) { "${e.byId["h2"]}" } }
+	export.getOrNull()?.let { e -> check("counter export button frame", e.assignments[0].byId["h2"]?.frame?.width == 311.953125) { "${e.assignments[0].byId["h2"]}" } }
+	val toggle = runCatching { StyleExport.decode(File(fixtures, "ms-toggle.native-style.json").readBytes()) }
+	check("decodes Dragon's /1 toggle export", toggle.isSuccess) { toggle.exceptionOrNull().toString() }
+	toggle.getOrNull()?.let { t ->
+		val s = t.stateFor("selected")
+		val on = t.next(t.initial, s, Scalar.Bool(true))
+		check("/1 next moves to the selected assignment", t.assignments[on].values.values.single() == Scalar.Bool(true)) { "${t.assignments[on].values}" }
+		check("/1 next moves back", t.next(on, s, Scalar.Bool(false)) == t.initial) { "" }
+		val err = runCatching { t.stateFor("other") }.exceptionOrNull()?.message
+		check("/1 refuses a cell with no state", err?.contains("0 states") == true) { "$err" }
+	}
 	val text = String(bytes, Charsets.UTF_8)
 	fun refusesStyle(name: String, changed: String, fragment: String) {
 		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
 	}
 	refusesStyle("an unknown write kind", text.replace("\"kind\": \"text-color\"", "\"kind\": \"box-shadow\""), "unknown style write kind \"box-shadow\"")
-	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/1"), "unknown style export schema")
+	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/9"), "unknown style export schema")
 }
 
 private fun ops() {

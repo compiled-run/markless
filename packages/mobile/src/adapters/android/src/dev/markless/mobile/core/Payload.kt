@@ -21,6 +21,8 @@ sealed interface Expr {
 	data class Template(val parts: List<Any>) : Expr
 	data class Length(val value: Expr) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
+	/** In an `input` handler: the field's whole text after the edit. */
+	data object EventValue : Expr
 }
 
 sealed interface TextPart {
@@ -30,7 +32,8 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-data class Binding(val attribute: String, val value: Expr)
+/** An attribute that follows state, or (when [property]) an input's `value` property. */
+data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
 	val id: String
@@ -42,7 +45,7 @@ sealed interface Node {
 	data class Branch(override val id: String, override val parent: String?, val test: Expr, val arms: Int, override val arm: ArmPlace? = null) : Node
 }
 
-enum class EventName(val wire: String) { Activate("activate") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input") }
 
 sealed interface Op {
 	val cell: String
@@ -51,7 +54,7 @@ sealed interface Op {
 	data class Assign(override val cell: String, val value: Expr) : Op
 }
 
-data class Cell(val id: String, val name: String, val initial: Scalar, val storageKey: String? = null)
+data class Cell(val id: String, val name: String, val initial: Scalar, val storageKey: String? = null, val styled: Boolean = false)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -114,6 +117,7 @@ data class Payload(
 			is Expr.Template -> e.parts.filterIsInstance<Expr>().flatMap(::cellsOf)
 			is Expr.Length -> cellsOf(e.value)
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
+			Expr.EventValue -> emptyList()
 		}
 
 		private val UNARY = setOf("!", "-", "+")
@@ -150,6 +154,7 @@ data class Payload(
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
+				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
 		}
@@ -173,9 +178,10 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled"), what)
+			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), scalar(o.field("initial", what), "$what.initial"), storage)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), scalar(o.field("initial", what), "$what.initial"), storage, styled)
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -188,8 +194,14 @@ data class Payload(
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
 						val bo = b.obj("$what.bindings[$n]")
-						bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
-						Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), expr(bo.field("value", what), "$what.bindings[$n].value"))
+						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
+						if (bo.containsKey("property")) {
+							bo.only(setOf("property", "value"), "$what.bindings[$n]")
+							Binding(oneOf(bo, "property", setOf("value"), "$what.bindings[$n]"), value, property = true)
+						} else {
+							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
+							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
+						}
 					} ?: emptyList()
 					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what))
 				}

@@ -15,10 +15,28 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"attribute\",\"node\":${jsonString(node)},\"name\":${jsonString(name)},\"value\":${value?.let(::jsonString) ?: "null"}}"
 	}
 
+	/** An input's text, as `String(value)`. */
+	data class Property(override val node: String, val name: String, val value: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"property\",\"node\":${jsonString(node)},\"name\":${jsonString(name)},\"value\":${jsonString(value)}}"
+	}
+
+	/** A styled cell's new value; [node] is the cell id. */
+	data class State(override val node: String, val value: Scalar) : JournalEntry {
+		override fun toJson() = "{\"op\":\"state\",\"cell\":${jsonString(node)},\"value\":${jsonScalar(value)}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
 	}
+}
+
+/** `JSON.stringify` of a scalar: non-finite numbers are `null`. */
+fun jsonScalar(v: Scalar): String = when (v) {
+	Scalar.Null -> "null"
+	is Scalar.Str -> jsonString(v.value)
+	is Scalar.Bool -> v.value.toString()
+	is Scalar.Num -> if (v.value.isNaN() || v.value.isInfinite()) "null" else JsString.number(v.value)
 }
 
 /** Where cells with a storage key keep their values across launches. */
@@ -41,7 +59,10 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
 
 	fun value(cell: String): Scalar = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
 
+	private var eventValue: String? = null
+
 	fun evaluate(e: Expr): Scalar = when (e) {
+		Expr.EventValue -> Scalar.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
 		is Expr.CellRef -> value(e.cell)
 		is Expr.Literal -> e.value
 		is Expr.Unary -> Js.unary(e.op, evaluate(e.value))
@@ -81,40 +102,60 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
 		}
 	}
 
-	fun attribute(element: Node.Element, binding: Binding): String? = AttributeValue.of(binding.attribute, evaluate(binding.value))
+	fun attribute(binding: Binding): String? = AttributeValue.of(binding.name, evaluate(binding.value))
+
+	/** `String(value ?? '')`, as an input's `value` property reads. */
+	fun property(binding: Binding): String = evaluate(binding.value).let { if (it == Scalar.Null) "" else Js.toStr(it) }
+
+	fun property(node: String, name: String): String {
+		val e = byId[node] as? Node.Element ?: throw MarklessRuntimeError("unknown element \"$node\"")
+		return property(e.bindings.firstOrNull { it.property && it.name == name } ?: throw MarklessRuntimeError("\"$node\" has no $name property binding"))
+	}
 
 	/** Every shown text node's string, in document order. */
 	fun texts(): List<Pair<String, String>> = payload.nodes.filter { it is Node.Text && isShown(it) }.map { it.id to text(it.id) }
 
 	/** Every shown element's bound attributes as written. */
-	fun attributes(): List<Triple<String, String, String?>> = payload.nodes.filterIsInstance<Node.Element>().filter { isShown(it) }.flatMap { e -> e.bindings.map { Triple(e.id, it.attribute, attribute(e, it)) } }
+	fun attributes(): List<Triple<String, String, String?>> = payload.nodes.filterIsInstance<Node.Element>().filter { isShown(it) }.flatMap { e -> e.bindings.filter { !it.property }.map { Triple(e.id, it.name, attribute(it)) } }
+
+	/** Every shown input's bound `value`. */
+	fun properties(): List<Triple<String, String, String>> = payload.nodes.filterIsInstance<Node.Element>().filter { isShown(it) }.flatMap { e -> e.bindings.filter { it.property }.map { Triple(e.id, it.name, property(it)) } }
 
 	/** Every shown branch's chosen arm. */
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().filter { isShown(it) }.map { it.id to armOf(it) }
 
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
-	fun dispatch(host: String, event: EventName): List<JournalEntry> {
-		val handler = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
-		return run(handler)
-	}
-
-	fun run(handlerId: String): List<JournalEntry> {
+	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
+	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
+		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		val handlerId = handlerFor(host, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
+		val cellsBefore = HashMap(values)
+		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
+		// The edited field already shows what was typed, so its own value counts as written.
+		if (value != null) beforeProperties[host to "value"] = value
 		val beforeTexts = texts().toMap()
 		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val beforeArms = arms().toMap()
-		for (op in handler.ops) when (op) {
-			is Op.Assign -> {
-				val v = evaluate(op.value)
-				values[op.cell] = v
-				storageKeys[op.cell]?.let { store.set(it, v) }
+		eventValue = value
+		try {
+			for (op in handler.ops) when (op) {
+				is Op.Assign -> {
+					val v = evaluate(op.value)
+					values[op.cell] = v
+					storageKeys[op.cell]?.let { store.set(it, v) }
+				}
 			}
+		} finally {
+			eventValue = null
 		}
+		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		val afterTexts = texts().toMap()
 		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
 		val afterArms = arms().toMap()
 		val journal = ArrayList<JournalEntry>()
+		for (c in payload.cells) if (c.styled && !sameValue(cellsBefore.getValue(c.id), values.getValue(c.id))) journal.add(JournalEntry.State(c.id, values.getValue(c.id)))
 		for (node in payload.nodes) when (node) {
 			is Node.Text -> {
 				val b = beforeTexts[node.id]; val a = afterTexts[node.id]
@@ -122,14 +163,19 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
 			}
 			is Node.Branch -> if (node.id in beforeArms && node.id in afterArms && beforeArms[node.id] != afterArms[node.id]) journal.add(JournalEntry.Arm(node.id, afterArms[node.id]))
 			is Node.Element -> for (binding in node.bindings) {
-				val key = node.id to binding.attribute
-				if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(node.id, binding.attribute, afterAttributes[key]))
+				val key = node.id to binding.name
+				if (binding.property) {
+					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(node.id, binding.name, afterProperties.getValue(key)))
+				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(node.id, binding.name, afterAttributes[key]))
 			}
 		}
 		return journal
 	}
 
 	companion object {
+		/** `!==` as the reference runtime compares cell values (so NaN always counts as a change). */
+		private fun sameValue(a: Scalar, b: Scalar): Boolean = Js.strictEquals(a, b)
+
 		fun strictEquals(a: Scalar, b: Scalar): Boolean = Js.strictEquals(a, b)
 	}
 }
