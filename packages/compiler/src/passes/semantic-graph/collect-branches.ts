@@ -26,11 +26,14 @@ import type { WalkState } from './types.ts';
  * A condition over PROPS alone mints too, unlike an attribute or an edge prop: a
  * parent can pass a live graph reference, and with no minted node the site had an
  * empty wake set, so the served payload dropped the branch and the child's arm
- * never re-decided when the parent's cell moved.
+ * never re-decided when the parent's cell moved. That holds for a condition reading
+ * into an object or array prop (`opened.includes(post.id)`) too: the derive reads
+ * through the parent's routes, not the child's scalar-only prop cell.
  */
 const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions = {
 	unaryOperators: true,
 	methodCalls: true,
+	readsIntoProps: true,
 };
 
 /**
@@ -233,7 +236,16 @@ function armIndexTest(
 		if (!sources) return {};
 		readSources.push(...sources);
 	}
-	const minted = mintTemplateExpressionComputed(`() => ${indexSource}`, readSources, state);
+	const minted = mintTemplateExpressionComputed(
+		`() => ${indexSource}`,
+		readSources,
+		state,
+		undefined,
+		false,
+		undefined,
+		false,
+		BRANCH_CONDITION_READ_OPTIONS.readsIntoProps,
+	);
 	return minted ? { testComputedGraphNodeId: minted.graphNodeId } : {};
 }
 

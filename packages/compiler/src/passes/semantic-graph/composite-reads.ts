@@ -59,6 +59,8 @@ export type CompositeReadOptions = {
 	readonly unaryOperators?: boolean;
 	/** A component prop says yes: `rows ?? []` falls back to a literal that reads only what it is built from. */
 	readonly literalBranches?: boolean;
+	/** The derive's reads into a prop follow the caller's value, so an object or array prop is lowered too. */
+	readonly readsIntoProps?: boolean;
 };
 
 export function isCompositeTemplateExpression(
@@ -424,6 +426,8 @@ export function collectCompositeTemplateExpression(
 		options.scope,
 		false,
 		memberRoots(node),
+		false,
+		options.readsIntoProps,
 	);
 }
 
@@ -475,12 +479,14 @@ export function mintTemplateExpressionComputed(
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
 	joinsText = false,
+	readsIntoProps = false,
 ): { readonly graphNodeId: string } | null {
 	const dependencies = graphReadDependencies(readSources, state, scope);
 	if (!dependencies) return null;
 	if (dependencies.length === 0 && !allowConstant) return null;
 	if (
 		!allowConstant &&
+		!readsIntoProps &&
 		!armRebuildsFromGraph(state) &&
 		propMemberReads(dependencies, propObjectRoots).length > 0
 	)
