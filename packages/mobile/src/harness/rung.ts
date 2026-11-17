@@ -34,13 +34,19 @@ type StyleExportFonts = {
 function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
 	const exportPath = join(dir, STYLE_EXPORT);
 	const bytes = readFileSync(exportPath);
-	const fontRoot = process.env.MARKLESS_DRAGON_DIR ?? dir;
 	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
-	for (const font of (JSON.parse(bytes.toString('utf8')) as StyleExportFonts).fonts ?? []) {
-		const file = resolve(fontRoot, font.file);
+	const fonts = (JSON.parse(bytes.toString('utf8')) as StyleExportFonts).fonts ?? [];
+	const dragon = process.env.MARKLESS_DRAGON_DIR;
+	if (fonts.length > 0 && !dragon) {
+		throw new Error(
+			`${name}: ${STYLE_EXPORT} names fonts; set MARKLESS_DRAGON_DIR to the Dragon checkout it came from`,
+		);
+	}
+	for (const font of fonts) {
+		const file = resolve(dragon!, font.file);
 		if (!existsSync(file)) {
 			throw new Error(
-				`${name}: font ${font.id} is not at ${file}; set MARKLESS_DRAGON_DIR to the Dragon checkout`,
+				`${name}: font ${font.id} is not at ${file}; MARKLESS_DRAGON_DIR must be the Dragon checkout the export came from`,
 			);
 		}
 		const face = readFileSync(file);
