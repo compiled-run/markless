@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 318,
+	total: 319,
 	guided: 51,
 	groups: [
 		{
