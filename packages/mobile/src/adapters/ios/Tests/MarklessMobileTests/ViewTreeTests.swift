@@ -49,6 +49,7 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(!count.isAccessibilityElement)
 	#expect(!count.isUserInteractionEnabled)
 	#expect(count.superview === button)
+	#expect(count.textColor == .label)
 
 	button.sendActions(for: .touchUpInside)
 	#expect(count.text == "Count 1")
@@ -118,6 +119,18 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	controller.view.frame = CGRect(x: 0, y: 0, width: 402, height: 874)
 	controller.view.layoutIfNeeded()
 	#expect(field.frame.height > 20)
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 874))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	#expect(field.becomeFirstResponder())
+	field.sendActions(for: .editingDidEndOnExit)
+	#expect(!field.isFirstResponder)
+	#expect(field.becomeFirstResponder())
+	let gestures = views.root.gestureRecognizers ?? []
+	#expect(gestures.contains { $0 is UIPanGestureRecognizer } && gestures.contains { $0 is UITapGestureRecognizer })
+	#expect(gestures.allSatisfy { !$0.cancelsTouchesInView })
+	views.keyboard.dismiss()
+	#expect(!field.isFirstResponder)
 	field.text = "Samantha"
 	field.sendActions(for: .editingChanged)
 	#expect(views.labels["h3:text0"]?.text == "Hello Samantha")

@@ -29,6 +29,7 @@ public final class MarklessViewController: UIViewController {
 	) throws {
 		self.payload = try NativeViewPayload.decode(payload)
 		self.style = try style.map { try StyleExport.decode($0) }
+		if let reason = self.style?.notReady { NSLog("Markless iOS host: applying a style export Dragon marks analysis-only: %@", reason) }
 		self.fonts = fonts
 		self.store = store
 		var params: [NativeRouteParam] = []
@@ -36,6 +37,8 @@ public final class MarklessViewController: UIViewController {
 			guard let page = self.payload.route else { throw HostError("opened at \(route), but \(self.payload.component) is not a page") }
 			guard let matched = page.match(route) else { throw HostError("\(route) does not match the page's route \(page.pattern)") }
 			params = matched
+		} else if let page = self.payload.route, !page.params.isEmpty {
+			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
 		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)

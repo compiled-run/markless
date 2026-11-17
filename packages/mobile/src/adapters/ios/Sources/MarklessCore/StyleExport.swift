@@ -1,7 +1,10 @@
 import Foundation
 
 public let dragonStyleExportSchemas = ["dragon.native-style-export/0", "dragon.native-style-export/1"]
-private let dragonStyleExportUnits = "device px; frames relative to the parent box"
+private let dragonStyleExportUnits = [
+	"device px; frames relative to the parent box",
+	"frames and borderWidths in device px, frames relative to the parent box; lengths inside writes in CSS px",
+]
 
 public struct RGBA: Equatable, Sendable {
 	public let r: Double, g: Double, b: Double, alpha: Double
@@ -54,6 +57,8 @@ public struct StyleExport: Sendable {
 	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
+	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
+	public let notReady: String?
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -65,16 +70,24 @@ public struct StyleExport: Sendable {
 		}
 		let perState = schema == dragonStyleExportSchemas[1]
 		let units = try fields["units"].string()
-		guard units == dragonStyleExportUnits else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
+		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
 		let fonts = try fields["fonts"].array().map { font in
 			let field = try font.object(["id", "file"])
 			return (id: try field["id"].string(), file: try field["file"].string())
 		}
 		let chosen = try fields["targets"].field(target)
-		// readiness is Dragon's verdict on its own device lanes; the proof does not depend on it, so it is read past.
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: ["readiness"])
+			optional: perState ? ["readiness"] : [])
+		var notReady: String?
+		if targetFields.has("readiness") {
+			let readiness = try targetFields["readiness"]
+			switch try readiness.field("kind").string() {
+			case "ready": _ = try readiness.object(["kind"])
+			case "analysis-only": notReady = try readiness.object(["kind", "reason"])["reason"].string()
+			case let kind: throw PayloadError(path: readiness.path + ".kind", reason: "unknown readiness \"\(kind)\"")
+			}
+		}
 		let actualBackend = try targetFields["backend"].string()
 		guard actualBackend == backend else {
 			throw PayloadError(path: chosen.path + ".backend", reason: "expected backend \(backend), found \(actualBackend)")
@@ -123,7 +136,7 @@ public struct StyleExport: Sendable {
 		}
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next)
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady)
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {

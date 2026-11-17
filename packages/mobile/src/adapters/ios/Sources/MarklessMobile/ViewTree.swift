@@ -20,6 +20,7 @@ private struct Context {
 @MainActor
 final class ViewTree {
 	let root = UIView()
+	let keyboard: KeyboardDismisser
 	private let runtime: NativeRuntime
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
@@ -46,6 +47,7 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
+		keyboard = KeyboardDismisser(root)
 		assignment = layout?.start ?? 0
 		let payload = runtime.payload
 		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
@@ -67,6 +69,11 @@ final class ViewTree {
 		events = Dictionary(grouping: payload.events, by: \.host)
 		var index = 0
 		_ = try build("", in: root, at: &index, Context())
+		for gesture in [UITapGestureRecognizer(), UIPanGestureRecognizer()] as [UIGestureRecognizer] {
+			gesture.cancelsTouchesInView = false
+			gesture.addTarget(keyboard, action: #selector(KeyboardDismisser.dismiss))
+			root.addGestureRecognizer(gesture)
+		}
 		if layout == nil { stackTree(root) }
 	}
 
@@ -192,6 +199,7 @@ final class ViewTree {
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
+					field.addAction(UIAction { [weak field] _ in field?.resignFirstResponder() }, for: .editingDidEndOnExit)
 					if layout == nil {
 						field.borderStyle = .roundedRect
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
@@ -233,7 +241,6 @@ final class ViewTree {
 				label.text = try runtime.text(of: parts, in: context.scope)
 				if context.button != nil {
 					label.isAccessibilityElement = false
-					if layout == nil { label.textColor = .tintColor }
 				} else if context.heading {
 					label.accessibilityTraits.insert(.header)
 				}
@@ -361,6 +368,14 @@ final class ViewTree {
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
 	}
+}
+
+/// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
+@MainActor
+final class KeyboardDismisser: NSObject {
+	private weak var root: UIView?
+	init(_ root: UIView) { self.root = root }
+	@objc func dismiss() { root?.endEditing(true) }
 }
 
 @MainActor
