@@ -36,6 +36,7 @@ final class ViewTree {
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
 	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private var anchors = Set<ObjectIdentifier>()
+	private var assignment: Int
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
@@ -45,6 +46,7 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
+		assignment = layout?.start ?? 0
 		let payload = runtime.payload
 		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
 		self.nodes = nodes
@@ -97,8 +99,12 @@ final class ViewTree {
 				applyAttributes(node, view)
 			case .navigate:
 				throw HostError("a navigate entry reaches the page's controller, not its views")
-			case .state:
-				if layout != nil { throw HostError("a styled cell changed, and switching styles needs dragon.native-style-export/1") }
+			case let .state(cell, value):
+				guard let layout else { continue }
+				assignment = try layout.next(from: assignment, cell: cell, value: value)
+				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
+					if let style = style(of: id) { try paint(view, style, faces: faces) }
+				}
 			case let .arm(node, index):
 				guard let branch = branches[node], let context = contexts[node] else { throw HostError("journal names branch \(node), which is not shown") }
 				let container = branch.anchor.superview ?? root
@@ -132,6 +138,11 @@ final class ViewTree {
 				settle(container, built: keys.flatMap { built[$0] ?? [] }, context)
 			}
 		}
+	}
+
+	private func style(of id: String) -> ResolvedStyle? {
+		guard let layout, let template = templates[id] else { return nil }
+		return layout.assignments[assignment][template]
 	}
 
 	private func settle(_ container: UIView, built: [String], _ context: Context) {
@@ -195,7 +206,7 @@ final class ViewTree {
 				inner.heading = context.heading || headings.contains(element)
 				view.accessibilityIdentifier = id
 				elements[id] = view
-				if let style = layout?.styles[template] { try paint(view, style, faces: faces) }
+				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
 				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
@@ -226,7 +237,7 @@ final class ViewTree {
 				} else if context.heading {
 					label.accessibilityTraits.insert(.header)
 				}
-				if let style = layout?.styles[template] { try paint(label, style, faces: faces) }
+				if let style = style(of: id) { try paint(label, style, faces: faces) }
 				labels[id] = label
 				container.insertSubview(label, at: index)
 				index += 1

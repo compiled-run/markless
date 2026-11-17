@@ -53,3 +53,8 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
     keeps UTF-16 slicing of user text away from pair boundaries. The generated expression cases avoid it.
 15. **Containers in storage.** Arrays and objects in a storage cell are kept in `UserDefaults` as JSON-text `Data`
     (property lists cannot hold null inside an array); strings, numbers and booleans as themselves.
+16. **Which export state follows which cell.** The contract says the export's state is "the one whose key names that
+    cell" without saying how a key names a cell. Both hosts read: the key equals the cell id, or ends in `#<cell id>`
+    (Dragon's own keys look like `doc/app/chip#selected`). The iOS host also refuses an export whose states do not cover
+    every `styled` cell, and starts at the assignment whose values match the cells at mount (so a stored value starts in
+    the right style). Change needed: the contract states the key rule, or the style input hands Dragon the cell id as the key.

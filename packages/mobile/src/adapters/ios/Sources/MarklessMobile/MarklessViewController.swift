@@ -50,7 +50,7 @@ public final class MarklessViewController: UIViewController {
 	}
 
 	private func buildPage() throws {
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts()) }
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)

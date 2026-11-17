@@ -161,6 +161,45 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(throws: HostError.self) { try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple/seeds") }
 }
 
+/// The attributes rung's payload with a `/1` export written from it: two assignments that differ in the heart's background.
+private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
+	var url = URL(fileURLWithPath: #filePath)
+	for _ in 0..<6 { url.deleteLastPathComponent() }
+	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+		let json = fields.first(where: { $0.0 == "payload" })?.1
+	else { throw PayloadError(path: "vector", reason: "no payload") }
+	let payload = try NativeViewPayload.decode(json)
+	let texts = Dictionary(uniqueKeysWithValues: try NativeRuntime(payload: payload).texts().map { ($0.node, $0.text) })
+	func nodes(_ red: Int) -> String {
+		payload.nodes.map { node in
+			let text = node.isText ? "\"\(texts[node.id]!)\"" : "null"
+			let writes = node.isText ? "" : #"{"kind":"background-color","color":{"r":\#(node.id == "h2" ? red : 0),"g":0,"b":0,"alpha":255},"key":"backgroundColor"}"#
+			return #"{"id":"\#(node.id)","parent":\#(node.parent.map { "\"\($0)\"" } ?? "null"),"kind":"\#(node.isText ? "text" : "element")","native":"\#(node.isText ? "DragonTextView" : "DragonBoxView")","text":\#(text),"frame":{"x":0,"y":0,"width":30,"height":30},"borderWidths":\#(node.isText ? "null" : #"{"top":0,"right":0,"bottom":0,"left":0}"#),"writes":[\#(writes)]}"#
+		}.joined(separator: ",")
+	}
+	let export = #"""
+		{"schema":"dragon.native-style-export/1","units":"device px; frames relative to the parent box","fonts":[],"targets":{"ios":{"backend":"uikit","viewport":{"width":402,"height":778},"dpr":3,
+		"states":[{"key":"doc/app#state:liked","domain":[false,true]}],"initial":\#(initial),
+		"assignments":[{"values":{"doc/app#state:liked":false},"nodes":[\#(nodes(10))]},{"values":{"doc/app#state:liked":true},"nodes":[\#(nodes(200))]}],
+		"next":[[[0,1]],[[0,1]]]}}}
+		"""#
+	return (payload, Data(export.utf8))
+}
+
+@MainActor @Test func aStyledCellMovesEveryViewToTheNextAssignment() throws {
+	let (_, export) = try toggleExport()
+	let controller = try MarklessViewController(payload: vectorPayload("attributes"), style: export, store: MemoryStore())
+	let views = try tree(controller)
+	let heart = try #require(views.elements["h2"] as? UIButton)
+	var red: CGFloat = 0
+	heart.backgroundColor?.getRed(&red, green: nil, blue: nil, alpha: nil)
+	#expect(Int((red * 255).rounded()) == 10)
+	heart.sendActions(for: .touchUpInside)
+	heart.backgroundColor?.getRed(&red, green: nil, blue: nil, alpha: nil)
+	#expect(Int((red * 255).rounded()) == 200)
+	#expect(heart.accessibilityLabel == "Unlike")
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
 	let controller = try MarklessViewController(payload: counterPayload())
 	let views = try tree(controller)

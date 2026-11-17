@@ -16,20 +16,69 @@ public struct ResolvedStyle: Equatable, Sendable {
 }
 
 public struct StyleLayout: Sendable {
-	public let styles: [String: ResolvedStyle]
+	/// Each assignment's look per payload node.
+	public let assignments: [[String: ResolvedStyle]]
+	/// The assignment matching the cells' values at mount.
+	public let start: Int
+	/// For each export state, the payload cell it follows.
+	public let stateCells: [String]
+	public let domains: [[NativeValue]]
+	public let next: [[[Int]]]
+	public var styles: [String: ResolvedStyle] { assignments[start] }
 	public let viewport: (width: Double, height: Double)
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
 }
 
+extension StyleLayout {
+	/// The assignment reached from `current` when `cell` takes `value`.
+	public func next(from current: Int, cell: String, value: NativeValue) throws -> Int {
+		guard let state = stateCells.firstIndex(of: cell) else { throw styleError("\(cell) changed but has no style state") }
+		guard let column = domains[state].firstIndex(where: { $0.strictlyEquals(value) }) else {
+			throw styleError("\(cell)'s style state has no value \(value.jsonText)")
+		}
+		let reached = next[current][state][column]
+		guard reached >= 0 else { throw styleError("\(cell) = \(value.jsonText) is unreachable from style assignment \(current)") }
+		return reached
+	}
+}
+
 extension StyleExport {
 	/// Pairs every payload node with its export node. Export nodes the payload does not name (Dragon's `html`, `body`) paint
 	/// nothing and only offset their children; a payload node the export lacks, or a write this host cannot express, is an error.
-	public func resolve(for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]) throws -> StyleLayout {
+	/// `value` reads a cell's value at mount, so the starting assignment matches stored values too.
+	public func resolve(
+		for payload: NativeViewPayload, initialTexts: [(node: String, text: String)], value: (String) throws -> NativeValue
+	) throws -> StyleLayout {
+		let styledCells = payload.cells.filter(\.styled).map(\.id)
+		let stateCells = try states.map { state in
+			let named = styledCells.filter(state.names)
+			guard named.count == 1 else { throw styleError("style state \(state.key) names \(named.count) styled cells of the payload") }
+			return named[0]
+		}
+		if let unstyled = styledCells.first(where: { !stateCells.contains($0) }) {
+			throw styleError("the payload's styled cell \(unstyled) has no state in the style export")
+		}
+		let current = try stateCells.map(value)
+		let matches = { (index: Int) in zip(self.states, current).allSatisfy { state, value in self.assignments[index].values[state.key].map { $0.strictlyEquals(value) } ?? false } }
+		guard let start = matches(initial) ? initial : assignments.indices.first(where: matches) else {
+			throw styleError("no assignment of the style export matches the cells' values \(current.map(\.jsonText))")
+		}
+		return StyleLayout(
+			assignments: try assignments.indices.map { index in
+				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
+			},
+			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
+			viewport: viewport, dpr: dpr, fontFiles: fonts)
+	}
+
+	private func resolveNodes(
+		_ nodes: [StyleNode], for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]?
+	) throws -> [String: ResolvedStyle] {
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		let payloadIds = Set(payload.nodes.map(\.id))
-		let texts = Dictionary(uniqueKeysWithValues: initialTexts.map { ($0.node, $0.text) })
+		let texts = initialTexts.map { Dictionary(uniqueKeysWithValues: $0.map { ($0.node, $0.text) }) }
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payload.nodes {
 			if case .branch = node.kind { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
@@ -41,7 +90,7 @@ extension StyleExport {
 			case .branch, .repeat: break
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
-				guard styled.text == texts[node.id] else {
+				if let texts, styled.text != texts[node.id] {
 					throw styleError("\(node.id) reads \(texts[node.id].map { "\"\($0)\"" } ?? "nothing") but the style export laid out \(styled.text.map { "\"\($0)\"" } ?? "nothing")")
 				}
 			}
@@ -62,8 +111,10 @@ extension StyleExport {
 			}
 			styles[node.id] = style
 		}
-		return StyleLayout(styles: styles, viewport: viewport, dpr: dpr, fontFiles: fonts)
+		return styles
 	}
+
+
 
 	private func resolve(_ node: StyleNode, _ writes: [StyleWrite]) throws -> ResolvedStyle {
 		var style = ResolvedStyle()
