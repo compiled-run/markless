@@ -25,6 +25,14 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'arithmetic',
+		fixture: 'test/fixtures/Arithmetic.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h10' },
+			{ event: 'activate', host: 'h10' },
+		],
+	},
+	{
 		name: 'attributes',
 		fixture: 'proofs/04-attributes/App.tsrx',
 		actions: [

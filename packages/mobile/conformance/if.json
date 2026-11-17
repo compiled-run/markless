@@ -129,8 +129,14 @@
 				"id": "handler:event:0",
 				"ops": [
 					{
-						"op": "toggle",
-						"cell": "state:open"
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
 					}
 				]
 			}

@@ -6,6 +6,7 @@ export {
 } from './conformance.ts';
 export {
 	createNativeRuntime,
+	evaluateNativeExpr,
 	formatNativeValue,
 	type NativeAction,
 	type NativeRuntime,

@@ -3,6 +3,19 @@
 Owner of this file: the lead on `cw/native-targets`. Every other native worker learns the contract from here; when it changes,
 this file changes in the same push. Status as of 2026-11-16, night one.
 
+## 0. What changed last (hosts: read this first)
+
+2026-11-17, `a989dc47f` and after; both hosts are merged into `cw/native-targets` (#741, #750, #751).
+
+1. **Ops are now one op, `assign`, with an expression tree** (section 4, "Handlers" and "Expressions"). `add`, `set` and
+   `toggle` are gone from payloads. Both hosts' decoders correctly refuse the new vectors today
+   (`test-jvm.sh`: 44 passed, 5 failed on unknown `assign`, `bindings` and `expr` parts). The host work next: an `NativeExpr`
+   evaluator with ECMAScript meaning (pinned by `arithmetic.json`), element `bindings` and the `attribute` journal entry
+   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells.
+2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
+   the older payload shape.
+3. Vectors to pass: every file in `packages/mobile/conformance/`.
+
 ## 1. What I found before building (the owner's picture is weeks old)
 
 - **`docs/goals/native-targets-api/` was not in the repo.** The research board lives only on the planner's machine (copy read
@@ -94,11 +107,25 @@ export function Counter() @{
   (so integer `1` is `"1"`, never `"1.0"`; hosts must implement this exactly; non-integer numbers are refused in v0).
 - **Events** are semantic. Authored `onClick` lowers to `activate`. Platform mapping (owned by each adapter): web `click`,
   iOS `UIControl.Event.touchUpInside`, Android `View.OnClickListener`.
-- **Handlers** are lists of ops: `{ op: 'add', cell, value }` (`x++` is `+1`, `x--` is `-1`; numbers only),
-  `{ op: 'set', cell, value }` (`x = 'b'`, `x = 3`, `x = true`: a literal string, integer or boolean) and
-  `{ op: 'toggle', cell }` (`x = !x`). Anything else (`x = x * 2`, a call, a member write) is refused for now. A handler is lowered only when the
-  analyzer proves its body is nothing but state writes (`handlerWriteStatements`); otherwise the compiler refuses with a
-  diagnostic instead of guessing. Ops run in order; then every text node reading a changed cell is recomputed.
+- **Handlers** are lists of ops, and there is one op: `{ op: 'assign', cell, value: <expr> }`. The analyzer records the
+  handler body as statements (`SemanticEvent.handlerStatements`); `x++` arrives as `x = +x + 1`, `x--` as `x = +x - 1`,
+  `x += e` as `x = x + e`. Ops run in order, each value evaluated before its write. A body with anything outside the
+  expression tree (a call to author code, `await`, a loop, an array or object value, a member write) is refused at build
+  time with the construct named, e.g. "the click handler uses a call to `console.log`, which needs a script engine".
+  That refusal list is how we will know when a JavaScript engine is needed. (This replaces the earlier `add`/`set`/`toggle`
+  ops, per the planner's steer: one tree, not one op per source shape.)
+- **Expressions** (`NativeExpr`) carry JavaScript meaning exactly, and the reference runtime defines it by running
+  JavaScript: `{ cell }`, `{ literal }` (string, number, boolean or null), `{ unary: '!'|'-'|'+', value }`,
+  `{ binary: '+'|'-'|'*'|'/'|'%'|'==='|'!=='|'<'|'<='|'>'|'>=', left, right }`, `{ logical: '&&'|'||'|'??', left, right }`
+  (short-circuit, returns an operand), `{ if, whenTrue, whenFalse }`, `{ template: [string | expr, ...] }`,
+  `{ member: expr, property: 'length' }` (strings only; any other value is a runtime error) and
+  `{ call: 'String'|'Number'|'Boolean'|'Math.abs'|'Math.floor'|'Math.max'|'Math.min'|'Math.round', arguments }`.
+  Hosts must reproduce ECMAScript number-to-string (`0.3333333333333333`, `1e+21`, `-0` reads `0`, `NaN`), `+` concatenating
+  when either side is a string, ToNumber for strings (`Number('5x')` is NaN), `Math.round` rounding half up. The vector file
+  `arithmetic.json` pins these. Arrays, objects, arrow functions and row reads join the tree with rung 6.
+- **Storage:** a cell may have `storage: { key }`: the host reads the kept value at mount (iOS `UserDefaults`, Android
+  `SharedPreferences`; absent means `initial`) and writes it after every op that changes the cell. Values are strings,
+  numbers or booleans as the cell holds them.
 - **Journal:** after a handler, the runtime emits `{ "op": "text", "node": "h2:text0", "value": "Count 1" }` for each text
   node whose string changed, in document order. Hosts apply journal entries to their retained views and do nothing else to
   them. The TypeScript reference runtime in `packages/mobile/src/runtime.ts` defines the expected journal; each host must
@@ -106,9 +133,7 @@ export function Counter() @{
 
 ### Additions for rungs 4 and 5 (pushed 2026-11-17)
 
-- **Expressions** (`NativeExpr`), evaluated by hosts with JavaScript meaning: `{ cell }`, `{ literal }`, `{ not: e }`
-  (JS truthiness), `{ if: e, whenTrue: e, whenFalse: e }` (not `then`, so no payload object is a thenable), `{ equals: [e, e] }` (`===`; `!==` arrives as `not` of `equals`). The
-  analyzer records the shape (`SemanticTemplateRead.valueShape`, `SemanticBranchSite.testShape`); anything else is refused.
+- **Expressions**: see the expression tree above. The analyzer records it on template reads (`SemanticTemplateRead.expression`) and plain `@if` tests (`SemanticBranchSite.testExpression`).
 - **Text parts** may be `{ expr: e }`, formatted like a cell (`String(value)`).
 - **Element `bindings`**: `[{ attribute, value: e }]`. A class that follows state is the attribute `class` with
   `{ if: test, whenTrue: { literal: 'like on mk-x' }, whenFalse: { literal: 'like mk-x' } }` (scope class included). The written
@@ -130,9 +155,14 @@ export function Counter() @{
   `isSelected`; `aria-expanded` to the expanded state (`accessibilityValue` on iOS, `AccessibilityNodeInfo` expanded state
   on Android). `class` is not applied by hosts as text: it selects the element's Dragon style (below). Unknown bound
   attributes are ignored by hosts, not errors, so web-only attributes do not break a build.
-- **Styles that follow a class** (for native-dragon-styles): the style export may give an element `variants: [{ class,
-  writes }]`, one per class string the binding can produce (both literals of the `if` above); a host applies the variant
-  whose `class` equals the current value, after the node's base writes. Frames do not change with a variant yet.
+- **Styles that follow state: Dragon's `dragon.native-style-export/1`** (the native-dragon-styles design replaces the
+  class-variant idea; adopted). Each target has `states` (`[{ key, domain }]`), `assignments` (each a complete node list
+  with its `values`), `initial` and `next[a][s][v]`. Markless side: a cell a class binding reads is marked `styled: true`
+  in the payload; after each handler the journal starts with `{ op: 'state', cell, value }` for every styled cell that
+  changed (cell order); the host moves to `next[current][s][v]` (the export's state `s` is the one whose key names that
+  cell) and applies that assignment's frames and writes to the retained views. Hosts ignore `attribute` entries for
+  `class`. The style input gives Dragon `states: [{ cell, domain: [false, true], initial }]` and, per element,
+  `classByState: [{ when: { <cell>: boolean }, value }]`; non-boolean styled cells are refused for now.
 
 ### Building a payload and the conformance vectors (pushed)
 
@@ -158,8 +188,9 @@ export function Counter() @{
 }
 ```
 
-  Committed files today: `counter.json` (add) and `switches.json` (toggle, set of a string and a negative integer, boolean
-  and string formatting, and a step whose journal is empty because the text did not change). A host must pass every file in
+  Committed files today: `counter.json`, `switches.json` (boolean and string formatting, and a step whose journal is
+  empty because the text did not change), `arithmetic.json` (number formatting and coercion), `attributes.json` (rung 4)
+  and `if.json` (rung 5). A host must pass every file in
   the folder; a new op or node kind always arrives with a new vector file first.
   A host passes the vectors when, loading `payload`, its mounted text nodes read exactly `initial` (same order) and, for each
   step in turn, dispatching `action` makes its runtime produce exactly `journal` (same entries, same order) and its views then
@@ -190,6 +221,30 @@ Answered requests (native-android-host, 2026-11-17):
   root is the platform's default background.
 - **Pixel ratio:** one export per target device (the export already has one entry per target); a host refuses an export
   whose `dpr` differs from the screen's by more than 0.001.
+
+Answered requests (native-ios-host, 2026-11-17):
+
+- **1, 2, pixel ratio:** as answered for Android above (write lengths CSS px; wrapper boxes only offset; 0.001).
+- **3, text frames after a journal entry:** keep the build-time frame and never resize, for now. The real answer is
+  linking Dragon's on-device layout engine (generated Swift/Kotlin, `packages/layout/generated/`) and re-laying out after
+  text entries; that is a later rung, listed in the owner note.
+- **4, `activate` on a non-button:** hosts support it: iOS adds a `UITapGestureRecognizer` and the `.button` trait;
+  Android sets a click listener and `accessibilityClassName = android.widget.Button`. The compiler does not refuse it.
+- **5, element names:** the compiler refuses them, once, for both hosts (below), so hosts need no list of their own; a host
+  may still refuse defensively.
+- **6, test ids:** adopted. Node ids are the test ids on both platforms (iOS `accessibilityIdentifier`, Android the id
+  Maestro's `id:` matches). Flows may match by text or by id. A button's accessibility label is its text runs joined; text
+  inside a button is not its own accessibility element; text in `h1`-`h6` carries the header trait.
+- **7, `@markless/core` devDependency:** kept.
+- **8, fonts:** every `font` write must name a face listed in `fonts`; anything else is a host error. Ahem appears only in
+  Dragon's own fixtures.
+- **9, `synthetic-bold` and `anonymous`:** Dragon's definitions apply (native-dragon-styles documents them); until then
+  refusing is right.
+- **10, export `/1`:** adopted, with the `state` journal entry above.
+
+**Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
+`nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
+refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
 
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
@@ -256,7 +311,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 6 | Keyed `@for` (add, remove, reorder) | passing | refused | not yet | not yet | needs list regions and array-op facts |
 | 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
 | 8 | Text input and two-way state | passing | refused | not yet | not yet | needs input element, `value` property, input event |
-| 9 | Storage | passing | refused | not yet | not yet | handler is `String(Number(visits) + 1)`: needs a script engine or a numeric storage cell |
+| 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
 | 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |
 

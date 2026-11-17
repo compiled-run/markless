@@ -6,7 +6,7 @@ const nativeView = async (source: string) =>
 	createNativeViewPayload(await buildSemanticGraph({ filename: 'src/App.tsrx', source }));
 
 describe('native view payload', () => {
-	it('lowers a counter to nodes, a semantic event and an add op', async () => {
+	it('lowers a counter to nodes, a semantic event and an assignment', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Counter() @{
 	let count = state(0);
@@ -33,7 +33,12 @@ export function Counter() @{
 				},
 			],
 			events: [{ host: 'h2', event: 'activate', handler: 'handler:event:0' }],
-			handlers: [{ id: 'handler:event:0', ops: [{ op: 'add', cell: 'state:count', value: 1 }] }],
+			handlers: [
+				{
+					id: 'handler:event:0',
+					ops: [{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+				},
+			],
 		});
 	});
 
@@ -62,8 +67,16 @@ export function Tally() @{
 			{
 				id: 'handler:event:0',
 				ops: [
-					{ op: 'add', cell: 'state:left', value: -1 },
-					{ op: 'add', cell: 'state:right', value: 1 },
+					{
+						op: 'assign',
+						cell: 'state:left',
+						value: { binary: '-', left: { unary: '+', value: { cell: 'state:left' } }, right: { literal: 1 } },
+					},
+					{
+						op: 'assign',
+						cell: 'state:right',
+						value: { binary: '+', left: { unary: '+', value: { cell: 'state:right' } }, right: { literal: 1 } },
+					},
 				],
 			},
 		]);
@@ -83,7 +96,7 @@ export function Tally() @{
 		expect(span?.class).toBe(article?.class.split(' ')[1]);
 	});
 
-	it('lowers literal assignments and self-negation to set and toggle', async () => {
+	it('lowers assignments, compound assignments and builtin calls to expression trees', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Panel() @{
 	let open = state(false);
@@ -91,26 +104,36 @@ export function Panel() @{
 	let size = state(1);
 	<div>
 		<p>{tab} {open} {size}</p>
-		<button onClick={() => { open = !open; tab = 'b'; size = 3; size = -4; }}>Go</button>
+		<button onClick={() => { open = !open; tab = \`t\${size}\`; size *= 2; size = Math.max(size, -4); }}>Go</button>
 	</div>
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload?.handlers[0]?.ops).toEqual([
-			{ op: 'toggle', cell: 'state:open' },
-			{ op: 'set', cell: 'state:tab', value: 'b' },
-			{ op: 'set', cell: 'state:size', value: 3 },
-			{ op: 'set', cell: 'state:size', value: -4 },
+			{ op: 'assign', cell: 'state:open', value: { unary: '!', value: { cell: 'state:open' } } },
+			{ op: 'assign', cell: 'state:tab', value: { template: ['t', { cell: 'state:size' }, ''] } },
+			{
+				op: 'assign',
+				cell: 'state:size',
+				value: { binary: '*', left: { cell: 'state:size' }, right: { literal: 2 } },
+			},
+			{
+				op: 'assign',
+				cell: 'state:size',
+				value: { call: 'Math.max', arguments: [{ cell: 'state:size' }, { unary: '-', value: { literal: 4 } }] },
+			},
 		]);
 	});
 
-	it('refuses an assignment whose value needs evaluating', async () => {
+	it('refuses a value that calls author code, naming the call', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Sum() @{
 	let total = state(1);
-	<button onClick={() => (total = total * 2)}>Total {total}</button>
+	<button onClick={() => (total = double(total))}>Total {total}</button>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toEqual(['a assign write to `total` needs a script engine']);
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the click handler uses a call to `double`, which needs a script engine',
+		]);
 	});
 
 	it('refuses a handler that does more than write state', async () => {
@@ -121,7 +144,7 @@ export function Logger() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
-			[NATIVE_UNSUPPORTED_CODE, 'the click handler does more than write state'],
+			[NATIVE_UNSUPPORTED_CODE, 'the click handler uses a call to `console.log`, which needs a script engine'],
 		]);
 	});
 

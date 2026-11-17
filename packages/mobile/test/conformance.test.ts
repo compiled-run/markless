@@ -55,8 +55,8 @@ describe('native conformance vectors', () => {
 				{
 					id: 'handler:x',
 					ops: [
-						{ op: 'add', cell: 'state:a', value: -1 },
-						{ op: 'add', cell: 'state:a', value: -1 },
+						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
+						{ op: 'assign', cell: 'state:a', value: { binary: '-', left: { cell: 'state:a' }, right: { literal: 1 } } },
 					],
 				},
 			],

@@ -49,3 +49,37 @@ Java 21, and `ANDROID_HOME` (default `~/Library/Android/sdk`) with build-tools 3
   harness; to embed this runtime elsewhere, compile `src/**/*.kt` with your own sources against `android.jar`.
 
 Outputs go to `.build/` (ignored), or `$MARKLESS_ANDROID_OUT`.
+
+## Checks on a device
+
+In-app conformance: build with `MARKLESS_CONFORMANCE_DIR=<vector dir> ./build-apk.sh ...`, launch with
+`adb shell am start -n dev.markless.mobile.shell/.ProofActivity --ez conformance true`, and read `adb logcat -s
+MarklessConformance`: one `pass <vector>` or `FAIL <vector>: <what differed>` line per vector. `DeviceConformance.run` mounts
+the vector's payload into real views, compares the TextViews with `initial`, then for each step calls `performClick()` on the
+action's view, compares the journal byte for byte and checks the views show each journaled string. Last run: `pass
+counter.json`; a copy with `Count 2` altered to `Count 3` logged `FAIL counter-altered.json: steps[1]: journal [...]`.
+
+
+With a style export, `MarklessActivity` logs `frames max gap <n> device px` after the first layout: the largest distance
+between any edge of a laid-out view and its Dragon frame (`MarklessHost.frameDeviation()`), with one `frame ...` line per
+node. Text frames round outward (a run a fraction of a pixel narrower than its frame would wrap), so a text edge can sit up to
+one device pixel outside Dragon's.
+
+Last run (Pixel 7 AVD, android-36, 2026-11-17), counter payload from `packages/mobile/conformance/counter.json` with Dragon's
+`examples/markless-counter/out/counter.native-style.json` (copied to `test/fixtures/`) and Inter Regular and Bold:
+`frames max gap 0.984375 device px`; two taps on `h2` logged `journal {"op":"text","node":"h2:text0","value":"Count 1"}` then
+`"Count 2"`. Screenshots: `screenshots/counter-styled-before.png`, `screenshots/counter-styled-after-two-taps.png`, and the
+unstyled stack in `screenshots/counter-stack-*.png`.
+
+## Ladder flows on Android (2026-11-17)
+
+Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
+`maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
+AVD (android-36):
+
+| Rung | Result | Screenshot |
+|---|---|---|
+| 01-static-text | flow passes | `screenshots/rung-01-static-text.png` |
+| 02-styles | flow passes **without styles**: no Dragon export for this rung's component yet. Styles on device are proven only with Dragon's counter export (above). | `screenshots/rung-02-styles.png` |
+| 03-counter | flow passes | `screenshots/rung-03-counter.png` |
+| 04 to 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
