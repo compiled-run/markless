@@ -7,6 +7,7 @@ import { mayContainDynamicImport, readChunkDynamicImports } from '../build/chunk
 import { DEV_RESIDENT_MODULE } from '../module-loads.ts';
 import { pathname } from '../virtual-ids.ts';
 import { marklessRuntimeSpecifierId } from '../build/delegate-loader.ts';
+import { runtimeModuleIdFromOrigin } from '../build/bundle-graph.ts';
 
 const RUNTIME_ENTRY = '@markless/web';
 
@@ -57,7 +58,10 @@ export function devResidentRuntimeImports(
 			const modules = await (lazyModules ??= runtimeLazyModules(this));
 			if (modules.length === 0) return null;
 			const named = modules
-				.map((module) => `[${JSON.stringify(module)}, () => import(${JSON.stringify(module)})]`)
+				.map((module) => {
+					const id = runtimeModuleIdFromOrigin(pathname(module));
+					return `[${JSON.stringify(module)}, () => import(${JSON.stringify(module)})${id ? `, ${JSON.stringify(id)}` : ''}]`;
+				})
 				.join(', ');
 			return { code: `${code}\nmarklessDevWarm('', [${named}]);\n`, map: null };
 		}

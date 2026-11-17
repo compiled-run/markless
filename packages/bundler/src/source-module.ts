@@ -2332,6 +2332,7 @@ function emitLoadSymbol(
 		readonly resolverId: string;
 		readonly symbols: ReadonlyArray<SourceSymbolRow>;
 		readonly hasBoundSymbols?: boolean;
+		readonly runtimeDemandMap?: unknown;
 	},
 	loads: ModuleLoads,
 	sourceReaderName?: string,
@@ -2341,15 +2342,18 @@ function emitLoadSymbol(
 		input.symbols.length > 0 &&
 		(input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT || loads.load !== undefined)
 	) {
+		const handler = loads.handler;
 		const direct = emitDirectSourceSymbolLoader(
 			input.symbols,
 			loads.load ?? importLoad,
 			sourceReaderName,
-			loads.handler,
+			handler &&
+				((symbol) =>
+					handler(symbol.chunk, actionRuntimeModuleIds(input.runtimeDemandMap, symbol.id))),
 		);
 		if (!input.hasBoundSymbols) return direct;
 		return [
-			`const marklessSymbolResolverModule = () => ${(loads.handler ?? importLoad)(input.resolverId)};`,
+			`const marklessSymbolResolverModule = () => ${handler ? handler(input.resolverId, actionRuntimeModuleIds(input.runtimeDemandMap)) : importLoad(input.resolverId)};`,
 			direct.replace(
 				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -2365,16 +2369,52 @@ function emitLoadSymbol(
 	].join('\n');
 }
 
+// The runtime modules a handler's actions run and their writes reach, from the demand map; every action's without a handler.
+function actionRuntimeModuleIds(runtimeDemandMap: unknown, symbolId?: string): string[] {
+	const map = runtimeDemandMap as
+		| {
+				readonly payloadRecords?: ReadonlyArray<{
+					readonly recordId: string;
+					readonly symbolIds?: ReadonlyArray<string>;
+				}>;
+				readonly actions?: ReadonlyArray<RuntimeDemandMapActionIds>;
+				readonly armActions?: ReadonlyArray<RuntimeDemandMapActionIds>;
+		  }
+		| undefined;
+	const records = new Set(
+		(map?.payloadRecords ?? [])
+			.filter((record) => symbolId === undefined || record.symbolIds?.includes(symbolId))
+			.map((record) => record.recordId),
+	);
+	const ids = new Set<string>();
+	for (const action of [...(map?.actions ?? []), ...(map?.armActions ?? [])])
+		if (action.payloadRecordIds.some((id) => records.has(id)))
+			for (const id of [
+				...action.runtimeModuleIds,
+				...(action.firstUse && action.firstUse !== 'unknown'
+					? action.firstUse.runtimeModuleIds
+					: []),
+			])
+				ids.add(id);
+	return [...ids];
+}
+
+type RuntimeDemandMapActionIds = {
+	readonly payloadRecordIds: ReadonlyArray<string>;
+	readonly runtimeModuleIds: ReadonlyArray<string>;
+	readonly firstUse?: { readonly runtimeModuleIds: ReadonlyArray<string> } | 'unknown';
+};
+
 function emitDirectSourceSymbolLoader(
 	symbols: ReadonlyArray<SourceSymbolRow>,
 	load: ModuleLoad,
 	readerName = 'readMarklessSourceSymbol',
-	handler: ModuleLoad = importLoad,
+	handler: (symbol: SourceSymbolRow) => string = (symbol) => importLoad(symbol.chunk),
 ): string {
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${(symbol.eventHandler ? handler : load)(symbol.chunk)}, ${JSON.stringify(symbol.exportName)});`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${symbol.eventHandler ? handler(symbol) : load(symbol.chunk)}, ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',

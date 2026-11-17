@@ -6,29 +6,16 @@ import { SeveralForms } from '../form-in-place/several-forms.tsrx';
 import { NoteForm } from './note-form.tsrx';
 import { SyncForm } from './sync-form.tsrx';
 
-// The hold is held back here, so a press can land before it starts, as on a slow first load of its module.
+// The hold's module is held back here, so a press can land while it is still on its way, as on a slow first load.
 const arrival = vi.hoisted(() => {
 	let open!: () => void;
 	const gate = new Promise<void>((resolve) => (open = resolve));
 	return { gate, open, asked: 0 };
 });
 vi.mock('../../../web/src/submit-hold.ts', async (importOriginal) => {
-	const hold = await importOriginal<typeof import('../../../web/src/submit-hold.ts')>();
-	return {
-		...hold,
-		holdSubmit: (...input: Parameters<typeof hold.holdSubmit>) => {
-			arrival.asked++;
-			let end: (() => void) | undefined;
-			let ended = false;
-			void arrival.gate.then(() => {
-				if (!ended) end = hold.holdSubmit(...input);
-			});
-			return () => {
-				ended = true;
-				end?.();
-			};
-		},
-	};
+	arrival.asked++;
+	await arrival.gate;
+	return importOriginal();
 });
 
 installServer();
@@ -78,9 +65,7 @@ test('an edit made while the hold is still loading is sent when submitted after 
 	arrival.open();
 	await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
 	submitter.click();
-	await expect
-		.poll(() => server.posts, poll)
-		.toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
+	await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
 	answer.resolve();
 	await expect.poll(() => form.hasAttribute('aria-busy'), poll).toBe(false);
 });
@@ -124,9 +109,7 @@ test('a handler form sends what it holds when its handler runs, and a repeat of 
 	submitter.click();
 	field.value = 'Hopper';
 	try {
-		await expect
-			.poll(() => server.posts, poll)
-			.toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
+		await expect.poll(() => server.posts, poll).toEqual(['POST /mut/items Grace', 'POST /mut/items Hopper']);
 		await expect.poll(() => form.getAttribute('aria-busy'), poll).toBe('true');
 		submitter.click();
 		await new Promise((resolve) => setTimeout(resolve, 50));

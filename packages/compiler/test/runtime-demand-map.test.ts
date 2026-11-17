@@ -527,6 +527,15 @@ test('a control that flips a branch through a computed reaches the flip, its der
 	expect(input.firstUse?.runtimeModuleIds).toContain('web/resume-commit-arm');
 });
 
+test('a control whose write reaches a sync computed loads what runs its derive and the roster reader it waits for', async () => {
+	const { action } = await panelDemandMap(PANEL);
+	const input = action('h1', 'input');
+	expect(input.firstUse?.runtimeModuleIds).toContain('web/resume-sync-computed');
+	expect(input.firstUse?.runtimeModuleIds).toContain('web/fns/roster-resume');
+	const click = action('h2', 'click');
+	expect(click.firstUse?.runtimeModuleIds).not.toContain('web/resume-sync-computed');
+});
+
 test('a control whose writes reach no branch leaves the branch symbols out', async () => {
 	const { action, kinds } = await panelDemandMap(PANEL);
 	const click = action('h2', 'click');
