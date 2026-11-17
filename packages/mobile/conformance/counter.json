@@ -15,13 +15,19 @@
 				"kind": "element",
 				"id": "h0",
 				"element": "main",
-				"parent": null
+				"parent": null,
+				"attributes": {
+					"class": "screen mk-uclxwk"
+				}
 			},
 			{
 				"kind": "element",
 				"id": "h1",
 				"element": "h1",
-				"parent": "h0"
+				"parent": "h0",
+				"attributes": {
+					"class": "title mk-uclxwk"
+				}
 			},
 			{
 				"kind": "text",
@@ -37,7 +43,10 @@
 				"kind": "element",
 				"id": "h2",
 				"element": "button",
-				"parent": "h0"
+				"parent": "h0",
+				"attributes": {
+					"class": "tap mk-uclxwk"
+				}
 			},
 			{
 				"kind": "text",
