@@ -27,13 +27,15 @@ class Runtime(val payload: Payload) {
 	fun run(handlerId: String): List<JournalEntry> {
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
 		val changed = HashSet<String>()
-		for (op in handler.ops) when (op) {
-			is Op.Add -> {
-				val before = values[op.cell] as? Scalar.Num ?: throw MarklessRuntimeError("add on \"${op.cell}\", which does not hold a number")
-				val after = before.value + op.value
-				if (after != before.value) changed.add(op.cell)
-				values[op.cell] = Scalar.Num(after)
+		for (op in handler.ops) {
+			val before = value(op.cell)
+			val after = when (op) {
+				is Op.Add -> Scalar.Num((before as? Scalar.Num ?: throw MarklessRuntimeError("add on \"${op.cell}\", which does not hold a number")).value + op.value)
+				is Op.Set -> op.value
+				is Op.Toggle -> Scalar.Bool(!JsString.truthy(before))
 			}
+			if (after != before) changed.add(op.cell)
+			values[op.cell] = after
 		}
 		val journal = ArrayList<JournalEntry>()
 		for (t in texts) {

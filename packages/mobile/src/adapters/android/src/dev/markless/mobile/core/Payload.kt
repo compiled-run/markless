@@ -17,14 +17,18 @@ sealed interface Node {
 	val id: String
 	val parent: String?
 
-	data class Element(override val id: String, val element: String, override val parent: String?) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap()) : Node
 	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>) : Node
 }
 
 enum class EventName(val wire: String) { Activate("activate") }
 
 sealed interface Op {
-	data class Add(val cell: String, val value: Double) : Op
+	val cell: String
+
+	data class Add(override val cell: String, val value: Double) : Op
+	data class Set(override val cell: String, val value: Scalar) : Op
+	data class Toggle(override val cell: String) : Op
 }
 
 data class Cell(val id: String, val name: String, val initial: Scalar)
@@ -94,9 +98,10 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes"), what)
 					val parent = o.field("parent", what)
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"))
+					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes)
 				}
 				"text" -> {
 					o.only(setOf("kind", "id", "parent", "parts"), what)
@@ -133,12 +138,21 @@ data class Payload(
 
 		private fun op(v: Json, what: String, cells: Set<String>): Op {
 			val o = v.obj(what)
-			return when (val name = o.field("op", what).str("$what.op")) {
+			val name = o.field("op", what).str("$what.op")
+			val cell = o.field("cell", what).str("$what.cell")
+			if (name in setOf("add", "set", "toggle") && cell !in cells) throw MarklessDecodeError("$what writes unknown cell \"$cell\"")
+			return when (name) {
 				"add" -> {
 					o.only(setOf("op", "cell", "value"), what)
-					val cell = o.field("cell", what).str("$what.cell")
-					if (cell !in cells) throw MarklessDecodeError("$what writes unknown cell \"$cell\"")
 					Op.Add(cell, integer(o.field("value", what).num("$what.value"), "$what.value"))
+				}
+				"set" -> {
+					o.only(setOf("op", "cell", "value"), what)
+					Op.Set(cell, scalar(o.field("value", what), "$what.value"))
+				}
+				"toggle" -> {
+					o.only(setOf("op", "cell"), what)
+					Op.Toggle(cell)
 				}
 				else -> throw MarklessDecodeError("$what has unknown op \"$name\"")
 			}

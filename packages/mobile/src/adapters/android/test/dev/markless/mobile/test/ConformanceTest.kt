@@ -99,7 +99,26 @@ private fun styleExport(fixtures: File) {
 	refusesStyle("an unknown schema", text.replace("native-style-export/0", "native-style-export/1"), "unknown style export schema")
 }
 
+private fun ops() {
+	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":0},{"id":"s","name":"s","initial":"a"},{"id":"b","name":"b","initial":false}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"attributes":{"class":"x mk-1"}},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"n"},{"text":"/"},{"cell":"s"},{"text":"/"},{"cell":"b"}]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"element","id":"h3","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"t"},{"host":"h2","event":"activate","handler":"s"},{"host":"h3","event":"activate","handler":"same"}],"handlers":[{"id":"t","ops":[{"op":"toggle","cell":"b"},{"op":"toggle","cell":"n"}]},{"id":"s","ops":[{"op":"set","cell":"s","value":"b"},{"op":"set","cell":"n","value":7}]},{"id":"same","ops":[{"op":"set","cell":"s","value":"b"}]}]}"""
+	val decoded = Payload.decode(payload.toByteArray())
+	check("element attributes decode", (decoded.nodes[0] as Node.Element).attributes == mapOf("class" to "x mk-1")) { "${decoded.nodes[0]}" }
+	val r = Runtime(decoded)
+	check("initial mixed scalars", r.text("h0:text0") == "0/a/false") { r.text("h0:text0") }
+	val toggled = r.dispatch("h1", EventName.Activate).joinToString(",") { it.toJson() }
+	check("toggle uses JavaScript truthiness (!0 is true)", toggled == """{"op":"text","node":"h0:text0","value":"true/a/true"}""") { toggled }
+	val set = r.dispatch("h2", EventName.Activate).joinToString(",") { it.toJson() }
+	check("set writes literals", set == """{"op":"text","node":"h0:text0","value":"7/b/true"}""") { set }
+	val same = r.dispatch("h3", EventName.Activate)
+	check("a set that changes nothing journals nothing", same.isEmpty()) { "$same" }
+	val add = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"s","name":"s","initial":"a"}],"nodes":[{"kind":"element","id":"h0","element":"button","parent":null}],"events":[{"host":"h0","event":"activate","handler":"x"}],"handlers":[{"id":"x","ops":[{"op":"add","cell":"s","value":1}]}]}"""
+	val err = runCatching { Runtime(Payload.decode(add.toByteArray())).dispatch("h0", EventName.Activate) }.exceptionOrNull()
+	check("add on a string is an error", err?.message?.contains("does not hold a number") == true) { "$err" }
+	refuses("a set to a non-integer", payload.replace("\"value\":7", "\"value\":7.5"), "integers only")
+}
+
 fun main(args: Array<String>) {
+	ops()
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()

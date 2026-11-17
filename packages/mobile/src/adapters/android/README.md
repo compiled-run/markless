@@ -52,6 +52,14 @@ Outputs go to `.build/` (ignored), or `$MARKLESS_ANDROID_OUT`.
 
 ## Checks on a device
 
+In-app conformance: build with `MARKLESS_CONFORMANCE_DIR=<vector dir> ./build-apk.sh ...`, launch with
+`adb shell am start -n dev.markless.mobile.shell/.ProofActivity --ez conformance true`, and read `adb logcat -s
+MarklessConformance`: one `pass <vector>` or `FAIL <vector>: <what differed>` line per vector. `DeviceConformance.run` mounts
+the vector's payload into real views, compares the TextViews with `initial`, then for each step calls `performClick()` on the
+action's view, compares the journal byte for byte and checks the views show each journaled string. Last run: `pass
+counter.json`; a copy with `Count 2` altered to `Count 3` logged `FAIL counter-altered.json: steps[1]: journal [...]`.
+
+
 With a style export, `MarklessActivity` logs `frames max gap <n> device px` after the first layout: the largest distance
 between any edge of a laid-out view and its Dragon frame (`MarklessHost.frameDeviation()`), with one `frame ...` line per
 node. Text frames round outward (a run a fraction of a pixel narrower than its frame would wrap), so a text edge can sit up to

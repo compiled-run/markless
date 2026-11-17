@@ -77,6 +77,9 @@ class MarklessHost(
 		style?.let { applyStyle(context, it, fonts) }
 	}
 
+	/** Called with each journal after it is applied. */
+	var onJournal: ((List<JournalEntry>) -> Unit)? = null
+
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
@@ -86,6 +89,7 @@ class MarklessHost(
 			tv.text = entry.value
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		onJournal?.invoke(journal)
 	}
 
 	private fun named(view: View, id: String, heading: Boolean = false) {
@@ -131,29 +135,26 @@ class MarklessHost(
 	private fun applyStyle(context: Context, style: StyleExport, fonts: FontSource) {
 		val dpr = context.resources.displayMetrics.density.toDouble()
 		if (Math.abs(dpr - style.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${style.dpr}; this device is $dpr")
-		val absolute = HashMap<String, Pair<Double, Double>>()
-		for (s in style.nodes) {
-			val p = s.parent?.let { absolute[it] ?: throw MarklessHostError("style node \"${s.id}\" precedes its parent") } ?: (0.0 to 0.0)
-			absolute[s.id] = (p.first + s.frame.x) to (p.second + s.frame.y)
-		}
+		val absolute = absoluteOrigins(style)
 		for (node in payload.nodes) {
 			val s = style.byId[node.id] ?: throw MarklessHostError("style export has no node \"${node.id}\"")
 			if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${node.id}\" is a ${s.kind}")
+			val frame = s.frame ?: throw MarklessHostError("style node \"${node.id}\" has no frame")
 			val view = views.getValue(node.id)
-			val (ax, ay) = absolute.getValue(s.id)
+			val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${node.id}\" sits inside a box with no frame")
 			if (node is Node.Text && view is Button) {
 				val (bx, by) = absolute.getValue(node.parent)
-				val box = style.byId.getValue(node.parent).frame
+				val box = style.byId.getValue(node.parent).frame!!
 				val l = (ax - bx).roundToInt(); val t = (ay - by).roundToInt()
-				view.setPadding(l, t, (bx + box.width).roundToInt() - (ax + s.frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + s.frame.height).roundToInt())
+				view.setPadding(l, t, (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
 			} else {
 				val parentId = node.parent
 				val (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
 				// Text rounds outward: a run a fraction of a pixel narrower than its frame wraps.
 				val rect = if (node is Node.Text) {
-					Rect(Math.floor(ax).toInt() - ox, Math.floor(ay).toInt() - oy, Math.ceil(ax + s.frame.width).toInt() - ox, Math.ceil(ay + s.frame.height).toInt() - oy)
+					Rect(Math.floor(ax).toInt() - ox, Math.floor(ay).toInt() - oy, Math.ceil(ax + frame.width).toInt() - ox, Math.ceil(ay + frame.height).toInt() - oy)
 				} else {
-					Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + s.frame.width).roundToInt() - ox, (ay + s.frame.height).roundToInt() - oy)
+					Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + frame.width).roundToInt() - ox, (ay + frame.height).roundToInt() - oy)
 				}
 				if (parentId == null) rootFrame = rect else (views.getValue(parentId) as MarklessBox).frames[view] = rect
 			}
@@ -164,17 +165,13 @@ class MarklessHost(
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
 	fun frameDeviation(): Double {
 		val style = style ?: throw MarklessHostError("no style export to compare frames with")
-		val absolute = HashMap<String, DoubleArray>()
-		for (s in style.nodes) {
-			val p = s.parent?.let { absolute.getValue(it) } ?: doubleArrayOf(0.0, 0.0)
-			absolute[s.id] = doubleArrayOf(p[0] + s.frame.x, p[1] + s.frame.y)
-		}
+		val absolute = absoluteOrigins(style).mapValues { doubleArrayOf(it.value.first, it.value.second) }
 		val rootId = payload.nodes.first().id
 		val origin = absolute.getValue(rootId)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
 		for (node in payload.nodes) {
-			val s = style.byId.getValue(node.id)
+			val frame = style.byId.getValue(node.id).frame!!
 			val a = absolute.getValue(node.id)
 			val view = views.getValue(node.id)
 			val at = IntArray(2).also { view.getLocationInWindow(it) }
@@ -182,11 +179,25 @@ class MarklessHost(
 			var w = view.width.toDouble(); var h = view.height.toDouble()
 			if (node is Node.Text && view is Button) { x += view.paddingLeft; y += view.paddingTop; w -= view.paddingLeft + view.paddingRight; h -= view.paddingTop + view.paddingBottom }
 			val left = a[0] - origin[0]; val top = a[1] - origin[1]
-			val gap = maxOf(maxOf(Math.abs(x - left), Math.abs(y - top)), maxOf(Math.abs(x + w - left - s.frame.width), Math.abs(y + h - top - s.frame.height)))
-			Log.i(TAG, "frame ${node.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon ${a[0] - origin[0]},${a[1] - origin[1]} ${s.frame.width}x${s.frame.height} gap $gap")
+			val gap = maxOf(maxOf(Math.abs(x - left), Math.abs(y - top)), maxOf(Math.abs(x + w - left - frame.width), Math.abs(y + h - top - frame.height)))
+			Log.i(TAG, "frame ${node.id} device ${x.toInt()},${y.toInt()} ${w.toInt()}x${h.toInt()} dragon ${a[0] - origin[0]},${a[1] - origin[1]} ${frame.width}x${frame.height} gap $gap")
 			worst = maxOf(worst, gap)
 		}
 		return worst
+	}
+
+	/** Each framed style node's top-left in device px from the export's root; a node under an unframed box has none. */
+	private fun absoluteOrigins(style: StyleExport): Map<String, Pair<Double, Double>> {
+		val absolute = HashMap<String, Pair<Double, Double>>()
+		val seen = HashSet<String>()
+		for (s in style.nodes) {
+			if (s.parent != null && s.parent !in seen) throw MarklessHostError("style node \"${s.id}\" precedes its parent")
+			seen.add(s.id)
+			val f = s.frame ?: continue
+			val p = if (s.parent == null) 0.0 to 0.0 else absolute[s.parent] ?: continue
+			absolute[s.id] = (p.first + f.x) to (p.second + f.y)
+		}
+		return absolute
 	}
 
 	/** The root's frame inside the viewport, when a style export placed it. */
