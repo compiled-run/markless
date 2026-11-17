@@ -1,11 +1,10 @@
 {
 	"rung": "D1",
 	"name": "A live device value read in markup follows the device",
-	"webRefused": "MARKLESS_DEVICE_WEB_UNSUPPORTED",
 	"steps": [
 		{
 			"visible": ["Connection", "Online"],
-			"absent": ["Offline"]
+			"absent": ["Offline", "Changes will sync later"]
 		},
 		{
 			"do": {
@@ -13,7 +12,7 @@
 					"network.online": false
 				}
 			},
-			"visible": ["Offline"],
+			"visible": ["Offline", "Changes will sync later"],
 			"absent": ["Online"]
 		},
 		{
@@ -23,7 +22,16 @@
 				}
 			},
 			"visible": ["Online"],
-			"absent": ["Offline"]
+			"absent": ["Offline", "Changes will sync later"]
 		}
-	]
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Connection", "Online"],
+				"absent": ["Offline", "Changes will sync later"]
+			}
+		],
+		"absentFromOutput": ["Changes will sync later", "Offline", "@markless/device"]
+	}
 }

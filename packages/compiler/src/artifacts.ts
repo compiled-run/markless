@@ -1,3 +1,4 @@
+import type { BuildTarget } from '@markless/serializer/native-device';
 import type {
 	ProtocolEventActionKind,
 	ProtocolStatePayload,
@@ -52,14 +53,36 @@ export type SemanticGraphInput = {
 	 * builds alone, so web and browser compiles neither run nor bundle it.
 	 */
 	readonly nativeFacts?: NativeFactCollectors;
+	/** What the build compiles for (`web` by default): `@markless/device` and `platform` fold to its constants. */
+	readonly target?: BuildTarget;
+	/**
+	 * On the web, what a device use that needs an answer does: `build-error` refuses it unless a `supported` check the
+	 * build can see rules it out (candidate a); `reject` leaves it to the web module, which rejects (candidate b).
+	 */
+	readonly deviceWebAnswers?: 'build-error' | 'reject';
+	/**
+	 * Folds `@markless/device` and `platform` to the target's constants and makes features absent on the web. Passed by
+	 * Node builds (the bundler, native builds); the browser's in-page compiler leaves it out and folds nothing.
+	 */
+	readonly deviceTargetFacts?: DeviceTargetFacts;
+};
+
+/** The target-constant analysis; its nodes are the parser's ESTree nodes and its state the analysis walk's. */
+export type DeviceTargetFacts = {
+	readonly foldedIfArm: (node: never, state: never) => number | null | undefined;
+	readonly foldedText: (container: never, state: never) => string | undefined;
+	readonly componentsAbsentOnTarget: (statements: never, state: never) => ReadonlySet<string>;
+	readonly collectWebDeviceAbsence: (
+		ast: never,
+		state: never,
+		answers: 'build-error' | 'reject',
+	) => ReadonlyArray<{ readonly start: number; readonly end: number; readonly text: string }>;
 };
 
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
-	readonly handlerStatements: (
-		node: never,
-	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
 };
 
 export type ElementOnlyAttribute = {
@@ -170,10 +193,7 @@ export type SemanticComponentPropBinding =
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
-			readonly catchResets?: ReadonlyArray<{
-				readonly name: string;
-				readonly boundaryId: string;
-			}>;
+			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
 			readonly catchBoundaryId?: string;
 			readonly returnsPromise?: true;
@@ -953,10 +973,7 @@ export type SemanticEvent = {
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
-	readonly handlerCatchResets?: ReadonlyArray<{
-		readonly name: string;
-		readonly boundaryId: string;
-	}>;
+	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
 	readonly handlerCatchBoundaryId?: string;
 	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
@@ -1022,7 +1039,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_ELEMENT_HANDLE_UNBOUND'
 		| 'MARKLESS_ELEMENT_HANDLE_PROP_UNSUPPORTED'
 		| 'MARKLESS_ELEMENT_MODULE_SCOPE'
-		| 'MARKLESS_DEVICE_WEB_UNSUPPORTED'
+		| 'MARKLESS_DEVICE_WEB_ABSENT'
 		| 'MARKLESS_ELEMENT_HANDLE_RENDER_READ'
 		| 'MARKLESS_ROSTER_COUNT_NOT_A_NUMBER'
 		| 'MARKLESS_ELEMENT_HANDLE_IDREF_UNBOUND'
@@ -1196,25 +1213,10 @@ export type SemanticGraphAlias = {
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| {
-			readonly kind: 'unary';
-			readonly operator: '!' | '-' | '+';
-			readonly value: SemanticExpression;
-	  }
+	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'binary';
-			readonly operator:
-				| '+'
-				| '-'
-				| '*'
-				| '/'
-				| '%'
-				| '==='
-				| '!=='
-				| '<'
-				| '<='
-				| '>'
-				| '>=';
+			readonly operator: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
 			readonly left: SemanticExpression;
 			readonly right: SemanticExpression;
 	  }
@@ -1243,15 +1245,9 @@ export type SemanticExpression =
 	| { readonly kind: 'await'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'array';
-			readonly items: ReadonlyArray<{
-				readonly spread: boolean;
-				readonly value: SemanticExpression;
-			}>;
+			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
 	  }
-	| {
-			readonly kind: 'object';
-			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
-	  }
+	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
 	/** A method of an array or string value, called with JavaScript's meaning. */
 	| {
 			readonly kind: 'method';
@@ -1260,11 +1256,7 @@ export type SemanticExpression =
 			readonly arguments: ReadonlyArray<SemanticExpression>;
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
-	| {
-			readonly kind: 'lambda';
-			readonly parameters: ReadonlyArray<string>;
-			readonly body: SemanticExpression;
-	  }
+	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
@@ -1305,10 +1297,7 @@ export type SemanticTemplateRead = {
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
 	// The async values a row expression reads beside its row item, which its @try waits on.
-	readonly asyncGateReads?: ReadonlyArray<{
-		readonly source: string;
-		readonly graphNodeId: string;
-	}>;
+	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -1691,6 +1680,12 @@ export type SemanticGraphArtifact = {
 	readonly componentPropBindings: ReadonlyArray<SemanticComponentPropDeclaration>;
 	readonly componentEdges: ReadonlyArray<SemanticComponentEdge>;
 	readonly moduleImports: ReadonlyArray<SemanticModuleImport>;
+	/** Web builds only: device calls removed from handler code and target constants written in place, by source span. */
+	readonly webDeviceEdits?: ReadonlyArray<{
+		readonly start: number;
+		readonly end: number;
+		readonly text: string;
+	}>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly sharedInstances: ReadonlyArray<SemanticSharedInstance>;
@@ -2522,11 +2517,7 @@ export type CaptureSlot = {
 };
 
 /** A file, line and column (both from 1), for naming code another module's compile cannot see. */
-export type SourcePosition = {
-	readonly filename: string;
-	readonly line: number;
-	readonly column: number;
-};
+export type SourcePosition = { readonly filename: string; readonly line: number; readonly column: number };
 
 export type ExtractedCaptureSymbol = {
 	readonly symbolId: string;

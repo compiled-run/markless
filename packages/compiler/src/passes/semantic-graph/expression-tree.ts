@@ -11,34 +11,11 @@ const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
-const BUILTINS = new Set([
-	'String',
-	'Number',
-	'Boolean',
-	'Math.abs',
-	'Math.floor',
-	'Math.max',
-	'Math.min',
-	'Math.round',
-]);
+const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round']);
 /** Array and string methods with exact JavaScript meaning that return a new value and change nothing. */
 const METHODS = new Set([
-	'filter',
-	'map',
-	'find',
-	'findIndex',
-	'some',
-	'every',
-	'includes',
-	'indexOf',
-	'join',
-	'concat',
-	'slice',
-	'reverse',
-	'toReversed',
-	'toUpperCase',
-	'toLowerCase',
-	'trim',
+	'filter', 'map', 'find', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
+	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
 ]);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
@@ -47,11 +24,7 @@ const lambdaOf = (node: AnyNode): SemanticExpression => {
 		return unsupported('a function with a pattern or async parameters');
 	const body = node.body as AnyNode | undefined;
 	if (!body || body.type === 'BlockStatement') return unsupported('a function with a block body');
-	return {
-		kind: 'lambda',
-		parameters: parameters.map((parameter) => String(parameter.name)),
-		body: expressionTreeOf(body),
-	};
+	return { kind: 'lambda', parameters: parameters.map((parameter) => String(parameter.name)), body: expressionTreeOf(body) };
 };
 
 const unsupported = (construct: string): SemanticExpression => ({ kind: 'unsupported', construct });
@@ -79,9 +52,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			return expressionTreeOf(node.expression as AnyNode | undefined);
 		case 'Identifier':
 			if (node.name === 'undefined') return { kind: 'literal', value: null };
-			return typeof node.name === 'string'
-				? { kind: 'read', name: node.name }
-				: unsupported('a name');
+			return typeof node.name === 'string' ? { kind: 'read', name: node.name } : unsupported('a name');
 		case 'Literal':
 			return typeof node.value === 'string' ||
 				typeof node.value === 'boolean' ||
@@ -104,20 +75,13 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		}
 		case 'UnaryExpression':
 			return typeof node.operator === 'string' && UNARY.has(node.operator)
-				? {
-						kind: 'unary',
-						operator: node.operator as '!' | '-' | '+',
-						value: expressionTreeOf(node.argument as AnyNode),
-					}
+				? { kind: 'unary', operator: node.operator as '!' | '-' | '+', value: expressionTreeOf(node.argument as AnyNode) }
 				: unsupported(`the \`${String(node.operator)}\` operator`);
 		case 'BinaryExpression':
 			return typeof node.operator === 'string' && BINARY.has(node.operator)
 				? {
 						kind: 'binary',
-						operator: node.operator as Extract<
-							SemanticExpression,
-							{ kind: 'binary' }
-						>['operator'],
+						operator: node.operator as Extract<SemanticExpression, { kind: 'binary' }>['operator'],
 						left: expressionTreeOf(node.left as AnyNode),
 						right: expressionTreeOf(node.right as AnyNode),
 					}
@@ -146,23 +110,14 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		}
 		case 'CallExpression': {
 			const callee = node.callee as AnyNode | undefined;
-			const method =
-				callee?.type === 'MemberExpression' && !callee.computed
-					? (callee.property as AnyNode | undefined)?.name
-					: undefined;
-			if (
-				typeof method === 'string' &&
-				METHODS.has(method) &&
-				!BUILTINS.has(calleeName(callee) ?? '')
-			) {
+			const method = callee?.type === 'MemberExpression' && !callee.computed ? (callee.property as AnyNode | undefined)?.name : undefined;
+			if (typeof method === 'string' && METHODS.has(method) && !BUILTINS.has(calleeName(callee) ?? '')) {
 				return {
 					kind: 'method',
 					method,
 					object: expressionTreeOf(callee!.object as AnyNode),
 					arguments: asNodes(node.arguments).map((argument) =>
-						argument.type === 'ArrowFunctionExpression'
-							? lambdaOf(argument)
-							: expressionTreeOf(argument),
+						argument.type === 'ArrowFunctionExpression' ? lambdaOf(argument) : expressionTreeOf(argument),
 					),
 				};
 			}
@@ -194,18 +149,8 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			const entries: (readonly [string, SemanticExpression])[] = [];
 			for (const property of asNodes(node.properties)) {
 				const key = property.key as AnyNode | undefined;
-				const name =
-					key?.type === 'Identifier'
-						? key.name
-						: key?.type === 'Literal'
-							? key.value
-							: undefined;
-				if (
-					property.type !== 'Property' ||
-					property.computed ||
-					property.kind !== 'init' ||
-					typeof name !== 'string'
-				)
+				const name = key?.type === 'Identifier' ? key.name : key?.type === 'Literal' ? key.value : undefined;
+				if (property.type !== 'Property' || property.computed || property.kind !== 'init' || typeof name !== 'string')
 					return unsupported('an object with a spread, computed key or method');
 				entries.push([name, expressionTreeOf(property.value as AnyNode)]);
 			}
@@ -217,8 +162,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 }
 
 const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
-	if (!expression)
-		return { kind: 'unsupported', construct: 'a statement other than an expression' };
+	if (!expression) return { kind: 'unsupported', construct: 'a statement other than an expression' };
 	if (expression.type === 'ParenthesizedExpression')
 		return statementOf((expression.expression as AnyNode | undefined) ?? null);
 	if (
@@ -247,10 +191,7 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 	if (expression.type === 'AssignmentExpression') {
 		const target = expression.left as AnyNode | undefined;
 		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
-			return {
-				kind: 'unsupported',
-				construct: 'an assignment to something other than a name',
-			};
+			return { kind: 'unsupported', construct: 'an assignment to something other than a name' };
 		const value = expressionTreeOf(expression.right as AnyNode | undefined);
 		const operator = String(expression.operator);
 		if (operator === '=') return { kind: 'assign', target: target.name, value };
@@ -260,10 +201,7 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 					target: target.name,
 					value: {
 						kind: 'binary',
-						operator: operator.slice(0, -1) as Extract<
-							SemanticExpression,
-							{ kind: 'binary' }
-						>['operator'],
+						operator: operator.slice(0, -1) as Extract<SemanticExpression, { kind: 'binary' }>['operator'],
 						left: { kind: 'read', name: target.name },
 						right: value,
 					},

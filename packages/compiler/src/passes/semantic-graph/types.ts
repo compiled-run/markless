@@ -1,3 +1,5 @@
+import type { DeviceTargetFacts } from '../../artifacts.ts';
+import type { BuildTarget } from '@markless/serializer/native-device';
 import type { AnyNode } from '../../ast/nodes.ts';
 import type { SourceSpan } from '../../diagnostics.ts';
 import type {
@@ -57,6 +59,11 @@ export type MutableSemanticGraphArtifact = {
 	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];
 	moduleImports: SemanticModuleImport[];
+	webDeviceEdits?: ReadonlyArray<{
+		readonly start: number;
+		readonly end: number;
+		readonly text: string;
+	}>;
 	graphBindings: SemanticGraphBinding[];
 	sharedDefinitions: SemanticSharedDefinition[];
 	sharedInstances: SemanticSharedInstance[];
@@ -151,6 +158,14 @@ export type WalkState = {
 	/** The router renders this module's default export as a page, so that component's props never change in the browser. */
 	readonly routeRoot: boolean;
 	readonly nativeFacts: NativeFactCollectors | null;
+	/** What this build compiles for; `@markless/device` and `platform` fold to its constants. */
+	readonly target: BuildTarget;
+	/** `@if` chains the target's constants decide, and the arm each keeps (null: none). */
+	readonly foldedIfs: Map<AnyNode, number | null>;
+	/** The target-constant analysis when this build passed it; absent in the browser's in-page compiler. */
+	readonly deviceTarget: DeviceTargetFacts | null;
+	/** `{expr}` containers whose value the target's constants decide, as the text they render. */
+	readonly foldedTexts: Map<AnyNode, string>;
 	/** Props the host provides only while rendering on the server, by component export. */
 	readonly serverOnlyProps: ReadonlyArray<{
 		readonly exportName: string;
@@ -320,6 +335,8 @@ export function createWalkState(input: {
 	}>;
 	readonly routeRoot?: boolean;
 	readonly nativeFacts?: NativeFactCollectors;
+	readonly target?: BuildTarget;
+	readonly deviceTargetFacts?: DeviceTargetFacts;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -338,6 +355,10 @@ export function createWalkState(input: {
 		serverOnlyProps: input.serverOnlyProps ?? [],
 		routeRoot: input.routeRoot === true,
 		nativeFacts: input.nativeFacts ?? null,
+		target: input.target ?? 'web',
+		foldedIfs: new Map(),
+		deviceTarget: input.deviceTargetFacts ?? null,
+		foldedTexts: new Map(),
 		hostIds: new WeakMap<object, string>(),
 		hostParents: new Map(),
 		handledTemplateValues: new WeakSet<object>(),

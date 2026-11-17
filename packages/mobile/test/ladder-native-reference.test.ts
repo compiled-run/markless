@@ -228,9 +228,13 @@ const appConfig = (folder: string): { device?: DeviceAppConfig } => {
 		: {};
 };
 
-test.each(rungFolders())(
-	'%s: the native payload shows the web steps, or is refused by name',
-	async (folder) => {
+test.each(
+	rungFolders().flatMap((folder) =>
+		(['ios', 'android'] as const).map((target) => [folder, target] as const),
+	),
+)(
+	'%s (%s): the native payload shows the web steps, or is refused by name',
+	async (folder, target) => {
 		const filename = join(proofsDir, folder, 'App.tsrx');
 		const rung = readRung(folder);
 		const page = rung.route === undefined ? undefined : `pages/${rung.route}.tsrx`;
@@ -240,6 +244,7 @@ test.each(rungFolders())(
 			...(page ? { page } : {}),
 			readModule: readRelativeModule,
 			...appConfig(folder),
+			target,
 		});
 		if (build.payload === null) {
 			// The device ladder's rungs are only written once they lower.
@@ -257,6 +262,10 @@ test.each(rungFolders())(
 			? matchRouteManifest(rung.start ?? '/', buildRouteManifestFromFileIds([page]))
 			: undefined;
 		if (page && !opened) throw new Error(`${folder}: ${rung.start} is not a path of ${page}`);
-		walk(build.payload, rung.steps, opened?.params ?? {}, rung.location);
+		const steps = rung.steps.map((step) => ({
+			...step,
+			visible: [...step.visible, ...(step.visibleOn?.[target] ?? [])],
+		}));
+		walk(build.payload, steps, opened?.params ?? {}, rung.location);
 	},
 );

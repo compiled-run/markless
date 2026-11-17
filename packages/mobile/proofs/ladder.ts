@@ -50,6 +50,8 @@ export type LadderStep = {
 	 * reference runtime check every expectation.
 	 */
 	readonly prompt?: 'location';
+	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
+	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
 };
 
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
@@ -75,10 +77,10 @@ export type LadderRung = {
 	/** Permissions at the first launch; `unset` leaves the system to ask (Maestro grants every permission otherwise). */
 	readonly permissions?: Readonly<Record<'location', 'allow' | 'deny' | 'unset'>>;
 	/**
-	 * The web build refuses this rung with this diagnostic code instead of showing it: the web half waits on an owner
-	 * decision named in the diagnostic. The web check asserts the refusal; the phones still run every step.
+	 * The web build, where `@markless/device` is absent: the steps it shows instead (a device action has nothing to
+	 * act on there), and texts that must not appear in any file of the built output (removed at build time).
 	 */
-	readonly webRefused?: string;
+	readonly web?: { readonly steps?: readonly LadderStep[]; readonly absentFromOutput?: readonly string[] };
 	readonly steps: readonly LadderStep[];
 };
 
@@ -86,7 +88,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|d\d)-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|[dp]\d)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort();
 
@@ -131,7 +133,24 @@ export const witnessCount = (witness: LadderStep): number =>
 const assertions = (step: LadderStep): unknown[] =>
 	step.prompt
 		? [{ assertVisible: { text: PERMISSION_PROMPTS[step.prompt] } }]
-		: screenAssertions(step);
+		: [...screenAssertions(step), ...platformAssertions(step)];
+
+const MAESTRO_PLATFORM = { ios: 'iOS', android: 'Android' } as const;
+
+const platformAssertions = (step: LadderStep): unknown[] =>
+	(['ios', 'android'] as const).flatMap((platform) => {
+		const texts = step.visibleOn?.[platform];
+		return texts
+			? [
+					{
+						runFlow: {
+							when: { platform: MAESTRO_PLATFORM[platform] },
+							commands: texts.map((text) => ({ assertVisible: selector(text) })),
+						},
+					},
+				]
+			: [];
+	});
 
 const screenAssertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),

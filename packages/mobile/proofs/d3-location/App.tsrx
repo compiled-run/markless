@@ -1,10 +1,9 @@
 import { computed } from '@markless/core';
 import { location } from '@markless/device';
 
-export default function App() @{
+function Here() @{
 	const here = computed(async () => location.current());
-	<main>
-		<h1>Location</h1>
+	<section>
 		<p>Access {location.access}</p>
 		@try {
 			<p>{here.latitude}, {here.longitude}</p>
@@ -12,6 +11,17 @@ export default function App() @{
 			<p>Locating</p>
 		} @catch (error) {
 			<p>{error.name}</p>
+		}
+	</section>
+}
+
+export default function App() @{
+	<main>
+		<h1>Location</h1>
+		@if (location.supported) {
+			<Here />
+		} @else {
+			<p>Location is not available here</p>
 		}
 	</main>
 }

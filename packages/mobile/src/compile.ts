@@ -4,6 +4,7 @@ import {
 	buildSemanticGraph,
 	createNativeViewPayload,
 	NATIVE_FACT_COLLECTORS,
+	DEVICE_TARGET_FACTS,
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
@@ -39,6 +40,8 @@ export async function compileNativeComponent(input: {
 	) => { readonly filename: string; readonly source: string } | undefined;
 	/** The app config's `device` section (usage text per feature). */
 	readonly device?: DeviceAppConfig;
+	/** The phone this payload is for; without one it serves both, and a read of `platform` is refused. */
+	readonly target?: 'ios' | 'android';
 }): Promise<NativeBuild> {
 	const route = input.page ? buildRouteManifestFromFileIds([input.page]).routes[0] : undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
@@ -47,6 +50,8 @@ export async function compileNativeComponent(input: {
 		source: input.source,
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
+		target: input.target ?? 'native',
+		deviceTargetFacts: DEVICE_TARGET_FACTS,
 	});
 	const importedModules: Record<string, SemanticGraphArtifact> = {};
 	for (const entry of compiled.semanticGraph.moduleImports) {
@@ -57,6 +62,8 @@ export async function compileNativeComponent(input: {
 			importedModules[entry.source] = await buildSemanticGraph({
 				...module,
 				nativeFacts: NATIVE_FACT_COLLECTORS,
+				target: input.target ?? 'native',
+				deviceTargetFacts: DEVICE_TARGET_FACTS,
 			});
 	}
 	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {

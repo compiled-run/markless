@@ -1,7 +1,6 @@
 {
 	"rung": "D3",
 	"name": "A one-time device ask in an async computed: pending, value, refused",
-	"webRefused": "MARKLESS_DEVICE_WEB_UNSUPPORTED",
 	"location": {
 		"latitude": 51.5,
 		"longitude": -0.125
@@ -40,5 +39,14 @@
 			"visible": ["NotAllowedError"],
 			"absent": ["Locating", "Access unknown", "Access granted", "51.5, -0.125"]
 		}
-	]
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Location", "Location is not available here"],
+				"absent": ["Locating", "Access unknown"]
+			}
+		],
+		"absentFromOutput": ["Locating", "geolocation", "@markless/device"]
+	}
 }

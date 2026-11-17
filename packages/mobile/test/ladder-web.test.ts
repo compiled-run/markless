@@ -1,4 +1,15 @@
-import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import {
+	copyFile,
+	cp,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	rm,
+	stat,
+	symlink,
+	writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
@@ -41,7 +52,10 @@ beforeAll(async () => {
 
 afterAll(() => browser.close(), 60_000);
 
-async function serveRung(folder: string, rung: LadderRung): Promise<string> {
+async function serveRung(
+	folder: string,
+	rung: LadderRung,
+): Promise<{ origin: string; root: string }> {
 	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder}-`));
 	cleanups.push(() => rm(root, { recursive: true, force: true }));
 	const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
@@ -66,7 +80,7 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
 	cleanups.push(() => server.close());
-	return server.origin;
+	return { origin: server.origin, root };
 }
 
 // The browser APIs `@markless/device` calls on the web, each recorded under the device call that made it.
@@ -133,23 +147,24 @@ describe.each(rungFolders())('%s', (folder) => {
 	const rung = readRung(folder);
 	let origin = '';
 
-	let refusal: unknown;
+	let built = '';
 	beforeAll(async () => {
-		if (rung.webRefused)
-			refusal = await serveRung(folder, rung).then(
-				() => null,
-				(error: unknown) => error,
-			);
-		else origin = await serveRung(folder, rung);
+		({ origin, root: built } = await serveRung(folder, rung));
 	}, 240_000);
 
-	if (rung.webRefused !== undefined) {
-		test(`${rung.name}: the web build refuses it by name`, () => {
-			expect(refusal, 'the web build succeeded').toBeInstanceOf(Error);
-			expect((refusal as Error).message).toContain(rung.webRefused);
+	const absent = rung.web?.absentFromOutput;
+	if (absent)
+		test(`${rung.name}: the web build's output has no trace of what is absent on the web`, async () => {
+			const found: string[] = [];
+			for (const file of await readdir(join(built, '.output'), { recursive: true })) {
+				const path = join(built, '.output', file);
+				if (!(await stat(path)).isFile()) continue;
+				const text = await readFile(path, 'utf8');
+				for (const needle of absent)
+					if (text.includes(needle)) found.push(`${needle} in ${file}`);
+			}
+			expect(found).toEqual([]);
 		});
-		return;
-	}
 
 	afterAll(async () => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
@@ -171,7 +186,11 @@ describe.each(rungFolders())('%s', (folder) => {
 			await page.goto(`${origin}${rung.start ?? '/'}`);
 			if (rung.steps.some((step) => step.do && 'wait' in step.do))
 				await page.clock.pauseAt(Date.now() + 60_000);
-			for (const [index, step] of rung.steps.entries()) {
+			for (const [index, authored] of (rung.web?.steps ?? rung.steps).entries()) {
+				const step = {
+					...authored,
+					visible: [...authored.visible, ...(authored.visibleOn?.web ?? [])],
+				};
 				await act(page, step);
 				await expect
 					.poll(() => mismatches(page, step), {

@@ -51,3 +51,44 @@ export type NativeDeviceCall = keyof typeof DEVICE_CALLS;
 
 /** The error name a refused ask rejects with, on every platform (the web's `DOMException` name). */
 export const DEVICE_REFUSED_ERROR = 'NotAllowedError';
+
+/** What a build compiles for; `native` is one payload for both phones, where `platform` is not decided. */
+export type BuildTarget = 'web' | 'ios' | 'android' | 'native';
+
+/** The `@markless/device` exports a target knows at build time: `platform`, and each feature's `supported`. */
+export const DEVICE_EXPORTS = [
+	'platform',
+	'network',
+	'haptics',
+	'location',
+	'camera',
+	'sharesheet',
+] as const;
+
+/**
+ * The fields of `@markless/device` exports that are build-time constants on each target, and their values. A read of
+ * one folds to its value: an `@if` it decides keeps only the chosen arm. On the web every feature is absent
+ * (`supported` is false) and a live value takes the value that means nothing is wrong; a value with no honest
+ * constant (`location.access`) is not listed.
+ */
+export function targetConstants(
+	target: BuildTarget,
+): Readonly<Record<string, Readonly<Record<string, boolean>>>> {
+	const supported = target !== 'web';
+	return {
+		...(target === 'native'
+			? {}
+			: {
+					platform: {
+						ios: target === 'ios',
+						android: target === 'android',
+						web: target === 'web',
+					},
+				}),
+		network: target === 'web' ? { supported, online: true } : { supported },
+		haptics: { supported },
+		location: { supported },
+		camera: { supported },
+		sharesheet: { supported },
+	};
+}
