@@ -1,0 +1,32 @@
+{"grader":"b5-g1","answers":{
+"WZ":{
+"A1":{"value":true,"why":"Module-level map.handle() gets moveTo(place) before a same-app link to /map; the handle survives and the sheet says the root starts at the moved-to place."},
+"A2":{"value":true,"why":"Module-level handle moveTo(place) then same-app <a href=\"/map\">; handle survives in-place navigation and the root starts there per the sheet."},
+"A3":{"value":true,"why":"Module-level handle moveTo(place) then same-app link to /map; the sheet guarantees the next-shown root starts at that place."},
+"A4":{"value":true,"why":"Module-level handle moveTo(result) then same-app link to /map; handle survives and the root starts at the moved-to place."},
+"A5":{"value":true,"why":"Module-level handle moveTo(spot.at) then same-app link to /map; the sheet says the root opens there instead of its center prop."}},
+"JR":{
+"A1":{"value":true,"why":"location.assign to /map?lat&lng carries the place in the URL; an attach callback (browser-side) reads location.search and assigns map.center, which the sheet says moves the map."},
+"A2":{"value":true,"why":"Link to /map?lat&lng; an attach callback reads window.location.search in the browser and assigns m.center, which moves the map."},
+"A3":{"value":true,"why":"Link to /map?lat&lng; the page's url prop is read into mapview({ center }) as the starting centre."},
+"A4":{"value":false,"why":"Place goes in the URL, but the body reads globalThis.location?.search, which is absent in the server render, so the map starts at HOME."},
+"A5":{"value":true,"why":"Link to /map?lat&lng; the url prop is read into mapview({ center }) as the starting centre."}},
+"ZK":{
+"A1":{"value":true,"why":"Link to /map?lat&lng; url.searchParams is read into mapview({ center })."},
+"A2":{"value":true,"why":"Link to /map?lat&lng; url.searchParams is read into mapview({ center })."},
+"A3":{"value":true,"why":"Link via mapHref to /map?lat&lng; placeFromUrl(url) feeds mapview({ center })."},
+"A4":{"value":true,"why":"Link to /map?lat&lng; url.searchParams is read into mapview({ center }) (mapview import is missing, but the mechanism is right)."},
+"A5":{"value":true,"why":"Link to /map?lat&lng; a searchParams page prop is read into mapview({ center }) as the starting centre."}},
+"DU":{
+"A1":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the cookie-backed value is read on the fresh render into MapView's center."},
+"A2":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the cookie is read on the fresh render and parsed into MapView's center."},
+"A3":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the saved value is parsed into MapView's center on the fresh render."},
+"A4":{"value":true,"why":"storage('map-center') write then location.assign('/map'); parseCenter(storage value) feeds MapView's center."},
+"A5":{"value":true,"why":"storage('map-center') write then location.assign('/map'); readCenter(storage value) feeds MapView's center."}},
+"KJ":{
+"A1":{"value":true,"why":"storage('map-center') write then window.location.assign('/map'); the body reads the cookie-backed value into the starting center state."},
+"A2":{"value":true,"why":"storage(MAP_CENTER_KEY) write then window.location.assign('/map'); the map's center is computed from the stored value."},
+"A3":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the center is computed from the stored string."},
+"A4":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the center is computed from the stored value."},
+"A5":{"value":true,"why":"storage('map-center') write then location.assign('/map'); the center is computed from the stored value."}}
+}}

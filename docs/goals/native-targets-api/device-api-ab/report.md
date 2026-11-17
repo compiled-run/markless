@@ -1,5 +1,7 @@
 # Device API A/B: which shape is most intuitive to a consumer?
 
+> **Round 2** (`round2/report.md`): five new designs on eight tasks. Writers made no API mistakes in any of them. Readers ranked device objects shown with `<camera el={cam} />` clearest (first for 8 of 8 readers) and parts with visible state least clear. A separate sub-test favoured plain functions for one-off features and the `<device.camera>` namespace spelling.
+
 ## Summary
 
 Given only a signature sheet, consumers made almost no API mistakes in any of the six designs, so correctness did not separate them. What did: device objects and compound parts produced the shortest code. Readers ranked device objects clearest (first for 7 of 8 readers) and compound parts least clear (last for 6 of 8). Blind consumers, with no docs, most often invented the explicit-permissions and view-element-plus-functions shapes. On the tasks where the designs differ, they never invented the web-standard one.

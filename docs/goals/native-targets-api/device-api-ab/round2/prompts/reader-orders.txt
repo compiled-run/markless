@@ -1,0 +1,8 @@
+reader1: KJ DU WZ ZK JR
+reader2: KJ ZK DU JR WZ
+reader3: JR WZ ZK KJ DU
+reader4: KJ ZK DU WZ JR
+reader5: KJ JR DU WZ ZK
+reader6: JR DU KJ WZ ZK
+reader7: KJ ZK WZ JR DU
+reader8: ZK KJ JR DU WZ

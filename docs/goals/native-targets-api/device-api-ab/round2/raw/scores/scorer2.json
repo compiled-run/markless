@@ -1,0 +1,549 @@
+{
+ "scorer": "scorer2",
+ "scores": {
+  "reader1": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged; Q2 'presumably' handles readiness (0.5); Q6/Q8 hedged"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged 'presumably/probably' waits or disabled; Q6 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "In `<device.recorder active={recording} onTick=\u2026 />`, it is unclear whether this element draws anything on screen."
+   }
+  },
+  "reader2": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged 'presumably' error content, unsure if picture hides; Q2 says code does not show readiness; Q6/Q8 hedged 'presumably'"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged 'presumably/probably' waits or disabled; Q6 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "In KJ, `<device.recorder active={recording} \u2026 />` seems to draw nothing on screen."
+   }
+  },
+  "reader3": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged 'presumably' error content, unsure if picture hides; Q2 says code does not show readiness; Q6/Q8 hedged 'presumably'"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 code does not show readiness; Q6 trigger 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />` is an element with no visible role. I can't tell whether it renders anything."
+   }
+  },
+  "reader4": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged 'presumably' error content, unsure if picture hides; Q2 says code does not show readiness; Q6/Q8 hedged 'presumably'"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged 'presumably/probably' waits or disabled; Q6 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "DU",
+    "KJ",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />` seems to render nothing yet controls recording. It is unclear what is on screen."
+   }
+  },
+  "reader5": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged; Q2 'presumably' handles readiness (0.5); Q6/Q8 hedged"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged 'presumably/probably' waits or disabled; Q6 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />` sits in the markup but appears to show nothing. It is unclear whether it renders anything."
+   }
+  },
+  "reader6": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged 'presumably' error content, unsure if picture hides; Q2 says code does not show readiness; Q6/Q8 hedged 'presumably'"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 code does not show readiness; Q6 trigger 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />` looks like an element that may show nothing on screen."
+   }
+  },
+  "reader7": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged 'presumably' error content, unsure if picture hides; Q2 says code does not show readiness; Q6/Q8 hedged 'presumably'"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 0.5,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged among disabled/queue/do nothing; Q6 'presumably' toggles; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "DU",
+    "KJ",
+    "WZ",
+    "ZK"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />`. I can't tell whether this element shows anything on screen."
+   }
+  },
+  "reader8": {
+   "WZ": {
+    "Q1": 0.5,
+    "Q2": 0,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q1 hedged; Q2 code does not show; Q8 hedged"
+   },
+   "JR": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ZK": {
+    "Q1": 1,
+    "Q2": 0.5,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 0.5,
+    "notes": "Q2 hedged among disabled/ignores/waits; Q8 'presumably' recenters"
+   },
+   "DU": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "KJ": {
+    "Q1": 1,
+    "Q2": 1,
+    "Q3": 1,
+    "Q4": 1,
+    "Q5": 1,
+    "Q6": 1,
+    "Q7": 1,
+    "Q8": 1,
+    "notes": ""
+   },
+   "ranking": [
+    "JR",
+    "KJ",
+    "DU",
+    "ZK",
+    "WZ"
+   ],
+   "recorderConfused": {
+    "value": true,
+    "quote": "KJ: `<device.recorder active={recording} \u2026 />`. This element seems to show nothing on screen."
+   }
+  }
+ }
+}

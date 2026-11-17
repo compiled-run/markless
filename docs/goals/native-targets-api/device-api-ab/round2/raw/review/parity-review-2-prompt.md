@@ -1,0 +1,10 @@
+You are reviewing reference solutions for an API-design study, read-only. Several designs of a hypothetical device package ("@markless/device") each have a signature sheet and eight reference solutions written by the same author. Readers will later compare designs by reading these solutions, so no design may be disadvantaged by sloppier or less careful code. A previous review already checked WZ and DU; this pass focuses on KJ (new), and on JR and ZK (just rewritten so the camera is shown as `<camera el={cam} />`), compared against each other and against WZ and DU.
+
+Read ONLY these files (do not modify anything, do not search the repository, do not use the web), all under /Users/jackshelton/wt/markless/device-api-round2/docs/goals/native-targets-api/device-api-ab/round2/:
+- tasks.md (the eight tasks; ignore its label table)
+- sheets/KJ.d.ts, sheets/JR.d.ts, sheets/ZK.d.ts, sheets/WZ.d.ts, sheets/DU.d.ts
+- solutions/<label>/task1.md … task8.md for KJ, JR, ZK, WZ, DU
+
+Markless basics: a component body is `@{ statements; one root element }` and runs once (no re-renders); `state()` values update by assignment; `@if`/`@else`/`@for` blocks hold one node each; `shared()` gives every caller one copy of some state; `element()` makes a handle to a real element bound with `el={handle}`; `navigate()` and `PageProps` come from `@markless/router`.
+
+For each task, compare KJ, JR and ZK with each other and with WZ and DU on parity of care: does each do everything the task asks within its sheet's stated guarantees; are user-facing touches equal (messages, refusal handling, formats); is any solution needlessly longer, more awkward, or using something its sheet does not declare; could anything mislead a reader about the design. Reply with concrete findings (design label, task, issue, suggested fix), and say plainly where a task has no parity problems. Be strict but do not invent problems: the designs are meant to differ in shape.

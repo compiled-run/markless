@@ -1,0 +1,6 @@
+reader1: AZ MM EC; X=S1
+reader2: MM AZ EC; X=S2
+reader3: EC MM AZ; X=S1
+reader4: EC AZ MM; X=S2
+reader5: MM EC AZ; X=S1
+reader6: AZ EC MM; X=S2

@@ -1,0 +1,8 @@
+reader1 ac72bcbd1ca7298cf
+reader2 ab267ba66114d962f
+reader3 a7259883f84b5d379
+reader4 a429483445599ca65
+reader5 ab08230a0810bef3b
+reader6 a592f8fa878ac7d2d
+reader7 a3e12b496a0fad1e3
+reader8 afef6122a8327c187
