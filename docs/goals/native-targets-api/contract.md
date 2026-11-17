@@ -17,6 +17,10 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
    the older payload shape.
 3. Vectors to pass: every file in `packages/mobile/conformance/`.
+4. Since then (2026-11-17, up to `6284b5111`): rung 7 (component instances inlined, ids prefixed `component-edge:N/`;
+   nothing new for hosts but `components.json`), rung 10 (`a` elements, the `navigate` op and journal entry, the
+   `{ route: 'params' }` expression, a payload `route`, vectors carrying `params`; `route.json`). Rung 11 is stopped on an
+   owner decision. Android passes every vector but `list.json` and `route.json` as of `d88b8011a`.
 
 ## 1. What I found before building (the owner's picture is weeks old)
 
