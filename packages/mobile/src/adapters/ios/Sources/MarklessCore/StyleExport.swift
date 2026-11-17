@@ -1,7 +1,10 @@
 import Foundation
 
 public let dragonStyleExportSchemas = ["dragon.native-style-export/0", "dragon.native-style-export/1"]
-private let dragonStyleExportUnits = "device px; frames relative to the parent box"
+private let dragonStyleExportUnits = [
+	"device px; frames relative to the parent box",
+	"frames and borderWidths in device px, frames relative to the parent box; lengths inside writes in CSS px",
+]
 
 public struct RGBA: Equatable, Sendable {
 	public let r: Double, g: Double, b: Double, alpha: Double
@@ -67,7 +70,7 @@ public struct StyleExport: Sendable {
 		}
 		let perState = schema == dragonStyleExportSchemas[1]
 		let units = try fields["units"].string()
-		guard units == dragonStyleExportUnits else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
+		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
 		let fonts = try fields["fonts"].array().map { font in
 			let field = try font.object(["id", "file"])
 			return (id: try field["id"].string(), file: try field["file"].string())

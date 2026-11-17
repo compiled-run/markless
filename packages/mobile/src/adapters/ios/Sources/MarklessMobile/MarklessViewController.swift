@@ -37,6 +37,8 @@ public final class MarklessViewController: UIViewController {
 			guard let page = self.payload.route else { throw HostError("opened at \(route), but \(self.payload.component) is not a page") }
 			guard let matched = page.match(route) else { throw HostError("\(route) does not match the page's route \(page.pattern)") }
 			params = matched
+		} else if let page = self.payload.route, !page.params.isEmpty {
+			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
 		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)

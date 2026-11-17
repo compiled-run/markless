@@ -1,6 +1,6 @@
 # Requests from native-ios-host
 
-Answered by the lead on 2026-11-17 and adopted: 1 (write lengths are CSS px), 2 (unnamed export nodes only offset their
+Answered by the lead on 2026-11-17 and adopted: 1 (write lengths are CSS px; Dragon's `units` string now says so and the host accepts it), 2 (unnamed export nodes only offset their
 children; the iOS host no longer builds them), the 0.001 pixel-ratio tolerance.
 
 Each item: the change I need in the contract, and the reading the iOS host uses until the lead decides.
@@ -53,7 +53,7 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
     keeps UTF-16 slicing of user text away from pair boundaries. The generated expression cases avoid it.
 15. **Containers in storage.** Arrays and objects in a storage cell are kept in `UserDefaults` as JSON-text `Data`
     (property lists cannot hold null inside an array); strings, numbers and booleans as themselves.
-16. **Which export state follows which cell.** The contract says the export's state is "the one whose key names that
+16. **Which export state follows which cell.** (Answered: keys are Markless cell ids; the `#<cell id>` suffix is kept only for Dragon's own fixtures.) The contract says the export's state is "the one whose key names that
     cell" without saying how a key names a cell. Both hosts read: the key equals the cell id, or ends in `#<cell id>`
     (Dragon's own keys look like `doc/app/chip#selected`). The iOS host also refuses an export whose states do not cover
     every `styled` cell, and starts at the assignment whose values match the cells at mount (so a stored value starts in
