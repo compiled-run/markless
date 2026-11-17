@@ -20,12 +20,14 @@ public enum StyleWrite: Sendable {
 	case borderRadius([(percent: Bool, value: Double)])
 	case font(family: String, size: Double)
 	case textColor(RGBA)
+	case syntheticBold
 }
 
 public struct StyleNode: Sendable {
 	public let id: String
 	public let parent: String?
 	public let isText: Bool
+	public let isAnonymous: Bool
 	public let text: String?
 	public let frame: Frame?
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
@@ -77,10 +79,12 @@ public struct StyleExport: Sendable {
 		let field = try node.object(["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
-		let isText: Bool
+		var isText = false
+		var isAnonymous = false
 		switch (kind, native) {
-		case ("element", "DragonBoxView"): isText = false
+		case ("element", "DragonBoxView"): break
 		case ("text", "DragonTextView"): isText = true
+		case ("anonymous", _): isAnonymous = true
 		default: throw PayloadError(path: node.path, reason: "unknown node kind \(kind) with native view \(native)")
 		}
 		let frameReader = try field["frame"]
@@ -95,7 +99,7 @@ public struct StyleExport: Sendable {
 		}()
 		let textReader = try field["text"]
 		return StyleNode(
-			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText,
+			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
 			writes: try field["writes"].array().map(decodeWrite))
 	}
@@ -139,6 +143,12 @@ public struct StyleExport: Sendable {
 			_ = try font["specifiedSize"].object(["kind", "value"])
 			_ = try font["absoluteSize"].bool()
 			return .font(family: try font["family"].string(), size: try font["size"].number())
+		case "synthetic-bold":
+			let f = try write.object(["kind", "keys", "values", "key"])
+			try expectKey(f, "syntheticBold")
+			_ = try f["keys"].array().map { try $0.number() }
+			_ = try f["values"].array().map { try $0.number() }
+			return .syntheticBold
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

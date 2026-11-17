@@ -20,12 +20,17 @@ public struct StyleLayout: Sendable {
 	public let wrappers: [(id: String, style: ResolvedStyle)]
 	public let styles: [String: ResolvedStyle]
 	public let viewport: (width: Double, height: Double)
+	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
+	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
 }
 
 extension StyleExport {
 	/// Pairs every payload node with its export node; a node either side lacks, or a write this host cannot express, is an error.
 	public func resolve(for payload: NativeViewPayload, initialTexts: [(node: String, text: String)]) throws -> StyleLayout {
+		if let anonymous = nodes.first(where: \.isAnonymous) {
+			throw styleError("\(anonymous.id): anonymous boxes are not implemented on iOS")
+		}
 		let byId = Dictionary(uniqueKeysWithValues: nodes.map { ($0.id, $0) })
 		let payloadIds = Set(payload.nodes.map(\.id))
 		let texts = Dictionary(uniqueKeysWithValues: initialTexts.map { ($0.node, $0.text) })
@@ -63,7 +68,7 @@ extension StyleExport {
 		}
 		return StyleLayout(
 			wrappers: try wrappers.map { (id: $0, style: try resolve(byId[$0]!)) }, styles: styles,
-			viewport: viewport, fontFiles: fonts)
+			viewport: viewport, dpr: dpr, fontFiles: fonts)
 	}
 
 	private func resolve(_ node: StyleNode) throws -> ResolvedStyle {
@@ -84,6 +89,7 @@ extension StyleExport {
 				style.cornerRadius = lengths[0].value
 			case let .font(family, size): style.font = (family, size)
 			case let .textColor(color): style.textColor = color
+			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
 			}
 		}
 		if let widths = node.borderWidths {

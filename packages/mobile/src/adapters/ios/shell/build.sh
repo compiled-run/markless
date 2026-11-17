@@ -23,7 +23,7 @@ case "$input" in
 esac
 if [ -n "$style" ]; then
 	cp "$style" "$app/style.json"
-	for font in "$fonts"/*; do cp "$font" "$app/fonts/$(shasum -a 256 "$font" | cut -d' ' -f1).${font##*.}"; done
+	for font in "$fonts"/*.ttf "$fonts"/*.otf; do [ -e "$font" ] || continue; cp "$font" "$app/fonts/$(shasum -a 256 "$font" | cut -d' ' -f1).${font##*.}"; done
 fi
 cp "$here/Info.plist" "$app/Info.plist"
 codesign --force --sign - "$app" >/dev/null

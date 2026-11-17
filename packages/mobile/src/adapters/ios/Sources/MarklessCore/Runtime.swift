@@ -72,6 +72,11 @@ public final class NativeRuntime {
 					throw RuntimeError(reason: "add on \(cell), which does not hold a number")
 				}
 				values[cell] = .number(value + amount)
+			case let .set(cell, value):
+				_ = try read(cell)
+				values[cell] = value
+			case let .toggle(cell):
+				values[cell] = .bool(!(try read(cell).isTruthy))
 			}
 		}
 		return try texts().compactMap { node, text in before[node] == text ? nil : .text(node: node, value: text) }

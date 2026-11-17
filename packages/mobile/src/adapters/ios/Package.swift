@@ -11,6 +11,7 @@ let package = Package(
 	targets: [
 		.target(name: "MarklessCore"),
 		.target(name: "MarklessMobile", dependencies: ["MarklessCore"]),
-		.testTarget(name: "MarklessCoreTests", dependencies: ["MarklessCore"]),
+		.testTarget(name: "MarklessMobileTests", dependencies: ["MarklessMobile", "MarklessCore"]),
+		.testTarget(name: "MarklessCoreTests", dependencies: ["MarklessCore"], resources: [.copy("Fixtures")]),
 	]
 )

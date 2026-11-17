@@ -16,7 +16,7 @@ public final class MarklessViewController: UIViewController {
 	private let runtime: NativeRuntime
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
-	private var tree: ViewTree?
+	private(set) var tree: ViewTree?
 
 	public init(payload: Data, style: Data? = nil, fonts: [String: Data] = [:]) throws {
 		let decoded = try NativeViewPayload.decode(payload)
@@ -39,6 +39,13 @@ public final class MarklessViewController: UIViewController {
 		screen.backgroundColor = .systemBackground
 		view = screen
 		tree?.mount(in: screen)
+	}
+
+	public override func viewIsAppearing(_ animated: Bool) {
+		super.viewIsAppearing(animated)
+		if let layout, traitCollection.displayScale != layout.dpr {
+			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
+		}
 	}
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.

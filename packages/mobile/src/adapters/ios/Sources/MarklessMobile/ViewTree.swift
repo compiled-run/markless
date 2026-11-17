@@ -13,8 +13,8 @@ private let unimplementedElements: Set<String> = [
 final class ViewTree {
 	private let layout: StyleLayout?
 	private var outermost: [UIView] = []
-	private var elements: [String: UIView] = [:]
-	private var labels: [String: UILabel] = [:]
+	private(set) var elements: [String: UIView] = [:]
+	private(set) var labels: [String: UILabel] = [:]
 	private var buttonOfLabel: [String: UIButton] = [:]
 	private var labelsOfButton: [ObjectIdentifier: [UILabel]] = [:]
 
@@ -43,7 +43,7 @@ final class ViewTree {
 			let underButton = node.parent.flatMap { buttonOf[$0] }
 			let view: UIView
 			switch node {
-			case let .element(id, element, _):
+			case let .element(id, element, _, _):
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				if element == "button" {
 					if underButton != nil { throw HostError("<button> \(id) is inside another button") }

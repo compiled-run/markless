@@ -4,7 +4,9 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
 
 1. **Units inside Dragon's writes.** The export says "device px", which holds for `frame` and `borderWidths` (the counter's
    2px border is 6 at 3x), but the write values are CSS px: `font.size` 24 and `border-radius` 12 match the CSS, not ×3.
-   Change needed: the contract (or Dragon's `units` string) states that write lengths are CSS px. Host reading: frames and
+   Dragon's own fixtures agree (`ms-text`: `font-size: 20px` exports `size: 20`; `ms-toggle`: `border-radius: 6px` exports 6).
+   The contract's handoff section now says "All lengths in device pixels", which is wrong for writes. Change needed: the
+   contract (or Dragon's `units` string) states that write lengths are CSS px. Host reading: frames and
    border widths ÷ dpr, write lengths used as points.
 2. **Wrapper boxes above the component.** The export has `html` and `body` nodes that the payload does not. Change needed: say
    so in the contract. Host reading: build them as plain boxes with their frames and writes, put the payload's root inside the
@@ -26,3 +28,11 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
 7. **`@markless/core` in `@markless/mobile`.** A `.tsrx` under `packages/mobile/src` is typechecked and imports `state` from
    `@markless/core`, which the package did not list. I added it as a devDependency (`packages/mobile/package.json` and the
    lockfile, four lines). Lead: keep or move it as you prefer; proof components will need the same.
+8. **Font families that are not face ids.** `ms-text` exports `font.family: "Ahem"` with an empty `fonts` list. The iOS host
+   resolves a family only through `fonts` (`sha256:` id to bytes) and refuses anything else. Change needed: every font write
+   names a face listed in `fonts`, or the contract names the system fonts a host may use.
+9. **`synthetic-bold` and `anonymous`.** Both decode; the iOS host refuses them when resolving until their meaning is written
+   down (`synthetic-bold` `keys`/`values` are not explained; `anonymous` boxes have no `native` the contract names).
+10. **Export `/1` (per-state assignments).** Dragon's `native-dragon-styles` branch emits `dragon.native-style-export/1`. The
+   iOS host reads only `/0` and refuses `/1` by schema. Change needed before rung 4: the journal entry that tells a host to
+   switch assignment (`next[a][s][v]`), so hosts stay "changed only by journal entries".

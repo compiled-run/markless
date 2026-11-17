@@ -7,6 +7,15 @@ public enum NativeScalar: Equatable, Sendable {
 	case string(String)
 	case bool(Bool)
 
+	/// JavaScript's `Boolean(value)`.
+	public var isTruthy: Bool {
+		switch self {
+		case let .number(value): return value != 0 && !value.isNaN
+		case let .string(value): return !value.isEmpty
+		case let .bool(value): return value
+		}
+	}
+
 	/// JavaScript's `String(value)`.
 	public var text: String {
 		switch self {
@@ -23,18 +32,18 @@ public enum NativeTextPart: Equatable, Sendable {
 }
 
 public enum NativeNode: Equatable, Sendable {
-	case element(id: String, element: String, parent: String?)
+	case element(id: String, element: String, parent: String?, attributes: [String: String])
 	case text(id: String, parent: String, parts: [NativeTextPart])
 
 	public var id: String {
 		switch self {
-		case let .element(id, _, _), let .text(id, _, _): return id
+		case let .element(id, _, _, _), let .text(id, _, _): return id
 		}
 	}
 
 	public var parent: String? {
 		switch self {
-		case let .element(_, _, parent): return parent
+		case let .element(_, _, parent, _): return parent
 		case let .text(_, parent, _): return parent
 		}
 	}
@@ -46,6 +55,14 @@ public enum NativeEventName: String, Sendable {
 
 public enum NativeOp: Equatable, Sendable {
 	case add(cell: String, value: Double)
+	case set(cell: String, value: NativeScalar)
+	case toggle(cell: String)
+
+	public var cell: String {
+		switch self {
+		case let .add(cell, _), let .set(cell, _), let .toggle(cell): return cell
+		}
+	}
 }
 
 public struct NativeCell: Equatable, Sendable {
@@ -92,8 +109,15 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let kind = try node.field("kind").string()
 			switch kind {
 			case "element":
-				let field = try node.object(["kind", "id", "element", "parent"])
-				return .element(id: try field["id"].string(), element: try field["element"].string(), parent: try field["parent"].optionalString())
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes"])
+				var attributes: [String: String] = [:]
+				if field.has("attributes") {
+					let reader = try field["attributes"]
+					for key in try reader.keys() { attributes[key] = try reader.field(key).string() }
+				}
+				return .element(
+					id: try field["id"].string(), element: try field["element"].string(),
+					parent: try field["parent"].optionalString(), attributes: attributes)
 			case "text":
 				let field = try node.object(["kind", "id", "parent", "parts"])
 				let parts = try field["parts"].array().map { part -> NativeTextPart in
@@ -123,6 +147,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "add":
 					let opField = try op.object(["op", "cell", "value"])
 					return .add(cell: try opField["cell"].string(), value: try opField["value"].number())
+				case "set":
+					let opField = try op.object(["op", "cell", "value"])
+					return .set(cell: try opField["cell"].string(), value: try opField["value"].scalar())
+				case "toggle":
+					return .toggle(cell: try op.object(["op", "cell"])["cell"].string())
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
@@ -160,8 +189,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard handlerIds.insert(handler.id).inserted else {
 				throw PayloadError(path: "payload.handlers", reason: "duplicate handler \(handler.id)")
 			}
-			for case let .add(cell, _) in handler.ops where !cellIds.contains(cell) {
-				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) writes unknown cell \(cell)")
+			for op in handler.ops where !cellIds.contains(op.cell) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) writes unknown cell \(op.cell)")
 			}
 		}
 		for event in events {
