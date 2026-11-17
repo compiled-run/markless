@@ -146,7 +146,18 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			close();
 			const element = tagOf.get(item.id);
 			if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
-			nodes.push({ kind: 'element', id: item.id, element: element ?? '*', parent });
+			const attributes = (chunk.attributes ?? []).filter(
+				(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
+			);
+			nodes.push({
+				kind: 'element',
+				id: item.id,
+				element: element ?? '*',
+				parent,
+				...(attributes.length > 0
+					? { attributes: Object.fromEntries(attributes.map((a) => [a.name, a.value])) }
+					: {}),
+			});
 			continue;
 		}
 		if (parent === null) {

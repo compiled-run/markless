@@ -12,6 +12,8 @@ export type NativeNode =
 			/** The authored tag; each platform maps it to the view it builds. */
 			readonly element: string;
 			readonly parent: string | null;
+			/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
+			readonly attributes?: Readonly<Record<string, string>>;
 	  }
 	| {
 			readonly kind: 'text';

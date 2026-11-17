@@ -1538,6 +1538,12 @@ export type SemanticMarkupChunk = {
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
 		readonly text: string;
 	}>;
+	/** Attributes whose value is fixed at build time, as written to the element (a scoped class included); absent when none. */
+	readonly attributes?: ReadonlyArray<{
+		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
+		readonly name: string;
+		readonly value: string;
+	}>;
 };
 
 export type SemanticMarkupArtifact = {

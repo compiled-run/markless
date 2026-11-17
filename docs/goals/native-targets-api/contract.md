@@ -155,10 +155,35 @@ vendored fonts). Chrome check (`examples/markless-counter/tools/chrome-compare.t
 at iPhone 402 pt @3x and Pixel 411 dp @2.625 within Dragon's 1-device-pixel gate (largest difference 0.0005 device px). This
 compares Dragon's build-time layout with Chrome, not the device's pixels.
 
-Open for rung 2: Markless must hand Dragon its input from analyzer facts (today the counter's HTML for Dragon is transcribed by
-hand, as Dragon's own music-player example is). That needs static attributes (`class`) and the component's `<style>` text as
-analyzer facts, and a decision on how Markless depends on an unpublished Dragon (section 6). Hosts apply writes by `kind`
-and must fail loudly on a kind they do not implement; frames place views absolutely inside their parent.
+#### The handoff, both directions (pushed on the Markless side)
+
+1. **Markless to Dragon, `markless.native-style-input/0`.** `nativeStyleInput(build.payload, build.styles)` in
+   `packages/mobile/src/style-input.ts`, all from compiler facts:
+   `{ version, component, nodes: [{ kind: 'element', id, element, parent, attributes } | { kind: 'text', id, parent, text }], css }`.
+   `attributes.class` is the class as written to the element, including the component's scope class (`tap mk-uclxwk`);
+   `text` is the text node's string at mount (`Count 0`); `css` is the compiler's scoped CSS for the module, the same text
+   the web build ships (`.tap.mk-uclxwk { ... }`). There is no `html`/`body`: Dragon wraps the tree in its own document
+   (zero body margin, the configured font map: `sans-serif` and the initial font pinned to "Dragon Sans" until the owner
+   picks fonts). Ids are the payload's ids; Dragon must use them unchanged for elements and for text nodes (`h2:text0`).
+2. **Dragon to Markless, `dragon.native-style-export/0`** (as exported tonight by `examples/markless-counter/tools/export.ts`):
+   `{ schema, units, compiler, source, warnings: [{ code, message }], fonts: [{ id, file }], targets: { ios, android } }`,
+   each target `{ backend: 'uikit' | 'android-views', viewport: { width, height }, dpr, nodes: [...] }`, each node
+   `{ id, parent, kind: 'element' | 'text' | 'anonymous', native, text, frame: { x, y, width, height } | null, borderWidths:
+   { top, right, bottom, left } | null, writes: [...] }`. All lengths in device pixels; frames relative to the parent box.
+   `writes` are Dragon's lowered writes minus its internal notes: each has `kind` and `key` (the backend property) plus its
+   values. Kinds seen so far: `background-color { color }`, `border-widths`, `border-styles { styles[4] }`,
+   `border-colors { colors[4] }`, `border-radius { lengths[8] }`, `font { font: { family: <face id>, size } }`,
+   `text-color { color }`, `synthetic-bold`; colours are `{ r, g, b, alpha }` 0 to 255. A face id is
+   `sha256:<hex of the font file>` and `fonts` maps it to the vendored file the app bundles.
+3. **How a build obtains it (tonight):** Dragon is not published, so Markless does not import it. The harness writes the
+   style input to `proofs/<rung>/native-style-input.json`; a Dragon CLI (native-dragon-styles owns it) run from a Dragon
+   checkout named by `MARKLESS_DRAGON_DIR` turns it into `proofs/<rung>/native-style.json`, which is committed with the
+   Dragon commit it came from. Both hosts read only `native-style.json`. Whether Markless later depends on a Dragon
+   prerelease is an owner decision.
+4. **Hosts:** apply writes by `kind`; fail loudly on a kind they do not implement; place views by `frame` inside their parent
+   (absolute), scaling device pixels by the screen scale (iOS points = px / 3 on the proof device, Android uses px); refuse
+   to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
+   frame is not recomputed yet (on-device layout is a later rung), which is visible only when text width changes.
 
 ## 5. The ladder
 

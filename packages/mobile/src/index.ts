@@ -1,4 +1,4 @@
-export { compileNativeComponent } from './compile.ts';
+export { compileNativeComponent, type NativeBuild } from './compile.ts';
 export {
 	NATIVE_CONFORMANCE_VERSION,
 	nativeConformance,
@@ -10,3 +10,8 @@ export {
 	type NativeAction,
 	type NativeRuntime,
 } from './runtime.ts';
+export {
+	NATIVE_STYLE_INPUT_VERSION,
+	nativeStyleInput,
+	type NativeStyleInput,
+} from './style-input.ts';
