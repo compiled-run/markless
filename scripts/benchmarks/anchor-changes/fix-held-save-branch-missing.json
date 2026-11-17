@@ -143,42 +143,6 @@
 			"delta": 1103,
 			"reason": "measured +771 B rendered over the recorded +332 (CI run 44028302284 on 9231684d3, linux-x64): one shown-arm record carrying a shown @catch error, the plain-@try state and the served @catch seed",
 			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /",
-				"jsGzipBytes"
-			],
-			"delta": 251,
-			"reason": "measured +102 B gzip over the recorded +149 (CI run 44028302284 on 9231684d3, linux-x64): the evaluator and async-wiring growth above",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /concepts/state",
-				"jsGzipBytes"
-			],
-			"delta": 251,
-			"reason": "measured +102 B gzip over the recorded +149 (CI run 44028302284 on 9231684d3, linux-x64): the evaluator and async-wiring growth above",
-			"date": "2026-11-17"
-		},
-		{
-			"surface": "perf-guards",
-			"path": [
-				"loadWeight",
-				"linux-x64",
-				"docs /ui/accordion",
-				"jsGzipBytes"
-			],
-			"delta": 84,
-			"reason": "measured +84 B gzip in total (CI run 44028302284 on 9231684d3, linux-x64), down from the recorded +197 now that the evaluator no longer imports graph-kept",
-			"date": "2026-11-17"
 		}
 	]
 }
