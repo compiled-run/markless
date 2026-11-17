@@ -143,6 +143,7 @@ export function createNativeRuntime(
 		dispatch(action) {
 			const bound = payload.events.find((event) => event.host === action.host && event.event === action.event);
 			if (!bound) throw new Error(`no ${action.event} handler on ${action.host}`);
+			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = new Map(attributes().map(([node, name, value]) => [`${node}\0${name}`, value]));
 			const beforeArms = new Map(arms());
@@ -155,8 +156,13 @@ export function createNativeRuntime(
 			const afterTexts = new Map(texts());
 			const afterAttributes = new Map(attributes().map(([node, name, value]) => [`${node}\0${name}`, value]));
 			const afterArms = new Map(arms());
+			const styles = payload.cells.flatMap((cell): NativeJournalEntry[] =>
+				cell.styled && cellsBefore.get(cell.id) !== values.get(cell.id)
+					? [{ op: 'state', cell: cell.id, value: values.get(cell.id)! }]
+					: [],
+			);
 			// A node shown before and after journals its change; a newly shown arm is built from current values instead.
-			return payload.nodes.flatMap((node): NativeJournalEntry[] => {
+			return [...styles, ...payload.nodes.flatMap((node): NativeJournalEntry[] => {
 				if (node.kind === 'text') {
 					const before = beforeTexts.get(node.id);
 					const after = afterTexts.get(node.id);
@@ -178,7 +184,7 @@ export function createNativeRuntime(
 					const after = afterAttributes.get(key)!;
 					return before !== after ? [{ op: 'attribute', node: node.id, name: binding.attribute, value: after }] : [];
 				});
-			});
+			})];
 		},
 	};
 }

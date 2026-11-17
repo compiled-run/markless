@@ -62,7 +62,7 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 			for (const entry of runtime.dispatch({ event: 'activate', host })) {
 				if (entry.op === 'text') texts.set(entry.node, entry.value);
 				else if (entry.op === 'attribute') attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-				else {
+				else if (entry.op === 'arm') {
 					chosen.set(entry.node, entry.index);
 					for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 					for (const key of attributes.keys()) if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);

@@ -7,7 +7,8 @@
 			{
 				"id": "state:liked",
 				"name": "liked",
-				"initial": false
+				"initial": false,
+				"styled": true
 			}
 		],
 		"nodes": [
@@ -208,6 +209,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:liked",
+					"value": true
+				},
+				{
 					"op": "attribute",
 					"node": "h2",
 					"name": "class",
@@ -240,6 +246,11 @@
 			},
 			"journal": [
 				{
+					"op": "state",
+					"cell": "state:liked",
+					"value": false
+				},
+				{
 					"op": "attribute",
 					"node": "h2",
 					"name": "class",
@@ -271,6 +282,11 @@
 				"host": "h2"
 			},
 			"journal": [
+				{
+					"op": "state",
+					"cell": "state:liked",
+					"value": true
+				},
 				{
 					"op": "attribute",
 					"node": "h2",

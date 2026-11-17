@@ -87,6 +87,8 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeScalar;
 		readonly storage?: { readonly key: string };
+		/** A class binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
+		readonly styled?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -103,5 +105,7 @@ export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
+	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
+	| { readonly op: 'state'; readonly cell: string; readonly value: NativeScalar | null }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null };

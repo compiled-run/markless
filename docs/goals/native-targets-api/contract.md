@@ -155,9 +155,14 @@ export function Counter() @{
   `isSelected`; `aria-expanded` to the expanded state (`accessibilityValue` on iOS, `AccessibilityNodeInfo` expanded state
   on Android). `class` is not applied by hosts as text: it selects the element's Dragon style (below). Unknown bound
   attributes are ignored by hosts, not errors, so web-only attributes do not break a build.
-- **Styles that follow a class** (for native-dragon-styles): the style export may give an element `variants: [{ class,
-  writes }]`, one per class string the binding can produce (both literals of the `if` above); a host applies the variant
-  whose `class` equals the current value, after the node's base writes. Frames do not change with a variant yet.
+- **Styles that follow state: Dragon's `dragon.native-style-export/1`** (the native-dragon-styles design replaces the
+  class-variant idea; adopted). Each target has `states` (`[{ key, domain }]`), `assignments` (each a complete node list
+  with its `values`), `initial` and `next[a][s][v]`. Markless side: a cell a class binding reads is marked `styled: true`
+  in the payload; after each handler the journal starts with `{ op: 'state', cell, value }` for every styled cell that
+  changed (cell order); the host moves to `next[current][s][v]` (the export's state `s` is the one whose key names that
+  cell) and applies that assignment's frames and writes to the retained views. Hosts ignore `attribute` entries for
+  `class`. The style input gives Dragon `states: [{ cell, domain: [false, true], initial }]` and, per element,
+  `classByState: [{ when: { <cell>: boolean }, value }]`; non-boolean styled cells are refused for now.
 
 ### Building a payload and the conformance vectors (pushed)
 
@@ -216,6 +221,30 @@ Answered requests (native-android-host, 2026-11-17):
   root is the platform's default background.
 - **Pixel ratio:** one export per target device (the export already has one entry per target); a host refuses an export
   whose `dpr` differs from the screen's by more than 0.001.
+
+Answered requests (native-ios-host, 2026-11-17):
+
+- **1, 2, pixel ratio:** as answered for Android above (write lengths CSS px; wrapper boxes only offset; 0.001).
+- **3, text frames after a journal entry:** keep the build-time frame and never resize, for now. The real answer is
+  linking Dragon's on-device layout engine (generated Swift/Kotlin, `packages/layout/generated/`) and re-laying out after
+  text entries; that is a later rung, listed in the owner note.
+- **4, `activate` on a non-button:** hosts support it: iOS adds a `UITapGestureRecognizer` and the `.button` trait;
+  Android sets a click listener and `accessibilityClassName = android.widget.Button`. The compiler does not refuse it.
+- **5, element names:** the compiler refuses them, once, for both hosts (below), so hosts need no list of their own; a host
+  may still refuse defensively.
+- **6, test ids:** adopted. Node ids are the test ids on both platforms (iOS `accessibilityIdentifier`, Android the id
+  Maestro's `id:` matches). Flows may match by text or by id. A button's accessibility label is its text runs joined; text
+  inside a button is not its own accessibility element; text in `h1`-`h6` carries the header trait.
+- **7, `@markless/core` devDependency:** kept.
+- **8, fonts:** every `font` write must name a face listed in `fonts`; anything else is a host error. Ahem appears only in
+  Dragon's own fixtures.
+- **9, `synthetic-bold` and `anonymous`:** Dragon's definitions apply (native-dragon-styles documents them); until then
+  refusing is right.
+- **10, export `/1`:** adopted, with the `state` journal entry above.
+
+**Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
+`nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
+refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
 
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
