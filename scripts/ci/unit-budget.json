@@ -143,9 +143,9 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.236,
-		"cpuS": 2865.2,
-		"peakRssMb": 4171,
+		"calibrationS": 1.267,
+		"cpuS": 3043.2,
+		"peakRssMb": 4068,
 		"models": {
 			"AMD EPYC 7763 64-Core Processor": 1.045,
 			"AMD EPYC 9V45 96-Core Processor": 0.89,
@@ -157,30 +157,32 @@
 		},
 		"shards": {
 			"1/3": {
-				"cpuS": 933.6,
-				"peakRssMb": 4013
+				"cpuS": 975.3,
+				"peakRssMb": 3963
 			},
 			"2/3": {
-				"cpuS": 865.1,
-				"peakRssMb": 4171
+				"cpuS": 938.3,
+				"peakRssMb": 4068
 			},
 			"3/3": {
-				"cpuS": 1066.5,
-				"peakRssMb": 3637
+				"cpuS": 1129.6,
+				"peakRssMb": 3849
 			}
 		},
 		"runs": [
-			"43576277596",
-			"43575255804",
-			"43573612566",
-			"43572505302",
-			"43572444143",
-			"43571715066",
-			"43557674440",
-			"43556033887",
-			"43551039878"
+			"43644444611",
+			"43645710927",
+			"43645711888",
+			"43649460585",
+			"43653762906",
+			"43808674640",
+			"43884980407",
+			"43915343602",
+			"43934576030",
+			"43947900042",
+			"43959681371"
 		],
-		"sha": "d61244a6926656459160673b94883424d14dc992"
+		"sha": "710c44d481f4c34da616029fe7aa61c8cf9192d1"
 	},
 	"history": [
 		{
@@ -386,6 +388,32 @@
 				"43551039878"
 			],
 			"reason": "re-anchored with CPU-model factors from 9 green merge-queue runs of 2026-11-14 (27 shard measurements); main reads +9.5% against the 2026-11-12 anchor (+7.8% at d61244a69, run 43551039878, against the 36 measurements of 64b23daf). Per-file test time, machine-normalised, 64b23daf to d61244a69: +365 s, of which router child-async-catch.test.ts grew 2 tests to 112 in #653 (c1fe2b983), 14 s to 140 s (raw, runs 43134571598 and 43576277596), 40% of the normalised growth; 37 new test files 90 s, 25% (bundler composition-grid-build 18 s, kernel-placed-rows-fixture 16 s, router form-in-place 15 s, submit-hold-preload 10 s, prerender-inline-event-record 9 s); router vite build tests (fragment-navigation-webkit, async-child-ssr, kept-late-handler, navigation-stream) and bundler ssr-row-outer-read-fixture most of the rest; the old 20.4% band absorbed it. Peak RSS median 4171 MB"
+		},
+		{
+			"date": "2026-11-17",
+			"change": "anchors",
+			"from": {
+				"cpuS": 2865.2,
+				"peakRssMb": 4171
+			},
+			"to": {
+				"cpuS": 3043.2,
+				"peakRssMb": 4068
+			},
+			"runs": [
+				"43644444611",
+				"43645710927",
+				"43645711888",
+				"43649460585",
+				"43653762906",
+				"43808674640",
+				"43884980407",
+				"43915343602",
+				"43934576030",
+				"43947900042",
+				"43959681371"
+			],
+			"reason": "re-anchored from main's 11 green runs since #721 (d96d14cc2 to 710c44d48, 33 shard measurements on 7 CPU models): largest-shard peak RSS read -6.5% to +1.6% against the 4171 MB anchor (PR #739 failed at -8.0% as stale), because shard 2's peak moved: in 22 of 26 green shard-2 measurements before #721 it was migration-defects' fixture build beside kept-late-handler 15-20 s in (~4171 MB), and in all 16 since #721 (whose grid build now takes the one build slot) it is render-order-sweep beside ssr-imported-rows-fixture, shard 2 median 4171 to 4068 MB; CPU at the anchors' speed read +3.6% (median, -2.5% to +7.8%) as 26 node test files were added since d61244a69, inside the 11.8% band; the ±7.9% RSS margin stays, same-tree repeats spread 0-4.3% (710c44d48 4100/3927 MB, 581eacb79 4169/4169, #739 3836/3998)"
 		}
 	],
 	"models": {
