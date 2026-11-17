@@ -1,0 +1,20 @@
+{
+	"rung": 5,
+	"name": "@if",
+	"steps": [
+		{
+			"visible": ["Details", "Show details", "Nothing shown yet"],
+			"absent": ["The details are here"]
+		},
+		{
+			"do": { "tap": "Show details" },
+			"visible": ["Hide details", "The details are here"],
+			"absent": ["Show details", "Nothing shown yet"]
+		},
+		{
+			"do": { "tap": "Hide details" },
+			"visible": ["Show details", "Nothing shown yet"],
+			"absent": ["The details are here"]
+		}
+	]
+}

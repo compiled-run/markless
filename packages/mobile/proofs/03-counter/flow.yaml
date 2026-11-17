@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: 03-counter
+---
+- launchApp:
+      clearState: true
+- assertVisible: Counter
+- assertVisible: Count 0
+- tapOn: Count 0
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertNotVisible: Count 0
+- tapOn: Count 1
+- assertNotVisible: Count 1
+- assertVisible: Count 2
+- assertNotVisible: Count 1

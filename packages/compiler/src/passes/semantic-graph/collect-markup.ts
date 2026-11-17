@@ -109,6 +109,7 @@ type ChunkBuilder = {
 	readonly hosts: SemanticMarkupChunk['hosts'][number][];
 	readonly slots: SemanticMarkupSlot[];
 	readonly texts: NonNullable<SemanticMarkupChunk['texts']>[number][];
+	readonly attributes: NonNullable<SemanticMarkupChunk['attributes']>[number][];
 };
 
 type WithoutStaticIndex<Slot> = Slot extends unknown ? Omit<Slot, 'staticIndex'> : never;
@@ -205,12 +206,35 @@ function createChunk(
 	kind: SemanticMarkupChunk['kind'],
 	componentName: string,
 ): ChunkBuilder {
-	return { id, kind, componentName, statics: [''], hosts: [], slots: [], texts: [] };
+	return {
+		id,
+		kind,
+		componentName,
+		statics: [''],
+		hosts: [],
+		slots: [],
+		texts: [],
+		attributes: [],
+	};
 }
 
 function finishChunk(builder: ChunkBuilder): SemanticMarkupChunk {
-	const { texts, ...chunk } = builder;
-	return texts.length > 0 ? { ...chunk, texts } : chunk;
+	const { texts, attributes, ...chunk } = builder;
+	return {
+		...chunk,
+		...(texts.length > 0 ? { texts } : {}),
+		...(attributes.length > 0 ? { attributes } : {}),
+	};
+}
+
+function appendStaticAttribute(
+	builder: ChunkBuilder,
+	path: ReadonlyArray<number>,
+	name: string,
+	value: string,
+): void {
+	append(builder, ` ${name}="${escapeAttribute(value)}"`);
+	builder.attributes.push({ coordinate: { kind: 'child-index', path }, name, value });
 }
 
 function append(builder: ChunkBuilder, value: string): void {
@@ -596,9 +620,11 @@ function emitNode(
 		if (literal) {
 			const text = attributeText(name, literal.value);
 			if (text !== null)
-				append(
+				appendStaticAttribute(
 					builder,
-					` ${name}="${escapeAttribute(name === 'class' && context.styleScopeClass ? `${text} ${context.styleScopeClass}` : text)}"`,
+					path,
+					name,
+					name === 'class' && context.styleScopeClass ? `${text} ${context.styleScopeClass}` : text,
 				);
 			continue;
 		}
@@ -641,7 +667,7 @@ function emitNode(
 				alwaysPresent: true,
 			});
 			append(builder, '"');
-		} else append(builder, ` class="${context.styleScopeClass}"`);
+		} else appendStaticAttribute(builder, path, 'class', context.styleScopeClass);
 	}
 	context.styleScopeClass = componentScopeClass;
 	append(builder, '>');

@@ -21,10 +21,10 @@ export function Counter() @{
 			component: 'Counter',
 			cells: [{ id: 'state:count', name: 'count', initial: 0 }],
 			nodes: [
-				{ kind: 'element', id: 'h0', element: 'main', parent: null },
-				{ kind: 'element', id: 'h1', element: 'h1', parent: 'h0' },
+				{ kind: 'element', id: 'h0', element: 'main', parent: null, attributes: { class: 'screen' } },
+				{ kind: 'element', id: 'h1', element: 'h1', parent: 'h0', attributes: { class: 'title' } },
 				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
-				{ kind: 'element', id: 'h2', element: 'button', parent: 'h0' },
+				{ kind: 'element', id: 'h2', element: 'button', parent: 'h0', attributes: { class: 'tap' } },
 				{
 					kind: 'text',
 					id: 'h2:text0',
@@ -67,6 +67,50 @@ export function Tally() @{
 				],
 			},
 		]);
+	});
+
+	it('carries static attributes, with the scope class a <style> block adds', async () => {
+		const { payload } = await nativeView(`export function Card() @{
+	<article class="card" title="Hello">
+		<style>.card { color: red; }</style>
+		<span>Plain</span>
+	</article>
+}`);
+		const elements = payload?.nodes.filter((node) => node.kind === 'element') ?? [];
+		const [article, span] = elements.map((node) => (node.kind === 'element' ? node.attributes : undefined));
+		expect(article?.title).toBe('Hello');
+		expect(article?.class).toMatch(/^card mk-[a-z0-9]+$/);
+		expect(span?.class).toBe(article?.class.split(' ')[1]);
+	});
+
+	it('lowers literal assignments and self-negation to set and toggle', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Panel() @{
+	let open = state(false);
+	let tab = state('a');
+	let size = state(1);
+	<div>
+		<p>{tab} {open} {size}</p>
+		<button onClick={() => { open = !open; tab = 'b'; size = 3; size = -4; }}>Go</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'toggle', cell: 'state:open' },
+			{ op: 'set', cell: 'state:tab', value: 'b' },
+			{ op: 'set', cell: 'state:size', value: 3 },
+			{ op: 'set', cell: 'state:size', value: -4 },
+		]);
+	});
+
+	it('refuses an assignment whose value needs evaluating', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Sum() @{
+	let total = state(1);
+	<button onClick={() => (total = total * 2)}>Total {total}</button>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual(['a assign write to `total` needs a script engine']);
 	});
 
 	it('refuses a handler that does more than write state', async () => {

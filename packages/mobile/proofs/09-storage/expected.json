@@ -1,0 +1,15 @@
+{
+	"rung": 9,
+	"name": "Storage",
+	"steps": [
+		{ "visible": ["Kept count", "Kept 0"], "absent": ["Kept 1"] },
+		{ "do": { "tap": "Kept 0" }, "visible": ["Kept 1"], "absent": ["Kept 0", "Kept 2"] },
+		{ "do": { "tap": "Kept 1" }, "visible": ["Kept 2"], "absent": ["Kept 1", "Kept 3"] },
+		{
+			"do": { "relaunch": true },
+			"visible": ["Kept count", "Kept 2"],
+			"absent": ["Kept 0", "Kept 3"]
+		},
+		{ "do": { "tap": "Kept 2" }, "visible": ["Kept 3"], "absent": ["Kept 2"] }
+	]
+}

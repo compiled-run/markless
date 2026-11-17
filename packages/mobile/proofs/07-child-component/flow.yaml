@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: 07-child-component
+---
+- launchApp:
+      clearState: true
+- assertVisible: Basket
+- assertVisible: Apples 0
+- assertVisible: Pears 0
+- assertVisible: Total 0
+- tapOn: Add one Apples
+- assertNotVisible: Apples 0
+- assertVisible: Apples 1
+- assertVisible: Pears 0
+- assertVisible: Total 1
+- assertNotVisible: Apples 0
+- tapOn: Add one Pears
+- assertNotVisible: Pears 0
+- assertVisible: Apples 1
+- assertVisible: Pears 1
+- assertVisible: Total 2
+- assertNotVisible: Pears 0

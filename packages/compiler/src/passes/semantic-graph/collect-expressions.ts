@@ -46,7 +46,38 @@ export function collectAssignment(node: AnyNode, state: WalkState): void {
 		assignmentOperator: operator === '=' ? undefined : operator,
 		valueSource: value ? expressionSource(value, state.source) : undefined,
 		valueSpan: value ? sourceSpan(value, state.filename) : undefined,
+		...assignedValueShape(operator, target, value),
 	});
+}
+
+// The assigned values a host can run as data: a literal, or the target's own negation (`open = !open`).
+function assignedValueShape(
+	operator: string,
+	target: AnyNode,
+	value: AnyNode | undefined,
+): Pick<SemanticStateWrite, 'valueShape'> {
+	if (operator !== '=' || target.type !== 'Identifier' || !value) return {};
+	if (
+		value.type === 'Literal' &&
+		(typeof value.value === 'string' ||
+			typeof value.value === 'boolean' ||
+			(typeof value.value === 'number' && Number.isInteger(value.value)))
+	) {
+		return { valueShape: { kind: 'literal', value: value.value } };
+	}
+	const operand = value.type === 'UnaryExpression' ? (value.argument as AnyNode | undefined) : undefined;
+	if (
+		value.operator === '-' &&
+		operand?.type === 'Literal' &&
+		typeof operand.value === 'number' &&
+		Number.isInteger(operand.value)
+	) {
+		return { valueShape: { kind: 'literal', value: operand.value === 0 ? 0 : -operand.value } };
+	}
+	const negated = value.operator === '!' ? operand : undefined;
+	return negated?.type === 'Identifier' && negated.name === target.name
+		? { valueShape: { kind: 'not-target' } }
+		: {};
 }
 
 export function collectUpdate(node: AnyNode, state: WalkState): void {

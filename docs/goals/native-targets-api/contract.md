@@ -94,7 +94,9 @@ export function Counter() @{
   (so integer `1` is `"1"`, never `"1.0"`; hosts must implement this exactly; non-integer numbers are refused in v0).
 - **Events** are semantic. Authored `onClick` lowers to `activate`. Platform mapping (owned by each adapter): web `click`,
   iOS `UIControl.Event.touchUpInside`, Android `View.OnClickListener`.
-- **Handlers** are lists of ops. v0 has one op, `add` (`x++` is `+1`, `x--` is `-1`). A handler is lowered only when the
+- **Handlers** are lists of ops: `{ op: 'add', cell, value }` (`x++` is `+1`, `x--` is `-1`; numbers only),
+  `{ op: 'set', cell, value }` (`x = 'b'`, `x = 3`, `x = true`: a literal string, integer or boolean) and
+  `{ op: 'toggle', cell }` (`x = !x`). Anything else (`x = x * 2`, a call, a member write) is refused for now. A handler is lowered only when the
   analyzer proves its body is nothing but state writes (`handlerWriteStatements`); otherwise the compiler refuses with a
   diagnostic instead of guessing. Ops run in order; then every text node reading a changed cell is recomputed.
 - **Journal:** after a handler, the runtime emits `{ "op": "text", "node": "h2:text0", "value": "Count 1" }` for each text
@@ -126,6 +128,9 @@ export function Counter() @{
 }
 ```
 
+  Committed files today: `counter.json` (add) and `switches.json` (toggle, set of a string and a negative integer, boolean
+  and string formatting, and a step whose journal is empty because the text did not change). A host must pass every file in
+  the folder; a new op or node kind always arrives with a new vector file first.
   A host passes the vectors when, loading `payload`, its mounted text nodes read exactly `initial` (same order) and, for each
   step in turn, dispatching `action` makes its runtime produce exactly `journal` (same entries, same order) and its views then
   show those strings. Hosts run this headless in their own unit tests (XCTest / a JVM test with no device) and may also run it
@@ -141,6 +146,21 @@ export function Counter() @{
 | text node | `UILabel` child of its element (`isUserInteractionEnabled = false`) | `TextView` child (`includeFontPadding = false`, not clickable) |
 | `h1`...`h6` | `.header` accessibility trait | `isAccessibilityHeading = true` |
 
+Answered requests (native-android-host, 2026-11-17):
+
+- **A button's text on Android:** confirmed. A `button` whose content is exactly one text run takes that run as the
+  `Button`'s own text; a button with an element child or a second run is a loud host error for now. When a rung needs such
+  a button, the Android cell becomes a `FrameLayout` with `accessibilityClassName = android.widget.Button`, clickable and
+  focusable; this file will say so first. iOS keeps a `UILabel` inside the `UIButton` (UIKit allows children).
+- **Units in the style export:** frames and `borderWidths` are device px; every length *inside a write*
+  (`font.size`, `border-radius` lengths, and any later write) is CSS px, so hosts multiply by the target's `dpr` (Android)
+  or use it as points (iOS, where 1 CSS px = 1 pt). Dragon's export will say so per field.
+- **`html` and `body` in the export:** they are Dragon's document wrapper, not payload nodes. Hosts skip any export node
+  the payload does not name, add its frame offset to its children, and never apply its writes. The screen behind the
+  root is the platform's default background.
+- **Pixel ratio:** one export per target device (the export already has one entry per target); a host refuses an export
+  whose `dpr` differs from the screen's by more than 0.001.
+
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
 
@@ -155,10 +175,35 @@ vendored fonts). Chrome check (`examples/markless-counter/tools/chrome-compare.t
 at iPhone 402 pt @3x and Pixel 411 dp @2.625 within Dragon's 1-device-pixel gate (largest difference 0.0005 device px). This
 compares Dragon's build-time layout with Chrome, not the device's pixels.
 
-Open for rung 2: Markless must hand Dragon its input from analyzer facts (today the counter's HTML for Dragon is transcribed by
-hand, as Dragon's own music-player example is). That needs static attributes (`class`) and the component's `<style>` text as
-analyzer facts, and a decision on how Markless depends on an unpublished Dragon (section 6). Hosts apply writes by `kind`
-and must fail loudly on a kind they do not implement; frames place views absolutely inside their parent.
+#### The handoff, both directions (pushed on the Markless side)
+
+1. **Markless to Dragon, `markless.native-style-input/0`.** `nativeStyleInput(build.payload, build.styles)` in
+   `packages/mobile/src/style-input.ts`, all from compiler facts:
+   `{ version, component, nodes: [{ kind: 'element', id, element, parent, attributes } | { kind: 'text', id, parent, text }], css }`.
+   `attributes.class` is the class as written to the element, including the component's scope class (`tap mk-uclxwk`);
+   `text` is the text node's string at mount (`Count 0`); `css` is the compiler's scoped CSS for the module, the same text
+   the web build ships (`.tap.mk-uclxwk { ... }`). There is no `html`/`body`: Dragon wraps the tree in its own document
+   (zero body margin, the configured font map: `sans-serif` and the initial font pinned to "Dragon Sans" until the owner
+   picks fonts). Ids are the payload's ids; Dragon must use them unchanged for elements and for text nodes (`h2:text0`).
+2. **Dragon to Markless, `dragon.native-style-export/0`** (as exported tonight by `examples/markless-counter/tools/export.ts`):
+   `{ schema, units, compiler, source, warnings: [{ code, message }], fonts: [{ id, file }], targets: { ios, android } }`,
+   each target `{ backend: 'uikit' | 'android-views', viewport: { width, height }, dpr, nodes: [...] }`, each node
+   `{ id, parent, kind: 'element' | 'text' | 'anonymous', native, text, frame: { x, y, width, height } | null, borderWidths:
+   { top, right, bottom, left } | null, writes: [...] }`. All lengths in device pixels; frames relative to the parent box.
+   `writes` are Dragon's lowered writes minus its internal notes: each has `kind` and `key` (the backend property) plus its
+   values. Kinds seen so far: `background-color { color }`, `border-widths`, `border-styles { styles[4] }`,
+   `border-colors { colors[4] }`, `border-radius { lengths[8] }`, `font { font: { family: <face id>, size } }`,
+   `text-color { color }`, `synthetic-bold`; colours are `{ r, g, b, alpha }` 0 to 255. A face id is
+   `sha256:<hex of the font file>` and `fonts` maps it to the vendored file the app bundles.
+3. **How a build obtains it (tonight):** Dragon is not published, so Markless does not import it. The harness writes the
+   style input to `proofs/<rung>/native-style-input.json`; a Dragon CLI (native-dragon-styles owns it) run from a Dragon
+   checkout named by `MARKLESS_DRAGON_DIR` turns it into `proofs/<rung>/native-style.json`, which is committed with the
+   Dragon commit it came from. Both hosts read only `native-style.json`. Whether Markless later depends on a Dragon
+   prerelease is an owner decision.
+4. **Hosts:** apply writes by `kind`; fail loudly on a kind they do not implement; place views by `frame` inside their parent
+   (absolute), scaling device pixels by the screen scale (iOS points = px / 3 on the proof device, Android uses px); refuse
+   to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
+   frame is not recomputed yet (on-device layout is a later rung), which is visible only when text width changes.
 
 ## 5. The ladder
 

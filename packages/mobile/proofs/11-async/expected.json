@@ -1,0 +1,18 @@
+{
+	"rung": 11,
+	"name": "Async value with @try, @pending and @catch",
+	"steps": [
+		{
+			"visible": ["Ask", "Ask the sum", "Ask the riddle"],
+			"absent": ["Thinking", "The answer is 42"]
+		},
+		{ "do": { "tap": "Ask the sum" }, "visible": ["Thinking"], "absent": ["The answer is 42"] },
+		{ "do": { "wait": 2000 }, "visible": ["The answer is 42"], "absent": ["Thinking"] },
+		{
+			"do": { "tap": "Ask the riddle" },
+			"visible": ["Thinking"],
+			"absent": ["The answer is 42"]
+		},
+		{ "do": { "wait": 2000 }, "visible": ["No answer for the riddle"], "absent": ["Thinking"] }
+	]
+}

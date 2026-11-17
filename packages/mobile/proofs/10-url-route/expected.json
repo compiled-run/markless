@@ -1,0 +1,14 @@
+{
+	"rung": 10,
+	"name": "State from the URL and one route change",
+	"route": "[fruit]",
+	"start": "/apple",
+	"steps": [
+		{ "visible": ["Fruit apple", "Go to pear"], "absent": ["Fruit pear"] },
+		{
+			"do": { "tap": "Go to pear" },
+			"visible": ["Fruit pear", "Go to apple"],
+			"absent": ["Fruit apple"]
+		}
+	]
+}
