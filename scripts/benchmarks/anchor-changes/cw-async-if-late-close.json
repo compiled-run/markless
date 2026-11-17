@@ -269,8 +269,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 161,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
 			"date": "2026-11-17"
 		},
 		{
@@ -281,8 +281,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 161,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
 			"date": "2026-11-17"
 		},
 		{
@@ -293,8 +293,68 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 161,
-			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
 			"date": "2026-11-17"
 		}
 	]
