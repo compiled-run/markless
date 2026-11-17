@@ -28,7 +28,7 @@ import { collectComponentProps } from './collect-components.ts';
 import { componentsWithIdleRecords, componentsWithLiveShared } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
-import { spreadHostsField } from './spread-hosts.ts';
+import { relayHostsField, spreadHostsField } from './spread-hosts.ts';
 import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
@@ -341,6 +341,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							? { rootBoundary: true as const }
 							: {}),
 						...spreadHostsField(chunks),
+						...relayHostsField(graph.events, root),
 						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,

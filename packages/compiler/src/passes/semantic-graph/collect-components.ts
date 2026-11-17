@@ -795,7 +795,7 @@ function spreadForwardsProp(
 export function receivedHandlerRelay(
 	expression: AnyNode,
 	state: WalkState,
-): { readonly source: string; readonly parameter: string } | undefined {
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
 	return relayedHandlerSource(expression, componentBodyScope(state), state);
 }
 
@@ -818,7 +818,7 @@ function relayedHandlerSource(
 	expression: AnyNode,
 	scope: GraphReadScope,
 	state: WalkState,
-): { readonly source: string; readonly parameter: string } | undefined {
+): { readonly source: string; readonly parameter: string; readonly propName: string } | undefined {
 	const source =
 		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
 	if (!source) return undefined;
@@ -827,7 +827,11 @@ function relayedHandlerSource(
 	const graph = resolveGraphPath(source, scope.bindings, scope.aliases);
 	if (graph?.binding.kind !== 'prop' || graph.path.length !== 1) return undefined;
 	const parameter = source === 'event' ? 'domEvent' : 'event';
-	return { source: `(${parameter}) => ${source}?.(${parameter})`, parameter };
+	return {
+		source: `(${parameter}) => ${source}?.(${parameter})`,
+		parameter,
+		propName: graph.path[0]!,
+	};
 }
 
 /** `props.onClick`: one static member read off an identifier, the props object read without destructuring. */

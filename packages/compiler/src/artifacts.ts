@@ -442,6 +442,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+			/** Elements whose handler for an event is one of the component's props, handed over as is. */
+			readonly relayHosts?: ReadonlyArray<ModuleGraphInterfaceRelayHost>;
 			/** Props this component files into a widget callback slot. */
 			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
@@ -582,6 +584,12 @@ export type ModuleGraphInterfaceArmMaterial = {
  * (`excludeNames`) and what the signature took out of the rest binding
  * (`destructuredNames`).
  */
+export type ModuleGraphInterfaceRelayHost = {
+	readonly hostNodeId: string;
+	readonly eventName: string;
+	readonly propName: string;
+};
+
 export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
 	/** The element the spread lands on, lowercase. */
@@ -939,6 +947,8 @@ export type SemanticEvent = {
 	readonly handlerMayReject?: true;
 	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
 	readonly dispatchCatchBoundaryId?: string;
+	/** The handler is the component's own prop of this name, handed to the element as is (`onSubmit={props.onSave}`). */
+	readonly relayedPropName?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
