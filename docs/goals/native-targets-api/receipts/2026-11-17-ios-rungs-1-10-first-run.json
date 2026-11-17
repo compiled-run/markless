@@ -1,0 +1,66 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 9.823558375000005,
+			"flowSeconds": 37.61583820800001
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.7713731659999903,
+			"flowSeconds": 32.152689042
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.5284160419999971,
+			"flowSeconds": 32.343941416999996
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Fruits\" is visible"
+			},
+			"installSeconds": 0.730031874999986,
+			"flowSeconds": 36.542746084000015
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.5038355839999858,
+			"flowSeconds": 30.982380416
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.4965964999999851,
+			"flowSeconds": 40.619534625
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.5196164160000044,
+			"flowSeconds": 39.404428833999994
+		},
+		{
+			"name": "10-url-route",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Fruit apple\" is visible"
+			},
+			"installSeconds": 0.41360720800003037,
+			"flowSeconds": 33.779884584000044
+		}
+	]
+}

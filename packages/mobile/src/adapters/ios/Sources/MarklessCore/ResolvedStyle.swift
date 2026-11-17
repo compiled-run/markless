@@ -32,10 +32,12 @@ extension StyleExport {
 		let texts = Dictionary(uniqueKeysWithValues: initialTexts.map { ($0.node, $0.text) })
 		var styles: [String: ResolvedStyle] = [:]
 		for node in payload.nodes {
+			if case .branch = node { throw styleError("\(node.id): @if is not styled on iOS yet, the style export lays out one state") }
 			guard let styled = byId[node.id] else { throw styleError("no style export node for \(node.id)") }
 			switch node {
 			case .element:
 				guard !styled.isText, !styled.isAnonymous else { throw styleError("\(node.id) is an element in the payload but not in the style export") }
+			case .branch: break
 			case .text:
 				guard styled.isText else { throw styleError("\(node.id) is text in the payload and an element in the style export") }
 				guard styled.text == texts[node.id] else {
@@ -53,7 +55,7 @@ extension StyleExport {
 			guard cursor == node.parent else {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
-			var style = try resolve(styled)
+			var style = try resolve(styled, styled.writes)
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
@@ -62,12 +64,12 @@ extension StyleExport {
 		return StyleLayout(styles: styles, viewport: viewport, dpr: dpr, fontFiles: fonts)
 	}
 
-	private func resolve(_ node: StyleNode) throws -> ResolvedStyle {
+	private func resolve(_ node: StyleNode, _ writes: [StyleWrite]) throws -> ResolvedStyle {
 		var style = ResolvedStyle()
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
-		for write in node.writes {
+		for write in writes {
 			switch write {
 			case let .backgroundColor(color): style.background = color
 			case .borderWidths: break

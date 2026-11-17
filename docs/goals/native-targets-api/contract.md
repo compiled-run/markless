@@ -17,6 +17,10 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
    the older payload shape.
 3. Vectors to pass: every file in `packages/mobile/conformance/`.
+4. Since then (2026-11-17, up to `6284b5111`): rung 7 (component instances inlined, ids prefixed `component-edge:N/`;
+   nothing new for hosts but `components.json`), rung 10 (`a` elements, the `navigate` op and journal entry, the
+   `{ route: 'params' }` expression, a payload `route`, vectors carrying `params`; `route.json`). Rung 11 is stopped on an
+   owner decision. Android passes every vector but `list.json` and `route.json` as of `d88b8011a`.
 
 ## 1. What I found before building (the owner's picture is weeks old)
 
@@ -384,17 +388,25 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 
 | # | Rung | Web | Native reference | iOS | Android | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Static elements and text | passing | passing | **passing** | **passing** | harness, both platforms, one flow; `proofs/01-static-text/screenshots/` |
-| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | not yet | not yet | style: Dragon Chrome compare green |
-| 3 | A state write updates text | passing | passing | not yet (host moving to `assign`) | flow passes from the host's own shell | vectors `counter.json`; passed on both through the harness before the `assign` change |
-| 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
-| 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
-| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | not yet | not yet | vectors `list.json` |
-| 7 | Child component with props and a callback | passing | passing | not yet | not yet | vectors `components.json` |
-| 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
-| 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
-| 10 | State from the URL and one route change | passing | passing | not yet | not yet | vectors `route.json` |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | stopped by design: the value comes from author JavaScript; owner decision (a declared fetch or a script engine) |
+| 1 | Static elements and text | passing | passing | **passing** | **passing** | screenshots in `proofs/01-static-text/screenshots/` |
+| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | blocked | blocked | Chrome compare green; no committed Dragon export from Markless's style input yet, so the harness refuses the rung |
+| 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
+| 4 | Attributes and classes that follow state | passing | passing | blocked | blocked | has `<style>`, so it waits on the Dragon export like rung 2; vectors `attributes.json` pass on both hosts |
+| 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
+| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | failing (host has no lists yet) | passing | vectors `list.json`; not passed until iOS |
+| 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
+| 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
+| 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
+| 10 | State from the URL and one route change | passing | passing | failing (hosts take no launch route yet) | failing (same) | vectors `route.json` |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
+
+**Device receipts (2026-11-17, tree `610f5f681` plus the harness's page fix):** the harness
+(`pnpm --filter @markless/mobile proof --platform <p> --report <dir> <rungs>`, then `proof verdict`) on mini-2, simulator
+`markless-lead` (iPhone, iOS 27.2) and AVD `markless_native` (Pixel 7, API 36). Reports are committed under
+`docs/goals/native-targets-api/receipts/`. iOS passed rungs 1, 3, 5, 7, 8 and 9 in one run. Android passed 3, 5, 7, 8 and 9 in
+that run and lost the emulator at rung 1's launch (`device offline`, load average about 60 from the other workers'
+builds); rung 1 then passed alone (`...-android-rung-1-rerun.json`), so the verdict over the first pair of reports is red
+and this row's rung 1 rests on two runs. Nothing was retried inside a run.
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the

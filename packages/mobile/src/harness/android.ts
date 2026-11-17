@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
 import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
@@ -35,20 +36,23 @@ export async function bootEmulator(
 	const running = await exec(tools.adb, ['-s', serial, 'get-state'], { allowFailure: true });
 	const bootedHere = running.stdout.trim() !== 'device';
 	if (bootedHere) {
-		const avds = (await exec(tools.emulator, ['-list-avds'])).stdout
+		// avdmanager and the emulator disagree on the default AVD folder on some hosts (GitHub's Linux runners), so name it.
+		const env = {
+			...process.env,
+			ANDROID_USER_HOME: process.env.ANDROID_USER_HOME ?? join(homedir(), '.android'),
+			ANDROID_AVD_HOME:
+				process.env.ANDROID_AVD_HOME ??
+				join(process.env.ANDROID_USER_HOME ?? join(homedir(), '.android'), 'avd'),
+		};
+		const avds = (await exec(tools.emulator, ['-list-avds'], { env })).stdout
 			.split('\n')
 			.map((line) => line.trim());
 		if (!avds.includes(avd)) {
-			const child = spawn(tools.avdmanager, [
-				'create',
-				'avd',
-				'-n',
-				avd,
-				'-k',
-				tools.systemImage,
-				'-d',
-				'pixel_7',
-			]);
+			const child = spawn(
+				tools.avdmanager,
+				['create', 'avd', '-n', avd, '-k', tools.systemImage, '-d', 'pixel_7'],
+				{ env },
+			);
 			child.stdin.end('no\n');
 			await new Promise<void>((resolve, reject) =>
 				child.on('close', (code) =>
@@ -75,7 +79,7 @@ export async function bootEmulator(
 				'swiftshader_indirect',
 				'-no-snapshot',
 			],
-			{ detached: true, stdio: ['ignore', log, log] },
+			{ detached: true, env, stdio: ['ignore', log, log] },
 		);
 		emulator.unref();
 		const logTail = () => readFileSync(logFile, 'utf8').split('\n').slice(-40).join('\n');
