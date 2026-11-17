@@ -4788,7 +4788,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A device feature is absent on the web: a Markless build error.',
 		printed: [
-			'MARKLESS_DEVICE_WEB_ABSENT: `<expressionSource>` needs an answer from `<name>`, which a web build does not have; check `<name>.supported` first',
+			'MARKLESS_DEVICE_WEB_ABSENT: `<expressionSource>` needs an answer from `<name>`, which a web build does not have; <state>',
 			'On the web, @markless/device features are absent: there is no value to show or wait for.',
 			'Wrap it in @if (<name>.supported) { ... } in markup, or start the handler with if (!<name>.supported) return;',
 			'https://markless.dev/errors/MARKLESS_DEVICE_WEB_ABSENT',
