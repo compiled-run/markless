@@ -269,3 +269,40 @@ test('SSR armization names the arm each branch in the served @try arm painted', 
 
 	expect(armized.armRecords.branches.map((record: { readonly takenArm?: number }) => record.takenArm)).toEqual([0, 1]);
 });
+
+test.each([
+	['pending', ASYNC_BOUNDARY_ARM.pending, false],
+	['fulfilled', ASYNC_BOUNDARY_ARM.try, true],
+] as const)(
+	'a list under an @if in the @try arm leaves the page records when the boundary serves %s',
+	(status, servedArm, travelsWithArm) => {
+		const list = { id: 'repeat:todos', parentHostNodeId: 'h-list', collectionGraphNodeId: 'computed:todos', keyPath: ['id'], rowEvents: [] };
+		const streams = { locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [list] };
+		const [armized] = marklessSsrArmizeBoundaries(
+			{
+				locators: [],
+				anchors: [{ kind: 'async', id: 'boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 1, html: '' }],
+				elementCount: 1,
+			},
+			[
+				{
+					id: 'boundary:0',
+					runnerGraphNodeId: 'computed:todos',
+					startAnchor: { strategy: 'dom-order-comment', index: 0 },
+					endAnchor: { strategy: 'dom-order-comment', index: 1 },
+					armRecords: [
+						{ branches: [{ id: 'branch-site:0', armRecords: [{ repeatParents: [{ repeatId: 'repeat:todos' }] }, {}] }] },
+						{},
+						{},
+					],
+				},
+			],
+			streams,
+			[{ graphNodeId: 'computed:todos', snapshot: { status } }],
+		);
+
+		expect(armized.initiallyServedArm).toBe(servedArm);
+		expect(streams.keyedRepeats).toEqual([]);
+		expect(armized.armRecords.keyedRepeats).toEqual(travelsWithArm ? [list] : undefined);
+	},
+);

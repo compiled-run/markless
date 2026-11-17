@@ -1354,8 +1354,13 @@ export function marklessSsrArmizeBoundaries(
 		}
 		// A list in an arm of a branch here travels with the arm, whichever arm the render painted.
 		const armListIds = new Set(marklessSsrArmListIds(planned.branches ?? []));
+		// One in an arm not painted reached no served byte; the commit that paints that arm brings its own record.
+		const unpaintedListIds = new Set(
+			plannedArms.flatMap((arm) => (arm === planned ? [] : marklessSsrArmListIds(arm.branches ?? []))),
+		);
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--)
 			if (armListIds.has(streams.keyedRepeats[i].id)) movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
+			else if (unpaintedListIds.has(streams.keyedRepeats[i].id)) streams.keyedRepeats.splice(i, 1);
 		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
 		return {
 			...boundary,
