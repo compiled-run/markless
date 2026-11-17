@@ -52,6 +52,8 @@ sealed interface Expr {
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
 	/** In an `input` handler: the field's whole text after the edit. */
 	data object EventValue : Expr
+	/** The page's route params, an object of strings. */
+	data object RouteParams : Expr
 }
 
 sealed interface TextPart {
@@ -81,10 +83,27 @@ sealed interface Node {
 enum class EventName(val wire: String) { Activate("activate"), Input("input") }
 
 sealed interface Op {
-	val cell: String
-
 	/** The cell takes the expression's value, evaluated before the write. */
-	data class Assign(override val cell: String, val value: Expr) : Op
+	data class Assign(val cell: String, val value: Expr) : Op
+	/** Opens the page at [route] with [params]; ops after it do not run. */
+	data class Navigate(val route: String, val params: Map<String, String>) : Op
+}
+
+/** A page's route as the router spells it (`/[fruit]`) and its param names. */
+data class Route(val pattern: String, val params: List<String>) {
+	/** The params of [path] when it matches the pattern: a `[name]` segment matches one URL-decoded path segment. */
+	fun match(path: String): Map<String, String>? {
+		val want = pattern.trim('/').split('/').filter { it.isNotEmpty() }
+		val got = path.substringBefore('?').substringBefore('#').trim('/').split('/').filter { it.isNotEmpty() }
+		if (want.size != got.size) return null
+		val out = LinkedHashMap<String, String>()
+		for ((w, g) in want.zip(got)) {
+			if (w.startsWith("[...") || w.startsWith("[[")) throw MarklessDecodeError("route segment \"$w\" is not supported yet")
+			if (w.startsWith("[") && w.endsWith("]")) out[w.substring(1, w.length - 1)] = java.net.URLDecoder.decode(g.replace("+", "%2B"), "UTF-8")
+			else if (w != g) return null
+		}
+		return out
+	}
 }
 
 data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false)
@@ -93,6 +112,7 @@ data class Handler(val id: String, val ops: List<Op>)
 
 data class Payload(
 	val component: String,
+	val route: Route?,
 	val cells: List<Cell>,
 	val nodes: List<Node>,
 	val events: List<Event>,
@@ -103,7 +123,11 @@ data class Payload(
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "cells", "nodes", "events", "handlers"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers"), "payload")
+			val route = root["route"]?.obj("payload.route")?.let { r ->
+				r.only(setOf("pattern", "params"), "payload.route")
+				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
+			}
 			val version = root.field("version", "payload").str("payload.version")
 			if (version != NATIVE_VIEW_VERSION) throw MarklessDecodeError("unknown payload version \"$version\" (this host reads $NATIVE_VIEW_VERSION)")
 			val cells = root.field("cells", "payload").arr("payload.cells").mapIndexed { n, c -> cell(c, "cells[$n]") }
@@ -139,7 +163,7 @@ data class Payload(
 				if (seen[e.host] !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), cells, nodes, events, handlers)
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -155,7 +179,7 @@ data class Payload(
 			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
 			is Expr.Lambda -> cellsOf(e.body)
-			is Expr.Local, is Expr.Item -> emptyList()
+			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
 			Expr.EventValue -> emptyList()
 		}
@@ -215,6 +239,7 @@ data class Payload(
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
+				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
 				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
@@ -318,6 +343,11 @@ data class Payload(
 		private fun op(v: Json, what: String, cells: Set<String>): Op {
 			val o = v.obj(what)
 			val name = o.field("op", what).str("$what.op")
+			if (name == "navigate") {
+				o.only(setOf("op", "route", "params"), what)
+				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
+				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)
 			val cell = o.field("cell", what).str("$what.cell")

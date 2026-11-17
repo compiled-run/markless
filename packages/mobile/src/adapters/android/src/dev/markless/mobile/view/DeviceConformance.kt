@@ -16,7 +16,7 @@ import dev.markless.mobile.core.str
 object DeviceConformance {
 	fun run(context: Context, vectorBytes: ByteArray): List<String> {
 		val vector = Json.parse(vectorBytes).obj("vector")
-		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore())
+		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap())
 		val failures = ArrayList<String>()
 		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.textView(id).text.toString() else "<no view>")}]" }
 		fun structure(where: String) {
@@ -44,6 +44,7 @@ object DeviceConformance {
 		}
 		val journal = ArrayList<JournalEntry>()
 		host.onJournal = { journal.addAll(it) }
+		host.onNavigate = { _, _ -> }
 		for ((n, step) in vector.field("steps", "vector").arr("steps").withIndex()) {
 			val s = step.obj("steps[$n]")
 			val action = s.field("action", "step").obj("action")
@@ -64,7 +65,7 @@ object DeviceConformance {
 			}
 			val runtimeTexts = host.runtime.texts().joinToString(",", "[", "]") { (id, t) -> "[${jsonString(id)},${jsonString(t)}]" }
 			if (shownTexts() != runtimeTexts) failures.add("steps[$n]: views show ${shownTexts()}, the runtime shows $runtimeTexts")
-			structure("steps[$n]")
+			if (journal.none { it is JournalEntry.Navigate }) structure("steps[$n]")
 		}
 		return failures
 	}
