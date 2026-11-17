@@ -1356,6 +1356,7 @@ function collectAttribute(
 								: {}),
 						}
 					: {}),
+				...(relayed ? { relayedPropName: relayed.propName } : {}),
 				handlerParameters: relayed
 					? [relayed.parameter]
 					: factory
