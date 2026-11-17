@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 318,
+	total: 320,
 	guided: 51,
 	groups: [
 		{
@@ -1596,6 +1596,14 @@ export const errorIndex: ErrorIndex = {
 					words: 'a debug event’s element is missing markless_debug_event_host_missing a markless runtime error from @markless/web.',
 				},
 				{
+					code: 'MARKLESS_DEVICE_USAGE_MISSING',
+					title: 'A device feature has no usage text',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'a device feature has no usage text markless_device_usage_missing a device feature has no usage text: a markless runtime error.',
+				},
+				{
 					code: 'MARKLESS_DYNAMIC_TAG_INVALID',
 					title: 'A dynamic tag name is not a valid element',
 					chip: 'error',
@@ -2578,6 +2586,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime warning',
 					guided: false,
 					words: 'this container was already resumed markless_resume_already_resumed this container was already resumed: a markless runtime warning.',
+				},
+				{
+					code: 'MARKLESS_DEVICE_WEB_UNSUPPORTED',
+					title: 'This device feature has no web build yet',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'this device feature has no web build yet markless_device_web_unsupported this device feature has no web build yet: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_PRERENDER_WAKE_ROUTE_INELIGIBLE',
