@@ -103,7 +103,8 @@
 					{
 						"attribute": "disabled",
 						"value": {
-							"not": {
+							"unary": "!",
+							"value": {
 								"cell": "state:liked"
 							}
 						}
@@ -138,8 +139,14 @@
 				"id": "handler:event:0",
 				"ops": [
 					{
-						"op": "toggle",
-						"cell": "state:liked"
+						"op": "assign",
+						"cell": "state:liked",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:liked"
+							}
+						}
 					}
 				]
 			},
@@ -147,9 +154,11 @@
 				"id": "handler:event:1",
 				"ops": [
 					{
-						"op": "set",
+						"op": "assign",
 						"cell": "state:liked",
-						"value": false
+						"value": {
+							"literal": false
+						}
 					}
 				]
 			}

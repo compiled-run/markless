@@ -3,13 +3,35 @@ export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
 export type NativeScalar = number | string | boolean;
 
-/** A value computed from cells as data: JavaScript truthiness for `not` and `if`, `===` for `equals`. */
+/** Calls a host implements with exact JavaScript meaning; nothing else can be called. */
+export type NativeBuiltin =
+	| 'String'
+	| 'Number'
+	| 'Boolean'
+	| 'Math.abs'
+	| 'Math.floor'
+	| 'Math.max'
+	| 'Math.min'
+	| 'Math.round';
+
+/**
+ * A value computed from cells, evaluated by every host with JavaScript's meaning (numbers are IEEE doubles; `String()`,
+ * `+`, comparisons, truthiness and `??` follow ECMAScript). The reference runtime and the conformance vectors pin it.
+ */
 export type NativeExpr =
 	| { readonly cell: string }
-	| { readonly literal: NativeScalar }
-	| { readonly not: NativeExpr }
+	| { readonly literal: NativeScalar | null }
+	| { readonly unary: '!' | '-' | '+'; readonly value: NativeExpr }
+	| {
+			readonly binary: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
+			readonly left: NativeExpr;
+			readonly right: NativeExpr;
+	  }
+	| { readonly logical: '&&' | '||' | '??'; readonly left: NativeExpr; readonly right: NativeExpr }
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
-	| { readonly equals: readonly [NativeExpr, NativeExpr] };
+	| { readonly template: ReadonlyArray<string | NativeExpr> }
+	| { readonly member: NativeExpr; readonly property: 'length' }
+	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> };
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -53,16 +75,19 @@ export type NativeNode =
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
 export type NativeEventName = 'activate';
 
-/** A state write a host runs as data, with no script engine. */
-export type NativeOp =
-	| { readonly op: 'add'; readonly cell: string; readonly value: number }
-	| { readonly op: 'set'; readonly cell: string; readonly value: NativeScalar }
-	| { readonly op: 'toggle'; readonly cell: string };
+/** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
+export type NativeOp = { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
 	readonly component: string;
-	readonly cells: ReadonlyArray<{ readonly id: string; readonly name: string; readonly initial: NativeScalar }>;
+	/** `storage` names a device-kept value (iOS UserDefaults, Android SharedPreferences): read at mount, written on every change. */
+	readonly cells: ReadonlyArray<{
+		readonly id: string;
+		readonly name: string;
+		readonly initial: NativeScalar;
+		readonly storage?: { readonly key: string };
+	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
 	readonly events: ReadonlyArray<{

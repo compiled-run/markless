@@ -121,8 +121,14 @@
 				"id": "handler:event:0",
 				"ops": [
 					{
-						"op": "toggle",
-						"cell": "state:open"
+						"op": "assign",
+						"cell": "state:open",
+						"value": {
+							"unary": "!",
+							"value": {
+								"cell": "state:open"
+							}
+						}
 					}
 				]
 			},
@@ -130,14 +136,21 @@
 				"id": "handler:event:1",
 				"ops": [
 					{
-						"op": "set",
+						"op": "assign",
 						"cell": "state:tab",
-						"value": "second"
+						"value": {
+							"literal": "second"
+						}
 					},
 					{
-						"op": "set",
+						"op": "assign",
 						"cell": "state:size",
-						"value": -2
+						"value": {
+							"unary": "-",
+							"value": {
+								"literal": 2
+							}
+						}
 					}
 				]
 			}
