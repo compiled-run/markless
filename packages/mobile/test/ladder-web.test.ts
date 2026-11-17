@@ -1,4 +1,4 @@
-import { copyFile, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { chromium, type Browser, type Locator, type Page } from '@playwright/test';
@@ -46,6 +46,8 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
 	await mkdir(dirname(page), { recursive: true });
 	await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
+	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
+	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
 	await writeFile(join(root, 'document.tsrx'), documentSource);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])

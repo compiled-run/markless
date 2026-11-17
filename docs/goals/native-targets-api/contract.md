@@ -37,7 +37,8 @@ this file changes in the same push. Status as of 2026-11-16, night one.
   page's pattern must have no params. A `navigate` entry re-mounts with the entry's params.
 - **native-proof-harness:** forward the `route` launch argument to the shells; run `node packages/mobile/src/style-export.ts
   <rung>` when a rung has styles and `MARKLESS_DRAGON_DIR` is set (or keep refusing a missing export, as now).
-- **native-ladder:** rungs 2 and 4's CSS now say `display: block` and `font-family: inherit` on buttons (and rung 4's
+- **native-ladder:** rung 7b is written by the lead (`proofs/07b-imported-component/`, rung number 7.5, importing
+  `proofs/lib/Stepper.tsrx`; the web check copies `proofs/lib` into its app). Also: rungs 2 and 4's CSS now say `display: block` and `font-family: inherit` on buttons (and rung 4's
   buttons have an author background and border): Dragon refused the originals with `DRAGON_UNSUPPORTED_VALUE` and
   `DRAGON_UNSUPPORTED_FONT`, which is the build error with a fix the design asks for. Please keep the web check green on
   the new CSS. Next: rung 7b, a component imported from another file (`proofs/07b-imported-component/`), which the
@@ -434,19 +435,18 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
-| 7b | A component imported from another file | not started | compiler side done (test fixture) | not yet | not yet | waits on the ladder's `proofs/07b-imported-component/` |
+| 7b | A component imported from another file | passing | passing | **passing** | **passing** | `proofs/07b-imported-component/` imports `proofs/lib/Stepper.tsrx`; harness verdict passed on both |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
 
-**Device receipts (2026-11-17, tree `610f5f681` plus the harness's page fix):** the harness
-(`pnpm --filter @markless/mobile proof --platform <p> --report <dir> <rungs>`, then `proof verdict`) on mini-2, simulator
-`markless-lead` (iPhone, iOS 27.2) and AVD `markless_native` (Pixel 7, API 36). Reports are committed under
-`docs/goals/native-targets-api/receipts/`. iOS passed rungs 1, 3, 5, 7, 8 and 9 in one run. Android passed 3, 5, 7, 8 and 9 in
-that run and lost the emulator at rung 1's launch (`device offline`, load average about 60 from the other workers'
-builds); rung 1 then passed alone (`...-android-rung-1-rerun.json`), so the verdict over the first pair of reports is red
-and this row's rung 1 rests on two runs. Nothing was retried inside a run.
+**Device receipt (2026-11-17 05:00, tree `06b410c1a`):** one harness run of rungs 1 to 10 on both platforms, then
+`proof verdict`: **"proof passed on iOS and Android"** (Android first, then iOS; devices booted for the run and shut down
+after; mini-2, simulator `markless-lead`, iOS 27.2; AVD `markless_native`, Pixel 7, API 36). Reports and the verdict are
+committed under `docs/goals/native-targets-api/receipts/2026-11-17-*-rungs-1-to-10.*`; rung 7b's own run is beside them.
+Earlier partial runs (also committed) record emulator drops under load (`device offline`), which the harness names as
+device failures and never retries.
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the

@@ -1,0 +1,66 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 9.578575708,
+			"flowSeconds": 25.631602625
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.641477082999998,
+			"flowSeconds": 29.401949457999997
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.7753277089999902,
+			"flowSeconds": 27.560831709000006
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.4103026660000032,
+			"flowSeconds": 26.761774875000004
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.3271385830000072,
+			"flowSeconds": 22.37763650000001
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.3419354170000006,
+			"flowSeconds": 21.76176233300002
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.3217067500000121,
+			"flowSeconds": 22.477012832999986
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.3085775840000133,
+			"flowSeconds": 30.688548874999977
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.49295495899999514,
+			"flowSeconds": 32.39084825000001
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.31186966600001326,
+			"flowSeconds": 18.23438045800003
+		}
+	]
+}
