@@ -1,0 +1,4165 @@
+{
+  "accordion": {
+    "files": [
+      "accordion/accordion-types.ts",
+      "accordion/accordion-walk.ts",
+      "accordion/accordion.tsrx",
+      "accordion/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "h3": 1,
+      "button": 1
+    },
+    "roles": [
+      "region"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-multiple",
+      "ui-open",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBeforematch",
+      "onClick",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "document",
+      "undefined"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLHeadingElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "activeElement",
+      "focus",
+      "key",
+      "preventDefault",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLHeadingElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "base": {
+    "files": [
+      "base/base-types.ts",
+      "base/button.tsrx",
+      "base/index.ts",
+      "base/label.tsrx",
+      "base/separator.tsrx",
+      "base/visually-hidden.tsrx"
+    ],
+    "tags": {
+      "button": 1,
+      "label": 1,
+      "div": 1,
+      "span": 1
+    },
+    "roles": [
+      "expr:{decorative === true ? undefined : 'separator'}"
+    ],
+    "aria": [
+      "aria-hidden",
+      "aria-orientation",
+      "aria-pressed"
+    ],
+    "ui": [
+      "ui-decorative",
+      "ui-orientation",
+      "ui-pressed",
+      "ui-separator"
+    ],
+    "domEvents": [
+      "onClick"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "for",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "Pick"
+    ],
+    "members": [],
+    "elementTypes": [],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "buttongroup": {
+    "files": [
+      "buttongroup/buttongroup-types.ts",
+      "buttongroup/buttongroup-values.ts",
+      "buttongroup/buttongroup-walk.ts",
+      "buttongroup/buttongroup.tsrx",
+      "buttongroup/index.ts"
+    ],
+    "tags": {
+      "div": 1,
+      "label": 1,
+      "button": 1,
+      "input": 1
+    },
+    "roles": [
+      "group"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-labelledby",
+      "aria-pressed"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-multiple",
+      "ui-pressed",
+      "ui-required",
+      "ui-vertical"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocus",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "name",
+      "tabindex=expr",
+      "type=button",
+      "type=hidden",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLButtonElement",
+      "HTMLLabelElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLButtonElement[]>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "toolbar"
+    ],
+    "parseErrors": []
+  },
+  "calendar": {
+    "files": [
+      "calendar/calendar-focus.ts",
+      "calendar/calendar-math.ts",
+      "calendar/calendar-types.ts",
+      "calendar/calendar.tsrx",
+      "calendar/index.ts"
+    ],
+    "tags": {
+      "div": 4,
+      "h2": 1,
+      "button": 4,
+      "label": 1,
+      "input": 1
+    },
+    "roles": [
+      "expr:{surfaceRole}"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-live",
+      "aria-pressed"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-inrange",
+      "ui-invalid",
+      "ui-multiple",
+      "ui-open",
+      "ui-outside",
+      "ui-popup",
+      "ui-range",
+      "ui-rangeend",
+      "ui-rangestart",
+      "ui-readonly",
+      "ui-required",
+      "ui-selected",
+      "ui-today",
+      "ui-unavailable"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onFocusin",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "name",
+      "overlay",
+      "required",
+      "tabindex=expr",
+      "type=button",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "Date",
+      "Intl",
+      "Math",
+      "Number",
+      "document",
+      "undefined"
+    ],
+    "domTypes": [
+      "Date",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLHeadingElement",
+      "HTMLLabelElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "activeElement",
+      "contains",
+      "focus",
+      "key",
+      "preventDefault",
+      "select",
+      "shiftKey",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLHeadingElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base",
+      "datebox"
+    ],
+    "parseErrors": []
+  },
+  "carousel": {
+    "files": [
+      "carousel/carousel-engine.ts",
+      "carousel/carousel-navigation.ts",
+      "carousel/carousel-types.ts",
+      "carousel/carousel.tsrx",
+      "carousel/index.ts"
+    ],
+    "tags": {
+      "div": 6,
+      "button": 4
+    },
+    "roles": [
+      "expr:{carousel.isTabbed ? 'tabpanel' : 'group'}",
+      "group",
+      "tab",
+      "tablist"
+    ],
+    "aria": [
+      "aria-atomic",
+      "aria-disabled",
+      "aria-label",
+      "aria-live",
+      "aria-orientation",
+      "aria-roledescription",
+      "aria-selected"
+    ],
+    "ui": [
+      "ui-active",
+      "ui-align",
+      "ui-draggable",
+      "ui-loop",
+      "ui-reduced-motion",
+      "ui-track",
+      "ui-value",
+      "ui-vertical"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocus",
+      "onFocusin",
+      "onKeydown",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerout",
+      "onPointerover",
+      "onPointerup",
+      "onWheel"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "Float64Array",
+      "Math",
+      "Number",
+      "WeakMap",
+      "getComputedStyle",
+      "performance",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "Animation",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "Node",
+      "Omit",
+      "Record"
+    ],
+    "members": [
+      "addEventListener",
+      "animate",
+      "button",
+      "clientX",
+      "clientY",
+      "contains",
+      "deltaY",
+      "focus",
+      "key",
+      "matchMedia",
+      "pointerId",
+      "pointerType",
+      "preventDefault",
+      "relatedTarget",
+      "reset",
+      "scrollLeft",
+      "scrollTop",
+      "setPointerCapture",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "checkbox": {
+    "files": [
+      "checkbox/checkbox-types.ts",
+      "checkbox/checkbox.tsrx",
+      "checkbox/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "button": 1,
+      "span": 1,
+      "label": 1,
+      "input": 1
+    },
+    "roles": [
+      "checkbox"
+    ],
+    "aria": [
+      "aria-checked",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid"
+    ],
+    "ui": [
+      "ui-checked",
+      "ui-disabled",
+      "ui-mixed"
+    ],
+    "domEvents": [
+      "onClick",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "checked",
+      "disabled",
+      "for",
+      "indeterminate",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=button",
+      "type=checkbox",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "Omit"
+    ],
+    "members": [
+      "checked",
+      "key",
+      "preventDefault",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "checklist": {
+    "files": [
+      "checklist/checklist-types.ts",
+      "checklist/checklist.tsrx",
+      "checklist/index.ts"
+    ],
+    "tags": {},
+    "roles": [],
+    "aria": [],
+    "ui": [],
+    "domEvents": [],
+    "componentEvents": [
+      "onChange"
+    ],
+    "otherAttrs": [],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "Omit"
+    ],
+    "members": [
+      "value"
+    ],
+    "elementTypes": [],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "checkbox"
+    ],
+    "parseErrors": []
+  },
+  "collapsible": {
+    "files": [
+      "collapsible/collapsible-types.ts",
+      "collapsible/collapsible.tsrx",
+      "collapsible/index.ts"
+    ],
+    "tags": {
+      "div": 2,
+      "button": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-controls",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-live"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onBeforematch",
+      "onClick"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "Omit"
+    ],
+    "members": [],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "colorpicker": {
+    "files": [
+      "colorpicker/colorpicker-math.ts",
+      "colorpicker/colorpicker-names.ts",
+      "colorpicker/colorpicker-types.ts",
+      "colorpicker/colorpicker.tsrx",
+      "colorpicker/index.ts"
+    ],
+    "tags": {
+      "div": 8,
+      "button": 2,
+      "label": 1,
+      "input": 2,
+      "output": 1
+    },
+    "roles": [
+      "expr:{surfaceRole}",
+      "expr:{thumbRole}",
+      "group",
+      "slider"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-orientation",
+      "aria-pressed",
+      "aria-readonly",
+      "aria-roledescription",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-alpha",
+      "ui-axis",
+      "ui-channel",
+      "ui-closed",
+      "ui-disabled",
+      "ui-dragging",
+      "ui-invalid",
+      "ui-open",
+      "ui-picker",
+      "ui-plane",
+      "ui-popup",
+      "ui-rail",
+      "ui-readonly",
+      "ui-required",
+      "ui-selected",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onClick",
+      "onDismiss",
+      "onFocusin",
+      "onInput",
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=off",
+      "disabled",
+      "hidden=expr",
+      "max",
+      "min",
+      "name",
+      "overlay",
+      "readonly",
+      "required",
+      "spellcheck",
+      "step",
+      "tabindex=expr",
+      "type=button",
+      "type=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "Math",
+      "Number",
+      "String",
+      "document",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "EventTarget",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Omit",
+      "ReadonlyArray",
+      "Record",
+      "const"
+    ],
+    "members": [
+      "activeElement",
+      "button",
+      "clientX",
+      "clientY",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "pointerId",
+      "preventDefault",
+      "relatedTarget",
+      "setPointerCapture",
+      "shiftKey",
+      "target",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLInputElement[]>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [
+        "anchor-name",
+        "anchor-scope",
+        "bottom",
+        "forced-color-adjust",
+        "inset",
+        "left",
+        "position",
+        "position-anchor",
+        "touch-action"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "var()"
+      ]
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "combobox": {
+    "files": [
+      "combobox/combobox-types.ts",
+      "combobox/combobox.tsrx",
+      "combobox/index.ts",
+      "combobox/option-walk.ts"
+    ],
+    "tags": {
+      "div": 5,
+      "label": 1,
+      "input": 1,
+      "button": 1,
+      "span": 2,
+      "select": 1,
+      "option": 1
+    },
+    "roles": [
+      "alert",
+      "combobox",
+      "group",
+      "listbox",
+      "option"
+    ],
+    "aria": [
+      "aria-autocomplete",
+      "aria-controls",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-multiselectable",
+      "aria-selected"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-hidden",
+      "ui-highlighted",
+      "ui-inline",
+      "ui-open",
+      "ui-required",
+      "ui-selected",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onFocus",
+      "onInput",
+      "onKeydown",
+      "onKeyup",
+      "onPointerenter",
+      "onPointerover"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=off",
+      "disabled",
+      "for",
+      "hidden=expr",
+      "name",
+      "overlay",
+      "placeholder",
+      "required",
+      "tabindex=expr",
+      "type=button",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Math",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "click",
+      "contains",
+      "focus",
+      "key",
+      "preventDefault",
+      "scrollIntoView",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLInputElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "crop": {
+    "files": [
+      "crop/crop-math.ts",
+      "crop/crop-types.ts",
+      "crop/crop.tsrx",
+      "crop/index.ts"
+    ],
+    "tags": {
+      "div": 7,
+      "output": 1,
+      "span": 1,
+      "input": 1
+    },
+    "roles": [
+      "group",
+      "slider"
+    ],
+    "aria": [
+      "aria-atomic",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-live",
+      "aria-orientation",
+      "aria-roledescription",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-area",
+      "ui-block-end",
+      "ui-block-start",
+      "ui-disabled",
+      "ui-dragging",
+      "ui-fixed",
+      "ui-grid",
+      "ui-handle",
+      "ui-inline-end",
+      "ui-inline-start",
+      "ui-resizing",
+      "ui-selection"
+    ],
+    "domEvents": [
+      "onFocusin",
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "Math",
+      "Number",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "Element",
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLInputElement",
+      "HTMLOutputElement",
+      "HTMLSpanElement",
+      "Node",
+      "Omit"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "contains",
+      "ctrlKey",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "metaKey",
+      "pointerId",
+      "preventDefault",
+      "setPointerCapture",
+      "shiftKey",
+      "target",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLInputElement>",
+      "<HTMLOutputElement>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [
+        "block-size",
+        "inline-size",
+        "inset",
+        "inset-block-end",
+        "inset-block-start",
+        "inset-inline-end",
+        "inset-inline-start",
+        "overflow",
+        "pointer-events",
+        "position",
+        "touch-action"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "var()"
+      ]
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "datebox": {
+    "files": [
+      "datebox/datebox-math.ts",
+      "datebox/datebox-types.ts",
+      "datebox/datebox.tsrx",
+      "datebox/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "label": 1,
+      "span": 1,
+      "input": 1
+    },
+    "roles": [
+      "group",
+      "spinbutton"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-required",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-empty",
+      "ui-invalid",
+      "ui-placeholder",
+      "ui-required",
+      "ui-type",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onKeydown",
+      "onPaste"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Intl",
+      "Math",
+      "Number",
+      "undefined"
+    ],
+    "domTypes": [
+      "Date",
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLLabelElement",
+      "HTMLSpanElement",
+      "Omit",
+      "Record"
+    ],
+    "members": [
+      "altKey",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLLabelElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "drawer": {
+    "files": [
+      "drawer/drawer-focus.ts",
+      "drawer/drawer-press.ts",
+      "drawer/drawer-swipe.ts",
+      "drawer/drawer-types.ts",
+      "drawer/drawer.tsrx",
+      "drawer/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "button": 2,
+      "h2": 1,
+      "p": 1
+    },
+    "roles": [
+      "dialog"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-describedby",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-labelledby",
+      "aria-modal"
+    ],
+    "ui": [
+      "ui-backdrop",
+      "ui-closed",
+      "ui-content",
+      "ui-dragging",
+      "ui-open",
+      "ui-orientation",
+      "ui-start"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onFocusin",
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "HTMLElement",
+      "Math",
+      "Number",
+      "WeakMap",
+      "WeakSet",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "CustomEvent",
+      "Element",
+      "EventTarget",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLHeadingElement",
+      "HTMLParagraphElement",
+      "Omit"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "close",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "ownerDocument",
+      "pointerId",
+      "preventDefault",
+      "setPointerCapture",
+      "target",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLHeadingElement>",
+      "<HTMLParagraphElement>"
+    ],
+    "css": {
+      "props": [
+        "inset",
+        "inset-block",
+        "inset-inline",
+        "overscroll-behavior",
+        "position",
+        "touch-action",
+        "translate"
+      ],
+      "pseudos": [
+        ":dir"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "calc()",
+        "var()"
+      ]
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "editable": {
+    "files": [
+      "editable/edit-walk.ts",
+      "editable/editable-types.ts",
+      "editable/editable.tsrx",
+      "editable/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "label": 1,
+      "button": 1,
+      "input": 2
+    },
+    "roles": [
+      "alert",
+      "group"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-invalid",
+      "aria-labelledby",
+      "aria-required"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-editing",
+      "ui-empty",
+      "ui-invalid",
+      "ui-readonly",
+      "ui-required",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onClick",
+      "onFocus",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=off",
+      "disabled",
+      "for",
+      "hidden=expr",
+      "name",
+      "placeholder",
+      "readonly",
+      "type=button",
+      "type=hidden",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Omit"
+    ],
+    "members": [
+      "focus",
+      "isComposing",
+      "key",
+      "preventDefault",
+      "select",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "fileupload": {
+    "files": [
+      "fileupload/fileupload-files.ts",
+      "fileupload/fileupload-types.ts",
+      "fileupload/fileupload.tsrx",
+      "fileupload/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "label": 1,
+      "button": 2,
+      "input": 1,
+      "span": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-hidden"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-dragging"
+    ],
+    "domEvents": [
+      "onChange",
+      "onClick",
+      "onDragenter",
+      "onDragleave",
+      "onDragover",
+      "onDrop"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "accept",
+      "disabled",
+      "for",
+      "multiple",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=button",
+      "type=file"
+    ],
+    "popover": [],
+    "globals": [
+      "Boolean",
+      "DOMException",
+      "DataTransfer",
+      "WeakMap",
+      "undefined"
+    ],
+    "domTypes": [
+      "DataTransfer",
+      "File",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Omit"
+    ],
+    "members": [
+      "click",
+      "clientX",
+      "clientY",
+      "dataTransfer",
+      "files",
+      "getBoundingClientRect",
+      "preventDefault",
+      "showPicker"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "gridlist": {
+    "files": [
+      "gridlist/grid-select.ts",
+      "gridlist/grid-typeahead.ts",
+      "gridlist/grid-walk.ts",
+      "gridlist/gridlist-types.ts",
+      "gridlist/gridlist.tsrx",
+      "gridlist/index.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "span": 3,
+      "button": 1
+    },
+    "roles": [
+      "grid",
+      "gridcell",
+      "row"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-hidden",
+      "aria-labelledby",
+      "aria-multiselectable",
+      "aria-selected"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-inside",
+      "ui-multiple",
+      "ui-selectable",
+      "ui-selected",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocusin",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Math",
+      "Number",
+      "undefined"
+    ],
+    "domTypes": [
+      "DOMRect",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Node",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "contains",
+      "ctrlKey",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "shiftKey",
+      "target",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [
+        "-webkit-user-select",
+        "user-select"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "hovercard": {
+    "files": [
+      "hovercard/hovercard-types.ts",
+      "hovercard/hovercard.tsrx",
+      "hovercard/index.ts"
+    ],
+    "tags": {
+      "div": 2,
+      "a": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-controls",
+      "aria-expanded"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onDismiss",
+      "onFocusin",
+      "onFocusout",
+      "onPointerout",
+      "onPointerover"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "overlay-hint"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "FocusEvent",
+      "PointerEvent",
+      "document",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "HTMLAnchorElement",
+      "HTMLDivElement",
+      "Node",
+      "Omit"
+    ],
+    "members": [
+      "activeElement",
+      "contains",
+      "dispatchEvent",
+      "focus",
+      "pointerType",
+      "relatedTarget"
+    ],
+    "elementTypes": [
+      "<HTMLAnchorElement>",
+      "<HTMLDivElement>"
+    ],
+    "css": {
+      "props": [
+        "--ui-anchor",
+        "anchor-name",
+        "anchor-scope",
+        "position",
+        "position-anchor",
+        "position-area"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "ink": {
+    "files": [
+      "ink/index.ts",
+      "ink/ink-stroke.ts",
+      "ink/ink-types.ts",
+      "ink/ink.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "output": 1,
+      "span": 1,
+      "svg": 1,
+      "path": 2,
+      "line": 1,
+      "input": 1
+    },
+    "roles": [
+      "img"
+    ],
+    "aria": [
+      "aria-atomic",
+      "aria-describedby",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-labelledby",
+      "aria-live"
+    ],
+    "ui": [
+      "ui-current",
+      "ui-disabled",
+      "ui-drawing",
+      "ui-empty",
+      "ui-guide",
+      "ui-readonly",
+      "ui-stroke",
+      "ui-surface"
+    ],
+    "domEvents": [
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "d",
+      "disabled",
+      "name",
+      "readonly",
+      "required",
+      "tabindex=expr",
+      "type=text",
+      "value",
+      "x1",
+      "x2",
+      "y1",
+      "y2"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "Error",
+      "Image",
+      "Math",
+      "Promise",
+      "String",
+      "document",
+      "encodeURIComponent",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "HTMLOutputElement",
+      "HTMLSpanElement",
+      "Omit",
+      "Promise",
+      "SVGSVGElement"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "ctrlKey",
+      "getBoundingClientRect",
+      "getContext",
+      "height",
+      "key",
+      "metaKey",
+      "pointerId",
+      "pointerType",
+      "pressure",
+      "preventDefault",
+      "setPointerCapture",
+      "shiftKey",
+      "toDataURL",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLOutputElement>",
+      "<HTMLSpanElement>",
+      "<SVGSVGElement>"
+    ],
+    "css": {
+      "props": [
+        "-webkit-user-select",
+        "display",
+        "fill",
+        "stroke",
+        "touch-action",
+        "user-select"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "menu": {
+    "files": [
+      "menu/index.ts",
+      "menu/menu-anchor.ts",
+      "menu/menu-types.ts",
+      "menu/menu-walk.ts",
+      "menu/menu.tsrx"
+    ],
+    "tags": {
+      "div": 5,
+      "button": 1
+    },
+    "roles": [
+      "expr:{itemRole}",
+      "menu"
+    ],
+    "aria": [
+      "aria-checked",
+      "aria-controls",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-checked",
+      "ui-closed",
+      "ui-disabled",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onClick",
+      "onContextmenu",
+      "onDismiss",
+      "onFocusin",
+      "onFocusout",
+      "onKeydown",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerout",
+      "onPointerover",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "overlay",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "CustomEvent",
+      "Date",
+      "HTMLElement",
+      "Math",
+      "MouseEvent",
+      "PointerEvent",
+      "WeakMap",
+      "document",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "Node",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "activeElement",
+      "checked",
+      "click",
+      "clientX",
+      "clientY",
+      "contains",
+      "dispatchEvent",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "pointerType",
+      "preventDefault",
+      "relatedTarget",
+      "shiftKey",
+      "stopPropagation",
+      "target",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>"
+    ],
+    "css": {
+      "props": [
+        "-webkit-touch-callout",
+        "anchor-name",
+        "anchor-scope",
+        "left",
+        "position",
+        "position-anchor",
+        "position-area",
+        "top"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "var()"
+      ]
+    },
+    "deps": [
+      "toolbar"
+    ],
+    "parseErrors": []
+  },
+  "menubar": {
+    "files": [
+      "menubar/index.ts",
+      "menubar/menubar-types.ts",
+      "menubar/menubar-walk.ts",
+      "menubar/menubar.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "span": 1
+    },
+    "roles": [
+      "menu",
+      "menubar",
+      "menuitem"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-labelledby",
+      "aria-orientation"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onClick",
+      "onContextmenu",
+      "onDismiss",
+      "onFocusin",
+      "onKeydown",
+      "onPointerover"
+    ],
+    "componentEvents": [
+      "onChange"
+    ],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "tabindex=expr"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "Date",
+      "HTMLElement",
+      "KeyboardEvent",
+      "MouseEvent",
+      "document",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Node",
+      "Omit"
+    ],
+    "members": [
+      "activeElement",
+      "compareDocumentPosition",
+      "contains",
+      "dispatchEvent",
+      "focus",
+      "isTrusted",
+      "key",
+      "preventDefault",
+      "stopPropagation",
+      "tabIndex",
+      "target"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [
+        "anchor-name",
+        "anchor-scope",
+        "position",
+        "position-anchor",
+        "position-area"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [
+      "menu",
+      "toolbar"
+    ],
+    "parseErrors": []
+  },
+  "modal": {
+    "files": [
+      "modal/index.ts",
+      "modal/modal-focus.ts",
+      "modal/modal-press.ts",
+      "modal/modal-types.ts",
+      "modal/modal.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "button": 2,
+      "h2": 1,
+      "p": 1
+    },
+    "roles": [
+      "expr:{modal.alert ? 'alertdialog' : 'dialog'}"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-describedby",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-labelledby",
+      "aria-modal"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onPointerdown",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "HTMLElement",
+      "WeakSet",
+      "undefined"
+    ],
+    "domTypes": [
+      "CustomEvent",
+      "Element",
+      "EventTarget",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLHeadingElement",
+      "HTMLParagraphElement",
+      "Omit"
+    ],
+    "members": [
+      "button",
+      "focus",
+      "ownerDocument",
+      "target"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLHeadingElement>",
+      "<HTMLParagraphElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "navbar": {
+    "files": [
+      "navbar/index.ts",
+      "navbar/navbar-safe-zone.ts",
+      "navbar/navbar-types.ts",
+      "navbar/navbar-walk.ts",
+      "navbar/navbar.tsrx"
+    ],
+    "tags": {
+      "nav": 1,
+      "div": 2,
+      "button": 2,
+      "a": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-controls",
+      "aria-current",
+      "aria-expanded"
+    ],
+    "ui": [
+      "ui-active",
+      "ui-closed",
+      "ui-from",
+      "ui-open",
+      "ui-to"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onFocusout",
+      "onKeydown",
+      "onPointerout",
+      "onPointerover"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Math",
+      "Node",
+      "PointerEvent",
+      "WeakSet",
+      "document",
+      "getComputedStyle",
+      "setTimeout",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "Array",
+      "DOMRect",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "Node",
+      "Omit",
+      "PointerEvent",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "activeElement",
+      "addEventListener",
+      "clientX",
+      "clientY",
+      "compareDocumentPosition",
+      "contains",
+      "dispatchEvent",
+      "focus",
+      "getBoundingClientRect",
+      "hidden",
+      "key",
+      "preventDefault",
+      "relatedTarget",
+      "removeEventListener",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLElement>",
+      "<HTMLElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "numberbox": {
+    "files": [
+      "numberbox/index.ts",
+      "numberbox/numberbox-math.ts",
+      "numberbox/numberbox-types.ts",
+      "numberbox/numberbox.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "output": 2,
+      "label": 1,
+      "input": 2,
+      "button": 2
+    },
+    "roles": [],
+    "aria": [
+      "aria-atomic",
+      "aria-controls",
+      "aria-describedby",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-live",
+      "aria-roledescription"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-empty",
+      "ui-invalid",
+      "ui-readonly",
+      "ui-required",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onFocus",
+      "onInput",
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointerleave",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=off",
+      "disabled",
+      "for",
+      "inputmode=decimal",
+      "name",
+      "readonly",
+      "required",
+      "spellcheck",
+      "tabindex=expr",
+      "type=button",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Intl",
+      "Map",
+      "Math",
+      "Number",
+      "String",
+      "document",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Intl",
+      "Omit",
+      "const"
+    ],
+    "members": [
+      "focus",
+      "key",
+      "lang",
+      "pointerType",
+      "preventDefault",
+      "selectionStart",
+      "setSelectionRange",
+      "shiftKey",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "otp": {
+    "files": [
+      "otp/index.ts",
+      "otp/otp-types.ts",
+      "otp/otp.tsrx"
+    ],
+    "tags": {
+      "div": 2,
+      "input": 1,
+      "span": 1
+    },
+    "roles": [],
+    "aria": [],
+    "ui": [
+      "ui-disabled",
+      "ui-empty"
+    ],
+    "domEvents": [
+      "onFocus",
+      "onInput"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=one-time-code",
+      "disabled",
+      "inputmode=numeric",
+      "maxlength",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "HTMLInputElement",
+      "Number",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "Omit"
+    ],
+    "members": [
+      "code",
+      "currentTarget",
+      "setSelectionRange",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLInputElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "pad": {
+    "files": [
+      "pad/index.ts",
+      "pad/pad-math.ts",
+      "pad/pad-types.ts",
+      "pad/pad.tsrx"
+    ],
+    "tags": {
+      "div": 6,
+      "span": 1,
+      "output": 1,
+      "input": 1
+    },
+    "roles": [
+      "group",
+      "slider"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-labelledby",
+      "aria-live",
+      "aria-roledescription",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-active",
+      "ui-disabled",
+      "ui-dragging",
+      "ui-grid",
+      "ui-handle",
+      "ui-plane",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onFocusin",
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "tabindex=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "Math",
+      "Number",
+      "String",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Omit"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "pointerId",
+      "preventDefault",
+      "setPointerCapture",
+      "shiftKey",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [
+        "bottom",
+        "inset",
+        "left",
+        "pointer-events",
+        "position",
+        "touch-action"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "var()"
+      ]
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "pagination": {
+    "files": [
+      "pagination/index.ts",
+      "pagination/pagination-range.ts",
+      "pagination/pagination-types.ts",
+      "pagination/pagination.tsrx"
+    ],
+    "tags": {
+      "nav": 1,
+      "div": 1,
+      "button": 3,
+      "a": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-current",
+      "aria-disabled",
+      "aria-label"
+    ],
+    "ui": [
+      "ui-active",
+      "ui-disabled"
+    ],
+    "domEvents": [
+      "onClick"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "Math",
+      "undefined"
+    ],
+    "domTypes": [
+      "Omit"
+    ],
+    "members": [
+      "preventDefault",
+      "value"
+    ],
+    "elementTypes": [],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "popover": {
+    "files": [
+      "popover/index.ts",
+      "popover/popover-types.ts",
+      "popover/popover.tsrx"
+    ],
+    "tags": {
+      "div": 2,
+      "button": 2,
+      "h2": 1,
+      "p": 1
+    },
+    "roles": [
+      "dialog"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-describedby",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "document",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLHeadingElement",
+      "HTMLParagraphElement",
+      "Omit"
+    ],
+    "members": [
+      "activeElement",
+      "contains",
+      "focus"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLHeadingElement>",
+      "<HTMLParagraphElement>"
+    ],
+    "css": {
+      "props": [
+        "--ui-anchor",
+        "anchor-name",
+        "anchor-scope",
+        "position",
+        "position-anchor",
+        "position-area"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "progress": {
+    "files": [
+      "progress/index.ts",
+      "progress/progress-types.ts",
+      "progress/progress.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "span": 2
+    },
+    "roles": [
+      "progressbar"
+    ],
+    "aria": [
+      "aria-labelledby",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-max",
+      "ui-min",
+      "ui-progress",
+      "ui-value"
+    ],
+    "domEvents": [],
+    "componentEvents": [],
+    "otherAttrs": [],
+    "popover": [],
+    "globals": [
+      "Math"
+    ],
+    "domTypes": [
+      "HTMLSpanElement"
+    ],
+    "members": [
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "qr-code": {
+    "files": [
+      "qr-code/index.ts",
+      "qr-code/qr-code-types.ts",
+      "qr-code/qr-code.tsrx",
+      "qr-code/qr-encode.ts"
+    ],
+    "tags": {
+      "div": 3,
+      "svg": 1,
+      "path": 1
+    },
+    "roles": [
+      "img"
+    ],
+    "aria": [
+      "aria-hidden"
+    ],
+    "ui": [],
+    "domEvents": [],
+    "componentEvents": [],
+    "otherAttrs": [
+      "d",
+      "viewBox"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "Infinity",
+      "Math",
+      "RangeError"
+    ],
+    "domTypes": [
+      "Readonly",
+      "Record"
+    ],
+    "members": [
+      "value"
+    ],
+    "elementTypes": [],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "radio-group": {
+    "files": [
+      "radio-group/index.ts",
+      "radio-group/radio-group-types.ts",
+      "radio-group/radio-group-walk.ts",
+      "radio-group/radio-group.tsrx"
+    ],
+    "tags": {
+      "div": 5,
+      "label": 2,
+      "span": 1,
+      "input": 1
+    },
+    "roles": [
+      "radiogroup"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-labelledby",
+      "aria-orientation",
+      "aria-required"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-horizontal",
+      "ui-required",
+      "ui-selected"
+    ],
+    "domEvents": [
+      "onChange",
+      "onClick",
+      "onFocus",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "checked",
+      "disabled",
+      "for",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=radio",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLInputElement[]>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "rating": {
+    "files": [
+      "rating/index.ts",
+      "rating/rating-math.ts",
+      "rating/rating-types.ts",
+      "rating/rating-walk.ts",
+      "rating/rating.tsrx"
+    ],
+    "tags": {
+      "div": 4,
+      "span": 1,
+      "output": 1,
+      "input": 1
+    },
+    "roles": [
+      "radio",
+      "radiogroup"
+    ],
+    "aria": [
+      "aria-checked",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-label",
+      "aria-labelledby",
+      "aria-posinset",
+      "aria-readonly",
+      "aria-required",
+      "aria-setsize"
+    ],
+    "ui": [
+      "ui-count",
+      "ui-disabled",
+      "ui-filled",
+      "ui-half",
+      "ui-preview",
+      "ui-readonly",
+      "ui-required",
+      "ui-star",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onClick",
+      "onKeydown",
+      "onPointerleave",
+      "onPointermove"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "name",
+      "readonly",
+      "tabindex=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Math",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "clientX",
+      "ctrlKey",
+      "focus",
+      "getBoundingClientRect",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [
+        "-webkit-user-select",
+        "position",
+        "user-select"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "resizable": {
+    "files": [
+      "resizable/index.ts",
+      "resizable/resizable-math.ts",
+      "resizable/resizable-types.ts",
+      "resizable/resizable-walk.ts",
+      "resizable/resizable.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "span": 1
+    },
+    "roles": [
+      "separator"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-labelledby",
+      "aria-orientation",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-collapsed",
+      "ui-collapsible",
+      "ui-disabled",
+      "ui-divider",
+      "ui-dragging",
+      "ui-max",
+      "ui-min",
+      "ui-orientation",
+      "ui-panel",
+      "ui-panels",
+      "ui-size",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "id",
+      "tabindex=expr"
+    ],
+    "popover": [],
+    "globals": [
+      "DOMException",
+      "HTMLElement",
+      "Math",
+      "Object",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "Element",
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Node",
+      "Omit",
+      "Record"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "contains",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "pointerId",
+      "preventDefault",
+      "setPointerCapture",
+      "shiftKey",
+      "target",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [
+        "block-size",
+        "clip-path",
+        "cursor",
+        "display",
+        "flex",
+        "flex-direction",
+        "inline-size",
+        "min-block-size",
+        "min-inline-size",
+        "overflow",
+        "position",
+        "touch-action",
+        "white-space"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "inset()",
+        "var()"
+      ]
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "select": {
+    "files": [
+      "select/index.ts",
+      "select/option-focus.ts",
+      "select/select-types.ts",
+      "select/select.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "label": 1,
+      "button": 1,
+      "span": 2,
+      "select": 1,
+      "option": 1
+    },
+    "roles": [
+      "listbox",
+      "option"
+    ],
+    "aria": [
+      "aria-controls",
+      "aria-disabled",
+      "aria-expanded",
+      "aria-haspopup",
+      "aria-hidden",
+      "aria-labelledby",
+      "aria-selected"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-hidden",
+      "ui-open",
+      "ui-required",
+      "ui-selected"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "name",
+      "overlay",
+      "required",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Math",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLLabelElement",
+      "HTMLSpanElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "click",
+      "contains",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLLabelElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base",
+      "toolbar"
+    ],
+    "parseErrors": []
+  },
+  "slider": {
+    "files": [
+      "slider/index.ts",
+      "slider/slider-math.ts",
+      "slider/slider-track.ts",
+      "slider/slider-types.ts",
+      "slider/slider.tsrx"
+    ],
+    "tags": {
+      "div": 4,
+      "span": 1,
+      "output": 1
+    },
+    "roles": [
+      "group",
+      "slider"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-labelledby",
+      "aria-orientation",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-dragging",
+      "ui-max",
+      "ui-min",
+      "ui-orientation",
+      "ui-side",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onKeydown",
+      "onPointercancel",
+      "onPointerdown",
+      "onPointermove",
+      "onPointerup"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "tabindex=expr"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "DOMException",
+      "Math",
+      "Number",
+      "String",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Omit"
+    ],
+    "members": [
+      "button",
+      "clientX",
+      "clientY",
+      "focus",
+      "getBoundingClientRect",
+      "height",
+      "key",
+      "pointerId",
+      "preventDefault",
+      "setPointerCapture",
+      "shiftKey",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "table": {
+    "files": [
+      "table/index.ts",
+      "table/table-types.ts",
+      "table/table-walk.ts",
+      "table/table.tsrx"
+    ],
+    "tags": {
+      "table": 1,
+      "tr": 1,
+      "td": 1,
+      "th": 2,
+      "input": 1
+    },
+    "roles": [
+      "columnheader",
+      "expr:{cellRole}",
+      "expr:{gridRole}",
+      "expr:{rowRole}"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-hidden",
+      "aria-multiselectable",
+      "aria-selected",
+      "aria-sort"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-multiple",
+      "ui-selectable",
+      "ui-selected",
+      "ui-sorted",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocusin",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "checked",
+      "tabindex=0",
+      "tabindex=expr",
+      "type=checkbox",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLElement",
+      "HTMLTableCellElement",
+      "HTMLTableElement",
+      "HTMLTableRowElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "shiftKey",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLTableCellElement[]>",
+      "<HTMLTableElement>",
+      "<HTMLTableRowElement[]>"
+    ],
+    "css": {
+      "props": [
+        "-webkit-user-select",
+        "user-select"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [
+      "base",
+      "gridlist"
+    ],
+    "parseErrors": []
+  },
+  "tabs": {
+    "files": [
+      "tabs/index.ts",
+      "tabs/tabs-types.ts",
+      "tabs/tabs-walk.ts",
+      "tabs/tabs.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "button": 1
+    },
+    "roles": [
+      "tab",
+      "tablist",
+      "tabpanel"
+    ],
+    "aria": [
+      "aria-live",
+      "aria-orientation",
+      "aria-selected"
+    ],
+    "ui": [
+      "ui-selected",
+      "ui-vertical"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocus",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLButtonElement",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "altKey",
+      "ctrlKey",
+      "focus",
+      "key",
+      "metaKey",
+      "preventDefault",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLButtonElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "taglist": {
+    "files": [
+      "taglist/index.ts",
+      "taglist/tag-walk.ts",
+      "taglist/taglist-types.ts",
+      "taglist/taglist.tsrx"
+    ],
+    "tags": {
+      "div": 5,
+      "output": 1,
+      "label": 1,
+      "input": 3,
+      "span": 1,
+      "button": 1
+    },
+    "roles": [
+      "alert",
+      "group",
+      "presentation"
+    ],
+    "aria": [
+      "aria-atomic",
+      "aria-describedby",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-live",
+      "aria-required"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-editing",
+      "ui-empty",
+      "ui-highlighted",
+      "ui-invalid",
+      "ui-required",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onClick",
+      "onFocus",
+      "onInput",
+      "onKeydown",
+      "onPaste"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "autocomplete=off",
+      "disabled",
+      "for",
+      "hidden=expr",
+      "name",
+      "type=button",
+      "type=hidden",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "ClipboardEvent",
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "InputEvent",
+      "Node",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "clipboardData",
+      "contains",
+      "focus",
+      "isComposing",
+      "key",
+      "preventDefault",
+      "selectionEnd",
+      "selectionStart",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLInputElement[]>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base",
+      "editable"
+    ],
+    "parseErrors": []
+  },
+  "textbox": {
+    "files": [
+      "textbox/index.ts",
+      "textbox/textbox-types.ts",
+      "textbox/textbox.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "input": 1,
+      "textarea": 1,
+      "label": 1
+    },
+    "roles": [],
+    "aria": [
+      "aria-describedby",
+      "aria-invalid",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-empty",
+      "ui-invalid",
+      "ui-readonly",
+      "ui-required"
+    ],
+    "domEvents": [
+      "onInput"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "for",
+      "name",
+      "readonly",
+      "required",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLInputElement",
+      "HTMLLabelElement",
+      "HTMLTextAreaElement",
+      "Omit"
+    ],
+    "members": [
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLInputElement>",
+      "<HTMLLabelElement>",
+      "<HTMLTextAreaElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "timebox": {
+    "files": [
+      "timebox/index.ts",
+      "timebox/timebox-math.ts",
+      "timebox/timebox-types.ts",
+      "timebox/timebox.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "label": 1,
+      "span": 1,
+      "input": 1
+    },
+    "roles": [
+      "group",
+      "spinbutton"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-label",
+      "aria-labelledby",
+      "aria-readonly",
+      "aria-valuemax",
+      "aria-valuemin",
+      "aria-valuenow",
+      "aria-valuetext"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-empty",
+      "ui-hour12",
+      "ui-order",
+      "ui-placeholder",
+      "ui-readonly",
+      "ui-required",
+      "ui-type",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onKeydown",
+      "onPaste"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=text",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Intl",
+      "Math",
+      "Number",
+      "Set",
+      "undefined"
+    ],
+    "domTypes": [
+      "Date",
+      "EventTarget",
+      "HTMLDivElement",
+      "HTMLLabelElement",
+      "HTMLSpanElement",
+      "Intl",
+      "Omit",
+      "Record"
+    ],
+    "members": [
+      "focus",
+      "key",
+      "preventDefault",
+      "target",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLLabelElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "toaster": {
+    "files": [
+      "toaster/index.ts",
+      "toaster/toaster-hotkey.ts",
+      "toaster/toaster-queue.ts",
+      "toaster/toaster-types.ts",
+      "toaster/toaster.tsrx"
+    ],
+    "tags": {
+      "div": 4,
+      "span": 1,
+      "button": 1
+    },
+    "roles": [
+      "expr:{rowRole}"
+    ],
+    "aria": [
+      "aria-atomic",
+      "aria-hidden",
+      "aria-live",
+      "aria-relevant"
+    ],
+    "ui": [
+      "ui-front",
+      "ui-paused",
+      "ui-toast",
+      "ui-toastclose",
+      "ui-toastdescription",
+      "ui-toaster",
+      "ui-toasticon",
+      "ui-toasttitle",
+      "ui-tone"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocusin",
+      "onFocusout",
+      "onPointerout",
+      "onPointerover"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "HTMLElement",
+      "Math",
+      "Number",
+      "window"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLDivElement",
+      "HTMLElement",
+      "KeyboardEvent"
+    ],
+    "members": [
+      "activeElement",
+      "addEventListener",
+      "contains",
+      "focus",
+      "key",
+      "ownerDocument",
+      "preventDefault",
+      "removeEventListener"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base"
+    ],
+    "parseErrors": []
+  },
+  "toggle": {
+    "files": [
+      "toggle/index.ts",
+      "toggle/toggle-types.ts",
+      "toggle/toggle.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "button": 1,
+      "span": 1,
+      "label": 1,
+      "input": 1
+    },
+    "roles": [
+      "switch"
+    ],
+    "aria": [
+      "aria-checked",
+      "aria-describedby",
+      "aria-disabled",
+      "aria-hidden",
+      "aria-invalid",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-checked",
+      "ui-disabled"
+    ],
+    "domEvents": [
+      "onClick"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "checked",
+      "disabled",
+      "for",
+      "name",
+      "required",
+      "tabindex=expr",
+      "type=button",
+      "type=checkbox",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLLabelElement",
+      "Omit"
+    ],
+    "members": [
+      "checked",
+      "value"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLLabelElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [
+      "base",
+      "toolbar"
+    ],
+    "parseErrors": []
+  },
+  "tokenbox": {
+    "files": [
+      "tokenbox/index.ts",
+      "tokenbox/token-range.ts",
+      "tokenbox/token-walk.ts",
+      "tokenbox/tokenbox-types.ts",
+      "tokenbox/tokenbox.tsrx"
+    ],
+    "tags": {
+      "div": 5,
+      "label": 1,
+      "span": 2,
+      "button": 1,
+      "input": 1
+    },
+    "roles": [
+      "alert",
+      "presentation",
+      "textbox"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-disabled",
+      "aria-invalid",
+      "aria-labelledby",
+      "aria-multiline",
+      "aria-required"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-editor",
+      "ui-empty",
+      "ui-invalid",
+      "ui-required",
+      "ui-text",
+      "ui-token",
+      "ui-tokenbox",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onBeforeinput",
+      "onClick",
+      "onCompositionend",
+      "onCompositionstart",
+      "onFocus",
+      "onInput",
+      "onKeyup",
+      "onPaste"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "contenteditable=expr",
+      "contenteditable=false",
+      "disabled",
+      "name",
+      "tabindex=0",
+      "type=button",
+      "type=hidden",
+      "value"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "JSON",
+      "Math",
+      "undefined"
+    ],
+    "domTypes": [
+      "Array",
+      "ClipboardEvent",
+      "Document",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLLabelElement",
+      "HTMLSpanElement",
+      "InputEvent",
+      "Omit",
+      "ReadonlyArray",
+      "Record",
+      "Selection"
+    ],
+    "members": [
+      "clipboardData",
+      "contains",
+      "createRange",
+      "dataTransfer",
+      "defaultView",
+      "focus",
+      "getBoundingClientRect",
+      "getSelection",
+      "height",
+      "inputType",
+      "isComposing",
+      "ownerDocument",
+      "preventDefault",
+      "value",
+      "width"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLLabelElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [
+        "white-space"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "toolbar": {
+    "files": [
+      "toolbar/index.ts",
+      "toolbar/toolbar-types.ts",
+      "toolbar/toolbar-walk.ts",
+      "toolbar/toolbar.tsrx"
+    ],
+    "tags": {
+      "div": 1,
+      "span": 1,
+      "button": 1
+    },
+    "roles": [
+      "toolbar"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-labelledby",
+      "aria-orientation"
+    ],
+    "ui": [
+      "ui-disabled",
+      "ui-vertical"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocusin",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Array",
+      "HTMLElement",
+      "document",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Omit",
+      "Partial",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "activeElement",
+      "compareDocumentPosition",
+      "focus",
+      "key",
+      "preventDefault",
+      "tabIndex",
+      "target"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>",
+      "<HTMLElement[]>",
+      "<HTMLSpanElement>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "tooltip": {
+    "files": [
+      "tooltip/index.ts",
+      "tooltip/tooltip-types.ts",
+      "tooltip/tooltip.tsrx"
+    ],
+    "tags": {
+      "div": 2,
+      "button": 1
+    },
+    "roles": [
+      "tooltip"
+    ],
+    "aria": [
+      "aria-describedby"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onBlur",
+      "onClick",
+      "onDismiss",
+      "onFocus",
+      "onPointerdown",
+      "onPointerout",
+      "onPointerover"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "hidden=expr",
+      "overlay",
+      "overlay-hint",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "PointerEvent",
+      "undefined",
+      "window"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "Node",
+      "Omit"
+    ],
+    "members": [
+      "contains",
+      "dispatchEvent",
+      "pointerType",
+      "relatedTarget"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement>",
+      "<HTMLDivElement>"
+    ],
+    "css": {
+      "props": [
+        "--ui-anchor",
+        "anchor-name",
+        "anchor-scope",
+        "position",
+        "position-anchor",
+        "position-area"
+      ],
+      "pseudos": [
+        ":not"
+      ],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "tour": {
+    "files": [
+      "tour/index.ts",
+      "tour/tour-anchor.ts",
+      "tour/tour-focus.ts",
+      "tour/tour-types.ts",
+      "tour/tour.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "h2": 1,
+      "p": 1,
+      "span": 1,
+      "button": 3
+    },
+    "roles": [
+      "dialog"
+    ],
+    "aria": [
+      "aria-describedby",
+      "aria-labelledby"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-current",
+      "ui-disabled",
+      "ui-max",
+      "ui-open",
+      "ui-spotlight",
+      "ui-value"
+    ],
+    "domEvents": [
+      "onClick",
+      "onDismiss",
+      "onFocus",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "overlay",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "HTMLElement",
+      "Number",
+      "WeakMap",
+      "undefined"
+    ],
+    "domTypes": [
+      "Element",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLHeadingElement",
+      "HTMLParagraphElement",
+      "Omit"
+    ],
+    "members": [
+      "close",
+      "contains",
+      "focus",
+      "key",
+      "ownerDocument",
+      "preventDefault",
+      "scrollIntoView",
+      "tabIndex",
+      "target"
+    ],
+    "elementTypes": [
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLHeadingElement>",
+      "<HTMLParagraphElement>"
+    ],
+    "css": {
+      "props": [
+        "box-shadow",
+        "height",
+        "left",
+        "pointer-events",
+        "position",
+        "position-anchor",
+        "position-area",
+        "top",
+        "width"
+      ],
+      "pseudos": [],
+      "atrules": [
+        "@layer"
+      ],
+      "funcs": [
+        "anchor()",
+        "anchor-size()",
+        "var()"
+      ]
+    },
+    "deps": [],
+    "parseErrors": []
+  },
+  "tree": {
+    "files": [
+      "tree/index.ts",
+      "tree/tree-types.ts",
+      "tree/tree-walk.ts",
+      "tree/tree.tsrx"
+    ],
+    "tags": {
+      "div": 3,
+      "span": 3,
+      "button": 1
+    },
+    "roles": [
+      "group",
+      "tree",
+      "treeitem"
+    ],
+    "aria": [
+      "aria-disabled",
+      "aria-expanded",
+      "aria-labelledby",
+      "aria-level"
+    ],
+    "ui": [
+      "ui-closed",
+      "ui-disabled",
+      "ui-inside",
+      "ui-leaf",
+      "ui-open"
+    ],
+    "domEvents": [
+      "onClick",
+      "onFocusin",
+      "onKeydown"
+    ],
+    "componentEvents": [],
+    "otherAttrs": [
+      "disabled",
+      "hidden=expr",
+      "tabindex=0",
+      "tabindex=expr",
+      "type=button"
+    ],
+    "popover": [],
+    "globals": [
+      "Date",
+      "Number",
+      "String",
+      "undefined"
+    ],
+    "domTypes": [
+      "HTMLButtonElement",
+      "HTMLDivElement",
+      "HTMLElement",
+      "HTMLSpanElement",
+      "Node",
+      "Omit",
+      "ReadonlyArray"
+    ],
+    "members": [
+      "click",
+      "contains",
+      "focus",
+      "key",
+      "preventDefault",
+      "target"
+    ],
+    "elementTypes": [
+      "<HTMLButtonElement[]>",
+      "<HTMLDivElement>",
+      "<HTMLDivElement[]>",
+      "<HTMLSpanElement>",
+      "<HTMLSpanElement[]>"
+    ],
+    "css": {
+      "props": [],
+      "pseudos": [],
+      "atrules": [],
+      "funcs": []
+    },
+    "deps": [],
+    "parseErrors": []
+  }
+}
