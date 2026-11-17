@@ -52,6 +52,7 @@ export function compileCacheKey(input: CompileTsrxModuleInput): string | null {
 			input.serverOnlyProps ?? null,
 			input.elementOnlyAttributes ?? null,
 			input.routeRoot === true,
+			input.nativeFacts !== undefined,
 			input.symbols,
 		])}${sortedRecordJson(input.importedModuleInterfaces)}${sortedRecordJson(
 			input.importedModuleConstants,

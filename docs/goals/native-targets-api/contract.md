@@ -176,6 +176,15 @@ export function Counter() @{
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
 
+### Where the native facts are collected (pushed 2026-11-17)
+
+The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
+`SemanticEvent.handlerStatements`) are collected in the same analysis walk, but only when the build passes
+`nativeFacts: NATIVE_FACT_COLLECTORS` (`compileNativeComponent` does). Web and in-browser compiles neither run nor bundle
+that code: the docs pages load the compiler in a worker, and collecting the trees for every compile grew every docs page
+by about 500 B gzip (perf-guards G16). Static text and attribute positions stay unconditional (small, and kept out of
+the browser's render-data module).
+
 ### Building a payload and the conformance vectors (pushed)
 
 - Compile: `compileNativeComponent({ filename, source })` from `@markless/mobile` (`packages/mobile/src/compile.ts`) returns

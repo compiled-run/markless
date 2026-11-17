@@ -1,9 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createNativeViewPayload, NATIVE_UNSUPPORTED_CODE } from '../src/index.ts';
+import {
+	createNativeViewPayload,
+	NATIVE_FACT_COLLECTORS,
+	NATIVE_UNSUPPORTED_CODE,
+} from '../src/index.ts';
 import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
 
 const nativeView = async (source: string) =>
-	createNativeViewPayload(await buildSemanticGraph({ filename: 'src/App.tsrx', source }));
+	createNativeViewPayload(
+		await buildSemanticGraph({ filename: 'src/App.tsrx', source, nativeFacts: NATIVE_FACT_COLLECTORS }),
+	);
 
 describe('native view payload', () => {
 	it('lowers a counter to nodes, a semantic event and an assignment', async () => {

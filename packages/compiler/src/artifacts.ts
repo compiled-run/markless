@@ -47,6 +47,17 @@ export type SemanticGraphInput = {
 	 * renders it as a child, so its props never change in the browser.
 	 */
 	readonly routeRoot?: boolean;
+	/**
+	 * Collects the facts only native targets read (value expressions and handler bodies as trees). Passed by native
+	 * builds alone, so web and browser compiles neither run nor bundle it.
+	 */
+	readonly nativeFacts?: NativeFactCollectors;
+};
+
+/** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
+export type NativeFactCollectors = {
+	readonly expression: (node: never) => SemanticExpression;
+	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
 };
 
 export type ElementOnlyAttribute = {
