@@ -552,6 +552,15 @@ function createStagedGraph(container: StagedContainer, local: GraphSegment): Run
 		changed: (change) => {
 			for (const segment of owners(change.graphNodeId)) segment.graph.changed(change);
 		},
+		...(local.graph.defineAsyncComputed
+			? {
+					// An async value a row or arm brings after resume runs in this group's own segment.
+					defineAsyncComputed: (asyncComputed, factory, held) => {
+						local.graphNodeIds.add(asyncComputed.graphNodeId);
+						return local.graph.defineAsyncComputed!(asyncComputed, factory, held);
+					},
+				}
+			: {}),
 		subscribe: (subscription) => local.graph.subscribe(subscription),
 		subscribeJournal: (listener) => local.graph.subscribeJournal(listener),
 		flush: async () => {

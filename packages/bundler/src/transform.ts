@@ -447,6 +447,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolResolver: compiled.symbolResolver,
 					boundRows: importedBoundRows,
 					componentEdges: compiled.semanticGraph.componentEdges,
+					graphBindings: compiled.semanticGraph.graphBindings,
+					branchSites: compiled.semanticGraph.branchSites,
 					renderData: compiled.renderData,
 				})
 			: [];
