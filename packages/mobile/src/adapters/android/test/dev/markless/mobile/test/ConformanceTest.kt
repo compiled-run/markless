@@ -16,6 +16,7 @@ import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.jsonString
 import dev.markless.mobile.core.jsonValue
+import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.StyleExport
@@ -262,6 +263,46 @@ private fun arrays() {
 	check("a method the target lacks is an error", err == ".toUpperCase() of a array") { "$err" }
 }
 
+private fun appStyle(fixtures: File) {
+	val bytes = File(fixtures, "s3-app.native-app-style.json").readBytes()
+	val decoded = runCatching { StyleExport.decodeApp(bytes) }
+	check("decodes the S3 app style", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	val routes = decoded.getOrNull() ?: return
+	check("app style routes", routes.keys == setOf("/", "/settings", "/help")) { "${routes.keys}" }
+	val raw = Json.parse(bytes).obj("root").getValue("targets").obj("targets").getValue("android").obj("android")
+	val lists = raw.getValue("writes").arr("writes")
+	val settingsRaw = raw.getValue("routes").arr("routes").map { it.obj("route") }.single { it.getValue("pattern") == Json.Str("/settings") }
+	val rawNodes = settingsRaw.getValue("assignments").arr("a")[0].obj("a0").getValue("nodes").arr("nodes").map { it.obj("node") }
+	val settings = routes.getValue("/settings")
+	for (n in rawNodes) {
+		val id = n.getValue("id").str("id")
+		val listed = lists[n.getValue("writes").num("writes").toInt()].arr("list").map { it.obj("w").getValue("kind").str("kind") }
+		val expanded = settings.assignments[0].byId.getValue(id).writes.map { it::class.simpleName }
+		check("$id's write index expands to the list it names", listed.size == expanded.size) { "$listed vs $expanded" }
+	}
+	check("the settings page has a band state", settings.bandState >= 0 && settings.bands != null) { "${settings.states}" }
+	val cells = listOf("state:on")
+	val light = settings.start(cells, { JsValue.Bool(false) }, dark = false)
+	val dark = settings.start(cells, { JsValue.Bool(false) }, dark = true)
+	check("light picks band 0", settings.assignments[light].values["@env#band"] == JsValue.Num(0.0)) { "${settings.assignments[light].values}" }
+	check("dark picks band 1", settings.assignments[dark].values["@env#band"] == JsValue.Num(1.0) && settings.assignments[dark].values["state:on"] == JsValue.Bool(false)) { "${settings.assignments[dark].values}" }
+	val onLight = settings.next(light, settings.stateFor("state:on"), JsValue.Bool(true))
+	val onDark = settings.next(onLight, settings.bandState, JsValue.Num(1.0))
+	check("next over the band keeps the cell", settings.assignments[onDark].values == mapOf("state:on" to JsValue.Bool(true), "@env#band" to JsValue.Num(1.0))) { "${settings.assignments[onDark].values}" }
+	check("the dark band paints the page dark", settings.assignments[onDark].byId.getValue("h0").writes != settings.assignments[onLight].byId.getValue("h0").writes) { "" }
+	check("a page without @media has no band state", routes.getValue("/").bandState == -1 && routes.getValue("/").start(emptyList(), { JsValue.Null }, true) == routes.getValue("/").initial) { "" }
+	val text = String(bytes)
+	fun refusesApp(name: String, changed: String, fragment: String) {
+		check("$name: the edit applied", changed != text) { "" }
+		val err = try { StyleExport.decodeApp(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("app style refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refusesApp("an atom of another media feature", text.replace("\"feature\":\"prefers-color-scheme\"", "\"feature\":\"width\""), "@media (width) is not implemented on Android")
+	refusesApp("an unknown version", text.replace("markless.native-app-style/0", "markless.native-app-style/9"), "unknown app style version")
+	refusesApp("a write index out of range", text.replace(Regex("\"writes\":\\d+}"), "\"writes\":99999}"), "not an index of the app's write lists")
+	refusesApp("an unknown route field", text.replace("\"pattern\":\"/help\"", "\"pattern\":\"/help\",\"extra\":1"), "unknown field \"extra\"")
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
@@ -270,6 +311,7 @@ fun main(args: Array<String>) {
 	jsOps()
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

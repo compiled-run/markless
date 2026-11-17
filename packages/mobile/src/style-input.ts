@@ -1,8 +1,15 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
-import type { NativeBuild } from './compile.ts';
+import { nativeStyleAttribute } from '@markless/serializer/native-view';
+import { marklessAttributeValue } from '@markless/web/dom-attribute';
+import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './runtime.ts';
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
+
+type NativeStyleByState = {
+	readonly when: Readonly<Record<string, boolean>>;
+	readonly value: string | null;
+};
 
 /** What Markless hands Dragon for one component: its element tree, each text node's first string and its scoped CSS. */
 export type NativeStyleInput = {
@@ -16,10 +23,11 @@ export type NativeStyleInput = {
 				readonly parent: string | null;
 				readonly attributes: Readonly<Record<string, string>>;
 				/** The element's class in every combination of `states`, when a binding sets it; null means no class attribute. */
-				readonly classByState?: ReadonlyArray<{
-					readonly when: Readonly<Record<string, boolean>>;
-					readonly value: string | null;
-				}>;
+				readonly classByState?: ReadonlyArray<NativeStyleByState>;
+				/** Each bound `ui-*` attribute's value in every combination of `states`, as the web writes it (null: absent). */
+				readonly attributesByState?: Readonly<
+					Record<string, ReadonlyArray<NativeStyleByState>>
+				>;
 				readonly arm?: NativeArmPlace;
 		  }
 		| {
@@ -30,8 +38,9 @@ export type NativeStyleInput = {
 				readonly arm?: NativeArmPlace;
 		  }
 	>;
+	/** The stylesheets the page imports (unscoped, in import order), then every shown component's scoped CSS. */
 	readonly css: string;
-	/** The cells class bindings read; Dragon compiles one style assignment per combination (booleans only for now). */
+	/** The cells class and `ui-*` attribute bindings read; Dragon compiles one style assignment per combination (booleans only for now). */
 	readonly states: ReadonlyArray<{
 		readonly cell: string;
 		readonly domain: readonly [false, true];
@@ -42,13 +51,14 @@ export type NativeStyleInput = {
 export function nativeStyleInput(
 	payload: NativeViewPayload,
 	styles: NativeBuild['styles'],
+	stylesheets: ReadonlyArray<NativeStylesheet> = [],
 ): NativeStyleInput {
 	const initial = new Map(createNativeRuntime(payload).texts());
 	const states = payload.cells.flatMap((cell) => {
 		if (!cell.styled) return [];
 		if (typeof cell.initial !== 'boolean')
 			throw new Error(
-				`${cell.name} decides a class but is not a boolean; Dragon needs a finite domain`,
+				`${cell.name} decides a class or a ui-* attribute but is not a boolean; Dragon needs a finite domain`,
 			);
 		return [{ cell: cell.id, domain: [false, true] as const, initial: cell.initial }];
 	});
@@ -89,22 +99,36 @@ export function nativeStyleInput(
 						...place,
 					},
 				];
-			const classBinding = (node.bindings ?? []).find(
-				(binding) => 'attribute' in binding && binding.attribute === 'class',
-			);
-			const classByState = classBinding
-				? combinations.map((when) => {
-						const value = evaluateNativeExpr(classBinding.value, (cell) =>
-							cell in when
-								? when[cell]!
-								: (payload.cells.find((c) => c.id === cell)?.initial ?? null),
-						);
-						return {
+			const byState = (name: string) => {
+				const binding = (node.bindings ?? []).find(
+					(candidate) => 'attribute' in candidate && candidate.attribute === name,
+				);
+				return binding
+					? combinations.map((when) => ({
 							when,
-							value: value === null || value === false ? null : String(value),
-						};
-					})
-				: undefined;
+							value: marklessAttributeValue(
+								name,
+								evaluateNativeExpr(binding.value, (cell) =>
+									cell in when
+										? when[cell]!
+										: (payload.cells.find((c) => c.id === cell)?.initial ??
+											null),
+								),
+							),
+						}))
+					: undefined;
+			};
+			const classByState = byState('class');
+			const styleAttributes = (node.bindings ?? []).flatMap((binding) =>
+				'attribute' in binding &&
+				binding.attribute !== 'class' &&
+				nativeStyleAttribute(binding.attribute)
+					? [binding.attribute]
+					: [],
+			);
+			const attributesByState = Object.fromEntries(
+				styleAttributes.map((name) => [name, byState(name)!]),
+			);
 			return [
 				{
 					kind: 'element',
@@ -113,11 +137,12 @@ export function nativeStyleInput(
 					parent: node.parent,
 					attributes: node.attributes ?? {},
 					...(classByState ? { classByState } : {}),
+					...(styleAttributes.length > 0 ? { attributesByState } : {}),
 					...place,
 				},
 			];
 		}),
-		css: styles.map((style) => style.cssText).join('\n'),
+		css: [...stylesheets, ...styles].map((style) => style.cssText).join('\n'),
 		states,
 	};
 }

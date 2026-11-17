@@ -7,7 +7,7 @@ import UIKit
 /// Shows one compiled Markless component as retained UIKit views and runs its handlers as data.
 ///
 /// - `payload`: the compiler's `markless.native-view/0` JSON.
-/// - `style`: Dragon's `dragon.native-style-export/0` JSON; without it children stack vertically in the system font.
+/// - `style`: Dragon's `dragon.native-style-export/0` or `/1` JSON; without it children stack vertically in the system font.
 /// - `fonts`: the bytes of every font face the style export names, keyed by its `sha256:` id.
 /// - `store`: where storage cells keep their values (`UserDefaults.standard` by default).
 ///
@@ -20,6 +20,8 @@ public final class MarklessViewController: UIViewController {
 	private let store: NativeStore
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
+	/// The `@media` band the views show; nil without bands.
+	private var band: Int?
 	private(set) var tree: ViewTree?
 	/// In an app: opens the page a `navigate` entry names, pushed or in this screen's place.
 	var navigator: ((_ route: String, _ params: [NativeRouteParam], _ replace: Bool) throws -> Void)?
@@ -45,17 +47,38 @@ public final class MarklessViewController: UIViewController {
 		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
+		followsAppearance()
 	}
 
-	/// One screen of an app: the page for a route, opened with its params; no styles yet (one export covers one page).
-	init(page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore) throws {
+	/// One screen of an app: the page for a route, opened with its params and its route's styles.
+	init(page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data]) throws {
 		payload = page
-		style = nil
-		fonts = [:]
+		self.style = style
+		self.fonts = fonts
 		self.store = store
 		runtime = NativeRuntime(payload: page, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
+		followsAppearance()
+	}
+
+	/// UIKit updates a covered screen's traits before it shows again, so every screen on the stack follows the appearance.
+	private func followsAppearance() {
+		registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (self: MarklessViewController, _: UITraitCollection) in
+			self.applyBand()
+		}
+	}
+
+	private func applyBand() {
+		guard let bands = layout?.bands, let band else { return }
+		do {
+			let now = try bands.band(dark: traitCollection.userInterfaceStyle == .dark)
+			guard now != band else { return }
+			try tree?.apply([.state(cell: StyleBands.state, value: .number(Double(now)))])
+			self.band = now
+		} catch {
+			fatalError("Markless iOS host: \(error)")
+		}
 	}
 
 	/// The `-route <path>` launch argument (Maestro's `launchApp: arguments: { route: ... }`).
@@ -66,7 +89,9 @@ public final class MarklessViewController: UIViewController {
 	}
 
 	private func buildPage() throws {
-		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
+		let dark = traitCollection.userInterfaceStyle == .dark
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:), dark: dark) }
+		band = try layout?.bands?.band(dark: dark)
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
@@ -88,6 +113,12 @@ public final class MarklessViewController: UIViewController {
 		super.viewIsAppearing(animated)
 		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
 			fatalError("Markless iOS host: the style export was laid out at \(layout.dpr)x, this screen is \(traitCollection.displayScale)x")
+		}
+		applyBand()
+		var pops = [navigationController?.interactivePopGestureRecognizer]
+		if #available(iOS 26, *) { pops.append(navigationController?.interactiveContentPopGestureRecognizer) }
+		for pop in pops.compactMap({ $0 }) {
+			for gesture in tree?.dismissGestures ?? [] { gesture.require(toFail: pop) }
 		}
 	}
 

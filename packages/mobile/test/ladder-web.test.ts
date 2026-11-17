@@ -11,6 +11,7 @@ import {
 	allRungFolders,
 	proofsDir,
 	readRung,
+	styleRungFolders,
 	type LadderRung,
 	type LadderStep,
 } from '../proofs/ladder.ts';
@@ -54,7 +55,13 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
-	await writeFile(join(root, 'document.tsrx'), documentSource);
+	// An app rung may bring its own components, stylesheets and document (whose stylesheet imports reach every page).
+	for (const own of ['lib', 'styles'])
+		if (existsSync(join(proofsDir, folder, own)))
+			await cp(join(proofsDir, folder, own), join(root, own), { recursive: true });
+	if (existsSync(join(proofsDir, folder, 'document.tsrx')))
+		await copyFile(join(proofsDir, folder, 'document.tsrx'), join(root, 'document.tsrx'));
+	else await writeFile(join(root, 'document.tsrx'), documentSource);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
 	for (const pkg of ['core', 'router'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
@@ -88,6 +95,7 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
 	else if ('back' in action) await page.goBack();
+	else if ('appearance' in action) await page.emulateMedia({ colorScheme: action.appearance });
 	else await page.clock.runFor(action.wait);
 }
 
@@ -129,6 +137,15 @@ const onWeb = (step: LadderStep): LadderStep =>
 			}
 		: step;
 
+/** The phones' CSS sizes and ratios (Dragon's proof devices), for the web screenshots a style rung's phone shots are read against. */
+const PHONES = {
+	ios: { viewport: { width: 402, height: 778 }, deviceScaleFactor: 3 },
+	android: { viewport: { width: 411, height: 818 }, deviceScaleFactor: 2.625 },
+} as const;
+
+// Written only when asked (MARKLESS_LADDER_SCREENSHOTS=1), so a test run leaves the proofs folder as it was.
+const screenshotsWanted = process.env.MARKLESS_LADDER_SCREENSHOTS === '1';
+
 describe.each(allRungFolders())('%s', (folder) => {
 	const rung = readRung(folder);
 	let origin = '';
@@ -141,11 +158,16 @@ describe.each(allRungFolders())('%s', (folder) => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 	}, 60_000);
 
-	test(
-		`${rung.name}: the web build shows every step's expected texts`,
+	const styled = styleRungFolders().includes(folder);
+	test.each(styled ? (['ios', 'android'] as const) : ([undefined] as const))(
+		`${rung.name}: the web build shows every step's expected texts%s`,
 		{ timeout: 60_000 },
-		async () => {
-			const context = await browser.newContext();
+		async (phone) => {
+			const context = await browser.newContext(
+				phone ? { ...PHONES[phone], colorScheme: 'light' } : {},
+			);
+			const shots = phone ? join(proofsDir, folder, 'screenshots', `web-${phone}`) : null;
+			if (shots && screenshotsWanted) await mkdir(shots, { recursive: true });
 			const page = await context.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));
@@ -170,6 +192,12 @@ describe.each(allRungFolders())('%s', (folder) => {
 						message: `step ${index}`,
 					})
 					.toEqual([]);
+				if (shots && screenshotsWanted) {
+					const action = step.do ? Object.keys(step.do)[0]! : 'launch';
+					await page.screenshot({
+						path: join(shots, `${String(index).padStart(2, '0')}-${action}-after.png`),
+					});
+				}
 			}
 			expect(errors).toEqual([]);
 			await context.close();

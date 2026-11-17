@@ -10,7 +10,7 @@ import type {
 	NativeTextPart,
 	NativeViewPayload,
 } from '@markless/serializer';
-import { NATIVE_VIEW_VERSION } from '@markless/serializer/native-view';
+import { NATIVE_VIEW_VERSION, nativeStyleAttribute } from '@markless/serializer/native-view';
 import type {
 	CompilerDiagnostic,
 	SemanticEvent,
@@ -811,6 +811,7 @@ export function createNativeViewPayload(
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
 					const replace = edge.props.find((prop) => prop.name === 'replace');
+					const className = edge.props.find((prop) => prop.name === 'class');
 					const projection = item.projection
 						? scope.module.chunks.get(item.projection)
 						: undefined;
@@ -822,21 +823,34 @@ export function createNativeViewPayload(
 						(replace &&
 							(replace.kind !== 'serializable' ||
 								typeof replace.value !== 'boolean')) ||
+						(className &&
+							(className.kind !== 'serializable' ||
+								typeof className.value !== 'string')) ||
 						edge.props.some(
 							(prop) =>
-								!['href', 'params', 'replace', 'children'].includes(prop.name),
+								!['href', 'params', 'replace', 'class', 'children'].includes(
+									prop.name,
+								),
 						) ||
 						(item.projection && !projection)
 					) {
 						refuse(
-							'a <Link> whose href is not fixed at build time, or whose params are not strings this build can compute',
+							'a <Link> whose href or class is not fixed at build time, or whose params are not strings this build can compute',
 						);
 						continue;
 					}
 					const route = linkRoute(href.value, paramValues);
 					if (!route) continue;
 					const id = scope.prefix + edge.id;
-					nodes.push({ kind: 'element', id, element: 'a', parent, ...place });
+					// The anchor's attributes as the router renders them, so styles see a link (`:any-link`) as the web does.
+					const attributes = {
+						...(className?.kind === 'serializable' &&
+						typeof className.value === 'string'
+							? { class: className.value }
+							: {}),
+						href: href.value,
+					};
+					nodes.push({ kind: 'element', id, element: 'a', parent, attributes, ...place });
 					if (projection) lowerChunk(projection, id, place, scope);
 					const handler = `handler:${id}`;
 					events.push({ host: id, event: 'activate', handler });
@@ -1154,7 +1168,7 @@ export function createNativeViewPayload(
 	for (const node of nodes)
 		if (node.kind === 'element')
 			for (const binding of node.bindings ?? [])
-				if ('attribute' in binding && binding.attribute === 'class')
+				if ('attribute' in binding && nativeStyleAttribute(binding.attribute))
 					collectCells(binding.value);
 
 	return done({

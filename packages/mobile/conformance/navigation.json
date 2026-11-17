@@ -101,6 +101,9 @@
 							"id": "component-edge:0",
 							"element": "a",
 							"parent": "h5",
+							"attributes": {
+								"href": "/orders/[id]"
+							},
 							"row": "repeat:0"
 						},
 						{

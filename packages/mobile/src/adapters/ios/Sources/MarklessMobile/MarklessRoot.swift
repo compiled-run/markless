@@ -11,8 +11,7 @@ public enum MarklessRoot {
 		let opened = path ?? MarklessViewController.launchRoute()
 		switch try NativePayload.decode(payload) {
 		case .app:
-			if style != nil { throw HostError("a style export covers one page; an app of several routes has none yet") }
-			return try MarklessNavigationController(app: payload, path: opened)
+			return try MarklessNavigationController(app: payload, style: style, fonts: fonts, path: opened)
 		case .page:
 			return try MarklessViewController(payload: payload, style: style, fonts: fonts, route: opened)
 		}

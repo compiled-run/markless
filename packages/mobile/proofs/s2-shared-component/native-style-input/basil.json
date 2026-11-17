@@ -1,0 +1,47 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Basil",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "seed mk-18y098k"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "heading mk-18y098k"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Sweet basil"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "span",
+			"parent": "h0",
+			"attributes": {
+				"class": "tag mk-1ghyv7t"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:0/h0:text0",
+			"parent": "component-edge:0/h0",
+			"text": "Sow in spring"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n\tfont-family: sans-serif;\n}\n\n.tag.mk-1ghyv7t {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin-top: 12px;\n\t\t\t\tpadding: 6px 10px;\n\t\t\t\tborder: 2px solid #1b4332;\n\t\t\t\tborder-radius: 8px;\n\t\t\t\tbackground: #d8f3dc;\n\t\t\t\tcolor: #1b4332;\n\t\t\t\tfont-size: 15px;\n\t\t\t\tfont-weight: 700;\n\t\t\t}\n.seed.mk-18y098k {\n\t\t\t\tpadding: 16px 28px;\n\t\t\t\tbackground: #ffffff;\n\t\t\t}\n\t\t\t.heading.mk-18y098k {\n\t\t\t\tfont-size: 22px;\n\t\t\t\tcolor: #606c38;\n\t\t\t}",
+	"states": []
+}

@@ -46,6 +46,41 @@ public struct StyleState: Sendable {
 	public func names(_ cell: String) -> Bool { key == cell || key.hasSuffix("#\(cell)") }
 }
 
+public let nativeAppStyleVersion = "markless.native-app-style/0"
+
+/// One media feature of a sheet's `@media` bands, as Dragon wrote it for the device to evaluate.
+public struct StyleAtom: Sendable {
+	public let feature: String
+	public let comparisons: Int
+	public let keyword: String
+}
+
+/// The `@media` bands of a page's styles: each band is the truth value of every atom; the state `@env#band` selects one.
+public struct StyleBands: Sendable {
+	public static let state = "@env#band"
+	public let atoms: [StyleAtom]
+	public let bands: [[Bool]]
+
+	/// The band the device is in: only `prefers-color-scheme` is read on a phone so far; any other feature is refused.
+	public func band(dark: Bool) throws -> Int {
+		let truth = try atoms.map { atom -> Bool in
+			guard atom.feature == "prefers-color-scheme", atom.comparisons == 0 else {
+				throw PayloadError(path: "style.bands", reason: "the media feature \(atom.feature) is not evaluated on iOS yet")
+			}
+			switch atom.keyword {
+			case "any": return true
+			case "dark": return dark
+			case "light": return !dark
+			default: throw PayloadError(path: "style.bands", reason: "prefers-color-scheme: \(atom.keyword) is not a colour scheme")
+			}
+		}
+		guard let index = bands.firstIndex(of: truth) else {
+			throw PayloadError(path: "style.bands", reason: "no band holds the atoms \(truth)")
+		}
+		return index
+	}
+}
+
 /// One target of a decoded `dragon.native-style-export/0` or `/1` file; `/0` reads as one assignment and no states.
 public struct StyleExport: Sendable {
 	public let fonts: [(id: String, file: String)]
@@ -59,6 +94,8 @@ public struct StyleExport: Sendable {
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
 	public let notReady: String?
+	/// Only for a sheet with `@media`: its bands, selected by the state `@env#band`.
+	public let bands: StyleBands?
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -71,14 +108,66 @@ public struct StyleExport: Sendable {
 		let perState = schema == dragonStyleExportSchemas[1]
 		let units = try fields["units"].string()
 		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
-		let fonts = try fields["fonts"].array().map { font in
+		return try decodeTarget(try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend)
+	}
+
+	/// Reads an app's `markless.native-app-style/0` for one target: each styled route's styles, by route pattern.
+	public static func decodeApp(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> [String: StyleExport] {
+		let root = try Reader(JSONValue.parse(data), at: "style")
+		let fields = try root.object(["version", "units", "warnings", "fonts", "targets"])
+		let version = try fields["version"].string()
+		guard version == nativeAppStyleVersion else {
+			throw PayloadError(path: "style.version", reason: "unsupported version \"\(version)\", this host reads \(nativeAppStyleVersion)")
+		}
+		let units = try fields["units"].string()
+		guard dragonStyleExportUnits.contains(units) else { throw PayloadError(path: "style.units", reason: "unsupported units \"\(units)\"") }
+		for warning in try fields["warnings"].array() {
+			let w = try warning.object(["pattern", "code", "message"])
+			_ = (try w["pattern"].string(), try w["code"].string(), try w["message"].string())
+		}
+		let fonts = try decodeFonts(fields["fonts"])
+		let chosen = try fields["targets"].field(target)
+		let targetFields = try chosen.object(["backend", "viewport", "dpr", "writes", "routes"])
+		let writes = try targetFields["writes"].array().map { list in _ = try list.array(); return list.value }
+		var routes: [String: StyleExport] = [:]
+		for route in try targetFields["routes"].array() {
+			let f = try route.object(
+				required: ["pattern", "component", "compiler", "readiness", "states", "initial", "next", "assignments"], optional: ["bands"])
+			let pattern = try f["pattern"].string()
+			_ = (try f["component"].string(), try f["compiler"].string())
+			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
+				let a = try assignment.object(["values", "nodes"])
+				let nodes: [JSONValue] = try a["nodes"].array().map { node in
+					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
+					let index = Int(try node.field("writes").number())
+					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
+					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
+				}
+				return .object([("values", try a["values"].value), ("nodes", .array(nodes))])
+			}
+			let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
+			var page: [(String, JSONValue)] = [
+				try raw(targetFields, "backend"), try raw(targetFields, "viewport"), try raw(targetFields, "dpr"),
+				try raw(f, "readiness"), try raw(f, "states"), try raw(f, "initial"), ("assignments", .array(assignments)), try raw(f, "next"),
+			]
+			if f.has("bands") { page.append(("bands", try f["bands"].value)) }
+			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
+			routes[pattern] = try decodeTarget(try Reader(.object(page), at: route.path), perState: true, fonts: fonts, backend: backend)
+		}
+		return routes
+	}
+
+	private static func decodeFonts(_ reader: Reader) throws -> [(id: String, file: String)] {
+		try reader.array().map { font in
 			let field = try font.object(["id", "file"])
 			return (id: try field["id"].string(), file: try field["file"].string())
 		}
-		let chosen = try fields["targets"].field(target)
+	}
+
+	private static func decodeTarget(_ chosen: Reader, perState: Bool, fonts: [(id: String, file: String)], backend: String) throws -> StyleExport {
 		let targetFields = try chosen.object(
 			required: perState ? ["backend", "viewport", "dpr", "states", "initial", "assignments", "next"] : ["backend", "viewport", "dpr", "nodes"],
-			optional: perState ? ["readiness"] : [])
+			optional: perState ? ["readiness", "bands"] : [])
 		var notReady: String?
 		if targetFields.has("readiness") {
 			let readiness = try targetFields["readiness"]
@@ -134,9 +223,27 @@ public struct StyleExport: Sendable {
 		} else {
 			assignments = [([:], try checkedNodes(try targetFields["nodes"]))]
 		}
+		var bands: StyleBands?
+		if targetFields.has("bands") {
+			let reader = try targetFields["bands"]
+			let b = try reader.object(["atoms", "bands", "conditions"])
+			let atoms = try b["atoms"].array().map { atom in
+				let a = try atom.object(["feature", "comparisons", "keyword"])
+				return StyleAtom(feature: try a["feature"].string(), comparisons: try a["comparisons"].array().count, keyword: try a["keyword"].string())
+			}
+			let rows = try b["bands"].array().map { row in try row.array().map { try $0.bool() } }
+			_ = try b["conditions"].array().map { try $0.string() }
+			guard rows.allSatisfy({ $0.count == atoms.count }),
+				let state = states.first(where: { $0.key == StyleBands.state }), state.domain.count == rows.count
+			else { throw PayloadError(path: reader.path, reason: "the bands do not match the atoms and the \(StyleBands.state) state") }
+			bands = StyleBands(atoms: atoms, bands: rows)
+		} else if states.contains(where: { $0.key == StyleBands.state }) {
+			throw PayloadError(path: chosen.path, reason: "\(StyleBands.state) is a state, but there are no bands")
+		}
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady)
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
+			bands: bands)
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
