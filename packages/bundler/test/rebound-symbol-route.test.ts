@@ -3,6 +3,7 @@ import { createServer } from 'vite';
 import { expect, test } from 'vitest';
 import { markless } from '../src/vite/index.ts';
 import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
+import { marklessDevResident } from '../../web/src/fns/dev-resident.ts';
 
 // The page composes RelayRow twice; each RelayRow hands its Row an arrow that calls
 // RelayRow's own `onPicked` prop. Row invokes that arrow by instance path, so the
@@ -17,6 +18,8 @@ const ROUTE_FUNCTION =
 	/const marklessSsrLoadSymbolRouteImports = [\s\S]*?function marklessSsrLoadSymbolRoute\(symbolId, consumed = ""\) \{[\s\S]*?\n\}/;
 const REBOUND_IMPORT =
 	/import \{ marklessReboundSymbol as marklessSsrLoadSymbolRouteRebound \} from "[^"]*rebound-symbol[^"]*";/;
+// The dev server imports a child module with its parent and hands it out as already loaded.
+const RESIDENT_IMPORT = /import \* as (marklessResidentModule\d+) from "([^"]+)";/g;
 
 async function pageCode(root = fixtureRoot): Promise<string> {
 	const server = await createServer({
@@ -36,21 +39,27 @@ async function pageCode(root = fixtureRoot): Promise<string> {
 	}
 }
 
-function runRoute(source: string) {
+function runRoute(source: string, code: string) {
 	const calls: string[] = [];
+	const child = (specifier: string) => ({
+		loadSymbol: (symbolId: string) => {
+			calls.push(`import ${specifier} -> ${symbolId}`);
+			return `child ${symbolId}`;
+		},
+	});
+	const residents = [...code.matchAll(RESIDENT_IMPORT)];
 	const route = new Function(
 		'__mxImport',
+		'marklessDevResident',
+		...residents.map(([, alias]) => alias!),
 		'marklessLoadLocalSymbol',
 		'marklessSsrLoadSymbolRouteRebound',
 		'marklessSsrLoadSymbolRouteWhenLoaded',
 		`${source.replace(/\bimport\(/g, '__mxImport(')}\nreturn marklessSsrLoadSymbolRoute;`,
 	)(
-		async (specifier: string) => ({
-			loadSymbol: (symbolId: string) => {
-				calls.push(`import ${specifier} -> ${symbolId}`);
-				return `child ${symbolId}`;
-			},
-		}),
+		async (specifier: string) => child(specifier),
+		marklessDevResident,
+		...residents.map(([, , specifier]) => child(specifier!)),
 		(symbolId: string) => {
 			calls.push(`local ${symbolId}`);
 			return `local ${symbolId}`;
@@ -70,7 +79,7 @@ test('a child symbol its edge binds is answered by that edge bound row, under th
 	expect(code).toMatch(REBOUND_IMPORT);
 	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
 	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
-	const { route, calls } = runRoute(routeSource);
+	const { route, calls } = runRoute(routeSource, code);
 
 	const second = route('c1:symbol:0') as {
 		loaded: unknown;
@@ -97,7 +106,7 @@ test('a same-module child two levels down is rebound under every prefix the tabl
 	const code = await pageCode(nestedFixtureRoot);
 	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
 	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
-	const { route } = runRoute(routeSource);
+	const { route } = runRoute(routeSource, code);
 
 	const routed = (await route('c0:c1:symbol:1')) as { loaded: unknown; prefix: string };
 	expect(routed.prefix).toBe('c0:c1:');
@@ -108,7 +117,7 @@ test('each copy of a same-module owner reaches the bound row of its own instance
 	const code = await pageCode(copiesFixtureRoot);
 	const routeSource = ROUTE_FUNCTION.exec(code)?.[0];
 	if (!routeSource) throw new Error('page.tsrx emitted no symbol route function');
-	const { route } = runRoute(routeSource);
+	const { route } = runRoute(routeSource, code);
 
 	for (const copy of [0, 1, 2]) {
 		const routed = (await route(`c${copy}:c3:symbol:1`)) as { loaded: unknown; prefix: string };

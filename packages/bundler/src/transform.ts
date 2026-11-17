@@ -379,6 +379,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		id: module.symbolId,
 		chunk: symbolModuleIdOf(module.symbolId),
 		exportName: symbolExportNames[index]!,
+		eventHandler: module.kind === 'event-handler',
 	}));
 	const linkInput = withServedRenderData(
 		linkedSymbolInput(compiled, input, renderDataId, resolverId, input.environment === 'client'),
@@ -714,6 +715,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				symbols: symbolRows,
 				symbolRoutes,
 				closurePlanRoutes,
+				devServer: input.devResumeReexport === true,
 			}),
 		},
 		...(emitsPrerenderWakeVariant
@@ -746,6 +748,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							boundSymbolDescriptors,
 							symbols: symbolRows,
 							symbolRoutes,
+							devServer: input.devResumeReexport === true,
 						}),
 					},
 				]

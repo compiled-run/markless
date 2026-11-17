@@ -1,4 +1,5 @@
 import { protocolBoundSymbolPrefix } from '@markless/serializer';
+import type { ModuleLoad } from './module-loads.ts';
 
 export const RESIDENT_LOAD_MODULE = '@markless/web/fns/resident-load';
 
@@ -27,6 +28,7 @@ export function emitSymbolRouteTable(input: {
 	readonly fallbackName: string;
 	readonly reboundName: string;
 	readonly exported?: boolean;
+	readonly load?: ModuleLoad;
 }): string {
 	const { routes, functionName, fallbackName, reboundName } = input;
 	const sources = [
@@ -43,7 +45,7 @@ export function emitSymbolRouteTable(input: {
 		sources.length > 0
 			? `import { marklessWhenLoaded as ${functionName}WhenLoaded } from '${RESIDENT_LOAD_MODULE}';`
 			: '',
-		`const ${functionName}Imports = [${sources.map((source) => `() => import(${JSON.stringify(source)})`).join(', ')}];`,
+		`const ${functionName}Imports = [${sources.map((source) => `() => ${input.load ? input.load(source) : `import(${JSON.stringify(source)})`}`).join(', ')}];`,
 		keyLists.length > 0 ? `const ${functionName}BoundKeys = [${keyLists.join(', ')}];` : '',
 		`const ${functionName}Routes = [${table.join(', ')}];`,
 		`${input.exported ? 'export ' : ''}function ${functionName}(symbolId${rebinds ? ", consumed = ''" : ''}) {`,
