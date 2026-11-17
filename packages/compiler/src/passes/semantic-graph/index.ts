@@ -28,7 +28,8 @@ import { collectComponentProps } from './collect-components.ts';
 import { componentsWithIdleRecords, componentsWithLiveShared } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
-import { relayHostsField, spreadHostsField } from './spread-hosts.ts';
+import { spreadHostsField } from './spread-hosts.ts';
+import { moduleRelayedProps, relayCancelDiagnostics } from './relayed-props.ts';
 import { callbackSlotPropsField, relayWidgetCallbackProps } from './widget-callback-relays.ts';
 import { elementOnlyAttributeDiagnostics } from './element-only-attributes.ts';
 import { armMaterialField } from './arm-material.ts';
@@ -291,6 +292,19 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
 	const liveSharedComponents = componentsWithLiveShared(graph, input.importedModuleInterfaces);
+	const relayedProps = moduleRelayedProps({
+		componentNames: graph.components.map((component) => component.name),
+		events: graph.events,
+		componentEdges: graph.componentEdges,
+		importedModuleInterfaces: input.importedModuleInterfaces ?? {},
+	});
+	graph.diagnostics.push(
+		...relayCancelDiagnostics(
+			state.relayCancelRefusals,
+			relayedProps,
+			input.importedModuleInterfaces ?? {},
+		),
+	);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
@@ -344,7 +358,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 							? { rootBoundary: true as const }
 							: {}),
 						...spreadHostsField(chunks),
-						...relayHostsField(graph.events, root),
+						...(relayedProps.get(component.name)?.size
+							? { relayedProps: [...relayedProps.get(component.name)!].sort() }
+							: {}),
 						...callbackSlotPropsField(graph.sharedCallbackBindings, component.name),
 						...projectionPlacementFields({
 							chunks: graph.markup.chunks,

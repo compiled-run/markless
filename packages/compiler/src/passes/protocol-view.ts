@@ -643,7 +643,7 @@ function rowSuffixField(
 	repeatId: string,
 	render: { readonly rowStartOffset?: number | 'unknown'; readonly rowEndOffset?: number },
 	enclosingRow: unknown,
-	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown }>,
+	rowEvents: ReadonlyArray<{ readonly syncPolicy?: unknown; readonly relayedProp?: string }>,
 ): { readonly rowEndOffset?: number } {
 	const chunks = input.semanticGraph?.markup.chunks;
 	if (
@@ -651,7 +651,7 @@ function rowSuffixField(
 		enclosingRow ||
 		render.rowEndOffset !== undefined ||
 		render.rowStartOffset === 'unknown' ||
-		!rowEvents.some((event) => event.syncPolicy)
+		!rowEvents.some((event) => event.syncPolicy || event.relayedProp)
 	)
 		return {};
 	const after = repeatRowSiblingElements(chunks, repeatId, 'after');
@@ -1785,16 +1785,19 @@ function withBehaviorSymbols<Behavior extends { readonly hostNodeId: string }>(
 }
 
 // The analyzer's submit facts for this event's host, carried on its record so the runtime reads no DOM to learn them.
+// `relayedProp`: the handler is the component's own prop handed over as is, so composition gives the record the cancel its parent passed in that prop.
 function submitEventFacts(
 	input: Pick<ProtocolViewPayloadInput, 'semanticGraph'>,
 	event: { readonly hostNodeId: string; readonly eventName: string },
-): ProtocolSubmitEventFacts {
+): ProtocolSubmitEventFacts & { readonly relayedProp?: string } {
 	const same = input.semanticGraph?.events.filter(
 		(candidate) =>
 			candidate.hostNodeId === event.hostNodeId && candidate.eventName === event.eventName,
 	);
 	const inPlace = same?.find((candidate) => candidate.inPlaceSubmit)?.inPlaceSubmit;
+	const relayedProp = same?.find((candidate) => candidate.relayedPropName)?.relayedPropName;
 	return {
+		...(relayedProp && { relayedProp }),
 		...(same?.some((candidate) => candidate.authoredSubmitAriaDisabled) && {
 			authoredSubmitAriaDisabled: true,
 		}),

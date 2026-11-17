@@ -6,6 +6,7 @@ import {
 	marklessComposeState,
 	marklessComposeWidgetRegistry,
 	marklessRegisterComposedWidgets,
+	marklessRelayedPolicy,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
@@ -1586,20 +1587,23 @@ export function marklessSsrAppendChildView(context: {
 		for (const symbolId of symbolIds)
 			if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId))
 				context.externalSymbolIds.add(symbolId);
-		const composed = {
-			...event,
-			hostNodeId: context.child.hostPrefix + event.hostNodeId,
-			symbolIds,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
-		};
+		const composed = marklessRelayedPolicy(
+			{
+				...event,
+				hostNodeId: context.child.hostPrefix + event.hostNodeId,
+				symbolIds,
+				...(event.syncPolicy
+					? {
+							syncPolicy: marklessComposedSyncPolicy(
+								event.syncPolicy,
+								context.child.graphProps,
+								childInstancePath,
+							),
+						}
+					: {}),
+			},
+			context.child.graphProps,
+		);
 		// The consumer's `{...rest}` handler for this same element was forwarded
 		// into the PARENT's payload, so the part's own record and the consumer's
 		// only meet here. One element, one listener list: they merge into one
@@ -1653,26 +1657,31 @@ export function marklessSsrAppendChildView(context: {
 			childInstancePath,
 		);
 		if (!mapped) continue;
-		const rowEvents = repeat.rowEvents.map((event) => ({
-			...event,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
-			symbolIds: event.symbolIds.map((symbolId) => {
-				const callbackSymbolId = callbackSymbolIds.get(symbolId);
-				if (callbackSymbolId) {
-					context.externalSymbolIds.add(callbackSymbolId);
-					return callbackSymbolId;
-				}
-				return marklessBoundSymbolId(context.child, symbolId);
-			}),
-		}));
+		const rowEvents = repeat.rowEvents.map((event) =>
+			marklessRelayedPolicy(
+				{
+					...event,
+					...(event.syncPolicy
+						? {
+								syncPolicy: marklessComposedSyncPolicy(
+									event.syncPolicy,
+									context.child.graphProps,
+									childInstancePath,
+								),
+							}
+						: {}),
+					symbolIds: event.symbolIds.map((symbolId) => {
+						const callbackSymbolId = callbackSymbolIds.get(symbolId);
+						if (callbackSymbolId) {
+							context.externalSymbolIds.add(callbackSymbolId);
+							return callbackSymbolId;
+						}
+						return marklessBoundSymbolId(context.child, symbolId);
+					}),
+				},
+				context.child.graphProps,
+			),
+		);
 		context.keyedRepeats.push({
 			...repeat,
 			id: context.child.hostPrefix + repeat.id,
@@ -2050,24 +2059,29 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 	const instancePath = marklessComposedInstancePath(child);
 	return {
 		...arm,
-		events: (arm.events ?? []).map((event) => ({
-			...event,
-			// A child's own arm records already carry the bound ids its module minted for this edge.
-			symbolIds: event.symbolIds.map((symbolId) =>
-				Object.values(child.boundSymbols ?? {}).includes(symbolId)
-					? symbolId
-					: marklessBoundSymbolId(child, symbolId),
+		events: (arm.events ?? []).map((event) =>
+			marklessRelayedPolicy(
+				{
+					...event,
+					// A child's own arm records already carry the bound ids its module minted for this edge.
+					symbolIds: event.symbolIds.map((symbolId) =>
+						Object.values(child.boundSymbols ?? {}).includes(symbolId)
+							? symbolId
+							: marklessBoundSymbolId(child, symbolId),
+					),
+					...(event.syncPolicy
+						? {
+								syncPolicy: marklessComposedSyncPolicy(
+									event.syncPolicy,
+									child.graphProps,
+									instancePath,
+								),
+							}
+						: {}),
+				},
+				child.graphProps,
 			),
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							child.graphProps,
-							instancePath,
-						),
-					}
-				: {}),
-		})),
+		),
 		domUpdates: (arm.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(
 				update,

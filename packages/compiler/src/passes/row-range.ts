@@ -108,7 +108,11 @@ export function rowRangeRefusal(
 	if (graph.behaviors.some((behavior) => behavior.keyedRepeatScopeIds?.includes(repeatId)))
 		return 'has rows that attach a behavior';
 	const rowHosts = new Set(row?.hosts.map((host) => host.hostNodeId));
-	if (graph.events.some((event) => event.syncPolicy && rowHosts.has(event.hostNodeId)))
+	if (
+		graph.events.some(
+			(event) => (event.syncPolicy || event.relayedPropName) && rowHosts.has(event.hostNodeId),
+		)
+	)
 		return 'has rows with an event that cancels before any code loads';
 	const owner = chunks.find((chunk) =>
 		chunk.slots.some((slot) => slot.kind === 'repeat' && slot.repeatId === repeatId),

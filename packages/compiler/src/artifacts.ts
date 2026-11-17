@@ -446,8 +446,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
-			/** Elements whose handler for an event is one of the component's props, handed over as is. */
-			readonly relayHosts?: ReadonlyArray<ModuleGraphInterfaceRelayHost>;
+			/** Props the component hands to an event as is, in its own markup or through a child it passes them on to. */
+			readonly relayedProps?: ReadonlyArray<string>;
 			/** Props this component files into a widget callback slot. */
 			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
@@ -588,12 +588,6 @@ export type ModuleGraphInterfaceArmMaterial = {
  * (`excludeNames`) and what the signature took out of the rest binding
  * (`destructuredNames`).
  */
-export type ModuleGraphInterfaceRelayHost = {
-	readonly hostNodeId: string;
-	readonly eventName: string;
-	readonly propName: string;
-};
-
 export type ModuleGraphInterfaceSpreadHost = {
 	readonly hostNodeId: string;
 	/** The element the spread lands on, lowercase. */
