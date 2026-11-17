@@ -130,8 +130,8 @@
 				"bench /",
 				"jsGzipBytes"
 			],
-			"delta": 28,
-			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -142,8 +142,8 @@
 				"bench /records",
 				"jsGzipBytes"
 			],
-			"delta": 28,
-			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -154,8 +154,44 @@
 				"bench /settings",
 				"jsGzipBytes"
 			],
-			"delta": 28,
-			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
 			"date": "2026-11-17"
 		}
 	]
