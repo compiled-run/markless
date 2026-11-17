@@ -19,7 +19,7 @@ import {
 	sharedDefinitionIdOf,
 	sharedInstanceVisibleFrom,
 } from '../semantic-graph/collect-shared.ts';
-import { MARKLESS_SHARED_INSTANCE_VALUES_KEY } from './shared-seed-pass.ts';
+import { sharedInstanceValuesMapSource } from './shared-seed-pass.ts';
 import { splitStaticGraphPath } from '../../artifact-helpers/graph-paths.ts';
 import { sharedInstancePreludeLines } from './residue-reader.ts';
 import type { PublicRenderRoot } from './types.ts';
@@ -214,7 +214,7 @@ function sharedStateSeedLine(
 	return `{ const marklessSharedSeed = (${value}); ${stateValueFunctionName}(${stateValuesName}, ${statePayloadName}, ${id}, ${seedValueSource(read, resolved.path, 'marklessSharedSeed')});${descendantSeedPublishSource(input, resolved.binding.id, id, read)} }`;
 }
 
-// Descendants render after this body, so they read the seeded node through the render context they inherit.
+// Every later render of the request, a sibling's included, reads the seeded node through the map its enclosing body opened.
 function descendantSeedPublishSource(
 	input: PublicRenderModuleInput,
 	graphNodeId: string,
@@ -224,8 +224,7 @@ function descendantSeedPublishSource(
 	const definitionId = sharedDefinitionIdOf(graphNodeId);
 	const definition = input.semanticGraph.sharedDefinitions.find((item) => item.id === definitionId);
 	if (!definition || definition.scope === 'subtree') return '';
-	const key = MARKLESS_SHARED_INSTANCE_VALUES_KEY;
-	return ` marklessSsrRenderContext = { ...marklessSsrRenderContext, ${key}: new Map([...(marklessSsrRenderContext?.${key} ?? []), [${idSource}, ${readSource}]]) };`;
+	return ` ${sharedInstanceValuesMapSource()}.set(${idSource}, ${readSource});`;
 }
 
 /**

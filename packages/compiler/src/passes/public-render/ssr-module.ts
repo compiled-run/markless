@@ -37,6 +37,7 @@ import {
 	staticProjectionChildren,
 	sharedSeedConsumeLine,
 	sharedInstanceValuesConsumeLine,
+	sharedInstanceValuesOpenLine,
 	sharedSeedMarkerLine,
 	adoptedWidgetDefinitionIds,
 	sharedSeedPassLines,
@@ -336,6 +337,7 @@ export function emitPublicSsrRenderModule(
 			'marklessSsrRenderStateValues',
 			'marklessSsrPayloadState',
 		),
+		sharedInstanceValuesOpenLine(input, rootInfo.componentName),
 		...rootDataLines.carriedSeed,
 		...renderBodyLines(
 			input,
