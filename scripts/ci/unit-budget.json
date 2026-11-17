@@ -143,9 +143,9 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.236,
-		"cpuS": 2865.2,
-		"peakRssMb": 4171,
+		"calibrationS": 1.37,
+		"cpuS": 3585.5,
+		"peakRssMb": 4414,
 		"models": {
 			"AMD EPYC 7763 64-Core Processor": 1.045,
 			"AMD EPYC 9V45 96-Core Processor": 0.89,
@@ -157,30 +157,22 @@
 		},
 		"shards": {
 			"1/3": {
-				"cpuS": 933.6,
-				"peakRssMb": 4013
+				"cpuS": 1094.3,
+				"peakRssMb": 3735
 			},
 			"2/3": {
-				"cpuS": 865.1,
-				"peakRssMb": 4171
+				"cpuS": 1208.8,
+				"peakRssMb": 4414
 			},
 			"3/3": {
-				"cpuS": 1066.5,
-				"peakRssMb": 3637
+				"cpuS": 1282.4,
+				"peakRssMb": 3816
 			}
 		},
 		"runs": [
-			"43576277596",
-			"43575255804",
-			"43573612566",
-			"43572505302",
-			"43572444143",
-			"43571715066",
-			"43557674440",
-			"43556033887",
-			"43551039878"
+			"44085378060"
 		],
-		"sha": "d61244a6926656459160673b94883424d14dc992"
+		"sha": "c1a746ebbdeddb4d74a92fe05beaccdc750c1986"
 	},
 	"history": [
 		{
@@ -386,6 +378,22 @@
 				"43551039878"
 			],
 			"reason": "re-anchored with CPU-model factors from 9 green merge-queue runs of 2026-11-14 (27 shard measurements); main reads +9.5% against the 2026-11-12 anchor (+7.8% at d61244a69, run 43551039878, against the 36 measurements of 64b23daf). Per-file test time, machine-normalised, 64b23daf to d61244a69: +365 s, of which router child-async-catch.test.ts grew 2 tests to 112 in #653 (c1fe2b983), 14 s to 140 s (raw, runs 43134571598 and 43576277596), 40% of the normalised growth; 37 new test files 90 s, 25% (bundler composition-grid-build 18 s, kernel-placed-rows-fixture 16 s, router form-in-place 15 s, submit-hold-preload 10 s, prerender-inline-event-record 9 s); router vite build tests (fragment-navigation-webkit, async-child-ssr, kept-late-handler, navigation-stream) and bundler ssr-row-outer-read-fixture most of the rest; the old 20.4% band absorbed it. Peak RSS median 4171 MB"
+		},
+		{
+			"date": "2026-11-17",
+			"change": "anchors",
+			"from": {
+				"cpuS": 2865.2,
+				"peakRssMb": 4171
+			},
+			"to": {
+				"cpuS": 3585.5,
+				"peakRssMb": 4414
+			},
+			"runs": [
+				"44085378060"
+			],
+			"reason": "the native ladder's web check (packages/mobile/test/ladder-web.test.ts) builds a router app per rung and drives it in Chromium, the web reference each native rung needs; 15 rungs now, measured in CI run 44085378060 at +369.6 CPU-s total"
 		}
 	],
 	"models": {
