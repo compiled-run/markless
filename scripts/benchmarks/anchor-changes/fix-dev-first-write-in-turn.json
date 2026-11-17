@@ -1,0 +1,72 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 105,
+			"reason": "resume start holds the flush while it reads stored values and wires computeds, so a stored value reaches computeds wired after it (+178 B rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 50,
+			"reason": "a dev-server-only hold of resume-sync-computed behind import.meta.env?.DEV: rendered +50 B before minify, the minified chunk drops it (measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 25,
+			"reason": "resume start holds the flush while it reads stored values and wires computeds (web/resume-runtime, +24 to +25 B gzip emitted, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 105,
+			"reason": "resume start holds the flush while it reads stored values and wires computeds, so a stored value reaches computeds wired after it (+178 B rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 50,
+			"reason": "a dev-server-only hold of resume-sync-computed behind import.meta.env?.DEV: rendered +50 B before minify, the minified chunk drops it (measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 24,
+			"reason": "resume start holds the flush while it reads stored values and wires computeds (web/resume-runtime, +24 to +25 B gzip emitted, measured)",
+			"date": "2026-11-17"
+		}
+	]
+}

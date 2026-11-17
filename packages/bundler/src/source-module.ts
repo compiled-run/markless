@@ -13,7 +13,7 @@ import type { RuntimeDemandMapArtifact } from '@markless/compiler';
 import { emitScalarPlanLoader } from './scalar-plan-loader.ts';
 import { scalarPlanSourceReference } from './scalar-plan-source.ts';
 import { RESIDENT_LOAD_MODULE, emitSymbolRouteTable } from './rebound-symbol-route.ts';
-import { moduleLoads, type ModuleLoad } from './module-loads.ts';
+import { moduleLoads, type ModuleLoad, type ModuleLoads } from './module-loads.ts';
 
 export const MARKLESS_VIRTUAL_PREFIX = 'virtual:markless:';
 
@@ -432,7 +432,7 @@ export function emitSourceModule(input: {
 		// twice on a resumed page is the same assignment, not a second page's.
 		input.environment === 'client' ? clientRowMintLoader({ ...input, load }) : null,
 		'',
-		emitLoadSymbol(input, load),
+		emitLoadSymbol(input, loads),
 		symbolsOnly && input.scalarActions
 			? emitScalarPlanLoader(
 					input.scalarActions,
@@ -1045,7 +1045,7 @@ export function emitResumeModule(input: {
 			? 'if (globalThis.__mxLog) globalThis.__mxLoadLog().then(log => log.installMarklessExecutionLog());'
 			: null,
 		'',
-		emitLoadSymbol(input, load, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
+		emitLoadSymbol(input, loads, stagedPrerender ? 'readMarklessWakeSourceSymbol' : undefined),
 		routeSymbols ? 'const marklessLoadLocalSymbol = loadSymbol;' : '',
 		routeSymbols
 			? emitLazySymbolRouteFunction(
@@ -2333,11 +2333,19 @@ function emitLoadSymbol(
 		readonly symbols: ReadonlyArray<SourceSymbolRow>;
 		readonly hasBoundSymbols?: boolean;
 	},
-	load: ModuleLoad,
+	loads: ModuleLoads,
 	sourceReaderName?: string,
 ) {
-	if (input.symbols.length > 0 && input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT) {
-		const direct = emitDirectSourceSymbolLoader(input.symbols, load, sourceReaderName);
+	// On the dev server every symbol is imported with this module, so none goes through the resolver.
+	if (
+		input.symbols.length > 0 &&
+		(input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT || loads.load !== undefined)
+	) {
+		const direct = emitDirectSourceSymbolLoader(
+			input.symbols,
+			loads.load ?? importLoad,
+			sourceReaderName,
+		);
 		if (!input.hasBoundSymbols) return direct;
 		return [
 			`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,

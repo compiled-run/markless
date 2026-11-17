@@ -399,6 +399,8 @@ export function createEventWiring(input: {
 		input.delegatedTriggers?.registerEventRecord(element, record);
 		queueDeferredHost(input.root, element, record.eventName);
 		wantPreload(record.eventName);
+		// The dev server fetches a module on first use; loaded now, a submission's marks paint with its handler's writes as in a build.
+		if (import.meta.env?.DEV && record.eventName === 'submit') void loadSubmitHold();
 		if (typeof __MARKLESS_DEBUG_ENABLED__ !== 'undefined' && __MARKLESS_DEBUG_ENABLED__)
 			trackDebug(
 				recordDebugInteraction(
