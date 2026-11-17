@@ -21,10 +21,28 @@ export function Counter() @{
 			component: 'Counter',
 			cells: [{ id: 'state:count', name: 'count', initial: 0 }],
 			nodes: [
-				{ kind: 'element', id: 'h0', element: 'main', parent: null, attributes: { class: 'screen' } },
-				{ kind: 'element', id: 'h1', element: 'h1', parent: 'h0', attributes: { class: 'title' } },
+				{
+					kind: 'element',
+					id: 'h0',
+					element: 'main',
+					parent: null,
+					attributes: { class: 'screen' },
+				},
+				{
+					kind: 'element',
+					id: 'h1',
+					element: 'h1',
+					parent: 'h0',
+					attributes: { class: 'title' },
+				},
 				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
-				{ kind: 'element', id: 'h2', element: 'button', parent: 'h0', attributes: { class: 'tap' } },
+				{
+					kind: 'element',
+					id: 'h2',
+					element: 'button',
+					parent: 'h0',
+					attributes: { class: 'tap' },
+				},
 				{
 					kind: 'text',
 					id: 'h2:text0',
@@ -36,7 +54,17 @@ export function Counter() @{
 			handlers: [
 				{
 					id: 'handler:event:0',
-					ops: [{ op: 'assign', cell: 'state:count', value: { binary: '+', left: { unary: '+', value: { cell: 'state:count' } }, right: { literal: 1 } } }],
+					ops: [
+						{
+							op: 'assign',
+							cell: 'state:count',
+							value: {
+								binary: '+',
+								left: { unary: '+', value: { cell: 'state:count' } },
+								right: { literal: 1 },
+							},
+						},
+					],
 				},
 			],
 		});
@@ -56,10 +84,20 @@ export function Tally() @{
 		expect(payload?.nodes).toEqual([
 			{ kind: 'element', id: 'h0', element: 'section', parent: null },
 			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0' },
-			{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ cell: 'state:left' }, { text: ' before ' }] },
+			{
+				kind: 'text',
+				id: 'h1:text0',
+				parent: 'h1',
+				parts: [{ cell: 'state:left' }, { text: ' before ' }],
+			},
 			{ kind: 'element', id: 'h2', element: 'b', parent: 'h1' },
 			{ kind: 'text', id: 'h2:text0', parent: 'h2', parts: [{ text: 'bold' }] },
-			{ kind: 'text', id: 'h1:text1', parent: 'h1', parts: [{ text: ' after ' }, { cell: 'state:right' }] },
+			{
+				kind: 'text',
+				id: 'h1:text1',
+				parent: 'h1',
+				parts: [{ text: ' after ' }, { cell: 'state:right' }],
+			},
 			{ kind: 'element', id: 'h3', element: 'button', parent: 'h0' },
 			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Move' }] },
 		]);
@@ -70,12 +108,20 @@ export function Tally() @{
 					{
 						op: 'assign',
 						cell: 'state:left',
-						value: { binary: '-', left: { unary: '+', value: { cell: 'state:left' } }, right: { literal: 1 } },
+						value: {
+							binary: '-',
+							left: { unary: '+', value: { cell: 'state:left' } },
+							right: { literal: 1 },
+						},
 					},
 					{
 						op: 'assign',
 						cell: 'state:right',
-						value: { binary: '+', left: { unary: '+', value: { cell: 'state:right' } }, right: { literal: 1 } },
+						value: {
+							binary: '+',
+							left: { unary: '+', value: { cell: 'state:right' } },
+							right: { literal: 1 },
+						},
 					},
 				],
 			},
@@ -90,7 +136,9 @@ export function Tally() @{
 	</article>
 }`);
 		const elements = payload?.nodes.filter((node) => node.kind === 'element') ?? [];
-		const [article, span] = elements.map((node) => (node.kind === 'element' ? node.attributes : undefined));
+		const [article, span] = elements.map((node) =>
+			node.kind === 'element' ? node.attributes : undefined,
+		);
 		expect(article?.title).toBe('Hello');
 		expect(article?.class).toMatch(/^card mk-[a-z0-9]+$/);
 		expect(span?.class).toBe(article?.class.split(' ')[1]);
@@ -109,8 +157,16 @@ export function Panel() @{
 }`);
 		expect(diagnostics).toEqual([]);
 		expect(payload?.handlers[0]?.ops).toEqual([
-			{ op: 'assign', cell: 'state:open', value: { unary: '!', value: { cell: 'state:open' } } },
-			{ op: 'assign', cell: 'state:tab', value: { template: ['t', { cell: 'state:size' }, ''] } },
+			{
+				op: 'assign',
+				cell: 'state:open',
+				value: { unary: '!', value: { cell: 'state:open' } },
+			},
+			{
+				op: 'assign',
+				cell: 'state:tab',
+				value: { template: ['t', { cell: 'state:size' }, ''] },
+			},
 			{
 				op: 'assign',
 				cell: 'state:size',
@@ -119,7 +175,10 @@ export function Panel() @{
 			{
 				op: 'assign',
 				cell: 'state:size',
-				value: { call: 'Math.max', arguments: [{ cell: 'state:size' }, { unary: '-', value: { literal: 4 } }] },
+				value: {
+					call: 'Math.max',
+					arguments: [{ cell: 'state:size' }, { unary: '-', value: { literal: 4 } }],
+				},
 			},
 		]);
 	});
@@ -136,6 +195,31 @@ export function Sum() @{
 		]);
 	});
 
+	it('lowers an input field: its value binding and the event value its handler reads', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Field() @{
+	let text = state('a');
+	<div>
+		<input aria-label="Text" value={text} onInput={(e) => (text = e.target.value + '!')} />
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes[1]).toMatchObject({
+			element: 'input',
+			bindings: [{ property: 'value', value: { cell: 'state:text' } }],
+		});
+		expect(payload?.events).toEqual([
+			{ host: 'h1', event: 'input', handler: 'handler:event:0' },
+		]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:text',
+				value: { binary: '+', left: { event: 'value' }, right: { literal: '!' } },
+			},
+		]);
+	});
+
 	it('refuses a handler that does more than write state', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Logger() @{
@@ -144,7 +228,10 @@ export function Logger() @{
 }`);
 		expect(payload).toBeNull();
 		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
-			[NATIVE_UNSUPPORTED_CODE, 'the click handler uses a call to `console.log`, which needs a script engine'],
+			[
+				NATIVE_UNSUPPORTED_CODE,
+				'the click handler uses a call to `console.log`, which needs a script engine',
+			],
 		]);
 	});
 
@@ -184,14 +271,50 @@ export function Toggle() @{
 				id: 'h1:text0',
 				parent: 'h1',
 				parts: [
-					{ expr: { if: { cell: 'state:open' }, whenTrue: { literal: 'Hide' }, whenFalse: { literal: 'Show' } } },
+					{
+						expr: {
+							if: { cell: 'state:open' },
+							whenTrue: { literal: 'Hide' },
+							whenFalse: { literal: 'Show' },
+						},
+					},
 				],
 			},
-			{ kind: 'branch', id: 'branch-site:0', parent: 'h0', test: { cell: 'state:open' }, arms: 2 },
-			{ kind: 'element', id: 'h2', element: 'p', parent: 'h0', arm: { branch: 'branch-site:0', index: 0 } },
-			{ kind: 'text', id: 'h2:text0', parent: 'h2', parts: [{ text: 'Open' }], arm: { branch: 'branch-site:0', index: 0 } },
-			{ kind: 'element', id: 'h3', element: 'p', parent: 'h0', arm: { branch: 'branch-site:0', index: 1 } },
-			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Closed' }], arm: { branch: 'branch-site:0', index: 1 } },
+			{
+				kind: 'branch',
+				id: 'branch-site:0',
+				parent: 'h0',
+				test: { cell: 'state:open' },
+				arms: 2,
+			},
+			{
+				kind: 'element',
+				id: 'h2',
+				element: 'p',
+				parent: 'h0',
+				arm: { branch: 'branch-site:0', index: 0 },
+			},
+			{
+				kind: 'text',
+				id: 'h2:text0',
+				parent: 'h2',
+				parts: [{ text: 'Open' }],
+				arm: { branch: 'branch-site:0', index: 0 },
+			},
+			{
+				kind: 'element',
+				id: 'h3',
+				element: 'p',
+				parent: 'h0',
+				arm: { branch: 'branch-site:0', index: 1 },
+			},
+			{
+				kind: 'text',
+				id: 'h3:text0',
+				parent: 'h3',
+				parts: [{ text: 'Closed' }],
+				arm: { branch: 'branch-site:0', index: 1 },
+			},
 		]);
 	});
 });

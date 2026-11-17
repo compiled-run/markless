@@ -31,7 +31,9 @@ export type NativeExpr =
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
 	| { readonly template: ReadonlyArray<string | NativeExpr> }
 	| { readonly member: NativeExpr; readonly property: 'length' }
-	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> };
+	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
+	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
+	| { readonly event: 'value' };
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -50,8 +52,11 @@ export type NativeNode =
 			readonly parent: string | null;
 			/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 			readonly attributes?: Readonly<Record<string, string>>;
-			/** Attributes that follow state; each value is written as the web writes it (absent, bare or a string). */
-			readonly bindings?: ReadonlyArray<{ readonly attribute: string; readonly value: NativeExpr }>;
+			/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
+			readonly bindings?: ReadonlyArray<
+				| { readonly attribute: string; readonly value: NativeExpr }
+				| { readonly property: 'value'; readonly value: NativeExpr }
+			>;
 			readonly arm?: NativeArmPlace;
 	  }
 	| {
@@ -73,7 +78,7 @@ export type NativeNode =
 	  };
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate';
+export type NativeEventName = 'activate' | 'input';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp = { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr };
@@ -87,6 +92,8 @@ export type NativeViewPayload = {
 		readonly name: string;
 		readonly initial: NativeScalar;
 		readonly storage?: { readonly key: string };
+		/** A class binding reads this cell, so Dragon's export has a state for it; its changes are journalled as `state`. */
+		readonly styled?: true;
 	}>;
 	/** Document order: a parent comes before its children, siblings in authored order. */
 	readonly nodes: ReadonlyArray<NativeNode>;
@@ -103,5 +110,9 @@ export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
+	/** An input's text, as `String(value)`; never sent for the field whose edit caused it while it already shows that text. */
+	| { readonly op: 'property'; readonly node: string; readonly name: 'value'; readonly value: string }
+	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
+	| { readonly op: 'state'; readonly cell: string; readonly value: NativeScalar | null }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null };

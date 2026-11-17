@@ -29,8 +29,38 @@ export type NativeViewArtifact = {
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
 
+/** Elements every native host maps; anything else is refused here once, not in each host. */
+const PORTABLE_ELEMENTS = new Set([
+	'main',
+	'div',
+	'section',
+	'article',
+	'header',
+	'footer',
+	'nav',
+	'aside',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'p',
+	'span',
+	'b',
+	'strong',
+	'em',
+	'i',
+	'ul',
+	'ol',
+	'li',
+	'button',
+	'input',
+]);
+
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
+	input: 'input',
 };
 
 type Item =
@@ -114,10 +144,14 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	const cellIds = new Set(cells.map((cell) => cell.id));
 	const cellOfName = new Map(cells.map((cell) => [cell.name, cell.id]));
 
-	const exprOf = (expression: SemanticExpression | undefined, what: string): NativeExpr | null => {
+	const exprOf = (
+		expression: SemanticExpression | undefined,
+		what: string,
+		eventParameter?: string,
+	): NativeExpr | null => {
 		if (!expression) return refuse(`${what} has no expression the compiler recorded`);
 		const all = (list: ReadonlyArray<SemanticExpression>): NativeExpr[] | null => {
-			const lowered = list.map((item) => exprOf(item, what));
+			const lowered = list.map((item) => exprOf(item, what, eventParameter));
 			return lowered.every((item) => item !== null) ? (lowered as NativeExpr[]) : null;
 		};
 		switch (expression.kind) {
@@ -125,36 +159,53 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				const cell = cellOfName.get(expression.name);
 				return cell
 					? { cell }
-					: refuse(`${what} reads \`${expression.name}\`, which is not state of this component`);
+					: refuse(
+							`${what} reads \`${expression.name}\`, which is not state of this component`,
+						);
 			}
 			case 'literal':
 				return { literal: expression.value };
 			case 'unary': {
-				const value = exprOf(expression.value, what);
+				const value = exprOf(expression.value, what, eventParameter);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
 			case 'logical': {
-				const left = exprOf(expression.left, what);
-				const right = exprOf(expression.right, what);
+				const left = exprOf(expression.left, what, eventParameter);
+				const right = exprOf(expression.right, what, eventParameter);
 				if (!left || !right) return null;
 				return expression.kind === 'binary'
 					? { binary: expression.operator, left, right }
 					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(expression.test, what);
-				const whenTrue = exprOf(expression.consequent, what);
-				const whenFalse = exprOf(expression.alternate, what);
+				const test = exprOf(expression.test, what, eventParameter);
+				const whenTrue = exprOf(expression.consequent, what, eventParameter);
+				const whenFalse = exprOf(expression.alternate, what, eventParameter);
 				return test && whenTrue && whenFalse ? { if: test, whenTrue, whenFalse } : null;
 			}
 			case 'template': {
-				const parts = expression.parts.map((part) => (typeof part === 'string' ? part : exprOf(part, what)));
-				return parts.every((part) => part !== null) ? { template: parts as (string | NativeExpr)[] } : null;
+				const parts = expression.parts.map((part) =>
+					typeof part === 'string' ? part : exprOf(part, what, eventParameter),
+				);
+				return parts.every((part) => part !== null)
+					? { template: parts as (string | NativeExpr)[] }
+					: null;
 			}
 			case 'member': {
-				if (expression.property !== 'length') return refuse(`${what} reads \`.${expression.property}\` of a value`);
-				const object = exprOf(expression.object, what);
+				const holder = expression.object;
+				if (
+					eventParameter !== undefined &&
+					expression.property === 'value' &&
+					holder.kind === 'member' &&
+					(holder.property === 'currentTarget' || holder.property === 'target') &&
+					holder.object.kind === 'read' &&
+					holder.object.name === eventParameter
+				)
+					return { event: 'value' };
+				if (expression.property !== 'length')
+					return refuse(`${what} reads \`.${expression.property}\` of a value`);
+				const object = exprOf(expression.object, what, eventParameter);
 				return object && { member: object, property: 'length' };
 			}
 			case 'call': {
@@ -176,6 +227,10 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		(readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
 			const target = read.target;
 			if (target.kind === 'text') return [];
+			if (target.kind === 'property' && target.name === 'value') {
+				const value = exprOf(read.expression, 'the `value` property');
+				return value ? [{ property: 'value' as const, value }] : [];
+			}
 			if (target.kind === 'attribute') {
 				const value = exprOf(read.expression, `the \`${target.name}\` attribute`);
 				return value ? [{ attribute: target.name, value }] : [];
@@ -234,12 +289,16 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		lowered.add(chunk.id);
 		const place = arm ? { arm } : {};
 		const items: Item[] = [
-			...chunk.hosts.map(
-				(host): Item => ({ kind: 'host', id: host.hostNodeId, path: host.coordinate.path }),
-			),
-			...(chunk.texts ?? []).map(
-				(text): Item => ({ kind: 'part', part: { text: text.text }, path: text.coordinate.path }),
-			),
+			...chunk.hosts.map((host): Item => ({
+				kind: 'host',
+				id: host.hostNodeId,
+				path: host.coordinate.path,
+			})),
+			...(chunk.texts ?? []).map((text): Item => ({
+				kind: 'part',
+				part: { text: text.text },
+				path: text.coordinate.path,
+			})),
 		];
 		for (const slot of chunk.slots) {
 			if (slot.kind === 'attribute') continue;
@@ -305,6 +364,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				close();
 				const element = tagOf.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
+				else if (!PORTABLE_ELEMENTS.has(element)) refuse(`the <${element}> element`);
 				const attributes = (chunk.attributes ?? []).filter(
 					(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
 				);
@@ -315,7 +375,11 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 					element: element ?? '*',
 					parent,
 					...(attributes.length > 0
-						? { attributes: Object.fromEntries(attributes.map((a) => [a.name, a.value])) }
+						? {
+								attributes: Object.fromEntries(
+									attributes.map((a) => [a.name, a.value]),
+								),
+							}
 						: {}),
 					...(bindings.length > 0 ? { bindings } : {}),
 					...place,
@@ -331,7 +395,14 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				}
 				const test = exprOf(site.testExpression, 'the @if test');
 				if (!test) continue;
-				nodes.push({ kind: 'branch', id: item.id, parent, test, arms: item.arms.length, ...place });
+				nodes.push({
+					kind: 'branch',
+					id: item.id,
+					parent,
+					test,
+					arms: item.arms.length,
+					...place,
+				});
 				item.arms.forEach((armId, index) => {
 					const armChunk = chunks.get(armId);
 					if (armChunk) lowerChunk(armChunk, parent, { branch: item.id, index });
@@ -361,25 +432,35 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 
 	const handlerOps = (event: SemanticEvent): NativeOp[] => {
 		const what = `the ${event.eventName} handler`;
-		if (event.handlerParameters.length > 0) {
+		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
+		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {
 			refuse(`${what} reads its event`, event.handlerSpan);
 			return [];
 		}
 		if (!event.handlerStatements) {
-			refuse(`${what} is defined elsewhere (a named, passed-in or factory function)`, event.handlerSpan);
+			refuse(
+				`${what} is defined elsewhere (a named, passed-in or factory function)`,
+				event.handlerSpan,
+			);
 			return [];
 		}
 		return event.handlerStatements.flatMap((statement): NativeOp[] => {
 			if (statement.kind === 'unsupported') {
-				refuse(`${what} uses ${statement.construct}, which needs a script engine`, event.handlerSpan);
+				refuse(
+					`${what} uses ${statement.construct}, which needs a script engine`,
+					event.handlerSpan,
+				);
 				return [];
 			}
 			const cell = cellOfName.get(statement.target);
 			if (!cell) {
-				refuse(`${what} assigns \`${statement.target}\`, which is not state of this component`, event.handlerSpan);
+				refuse(
+					`${what} assigns \`${statement.target}\`, which is not state of this component`,
+					event.handlerSpan,
+				);
 				return [];
 			}
-			const value = exprOf(statement.value, what);
+			const value = exprOf(statement.value, what, eventParameter);
 			return value ? [{ op: 'assign', cell, value }] : [];
 		});
 	};
@@ -397,10 +478,29 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		handlers.push({ id: handler, ops: handlerOps(event) });
 	}
 
+	const styledCells = new Set<string>();
+	const collectCells = (expr: NativeExpr): void => {
+		if ('cell' in expr) styledCells.add(expr.cell);
+		for (const child of Object.values(expr)) {
+			if (Array.isArray(child))
+				for (const item of child)
+					if (item && typeof item === 'object') collectCells(item as NativeExpr);
+			if (child && typeof child === 'object' && !Array.isArray(child))
+				collectCells(child as NativeExpr);
+		}
+	};
+	for (const node of nodes)
+		if (node.kind === 'element')
+			for (const binding of node.bindings ?? [])
+				if ('attribute' in binding && binding.attribute === 'class')
+					collectCells(binding.value);
+
 	return done({
 		version: NATIVE_VIEW_VERSION,
 		component: root.componentName,
-		cells,
+		cells: cells.map((cell) =>
+			styledCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
+		),
 		nodes,
 		events,
 		handlers,
