@@ -1352,15 +1352,13 @@ export function marklessSsrArmizeBoundaries(
 			if (completeArmHostIds.has(streams.keyedRepeats[i].parentHostNodeId))
 				movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
 		}
-		// A list in an arm of a branch here travels with the arm, whichever arm the render painted.
-		const armListIds = new Set(marklessSsrArmListIds(planned.branches ?? []));
-		// One in an arm not painted reached no served byte; the commit that paints that arm brings its own record.
-		const unpaintedListIds = new Set(
-			plannedArms.flatMap((arm) => (arm === planned ? [] : marklessSsrArmListIds(arm.branches ?? []))),
-		);
+		// A list in an arm of a branch here travels with the arm the render painted; one in an arm not painted reached no served byte.
+		const armLists = new Map(plannedArms.flatMap((arm) => marklessSsrArmListIds(arm.branches ?? []).map((id) => [id, arm === planned] as const)));
 		for (let i = (streams.keyedRepeats ?? []).length - 1; i >= 0; i--)
-			if (armListIds.has(streams.keyedRepeats[i].id)) movedKeyedRepeats.unshift(...streams.keyedRepeats.splice(i, 1));
-			else if (unpaintedListIds.has(streams.keyedRepeats[i].id)) streams.keyedRepeats.splice(i, 1);
+			if (armLists.has(streams.keyedRepeats[i].id)) {
+				const [list] = streams.keyedRepeats.splice(i, 1);
+				if (armLists.get(list.id)) movedKeyedRepeats.unshift(list);
+			}
 		const keyedRepeats = [...(planned.keyedRepeats ?? []), ...movedKeyedRepeats];
 		return {
 			...boundary,
