@@ -234,6 +234,18 @@ function armRebuildsFromGraph(state: WalkState): boolean {
 	return !!state.currentArmScope && state.currentKeyedRepeatScopeIds.length === 0;
 }
 
+function liftTemplateExpression(
+	expression: AnyNode,
+	state: WalkState,
+): { readonly graphNodeId: string; readonly splicedSource?: string } | null {
+	return (
+		collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS) ??
+		liftArmModuleValue(expression, state) ??
+		liftArmShownValue(expression, state) ??
+		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS)
+	);
+}
+
 function rowScope(state: WalkState): { readonly keyedRepeatId?: string } {
 	const id = state.currentKeyedRepeatScopeIds.at(-1);
 	return id ? { keyedRepeatId: id } : {};
@@ -247,12 +259,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 	}
 	const joined = joinedTextExpressions.get(expression);
 	if (joined === null) return;
-	const composite =
-		joined ??
-		collectCompositeTemplateExpression(expression, state, TEMPLATE_READ_OPTIONS) ??
-		liftArmModuleValue(expression, state) ??
-		liftArmShownValue(expression, state) ??
-		liftRenderLocalComposite(expression, state, TEMPLATE_READ_OPTIONS);
+	const composite = joined ?? liftTemplateExpression(expression, state);
 
 	if (!composite && refuseUnroutedExpression(expression, 'This text', state)) return;
 	collectRowLocalReads(expression, state);
@@ -276,6 +283,7 @@ export function collectTemplateExpression(expression: AnyNode | undefined, state
 		...rowScope(state),
 		hostNodeId: state.currentHostNodeId,
 		...(joined ? { source: joined.source } : templateReadSource(composite, expression, state)),
+		...(joined?.armHoles.length ? { armHoles: joined.armHoles } : {}),
 		sourceSpan: sourceSpan(expression, state.filename),
 		target: armText ?? state.currentTextTarget ?? { kind: 'text' },
 		asyncBoundaryId: state.currentAsyncBoundaryId ?? undefined,
@@ -342,7 +350,11 @@ function templateReadSource(
 // The first interpolation carries the joined text's computed; the rest carry null and ship nothing.
 const joinedTextExpressions = new WeakMap<
 	AnyNode,
-	{ readonly graphNodeId: string; readonly source: string } | null
+	{
+		readonly graphNodeId: string;
+		readonly source: string;
+		readonly armHoles: NonNullable<SemanticTemplateRead['armHoles']>;
+	} | null
 >();
 
 // A text write replaces the host's whole text, so several interpolations update as one joined derive.
@@ -506,7 +518,17 @@ function joinTextParts(
 		return null;
 	for (const definition of definitions) collectDefinitionReads(definition, state);
 	const [first, ...rest] = values as AnyNode[];
-	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source });
+	// A flipped arm rebuilds each interpolation from graph reads alone, so a composite one needs its own computed.
+	const armHoles = armRebuildsFromGraph(state)
+		? (values as AnyNode[]).flatMap((value) => {
+				const span = sourceSpan(value, state.filename);
+				const lifted = span ? liftTemplateExpression(value, state) : null;
+				return span && lifted
+					? [{ sourceSpan: span, computedGraphNodeId: lifted.graphNodeId }]
+					: [];
+			})
+		: [];
+	joinedTextExpressions.set(first!, { graphNodeId: composite.graphNodeId, source, armHoles });
 	for (const value of rest) joinedTextExpressions.set(value, null);
 	return { source, graphNodeId: composite.graphNodeId, graphBindingKind: 'computed', path: [] };
 }

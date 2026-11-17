@@ -1388,9 +1388,13 @@ function withoutAcceptedArmRefusals(
 	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'diagnostics' | 'escalationCandidates'>,
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 ): ReadonlyArray<SymbolModulesDiagnostic> {
+	// A render module withheld for the render plan's own error leaves that error as the one to fix.
+	const planRefused =
+		input.publicRenderPlan?.diagnostics.some((diagnostic) => diagnostic.severity === 'error') ??
+		false;
 	if (
 		branchArms.escalationCandidates.length === 0 ||
-		!input.publicRenderModule?.renderDataModuleSource ||
+		(!input.publicRenderModule?.renderDataModuleSource && !planRefused) ||
 		!input.semanticGraph ||
 		!prerenderInterfacesComplete({ semanticGraph: input.semanticGraph }, input.source ?? {})
 	)
