@@ -24,12 +24,17 @@ func reproducesConformanceVector(file: URL) throws {
 	let vector = try JSONValue.parse(Data(contentsOf: file))
 	guard case let .object(fields) = vector else { Issue.record("vector is not an object"); return }
 	let field = { (key: String) -> JSONValue? in fields.first { $0.0 == key }?.1 }
-	#expect(fields.map(\.0) == ["version", "payload", "initial", "steps"])
+	let known = ["version", "payload", "initial", "initialAttributes", "initialArms", "steps"]
+	#expect(fields.map(\.0).allSatisfy(known.contains), "unknown vector fields \(fields.map(\.0))")
 	#expect(field("version") == .string("markless.native-conformance/0"))
 	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(try #require(field("payload"))))
 
 	let initial = JSONValue.array(try runtime.texts().map { .array([.string($0.node), .string($0.text)]) })
 	#expect(initial.jsonText == field("initial")?.jsonText)
+	let attributes = try runtime.attributes().map { JSONValue.array([.string($0.node), .string($0.name), $0.value.map(JSONValue.string) ?? .null]) }
+	#expect(attributes.isEmpty ? field("initialAttributes") == nil : JSONValue.array(attributes).jsonText == field("initialAttributes")?.jsonText)
+	let arms = try runtime.arms().map { JSONValue.array([.string($0.node), $0.index.map { .number(Double($0)) } ?? .null]) }
+	#expect(arms.isEmpty ? field("initialArms") == nil : JSONValue.array(arms).jsonText == field("initialArms")?.jsonText)
 
 	guard case let .array(steps)? = field("steps") else { Issue.record("steps is not an array"); return }
 	for step in steps {

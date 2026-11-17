@@ -26,25 +26,64 @@ public enum NativeScalar: Equatable, Sendable {
 	}
 }
 
+/// A value computed from cells as data: JavaScript truthiness for `not` and `if`, `===` for `equals`.
+public indirect enum NativeExpr: Equatable, Sendable {
+	case cell(String)
+	case literal(NativeScalar)
+	case not(NativeExpr)
+	case conditional(test: NativeExpr, whenTrue: NativeExpr, whenFalse: NativeExpr)
+	case equals(NativeExpr, NativeExpr)
+
+	var cells: [String] {
+		switch self {
+		case let .cell(cell): return [cell]
+		case .literal: return []
+		case let .not(inner): return inner.cells
+		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
+		case let .equals(a, b): return a.cells + b.cells
+		}
+	}
+}
+
 public enum NativeTextPart: Equatable, Sendable {
 	case text(String)
 	case cell(String)
+	case expr(NativeExpr)
+}
+
+/// Where a node sits when it belongs to one arm of an `@if`.
+public struct NativeArmPlace: Equatable, Hashable, Sendable {
+	public let branch: String
+	public let index: Int
+}
+
+public struct NativeBinding: Equatable, Sendable {
+	public let attribute: String
+	public let value: NativeExpr
 }
 
 public enum NativeNode: Equatable, Sendable {
-	case element(id: String, element: String, parent: String?, attributes: [String: String])
-	case text(id: String, parent: String, parts: [NativeTextPart])
+	case element(id: String, element: String, parent: String?, attributes: [String: String], bindings: [NativeBinding], arm: NativeArmPlace?)
+	case text(id: String, parent: String, parts: [NativeTextPart], arm: NativeArmPlace?)
+	case branch(id: String, parent: String?, test: NativeExpr, arms: Int, arm: NativeArmPlace?)
 
 	public var id: String {
 		switch self {
-		case let .element(id, _, _, _), let .text(id, _, _): return id
+		case let .element(id, _, _, _, _, _), let .text(id, _, _, _), let .branch(id, _, _, _, _): return id
 		}
 	}
 
 	public var parent: String? {
 		switch self {
-		case let .element(_, _, parent, _): return parent
-		case let .text(_, parent, _): return parent
+		case let .element(_, _, parent, _, _, _): return parent
+		case let .text(_, parent, _, _): return parent
+		case let .branch(_, parent, _, _, _): return parent
+		}
+	}
+
+	public var arm: NativeArmPlace? {
+		switch self {
+		case let .element(_, _, _, _, _, arm), let .text(_, _, _, arm), let .branch(_, _, _, _, arm): return arm
 		}
 	}
 }
@@ -109,24 +148,36 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let kind = try node.field("kind").string()
 			switch kind {
 			case "element":
-				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes"])
+				let field = try node.object(required: ["kind", "id", "element", "parent"], optional: ["attributes", "bindings", "arm"])
 				var attributes: [String: String] = [:]
 				if field.has("attributes") {
 					let reader = try field["attributes"]
 					for key in try reader.keys() { attributes[key] = try reader.field(key).string() }
 				}
+				let bindings: [NativeBinding] = field.has("bindings") ? try field["bindings"].array().map { binding -> NativeBinding in
+					let b = try binding.object(["attribute", "value"])
+					return NativeBinding(attribute: try b["attribute"].string(), value: try decodeExpr(try b["value"]))
+				} : []
 				return .element(
 					id: try field["id"].string(), element: try field["element"].string(),
-					parent: try field["parent"].optionalString(), attributes: attributes)
+					parent: try field["parent"].optionalString(), attributes: attributes, bindings: bindings, arm: try decodeArm(field))
 			case "text":
-				let field = try node.object(["kind", "id", "parent", "parts"])
+				let field = try node.object(required: ["kind", "id", "parent", "parts"], optional: ["arm"])
 				let parts = try field["parts"].array().map { part -> NativeTextPart in
 					let keys = try part.keys()
 					if keys == ["text"] { return .text(try part.field("text").string()) }
 					if keys == ["cell"] { return .cell(try part.field("cell").string()) }
+					if keys == ["expr"] { return .expr(try decodeExpr(try part.field("expr"))) }
 					throw PayloadError(path: part.path, reason: "unknown text part with keys \(keys)")
 				}
-				return .text(id: try field["id"].string(), parent: try field["parent"].string(), parts: parts)
+				return .text(id: try field["id"].string(), parent: try field["parent"].string(), parts: parts, arm: try decodeArm(field))
+			case "branch":
+				let field = try node.object(required: ["kind", "id", "parent", "test", "arms"], optional: ["arm"])
+				let arms = try field["arms"].number()
+				guard arms == 1 || arms == 2 else { throw PayloadError(path: node.path + ".arms", reason: "a branch has 1 or 2 arms") }
+				return .branch(
+					id: try field["id"].string(), parent: try field["parent"].optionalString(), test: try decodeExpr(try field["test"]),
+					arms: Int(arms), arm: try decodeArm(field))
 			default:
 				throw PayloadError(path: node.path + ".kind", reason: "unknown node kind \"\(kind)\"")
 			}
@@ -164,24 +215,70 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return payload
 	}
 
+	private static func decodeArm(_ fields: Fields) throws -> NativeArmPlace? {
+		guard fields.has("arm") else { return nil }
+		let arm = try fields["arm"].object(["branch", "index"])
+		let index = try arm["index"].number()
+		guard index == 0 || index == 1 else { throw PayloadError(path: try fields["arm"].path, reason: "arm index must be 0 or 1") }
+		return NativeArmPlace(branch: try arm["branch"].string(), index: Int(index))
+	}
+
+	private static func decodeExpr(_ reader: Reader) throws -> NativeExpr {
+		let keys = try reader.keys()
+		switch keys.sorted() {
+		case ["cell"]: return .cell(try reader.field("cell").string())
+		case ["literal"]: return .literal(try reader.field("literal").scalar())
+		case ["not"]: return .not(try decodeExpr(try reader.field("not")))
+		case ["if", "whenFalse", "whenTrue"]:
+			return .conditional(
+				test: try decodeExpr(try reader.field("if")), whenTrue: try decodeExpr(try reader.field("whenTrue")),
+				whenFalse: try decodeExpr(try reader.field("whenFalse")))
+		case ["equals"]:
+			let pair = try reader.field("equals").array()
+			guard pair.count == 2 else { throw PayloadError(path: reader.path + ".equals", reason: "equals takes two expressions") }
+			return .equals(try decodeExpr(pair[0]), try decodeExpr(pair[1]))
+		default: throw PayloadError(path: reader.path, reason: "unknown expression with keys \(keys)")
+		}
+	}
+
 	private func check() throws {
 		var cellIds = Set<String>()
 		for cell in cells where !cellIds.insert(cell.id).inserted {
 			throw PayloadError(path: "payload.cells", reason: "duplicate cell \(cell.id)")
 		}
 		var elements = Set<String>()
+		var branchArms: [String: Int] = [:]
 		var seen = Set<String>()
+		func checkCells(_ node: NativeNode, _ expressions: [NativeExpr]) throws {
+			for cell in expressions.flatMap(\.cells) where !cellIds.contains(cell) {
+				throw PayloadError(path: "payload.nodes", reason: "\(node.id) reads unknown cell \(cell)")
+			}
+		}
 		for node in nodes {
 			guard seen.insert(node.id).inserted else { throw PayloadError(path: "payload.nodes", reason: "duplicate node \(node.id)") }
 			if let parent = node.parent, !elements.contains(parent) {
 				throw PayloadError(path: "payload.nodes", reason: "\(node.id)'s parent \(parent) is not an earlier element")
 			}
-			switch node {
-			case .element: elements.insert(node.id)
-			case let .text(_, _, parts):
-				for case let .cell(cell) in parts where !cellIds.contains(cell) {
-					throw PayloadError(path: "payload.nodes", reason: "\(node.id) reads unknown cell \(cell)")
+			if let arm = node.arm {
+				guard let arms = branchArms[arm.branch], arm.index < arms else {
+					throw PayloadError(path: "payload.nodes", reason: "\(node.id) sits in arm \(arm.index) of \(arm.branch), which is not an earlier branch with that arm")
 				}
+			}
+			switch node {
+			case let .element(_, _, _, _, bindings, _):
+				elements.insert(node.id)
+				try checkCells(node, bindings.map(\.value))
+			case let .text(_, _, parts, _):
+				try checkCells(node, parts.map { part in
+					switch part {
+					case .text: return .literal(.bool(true))
+					case let .cell(cell): return .cell(cell)
+					case let .expr(expr): return expr
+					}
+				})
+			case let .branch(_, _, test, arms, _):
+				branchArms[node.id] = arms
+				try checkCells(node, [test])
 			}
 		}
 		var handlerIds = Set<String>()

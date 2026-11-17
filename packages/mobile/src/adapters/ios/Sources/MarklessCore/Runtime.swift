@@ -12,10 +12,18 @@ public struct NativeAction: Equatable, Sendable {
 /// One change the host applies to its retained views after a handler runs.
 public enum NativeJournalEntry: Equatable, Sendable {
 	case text(node: String, value: String)
+	/// nil removes the attribute; "" is a bare attribute.
+	case attribute(node: String, name: String, value: String?)
+	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
+	case arm(node: String, index: Int?)
 
 	public var json: JSONValue {
 		switch self {
 		case let .text(node, value): return .object([("op", .string("text")), ("node", .string(node)), ("value", .string(value))])
+		case let .attribute(node, name, value):
+			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
+		case let .arm(node, index):
+			return .object([("op", .string("arm")), ("node", .string(node)), ("index", index.map { .number(Double($0)) } ?? .null)])
 		}
 	}
 }
@@ -29,17 +37,17 @@ public struct RuntimeError: Error, CustomStringConvertible, Equatable {
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
 	private var values: [String: NativeScalar]
-	private let textNodes: [(id: String, parts: [NativeTextPart])]
 	private let handlers: [String: [NativeOp]]
+	private let branches: [String: (test: NativeExpr, arms: Int, arm: NativeArmPlace?)]
 
 	public init(payload: NativeViewPayload) {
 		self.payload = payload
 		values = Dictionary(uniqueKeysWithValues: payload.cells.map { ($0.id, $0.initial) })
-		textNodes = payload.nodes.compactMap { node in
-			if case let .text(id, _, parts) = node { return (id, parts) }
-			return nil
-		}
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
+		branches = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
+			if case let .branch(id, _, test, arms, arm) = node { return (id, (test, arms, arm)) }
+			return nil
+		})
 	}
 
 	private func read(_ cell: String) throws -> NativeScalar {
@@ -47,15 +55,59 @@ public final class NativeRuntime {
 		return value
 	}
 
-	/// Every text node's current string, in document order.
+	public func evaluate(_ expr: NativeExpr) throws -> NativeScalar {
+		switch expr {
+		case let .cell(cell): return try read(cell)
+		case let .literal(value): return value
+		case let .not(inner): return .bool(!(try evaluate(inner).isTruthy))
+		case let .conditional(test, whenTrue, whenFalse): return try evaluate(test).isTruthy ? evaluate(whenTrue) : evaluate(whenFalse)
+		case let .equals(a, b): return .bool(try evaluate(a) == evaluate(b))
+		}
+	}
+
+	/// The arm a branch shows now (nil: none).
+	public func arm(of branch: String) throws -> Int? {
+		guard let site = branches[branch] else { throw RuntimeError(reason: "unknown branch \(branch)") }
+		return try evaluate(site.test).isTruthy ? 0 : site.arms > 1 ? 1 : nil
+	}
+
+	public func isShown(_ place: NativeArmPlace?) throws -> Bool {
+		guard let place else { return true }
+		guard let site = branches[place.branch] else { return false }
+		return try isShown(site.arm) && arm(of: place.branch) == place.index
+	}
+
+	public func text(of parts: [NativeTextPart]) throws -> String {
+		try parts.map { part in
+			switch part {
+			case let .text(text): return text
+			case let .cell(cell): return try read(cell).text
+			case let .expr(expr): return try evaluate(expr).text
+			}
+		}.joined()
+	}
+
+	/// Every shown text node's current string, in document order.
 	public func texts() throws -> [(node: String, text: String)] {
-		try textNodes.map { node in
-			(node.id, try node.parts.map { part in
-				switch part {
-				case let .text(text): return text
-				case let .cell(cell): return try read(cell).text
-				}
-			}.joined())
+		try payload.nodes.compactMap { node in
+			guard case let .text(id, _, parts, arm) = node, try isShown(arm) else { return nil }
+			return (id, try text(of: parts))
+		}
+	}
+
+	/// Every shown element's bound attributes as written: nil absent, "" bare.
+	public func attributes() throws -> [(node: String, name: String, value: String?)] {
+		try payload.nodes.flatMap { node -> [(node: String, name: String, value: String?)] in
+			guard case let .element(id, _, _, _, bindings, arm) = node, try isShown(arm) else { return [] }
+			return try bindings.map { (id, $0.attribute, marklessAttributeValue($0.attribute, try evaluate($0.value))) }
+		}
+	}
+
+	/// Every shown branch's chosen arm.
+	public func arms() throws -> [(node: String, index: Int?)] {
+		try payload.nodes.compactMap { node in
+			guard case let .branch(id, _, _, _, arm) = node, try isShown(arm) else { return nil }
+			return (id, try self.arm(of: id))
 		}
 	}
 
@@ -64,7 +116,9 @@ public final class NativeRuntime {
 		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
-		let before = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
+		let beforeTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
+		let beforeAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
+		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		for op in handlers[bound.handler] ?? [] {
 			switch op {
 			case let .add(cell, amount):
@@ -79,6 +133,24 @@ public final class NativeRuntime {
 				values[cell] = .bool(!(try read(cell).isTruthy))
 			}
 		}
-		return try texts().compactMap { node, text in before[node] == text ? nil : .text(node: node, value: text) }
+		let afterTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
+		let afterAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
+		let afterArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
+		return payload.nodes.flatMap { node -> [NativeJournalEntry] in
+			switch node {
+			case let .text(id, _, _, _):
+				guard let before = beforeTexts[id], let after = afterTexts[id], before != after else { return [] }
+				return [.text(node: id, value: after)]
+			case let .branch(id, _, _, _, _):
+				guard let before = beforeArms[id], let after = afterArms[id], before != after else { return [] }
+				return [.arm(node: id, index: after)]
+			case let .element(id, _, _, _, bindings, _):
+				return bindings.compactMap { binding in
+					let key = "\(id)\u{0}\(binding.attribute)"
+					guard let before = beforeAttributes[key], let after = afterAttributes[key], before != after else { return nil }
+					return .attribute(node: id, name: binding.attribute, value: after)
+				}
+			}
+		}
 	}
 }
