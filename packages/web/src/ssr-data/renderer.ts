@@ -218,6 +218,8 @@ export type SsrDataStructure = {
 		readonly html: string;
 		/** The arm a branch or @try painted: a served @try arm's branch is wired to it, since its test reads nothing until the browser derives it. */
 		readonly arm?: number;
+		/** The id of the anchor this one renders directly inside. */
+		readonly outer?: string;
 	}>;
 	readonly elementCount: number;
 	/** Repeat slots walked by this render, including their id prefix. */
@@ -1101,6 +1103,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 		{ readonly comment: number; readonly element: number; readonly html: string; readonly arm?: number }
 	>();
 	const anchors: Array<SsrDataStructure['anchors'][number]> = [];
+	const open: string[] = [];
 	let commentIndex = 0;
 	for (const token of tokens) {
 		if (token.kind === 'element') {
@@ -1115,14 +1118,16 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 		}
 		// Arm-branch comments live in their owning boundary's local census.
 		// Page-level anchor indexes deliberately do not count them.
-		if (token.edge === 'start')
+		if (token.edge === 'start') {
 			starts.set(token.anchorId, {
 				comment: commentIndex,
 				element: elementCount,
 				html: token.anchorHtml ?? '',
 				arm: token.arm,
 			});
-		else {
+			open.push(token.anchorId);
+		} else {
+			open.pop();
 			const start = starts.get(token.anchorId);
 			if (!start)
 				throw new Error(`MARKLESS_SSR_DATA_ANCHOR_START_MISSING: ${token.anchorId}`);
@@ -1135,6 +1140,7 @@ function materializeStructure(tokens: ReadonlyArray<StructureToken>): SsrDataStr
 				elementEnd: elementCount,
 				html: start.html,
 				arm: start.arm,
+				outer: open.at(-1),
 			});
 		}
 		if (token.anchorKind !== 'arm-branch') commentIndex++;
