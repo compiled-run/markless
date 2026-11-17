@@ -299,6 +299,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_RESUME_RECORD_DIVERGENCE_UNSERIALIZABLE: 'An update holds a value that cannot be sent',
 	MARKLESS_ROSTER_COUNT_UNRESOLVED: 'A list count has no answer',
 	MARKLESS_ROUTER_DOCUMENT_HANDLERS_UNSUPPORTED: 'document.tsrx has an event handler',
+	MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED: 'document.tsrx reads shared()',
 	MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED: 'document.tsrx uses storage()',
 	MARKLESS_ROUTER_FRAGMENT_MINIFY_FAILED: 'A page fragment could not be minified',
 	MARKLESS_ROUTER_FRAGMENT_OFF_ORIGIN: 'A page fragment points to another site',

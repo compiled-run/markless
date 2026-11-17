@@ -484,6 +484,9 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 		compiled.payloadScripts.state,
 		compiled.moduleGraphInterface.asyncPlanes,
 	);
+	const hasLiveSharedState =
+		hasLiveSharedDefinitions(compiled.payloadScripts.state) ||
+		compiled.moduleGraphInterface.liveShared === true;
 	const rosterDerivation = compiled.moduleGraphInterface.render.components.some(
 		(component) => component.rosterDerivation === true,
 	);
@@ -704,6 +707,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 				linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
 				linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 				rosterDerivation,
+				hasLiveSharedState,
 				storageCells,
 				hasBoundSymbols: compiled.boundSymbolResolver.rows.length > 0,
 				boundSymbolDescriptors,
@@ -734,6 +738,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
 							})),
 							rosterDerivation,
+							hasLiveSharedState,
 							storageCells,
 							installResumeSummary: true,
 							recordsOnly: true,
@@ -906,7 +911,7 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					hasOverlayMarks: compiled.runtimeDemandMap.payloadRecords.some(
 						(record) => record.kind === 'overlay',
 					),
-					hasLiveSharedState: hasLiveSharedDefinitions(compiled.payloadScripts.state),
+					hasLiveSharedState,
 					hasIdleEvents: moduleHasIdleEvents(compiled.semanticGraph),
 					runtimeDemandMap: compiled.runtimeDemandMap,
 					resumeModuleUrl: input.resumeModuleUrl,
