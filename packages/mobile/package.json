@@ -17,8 +17,12 @@
 	"exports": {
 		".": "./src/index.ts"
 	},
+	"scripts": {
+		"proof": "node src/harness/cli.ts"
+	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
-		"@markless/serializer": "workspace:*"
+		"@markless/serializer": "workspace:*",
+		"yaml": "2.9.1"
 	}
 }

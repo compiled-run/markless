@@ -1,0 +1,6 @@
+{
+	"steps": [
+		{ "visible": ["Harness", "Tap 0"] },
+		{ "do": { "tap": "Tap 0" }, "visible": ["Harness", "Tap 1"], "absent": ["Tap 0"] }
+	]
+}

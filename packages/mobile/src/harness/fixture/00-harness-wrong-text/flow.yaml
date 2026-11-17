@@ -1,0 +1,8 @@
+appId: ${APP_ID}
+name: 00-harness-wrong-text
+---
+- launchApp:
+      clearState: true
+- assertVisible: Harness
+- tapOn: Tap 0
+- assertVisible: Tap 1
