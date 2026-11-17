@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 153,
+			"reason": "the compiler gained the liveShared module fact, which the playground compile worker downloaded at load bundles (1043908 -> 1044086 B gzip measured on a local build), and docs demo modules that render a child reading an app-scoped shared() now install the shared-instances loader, which is the fix",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 188,
+			"reason": "the compiler gained the liveShared module fact, which the playground compile worker downloaded at load bundles (1043908 -> 1044086 B gzip measured on a local build), and docs demo modules that render a child reading an app-scoped shared() now install the shared-instances loader, which is the fix",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": -2,
+			"reason": "the compiler gained the liveShared module fact, which the playground compile worker downloaded at load bundles (1043908 -> 1044086 B gzip measured on a local build), and docs demo modules that render a child reading an app-scoped shared() now install the shared-instances loader, which is the fix",
+			"date": "2026-11-17"
+		}
+	]
+}
