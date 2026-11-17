@@ -9,7 +9,9 @@ name: n4-deep-link
       when:
           platform: iOS
       commands:
-          - tapOn: Open
+          - tapOn:
+                text: Open
+                optional: true
 - assertVisible: Details for order 42
 - assertNotVisible: Your orders
 - assertNotVisible: Shop front
