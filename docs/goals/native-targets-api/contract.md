@@ -35,7 +35,8 @@ this file changes in the same push. Status as of 2026-11-16, night one.
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
   segment, URL-decoded; any other segment matches itself) to get the params, then mounts with them; no route means the
   page's pattern must have no params. A `navigate` entry re-mounts with the entry's params.
-- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`).
+- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`); `null` formats as
+  empty text, as on the web; child-component state arrives as ordinary cells with prefixed ids (nothing new to build).
 - **native-proof-harness:** forward the `route` launch argument to the shells; run `node packages/mobile/src/style-export.ts
   <rung>` when a rung has styles and `MARKLESS_DRAGON_DIR` is set (or keep refusing a missing export, as now).
 - **native-ladder:** rung 7b is written by the lead (`proofs/07b-imported-component/`, rung number 7.5, importing
@@ -137,7 +138,9 @@ export function Counter() @{
 - **Nodes** are in document order; a parent precedes its children. Element ids are the compiler's host ids (`h0`...), the same
   ids the web payload and Dragon use. A text node is one run of adjacent static text and bound values inside one element;
   its id is `<element>:text<n>` (n counts text runs in that element), which is also Dragon's text node id.
-- **Text parts:** `{ "text" }` is literal; `{ "cell" }` is the cell's current value formatted as JavaScript's `String(value)`
+- **Text parts:** `{ "text" }` is literal; `{ "cell" }` (and `{ "expr" }`) is the value formatted as the web writes text
+  (`marklessCsrText` in `@markless/web`): `null` is the empty string, anything else JavaScript's `String(value)`, so `false`
+  reads "false" exactly as on the web
   (so integer `1` is `"1"`, never `"1.0"`; hosts must implement this exactly; non-integer numbers are refused in v0).
 - **Events** are semantic. Authored `onClick` lowers to `activate`. Platform mapping (owned by each adapter): web `click`,
   iOS `UIControl.Event.touchUpInside`, Android `View.OnClickListener`.
@@ -209,6 +212,16 @@ export function Counter() @{
   already equals what was typed, so a host does not write back into the field under the cursor; another handler that
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
+
+### Several expressions in one text run, and state inside child components (pushed 2026-11-17)
+
+- The analyzer now records each text interpolation's expression on its markup slot (`nativeExpression`, native builds
+  only), so `{title} is {open ? 'open' : 'shut'}` in one element lowers to one text node with several parts, as the web
+  renders it, instead of being refused.
+- A component's own `state()` gets one set of cells per instance, ids prefixed by the call site
+  (`component-edge:0/state:open`); module-level state (a top-level `storage()`) stays one shared cell. Refused for now:
+  `storage()` declared inside a child component, and top-level state in an imported module.
+- Text formatting: `null` renders as empty text (the web's rule); vectors are unchanged.
 
 ### `@else if` chains and `@switch` (pushed 2026-11-17, after rung 10)
 

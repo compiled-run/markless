@@ -1507,7 +1507,13 @@ type SemanticMarkupLocatedSlot = {
 
 export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 	(
-		| { readonly kind: 'text'; readonly residue: SemanticMarkupResidue; readonly raw?: boolean }
+		| {
+				readonly kind: 'text';
+				readonly residue: SemanticMarkupResidue;
+				readonly raw?: boolean;
+				/** The interpolation as a tree, for native builds only (`nativeFacts`). */
+				readonly nativeExpression?: SemanticExpression;
+		  }
 		| {
 				readonly kind: 'attribute';
 				readonly name: string;
