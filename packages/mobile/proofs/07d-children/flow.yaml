@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: 07d-children
+---
+- launchApp:
+    clearState: true
+- assertVisible: Wrapped
+- assertVisible: Coffee
+- assertVisible: Cups 0
+- assertVisible: Pour
+- assertNotVisible: Cups 1
+- tapOn: Pour
+- assertVisible: Cups 1
+- assertNotVisible: Cups 0
+- assertVisible: Coffee
+- assertVisible: Cups 1
+- assertNotVisible: Cups 0
+- tapOn: Pour
+- assertNotVisible: Cups 1
+- assertVisible: Cups 2
+- assertNotVisible: Cups 1

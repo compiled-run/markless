@@ -13,7 +13,7 @@ import {
 
 test('the ladder has one proof folder per rung, in rung order', () => {
 	expect(rungFolders().map((folder) => readRung(folder).rung)).toEqual([
-		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 8, 9, 10, 11,
+		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);

@@ -81,7 +81,8 @@ type Item =
 			readonly row: string;
 			readonly path: ReadonlyArray<number>;
 	  }
-	| { readonly kind: 'child'; readonly edge: string; readonly template: string; readonly projection?: string; readonly path: ReadonlyArray<number> };
+	| { readonly kind: 'child'; readonly edge: string; readonly template: string; readonly projection?: string; readonly path: ReadonlyArray<number> }
+	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> };
 
 const isNativeValue = (value: unknown): value is NativeValue =>
 	value === null ||
@@ -97,6 +98,8 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 /** A prop as an instance sees it: a value lowered where it was passed, or a callback lowered where it is called. */
 type Prop =
 	| { readonly kind: 'value'; readonly expr: NativeExpr }
+	/** The markup a caller wrote between the component's tags, lowered where the component renders `{children}`. */
+	| { readonly kind: 'children'; readonly chunk: SemanticMarkupChunk; readonly scope: Scope }
 	| {
 			readonly kind: 'callback';
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
@@ -491,6 +494,10 @@ export function createNativeViewPayload(
 				refuse(`a ${slot.kind} binding`);
 				continue;
 			}
+			if (slot.raw) {
+				items.push({ kind: 'children', path: slot.coordinate.path });
+				continue;
+			}
 			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
 				const expr = exprOf(slot.nativeExpression, 'a text expression', scope);
 				if (expr) items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
@@ -603,6 +610,17 @@ export function createNativeViewPayload(
 				}
 				continue;
 			}
+			if (item.kind === 'children') {
+				close();
+				const children = scope.props.get('children');
+				if (children?.kind !== 'children') continue;
+				if (parent === null) {
+					refuse('`{children}` at the top of a component');
+					continue;
+				}
+				lowerChunk(children.chunk, parent, place, children.scope);
+				continue;
+			}
 			if (item.kind === 'child') {
 				close();
 				const edge = scope.module.edgesById.get(item.edge);
@@ -653,11 +671,14 @@ export function createNativeViewPayload(
 					refuse(`<${edge.childComponentName}>, a component from another module`);
 					continue;
 				}
-				if (item.projection) {
-					refuse(`children passed to <${edge.childComponentName}>`);
+				const projected = item.projection ? scope.module.chunks.get(item.projection) : undefined;
+				if (item.projection && !projected) {
+					refuse(`children passed to <${edge.childComponentName}> that have no markup`);
 					continue;
 				}
-				const props = new Map<string, Prop>();
+				const props = new Map<string, Prop>(
+					projected ? [['children', { kind: 'children', chunk: projected, scope }]] : [],
+				);
 				for (const prop of edge.props) {
 					if (prop.kind === 'callback') {
 						props.set(prop.name, { kind: 'callback', statements: prop.nativeStatements, scope });

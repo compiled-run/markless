@@ -242,14 +242,44 @@ export function Logger() @{
 	});
 
 	it('refuses constructs with no native lowering yet', async () => {
-		const { payload, diagnostics } = await nativeView(`function Card({ children }) @{
-	<section>{children}</section>
-}
-export function Page() @{
-	<div><Card><p>Inside</p></Card></div>
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Field() @{
+	let text = state('');
+	<input value={text} onKeyDown={() => (text = '')} />
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain('children passed to <Card>');
+		expect(diagnostics.map((d) => d.message)).toContain('the keydown event has no native meaning yet');
+	});
+
+	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function Card({ title, children }) @{
+	<section>
+		<h2>{title}</h2>
+		{children}
+	</section>
+}
+export function Page() @{
+	let count = state(0);
+	<main>
+		<Card title="Totals">
+			<p>Count {count}</p>
+			<button onClick={() => count++}>Add</button>
+		</Card>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes.map((node) => [node.id, node.parent])).toEqual([
+			['h2', null],
+			['component-edge:0/h0', 'h2'],
+			['component-edge:0/h1', 'component-edge:0/h0'],
+			['component-edge:0/h1:text0', 'component-edge:0/h1'],
+			['h3', 'component-edge:0/h0'],
+			['h3:text0', 'h3'],
+			['h4', 'component-edge:0/h0'],
+			['h4:text0', 'h4'],
+		]);
+		expect(payload?.events).toEqual([{ host: 'h4', event: 'activate', handler: 'handler:event:0' }]);
 	});
 
 	it('inlines each component instance with its props, and resolves a called callback to the writes of its caller', async () => {

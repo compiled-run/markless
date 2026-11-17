@@ -211,6 +211,12 @@ export function Counter() @{
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
 
+### Children passed into a component (pushed 2026-11-17)
+
+- The markup a caller writes between a component's tags lowers where the component renders `{children}`: as children of
+  the element around `{children}`, in the caller's scope (its state, handlers and ids, unprefixed). A component that
+  renders no `{children}` drops them, as on the web. Hosts see the same flat node list; nothing new to build. Rung 7d.
+
 ### Several expressions in one text run, and state inside child components (pushed 2026-11-17)
 
 - The analyzer now records each text interpolation's expression on its markup slot (`nativeExpression`, native builds
@@ -459,6 +465,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
 | 7b | A component imported from another file | passing | passing | **passing** | **passing** | `proofs/07b-imported-component/` imports `proofs/lib/Stepper.tsrx`; harness verdict passed on both |
 | 7c | State inside a reused component, one per instance (with joined text) | passing | passing | **passing** | **passing** | `proofs/07c-child-state/` uses `proofs/lib/Panel.tsrx` twice; harness verdict passed on both |
+| 7d | Children passed into a component | passing | passing | **passing** | **passing** | `proofs/07d-children/` wraps caller markup in `proofs/lib/Card.tsrx`; harness verdict passed on both |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
