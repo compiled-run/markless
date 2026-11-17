@@ -111,17 +111,58 @@ test('the fact follows an aliased, a default and a namespace import of the idle 
 	expect(await pageWith(`import { Plain as Ticker } from './child.tsrx';`, '<Ticker />')).toBeUndefined();
 });
 
-// Open: a component handed over as a prop value renders through no edge, so its idle record is not seen.
-test.fails('the fact follows a component passed as a prop value', async () => {
-	const frame = await compile(
-		'/w/src/frame.tsrx',
-		`export function Frame({ Body }) @{\n\t<section><Body /></section>\n}\n`,
-	);
+const framed = async (frameSource: string, pageSource: string) => {
+	const frame = await compile('/w/src/frame.tsrx', frameSource);
 	const child = await compile('/w/src/child.tsrx', tickerModule);
+	const page = await compile('/w/src/page.tsrx', pageSource, {
+		'./frame.tsrx': frame.moduleGraphInterface,
+		'./child.tsrx': child.moduleGraphInterface,
+	});
+	return page.moduleGraphInterface.idleRecords;
+};
+
+test('the fact follows a component passed as a prop value', async () => {
+	expect(
+		await framed(
+			`export function Frame({ Body }) @{\n\t<section><Body /></section>\n}\n`,
+			`import { Frame } from './frame.tsrx';\nimport { Ticker } from './child.tsrx';\n\nexport default function Page() @{\n\t<main><Frame Body={Ticker} /></main>\n}\n`,
+		),
+	).toBe(true);
+});
+
+test('the fact follows a renamed prop, an aliased import and a frame that hands the prop on', async () => {
+	expect(
+		await framed(
+			`function Inner({ view: View }) @{\n\t<div><View /></div>\n}\n\nexport function Frame({ slot }) @{\n\t<section>@if (slot) {<Inner view={slot} />}</section>\n}\n`,
+			`import { Frame } from './frame.tsrx';\nimport { Ticker as Clock } from './child.tsrx';\n\nexport default function Page() @{\n\t<main><Frame slot={Clock} /></main>\n}\n`,
+		),
+	).toBe(true);
+});
+
+test('the fact follows a same-module component passed to a same-module frame', async () => {
 	const page = await compile(
 		'/w/src/page.tsrx',
-		`import { Frame } from './frame.tsrx';\nimport { Ticker } from './child.tsrx';\n\nexport default function Page() @{\n\t<main><Frame Body={Ticker} /></main>\n}\n`,
-		{ './frame.tsrx': frame.moduleGraphInterface, './child.tsrx': child.moduleGraphInterface },
+		`function Pulse() @{\n\t<i onIdle={() => {}}>pulse</i>\n}\n\nfunction Card({ Face }) @{\n\t<article><Face /></article>\n}\n\nexport default function Page() @{\n\t<main><Card Face={Pulse} /></main>\n}\n\nexport function Bare() @{\n\t<main><Card /></main>\n}\n`,
 	);
-	expect(page.moduleGraphInterface.idleRecords).toBe(true);
+	const idle = (name: string) =>
+		page.moduleGraphInterface.render.components.find((component) => component.componentName === name)
+			?.idleRecords;
+	expect([idle('Page'), idle('Card'), idle('Bare')]).toEqual([true, undefined, undefined]);
+});
+
+test('no fact when the frame never renders the prop, or a local shadows it, or the value has no idle record', async () => {
+	const page = (prop: string) =>
+		`import { Frame } from './frame.tsrx';\nimport { Ticker, Plain } from './child.tsrx';\n\nexport default function Page() @{\n\t<main><Frame Body={${prop}} /></main>\n}\n`;
+	expect(
+		await framed(`export function Frame({ Body }) @{\n\t<section>{String(!!Body)}</section>\n}\n`, page('Ticker')),
+	).toBeUndefined();
+	expect(
+		await framed(
+			`import { Plain } from './child.tsrx';\n\nexport function Frame({ Body }) @{\n\t<section>@for (const Body of [Plain]; key Body) {<Body />}</section>\n}\n`,
+			page('Ticker'),
+		),
+	).toBeUndefined();
+	expect(
+		await framed(`export function Frame({ Body }) @{\n\t<section><Body /></section>\n}\n`, page('Plain')),
+	).toBeUndefined();
 });

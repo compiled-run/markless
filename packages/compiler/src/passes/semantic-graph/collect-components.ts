@@ -11,6 +11,7 @@ import {
 	getComponentFunction,
 	getElementAttributes,
 	getElementTagName,
+	getElementTagNode,
 	isHostTagName,
 	isIgnorableJsxTextNode,
 	isMemberTagName,
@@ -28,6 +29,7 @@ import { collectObjectPatternAliases } from './collect-aliases.ts';
 import { constantPropValue } from './constant-props.ts';
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { rowItemRead } from './row-item-read.ts';
+import { propValueComponent, renderedPropPath } from './prop-components.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import {
 	type GraphReadScope,
@@ -179,6 +181,9 @@ export function collectComponentEdge(
 	});
 	const edgeId = `component-edge:${state.nextComponentEdgeId++}`;
 	if (state.currentHostNodeId) state.edgeHosts.set(edgeId, state.currentHostNodeId);
+	const renderedProp = importSource.importSource
+		? undefined
+		: renderedPropPath(getElementTagNode(node), state);
 	state.graph.componentEdges.push({
 		id: edgeId,
 		parentComponentName: state.currentComponentName,
@@ -195,6 +200,7 @@ export function collectComponentEdge(
 		branchSiteIds: [...state.currentBranchSiteIds],
 		...(state.currentBranchArms.length > 0 ? { branchArms: [...state.currentBranchArms] } : {}),
 		keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
+		...(renderedProp ? { renderedProp } : {}),
 	});
 
 	for (const attribute of getElementAttributes(node)) {
@@ -557,6 +563,7 @@ function componentPropBindings(
 			continue;
 		}
 		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
+		const component = propValueComponent(expression, state);
 		const fixedValue =
 			!rowRead &&
 			!constant?.value.ok &&
@@ -573,6 +580,7 @@ function componentPropBindings(
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
 				: {}),
+			...(component ? { component } : {}),
 		});
 	}
 
