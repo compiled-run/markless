@@ -78,10 +78,9 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 							loadSymbol: input.loadSymbol,
 							elementHandles: input.elementHandles,
 						};
-						await (
-							batches && computed.deriveOnRead
-								? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
-								: module.refreshSyncComputed(refresh)
+						await (batches && computed.deriveOnRead
+							? module.refreshWhenShown(refresh, onReadBatches.get(graph)!)
+							: module.refreshSyncComputed(refresh)
 						).finally(done);
 					},
 				}),
@@ -91,12 +90,7 @@ export function wireSyncComputedDemandRecordsWithoutLoadingCapability(input: {
 	// An async value's key may read a sync computed nothing derived yet: the async plane derives it now.
 	return (
 		asyncPlanes.deriveAsyncKeys?.(
-			{
-				graph,
-				root: input.root,
-				loadSymbol: input.loadSymbol,
-				elementHandles: input.elementHandles,
-			},
+			{ graph, root: input.root, loadSymbol: input.loadSymbol, elementHandles: input.elementHandles },
 			records as never,
 			all,
 		) ?? Promise.resolve()

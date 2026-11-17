@@ -3,7 +3,11 @@ import { ASYNC_PROTOCOL_VERSION, STORAGE_PROTOCOL_VERSION } from '@markless/seri
 import { marklessWriteScalar } from '../../web/src/fns/write-scalar.ts';
 import { marklessUpdateText } from '../../web/src/fns/update-text.ts';
 import { marklessWhenLoaded } from '../../web/src/fns/resident-load.ts';
-import { marklessDevResident } from '../../web/src/fns/dev-resident.ts';
+import {
+	marklessDevLoad,
+	marklessDevWarm,
+	marklessDevWarmed,
+} from '../../web/src/fns/dev-resident.ts';
 import {
 	marklessDecodeScalarCell,
 	marklessReadScalarCell,
@@ -499,26 +503,43 @@ test('specialized scalar dispatch preserves a suffix on first and repeated write
 	}
 });
 
-test('on the dev server a symbol the resume module names is already loaded, as packed code is in a build', () => {
+test('on the dev server a first handler load brings the code its writes reach, and nothing loads before it', async () => {
 	const onClick = () => undefined;
-	const loadSymbolOf = (devServer: boolean) => {
-		const source = emitResumeModule({ ...baseInput, devServer })
-			.replace(/^import .*;$/gm, '')
-			.replace(/export /g, '')
-			.replace(/\bimport\(/g, 'loadModule(')
-			.replace(/\bimport\.meta\b/g, '({ env: {} })');
-		return new Function(
-			'loadModule',
-			'marklessDevResident',
-			'marklessResidentModule0',
-			'readMarklessSourceSymbolWhenLoaded',
-			`${source}\nreturn loadSymbol;`,
-		)(async () => ({ onClick }), marklessDevResident, { onClick }, marklessWhenLoaded) as (
-			symbolId: string,
-		) => unknown;
-	};
-	expect(loadSymbolOf(true)('symbol:click')).toBe(onClick);
-	expect(loadSymbolOf(false)('symbol:click')).toBeInstanceOf(Promise);
+	const update = () => undefined;
+	const loaded: string[] = [];
+	const source = emitResumeModule({
+		...baseInput,
+		devServer: true,
+		symbols: [
+			{ id: 'symbol:click', chunk: './click.js', exportName: 'onClick', eventHandler: true },
+			{ id: 'symbol:update', chunk: './update.js', exportName: 'update' },
+		],
+	})
+		.replace(/^import .*;$/gm, '')
+		.replace(/export /g, '')
+		.replace(/\bimport\(/g, 'loadModule(')
+		.replace(/\bimport\.meta\b/g, '({ env: {} })');
+	const loadSymbol = new Function(
+		'loadModule',
+		'marklessDevLoad',
+		'marklessDevWarm',
+		'marklessDevWarmed',
+		'readMarklessSourceSymbolWhenLoaded',
+		`${source}\nreturn loadSymbol;`,
+	)(
+		async (specifier: string) => {
+			loaded.push(specifier);
+			return specifier === './click.js' ? { onClick } : { update };
+		},
+		marklessDevLoad,
+		marklessDevWarm,
+		marklessDevWarmed,
+		marklessWhenLoaded,
+	) as (symbolId: string) => unknown;
+	expect(loaded).toEqual([]);
+	expect(await loadSymbol('symbol:click')).toBe(onClick);
+	expect(loaded).toEqual(['./update.js', './click.js']);
+	expect(loadSymbol('symbol:update')).toBe(update);
 });
 
 test('scalar dispatch and staged wake share one neutral DOM-order helper import', () => {

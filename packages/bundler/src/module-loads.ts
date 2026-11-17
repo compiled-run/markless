@@ -1,30 +1,40 @@
 /** Writes the expression that loads a module emitted code names. */
 export type ModuleLoad = (specifier: string) => string;
 
-export type ModuleLoads = { readonly load?: ModuleLoad; imports(): string | null };
+export type ModuleLoads = {
+	readonly load?: ModuleLoad;
+	/** Loads an event handler, the first code an interaction runs. */
+	readonly handler?: ModuleLoad;
+	imports(): string | null;
+};
 
 export const DEV_RESIDENT_MODULE = '@markless/web/fns/dev-resident';
 
 const nativeLoads: ModuleLoads = { imports: () => null };
 
-// The dev server imports what a build would pack, so a first write finds its code loaded, as packed code is in a build.
+const importCall = (specifier: string) => `import(${JSON.stringify(specifier)})`;
+
+// A dev `import()` fetches on first use, a task after the write that reached it; a build has packed code on the page.
 function residentModuleLoads(helper: string): ModuleLoads {
-	const aliases = new Map<string, string>();
+	const named = new Set<string>();
+	let handlers = false;
 	return {
 		load(specifier) {
-			let alias = aliases.get(specifier);
-			if (!alias) aliases.set(specifier, (alias = `marklessResidentModule${aliases.size}`));
-			return `marklessDevResident(${alias})`;
+			named.add(specifier);
+			return `marklessDevLoad(import.meta.url, ${JSON.stringify(specifier)}, () => ${importCall(specifier)})`;
+		},
+		handler(specifier) {
+			handlers = true;
+			return `marklessDevWarmed().then(() => ${importCall(specifier)})`;
 		},
 		imports: () =>
-			aliases.size === 0
+			named.size === 0 && !handlers
 				? null
 				: [
-						`import { marklessDevResident } from ${JSON.stringify(helper)};`,
-						...[...aliases].map(
-							([specifier, alias]) =>
-								`import * as ${alias} from ${JSON.stringify(specifier)};`,
-						),
+						`import { marklessDevLoad, marklessDevWarm, marklessDevWarmed } from ${JSON.stringify(helper)};`,
+						named.size > 0
+							? `marklessDevWarm(import.meta.url, [${[...named].map((specifier) => `[${JSON.stringify(specifier)}, () => ${importCall(specifier)}]`).join(', ')}]);`
+							: '',
 					].join('\n'),
 	};
 }

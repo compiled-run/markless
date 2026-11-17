@@ -57,14 +57,11 @@ type DispatchSymbolContext = Omit<ResumeSymbolContext, 'graph'> & {
 
 // Asked for once a submission is still running and never awaited on the way to a handler; a page whose forms need it preloads it.
 let submitHold: Promise<typeof import('./submit-hold.ts') | undefined> | undefined;
-const loadSubmitHold = () =>
-	(submitHold ??= import('./submit-hold.ts').catch(() => (submitHold = undefined)));
+const loadSubmitHold = () => (submitHold ??= import('./submit-hold.ts').catch(() => (submitHold = undefined)));
 // What a form sent in place carried when the runtime heard its press; a handler's form is read when the handler runs.
 const pressRecords = new WeakMap<object, string>();
 const submittedForm = (event: ResumeDomEvent) =>
-	event.type === 'submit' && event.target?.tagName === 'FORM'
-		? (event.target as unknown as HTMLFormElement)
-		: undefined;
+	event.type === 'submit' && event.target?.tagName === 'FORM' ? (event.target as unknown as HTMLFormElement) : undefined;
 
 export type ResumeRowEventMatch = {
 	readonly repeat: ResumeKeyedRepeatRecord;
@@ -526,10 +523,7 @@ export function createEventWiring(input: {
 		runPolicy = (await import('./inline/sync-policy-core-lazy.ts'))
 			.runSyncPolicyActions as never;
 	}
-	function dispatch(
-		event: ResumeDomEvent,
-		dispatchOptions?: ResumeDispatchOptions,
-	): Promise<void> {
+	function dispatch(event: ResumeDomEvent, dispatchOptions?: ResumeDispatchOptions): Promise<void> {
 		// Another dispatch's flush may land while this one's handler still loads.
 		const releaseArrivingEdits = marklessNoteArrivingControlEdits(event);
 		const pressed = submittedForm(event);
@@ -549,9 +543,7 @@ export function createEventWiring(input: {
 		const moved = keyTargetAfterHandlerFocus(event, input.root);
 		if (moved) Object.defineProperty(event, 'target', { value: moved });
 		const target = event.target;
-		const options: {
-			-readonly [Key in keyof ResumeDispatchOptions]: ResumeDispatchOptions[Key];
-		} = {
+		const options: { -readonly [Key in keyof ResumeDispatchOptions]: ResumeDispatchOptions[Key] } = {
 			...dispatchOptions,
 			// A key the browser would have sent to an element with no handler does nothing there.
 			...(moved ? { ignoreUnmatched: true } : {}),
@@ -575,25 +567,17 @@ export function createEventWiring(input: {
 		const pressAnchor =
 			attached || rowAnchor
 				? undefined
-				: pressPath.find(
-						(element) => element.nodeType === 1 && containsElement(input.root, element),
-					);
+				: pressPath.find((element) => element.nodeType === 1 && containsElement(input.root, element));
 		// The host itself went with the redraw: nothing on the page is left to run.
 		if (!attached && !rowAnchor && pressPath[0] && !pressAnchor) return;
 		const bubbles = event.bubbles !== false;
 		const collect = () =>
-			collectDispatchPath(
-				pressAnchor ?? target,
-				event.type,
-				eventRecords,
-				rowEventRecords,
-				bubbles,
-			);
+			collectDispatchPath(pressAnchor ?? target, event.type, eventRecords, rowEventRecords, bubbles);
 		let path = collect();
 		// Arm content lands before it is wired: a press inside it waits for the whole registration, and one that failed runs nothing.
 		const registeringAt = () =>
-			[...((input.root as ArmRegisteringRoot).__marklessArmRegistering ?? [])].filter(
-				(entry) => entry.holds(pressAnchor ?? target),
+			[...((input.root as ArmRegisteringRoot).__marklessArmRegistering ?? [])].filter((entry) =>
+				entry.holds(pressAnchor ?? target),
 			);
 		for (let waits = registeringAt(); waits.length; waits = registeringAt()) {
 			queueRelease?.();
@@ -835,8 +819,7 @@ export function createEventWiring(input: {
 					);
 					// The hold covers the callee's synchronous run; its writes after an await land when they happen.
 					releaseFlush?.();
-					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function')
-						return result;
+					if (typeof (result as PromiseLike<unknown> | undefined)?.then !== 'function') return result;
 					if (form && !held && !hold) {
 						// The marks paint with the pass that paints the handler's writes before its first await, held as they are.
 						const painted = graph.pendingFlush?.();
@@ -919,18 +902,12 @@ export function createEventWiring(input: {
 						// The submission is this dispatch's own save, so its reload is the one the form's hold waits for.
 						(module) =>
 							runAsDispatchOwn(userActionToken, () =>
-								module.sendInPlace(
-									event as unknown as SubmitEvent,
-									kept,
-									record,
-									pressRecords.get(event) ?? submitRecord(form!),
-									(end) => {
-										hold = Promise.resolve(end);
-										// Waiting on the answer is this dispatch's own await, so the next gesture starts now.
-										options.releaseQueue?.();
-										marklessEventHandled(input.root, event);
-									},
-								),
+								module.sendInPlace(event as unknown as SubmitEvent, kept, record, pressRecords.get(event) ?? submitRecord(form!), (end) => {
+									hold = Promise.resolve(end);
+									// Waiting on the answer is this dispatch's own await, so the next gesture starts now.
+									options.releaseQueue?.();
+									marklessEventHandled(input.root, event);
+								}),
 							),
 						// A sender that cannot load leaves the submit to the browser, which would have sent it.
 						() => kept.native(),
@@ -949,8 +926,7 @@ export function createEventWiring(input: {
 				dispatchSpans().delete(userActionToken);
 				userActionToken.closed?.();
 				// A submission stays held until the reload its save caused has landed.
-				if (hold)
-					void Promise.all([hold, userActionToken.refreshed]).then(([end]) => end?.());
+				if (hold) void Promise.all([hold, userActionToken.refreshed]).then(([end]) => end?.());
 			}
 			marklessEndFocusCommit(focusCommit);
 			await marklessLogInteraction({
@@ -966,8 +942,7 @@ export function createEventWiring(input: {
 	// The browser reads defaultPrevented when the DOM dispatch returns; a forwarded dispatch runs after an await.
 	const applyPolicies = (path: ReturnType<typeof collectDispatchPath>, event: ResumeDomEvent) => {
 		for (const matched of path) {
-			const policy = ('rowMatch' in matched ? matched.rowMatch.rowEvent : matched.eventRecord)
-				.syncPolicy;
+			const policy = ('rowMatch' in matched ? matched.rowMatch.rowEvent : matched.eventRecord).syncPolicy;
 			if (!policy) continue;
 			// Only a policy that runs reads the edit; an input event with none keeps its text held until its handler does.
 			marklessControlEditsRead(event);
@@ -977,13 +952,7 @@ export function createEventWiring(input: {
 	const applySyncPolicy = (event: ResumeDomEvent): void => {
 		if (event.target)
 			applyPolicies(
-				collectDispatchPath(
-					event.target,
-					event.type,
-					eventRecords,
-					rowEventRecords,
-					event.bubbles !== false,
-				),
+				collectDispatchPath(event.target, event.type, eventRecords, rowEventRecords, event.bubbles !== false),
 				event,
 			);
 	};
@@ -1070,9 +1039,7 @@ async function marklessLogInteraction(input: {
 	}
 }
 
-type ArmRegisteringRoot = {
-	readonly __marklessArmRegistering?: ReadonlySet<ResumeArmRegistration>;
-};
+type ArmRegisteringRoot = { readonly __marklessArmRegistering?: ReadonlySet<ResumeArmRegistration> };
 
 type ResumeDispatchMatch =
 	| { readonly element: ResumeDomElement; readonly rowMatch: ResumeRowEventMatch }
@@ -1195,3 +1162,4 @@ function unmatchedDispatchError(event: ResumeDomEvent, selector: string | undefi
 		},
 	);
 }
+

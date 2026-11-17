@@ -2336,7 +2336,7 @@ function emitLoadSymbol(
 	loads: ModuleLoads,
 	sourceReaderName?: string,
 ) {
-	// On the dev server every symbol is imported with this module, so none goes through the resolver.
+	// On the dev server each symbol is named for the first interaction's load, so none goes through the resolver.
 	if (
 		input.symbols.length > 0 &&
 		(input.symbols.length <= SMALL_SYMBOL_DIRECT_LOAD_LIMIT || loads.load !== undefined)
@@ -2345,10 +2345,11 @@ function emitLoadSymbol(
 			input.symbols,
 			loads.load ?? importLoad,
 			sourceReaderName,
+			loads.handler,
 		);
 		if (!input.hasBoundSymbols) return direct;
 		return [
-			`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
+			`const marklessSymbolResolverModule = () => ${(loads.handler ?? importLoad)(input.resolverId)};`,
 			direct.replace(
 				'\treturn Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 				'\treturn marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
@@ -2368,12 +2369,12 @@ function emitDirectSourceSymbolLoader(
 	symbols: ReadonlyArray<SourceSymbolRow>,
 	load: ModuleLoad,
 	readerName = 'readMarklessSourceSymbol',
+	handler: ModuleLoad = importLoad,
 ): string {
 	return [
 		'function loadSymbol(symbolId) {',
 		...symbols.flatMap((symbol) => [
-			// The dispatch loads a handler before it runs it; only what its writes reach has to be loaded already.
-			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${(symbol.eventHandler ? importLoad : load)(symbol.chunk)}, ${JSON.stringify(symbol.exportName)});`,
+			`	if (symbolId === ${JSON.stringify(symbol.id)}) return ${readerName}(${(symbol.eventHandler ? handler : load)(symbol.chunk)}, ${JSON.stringify(symbol.exportName)});`,
 		]),
 		'	return Promise.reject(new Error(`Unknown async symbol ${symbolId}`));',
 		'}',
