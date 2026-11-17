@@ -1799,9 +1799,9 @@ export const errorIndex: ErrorIndex = {
 					code: 'MARKLESS_SYMBOL_UNKNOWN',
 					title: 'A piece of code is unknown',
 					chip: 'error',
-					kind: 'build error',
+					kind: 'runtime error',
 					guided: false,
-					words: 'a piece of code is unknown markless_symbol_unknown a markless build tooling error from @markless/compiler.',
+					words: 'a piece of code is unknown markless_symbol_unknown a markless runtime error from @markless/web.',
 				},
 				{
 					code: 'MARKLESS_SSR_DATA_CHUNK_MISSING',

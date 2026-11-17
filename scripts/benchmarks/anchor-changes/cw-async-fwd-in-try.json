@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 673,
+			"reason": "the docs site's in-browser compiler gains forwarded-callback routing so a row callback forwarded through a middle component runs from inside the row child's own @try; app pages (bench) +0 B",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 670,
+			"reason": "the docs site's in-browser compiler gains forwarded-callback routing so a row callback forwarded through a middle component runs from inside the row child's own @try; app pages (bench) +0 B",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 354,
+			"reason": "the docs site's in-browser compiler gains forwarded-callback routing so a row callback forwarded through a middle component runs from inside the row child's own @try; app pages (bench) +0 B",
+			"date": "2026-11-17"
+		}
+	]
+}
