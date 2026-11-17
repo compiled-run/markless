@@ -98,7 +98,10 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
 	defaults.removePersistentDomain(forName: "markless-ios-host-tests")
 	let store = UserDefaultsStore(defaults)
-	for value: NativeValue in [.string("1"), .number(1), .bool(true), .number(-2.5), .string("")] {
+	for value: NativeValue in [
+		.string("1"), .number(1), .bool(true), .number(-2.5), .string(""),
+		.array([.null, .number(1), .object([(key: "b", value: .string("x")), (key: "a", value: .bool(false))])]),
+	] {
 		store.write("k", value)
 		#expect(store.read("k") == value)
 	}
@@ -122,6 +125,24 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
 	#expect(field.text == "Bo")
 	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
+@MainActor @Test func rowsAreBuiltRemovedAndMovedNotRebuilt() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("list"), store: MemoryStore())
+	let views = try tree(controller)
+	let list = try #require(views.elements["h5"])
+	let rows = { list.subviews.filter { !$0.isHidden }.compactMap(\.accessibilityIdentifier) }
+	#expect(rows() == ["h6@apple", "h6@pear"])
+	let pear = try #require(views.labels["h6:text0@pear"])
+	controller.perform(NativeAction(event: .activate, host: "h2"))
+	#expect(rows() == ["h6@apple", "h6@pear", "h6@plum"])
+	#expect(views.labels["h6:text0@plum"]?.text == "Plum")
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(rows() == ["h6@pear", "h6@plum"])
+	#expect(views.labels["h6:text0@apple"] == nil)
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(rows() == ["h6@plum", "h6@pear"])
+	#expect(views.labels["h6:text0@pear"] === pear)
 }
 
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {

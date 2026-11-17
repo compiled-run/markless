@@ -48,3 +48,8 @@ Each item: the change I need in the contract, and the reading the iOS host uses 
     contract says which, and what a kept `null` means.
 13. **Variants dropped.** The iOS host removed the `variants` reading after the contract replaced it with export `/1`; the
     `/0` reader rejects a `variants` field again.
+14. **Lone surrogates.** JavaScript strings can hold half of a surrogate pair (`'😀ab'.slice(1)`); Swift `String` cannot,
+    so the iOS host replaces it with U+FFFD. Change needed: the contract names this as a known difference, or the compiler
+    keeps UTF-16 slicing of user text away from pair boundaries. The generated expression cases avoid it.
+15. **Containers in storage.** Arrays and objects in a storage cell are kept in `UserDefaults` as JSON-text `Data`
+    (property lists cannot hold null inside an array); strings, numbers and booleans as themselves.

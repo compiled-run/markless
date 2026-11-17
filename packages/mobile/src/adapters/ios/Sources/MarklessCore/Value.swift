@@ -45,7 +45,10 @@ public enum NativeValue: Equatable, Sendable {
 		}
 	}
 
-	init(json: JSONValue) {
+	/// `JSON.stringify(value)`.
+	public var jsonText: String { json.jsonText }
+
+	public init(json: JSONValue) {
 		switch json {
 		case .null: self = .null
 		case let .bool(flag): self = .bool(flag)
