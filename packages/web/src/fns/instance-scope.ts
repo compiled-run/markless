@@ -1277,6 +1277,7 @@ function composedBoundaryArmRecords(
 						...qualifyRead(read),
 						...(read.runnerSymbolId && { runnerSymbolId: symbol(read.runnerSymbolId) }),
 					})),
+					...(nested.rerenderReads && { rerenderReads: nested.rerenderReads.map(qualifyRead) }),
 					...(nested.asyncSources && {
 						asyncSources: Object.fromEntries(
 							Object.entries(nested.asyncSources).map(([read, sources]) => [

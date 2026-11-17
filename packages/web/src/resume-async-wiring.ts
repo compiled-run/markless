@@ -237,6 +237,23 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 			});
 			releases.push(subscribed);
 		}
+		for (const read of boundary.rerenderReads ?? [])
+			releases.push(
+				input.graph.subscribe({
+					id: `async-boundary-rerender:${boundary.id}:${read.graphNodeId}:${read.path.join('.')}`,
+					graphNodeId: read.graphNodeId,
+					path: read.path,
+					run() {
+						if (detached(input.root, boundary.startAnchor) || !showsTry(boundary)) return;
+						const first = boundary.asyncReads[0];
+						const snapshot = first
+							? boundaryGateSnapshot(input.graph, boundary, first.graphNodeId, input.graph.read(first.graphNodeId, []))
+							: { status: 'fulfilled' };
+						if ((snapshot as { readonly status?: unknown } | null)?.status !== 'fulfilled') return;
+						return prepareBoundarySettle(input, boundary, snapshot, () => !disposed, true);
+					},
+				}),
+			);
 		if (!demand) return;
 		for (const asyncRead of boundary.asyncReads)
 			input.graph.read(asyncRead.graphNodeId, ['status']);

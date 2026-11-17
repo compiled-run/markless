@@ -1,0 +1,84 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 177,
+			"reason": "composition carries a child row @try's re-render reads into page space; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-async-wiring"
+			],
+			"delta": 677,
+			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written, so wiring subscribes each row boundary to those values; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": -3,
+			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 177,
+			"reason": "composition carries a child row @try's re-render reads into page space; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-async-wiring"
+			],
+			"delta": 677,
+			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written, so wiring subscribes each row boundary to those values; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 15,
+			"reason": "a keyed row's @try re-renders its shown arm when page state its text reads is written; measured by the fixture-builds accept run on this tree, minus the bytes #745 (cw-async-row-try-id) already records",
+			"date": "2026-11-17"
+		}
+	]
+}
