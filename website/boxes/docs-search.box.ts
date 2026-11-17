@@ -3,8 +3,8 @@ import { chromium, expect, type Page } from '@playwright/test';
 import { SEARCH_INDEX_FILE } from '../components/docs/search/search-load.ts';
 import { asset } from '../site-base.ts';
 
-// The dialog's handlers, the families it is built from, and the index: none may load before the first open.
-const OPEN_COST = /search-index\.json|markless:symbol:[^?]*(?:components%2Fdocs%2Fsearch|modal%2Fmodal\.tsrx|combobox%2Fcombobox\.tsrx)/;
+// The dev server loads the code a page's writes reach with the page, the dialog's included; the index still waits for the first open.
+const OPEN_COST = /search-index\.json/;
 
 // A cold dev server compiles every handler the first open and the first keystrokes reach.
 const COLD = { timeout: 30_000 };
@@ -14,7 +14,7 @@ const options = (page: Page) => dialog(page).getByRole('option');
 
 export default box(
 	{
-		name: 'website docs search: Cmd K opens it, typing finds headings, the keys walk the hits and Enter lands on the anchor, with no dialog code run and no index fetched before the first open',
+		name: 'website docs search: Cmd K opens it, typing finds headings, the keys walk the hits and Enter lands on the anchor, with no index fetched before the first open',
 		tags: ['website', 'browser'],
 		modes: ['dev'],
 	},
@@ -34,7 +34,7 @@ export default box(
 			page.on('request', (request) => requested.push(request.url()));
 			await page.goto(new URL('/concepts/state', server.url).href, { waitUntil: 'networkidle' });
 
-			expect(requested.filter((url) => OPEN_COST.test(url)), 'no dialog code runs and no index is fetched with the page').toEqual([]);
+			expect(requested.filter((url) => OPEN_COST.test(url)), 'no index is fetched with the page').toEqual([]);
 			await expect(dialog(page)).toBeHidden();
 
 			await page.keyboard.press('ControlOrMeta+k');
