@@ -91,7 +91,7 @@ export function Panel() @{
 	let size = state(1);
 	<div>
 		<p>{tab} {open} {size}</p>
-		<button onClick={() => { open = !open; tab = 'b'; size = 3; }}>Go</button>
+		<button onClick={() => { open = !open; tab = 'b'; size = 3; size = -4; }}>Go</button>
 	</div>
 }`);
 		expect(diagnostics).toEqual([]);
@@ -99,6 +99,7 @@ export function Panel() @{
 			{ op: 'toggle', cell: 'state:open' },
 			{ op: 'set', cell: 'state:tab', value: 'b' },
 			{ op: 'set', cell: 'state:size', value: 3 },
+			{ op: 'set', cell: 'state:size', value: -4 },
 		]);
 	});
 

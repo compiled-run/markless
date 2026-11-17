@@ -65,7 +65,16 @@ function assignedValueShape(
 	) {
 		return { valueShape: { kind: 'literal', value: value.value } };
 	}
-	const negated = value.type === 'UnaryExpression' && value.operator === '!' ? (value.argument as AnyNode | undefined) : undefined;
+	const operand = value.type === 'UnaryExpression' ? (value.argument as AnyNode | undefined) : undefined;
+	if (
+		value.operator === '-' &&
+		operand?.type === 'Literal' &&
+		typeof operand.value === 'number' &&
+		Number.isInteger(operand.value)
+	) {
+		return { valueShape: { kind: 'literal', value: operand.value === 0 ? 0 : -operand.value } };
+	}
+	const negated = value.operator === '!' ? operand : undefined;
 	return negated?.type === 'Identifier' && negated.name === target.name
 		? { valueShape: { kind: 'not-target' } }
 		: {};

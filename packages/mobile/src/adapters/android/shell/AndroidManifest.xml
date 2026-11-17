@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="dev.markless.mobile.shell" android:versionCode="1" android:versionName="0">
+	<application android:label="Markless" android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+		<activity android:name="dev.markless.mobile.shell.ProofActivity" android:exported="true">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+	</application>
+</manifest>
