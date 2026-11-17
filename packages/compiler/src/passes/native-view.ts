@@ -1,5 +1,6 @@
 import type {
 	NativeArmPlace,
+	NativeBuiltin,
 	NativeExpr,
 	NativeNode,
 	NativeOp,
@@ -14,7 +15,7 @@ import type {
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
 	SemanticTemplateRead,
-	SemanticValueShape,
+	SemanticExpression,
 	SourceSpan,
 } from '../artifacts.ts';
 
@@ -49,13 +50,6 @@ const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): numbe
 
 const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): boolean =>
 	prefix.length < path.length && prefix.every((step, i) => path[i] === step);
-
-const within = (inner: SourceSpan | undefined, outer: SourceSpan | undefined): boolean =>
-	inner !== undefined &&
-	outer !== undefined &&
-	inner.filename === outer.filename &&
-	inner.start >= outer.start &&
-	inner.end <= outer.end;
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
 export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeViewArtifact {
@@ -100,45 +94,75 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			!(
 				typeof value === 'string' ||
 				typeof value === 'boolean' ||
-				(typeof value === 'number' && Number.isInteger(value))
+				(typeof value === 'number' && Number.isFinite(value))
 			)
 		) {
 			refuse(
-				`state \`${binding.name}\` needs an integer, string or boolean initial value known at build time`,
+				`state \`${binding.name}\` needs a number, string or boolean initial value known at build time`,
 			);
 			return [];
 		}
-		return [{ id: binding.id, name: binding.name, initial: value as NativeScalar }];
+		return [
+			{
+				id: binding.id,
+				name: binding.name,
+				initial: value as NativeScalar,
+				...(binding.storage ? { storage: { key: binding.storage.key } } : {}),
+			},
+		];
 	});
 	const cellIds = new Set(cells.map((cell) => cell.id));
 	const cellOfName = new Map(cells.map((cell) => [cell.name, cell.id]));
 
-	const exprOf = (shape: SemanticValueShape | undefined, what: string): NativeExpr | null => {
-		if (!shape) return refuse(`${what} needs a script engine`);
-		switch (shape.kind) {
+	const exprOf = (expression: SemanticExpression | undefined, what: string): NativeExpr | null => {
+		if (!expression) return refuse(`${what} has no expression the compiler recorded`);
+		const all = (list: ReadonlyArray<SemanticExpression>): NativeExpr[] | null => {
+			const lowered = list.map((item) => exprOf(item, what));
+			return lowered.every((item) => item !== null) ? (lowered as NativeExpr[]) : null;
+		};
+		switch (expression.kind) {
 			case 'read': {
-				const cell = cellOfName.get(shape.name);
+				const cell = cellOfName.get(expression.name);
 				return cell
 					? { cell }
-					: refuse(`${what} reads \`${shape.name}\`, which is not state of this component`);
+					: refuse(`${what} reads \`${expression.name}\`, which is not state of this component`);
 			}
 			case 'literal':
-				return { literal: shape.value };
-			case 'not': {
-				const value = exprOf(shape.value, what);
-				return value && { not: value };
+				return { literal: expression.value };
+			case 'unary': {
+				const value = exprOf(expression.value, what);
+				return value && { unary: expression.operator, value };
+			}
+			case 'binary':
+			case 'logical': {
+				const left = exprOf(expression.left, what);
+				const right = exprOf(expression.right, what);
+				if (!left || !right) return null;
+				return expression.kind === 'binary'
+					? { binary: expression.operator, left, right }
+					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(shape.test, what);
-				const whenTrue = exprOf(shape.consequent, what);
-				const whenFalse = exprOf(shape.alternate, what);
+				const test = exprOf(expression.test, what);
+				const whenTrue = exprOf(expression.consequent, what);
+				const whenFalse = exprOf(expression.alternate, what);
 				return test && whenTrue && whenFalse ? { if: test, whenTrue, whenFalse } : null;
 			}
-			case 'equals': {
-				const left = exprOf(shape.left, what);
-				const right = exprOf(shape.right, what);
-				return left && right ? { equals: [left, right] } : null;
+			case 'template': {
+				const parts = expression.parts.map((part) => (typeof part === 'string' ? part : exprOf(part, what)));
+				return parts.every((part) => part !== null) ? { template: parts as (string | NativeExpr)[] } : null;
 			}
+			case 'member': {
+				if (expression.property !== 'length') return refuse(`${what} reads \`.${expression.property}\` of a value`);
+				const object = exprOf(expression.object, what);
+				return object && { member: object, property: 'length' };
+			}
+			case 'call': {
+				const args = all(expression.arguments);
+				return args && { call: expression.callee as NativeBuiltin, arguments: args };
+			}
+			case 'unsupported':
+				return refuse(`${what} uses ${expression.construct}, which needs a script engine`);
 		}
 	};
 
@@ -153,7 +177,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'attribute') {
-				const value = exprOf(read.valueShape, `the \`${target.name}\` attribute`);
+				const value = exprOf(read.expression, `the \`${target.name}\` attribute`);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
 			if (
@@ -163,7 +187,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				target.constantClass === undefined &&
 				target.leadingClass === undefined
 			) {
-				const test = exprOf(read.valueShape, 'the class test');
+				const test = exprOf(read.expression, 'the class test');
 				return test
 					? [
 							{
@@ -191,7 +215,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		if (cellIds.has(graphNodeId)) return { cell: graphNodeId };
 		const read = computedReads.get(graphNodeId);
 		const expr = read
-			? exprOf(read.valueShape, 'a text expression')
+			? exprOf(read.expression, 'a text expression')
 			: refuse('a text binding that is not state');
 		return expr && { expr };
 	};
@@ -232,11 +256,20 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				refuse(`a ${slot.kind} binding`);
 				continue;
 			}
-			if (slot.residue.kind !== 'graph-read' || slot.residue.path.length > 0) {
-				refuse('a text binding that is not a plain state read');
+			if (slot.residue.kind !== 'graph-read') {
+				refuse(`a text binding the compiler renders once (${slot.residue.kind})`);
 				continue;
 			}
-			const part = textPartOf(slot.residue.graphNodeId);
+			const path = slot.residue.path;
+			if (path.length > 1 || (path.length === 1 && path[0] !== 'length')) {
+				refuse(`a text binding that reads \`.${path.join('.')}\` of state`);
+				continue;
+			}
+			const read = textPartOf(slot.residue.graphNodeId);
+			const part: NativeTextPart | null =
+				read && path.length === 1 && 'cell' in read
+					? { expr: { member: { cell: read.cell }, property: 'length' } }
+					: read;
 			if (part) items.push({ kind: 'part', part, path: slot.coordinate.path });
 		}
 		items.sort((a, b) => comparePaths(a.path, b.path));
@@ -296,7 +329,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 					refuse('@else if chains and @switch');
 					continue;
 				}
-				const test = exprOf(site.testShape, 'the @if test');
+				const test = exprOf(site.testExpression, 'the @if test');
 				if (!test) continue;
 				nodes.push({ kind: 'branch', id: item.id, parent, test, arms: item.arms.length, ...place });
 				item.arms.forEach((armId, index) => {
@@ -327,36 +360,27 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		refuse('markup outside the root template and its @if arms');
 
 	const handlerOps = (event: SemanticEvent): NativeOp[] => {
-		if (event.handlerParameters.length > 0 || event.handlerReturnsPromise || event.handlerMayReject) {
-			refuse(`the ${event.eventName} handler reads its event or may be async`, event.handlerSpan);
+		const what = `the ${event.eventName} handler`;
+		if (event.handlerParameters.length > 0) {
+			refuse(`${what} reads its event`, event.handlerSpan);
 			return [];
 		}
-		const writes = graph.stateWrites.filter((write) => within(write.targetSpan, event.handlerSpan));
-		if (
-			event.handlerWriteStatements === undefined ||
-			event.handlerWriteStatements !== writes.length
-		) {
-			refuse(`the ${event.eventName} handler does more than write state`, event.handlerSpan);
+		if (!event.handlerStatements) {
+			refuse(`${what} is defined elsewhere (a named, passed-in or factory function)`, event.handlerSpan);
 			return [];
 		}
-		return writes.flatMap((write): NativeOp[] => {
-			const cell = cellOfName.get(write.target);
-			if (cell !== undefined && write.through === undefined && write.passedTo === undefined) {
-				if (write.operation === 'update') {
-					return [{ op: 'add', cell, value: write.updateOperator === '--' ? -1 : 1 }];
-				}
-				if (write.operation === 'assign' && write.valueShape?.kind === 'literal') {
-					return [{ op: 'set', cell, value: write.valueShape.value }];
-				}
-				if (write.operation === 'assign' && write.valueShape?.kind === 'not-target') {
-					return [{ op: 'toggle', cell }];
-				}
+		return event.handlerStatements.flatMap((statement): NativeOp[] => {
+			if (statement.kind === 'unsupported') {
+				refuse(`${what} uses ${statement.construct}, which needs a script engine`, event.handlerSpan);
+				return [];
 			}
-			refuse(
-				`a ${write.operation} write to \`${write.target}\` needs a script engine`,
-				write.targetSpan,
-			);
-			return [];
+			const cell = cellOfName.get(statement.target);
+			if (!cell) {
+				refuse(`${what} assigns \`${statement.target}\`, which is not state of this component`, event.handlerSpan);
+				return [];
+			}
+			const value = exprOf(statement.value, what);
+			return value ? [{ op: 'assign', cell, value }] : [];
 		});
 	};
 

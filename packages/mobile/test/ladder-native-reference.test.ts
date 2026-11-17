@@ -11,9 +11,18 @@ const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
 function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
-	const runtime = createNativeRuntime(payload);
+	const store = new Map<string, string | number | boolean | null>();
+	let runtime = createNativeRuntime(payload, store);
 	const texts = new Map(runtime.texts());
 	const attributes = new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value]));
+	const mount = () => {
+		texts.clear();
+		attributes.clear();
+		chosen.clear();
+		for (const [node, text] of runtime.texts()) texts.set(node, text);
+		for (const [node, name, value] of runtime.attributes()) attributes.set(`${node}\0${name}`, value);
+		for (const [node, index] of runtime.arms()) chosen.set(node, index);
+	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	const chosen = new Map(runtime.arms());
 	const shownNode = (id: string): boolean => {
@@ -41,9 +50,12 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 	};
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
-		if (action && !('tap' in action))
+		if (action && 'relaunch' in action) {
+			runtime = createNativeRuntime(payload, store);
+			mount();
+		} else if (action && !('tap' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
-		if (action) {
+		else if (action) {
 			const host = elementReading(action.tap);
 			if (!host) throw new Error(`step ${index}: nothing reads "${action.tap}" to tap`);
 			if (attributes.get(`${host}\0disabled`) != null) throw new Error(`step ${index}: "${action.tap}" is disabled`);

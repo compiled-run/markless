@@ -1074,6 +1074,10 @@ importers:
       '@markless/web':
         specifier: workspace:*
         version: link:../web
+    devDependencies:
+      '@markless/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/router:
     dependencies:

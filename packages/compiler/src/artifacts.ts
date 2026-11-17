@@ -845,8 +845,8 @@ export type SemanticBranchSite = {
 	// site tests THAT node; `testSource` stays the authored text so a diagnostic
 	// quotes what the file says rather than a generated name.
 	readonly testComputedGraphNodeId?: string;
-	/** A plain `@if` test as data a native host can evaluate; absent for chains, `@switch` and tests that need script. */
-	readonly testShape?: SemanticValueShape;
+	/** A plain `@if` test as a tree; absent for chains and `@switch`. */
+	readonly testExpression?: SemanticExpression;
 	// An `@else if` chain or a non-literal-case `@switch` answers its arm index here, evaluated in place of `testSource`.
 	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
@@ -938,8 +938,8 @@ export type SemanticEvent = {
 	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
 	readonly dispatchCatchBoundaryId?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
-	/** Set when the handler body is only this many bare `x++`, `x--` or `x = ...` statements, so its writes are all it does. */
-	readonly handlerWriteStatements?: number;
+	/** The inline handler's body as statements, for hosts that run handlers as data; absent for a named or relayed handler. */
+	readonly handlerStatements?: ReadonlyArray<SemanticHandlerStatement>;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
 	/** A submit event whose form has a submit control with an author-written aria-disabled, which a submitting form then leaves alone. */
@@ -1081,10 +1081,6 @@ export type SemanticStateWrite = {
 	readonly assignmentOperator?: string;
 	readonly valueSource?: string;
 	readonly valueSpan?: SourceSpan;
-	/** A plain `=` whose value a host can apply without a script engine: a literal, or `!` of the target itself. */
-	readonly valueShape?:
-		| { readonly kind: 'literal'; readonly value: string | number | boolean }
-		| { readonly kind: 'not-target' };
 	readonly optional?: boolean;
 	readonly prefix?: boolean;
 	readonly updateOperator?: '++' | '--';
@@ -1167,23 +1163,44 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
-/** A template value or test as data a native host can evaluate: names are the component's bindings. */
-export type SemanticValueShape =
+/** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
+export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
-	| { readonly kind: 'literal'; readonly value: string | number | boolean }
-	| { readonly kind: 'not'; readonly value: SemanticValueShape }
+	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
+	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+'; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'binary';
+			readonly operator: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
+			readonly left: SemanticExpression;
+			readonly right: SemanticExpression;
+	  }
+	| {
+			readonly kind: 'logical';
+			readonly operator: '&&' | '||' | '??';
+			readonly left: SemanticExpression;
+			readonly right: SemanticExpression;
+	  }
 	| {
 			readonly kind: 'conditional';
-			readonly test: SemanticValueShape;
-			readonly consequent: SemanticValueShape;
-			readonly alternate: SemanticValueShape;
+			readonly test: SemanticExpression;
+			readonly consequent: SemanticExpression;
+			readonly alternate: SemanticExpression;
 	  }
-	| { readonly kind: 'equals'; readonly left: SemanticValueShape; readonly right: SemanticValueShape };
+	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
+	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
+	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	/** Outside the tree: names what would need a script engine. */
+	| { readonly kind: 'unsupported'; readonly construct: string };
+
+/** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
+export type SemanticHandlerStatement =
+	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
+	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {
 	readonly source: string;
-	/** The read's value as data (for a conditional class, its test); absent when it needs script. */
-	readonly valueShape?: SemanticValueShape;
+	/** The read's value as a tree (for a conditional class, its test). */
+	readonly expression?: SemanticExpression;
 	readonly sourceSpan?: SourceSpan;
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;

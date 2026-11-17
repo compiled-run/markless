@@ -21,5 +21,8 @@
 		"@markless/compiler": "workspace:*",
 		"@markless/serializer": "workspace:*",
 		"@markless/web": "workspace:*"
+	},
+	"devDependencies": {
+		"@markless/core": "workspace:*"
 	}
 }
