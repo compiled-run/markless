@@ -2,25 +2,56 @@ package dev.markless.mobile.core
 
 const val NATIVE_VIEW_VERSION = "markless.native-view/0"
 
-sealed interface Scalar {
-	data object Null : Scalar
-	data class Num(val value: Double) : Scalar
-	data class Str(val value: String) : Scalar
-	data class Bool(val value: Boolean) : Scalar
+/** A JavaScript value a cell or expression holds; arrays and objects compare by identity, as `===` does. */
+sealed interface JsValue {
+	data object Null : JsValue
+	data class Num(val value: Double) : JsValue
+	data class Str(val value: String) : JsValue
+	data class Bool(val value: Boolean) : JsValue
+	class Arr(val items: MutableList<JsValue>) : JsValue {
+		override fun toString() = "Arr$items"
+	}
+	class Obj(val fields: LinkedHashMap<String, JsValue>) : JsValue {
+		override fun toString() = "Obj$fields"
+	}
+
+	companion object {
+		/** A JSON value as JavaScript holds it after `JSON.parse`. */
+		fun fromJson(j: Json): JsValue = when (j) {
+			Json.Null -> Null
+			is Json.Num -> Num(j.value)
+			is Json.Str -> Str(j.value)
+			is Json.Bool -> Bool(j.value)
+			is Json.Arr -> Arr(j.items.mapTo(ArrayList(), ::fromJson))
+			is Json.Obj -> Obj(j.fields.entries.associateTo(LinkedHashMap()) { it.key to fromJson(it.value) })
+		}
+	}
 }
 
 /** A value computed from cells with ECMAScript's meaning (see [Js]). */
 sealed interface Expr {
 	data class CellRef(val cell: String) : Expr
-	data class Literal(val value: Scalar) : Expr
+	data class Literal(val value: JsValue) : Expr
 	data class Unary(val op: String, val value: Expr) : Expr
 	data class Binary(val op: String, val left: Expr, val right: Expr) : Expr
 	data class Logical(val op: String, val left: Expr, val right: Expr) : Expr
 	data class If(val test: Expr, val whenTrue: Expr, val whenFalse: Expr) : Expr
 	/** Each part is a literal string or an expression read with `String(value)`. */
 	data class Template(val parts: List<Any>) : Expr
-	data class Length(val value: Expr) : Expr
+	/** `length` of a string or array, or an own property of an object. */
+	data class Member(val value: Expr, val property: String) : Expr
+	/** Each item, spread when [spread] (its value must be an array). */
+	data class ArrayLit(val items: List<Pair<Boolean, Expr>>) : Expr
+	data class ObjectLit(val entries: List<Pair<String, Expr>>) : Expr
+	data class Method(val name: String, val target: Expr, val arguments: List<Expr>) : Expr
+	/** An arrow function; only a method argument. */
+	data class Lambda(val params: List<String>, val body: Expr) : Expr
+	data class Local(val name: String) : Expr
+	/** The current row's item of a list. */
+	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
+	/** In an `input` handler: the field's whole text after the edit. */
+	data object EventValue : Expr
 }
 
 sealed interface TextPart {
@@ -30,19 +61,24 @@ sealed interface TextPart {
 
 data class ArmPlace(val branch: String, val index: Int)
 
-data class Binding(val attribute: String, val value: Expr)
+/** An attribute that follows state, or (when [property]) an input's `value` property. */
+data class Binding(val name: String, val value: Expr, val property: Boolean = false)
 
 sealed interface Node {
 	val id: String
 	val parent: String?
 	val arm: ArmPlace?
+	/** The `repeat` node whose rows this node is part of. */
+	val row: String?
 
-	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null) : Node
-	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null) : Node
-	data class Branch(override val id: String, override val parent: String?, val test: Expr, val arms: Int, override val arm: ArmPlace? = null) : Node
+	data class Element(override val id: String, val element: String, override val parent: String?, val attributes: Map<String, String> = emptyMap(), val bindings: List<Binding> = emptyList(), override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	data class Text(override val id: String, override val parent: String, val parts: List<TextPart>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	data class Branch(override val id: String, override val parent: String?, val test: Expr, val arms: Int, override val arm: ArmPlace? = null, override val row: String? = null) : Node
+	/** A keyed list: one row per item of [list], keyed by `String()` of the item at the [key] path. */
+	data class Repeat(override val id: String, override val parent: String?, val list: Expr, val key: List<String>, override val arm: ArmPlace? = null, override val row: String? = null) : Node
 }
 
-enum class EventName(val wire: String) { Activate("activate") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input") }
 
 sealed interface Op {
 	val cell: String
@@ -51,7 +87,7 @@ sealed interface Op {
 	data class Assign(override val cell: String, val value: Expr) : Op
 }
 
-data class Cell(val id: String, val name: String, val initial: Scalar, val storageKey: String? = null)
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -79,17 +115,19 @@ data class Payload(
 				val p = node.parent
 				if (p != null) {
 					val parent = seen[p] ?: throw MarklessDecodeError("node \"${node.id}\" names parent \"$p\" that does not precede it")
-					if (parent !is Node.Element) throw MarklessDecodeError("node \"${node.id}\" has a ${if (parent is Node.Text) "text" else "branch"} node as its parent")
+					if (parent !is Node.Element) throw MarklessDecodeError("node \"${node.id}\" has a ${parent::class.simpleName} node as its parent")
 				} else if (node is Node.Text) throw MarklessDecodeError("text node \"${node.id}\" has no parent")
 				node.arm?.let { a ->
 					val b = seen[a.branch] as? Node.Branch ?: throw MarklessDecodeError("node \"${node.id}\" sits in an arm of \"${a.branch}\", which is not a preceding branch")
 					if (a.index < 0 || a.index >= b.arms) throw MarklessDecodeError("node \"${node.id}\" sits in arm ${a.index} of a branch with ${b.arms}")
 				}
+				node.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("node \"${node.id}\" sits in rows of \"$r\", which is not a preceding list") }
 				if (seen.put(node.id, node) != null) throw MarklessDecodeError("duplicate node \"${node.id}\"")
 				val reads = when (node) {
 					is Node.Text -> node.parts.filterIsInstance<TextPart.Value>().map { it.expr }
 					is Node.Element -> node.bindings.map { it.value }
 					is Node.Branch -> listOf(node.test)
+					is Node.Repeat -> listOf(node.list)
 				}
 				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
@@ -112,13 +150,20 @@ data class Payload(
 			is Expr.Logical -> cellsOf(e.left) + cellsOf(e.right)
 			is Expr.If -> cellsOf(e.test) + cellsOf(e.whenTrue) + cellsOf(e.whenFalse)
 			is Expr.Template -> e.parts.filterIsInstance<Expr>().flatMap(::cellsOf)
-			is Expr.Length -> cellsOf(e.value)
+			is Expr.Member -> cellsOf(e.value)
+			is Expr.ArrayLit -> e.items.flatMap { cellsOf(it.second) }
+			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
+			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
+			is Expr.Lambda -> cellsOf(e.body)
+			is Expr.Local, is Expr.Item -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
+			Expr.EventValue -> emptyList()
 		}
 
 		private val UNARY = setOf("!", "-", "+")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
+		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -132,7 +177,7 @@ data class Payload(
 			fun sub(k: String) = expr(o.field(k, what), "$what.$k")
 			return when {
 				o.containsKey("cell") -> { o.only(setOf("cell"), what); Expr.CellRef(o.field("cell", what).str("$what.cell")) }
-				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) Scalar.Null else scalar(it, "$what.literal") }) }
+				o.containsKey("literal") -> { o.only(setOf("literal"), what); Expr.Literal(o.field("literal", what).let { if (it == Json.Null) JsValue.Null else scalar(it, "$what.literal") }) }
 				o.containsKey("unary") -> { o.only(setOf("unary", "value"), what); Expr.Unary(oneOf(o, "unary", UNARY, what), sub("value")) }
 				o.containsKey("binary") -> { o.only(setOf("binary", "left", "right"), what); Expr.Binary(oneOf(o, "binary", BINARY, what), sub("left"), sub("right")) }
 				o.containsKey("logical") -> { o.only(setOf("logical", "left", "right"), what); Expr.Logical(oneOf(o, "logical", LOGICAL, what), sub("left"), sub("right")) }
@@ -141,28 +186,51 @@ data class Payload(
 					o.only(setOf("template"), what)
 					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
 				}
-				o.containsKey("member") -> {
-					o.only(setOf("member", "property"), what)
-					oneOf(o, "property", setOf("length"), what)
-					Expr.Length(sub("member"))
+				o.containsKey("member") -> { o.only(setOf("member", "property"), what); Expr.Member(sub("member"), o.field("property", what).str("$what.property")) }
+				o.containsKey("array") -> {
+					o.only(setOf("array"), what)
+					Expr.ArrayLit(o.field("array", what).arr("$what.array").mapIndexed { n, a ->
+						val ao = a.obj("$what.array[$n]")
+						ao.only(setOf("spread", "value"), "$what.array[$n]")
+						val spread = ao.field("spread", what) as? Json.Bool ?: throw MarklessDecodeError("$what.array[$n].spread must be a boolean")
+						spread.value to expr(ao.field("value", what), "$what.array[$n].value")
+					})
 				}
+				o.containsKey("object") -> {
+					o.only(setOf("object"), what)
+					Expr.ObjectLit(o.field("object", what).arr("$what.object").mapIndexed { n, e ->
+						val pair = e.arr("$what.object[$n]")
+						if (pair.size != 2) throw MarklessDecodeError("$what.object[$n] is not a [key, value] pair")
+						pair[0].str("$what.object[$n][0]") to expr(pair[1], "$what.object[$n][1]")
+					})
+				}
+				o.containsKey("method") -> {
+					o.only(setOf("method", "target", "arguments"), what)
+					Expr.Method(oneOf(o, "method", METHODS, what), sub("target"), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
+				}
+				o.containsKey("lambda") -> { o.only(setOf("lambda", "body"), what); Expr.Lambda(o.field("lambda", what).arr("$what.lambda").map { it.str("$what.lambda[]") }, sub("body")) }
+				o.containsKey("local") -> { o.only(setOf("local"), what); Expr.Local(o.field("local", what).str("$what.local")) }
+				o.containsKey("item") -> { o.only(setOf("item"), what); Expr.Item(o.field("item", what).str("$what.item")) }
 				o.containsKey("call") -> {
 					o.only(setOf("call", "arguments"), what)
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
+				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
 			}
 		}
+
+		private fun rowPlace(o: Map<String, Json>, what: String): String? = o["row"]?.str("$what.row")
 
 		private fun armPlace(o: Map<String, Json>, what: String): ArmPlace? = o["arm"]?.obj("$what.arm")?.let { a ->
 			a.only(setOf("branch", "index"), "$what.arm")
 			ArmPlace(a.field("branch", what).str("$what.arm.branch"), integer(a.field("index", what).num("$what.arm.index"), "$what.arm.index").toInt())
 		}
 
-		private fun scalar(v: Json, what: String): Scalar = when (v) {
-			is Json.Num -> Scalar.Num(v.value)
-			is Json.Str -> Scalar.Str(v.value)
-			is Json.Bool -> Scalar.Bool(v.value)
+		private fun scalar(v: Json, what: String): JsValue = when (v) {
+			is Json.Num -> JsValue.Num(v.value)
+			is Json.Str -> JsValue.Str(v.value)
+			is Json.Bool -> JsValue.Bool(v.value)
 			else -> throw MarklessDecodeError("$what must be a number, string or boolean")
 		}
 
@@ -173,9 +241,10 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled"), what)
+			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), scalar(o.field("initial", what), "$what.initial"), storage)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled)
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -183,27 +252,39 @@ data class Payload(
 			val id = o.field("id", what).str("$what.id")
 			return when (val kind = o.field("kind", what).str("$what.kind")) {
 				"element" -> {
-					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm"), what)
+					o.only(setOf("kind", "id", "element", "parent", "attributes", "bindings", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val attributes = o["attributes"]?.obj("$what.attributes")?.mapValues { (k, v) -> v.str("$what.attributes.$k") } ?: emptyMap()
 					val bindings = o["bindings"]?.arr("$what.bindings")?.mapIndexed { n, b ->
 						val bo = b.obj("$what.bindings[$n]")
-						bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
-						Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), expr(bo.field("value", what), "$what.bindings[$n].value"))
+						val value = expr(bo.field("value", what), "$what.bindings[$n].value")
+						if (bo.containsKey("property")) {
+							bo.only(setOf("property", "value"), "$what.bindings[$n]")
+							Binding(oneOf(bo, "property", setOf("value"), "$what.bindings[$n]"), value, property = true)
+						} else {
+							bo.only(setOf("attribute", "value"), "$what.bindings[$n]")
+							Binding(bo.field("attribute", what).str("$what.bindings[$n].attribute"), value)
+						}
 					} ?: emptyList()
-					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what))
+					Node.Element(id, o.field("element", what).str("$what.element"), if (parent == Json.Null) null else parent.str("$what.parent"), attributes, bindings, armPlace(o, what), rowPlace(o, what))
 				}
 				"text" -> {
-					o.only(setOf("kind", "id", "parent", "parts", "arm"), what)
+					o.only(setOf("kind", "id", "parent", "parts", "arm", "row"), what)
 					val parts = o.field("parts", what).arr("$what.parts").mapIndexed { n, p -> part(p, "$what.parts[$n]") }
-					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what))
+					Node.Text(id, o.field("parent", what).str("$what.parent"), parts, armPlace(o, what), rowPlace(o, what))
 				}
 				"branch" -> {
-					o.only(setOf("kind", "id", "parent", "test", "arms", "arm"), what)
+					o.only(setOf("kind", "id", "parent", "test", "arms", "arm", "row"), what)
 					val parent = o.field("parent", what)
 					val arms = integer(o.field("arms", what).num("$what.arms"), "$what.arms").toInt()
 					if (arms != 1 && arms != 2) throw MarklessDecodeError("$what has $arms arms; native-view/0 has 1 or 2")
-					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("test", what), "$what.test"), arms, armPlace(o, what))
+					Node.Branch(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("test", what), "$what.test"), arms, armPlace(o, what), rowPlace(o, what))
+				}
+				"repeat" -> {
+					o.only(setOf("kind", "id", "parent", "list", "key", "arm", "row"), what)
+					val parent = o.field("parent", what)
+					val key = o.field("key", what).arr("$what.key").map { it.str("$what.key[]") }
+					Node.Repeat(id, if (parent == Json.Null) null else parent.str("$what.parent"), expr(o.field("list", what), "$what.list"), key, armPlace(o, what), rowPlace(o, what))
 				}
 				else -> throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			}

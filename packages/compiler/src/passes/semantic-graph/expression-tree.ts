@@ -157,6 +157,13 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 	if (!expression) return { kind: 'unsupported', construct: 'a statement other than an expression' };
 	if (expression.type === 'ParenthesizedExpression')
 		return statementOf((expression.expression as AnyNode | undefined) ?? null);
+	if (
+		expression.type === 'CallExpression' &&
+		(expression.callee as AnyNode | undefined)?.type === 'Identifier' &&
+		asNodes(expression.arguments).length === 0 &&
+		!BUILTINS.has(String((expression.callee as AnyNode).name))
+	)
+		return { kind: 'invoke', name: String((expression.callee as AnyNode).name) };
 	if (expression.type === 'UpdateExpression') {
 		const target = expression.argument as AnyNode | undefined;
 		if (target?.type !== 'Identifier' || typeof target.name !== 'string')

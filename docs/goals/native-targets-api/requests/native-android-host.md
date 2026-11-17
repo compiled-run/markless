@@ -32,3 +32,9 @@
 8. **Dragon exports per rung.** Rung 2 on the device is proven only with Dragon's hand-transcribed counter export. Rungs 2
    and 4 need `proofs/<rung>/native-style.json` from the native-dragon-styles CLI, and rung 4's needs `variants`, before the
    styled half of those rungs can be checked on Android.
+9. **Which export state a `state` entry moves.** The contract says "the export's state `s` is the one whose key names that
+   cell"; Dragon's `/1` keys are `<instance>#<state>` (`doc/app/chip#selected`). The Android host accepts a key equal to the
+   cell id or ending in `#<cell id>`, and errors on zero or several matches. Please pin the exact key the style input makes
+   Dragon write for a Markless cell (simplest: the cell id itself, `state:liked`).
+10. **A `/1` export for a ladder rung.** Style changes driven by `state` entries are checked on the JVM against Dragon's
+    `ms-toggle` export only; the device check needs a `/1` export whose node ids are a rung payload's (rung 4's).

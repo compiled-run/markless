@@ -165,6 +165,8 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
+			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
 			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
@@ -1220,6 +1222,8 @@ export type SemanticExpression =
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
 	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
+	/** `name()`: calls a function the component received, such as a callback prop. */
+	| { readonly kind: 'invoke'; readonly name: string }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {

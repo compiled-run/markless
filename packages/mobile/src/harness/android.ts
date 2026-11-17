@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, openSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
 import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
@@ -15,6 +16,16 @@ export type BootedEmulator = {
 const adb = (tools: AndroidTools, serial: string, args: string[], timeoutMs = 120_000) =>
 	exec(tools.adb, ['-s', serial, ...args], { timeoutMs });
 
+async function waitForBoot(tools: AndroidTools, serial: string): Promise<void> {
+	await adb(tools, serial, ['wait-for-device'], 180_000);
+	await adb(
+		tools,
+		serial,
+		['shell', 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'],
+		300_000,
+	);
+}
+
 /** Starts the AVD called `avd` on `port` (creating the AVD when missing) unless an emulator already serves that port. */
 export async function bootEmulator(
 	tools: AndroidTools,
@@ -25,20 +36,23 @@ export async function bootEmulator(
 	const running = await exec(tools.adb, ['-s', serial, 'get-state'], { allowFailure: true });
 	const bootedHere = running.stdout.trim() !== 'device';
 	if (bootedHere) {
-		const avds = (await exec(tools.emulator, ['-list-avds'])).stdout
+		// avdmanager and the emulator disagree on the default AVD folder on some hosts (GitHub's Linux runners), so name it.
+		const env = {
+			...process.env,
+			ANDROID_USER_HOME: process.env.ANDROID_USER_HOME ?? join(homedir(), '.android'),
+			ANDROID_AVD_HOME:
+				process.env.ANDROID_AVD_HOME ??
+				join(process.env.ANDROID_USER_HOME ?? join(homedir(), '.android'), 'avd'),
+		};
+		const avds = (await exec(tools.emulator, ['-list-avds'], { env })).stdout
 			.split('\n')
 			.map((line) => line.trim());
 		if (!avds.includes(avd)) {
-			const child = spawn(tools.avdmanager, [
-				'create',
-				'avd',
-				'-n',
-				avd,
-				'-k',
-				tools.systemImage,
-				'-d',
-				'pixel_7',
-			]);
+			const child = spawn(
+				tools.avdmanager,
+				['create', 'avd', '-n', avd, '-k', tools.systemImage, '-d', 'pixel_7'],
+				{ env },
+			);
 			child.stdin.end('no\n');
 			await new Promise<void>((resolve, reject) =>
 				child.on('close', (code) =>
@@ -48,10 +62,10 @@ export async function bootEmulator(
 				),
 			);
 		}
-		const logDir = join(cacheRoot(), 'logs');
-		mkdirSync(logDir, { recursive: true });
-		const log = openSync(join(logDir, `emulator-${port}.log`), 'w');
-		spawn(
+		const logFile = join(cacheRoot(), 'logs', `emulator-${port}.log`);
+		mkdirSync(join(logFile, '..'), { recursive: true });
+		const log = openSync(logFile, 'w');
+		const emulator = spawn(
 			tools.emulator,
 			[
 				'-avd',
@@ -65,16 +79,27 @@ export async function bootEmulator(
 				'swiftshader_indirect',
 				'-no-snapshot',
 			],
-			{ detached: true, stdio: ['ignore', log, log] },
-		).unref();
+			{ detached: true, env, stdio: ['ignore', log, log] },
+		);
+		emulator.unref();
+		const logTail = () => readFileSync(logFile, 'utf8').split('\n').slice(-40).join('\n');
+		const exited = new Promise<{ readonly code: number | null }>((resolve) =>
+			emulator.on('exit', (code) => resolve({ code })),
+		);
+		let ended: { readonly code: number | null } | undefined;
+		try {
+			ended = await Promise.race([waitForBoot(tools, serial).then(() => undefined), exited]);
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new Error(`${message}\nthe emulator log ends:\n${logTail()}`);
+		}
+		if (ended)
+			throw new Error(
+				`the emulator exited (${ended.code}) before booting; its log ends:\n${logTail()}`,
+			);
+		return { serial, avd, bootedHere };
 	}
-	await adb(tools, serial, ['wait-for-device'], 180_000);
-	await adb(
-		tools,
-		serial,
-		['shell', 'while [ "$(getprop sys.boot_completed)" != 1 ]; do sleep 1; done'],
-		300_000,
-	);
+	await waitForBoot(tools, serial);
 	return { serial, avd, bootedHere };
 }
 

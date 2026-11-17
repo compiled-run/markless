@@ -77,20 +77,28 @@ unstyled stack in `screenshots/counter-stack-*.png`.
 Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
 `maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
 AVD (android-36), from the `assign`-shaped payloads (`a989dc47f` and later). The in-app conformance run logged `pass` for
-`arithmetic.json`, `attributes.json`, `counter.json`, `if.json` and `switches.json`.
+`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json`, `list.json`, `components.json` and `switches.json`; it also checks
+that views exist for exactly the shown instances and that each list's rows sit in their parent in key order.
 
 | Rung | Result | Screenshot |
 |---|---|---|
 | 01-static-text | flow passes | `screenshots/rung-01-static-text.png` |
 | 02-styles | flow passes **without styles**: no Dragon export for this rung's component yet. Styles on device are proven only with Dragon's counter export (above). | `screenshots/rung-02-styles.png` |
 | 03-counter | flow passes | `screenshots/rung-03-counter.png` |
-| 04-attributes | flow passes (accessible name from `aria-label`, `enabled: false` from `disabled`); class variants are implemented but unproven on device: no export with `variants` yet | `screenshots/rung-04-attributes.png` |
+| 04-attributes | flow passes (accessible name from `aria-label`, `enabled: false` from `disabled`); styles that follow the class (`state` entries over a `/1` export) are implemented and checked on the JVM against Dragon's toggle export, but unproven on device: no `/1` export with Markless ids exists yet | `screenshots/rung-04-attributes.png` |
 | 05-if | flow passes (arms removed and built by `arm` journal entries) | `screenshots/rung-05-if.png` |
+| 06-keyed-for | flow passes (add, remove, reverse: `rows` entries keep each row's retained views and move them; new keys are built, gone keys removed) | `screenshots/rung-06-keyed-for.png` |
+| 07-child-component | flow passes; no host change (the compiler inlines same-module components into the flat tree) | `screenshots/rung-07-child-component.png` |
+| 08-text-input | flow passes (`EditText`; typing dispatches `input` with the whole text through a `TextWatcher`; `Use Bo` writes the field through a `property` entry) | `screenshots/rung-08-text-input.png` |
 | 09-storage | flow passes, including `stopApp` then `launchApp` reading `Kept 2` back (`SharedPreferences`, `PreferencesStore`) | `screenshots/rung-09-storage.png` |
-| 06, 07, 08, 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+| 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
 
 Bound attributes on Android: `aria-label` sets `contentDescription`; `disabled` present sets `isEnabled = false`;
 `aria-pressed`/`aria-selected` `"true"` sets `isSelected`; `aria-expanded` sets the accessibility expanded state (API 36) and
-the expand/collapse action; `class` picks the Dragon style variant whose `class` equals it. Other bound attributes are ignored.
-An `arm` entry removes the views of nodes no longer shown and builds every shown node without a view, in document order,
-from current values, each inserted at its document position among its parent's children.
+the expand/collapse action; `class` does not reach views (styles follow state through `state` entries: the host moves to `next[current][s][v]` of the
+`dragon.native-style-export/1` and re-applies that assignment's frames and writes). Other attributes are ignored. Static
+attributes use the same mapping. An element with an `activate` event that is not a button reports `android.widget.Button` as
+its accessibility class.
+Views are kept per instance (`h6:text0@pear` inside a list row). An `arm` or `rows` entry removes the views of instances no
+longer shown, builds every shown instance without a view from current values, and moves each parent's retained children
+into place: document order, with a list's rows at the list's place in key order.

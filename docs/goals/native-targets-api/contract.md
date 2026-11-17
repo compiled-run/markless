@@ -17,6 +17,10 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
    the older payload shape.
 3. Vectors to pass: every file in `packages/mobile/conformance/`.
+4. Since then (2026-11-17, up to `6284b5111`): rung 7 (component instances inlined, ids prefixed `component-edge:N/`;
+   nothing new for hosts but `components.json`), rung 10 (`a` elements, the `navigate` op and journal entry, the
+   `{ route: 'params' }` expression, a payload `route`, vectors carrying `params`; `route.json`). Rung 11 is stopped on an
+   owner decision. Android passes every vector but `list.json` and `route.json` as of `d88b8011a`.
 
 ## 1. What I found before building (the owner's picture is weeks old)
 
@@ -199,6 +203,36 @@ export function Counter() @{
 - **Vectors:** `initialRows: [[repeat, keys]]` when present; new file `list.json` (rung 6: add, remove, reverse). Text
   nodes in rows appear in `initial` as instances.
 
+### Additions for rung 7: child components (pushed 2026-11-17)
+
+- A component defined in the same module is **inlined at each call site**: its nodes appear in the parent's place with
+  ids prefixed by the call site (`component-edge:0/h2`, `component-edge:0/h1:text0`); handler ids likewise
+  (`handler:component-edge:0/event:0`). Hosts see one flat tree, as before; no new node kind.
+- Props are substituted at build time: a literal prop becomes `{ literal }`, a prop bound to state becomes `{ cell }`.
+  A callback prop called from the child (`onClick={() => onStep()}`) lowers to the caller's own statements, so the
+  child's handler is the parent's `assign` ops. The analyzer records callback bodies (`nativeStatements`) and `name()`
+  calls (`invoke` statements) for native builds only.
+- Not yet (each refused by name): state declared in a child component (instance-local cells), children passed into a
+  component (`{children}`), components from another module (`<Link>` included), a callback called with arguments or used
+  as a value.
+- Vectors: `components.json` (rung 7).
+
+### Additions for rung 10: routes and the URL (pushed 2026-11-17)
+
+- A page compiles with its page file (`compileNativeComponent({ ..., page: 'pages/[fruit].tsrx' })`); the router's own
+  `buildRouteManifestFromFileIds` derives its route. The payload carries `route: { pattern: '/[fruit]', params: ['fruit'] }`.
+- The page component's `params` prop reads the expression `{ route: 'params' }` (an object of strings), so
+  `params.fruit` is `{ member: { route: 'params' }, property: 'fruit' }`. Hosts open a page with params: the harness's
+  launch argument `route: "/apple"` is matched against the payload's `pattern` (a `[name]` segment matches one path
+  segment, URL-decoded; catch-all routes are not used yet).
+- A router `<Link href="/[fruit]" params={{ fruit: 'pear' }}>Go to pear</Link>` lowers to an `a` element (link trait on
+  iOS, `accessibilityClassName` `android.widget.Button` with a link role description on Android) holding its children,
+  and an `activate` handler with the op `{ op: 'navigate', route: '/[fruit]', params: { fruit: 'pear' } }`, resolved at
+  build time (the link's href and params must be fixed at build time). The journal entry `{ op: 'navigate', route, params }`
+  tells the host to build that page from scratch with those params; ops after it do not run.
+- One page per payload for now; an app's route table (several pages, back stack, presentation) is the next step.
+- Vectors: `route.json` (opens with `params: { fruit: 'apple' }`).
+
 ### Where the native facts are collected (pushed 2026-11-17)
 
 The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
@@ -360,11 +394,11 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
 | 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | not yet | not yet | vectors `list.json` |
-| 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
+| 7 | Child component with props and a callback | passing | passing | not yet | not yet | vectors `components.json` |
 | 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
-| 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
-| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |
+| 10 | State from the URL and one route change | passing | passing | not yet | not yet | vectors `route.json` |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | stopped by design: the value comes from author JavaScript; owner decision (a declared fetch or a script engine) |
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the
