@@ -25,6 +25,7 @@ export type ModulePropFlow = {
 		readonly componentName: string;
 		readonly props: ReadonlyArray<string>;
 		readonly message: string;
+		readonly docsUrl?: string;
 		/** Where the read is written, in the source this module compiled. */
 		readonly position?: { readonly line: number; readonly column: number };
 	}>;
@@ -95,6 +96,7 @@ export function modulePropFlow(
 							componentName: diagnostic.decidedByProps.componentName,
 							props: diagnostic.decidedByProps.props,
 							message: diagnostic.message,
+							...(diagnostic.docsUrl ? { docsUrl: diagnostic.docsUrl } : {}),
 							...(source !== undefined && diagnostic.primarySpan
 								? { position: sourcePosition(source, diagnostic.primarySpan.start) }
 								: {}),
@@ -205,6 +207,17 @@ export type ProjectionRefusal = {
 	readonly docsUrl: string;
 	/** The file whose component renders `{children}` inside the arm. */
 	readonly armSource: string;
+	readonly message: string;
+	/** Every file the verdict reads; an edit to any of them can change it. */
+	readonly sources: ReadonlySet<string>;
+};
+
+export type PropFlowRefusal = {
+	readonly code: string;
+	readonly docsUrl?: string;
+	/** The file whose verdict a caller breaks. */
+	readonly source: string;
+	readonly position?: { readonly line: number; readonly column: number };
 	readonly message: string;
 	/** Every file the verdict reads; an edit to any of them can change it. */
 	readonly sources: ReadonlySet<string>;
@@ -338,15 +351,27 @@ export class PropFlowRegistry {
 
 	/** One message per prop-decided @if some caller can change, or whose caller the build cannot see. */
 	refusals(): ReadonlyArray<string> {
-		const refusals: string[] = [];
+		return [...this.decidedRefusals(), ...this.projectionRefusals()].map((refusal) => refusal.message);
+	}
+
+	/** Prop-decided verdicts some caller breaks, each with every file its verdict reads. */
+	decidedRefusals(): ReadonlyArray<PropFlowRefusal> {
+		const refusals: PropFlowRefusal[] = [];
 		for (const [source, { flow }] of this.#modules)
 			for (const decided of flow.decided)
 				for (const prop of decided.props) {
-					const reason = this.#changes(source, decided.componentName, prop, new Set());
+					const sources = new Set([source]);
+					const reason = this.#changes(source, decided.componentName, prop, new Set(), sources);
 					if (reason)
-						refusals.push(refusalMessage(decided, source, prop, reason));
+						refusals.push({
+							code: decided.code,
+							...(decided.docsUrl ? { docsUrl: decided.docsUrl } : {}),
+							source,
+							...(decided.position ? { position: decided.position } : {}),
+							message: refusalMessage(decided, source, prop, reason),
+							sources,
+						});
 				}
-		for (const refusal of this.projectionRefusals()) refusals.push(refusal.message);
 		return refusals;
 	}
 
@@ -589,22 +614,35 @@ function projectionRefusalMessage(
 	return `${arm.code}: <${caller.edge.parentComponentName}> in ${caller.source} passes <${arm.componentName}> children that respond to events or show changing state (${live}), and <${arm.componentName}> in ${source} renders its children inside ${arm.construct}.${why} When that arm changes, the browser redraws it from fixed HTML, and the children stop responding. Move the state into <${arm.componentName}>, or render {children} outside the ${arm.construct.split(' ')[0]} and hide it with an attribute. If the arm never changes after the page loads, write \`// markless-allow ${arm.code}: reason\` above it.`;
 }
 
-/** Throws the projection refusals whose verdict reads `source`, as a dev overlay error. */
-export function throwDevProjectionRefusals(registry: PropFlowRegistry, source: string): void {
-	const refusals = registry.projectionRefusals().filter((refusal) => refusal.sources.has(source));
-	if (refusals.length === 0) return;
-	const details = refusals.map((refusal) => refusal.message).join('\n\n');
+/** Throws the refusals the build would raise whose verdict reads `source`, as a dev overlay error. */
+export function throwDevPropFlowRefusals(registry: PropFlowRegistry, source: string): void {
+	const diagnostics = [
+		...registry.decidedRefusals().flatMap((refusal) =>
+			refusal.sources.has(source)
+				? [
+						{
+							code: refusal.code,
+							message: refusal.message,
+							filename: refusal.source,
+							...(refusal.position ? refusal.position : {}),
+							...(refusal.docsUrl ? { docsUrl: refusal.docsUrl } : {}),
+						},
+					]
+				: [],
+		),
+		...registry.projectionRefusals().flatMap((refusal) =>
+			refusal.sources.has(source)
+				? [{ code: refusal.code, message: refusal.message, filename: refusal.armSource, docsUrl: refusal.docsUrl }]
+				: [],
+		),
+	];
+	if (diagnostics.length === 0) return;
 	throw new MarklessCompileError({
 		version: 1,
 		// Not a file id: no single file's own compile clears it, so the overlay's per-file recheck must not own it.
-		id: `markless-projection:${source}`,
+		id: `markless-prop-flow:${source}`,
 		kind: 'compile',
-		diagnostics: refusals.map((refusal) => ({
-			code: refusal.code,
-			message: refusal.message,
-			filename: refusal.armSource,
-			docsUrl: refusal.docsUrl,
-		})),
-		details,
+		diagnostics,
+		details: diagnostics.map((diagnostic) => diagnostic.message).join('\n\n'),
 	});
 }

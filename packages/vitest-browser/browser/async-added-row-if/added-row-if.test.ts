@@ -3,6 +3,7 @@ import { cleanup, render, renderSSR } from '../../src/index.ts';
 import ImportedRows from './imported-rows.tsrx';
 import LocalRows from './local-rows.tsrx';
 import PlainRows from './plain-rows.tsrx';
+import PropFixedRows from './prop-fixed-rows.tsrx';
 import PropRows from './prop-rows.tsrx';
 
 // Component rows in a keyed @for over an async value inside @try, each row holding @if blocks:
@@ -152,4 +153,38 @@ test('CSR: rows from a plain state list (control)', async () => {
 test('SSR: rows from a plain state list (control)', async () => {
 	await renderSSR(PlainRows);
 	await rowsOpenTheirBlocks('own');
+});
+
+// A child given changing open state as a prop, whose open block holds a nested @if, cannot be rebuilt when the
+// prop changes. Dev refuses it with the build's message instead of serving a page whose first press throws.
+test('the dev server refuses rows whose child @if a changing prop decides, with the build message', async () => {
+	const response = await fetch(`${new URL('./prop-handler-rows.tsrx', import.meta.url).href}?import`);
+	expect(response.status).toBe(500);
+	expect(await response.text()).toMatch(
+		/MARKLESS_BRANCH_ARM_UPDATE_UNSUPPORTED: .*prop-handler-rows\.tsrx: \\u003cNoteBlock>: this @if \(open\) cannot be rebuilt when open changes because it holds a branch binding\. Its test reads the prop `open`, and \\u003cRow> in .*prop-handler-rows\.tsrx passes it `note`, which changes\./,
+	);
+	await expect(import('./prop-handler-rows.tsrx')).rejects.toThrow(/Failed to fetch dynamically imported module/);
+});
+
+async function fixedRowsOpen() {
+	await expect.poll(marks(3)).toBe('n n n (3 of 3)');
+	press(1, '[data-deeper]');
+	await expect.poll(markAt(1)).toBe('nd');
+	pressPage('[data-add]');
+	await expect.poll(marks(4)).toBe('n nd n n (4 of 4)');
+	press(3, '[data-deeper]');
+	await expect.poll(markAt(3)).toBe('nd');
+	expect(pageErrors).toEqual([]);
+}
+
+test('CSR: rows whose child @if every caller passes a fixed value render and handle presses', async () => {
+	await render(PropFixedRows);
+	await fixedRowsOpen();
+});
+
+// Live defect, also on main before the dev refusal: resumed from served HTML, the nested @if in a row child's
+// fixed-prop arm never flips. Remove `.fails` when it is fixed.
+test.fails('SSR: rows whose child @if every caller passes a fixed value render and handle presses', async () => {
+	await renderSSR(PropFixedRows);
+	await fixedRowsOpen();
 });
