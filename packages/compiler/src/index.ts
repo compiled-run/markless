@@ -101,6 +101,7 @@ export { emitPublicRenderModule } from './passes/public-render/module.ts';
 export { planPublicRender } from './passes/public-render/plan.ts';
 export { createProtocolStatePayloadFromArena } from './passes/protocol-state.ts';
 export { createProtocolViewPayload } from './passes/protocol-view.ts';
+export { NATIVE_FACT_COLLECTORS } from './passes/semantic-graph/expression-tree.ts';
 export {
 	createNativeViewPayload,
 	NATIVE_UNSUPPORTED_CODE,

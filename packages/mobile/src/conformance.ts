@@ -16,6 +16,8 @@ export type NativeConformance = {
 	readonly initialProperties?: ReadonlyArray<
 		readonly [node: string, name: 'value', value: string]
 	>;
+	/** Present when the payload has lists: `[repeat, keys]`. */
+	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	readonly steps: ReadonlyArray<{
@@ -33,6 +35,7 @@ export function nativeConformance(
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
 	const initialProperties = runtime.properties();
+	const initialRows = runtime.rows();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
@@ -40,6 +43,7 @@ export function nativeConformance(
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),
 		...(initialArms.length > 0 ? { initialArms } : {}),
+		...(initialRows.length > 0 ? { initialRows } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }

@@ -50,6 +50,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'list',
+		fixture: 'proofs/06-keyed-for/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
 		name: 'input',
 		fixture: 'proofs/08-text-input/App.tsrx',
 		actions: [

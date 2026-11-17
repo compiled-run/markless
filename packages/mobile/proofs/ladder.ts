@@ -108,21 +108,23 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 	];
 };
 
-/** The one Maestro flow for a rung, written from its expected.json so the two never drift. */
-export function renderFlow(folder: string, rung: LadderRung): string {
+/** The Maestro commands of each step in order: step 0 launches the app, every later step is its action then its checks. */
+export function flowSteps(rung: LadderRung): unknown[][] {
 	const launch = {
 		launchApp: {
 			clearState: true,
 			...(rung.start && { arguments: { route: rung.start } }),
 		},
 	};
-	const commands = [
-		launch,
-		...rung.steps.flatMap((step, index) => [
-			...(step.do ? actionCommands(step.do, step) : []),
-			...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
-			...assertions(step),
-		]),
-	];
-	return `${stringify({ appId: '${APP_ID}', name: folder })}---\n${stringify(commands)}`;
+	return rung.steps.map((step, index) => [
+		...(index === 0 ? [launch] : []),
+		...(step.do ? actionCommands(step.do, step) : []),
+		...(index > 0 ? assertions(changeWitness(rung.steps[index - 1]!, step)) : []),
+		...assertions(step),
+	]);
+}
+
+/** The one Maestro flow for a rung, written from its expected.json so the two never drift. */
+export function renderFlow(folder: string, rung: LadderRung): string {
+	return `${stringify({ appId: '${APP_ID}', name: folder })}---\n${stringify(flowSteps(rung).flat())}`;
 }

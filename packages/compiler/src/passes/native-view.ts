@@ -1,10 +1,11 @@
 import type {
-	NativeArmPlace,
+	NativePlace,
 	NativeBuiltin,
 	NativeExpr,
 	NativeNode,
 	NativeOp,
-	NativeScalar,
+	NativeMethod,
+	NativeValue,
 	NativeTextPart,
 	NativeViewPayload,
 } from '@markless/serializer';
@@ -71,7 +72,38 @@ type Item =
 			readonly id: string;
 			readonly arms: ReadonlyArray<string>;
 			readonly path: ReadonlyArray<number>;
+	  }
+	| {
+			readonly kind: 'repeat';
+			readonly id: string;
+			readonly row: string;
+			readonly path: ReadonlyArray<number>;
 	  };
+
+const isNativeValue = (value: unknown): value is NativeValue =>
+	value === null ||
+	typeof value === 'string' ||
+	typeof value === 'boolean' ||
+	(typeof value === 'number' && Number.isFinite(value)) ||
+	(Array.isArray(value) && value.every(isNativeValue)) ||
+	(typeof value === 'object' &&
+		Object.getPrototypeOf(value) === Object.prototype &&
+		Object.values(value as object).every(isNativeValue));
+
+/** What names mean where an expression is: an input handler's event, arrow parameters, and enclosing rows' items. */
+type Scope = {
+	readonly event?: string;
+	readonly locals: ReadonlySet<string>;
+	readonly items: ReadonlyMap<string, string>;
+};
+
+const TOP: Scope = { locals: new Set(), items: new Map() };
+
+/** Methods with JavaScript meaning that return a new value; `reverse` mutates, so only a fresh array may take it. */
+const METHODS = new Set<string>([
+	'filter', 'map', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
+	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
+]);
 
 const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
 	for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
@@ -109,7 +141,6 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	if (!root) return done(refuse('the module has no root component'));
 	if (graph.components.length !== 1) refuse('a module with more than one component');
 	if (graph.componentEdges.length > 0) refuse('child components');
-	if (graph.keyedRepeats.length > 0) refuse('@for');
 	if (graph.asyncBoundaries.length > 0) refuse('@try');
 	if (graph.behaviors.length > 0) refuse('attach behaviours');
 	const chunks = new Map(graph.markup.chunks.map((chunk) => [chunk.id, chunk]));
@@ -119,24 +150,15 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	const cells = graph.graphBindings.flatMap((binding) => {
 		if (binding.kind !== 'state') return [];
 		const value = binding.initialValue;
-		if (
-			binding.initialValueKnown !== true ||
-			!(
-				typeof value === 'string' ||
-				typeof value === 'boolean' ||
-				(typeof value === 'number' && Number.isFinite(value))
-			)
-		) {
-			refuse(
-				`state \`${binding.name}\` needs a number, string or boolean initial value known at build time`,
-			);
+		if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
 			return [];
 		}
 		return [
 			{
 				id: binding.id,
 				name: binding.name,
-				initial: value as NativeScalar,
+				initial: value,
 				...(binding.storage ? { storage: { key: binding.storage.key } } : {}),
 			},
 		];
@@ -147,15 +169,18 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	const exprOf = (
 		expression: SemanticExpression | undefined,
 		what: string,
-		eventParameter?: string,
+		scope: Scope = TOP,
 	): NativeExpr | null => {
 		if (!expression) return refuse(`${what} has no expression the compiler recorded`);
 		const all = (list: ReadonlyArray<SemanticExpression>): NativeExpr[] | null => {
-			const lowered = list.map((item) => exprOf(item, what, eventParameter));
+			const lowered = list.map((item) => exprOf(item, what, scope));
 			return lowered.every((item) => item !== null) ? (lowered as NativeExpr[]) : null;
 		};
 		switch (expression.kind) {
 			case 'read': {
+				if (scope.locals.has(expression.name)) return { local: expression.name };
+				const repeat = scope.items.get(expression.name);
+				if (repeat) return { item: repeat };
 				const cell = cellOfName.get(expression.name);
 				return cell
 					? { cell }
@@ -166,27 +191,27 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			case 'literal':
 				return { literal: expression.value };
 			case 'unary': {
-				const value = exprOf(expression.value, what, eventParameter);
+				const value = exprOf(expression.value, what, scope);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
 			case 'logical': {
-				const left = exprOf(expression.left, what, eventParameter);
-				const right = exprOf(expression.right, what, eventParameter);
+				const left = exprOf(expression.left, what, scope);
+				const right = exprOf(expression.right, what, scope);
 				if (!left || !right) return null;
 				return expression.kind === 'binary'
 					? { binary: expression.operator, left, right }
 					: { logical: expression.operator, left, right };
 			}
 			case 'conditional': {
-				const test = exprOf(expression.test, what, eventParameter);
-				const whenTrue = exprOf(expression.consequent, what, eventParameter);
-				const whenFalse = exprOf(expression.alternate, what, eventParameter);
+				const test = exprOf(expression.test, what, scope);
+				const whenTrue = exprOf(expression.consequent, what, scope);
+				const whenFalse = exprOf(expression.alternate, what, scope);
 				return test && whenTrue && whenFalse ? { if: test, whenTrue, whenFalse } : null;
 			}
 			case 'template': {
 				const parts = expression.parts.map((part) =>
-					typeof part === 'string' ? part : exprOf(part, what, eventParameter),
+					typeof part === 'string' ? part : exprOf(part, what, scope),
 				);
 				return parts.every((part) => part !== null)
 					? { template: parts as (string | NativeExpr)[] }
@@ -195,23 +220,56 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 			case 'member': {
 				const holder = expression.object;
 				if (
-					eventParameter !== undefined &&
+					scope.event !== undefined &&
 					expression.property === 'value' &&
 					holder.kind === 'member' &&
 					(holder.property === 'currentTarget' || holder.property === 'target') &&
 					holder.object.kind === 'read' &&
-					holder.object.name === eventParameter
+					holder.object.name === scope.event
 				)
 					return { event: 'value' };
-				if (expression.property !== 'length')
-					return refuse(`${what} reads \`.${expression.property}\` of a value`);
-				const object = exprOf(expression.object, what, eventParameter);
-				return object && { member: object, property: 'length' };
+				const object = exprOf(expression.object, what, scope);
+				return object && { member: object, property: expression.property };
 			}
 			case 'call': {
 				const args = all(expression.arguments);
 				return args && { call: expression.callee as NativeBuiltin, arguments: args };
 			}
+			case 'array': {
+				const items = expression.items.map((item) => {
+					const value = exprOf(item.value, what, scope);
+					return value && { spread: item.spread, value };
+				});
+				return items.every((item) => item !== null)
+					? { array: items as { spread: boolean; value: NativeExpr }[] }
+					: null;
+			}
+			case 'object': {
+				const entries = expression.entries.map(([key, value]) => {
+					const lowered = exprOf(value, what, scope);
+					return lowered && ([key, lowered] as const);
+				});
+				return entries.every((entry) => entry !== null)
+					? { object: entries as (readonly [string, NativeExpr])[] }
+					: null;
+			}
+			case 'method': {
+				if (!METHODS.has(expression.method)) return refuse(`${what} calls \`.${expression.method}()\``);
+				if (expression.method === 'reverse' && expression.object.kind !== 'array')
+					return refuse(`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`);
+				const target = exprOf(expression.object, what, scope);
+				const args = expression.arguments.map((argument) => {
+					if (argument.kind !== 'lambda') return exprOf(argument, what, scope);
+					const inner: Scope = { ...scope, locals: new Set([...scope.locals, ...argument.parameters]) };
+					const lambdaBody = exprOf(argument.body, what, inner);
+					return lambdaBody && { lambda: argument.parameters, body: lambdaBody };
+				});
+				return target && args.every((argument) => argument !== null)
+					? { method: expression.method as NativeMethod, target, arguments: args as NativeExpr[] }
+					: null;
+			}
+			case 'lambda':
+				return refuse(`${what} uses a function value outside a method call`);
 			case 'unsupported':
 				return refuse(`${what} uses ${expression.construct}, which needs a script engine`);
 		}
@@ -223,16 +281,16 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		list.push(read);
 		readsByHost.set(read.hostNodeId, list);
 	}
-	const bindingsOf = (host: string): ElementBindings =>
+	const bindingsOf = (host: string, scope: Scope): ElementBindings =>
 		(readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'property' && target.name === 'value') {
-				const value = exprOf(read.expression, 'the `value` property');
+				const value = exprOf(read.expression, 'the `value` property', scope);
 				return value ? [{ property: 'value' as const, value }] : [];
 			}
 			if (target.kind === 'attribute') {
-				const value = exprOf(read.expression, `the \`${target.name}\` attribute`);
+				const value = exprOf(read.expression, `the \`${target.name}\` attribute`, scope);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
 			if (
@@ -242,7 +300,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				target.constantClass === undefined &&
 				target.leadingClass === undefined
 			) {
-				const test = exprOf(read.expression, 'the class test');
+				const test = exprOf(read.expression, 'the class test', scope);
 				return test
 					? [
 							{
@@ -266,11 +324,11 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				: [],
 		),
 	);
-	const textPartOf = (graphNodeId: string): NativeTextPart | null => {
+	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
 		if (cellIds.has(graphNodeId)) return { cell: graphNodeId };
 		const read = computedReads.get(graphNodeId);
 		const expr = read
-			? exprOf(read.expression, 'a text expression')
+			? exprOf(read.expression, 'a text expression', scope)
 			: refuse('a text binding that is not state');
 		return expr && { expr };
 	};
@@ -281,13 +339,14 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
+	const repeatsById = new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat]));
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
-		arm: NativeArmPlace | undefined,
+		place: NativePlace,
+		scope: Scope,
 	) => {
 		lowered.add(chunk.id);
-		const place = arm ? { arm } : {};
 		const items: Item[] = [
 			...chunk.hosts.map((host): Item => ({
 				kind: 'host',
@@ -302,6 +361,11 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		];
 		for (const slot of chunk.slots) {
 			if (slot.kind === 'attribute') continue;
+			if (slot.kind === 'repeat') {
+				items.push({ kind: 'repeat', id: slot.repeatId, row: slot.rowTemplateId, path: slot.coordinate.path });
+				if (slot.emptyTemplateId) refuse('@empty');
+				continue;
+			}
 			if (slot.kind === 'branch') {
 				items.push({
 					kind: 'branch',
@@ -315,6 +379,15 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				refuse(`a ${slot.kind} binding`);
 				continue;
 			}
+			if (slot.residue.kind === 'repeat-item') {
+				const repeatId = slot.residue.repeatId;
+				const expr = slot.residue.path.reduce<NativeExpr>(
+					(object, property) => ({ member: object, property }),
+					{ item: repeatId },
+				);
+				items.push({ kind: 'part', part: { expr }, path: slot.coordinate.path });
+				continue;
+			}
 			if (slot.residue.kind !== 'graph-read') {
 				refuse(`a text binding the compiler renders once (${slot.residue.kind})`);
 				continue;
@@ -324,7 +397,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				refuse(`a text binding that reads \`.${path.join('.')}\` of state`);
 				continue;
 			}
-			const read = textPartOf(slot.residue.graphNodeId);
+			const read = textPartOf(slot.residue.graphNodeId, scope);
 			const part: NativeTextPart | null =
 				read && path.length === 1 && 'cell' in read
 					? { expr: { member: { cell: read.cell }, property: 'length' } }
@@ -368,7 +441,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				const attributes = (chunk.attributes ?? []).filter(
 					(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
 				);
-				const bindings = bindingsOf(item.id);
+				const bindings = bindingsOf(item.id, scope);
 				nodes.push({
 					kind: 'element',
 					id: item.id,
@@ -386,14 +459,34 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				});
 				continue;
 			}
+			if (item.kind === 'repeat') {
+				close();
+				const repeat = repeatsById.get(item.id);
+				const rowChunk = chunks.get(item.row);
+				if (place.arm || place.row) {
+					refuse('@for inside an @if arm or another @for');
+					continue;
+				}
+				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !cellIds.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
+					refuse('a @for over something other than a state list keyed by a path of its item');
+					continue;
+				}
+				nodes.push({ kind: 'repeat', id: item.id, parent, list: { cell: repeat.collectionGraphNodeId }, key: repeat.keyPath });
+				lowerChunk(rowChunk, parent, { row: item.id }, { ...scope, items: new Map([...scope.items, [repeat.itemName, item.id]]) });
+				continue;
+			}
 			if (item.kind === 'branch') {
 				close();
+				if (place.row) {
+					refuse('@if inside a @for row');
+					continue;
+				}
 				const site = branchSites.get(item.id);
 				if (!site || site.kind !== 'if' || site.armIndexSource !== undefined) {
 					refuse('@else if chains and @switch');
 					continue;
 				}
-				const test = exprOf(site.testExpression, 'the @if test');
+				const test = exprOf(site.testExpression, 'the @if test', scope);
 				if (!test) continue;
 				nodes.push({
 					kind: 'branch',
@@ -405,7 +498,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				});
 				item.arms.forEach((armId, index) => {
 					const armChunk = chunks.get(armId);
-					if (armChunk) lowerChunk(armChunk, parent, { branch: item.id, index });
+					if (armChunk) lowerChunk(armChunk, parent, { arm: { branch: item.id, index } }, scope);
 					else refuse(`arm ${armId} has no markup`);
 				});
 				continue;
@@ -426,9 +519,9 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		}
 		close();
 	};
-	lowerChunk(rootChunk, null, undefined);
+	lowerChunk(rootChunk, null, {}, TOP);
 	if (graph.markup.chunks.some((chunk) => !lowered.has(chunk.id)))
-		refuse('markup outside the root template and its @if arms');
+		refuse('markup outside the root template, its @if arms and its @for rows');
 
 	const handlerOps = (event: SemanticEvent): NativeOp[] => {
 		const what = `the ${event.eventName} handler`;
@@ -460,17 +553,26 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				);
 				return [];
 			}
-			const value = exprOf(statement.value, what, eventParameter);
+			const value = exprOf(
+				statement.value,
+				what,
+				eventParameter === undefined ? TOP : { ...TOP, event: eventParameter },
+			);
 			return value ? [{ op: 'assign', cell, value }] : [];
 		});
 	};
 
+	const rowHosts = new Set(nodes.flatMap((node) => (node.row ? [node.id] : [])));
 	const events: NativeViewPayload['events'][number][] = [];
 	const handlers: NativeViewPayload['handlers'][number][] = [];
 	for (const event of graph.events) {
 		const semantic = SEMANTIC_EVENTS[event.eventName];
 		if (!semantic) {
 			refuse(`the ${event.eventName} event has no native meaning yet`, event.handlerSpan);
+			continue;
+		}
+		if (rowHosts.has(event.hostNodeId)) {
+			refuse(`the ${event.eventName} handler inside a @for row`, event.handlerSpan);
 			continue;
 		}
 		const handler = `handler:${event.id}`;

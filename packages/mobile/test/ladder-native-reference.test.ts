@@ -81,7 +81,27 @@ function walk(payload: NativeViewPayload, steps: readonly LadderStep[]) {
 				else if (entry.op === 'attribute')
 					attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 				else if (entry.op === 'property') properties.set(entry.node, entry.value);
-				else if (entry.op === 'arm') {
+				else if (entry.op === 'rows') {
+					const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
+					const instanceOf = (id: string) => {
+						const at = id.indexOf('@');
+						return at < 0 ? null : { node: id.slice(0, at), key: id.slice(at + 1) };
+					};
+					const kept = new Map<string, string>();
+					for (const [id, text] of texts) {
+						const instance = instanceOf(id);
+						if (!instance || !rowNodes.includes(instance.node)) continue;
+						texts.delete(id);
+						if (entry.keys.includes(instance.key)) kept.set(id, text);
+					}
+					const fresh = new Map(runtime.texts());
+					for (const key of entry.keys)
+						for (const node of rowNodes) {
+							const id = `${node}@${key}`;
+							const text = kept.get(id) ?? fresh.get(id);
+							if (text !== undefined) texts.set(id, text);
+						}
+				} else if (entry.op === 'arm') {
 					chosen.set(entry.node, entry.index);
 					for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
 					for (const key of attributes.keys())
