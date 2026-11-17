@@ -1,0 +1,28 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 291,
+			"reason": "A click that adds a component row on a page woken from prerender records loads that row's code (PR #776): the docs playground's compile worker carries the bundler's new trigger-group planning and wake-module render-data inputs; no app page grows; measured on CI run 44062537436 against merge-queue run 44033740868 of merge-base ae49000ea",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 291,
+			"reason": "A click that adds a component row on a page woken from prerender records loads that row's code (PR #776): the docs playground's compile worker carries the bundler's new trigger-group planning and wake-module render-data inputs; no app page grows; measured on CI run 44062537436 against merge-queue run 44033740868 of merge-base ae49000ea",
+			"date": "2026-11-17"
+		}
+	]
+}
