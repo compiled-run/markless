@@ -3,7 +3,21 @@ export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
 
 export type NativeScalar = number | string | boolean;
 
-export type NativeTextPart = { readonly text: string } | { readonly cell: string };
+/** A value computed from cells as data: JavaScript truthiness for `not` and `if`, `===` for `equals`. */
+export type NativeExpr =
+	| { readonly cell: string }
+	| { readonly literal: NativeScalar }
+	| { readonly not: NativeExpr }
+	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
+	| { readonly equals: readonly [NativeExpr, NativeExpr] };
+
+export type NativeTextPart =
+	| { readonly text: string }
+	| { readonly cell: string }
+	| { readonly expr: NativeExpr };
+
+/** Where a node sits when it belongs to one arm of an `@if`: shown only while that arm is chosen. */
+export type NativeArmPlace = { readonly branch: string; readonly index: number };
 
 export type NativeNode =
 	| {
@@ -14,6 +28,9 @@ export type NativeNode =
 			readonly parent: string | null;
 			/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 			readonly attributes?: Readonly<Record<string, string>>;
+			/** Attributes that follow state; each value is written as the web writes it (absent, bare or a string). */
+			readonly bindings?: ReadonlyArray<{ readonly attribute: string; readonly value: NativeExpr }>;
+			readonly arm?: NativeArmPlace;
 	  }
 	| {
 			readonly kind: 'text';
@@ -21,6 +38,16 @@ export type NativeNode =
 			readonly id: string;
 			readonly parent: string;
 			readonly parts: ReadonlyArray<NativeTextPart>;
+			readonly arm?: NativeArmPlace;
+	  }
+	| {
+			/** An `@if`: arm 0 while `test` is truthy, arm 1 (when there is an `@else`) otherwise. */
+			readonly kind: 'branch';
+			readonly id: string;
+			readonly parent: string | null;
+			readonly test: NativeExpr;
+			readonly arms: number;
+			readonly arm?: NativeArmPlace;
 	  };
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
@@ -47,4 +74,9 @@ export type NativeViewPayload = {
 };
 
 /** One change a host applies to its retained views after a handler runs. */
-export type NativeJournalEntry = { readonly op: 'text'; readonly node: string; readonly value: string };
+export type NativeJournalEntry =
+	| { readonly op: 'text'; readonly node: string; readonly value: string }
+	/** `value` null removes the attribute; "" is a bare (present) attribute. */
+	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
+	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
+	| { readonly op: 'arm'; readonly node: string; readonly index: number | null };

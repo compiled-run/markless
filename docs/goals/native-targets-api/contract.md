@@ -104,6 +104,36 @@ export function Counter() @{
   them. The TypeScript reference runtime in `packages/mobile/src/runtime.ts` defines the expected journal; each host must
   reproduce the conformance vectors byte for byte.
 
+### Additions for rungs 4 and 5 (pushed 2026-11-17)
+
+- **Expressions** (`NativeExpr`), evaluated by hosts with JavaScript meaning: `{ cell }`, `{ literal }`, `{ not: e }`
+  (JS truthiness), `{ if: e, whenTrue: e, whenFalse: e }` (not `then`, so no payload object is a thenable), `{ equals: [e, e] }` (`===`; `!==` arrives as `not` of `equals`). The
+  analyzer records the shape (`SemanticTemplateRead.valueShape`, `SemanticBranchSite.testShape`); anything else is refused.
+- **Text parts** may be `{ expr: e }`, formatted like a cell (`String(value)`).
+- **Element `bindings`**: `[{ attribute, value: e }]`. A class that follows state is the attribute `class` with
+  `{ if: test, whenTrue: { literal: 'like on mk-x' }, whenFalse: { literal: 'like mk-x' } }` (scope class included). The written
+  value follows the web's rule exactly (`marklessAttributeValue` in `@markless/web/dom-attribute`, which the reference
+  runtime imports): `null`, `undefined` and `false` are absent, except names that spell false (`aria-pressed`,
+  `aria-expanded`, `aria-checked`, `aria-selected`, `aria-disabled`... see the file) where `false` is `"false"`; `true` is
+  bare (`""`) except `aria-*`/`data-*` and the enumerated names, where it is `"true"`; anything else is `String(value)`.
+- **Branches**: `{ kind: 'branch', id: 'branch-site:0', parent, test, arms: 1 | 2 }` sits among its parent's children in
+  document order. Its arms' nodes follow it, each with `arm: { branch, index }`; arm 0 is shown while `test` is truthy, arm 1
+  (the `@else`) otherwise, none when there is no `@else`. Only plain `@if`/`@else` for now; chains and `@switch` are refused.
+- **Journal entries**: `{ op: 'attribute', node, name, value: string | null }` and `{ op: 'arm', node: <branch id>, index:
+  number | null }`. For `arm`, the host removes the old arm's views and builds the new arm's nodes at the branch's position,
+  from current values; it receives no `text`/`attribute` entries for nodes that were not shown both before and after.
+  Entries come in document order.
+- **Vectors** add, when non-empty, `initialAttributes: [[node, name, value]]` and `initialArms: [[branch, index]]`. New files:
+  `attributes.json` (rung 4) and `if.json` (rung 5), built from the ladder's own `App.tsrx`.
+- **Host mapping for bound attributes**, per platform: `aria-label` to `accessibilityLabel` / `contentDescription`;
+  `disabled` present to `isEnabled = false` on both; `aria-pressed`/`aria-selected` `"true"` to the selected trait /
+  `isSelected`; `aria-expanded` to the expanded state (`accessibilityValue` on iOS, `AccessibilityNodeInfo` expanded state
+  on Android). `class` is not applied by hosts as text: it selects the element's Dragon style (below). Unknown bound
+  attributes are ignored by hosts, not errors, so web-only attributes do not break a build.
+- **Styles that follow a class** (for native-dragon-styles): the style export may give an element `variants: [{ class,
+  writes }]`, one per class string the binding can produce (both literals of the `if` above); a host applies the variant
+  whose `class` equals the current value, after the node's base writes. Frames do not change with a variant yet.
+
 ### Building a payload and the conformance vectors (pushed)
 
 - Compile: `compileNativeComponent({ filename, source })` from `@markless/mobile` (`packages/mobile/src/compile.ts`) returns
@@ -210,19 +240,25 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
 Each rung: a real `.tsrx` compiled by the real compiler, the same Maestro flow green on the iOS simulator and the Android
 emulator, the web build of the same component as the reference. A rung green on one platform only is not passed.
 
-| # | Rung | Web | iOS | Android | Check |
-|---|---|---|---|---|---|
-| 1 | Static elements and text | not started | not started | not started | `proofs/01-static-text/flow.yaml` |
-| 2 | Styles through Dragon | n/a | not started | not started | Dragon Chrome compare green (above); device flow pending |
-| 3 | A state write updates text (counter) | not started | not started | not started | `proofs/03-counter/flow.yaml` + conformance vectors |
-| 4 | Attributes and classes that follow state | not started | not started | not started | |
-| 5 | `@if` | not started | not started | not started | |
-| 6 | Keyed `@for` (add, remove, reorder) | not started | not started | not started | |
-| 7 | Child component with props and a callback | not started | not started | not started | |
-| 8 | Text input and two-way state | not started | not started | not started | |
-| 9 | Storage | not started | not started | not started | |
-| 10 | State from the URL and one route change | not started | not started | not started | |
-| 11 | Async value with `@try`/`@pending`/`@catch` | not started | not started | not started | |
+Columns: **Web** is `packages/mobile/test/ladder-web.test.ts` (builds each rung as a real router app and drives it in
+Chromium; heavy lane). **Native reference** is `packages/mobile/test/ladder-native-reference.test.ts`: the real compiler's
+payload run through the reference runtime by a mirror host that changes what it shows only through journal entries,
+checked against the same `expected.json`; "refused" means the compiler refuses the rung by name. Neither is a device
+result. **iOS** and **Android** pass only with the rung's Maestro flow green on the simulator and the emulator.
+
+| # | Rung | Web | Native reference | iOS | Android | Notes |
+|---|---|---|---|---|---|---|
+| 1 | Static elements and text | passing | passing | not yet | not yet |  |
+| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | not yet | not yet | style: Dragon Chrome compare green |
+| 3 | A state write updates text | passing | passing | not yet | not yet | vectors `counter.json` |
+| 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
+| 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
+| 6 | Keyed `@for` (add, remove, reorder) | passing | refused | not yet | not yet | needs list regions and array-op facts |
+| 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
+| 8 | Text input and two-way state | passing | refused | not yet | not yet | needs input element, `value` property, input event |
+| 9 | Storage | passing | refused | not yet | not yet | handler is `String(Number(visits) + 1)`: needs a script engine or a numeric storage cell |
+| 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
+| 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the
