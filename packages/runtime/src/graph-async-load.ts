@@ -165,6 +165,8 @@ export type AsyncPlaneState = AsyncPlaneContext & {
 	readonly staleDerives: Map<string, number>;
 	/** Runs `run` with what it invalidates decided as `quiet`, whatever turn is open: an answer landing refreshes its readers as it was refreshed. */
 	readonly decidedAs: (quiet: boolean, run: () => void) => void;
+	/** Holds a first run an arm-owned value is asked for until the pass decides its arm; false when it may start now. */
+	readonly heldForArm: (node: RuntimeAsyncComputedNode) => boolean;
 };
 
 /** Runs, refresh scheduling, entry marks and failures: `@markless/runtime/graph-async-refresh`. */
@@ -233,6 +235,7 @@ export function createAsyncPlane(
 			start: (...args) => bound!.start(...args),
 			peek,
 			isQuiet: internals.isQuiet && (() => replaying ?? internals.isQuiet!()),
+			heldForArm,
 			decidedAs: (quiet, run) => {
 				const outer = replaying;
 				replaying = quiet;
@@ -278,6 +281,12 @@ export function createAsyncPlane(
 	for (const each of asyncComputed ?? []) add(createNode(each));
 	// Runs that writes asked of loads an arm owns, held until the pass has flipped the arm.
 	let armHeld: Map<RuntimeAsyncComputedNode, boolean | undefined> | undefined;
+	// A first run asked for before the pass decides its arm would key on what may be closing it.
+	function heldForArm(node: RuntimeAsyncComputedNode): boolean {
+		if (node.boundaryGate || !internals.armsUndecided?.() || internals.armShown?.(node.graphNodeId) === undefined) return false;
+		(armHeld ??= new Map()).set(node, armHeld.get(node) ?? false);
+		return true;
+	}
 	function startWritten(passEnd?: boolean): void {
 		const batch = passEnd ? armHeld : written;
 		if (passEnd) armHeld = undefined;
@@ -285,7 +294,11 @@ export function createAsyncPlane(
 		batch?.forEach((quiet, node) => {
 			// A gate fetches nothing, so it never waits.
 			const shown = node.boundaryGate ? undefined : internals.armShown?.(node.graphNodeId);
-			if (!passEnd && shown !== undefined) return void (armHeld ??= new Map()).set(node, quiet);
+			if (!passEnd && shown !== undefined) {
+				// The run in flight would read the inputs that moved, which may be the ones closing its arm.
+				if (node.phase === NODE_RUNNING || node.phase === NODE_RUNNING_ON_SHOWN) node.controller?.abort();
+				return void (armHeld ??= new Map()).set(node, quiet);
+			}
 			if (shown === false || nodes.get(node.graphNodeId) !== node) return;
 			withRefresh((loaded) => {
 				replaying = quiet;
@@ -306,7 +319,7 @@ export function createAsyncPlane(
 		nodes,
 		read(node, path) {
 			if (written?.has(node)) startWritten();
-			if (node.phase <= NODE_PLANNED) withRefresh((loaded) => loaded.advance(node), node);
+			if (node.phase <= NODE_PLANNED && !heldForArm(node)) withRefresh((loaded) => loaded.advance(node), node);
 			return peek(node, path);
 		},
 		invalidate,

@@ -64,6 +64,8 @@ export type AsyncComputedPlaneInternals = {
 	readonly hasPendingFlush?: () => boolean;
 	/** False for a value an @if or @switch arm owns once that arm no longer shows; undefined for a value no arm owns. */
 	readonly armShown?: (graphNodeId: string) => boolean | undefined;
+	/** True while a write waits on a pass that has not yet decided the arms, so a branch test may still read as it did before the write. */
+	readonly armsUndecided?: () => boolean;
 };
 
 /** Async computeds, from `@markless/runtime/graph-async`; a graph without async values never loads it. */
@@ -749,6 +751,9 @@ export function createRuntimeGraph(input: RuntimeGraphInput): RuntimeGraph {
 			return hasPendingFlush();
 		},
 		armShown: (graphNodeId) => armShown?.(graphNodeId),
+		armsUndecided() {
+			return dirtyPaths.length > 0 || flushPhase === FLUSH_SCHEDULED || flushPhase === FLUSH_RUNNING || flushPhase === FLUSH_REARMED;
+		},
 	};
 	// Without a plane a graph behaves as it did before reconciliation existed.
 	const plane = input.reconcile?.(internals);
