@@ -47,10 +47,12 @@ public enum NativeJournalEntry: Equatable, Sendable {
 		case let .navigate(route, params):
 			return .object([("op", .string("navigate")), ("route", .string(route)), ("params", .object(params.map { ($0.name, .string($0.value)) }))])
 		case let .call(call, object, arguments, result, resume):
-			return .object(
-				[("op", .string("call")), ("call", .string(call))] + (object.map { [("object", JSONValue.string($0))] } ?? [])
-					+ [("arguments", .array(arguments.map(\.json)))] + (result.map { [("result", JSONValue.string($0))] } ?? [])
-					+ (resume.map { [("resume", JSONValue.string($0))] } ?? []))
+			var fields: [(String, JSONValue)] = [("op", .string("call")), ("call", .string(call))]
+			if let object { fields.append(("object", .string(object))) }
+			fields.append(("arguments", .array(arguments.map(\.json))))
+			if let result { fields.append(("result", .string(result))) }
+			if let resume { fields.append(("resume", .string(resume))) }
+			return .object(fields)
 		}
 	}
 }

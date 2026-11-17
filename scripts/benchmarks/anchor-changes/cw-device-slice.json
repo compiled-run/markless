@@ -1,0 +1,11 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 230,
+			"reason": "Build-time device folding: the analyzer's hooks that every web compile carries (folded @if and text maps, the device-object check before a handler rebuilds a local, a member tag's path) ship in the docs playground's in-browser compile worker; the target analysis itself is passed in only by the build plugin and does not ship; executed chars +1; measured on CI run 44184211995 against the anchor cw-native-targets carries (1709146)",
+			"date": "2026-11-17"
+		}
+	]
+}
