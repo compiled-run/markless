@@ -1,7 +1,9 @@
 import type {
 	BoundSymbolResolverRow,
 	RenderDataArtifact,
+	SemanticBranchSite,
 	SemanticComponentEdge,
+	SemanticGraphBinding,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '@markless/compiler';
@@ -159,6 +161,8 @@ export function planPrerenderTriggerGroups(input: {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
+	readonly graphBindings?: ReadonlyArray<Pick<SemanticGraphBinding, 'id' | 'componentName'>>;
+	readonly branchSites?: ReadonlyArray<Pick<SemanticBranchSite, 'id' | 'componentName'>>;
 	readonly renderData?: RenderDataArtifact;
 }): PrerenderTriggerGroup[] {
 	const symbols = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
@@ -326,6 +330,8 @@ export function planPrerenderTriggerGroups(input: {
 					if (runnerSymbolId) symbolIds.add(runnerSymbolId);
 				}
 				selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
+				for (const index of selected.repeats)
+					collectRowComponentSymbols(input, closureView.keyedRepeats![index]!, symbols, symbolIds);
 				const escalatedBranchIds = new Set<string>();
 				for (const index of selected.branches) {
 					const record = closureView.branches?.[index];
@@ -475,6 +481,54 @@ export function planPrerenderTriggerGroups(input: {
 	return groups.map(({ adoptsSettledArm, ...group }) =>
 		adoptsSettledArm && armRendererModuleId ? { ...group, armRendererModuleId } : group,
 	);
+}
+
+// A component row this group builds runs its components' code: what they bind under the repeat, and every symbol they own.
+function collectRowComponentSymbols(
+	input: Parameters<typeof planPrerenderTriggerGroups>[0],
+	repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number],
+	symbols: ReadonlyMap<string, SymbolResolverPlan['symbols'][number]>,
+	symbolIds: Set<string>,
+): void {
+	if (!repeat.rowComponent) return;
+	for (const row of input.boundRows)
+		if (row.ancestry.some((step) => step.keyedRepeatScopeIds.includes(repeat.id)))
+			symbolIds.add(row.id);
+	const edges = input.componentEdges ?? [];
+	const components = new Set(
+		edges
+			.filter((edge) => !edge.importSource && edge.keyedRepeatScopeIds.includes(repeat.id))
+			.map((edge) => edge.childComponentName),
+	);
+	for (const name of components)
+		for (const edge of edges)
+			if (!edge.importSource && edge.parentComponentName === name)
+				components.add(edge.childComponentName);
+	const hostOwners = new Map(
+		(input.renderData?.chunks ?? []).flatMap((chunk) =>
+			chunk.hosts.map((host) => [host.hostNodeId, chunk.componentName] as const),
+		),
+	);
+	const graphOwners = new Map(
+		(input.graphBindings ?? []).map((binding) => [binding.id, binding.componentName]),
+	);
+	const branchOwners = new Map((input.branchSites ?? []).map((site) => [site.id, site.componentName]));
+	const edgeOwners = new Map(edges.map((edge) => [edge.id, edge.parentComponentName]));
+	for (const symbol of symbols.values()) {
+		const owner =
+			'hostNodeId' in symbol
+				? hostOwners.get(symbol.hostNodeId)
+				: symbol.kind === 'callback-prop'
+					? edgeOwners.get(symbol.componentEdgeId)
+					: symbol.kind === 'branch-update'
+						? branchOwners.get(symbol.branchSiteId)
+						: symbol.kind === 'shared-seed'
+							? symbol.componentName
+							: 'graphNodeId' in symbol
+								? graphOwners.get(symbol.graphNodeId)
+								: undefined;
+		if (owner !== undefined && components.has(owner)) symbolIds.add(symbol.id);
+	}
 }
 
 // Graph cells a settled arm reads: its own records, page records bound to its hosts, and props it forwards to children inside it.

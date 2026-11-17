@@ -447,6 +447,8 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					symbolResolver: compiled.symbolResolver,
 					boundRows: importedBoundRows,
 					componentEdges: compiled.semanticGraph.componentEdges,
+					graphBindings: compiled.semanticGraph.graphBindings,
+					branchSites: compiled.semanticGraph.branchSites,
 					renderData: compiled.renderData,
 				})
 			: [];
@@ -733,6 +735,15 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 							needsFullResume: prerenderClosureNeedsWake,
 							prerenderDataId: renderDataId,
 							lazyRenderDataId,
+							...(servedRenderData
+								? { servedRenderDataId: servedRenderDataEntryId(encodedModuleId) }
+								: {}),
+							renderDataId: canonicalRenderData ? renderDataId : undefined,
+							linkedRowSlotReaders: importedRowSlotReaders(input.importedModuleInterfaces),
+							linkedRowComponents: importedRowComponentMints(input.importedModuleInterfaces),
+							linkedRowTemplates: importedRowTemplateMints(input.importedModuleInterfaces),
+							linkedNestedRepeats: importedNestedRepeats(input.importedModuleInterfaces),
+							linkedRowBranches: importedRowBranchMints(input.importedModuleInterfaces),
 							prerenderTriggerGroups: prerenderTriggerGroups.map((group, index) => ({
 								...group,
 								moduleId: triggerGroupVirtualModuleId(input.filename, index),
