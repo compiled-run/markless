@@ -6,6 +6,9 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Debug
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
@@ -23,6 +26,7 @@ import dev.markless.mobile.core.JournalEntry
 import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
+import dev.markless.mobile.core.ScriptEngine
 import dev.markless.mobile.core.Store
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.StyleWrite
@@ -57,9 +61,14 @@ class MarklessHost(
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
+	/** Proof only: the JavaScript engine `script` ops run in, by name; started on the first one. */
+	engine: Pair<String, (String) -> ScriptEngine>? = ScriptEngines.linked(),
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
-	val runtime = Runtime(payload, store, params)
+	val runtime = Runtime(payload, store, params, engine?.let { (name, start) -> { source: String -> measureStart(name, start, source) } })
+	private val timers = Handler(Looper.getMainLooper())
+	/** Proof only: true once the first dispatch that ran a script has been timed. */
+	private var timedFirstScript = false
 	val style: StyleExport? = styleExportBytes?.let { StyleExport.decode(it) }
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
@@ -92,6 +101,7 @@ class MarklessHost(
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
 		buildShown()
 		root = views.getValue(top.id)
+		runtime.onScriptError = { e -> Log.w(ENGINE_TAG, "script handler threw: ${e.cause ?: e}") }
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -103,10 +113,32 @@ class MarklessHost(
 
 	fun textView(id: String): TextView = textViews[id] ?: throw MarklessHostError("no text view for \"$id\"")
 
+	private fun measureStart(name: String, start: (String) -> ScriptEngine, source: String): ScriptEngine {
+		val heapBefore = Debug.getNativeHeapAllocatedSize()
+		val t0 = System.nanoTime()
+		val engine = start(source)
+		Log.i(ENGINE_TAG, "engine $name started in ${"%.2f".format((System.nanoTime() - t0) / 1e6)} ms, native heap +${(Debug.getNativeHeapAllocatedSize() - heapBefore) / 1024} KiB, script ${source.length} chars")
+		return engine
+	}
+
+	/** Proof only: runs a dispatch and logs how long it took, the first one that ran a script apart. */
+	private fun timed(what: String, run: () -> List<JournalEntry>) {
+		val scripted = !timedFirstScript && payload.script != null
+		val t0 = System.nanoTime()
+		val journal = run()
+		apply(journal)
+		val ms = (System.nanoTime() - t0) / 1e6
+		Log.i(ENGINE_TAG, "$what ${"%.2f".format(ms)} ms${if (scripted && runtime.engineStarted) " (first after the engine started)" else ""}")
+		if (scripted && runtime.engineStarted) timedFirstScript = true
+	}
+
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
 		for (entry in journal) {
 			when (entry) {
+				is JournalEntry.Timer -> {
+					timers.postDelayed({ timed("timer ${entry.id}") { runtime.fire(entry.id) } }, entry.ms.toLong())
+				}
 				is JournalEntry.Text -> textView(entry.node).text = entry.value
 				is JournalEntry.Attribute -> attribute(entry.node, entry.name, entry.value)
 				is JournalEntry.Property -> {
@@ -248,7 +280,7 @@ class MarklessHost(
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { timed("tap ${e.host}") { runtime.dispatch(e.host, EventName.Activate) } }
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -398,6 +430,7 @@ class MarklessHost(
 
 	companion object {
 		const val TAG = "MarklessHost"
+		const val ENGINE_TAG = "MarklessEngine"
 		private val HEADINGS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
 	}
 }

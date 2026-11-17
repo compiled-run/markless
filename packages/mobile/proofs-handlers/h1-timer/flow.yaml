@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: h1-timer
+---
+- launchApp:
+    clearState: true
+- assertVisible: Reload 0
+- assertVisible: Page done
+- tapOn: Reload 0
+- assertNotVisible: Page done
+- assertVisible: Reload 1
+- assertVisible: Page loading
+- assertNotVisible: Page done
+- tapOn: Reload 1
+- assertNotVisible: Reload 1
+- assertVisible: Reload 2
+- assertVisible: Page loading
+- assertNotVisible: Reload 1
+- extendedWaitUntil:
+    visible: Reload 2
+    timeout: 15000
+- assertNotVisible: Page loading
+- assertVisible: Reload 2
+- assertVisible: Page done
+- assertNotVisible: Page loading

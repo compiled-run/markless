@@ -1,0 +1,47 @@
+{
+	"rung": 106,
+	"name": "Rung 8 with every handler in the engine",
+	"scriptHandlers": "all",
+	"steps": [
+		{
+			"visible": [
+				"Greeting",
+				"Hello Sam"
+			],
+			"fields": {
+				"Name": "Sam"
+			}
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Name",
+					"text": "Ada"
+				}
+			},
+			"visible": [
+				"Hello Ada"
+			],
+			"absent": [
+				"Hello Sam"
+			],
+			"fields": {
+				"Name": "Ada"
+			}
+		},
+		{
+			"do": {
+				"tap": "Use Bo"
+			},
+			"visible": [
+				"Hello Bo"
+			],
+			"absent": [
+				"Hello Ada"
+			],
+			"fields": {
+				"Name": "Bo"
+			}
+		}
+	]
+}

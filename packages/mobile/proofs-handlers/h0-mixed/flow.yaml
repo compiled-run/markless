@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: h0-mixed
+---
+- launchApp:
+    clearState: true
+- assertVisible: Count 0
+- assertVisible: Phase idle
+- tapOn: Count 0
+- assertNotVisible: Count 0
+- assertVisible: Count 1
+- assertNotVisible: Count 0
+- tapOn: Phase idle
+- assertVisible: Phase waiting
+- assertNotVisible: Phase idle
+- extendedWaitUntil:
+    visible: Phase done
+    timeout: 15000
+- assertNotVisible: Phase waiting
+- assertVisible: Phase done
+- assertNotVisible: Phase waiting
+- tapOn: Count 1
+- assertVisible: Count 2
+- assertVisible: Phase done
+- assertNotVisible: Count 1

@@ -1,0 +1,9 @@
+{
+	"rung": 104,
+	"name": "An object of the platform: Intl.NumberFormat",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["Total $19.99"] },
+		{ "do": { "tap": "Add" }, "visible": ["Total $1,270.49"], "absent": ["Total $19.99"] }
+	]
+}

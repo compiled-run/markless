@@ -1,0 +1,17 @@
+appId: ${APP_ID}
+name: h2-regex
+---
+- launchApp:
+    clearState: true
+- assertVisible: /blog/hell
+- tapOn: Type O
+- assertNotVisible: /blog/hell
+- assertVisible: /blog/hello
+- assertNotVisible: /blog/hell
+- tapOn: Type slash
+- assertVisible: /blog/hello
+- assertNotVisible: /blog/hello/
+- tapOn: Backspace
+- assertNotVisible: /blog/hello
+- assertVisible: /blog/hell
+- assertNotVisible: /blog/hello

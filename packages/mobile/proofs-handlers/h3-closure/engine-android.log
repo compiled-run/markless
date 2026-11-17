@@ -1,0 +1,4 @@
+I/MarklessEngine( 4846): engine hermes started in 10.68 ms, native heap +194 KiB, script 1938 chars
+I/MarklessEngine( 4846): tap h3 12.55 ms (first after the engine started)
+I/MarklessEngine( 4846): tap h3 1.39 ms
+W/libc    ( 3044): Access denied finding property "ro.debuggable"

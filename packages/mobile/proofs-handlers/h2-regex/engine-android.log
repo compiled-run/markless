@@ -1,0 +1,4 @@
+I/MarklessEngine( 4559): engine hermes started in 4.83 ms, native heap +195 KiB, script 2173 chars
+I/MarklessEngine( 4559): tap h2 5.66 ms (first after the engine started)
+I/MarklessEngine( 4559): tap h3 0.38 ms
+I/MarklessEngine( 4559): tap h4 1.05 ms

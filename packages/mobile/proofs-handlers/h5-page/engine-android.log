@@ -1,0 +1,12 @@
+I/MarklessEngine( 5425): engine hermes started in 4.76 ms, native heap +193 KiB, script 1750 chars
+W/MarklessEngine( 5425): script handler threw: java.lang.RuntimeException: undefined is not a function
+W/MarklessEngine( 5425): 
+W/MarklessEngine( 5425): TypeError: undefined is not a function
+W/MarklessEngine( 5425):     at handler (markless.js:15:44)
+W/MarklessEngine( 5425):     at event:0 (markless.js:17:17)
+W/MarklessEngine( 5425):     at anonymous (markless.js:35:52)
+W/MarklessEngine( 5425):     at run (markless.js:25:6)
+W/MarklessEngine( 5425):     at dispatch (markless.js:35:13)
+W/MarklessEngine( 5425):     at global (markless.js:1:20)
+I/MarklessEngine( 5425): tap h2 5.41 ms (first after the engine started)
+I/MarklessEngine( 5425): tap h3 0.96 ms

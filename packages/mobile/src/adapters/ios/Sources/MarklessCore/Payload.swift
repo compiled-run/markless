@@ -119,6 +119,8 @@ public enum NativeOp: Equatable, Sendable {
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params; ops after it do not run.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// Proof only: runs `handler` of the payload's script in a JavaScript engine; the cells it changed are written.
+	case script(handler: String)
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -178,6 +180,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let nodes: [NativeNode]
 	public let events: [NativeEvent]
 	public let handlers: [NativeHandler]
+	/// Proof only: the source `script` ops run (defines `__markless`).
+	public var script: String? = nil
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -185,7 +189,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "script"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -285,6 +289,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "navigate":
 					let opField = try op.object(["op", "route", "params"])
 					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+				case "script":
+					let opField = try op.object(["op", "handler"])
+					return .script(handler: try opField["handler"].string())
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
@@ -295,8 +302,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
-		let payload = NativeViewPayload(
+		var payload = NativeViewPayload(
 			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers)
+		if fields.has("script") { payload.script = try fields["script"].object(["source"])["source"].string() }
 		try payload.check()
 		return payload
 	}

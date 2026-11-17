@@ -1,0 +1,8 @@
+2026-11-17 17:58:49.103 Df Proof[42685:1246e1e] (Foundation) MarklessEngine engine javascriptcore started in 3.81 ms, footprint +3424 KiB, script 1803 chars
+2026-11-17 17:58:49.104 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 4.67 ms (first after the engine started)
+2026-11-17 17:58:49.826 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 0.34 ms
+2026-11-17 17:58:49.861 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 0.30 ms
+2026-11-17 17:58:51.788 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 0.27 ms
+2026-11-17 17:58:52.527 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 0.51 ms
+2026-11-17 17:58:52.566 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h2 0.55 ms
+2026-11-17 17:58:59.681 Df Proof[42685:1246e1e] (Foundation) MarklessEngine tap h4 0.58 ms

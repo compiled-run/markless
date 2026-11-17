@@ -1,3 +1,4 @@
+import Foundation
 /// What a person does to a retained view.
 public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
@@ -27,9 +28,12 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case arm(node: String, index: Int?)
 	/// Leave this page: the host builds the page at `route` from scratch with `params`.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// Proof only: the script asked for timer `id` to fire after `ms`; the host calls `fire(timer:)` then.
+	case timer(id: Int, ms: Double)
 
 	public var json: JSONValue {
 		switch self {
+		case let .timer(id, ms): return .object([("op", .string("timer")), ("id", .number(Double(id))), ("ms", .number(ms))])
 		case let .text(node, value): return .object([("op", .string("text")), ("node", .string(node)), ("value", .string(value))])
 		case let .state(cell, value):
 			return .object([("op", .string("state")), ("cell", .string(cell)), ("value", value.json)])
@@ -78,8 +82,18 @@ public struct NativeInstance {
 	public let scope: NativeScope
 }
 
+/// Proof only: a JavaScript engine that evaluates one expression of the payload's script and returns its string result.
+public protocol NativeScriptEngine: AnyObject {
+	func call(_ expression: String) throws -> String
+}
+
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
+	private let startEngine: ((String) throws -> NativeScriptEngine)?
+	private var engine: NativeScriptEngine?
+	public var engineStarted: Bool { engine != nil }
+	/// Called when a script handler throws; the handler then changes nothing.
+	public var onScriptError: ((Error) -> Void)?
 	public let payload: NativeViewPayload
 	private var values: [String: NativeValue]
 	private let store: NativeStore
@@ -90,7 +104,11 @@ public final class NativeRuntime {
 	private var eventValue: String?
 
 	/// `params`: the route params the page opened with.
-	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = []) {
+	public init(
+		payload: NativeViewPayload, store: NativeStore = MemoryStore(), params: [NativeRouteParam] = [],
+		startEngine: ((String) throws -> NativeScriptEngine)? = nil
+	) {
+		self.startEngine = startEngine
 		self.payload = payload
 		self.params = params
 		self.store = store
@@ -278,12 +296,79 @@ public final class NativeRuntime {
 		}
 	}
 
+	/// Starts the engine now (warming at idle) instead of on the first `script` op.
+	public func warmEngine() throws { if payload.script != nil { _ = try engineOrStart() } }
+
+	private func engineOrStart() throws -> NativeScriptEngine {
+		if let engine { return engine }
+		guard let startEngine else { throw RuntimeError(reason: "a script op, but this host has no script engine") }
+		guard let script = payload.script else { throw RuntimeError(reason: "a script op in a payload with no script") }
+		let started = try startEngine(script)
+		engine = started
+		return started
+	}
+
+	/// One script call: writes the cells it changed, in the order it reports them, and returns the timers it asked for.
+	private func runScript(_ call: (String) -> String) throws -> [NativeJournalEntry] {
+		let cellsObject = JSONValue.object(payload.cells.map { ($0.id, (values[$0.id] ?? .null).json) })
+		let cells = JSONValue.string(cellsObject.jsonText).jsonText
+		let text: String
+		do {
+			text = try engineOrStart().call(call(cells))
+		} catch let error as RuntimeError {
+			throw error
+		} catch {
+			onScriptError?(error)
+			return []
+		}
+		let result = try Reader(try JSONValue.parse(Data(text.utf8)), at: "script result").object(["writes", "timers"])
+		for write in try result["writes"].array() {
+			let pair = try write.array()
+			let cell = try pair[0].string()
+			guard values[cell] != nil else { throw RuntimeError(reason: "the script wrote unknown cell \(cell)") }
+			let value = NativeValue(json: try pair[1].value)
+			values[cell] = value
+			if let key = storageKeys[cell] { store.write(key, value) }
+		}
+		return try result["timers"].array().map { timer in
+			let pair = try timer.array()
+			return .timer(id: Int(try pair[0].number()), ms: try pair[1].number())
+		}
+	}
+
+	/// Proof only: timer `id` that a script asked for fires.
+	public func fire(timer id: Int) throws -> [NativeJournalEntry] {
+		try journal(host: nil, value: nil) { timers in
+			timers += try runScript { cells in "__markless.fire(\(id), \(cells))" }
+			return nil
+		}
+	}
+
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
 		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
-		eventValue = action.event == .input ? action.value ?? "" : nil
+		let value = action.event == .input ? action.value ?? "" : nil
+		return try journal(host: action.host, value: value) { timers in
+			for op in handlers[bound.handler] ?? [] {
+				switch op {
+				case let .navigate(route, params): return [.navigate(route: route, params: params)]
+				case let .script(handler):
+					let event = JSONValue.string(JSONValue.object(value.map { [("value", .string($0))] } ?? []).jsonText).jsonText
+					timers += try runScript { cells in "__markless.dispatch(\(JSONValue.string(handler).jsonText), \(cells), \(event))" }
+				case let .assign(cell, expr):
+					let result = try evaluate(expr)
+					values[cell] = result
+					if let key = storageKeys[cell] { store.write(key, result) }
+				}
+			}
+			return nil
+		}
+	}
+
+	private func journal(host: String?, value: String?, _ run: (inout [NativeJournalEntry]) throws -> [NativeJournalEntry]?) throws -> [NativeJournalEntry] {
+		eventValue = value
 		defer { eventValue = nil }
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
@@ -292,18 +377,11 @@ public final class NativeRuntime {
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let beforeAttributes = keyed(try attributes())
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
-		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
+		if let eventValue, let host { beforeProperties["\(host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
-		for op in handlers[bound.handler] ?? [] {
-			switch op {
-			case let .navigate(route, params): return [.navigate(route: route, params: params)]
-			case let .assign(cell, expr):
-				let value = try evaluate(expr)
-				values[cell] = value
-				if let key = storageKeys[cell] { store.write(key, value) }
-			}
-		}
+		var timers: [NativeJournalEntry] = []
+		if let early = try run(&timers) { return early }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
@@ -337,6 +415,6 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries
+		return styles + entries + timers
 	}
 }

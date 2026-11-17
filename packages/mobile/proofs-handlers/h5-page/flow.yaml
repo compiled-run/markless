@@ -1,0 +1,15 @@
+appId: ${APP_ID}
+name: h5-page
+---
+- launchApp:
+    clearState: true
+- assertVisible: Motion unknown
+- assertVisible: Taps 0
+- tapOn: Ask the page
+- assertVisible: Motion unknown
+- assertNotVisible: Motion full
+- assertNotVisible: Motion reduced
+- tapOn: Taps 0
+- assertVisible: Taps 1
+- assertVisible: Motion unknown
+- assertNotVisible: Taps 0

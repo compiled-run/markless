@@ -40,10 +40,23 @@ public final class MarklessViewController: UIViewController {
 		} else if let page = self.payload.route, !page.params.isEmpty {
 			throw HostError("\(page.pattern) needs a route to open at, and none was given")
 		}
-		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
+		runtime = NativeRuntime(payload: self.payload, store: store, params: params, startEngine: MarklessViewController.startEngine)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
 	}
+
+	/// Proof only: starts JavaScriptCore for `script` ops and logs what it cost.
+	nonisolated static func startEngine(_ source: String) throws -> NativeScriptEngine {
+		let footprint = memoryFootprint()
+		let started = DispatchTime.now()
+		let engine = try JavaScriptCoreEngine(source: source)
+		let ms = Double(DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds) / 1e6
+		NSLog("MarklessEngine engine javascriptcore started in %.2f ms, footprint +%lld KiB, script %d chars", ms, (memoryFootprint() - footprint) / 1024, source.count)
+		return engine
+	}
+
+	/// Proof only: true once the first dispatch that ran a script has been timed.
+	private var timedFirstScript = false
 
 	/// The `-route <path>` launch argument (Maestro's `launchApp: arguments: { route: ... }`).
 	public nonisolated static func launchRoute() -> String? {
@@ -79,22 +92,47 @@ public final class MarklessViewController: UIViewController {
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
 	public func perform(_ action: NativeAction) {
+		timed("tap \(action.host)") { try runtime.dispatch(action) }
+	}
+
+	/// Runs a dispatch, applies its journal (scheduling the timers it names) and logs how long it took.
+	private func timed(_ what: String, _ run: () throws -> [NativeJournalEntry]) {
+		let scripted = !timedFirstScript && payload.script != nil
+		let started = DispatchTime.now()
 		do {
-			let journal = try runtime.dispatch(action)
+			runtime.onScriptError = { error in NSLog("MarklessEngine %@", String(describing: error)) }
+			let journal = try run()
 			if case let .navigate(route, params)? = journal.last {
 				try navigate(route, params)
 			} else {
-				try tree?.apply(journal)
+				try tree?.apply(journal.filter { if case .timer = $0 { return false } else { return true } })
+				for case let .timer(id, ms) in journal {
+					DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000) { [weak self] in
+						guard let self else { return }
+						self.timed("timer \(id)") { try self.runtime.fire(timer: id) }
+					}
+				}
 			}
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+		let ms = Double(DispatchTime.now().uptimeNanoseconds - started.uptimeNanoseconds) / 1e6
+		let first = scripted && runtime.engineStarted
+		NSLog("MarklessEngine %@ %.2f ms%@", what, ms, first ? " (first after the engine started)" : "")
+		if first { timedFirstScript = true }
+	}
+
+	public override func viewDidAppear(_ animated: Bool) {
+		super.viewDidAppear(animated)
+		// Proof only: a build that asks for it starts the engine once the first frame is up and the run loop is idle.
+		guard payload.script != nil, Bundle.main.url(forResource: "warm-engine", withExtension: nil, subdirectory: "markless") != nil else { return }
+		RunLoop.main.perform(inModes: [.default]) { [weak self] in try? self?.runtime.warmEngine() }
 	}
 
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
-		runtime = NativeRuntime(payload: payload, store: store, params: params)
+		runtime = NativeRuntime(payload: payload, store: store, params: params, startEngine: MarklessViewController.startEngine)
 		tree?.root.removeFromSuperview()
 		try buildPage()
 		if isViewLoaded { tree?.mount(in: view) }
@@ -113,6 +151,16 @@ private func registerFaces(_ files: [(id: String, file: String)], fonts: [String
 		faces[id] = descriptor as UIFontDescriptor
 	}
 	return faces
+}
+
+/// The process's physical footprint, as the system counts it against the app's memory limit.
+func memoryFootprint() -> Int64 {
+	var info = task_vm_info_data_t()
+	var count = mach_msg_type_number_t(MemoryLayout<task_vm_info_data_t>.size / MemoryLayout<integer_t>.size)
+	let result = withUnsafeMutablePointer(to: &info) {
+		$0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { task_info(mach_task_self_, task_flavor_t(TASK_VM_INFO), $0, &count) }
+	}
+	return result == KERN_SUCCESS ? Int64(info.phys_footprint) : 0
 }
 
 struct HostError: Error, CustomStringConvertible {

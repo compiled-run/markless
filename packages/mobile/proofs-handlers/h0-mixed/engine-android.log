@@ -1,0 +1,5 @@
+I/MarklessEngine( 3916): tap h1 1.51 ms
+I/MarklessEngine( 3916): engine hermes started in 3.81 ms, native heap +193 KiB, script 1817 chars
+I/MarklessEngine( 3916): tap h2 8.20 ms (first after the engine started)
+I/MarklessEngine( 3916): timer 1 0.65 ms
+I/MarklessEngine( 3916): tap h1 0.70 ms

@@ -60,6 +60,9 @@ abstract class MarklessActivity : Activity() {
 		}
 		viewport.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
 		setContentView(viewport)
+		// Proof only: a build that asks for it starts the script engine once the first frame is up and the queue is idle.
+		if (host.payload.script != null && assets.list("markless")?.contains("warm-engine") == true)
+			android.os.Looper.myQueue().addIdleHandler { host.runtime.warmEngine(); false }
 		if (host.style != null) viewport.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}
 

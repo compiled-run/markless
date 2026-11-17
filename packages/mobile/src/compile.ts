@@ -10,6 +10,7 @@ import {
 } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import type { NativeViewPayload } from '@markless/serializer';
+import { nativeScript } from './script.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
@@ -32,6 +33,8 @@ export async function compileNativeComponent(input: {
 		specifier: string,
 		importer: string,
 	) => { readonly filename: string; readonly source: string } | undefined;
+	/** Proof only: handlers that do not lower to data run in a JavaScript engine (`fallback`), or all do (`all`). */
+	readonly scriptHandlers?: 'fallback' | 'all';
 }): Promise<NativeBuild> {
 	const route = input.page ? buildRouteManifestFromFileIds([input.page]).routes[0] : undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
@@ -51,10 +54,12 @@ export async function compileNativeComponent(input: {
 	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {
 		...(route ? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } } : {}),
 		importedModules,
+		...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 	});
+	const script = native.payload && nativeScript(native.payload, compiled.semanticGraph, input);
 	const errors = collectTsrxModuleDiagnostics(compiled).filter((diagnostic) => diagnostic.severity === 'error');
 	return {
-		payload: errors.length > 0 ? null : native.payload,
+		payload: errors.length > 0 || !native.payload ? null : script ? { ...native.payload, script: { source: script } } : native.payload,
 		styles: compiled.publicRenderPlan.styleScopes,
 		diagnostics: [...errors, ...native.diagnostics],
 	};

@@ -1,0 +1,7 @@
+I/MarklessEngine( 4224): engine hermes started in 15.97 ms, native heap +194 KiB, script 1934 chars
+I/MarklessEngine( 4224): tap h1 17.43 ms (first after the engine started)
+I/MarklessEngine( 4224): timer 1 1.13 ms
+W/libc    ( 2940): Access denied finding property "persist.adb.tls_server.enable"
+W/libc    ( 2940): Access denied finding property "service.adb.tls.port"
+I/MarklessEngine( 4224): tap h1 0.74 ms
+I/MarklessEngine( 4224): timer 2 0.81 ms

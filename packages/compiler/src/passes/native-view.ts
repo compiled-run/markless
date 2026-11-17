@@ -144,6 +144,11 @@ export type NativeViewOptions = {
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/** The analyses of modules this one imports components from, by import specifier as written. */
 	readonly importedModules?: Readonly<Record<string, SemanticGraphArtifact>>;
+	/**
+	 * Proof only: a handler of the root component that does not lower to data becomes a `script` op instead of a refusal
+	 * (`fallback`), or every one does (`all`, to check that both paths mean the same).
+	 */
+	readonly scriptHandlers?: 'fallback' | 'all';
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -801,6 +806,16 @@ export function createNativeViewPayload(
 		close();
 	};
 	function handlerOps(event: SemanticEvent, scope: Scope): NativeOp[] {
+		if (!options.scriptHandlers || scope.prefix !== '') return dataOps(event, scope);
+		if (options.scriptHandlers === 'all') return [{ op: 'script', handler: event.id }];
+		const before = diagnostics.length;
+		const ops = dataOps(event, scope);
+		if (diagnostics.length === before) return ops;
+		diagnostics.length = before;
+		return [{ op: 'script', handler: event.id }];
+	}
+
+	function dataOps(event: SemanticEvent, scope: Scope): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
 		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {

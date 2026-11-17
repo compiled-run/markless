@@ -1,0 +1,10 @@
+{
+	"rung": 105,
+	"name": "A handler that asks the page fails in the engine; the screen keeps working",
+	"scriptHandlers": "fallback",
+	"steps": [
+		{ "visible": ["Motion unknown", "Taps 0"] },
+		{ "do": { "tap": "Ask the page" }, "visible": ["Motion unknown"], "absent": ["Motion full", "Motion reduced"] },
+		{ "do": { "tap": "Taps 0" }, "visible": ["Taps 1", "Motion unknown"], "absent": ["Taps 0"] }
+	]
+}

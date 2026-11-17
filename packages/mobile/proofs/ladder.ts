@@ -31,6 +31,8 @@ export type LadderRung = {
 	readonly route?: string;
 	/** The path the app opens at; `/` when absent. */
 	readonly start?: string;
+	/** Proof only (`proofs-handlers/`): handlers that do not lower to data run in a JavaScript engine. */
+	readonly scriptHandlers?: 'fallback' | 'all';
 	readonly steps: readonly LadderStep[];
 };
 

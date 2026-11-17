@@ -197,6 +197,8 @@ export async function installProofApp(
 		mkdirSync(join(app, path, '..'), { recursive: true });
 		writeFileSync(join(app, path), bytes);
 	}
+	// Proof only (handler-boundary.md): the shell starts the script engine once idle.
+	if (process.env.MARKLESS_PROOF_ENGINE_WARM === '1') writeFileSync(join(app, 'markless', 'warm-engine'), '');
 	await exec('codesign', ['--force', '--sign', '-', app]);
 	await exec('xcrun', ['simctl', 'install', simulator.udid, app]);
 }

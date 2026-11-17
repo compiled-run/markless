@@ -17,6 +17,8 @@ export function readProofExpected(json: unknown, source: string): LadderRung {
 		return fail('expected an object with a "steps" list');
 	}
 	if (json.steps.length === 0) fail('"steps" is empty');
+	const script = (json as { scriptHandlers?: unknown }).scriptHandlers;
+	if (script !== undefined && script !== 'fallback' && script !== 'all') fail('"scriptHandlers" is not "fallback" or "all"');
 	(json.steps as unknown[]).forEach((step, index) => {
 		if (typeof step !== 'object' || step === null)
 			return fail(`step ${index} is not an object`);

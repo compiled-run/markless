@@ -1,0 +1,10 @@
+appId: ${APP_ID}
+name: h4-intl
+---
+- launchApp:
+    clearState: true
+- assertVisible: Total \$19\.99
+- tapOn: Add
+- assertNotVisible: Total \$19\.99
+- assertVisible: Total \$1,270\.49
+- assertNotVisible: Total \$19\.99

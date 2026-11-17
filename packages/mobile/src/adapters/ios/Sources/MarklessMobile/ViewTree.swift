@@ -106,6 +106,8 @@ final class ViewTree {
 				applyAttributes(node, view)
 			case .navigate:
 				throw HostError("a navigate entry reaches the page's controller, not its views")
+			case .timer:
+				throw HostError("a timer entry reaches the page's controller, not its views")
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)

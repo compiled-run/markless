@@ -7,13 +7,29 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
+import { createContext, runInContext } from 'node:vm';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 
 /** A host-side action: what a person does to a retained view. */
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
 	/** The field's whole text after an edit. */
-	| { readonly event: 'input'; readonly host: string; readonly value: string };
+	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** Proof only: a timer a script asked for (journal entry `timer`) fires. */
+	| { readonly event: 'timer'; readonly id: number };
+
+/**
+ * Proof only: the JavaScript engine `script` ops run in. `call` evaluates one expression of the payload's script and
+ * returns its string result; the host owns the engine and starts it on the first `script` op.
+ */
+export type NativeScriptEngine = { readonly call: (expression: string) => string };
+
+/** The reference engine: a fresh V8 context with no DOM, like a phone's JavaScriptCore or QuickJS. */
+export function nodeScriptEngine(source: string): NativeScriptEngine {
+	const context = createContext({});
+	runInContext(source, context);
+	return { call: (expression) => String(runInContext(expression, context)) };
+}
 
 type Value = NativeValue;
 
@@ -177,7 +193,32 @@ export function createNativeRuntime(
 	store: Map<string, Value> = new Map(),
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
+	startEngine: (source: string) => NativeScriptEngine = nodeScriptEngine,
 ): NativeRuntime {
+	let engine: NativeScriptEngine | undefined;
+	/** Runs one script call and writes the cells it changed, in the order it reports them; returns the timers it asked for. */
+	const runScript = (call: (cells: string) => string): ReadonlyArray<readonly [number, number]> => {
+		if (!payload.script) throw new Error('a script op in a payload with no script');
+		engine ??= startEngine(payload.script.source);
+		let text: string;
+		try {
+			text = engine.call(call(JSON.stringify(JSON.stringify(Object.fromEntries(values)))));
+		} catch {
+			// A script handler that throws changes nothing; engines word the error differently, so no entry names it.
+			return [];
+		}
+		const result = JSON.parse(text) as {
+			readonly writes: ReadonlyArray<readonly [string, Value]>;
+			readonly timers: ReadonlyArray<readonly [number, number]>;
+		};
+		for (const [cell, value] of result.writes) {
+			if (!values.has(cell)) throw new Error(`the script wrote unknown cell ${cell}`);
+			values.set(cell, value);
+			const key = storageKeys.get(cell);
+			if (key !== undefined) store.set(key, value);
+		}
+		return result.timers;
+	};
 	const base: NativeScope = { ...EMPTY_SCOPE, params };
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
@@ -292,19 +333,30 @@ export function createNativeRuntime(
 		arms,
 		rows,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
-			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
+			const event =
+				action.event === 'timer'
+					? undefined
+					: payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
+			if (action.event !== 'timer' && !event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
+			if (action.event === 'input') beforeProperties.set(`${action.host}\0value`, action.value);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
-			for (const op of handlers.get(event.handler) ?? []) {
+			const timers: (readonly [number, number])[] = [];
+			if (action.event === 'timer')
+				timers.push(...runScript((cells) => `__markless.fire(${action.id}, ${cells})`));
+			for (const op of event ? (handlers.get(event.handler) ?? []) : []) {
 				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
+				if (op.op === 'script') {
+					const eventJson = JSON.stringify(JSON.stringify(eventValue === undefined ? {} : { value: eventValue }));
+					timers.push(...runScript((cells) => `__markless.dispatch(${JSON.stringify(op.handler)}, ${cells}, ${eventJson})`));
+					continue;
+				}
 				const value = evaluate(op.value, eventValue);
 				values.set(op.cell, value);
 				const key = storageKeys.get(op.cell);
@@ -357,7 +409,7 @@ export function createNativeRuntime(
 					}),
 				);
 			});
-			return [...styles, ...nodes];
+			return [...styles, ...nodes, ...timers.map(([id, ms]): NativeJournalEntry => ({ op: 'timer', id, ms }))];
 		},
 	};
 }

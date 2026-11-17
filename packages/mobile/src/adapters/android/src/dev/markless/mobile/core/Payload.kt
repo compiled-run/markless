@@ -88,6 +88,8 @@ sealed interface Op {
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params]; ops after it do not run. */
 	data class Navigate(val route: String, val params: Map<String, String>) : Op
+	/** Proof only: runs [handler] of the payload's script in a JavaScript engine; the cells it changed are written. */
+	data class Script(val handler: String) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -118,13 +120,15 @@ data class Payload(
 	val nodes: List<Node>,
 	val events: List<Event>,
 	val handlers: List<Handler>,
+	/** Proof only: the source `script` ops run (defines `__markless`). */
+	val script: String? = null,
 ) {
 	companion object {
 		fun decode(bytes: ByteArray): Payload = decode(Json.parse(bytes))
 
 		fun decode(json: Json): Payload {
 			val root = json.obj("payload")
-			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers"), "payload")
+			root.only(setOf("version", "component", "route", "cells", "nodes", "events", "handlers", "script"), "payload")
 			val route = root["route"]?.obj("payload.route")?.let { r ->
 				r.only(setOf("pattern", "params"), "payload.route")
 				Route(r.field("pattern", "route").str("route.pattern"), r.field("params", "route").arr("route.params").map { it.str("route.params[]") })
@@ -164,7 +168,9 @@ data class Payload(
 				if (seen[e.host] !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
-			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers)
+			val script = root["script"]?.obj("payload.script")?.let { it.only(setOf("source"), "payload.script"); it.field("source", "payload.script").str("payload.script.source") }
+			if (script == null && handlers.any { h -> h.ops.any { it is Op.Script } }) throw MarklessDecodeError("a script op in a payload with no script")
+			return Payload(root.field("component", "payload").str("payload.component"), route, cells, nodes, events, handlers, script)
 		}
 
 		fun cellsOf(e: Expr): List<String> = when (e) {
@@ -352,6 +358,10 @@ data class Payload(
 				o.only(setOf("op", "route", "params"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
 				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
+			if (name == "script") {
+				o.only(setOf("op", "handler"), what)
+				return Op.Script(o.field("handler", what).str("$what.handler"))
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)
