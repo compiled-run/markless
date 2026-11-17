@@ -7,6 +7,7 @@ import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import {
+	callsText,
 	proofsDir,
 	readRung,
 	rungFolders,
@@ -50,7 +51,7 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
 	await writeFile(join(root, 'document.tsrx'), documentSource);
 	await mkdir(join(root, 'node_modules/@markless'), { recursive: true });
-	for (const pkg of ['core', 'router'])
+	for (const pkg of ['core', 'router', 'device'])
 		await symlink(join(packagesRoot, pkg), join(root, 'node_modules/@markless', pkg), 'dir');
 	const nodeEnv = process.env.NODE_ENV;
 	// Vitest's NODE_ENV=test leaves import.meta.env.DEV true in a build.
@@ -66,6 +67,19 @@ async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	});
 	cleanups.push(() => server.close());
 	return server.origin;
+}
+
+// The browser APIs `@markless/device` calls on the web, each recorded under the device call that made it.
+function recordDeviceCalls() {
+	const calls: string[] = [];
+	(window as { __marklessDeviceCalls?: string[] }).__marklessDeviceCalls = calls;
+	Object.defineProperty(Navigator.prototype, 'vibrate', {
+		configurable: true,
+		value: () => {
+			calls.push('haptics.tap');
+			return true;
+		},
+	});
 }
 
 // A visible text or an accessible name, the two ways a Maestro selector finds a view.
@@ -99,6 +113,12 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
 	}
+	if (step.calls) {
+		const made = await page.evaluate(
+			() => (window as { __marklessDeviceCalls?: string[] }).__marklessDeviceCalls ?? [],
+		);
+		if (callsText(made) !== callsText(step.calls)) failed.push(`device ${callsText(made)}`);
+	}
 	if (step.order) {
 		const tops: number[] = [];
 		for (const text of step.order)
@@ -113,9 +133,23 @@ describe.each(rungFolders())('%s', (folder) => {
 	const rung = readRung(folder);
 	let origin = '';
 
+	let refusal: unknown;
 	beforeAll(async () => {
-		origin = await serveRung(folder, rung);
+		if (rung.webRefused)
+			refusal = await serveRung(folder, rung).then(
+				() => null,
+				(error: unknown) => error,
+			);
+		else origin = await serveRung(folder, rung);
 	}, 240_000);
+
+	if (rung.webRefused !== undefined) {
+		test(`${rung.name}: the web build refuses it by name`, () => {
+			expect(refusal, 'the web build succeeded').toBeInstanceOf(Error);
+			expect((refusal as Error).message).toContain(rung.webRefused);
+		});
+		return;
+	}
 
 	afterAll(async () => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
@@ -126,6 +160,7 @@ describe.each(rungFolders())('%s', (folder) => {
 		{ timeout: 60_000 },
 		async () => {
 			const context = await browser.newContext();
+			await context.addInitScript(recordDeviceCalls);
 			const page = await context.newPage();
 			const errors: string[] = [];
 			page.on('pageerror', (error) => errors.push(error.message));

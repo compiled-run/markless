@@ -22,6 +22,7 @@ import {
 import { repeatRowBindsName } from './collect-repeat.ts';
 import { resolveSharedInstanceGraphPath } from './collect-shared.ts';
 import type { WalkState } from './types.ts';
+import { refuseDeviceValueOnWeb } from './device-web.ts';
 
 /**
  * One recombined expression - a ternary, a comparison, a template literal, a
@@ -254,12 +255,24 @@ function callOperandReadSources(
 		return joinReadSources(
 			asNodes(node.properties).map((property) => {
 				if (property.type === 'SpreadElement')
-					return callOperandReadSources(property.argument as AnyNode | undefined, state, options);
-				if (property.type !== 'Property' || property.kind !== 'init' || property.method === true)
+					return callOperandReadSources(
+						property.argument as AnyNode | undefined,
+						state,
+						options,
+					);
+				if (
+					property.type !== 'Property' ||
+					property.kind !== 'init' ||
+					property.method === true
+				)
 					return null;
 				return joinReadSources([
 					property.computed === true
-						? pureCompositeReadSources(property.key as AnyNode | undefined, state, options)
+						? pureCompositeReadSources(
+								property.key as AnyNode | undefined,
+								state,
+								options,
+							)
 						: [],
 					callOperandReadSources(property.value as AnyNode | undefined, state, options),
 				]);
@@ -270,7 +283,9 @@ function callOperandReadSources(
 		return joinReadSources(
 			asNodes(node.elements).map((element) =>
 				callOperandReadSources(
-					element.type === 'SpreadElement' ? (element.argument as AnyNode | undefined) : element,
+					element.type === 'SpreadElement'
+						? (element.argument as AnyNode | undefined)
+						: element,
 					state,
 					options,
 				),
@@ -346,6 +361,7 @@ function readsModuleValue(node: AnyNode, source: string, state: WalkState): bool
 	)
 		return false;
 	if (repeatRowBindsName(source, state)) return false;
+	refuseDeviceValueOnWeb(node, state);
 	return (
 		!resolveGraphPath(
 			source,
@@ -544,7 +560,8 @@ export function refusedPropMemberReads(
 	state: WalkState,
 	options: CompositeReadOptions,
 ): ReadonlyArray<string> {
-	if (armRebuildsFromGraph(state) || !isCompositeTemplateExpression(expression, options)) return [];
+	if (armRebuildsFromGraph(state) || !isCompositeTemplateExpression(expression, options))
+		return [];
 	const readSources = pureCompositeReadSources(expression, state, options);
 	const dependencies = readSources && graphReadDependencies(readSources, state);
 	if (!dependencies?.length) return [];
@@ -633,7 +650,11 @@ export function freeReadSources(
 				((parent.type === 'Property' || parent.type === 'ObjectProperty') &&
 					parent.key === node &&
 					parent.computed !== true));
-		if (!isName && node.type === 'MemberExpression' && !rootBindsInsideRegion(node, state, region))
+		if (
+			!isName &&
+			node.type === 'MemberExpression' &&
+			!rootBindsInsideRegion(node, state, region)
+		)
 			sources.push(expressionSource(node, state.source));
 		for (const child of childNodes(node)) visit(child, node);
 	};

@@ -157,6 +157,7 @@ async function main(argv: string[]): Promise<number> {
 							simulator!,
 							iosApp!,
 							rung.assets,
+							rung.manifest,
 							join(work, 'ios-app'),
 						);
 					} else {
@@ -165,6 +166,7 @@ async function main(argv: string[]): Promise<number> {
 							emulator!,
 							androidDex!,
 							rung.assets,
+							rung.manifest,
 							join(work, 'android-app'),
 						);
 					}

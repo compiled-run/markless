@@ -119,6 +119,14 @@ public enum NativeOp: Equatable, Sendable {
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params; ops after it do not run.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// A device call (`haptics.tap`); with `result`, the call settles that task cell.
+	case call(call: String, arguments: [NativeExpr], result: String?)
+}
+
+/// A device call a task cell starts at mount.
+public struct NativeTask: Equatable, Sendable {
+	public let call: String
+	public let arguments: [NativeExpr]
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -157,6 +165,10 @@ public struct NativeCell: Equatable, Sendable {
 	public let storageKey: String?
 	/// A class binding reads this cell, so its changes are journalled as `state`.
 	public let styled: Bool
+	/// A live device value (`network.online`) the host fills at mount and on every change.
+	public var device: String? = nil
+	/// An async device call started at mount; the cell holds `{ state: 'pending' | 'value' | 'error', ... }`.
+	public var task: NativeTask? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -191,7 +203,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task"])
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -200,7 +212,12 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			return NativeCell(
 				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
-				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled)
+				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled,
+				device: field.has("device") ? try field["device"].string() : nil,
+				task: field.has("task") ? try {
+					let task = try field["task"].object(["call", "arguments"])
+					return NativeTask(call: try task["call"].string(), arguments: try task["arguments"].array().map(decodeExpr))
+				}() : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
@@ -285,6 +302,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "navigate":
 					let opField = try op.object(["op", "route", "params"])
 					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+				case "call":
+					let opField = try op.object(required: ["op", "call", "arguments"], optional: ["result"])
+					return .call(
+						call: try opField["call"].string(), arguments: try opField["arguments"].array().map(decodeExpr),
+						result: opField.has("result") ? try opField["result"].string() : nil)
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
@@ -436,6 +458,10 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
+			}
+			for case let .call(_, arguments, result) in handler.ops
+			where !arguments.flatMap(\.cells).allSatisfy(cellIds.contains) || !(result.map { id in cells.contains { $0.id == id && $0.task != nil } } ?? true) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) calls the device with an unknown cell or a result cell that is not a task")
 			}
 		}
 		for event in events {

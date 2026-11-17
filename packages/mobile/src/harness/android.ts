@@ -3,7 +3,13 @@ import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
-import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
+import {
+	ANDROID_SHELL_ACTIVITY,
+	PROOF_APP_ID,
+	PROOF_APP_NAME,
+	PROOF_LINK_SCHEME,
+} from './proof-app.ts';
+import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
 import { type AndroidTools, cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -150,14 +156,23 @@ export async function buildAndroidShell(
 	return dex;
 }
 
-const manifest = () => `<?xml version="1.0" encoding="utf-8"?>
+const androidManifest = (
+	permissions: ReadonlyArray<string>,
+) => `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
+${permissions.map((name) => `\t<uses-permission android:name="${name}" />\n`).join('')}
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:launchMode="singleTask" android:theme="@android:style/Theme.Material.Light.NoActionBar">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="${PROOF_LINK_SCHEME}" />
 			</intent-filter>
 		</activity>
 	</application>
@@ -196,6 +211,7 @@ export async function installProofApk(
 	emulator: BootedEmulator,
 	dex: string,
 	assets: ProofAssets,
+	manifest: DeviceManifest,
 	workDir: string,
 ) {
 	const assetDir = join(workDir, 'assets');
@@ -205,7 +221,7 @@ export async function installProofApk(
 		mkdirSync(join(assetDir, path, '..'), { recursive: true });
 		writeFileSync(join(assetDir, path), bytes);
 	}
-	writeFileSync(join(workDir, 'AndroidManifest.xml'), manifest());
+	writeFileSync(join(workDir, 'AndroidManifest.xml'), androidManifest(manifest.android));
 	const unsigned = join(workDir, 'unsigned.apk');
 	const aligned = join(workDir, 'aligned.apk');
 	const apk = join(workDir, `${PROOF_APP_NAME}.apk`);

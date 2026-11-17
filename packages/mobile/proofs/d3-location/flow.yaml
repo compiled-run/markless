@@ -1,0 +1,40 @@
+appId: ${APP_ID}
+name: d3-location
+---
+- setLocation:
+      latitude: 51.5
+      longitude: -0.125
+- launchApp:
+      clearState: true
+      permissions:
+          location: unset
+- assertVisible:
+      text: Allow .?Proof.? to (use your|access this device.s) location\?
+- tapOn:
+      text: Allow While Using App|While using the app
+- assertVisible: 51\.5, -0\.125
+- assertNotVisible: Locating
+- assertNotVisible: Access unknown
+- assertVisible: Access granted
+- assertVisible: 51\.5, -0\.125
+- assertNotVisible: Locating
+- assertNotVisible: Access unknown
+- assertNotVisible: NotAllowedError
+- stopApp
+- launchApp:
+      permissions:
+          location: unset
+- assertVisible:
+      text: Allow .?Proof.? to (use your|access this device.s) location\?
+- assertVisible:
+      text: Allow .?Proof.? to (use your|access this device.s) location\?
+- tapOn:
+      text: Don.t Allow|Don.t allow
+- assertVisible: NotAllowedError
+- assertNotVisible: Locating
+- assertNotVisible: Access unknown
+- assertVisible: NotAllowedError
+- assertNotVisible: Locating
+- assertNotVisible: Access unknown
+- assertNotVisible: Access granted
+- assertNotVisible: 51\.5, -0\.125

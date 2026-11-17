@@ -88,7 +88,12 @@ sealed interface Op {
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params]; ops after it do not run. */
 	data class Navigate(val route: String, val params: Map<String, String>) : Op
+	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
+	data class Call(val call: String, val arguments: List<Expr>, val result: String?) : Op
 }
+
+/** A device call a task cell starts at mount. */
+data class Task(val call: String, val arguments: List<Expr>)
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
 data class Route(val pattern: String, val params: List<String>) {
@@ -107,7 +112,8 @@ data class Route(val pattern: String, val params: List<String>) {
 	}
 }
 
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false)
+/** [device]: a live device value the host fills at mount and on change. [task]: an async device call started at mount. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val device: String? = null, val task: Task? = null)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -267,10 +273,14 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "device", "task"), what)
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled)
+			val task = o["task"]?.obj("$what.task")?.let { t ->
+				t.only(setOf("call", "arguments"), "$what.task")
+				Task(t.field("call", what).str("$what.task.call"), t.field("arguments", what).arr("$what.task.arguments").mapIndexed { n, a -> expr(a, "$what.task.arguments[$n]") })
+			}
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["device"]?.str("$what.device"), task)
 		}
 
 		private fun node(v: Json, what: String): Node {
@@ -352,6 +362,14 @@ data class Payload(
 				o.only(setOf("op", "route", "params"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
 				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
+			if (name == "call") {
+				o.only(setOf("op", "call", "arguments", "result"), what)
+				val args = o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") }
+				for (c in args.flatMap(::cellsOf)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val result = o["result"]?.str("$what.result")
+				if (result != null && result !in cells) throw MarklessDecodeError("$what settles unknown cell \"$result\"")
+				return Op.Call(o.field("call", what).str("$what.call"), args, result)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

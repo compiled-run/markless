@@ -1,0 +1,20 @@
+{
+	"name": "@markless/device",
+	"version": "0.14.0",
+	"private": true,
+	"description": "Markless device features: connectivity, haptics, location and camera, the same calls on the web, iOS and Android.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/compiled-run/markless.git",
+		"directory": "packages/device"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": "./src/index.ts"
+	},
+	"dependencies": {
+		"@markless/serializer": "workspace:*"
+	}
+}

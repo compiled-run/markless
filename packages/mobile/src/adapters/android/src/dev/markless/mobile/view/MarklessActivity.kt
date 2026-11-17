@@ -17,6 +17,14 @@ abstract class MarklessActivity : Activity() {
 
 	open fun styleExportBytes(): ByteArray? = null
 
+	/** Where device values come from and device calls go; the phone's own by default. */
+	open val device: NativeDevice by lazy { PlatformDevice(this) }
+
+	override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+		super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+		device.permissionsAnswered(requestCode)
+	}
+
 	/** The path the app opens at (`/apple`); the Maestro launch argument `route` arrives as this intent extra. */
 	open fun route(): String? = intent.getStringExtra("route")
 
@@ -36,7 +44,8 @@ abstract class MarklessActivity : Activity() {
 	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
 	private fun open(params: Map<String, String>) {
 		val bytes = payloadBytes()
-		host = MarklessHost(this, bytes, styleExportBytes(), params = params)
+		if (::host.isInitialized) host.released = true
+		host = MarklessHost(this, bytes, styleExportBytes(), params = params, device = device)
 		host.onNavigate = { route, next ->
 			if (route != host.payload.route?.pattern) throw MarklessHostError("navigate to $route; this app holds only ${host.payload.route?.pattern}")
 			open(next)

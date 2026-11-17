@@ -18,6 +18,7 @@ public final class MarklessViewController: UIViewController {
 	private let style: StyleExport?
 	private let fonts: [String: Data]
 	private let store: NativeStore
+	private let device: NativeDevice
 	private var runtime: NativeRuntime
 	private var layout: StyleLayout?
 	private(set) var tree: ViewTree?
@@ -25,8 +26,9 @@ public final class MarklessViewController: UIViewController {
 	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
 	public init(
 		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore(),
-		route: String? = MarklessViewController.launchRoute()
+		device: NativeDevice? = nil, route: String? = MarklessViewController.launchRoute()
 	) throws {
+		self.device = device ?? PlatformDevice()
 		self.payload = try NativeViewPayload.decode(payload)
 		self.style = try style.map { try StyleExport.decode($0) }
 		if let reason = self.style?.notReady { NSLog("Markless iOS host: applying a style export Dragon marks analysis-only: %@", reason) }
@@ -43,6 +45,13 @@ public final class MarklessViewController: UIViewController {
 		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)
 		try buildPage()
+		for cell in self.payload.cells {
+			guard let name = cell.device else { continue }
+			try self.device.watch(name) { [weak self] value in
+				guard let self else { return }
+				self.apply { try self.runtime.device(cell.id, value) }
+			}
+		}
 	}
 
 	/// The `-route <path>` launch argument (Maestro's `launchApp: arguments: { route: ... }`).
@@ -52,11 +61,44 @@ public final class MarklessViewController: UIViewController {
 		return arguments[index + 1]
 	}
 
+	/// Fills the device cells from the device, then builds the views and starts the page's async device calls.
 	private func buildPage() throws {
+		for cell in payload.cells {
+			if let name = cell.device { _ = try runtime.device(cell.id, try device.read(name)) }
+		}
 		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
 		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
+		}
+		try runCalls(try runtime.tasks())
+	}
+
+	/// Hands `call` entries to the device; a call with a result settles its task cell when the device answers.
+	private func runCalls(_ calls: [NativeJournalEntry]) throws {
+		for case let .call(name, arguments, result) in calls {
+			let runtime = self.runtime
+			try device.call(name, arguments, settle: result.map { cell in
+				{ [weak self] outcome in
+					guard let self, self.runtime === runtime else { return }
+					self.apply {
+						switch outcome {
+						case let .value(value): return try runtime.settle(cell, value: value)
+						case let .error(name, message): return try runtime.settle(cell, errorName: name, message: message)
+						}
+					}
+				}
+			})
+		}
+	}
+
+	private func apply(_ journalOf: () throws -> [NativeJournalEntry]) {
+		do {
+			let journal = try journalOf()
+			try tree?.apply(journal.filter { if case .call = $0 { false } else { true } })
+			try runCalls(journal)
+		} catch {
+			fatalError("Markless iOS host: \(error)")
 		}
 	}
 
@@ -84,7 +126,8 @@ public final class MarklessViewController: UIViewController {
 			if case let .navigate(route, params)? = journal.last {
 				try navigate(route, params)
 			} else {
-				try tree?.apply(journal)
+				try tree?.apply(journal.filter { if case .call = $0 { false } else { true } })
+				try runCalls(journal)
 			}
 		} catch {
 			fatalError("Markless iOS host: \(error)")

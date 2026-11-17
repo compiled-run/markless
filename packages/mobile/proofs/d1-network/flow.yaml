@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: d1-network
+---
+- launchApp:
+      clearState: true
+- assertVisible: Connection
+- assertVisible: Online
+- assertNotVisible: Offline
+- openLink: markless-proof://device/network.online?value=false
+- tapOn:
+      text: Open
+      optional: true
+- assertVisible: Offline
+- assertNotVisible: Online
+- assertVisible: Offline
+- assertNotVisible: Online
+- openLink: markless-proof://device/network.online?value=true
+- tapOn:
+      text: Open
+      optional: true
+- assertVisible: Online
+- assertNotVisible: Offline
+- assertVisible: Online
+- assertNotVisible: Offline

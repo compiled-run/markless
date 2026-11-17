@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
+import type { DeviceAppConfig, DeviceManifest } from '../permissions.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
@@ -18,7 +19,12 @@ export type ProofRung = {
 	readonly flow: string;
 	readonly expected: LadderRung;
 	readonly assets: ProofAssets;
+	/** The Info.plist and AndroidManifest.xml entries the build derived from the device features the rung uses. */
+	readonly manifest: DeviceManifest;
 };
+
+/** A rung's app config, when it has one: `{ "device": { "usage": { "<feature>": "<text>" } } }`. */
+const APP_CONFIG = 'app.json';
 
 const COMPONENT_FILE = 'App.tsrx';
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..', '..');
@@ -85,6 +91,12 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 	);
 	const component = join(dir, COMPONENT_FILE);
 	const assets: Array<[string, Uint8Array]> = [];
+	let manifest: DeviceManifest = { ios: [], android: [] };
+	const appConfig = existsSync(join(dir, APP_CONFIG))
+		? (JSON.parse(readFileSync(join(dir, APP_CONFIG), 'utf8')) as {
+				readonly device?: DeviceAppConfig;
+			})
+		: {};
 	if (existsSync(component)) {
 		const build = await compileNativeComponent({
 			// Repo-relative: the scope class hashes the filename, so every checkout builds the same payload and style input.
@@ -93,6 +105,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			// A rung that is a page compiles as its page file, so the router derives its route.
 			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
 			readModule: readRelativeModule,
+			...(appConfig.device ? { device: appConfig.device } : {}),
 		});
 		if (!build.payload) {
 			const lines = build.diagnostics.map(
@@ -100,6 +113,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			);
 			throw new Error(`${name}: ${COMPONENT_FILE} has no native build\n${lines.join('\n')}`);
 		}
+		manifest = build.manifest;
 		assets.push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))]);
 		if (build.styles.some((style) => style.cssText.length > 0)) {
 			writeFileSync(
@@ -120,5 +134,6 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		flow: readFileSync(flowPath, 'utf8'),
 		expected,
 		assets: new Map(assets),
+		manifest,
 	};
 }

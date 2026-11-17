@@ -1,0 +1,29 @@
+{
+	"rung": "D1",
+	"name": "A live device value read in markup follows the device",
+	"webRefused": "MARKLESS_DEVICE_WEB_UNSUPPORTED",
+	"steps": [
+		{
+			"visible": ["Connection", "Online"],
+			"absent": ["Offline"]
+		},
+		{
+			"do": {
+				"device": {
+					"network.online": false
+				}
+			},
+			"visible": ["Offline"],
+			"absent": ["Online"]
+		},
+		{
+			"do": {
+				"device": {
+					"network.online": true
+				}
+			},
+			"visible": ["Online"],
+			"absent": ["Offline"]
+		}
+	]
+}

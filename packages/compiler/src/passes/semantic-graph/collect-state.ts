@@ -32,6 +32,7 @@ import {
 	patternIdentifiers,
 } from './collect-aliases.ts';
 import { collectAsyncComputedPostAwaitReads, collectGraphDependencies } from './collect-async.ts';
+import { refuseDeviceAskOnWeb } from './device-web.ts';
 import {
 	collectExpressionReads,
 	findTemplateValue,
@@ -427,6 +428,7 @@ export function collectComputedBinding(input: {
 	}
 	const definitions = inlined?.definitions ?? [];
 	const isAsync = body?.async === true;
+	refuseDeviceAskOnWeb(body, state);
 	const dependencies = [body, ...definitions].flatMap((node) =>
 		collectGraphDependencies(node, state),
 	);
@@ -2051,9 +2053,10 @@ function computedNativeExpression(
 	body: AnyNode | undefined,
 	state: WalkState,
 ): Pick<SemanticGraphBinding, 'nativeExpression'> {
-	if (!state.nativeFacts || !body || body.async) return {};
+	if (!state.nativeFacts || !body) return {};
 	const inner = body.body as AnyNode | undefined;
-	const statements = inner?.type === 'BlockStatement' ? (inner.body as AnyNode[] | undefined) : undefined;
+	const statements =
+		inner?.type === 'BlockStatement' ? (inner.body as AnyNode[] | undefined) : undefined;
 	const returned =
 		inner?.type === 'BlockStatement'
 			? statements?.length === 1 && statements[0]?.type === 'ReturnStatement'

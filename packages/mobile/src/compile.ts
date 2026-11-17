@@ -10,11 +10,16 @@ import {
 } from '@markless/compiler';
 import { buildRouteManifestFromFileIds } from '@markless/router';
 import type { NativeViewPayload } from '@markless/serializer';
+import type { NativeDeviceFeature } from '@markless/serializer/native-device';
+import { deviceManifest, type DeviceAppConfig, type DeviceManifest } from './permissions.ts';
 
 export type NativeBuild = {
 	readonly payload: NativeViewPayload | null;
 	/** The component's scoped CSS as the compiler compiled it for web; Dragon compiles the same text for each platform. */
 	readonly styles: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
+	/** The device features the payload uses, and the manifest entries they need. */
+	readonly features: ReadonlyArray<NativeDeviceFeature>;
+	readonly manifest: DeviceManifest;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
 };
 
@@ -32,6 +37,8 @@ export async function compileNativeComponent(input: {
 		specifier: string,
 		importer: string,
 	) => { readonly filename: string; readonly source: string } | undefined;
+	/** The app config's `device` section (usage text per feature). */
+	readonly device?: DeviceAppConfig;
 }): Promise<NativeBuild> {
 	const route = input.page ? buildRouteManifestFromFileIds([input.page]).routes[0] : undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
@@ -43,19 +50,30 @@ export async function compileNativeComponent(input: {
 	});
 	const importedModules: Record<string, SemanticGraphArtifact> = {};
 	for (const entry of compiled.semanticGraph.moduleImports) {
-		if (entry.typeOnly || !entry.source.startsWith('.') || importedModules[entry.source]) continue;
+		if (entry.typeOnly || !entry.source.startsWith('.') || importedModules[entry.source])
+			continue;
 		const module = input.readModule?.(entry.source, input.filename);
 		if (module)
-			importedModules[entry.source] = await buildSemanticGraph({ ...module, nativeFacts: NATIVE_FACT_COLLECTORS });
+			importedModules[entry.source] = await buildSemanticGraph({
+				...module,
+				nativeFacts: NATIVE_FACT_COLLECTORS,
+			});
 	}
 	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {
-		...(route ? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } } : {}),
+		...(route
+			? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } }
+			: {}),
 		importedModules,
 	});
-	const errors = collectTsrxModuleDiagnostics(compiled).filter((diagnostic) => diagnostic.severity === 'error');
+	const errors = collectTsrxModuleDiagnostics(compiled).filter(
+		(diagnostic) => diagnostic.severity === 'error',
+	);
+	const { manifest, diagnostics: usage } = deviceManifest(native.features, input.device);
 	return {
-		payload: errors.length > 0 ? null : native.payload,
+		payload: errors.length > 0 || usage.length > 0 ? null : native.payload,
 		styles: compiled.publicRenderPlan.styleScopes,
-		diagnostics: [...errors, ...native.diagnostics],
+		features: native.features,
+		manifest,
+		diagnostics: [...errors, ...native.diagnostics, ...usage],
 	};
 }

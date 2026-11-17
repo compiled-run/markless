@@ -1,0 +1,19 @@
+{
+	"rung": "D2",
+	"name": "A device call in a handler reaches the device",
+	"steps": [
+		{ "visible": ["Haptics", "Tapped 0"], "calls": [] },
+		{
+			"do": { "tap": "Tapped 0" },
+			"visible": ["Tapped 1"],
+			"absent": ["Tapped 0"],
+			"calls": ["haptics.tap"]
+		},
+		{
+			"do": { "tap": "Tapped 1" },
+			"visible": ["Tapped 2"],
+			"absent": ["Tapped 1"],
+			"calls": ["haptics.tap", "haptics.tap"]
+		}
+	]
+}

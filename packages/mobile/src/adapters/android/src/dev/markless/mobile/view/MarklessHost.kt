@@ -57,6 +57,8 @@ class MarklessHost(
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
+	/** Where device values come from and device calls go; required for a payload that names device features. */
+	private val device: NativeDevice? = null,
 ) {
 	val payload: Payload = Payload.decode(payloadBytes)
 	val runtime = Runtime(payload, store, params)
@@ -90,8 +92,28 @@ class MarklessHost(
 		val top = payload.nodes.firstOrNull() as? Node.Element ?: throw MarklessHostError("payload does not start with its root element")
 		if (top.parent != null || top.arm != null) throw MarklessHostError("the root element has a parent or sits in an arm")
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
+		for (cell in payload.cells) cell.device?.let { runtime.device(cell.id, needDevice().read(it)) }
 		buildShown()
 		root = views.getValue(top.id)
+		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name) { if (!released) apply(runtime.device(cell.id, it)) } }
+		for (call in runtime.tasks()) runCall(call)
+	}
+
+	/** Set when another page replaces this one: device answers that arrive later change nothing. */
+	var released = false
+
+	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
+
+	private fun runCall(call: JournalEntry.Call) {
+		val cell = call.result
+		needDevice().call(call.node, call.arguments, cell?.let {
+			{ outcome: DeviceOutcome ->
+				if (!released) apply(when (outcome) {
+					is DeviceOutcome.Value -> runtime.settle(it, outcome.value)
+					is DeviceOutcome.Error -> runtime.settleError(it, outcome.name, outcome.message)
+				})
+			}
+		})
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -128,6 +150,7 @@ class MarklessHost(
 					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
 					return
 				}
+				is JournalEntry.Call -> runCall(entry)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()

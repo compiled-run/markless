@@ -13,7 +13,16 @@ import { marklessAttributeValue } from '@markless/web/dom-attribute';
 export type NativeAction =
 	| { readonly event: 'activate'; readonly host: string }
 	/** The field's whole text after an edit. */
-	| { readonly event: 'input'; readonly host: string; readonly value: string };
+	| { readonly event: 'input'; readonly host: string; readonly value: string }
+	/** A live device value changed (connectivity, permission): the host writes the device cell. */
+	| { readonly event: 'device'; readonly cell: string; readonly value: Value }
+	/** A device call the host started has answered: a task cell takes `{ state: 'value', value }` or the error. */
+	| { readonly event: 'settle'; readonly cell: string; readonly value: Value }
+	| {
+			readonly event: 'settle';
+			readonly cell: string;
+			readonly error: { readonly name: string; readonly message: string };
+	  };
 
 type Value = NativeValue;
 
@@ -40,8 +49,10 @@ export type NativeRuntime = {
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
-	/** Runs the handler bound to the action and returns the journal the host applies. */
+	/** Runs the handler bound to the action (or writes the device or task cell it names) and returns the journal. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
+	/** The calls a host starts at mount, one per task cell, each settling its cell. */
+	readonly tasks: () => ReadonlyArray<Extract<NativeJournalEntry, { op: 'call' }>>;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -71,11 +82,13 @@ export function evaluateNativeExpr(
 		return { ...scope.params };
 	}
 	if ('item' in expr) {
-		if (!scope.items.has(expr.item)) throw new Error(`the row item of ${expr.item} read outside its row`);
+		if (!scope.items.has(expr.item))
+			throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
 	}
 	if ('local' in expr) {
-		if (!scope.locals.has(expr.local)) throw new Error(`the parameter ${expr.local} read outside its function`);
+		if (!scope.locals.has(expr.local))
+			throw new Error(`the parameter ${expr.local} read outside its function`);
 		return scope.locals.get(expr.local)!;
 	}
 	if ('array' in expr)
@@ -85,7 +98,8 @@ export function evaluateNativeExpr(
 			if (!Array.isArray(value)) throw new Error('a spread of a value that is not an array');
 			return value;
 		});
-	if ('object' in expr) return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
+	if ('object' in expr)
+		return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
 	if ('lambda' in expr) throw new Error('a function value outside a method call');
 	if ('method' in expr) {
 		const target = evaluate(expr.target);
@@ -95,14 +109,21 @@ export function evaluateNativeExpr(
 						evaluateNativeExpr(argument.body, read, eventValue, {
 							items: scope.items,
 							...(scope.params ? { params: scope.params } : {}),
-							locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
+							locals: new Map([
+								...scope.locals,
+								...argument.lambda.map(
+									(name, i) => [name, values[i] ?? null] as const,
+								),
+							]),
 						})
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
 		if ((typeof target !== 'string' && !Array.isArray(target)) || typeof method !== 'function')
 			throw new Error(`.${expr.method}() of a ${target === null ? 'null' : typeof target}`);
-		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as Value | undefined;
+		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as
+			| Value
+			| undefined;
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
@@ -162,8 +183,14 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
-		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
-		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
+		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
+			return value.length;
+		if (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.hasOwn(value, expr.property)
+		)
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
@@ -182,11 +209,15 @@ export function createNativeRuntime(
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
-			cell.storage && store.has(cell.storage.key) ? store.get(cell.storage.key)! : cell.initial,
+			cell.storage && store.has(cell.storage.key)
+				? store.get(cell.storage.key)!
+				: cell.initial,
 		]),
 	);
 	const storageKeys = new Map(
-		payload.cells.flatMap((cell) => (cell.storage ? [[cell.id, cell.storage.key] as const] : [])),
+		payload.cells.flatMap((cell) =>
+			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
+		),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
 	const branches = new Map(
@@ -217,11 +248,17 @@ export function createNativeRuntime(
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
-		if (!Array.isArray(list)) throw new Error(`${repeat.id} lists a value that is not an array`);
+		if (!Array.isArray(list))
+			throw new Error(`${repeat.id} lists a value that is not an array`);
 		return list.map((item) => {
 			let key: Value = item;
 			for (const step of repeat.key) {
-				if (key === null || typeof key !== 'object' || Array.isArray(key) || !Object.hasOwn(key, step))
+				if (
+					key === null ||
+					typeof key !== 'object' ||
+					Array.isArray(key) ||
+					!Object.hasOwn(key, step)
+				)
 					throw new Error(`${repeat.id}: a row has no key at ${repeat.key.join('.')}`);
 				key = (key as Record<string, Value>)[step]!;
 			}
@@ -229,7 +266,9 @@ export function createNativeRuntime(
 		});
 	};
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
-	const instances = (node: NativeNode): { readonly id: string; readonly scope: NativeScope }[] => {
+	const instances = (
+		node: NativeNode,
+	): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!shown(node)) return [];
 		if (!node.row) return [{ id: node.id, scope: base }];
 		const repeat = repeats.get(node.row);
@@ -244,7 +283,11 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue('cell' in part ? read(part.cell) : evaluate(part.expr, undefined, scope)),
+					: formatNativeValue(
+							'cell' in part
+								? read(part.cell)
+								: evaluate(part.expr, undefined, scope),
+						),
 			)
 			.join('');
 
@@ -263,15 +306,27 @@ export function createNativeRuntime(
 				? instances(node).flatMap(({ id, scope }) =>
 						(node.bindings ?? []).flatMap((binding) => {
 							if (!(kind in binding)) return [];
-							const name = 'attribute' in binding ? binding.attribute : binding.property;
-							return [[id, name, write(name, evaluate(binding.value, undefined, scope))] as const];
+							const name =
+								'attribute' in binding ? binding.attribute : binding.property;
+							return [
+								[
+									id,
+									name,
+									write(name, evaluate(binding.value, undefined, scope)),
+								] as const,
+							];
 						}),
 					)
 				: [],
 		);
-	const attributes = () => bound('attribute', (name, value) => marklessAttributeValue(name, value));
+	const attributes = () =>
+		bound('attribute', (name, value) => marklessAttributeValue(name, value));
 	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')) as (readonly [string, 'value', string])[];
+		bound('property', (_name, value) => String(value ?? '')) as (readonly [
+			string,
+			'value',
+			string,
+		])[];
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
@@ -282,7 +337,7 @@ export function createNativeRuntime(
 				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
 				: [],
 		);
-	const keyed = <T,>(list: ReadonlyArray<readonly [string, string, T]>) =>
+	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
 	return {
@@ -292,24 +347,90 @@ export function createNativeRuntime(
 		arms,
 		rows,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
+			if (action.event === 'device' || action.event === 'settle') {
+				const cell = payload.cells.find((candidate) => candidate.id === action.cell);
+				if (action.event === 'device' ? !cell?.device : !cell?.task)
+					throw new Error(
+						`${action.cell} is not a ${action.event === 'device' ? 'device' : 'task'} cell`,
+					);
+				const value: Value =
+					action.event === 'device'
+						? action.value
+						: 'error' in action
+							? { state: 'error', error: { ...action.error } }
+							: { state: 'value', value: action.value };
+				return change(undefined, undefined, () => {
+					values.set(action.cell, value);
+					return [];
+				});
+			}
+			const event = payload.events.find(
+				(candidate) => candidate.host === action.host && candidate.event === action.event,
+			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
+			return change(action.host, eventValue, () => {
+				const calls: NativeJournalEntry[] = [];
+				for (const op of handlers.get(event.handler) ?? []) {
+					if (op.op === 'navigate')
+						return [{ op: 'navigate', route: op.route, params: op.params }];
+					if (op.op === 'call') {
+						calls.push({
+							op: 'call',
+							call: op.call,
+							arguments: op.arguments.map((argument) =>
+								evaluate(argument, eventValue),
+							),
+							...(op.result !== undefined ? { result: op.result } : {}),
+						});
+						continue;
+					}
+					const value = evaluate(op.value, eventValue);
+					values.set(op.cell, value);
+					const key = storageKeys.get(op.cell);
+					if (key !== undefined) store.set(key, value);
+				}
+				return calls;
+			});
+		},
+		tasks: () =>
+			payload.cells.flatMap((cell) =>
+				cell.task
+					? [
+							{
+								op: 'call' as const,
+								call: cell.task.call,
+								arguments: cell.task.arguments.map((argument) =>
+									evaluate(argument),
+								),
+								result: cell.id,
+							},
+						]
+					: [],
+			),
+	};
+
+	/**
+	 * Runs `apply` (which writes cells and returns the calls it made, or a navigation that ends the page) and returns the
+	 * journal: styled cells first, then every shown node whose output changed, in document order, then the calls.
+	 */
+	function change(
+		host: string | undefined,
+		eventValue: string | undefined,
+		apply: () => NativeJournalEntry[],
+	): ReadonlyArray<NativeJournalEntry> {
+		{
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
+			if (eventValue !== undefined && host !== undefined)
+				beforeProperties.set(`${host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
-			for (const op of handlers.get(event.handler) ?? []) {
-				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
-				const value = evaluate(op.value, eventValue);
-				values.set(op.cell, value);
-				const key = storageKeys.get(op.cell);
-				if (key !== undefined) store.set(key, value);
-			}
+			const calls = apply();
+			if (calls[0]?.op === 'navigate') return calls;
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());
@@ -330,7 +451,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'branch') {
-					return beforeArms.has(node.id) && afterArms.has(node.id) && beforeArms.get(node.id) !== afterArms.get(node.id)
+					return beforeArms.has(node.id) &&
+						afterArms.has(node.id) &&
+						beforeArms.get(node.id) !== afterArms.get(node.id)
 						? [{ op: 'arm', node: node.id, index: afterArms.get(node.id)! }]
 						: [];
 				}
@@ -349,15 +472,36 @@ export function createNativeRuntime(
 						const name = 'attribute' in binding ? binding.attribute : binding.property;
 						const key = `${id}\0${name}`;
 						const [before, after] =
-							'attribute' in binding ? [beforeAttributes, afterAttributes] : [beforeProperties, afterProperties];
-						if (!before.has(key) || !after.has(key) || before.get(key) === after.get(key)) return [];
+							'attribute' in binding
+								? [beforeAttributes, afterAttributes]
+								: [beforeProperties, afterProperties];
+						if (
+							!before.has(key) ||
+							!after.has(key) ||
+							before.get(key) === after.get(key)
+						)
+							return [];
 						return 'attribute' in binding
-							? [{ op: 'attribute', node: id, name, value: afterAttributes.get(key)! }]
-							: [{ op: 'property', node: id, name: 'value', value: afterProperties.get(key)! }];
+							? [
+									{
+										op: 'attribute',
+										node: id,
+										name,
+										value: afterAttributes.get(key)!,
+									},
+								]
+							: [
+									{
+										op: 'property',
+										node: id,
+										name: 'value',
+										value: afterProperties.get(key)!,
+									},
+								];
 					}),
 				);
 			});
-			return [...styles, ...nodes];
-		},
-	};
+			return [...styles, ...nodes, ...calls];
+		}
+	}
 }
