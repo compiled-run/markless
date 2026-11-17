@@ -106,11 +106,16 @@ export type NativeNode = NativePlace &
 				readonly parts: ReadonlyArray<NativeTextPart>;
 		  }
 		| {
-				/** An `@if`: arm 0 while `test` is truthy, arm 1 (when there is an `@else`) otherwise. */
+				/**
+				 * A plain `@if` has `test`: arm 0 while it is truthy, arm 1 (an `@else`) otherwise. An `@else if` chain or a
+				 * `@switch` has `tests` instead, one per arm: the first truthy one's arm, else the `null` (`@else` or
+				 * `@default`) arm, else none.
+				 */
 				readonly kind: 'branch';
 				readonly id: string;
 				readonly parent: string | null;
-				readonly test: NativeExpr;
+				readonly test?: NativeExpr;
+				readonly tests?: ReadonlyArray<NativeExpr | null>;
 				readonly arms: number;
 		  }
 		| {

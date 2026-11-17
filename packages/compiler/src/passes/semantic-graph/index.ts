@@ -241,6 +241,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph,
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
+		nativeFacts: state.nativeFacts,
 	});
 	// Needs the chunks, so it runs after them: a repeat inside a child's
 	// `{children}` renders into that child's markup, not the enclosing element of

@@ -1,0 +1,449 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Choices",
+		"cells": [
+			{
+				"id": "state:n",
+				"name": "n",
+				"initial": 0
+			},
+			{
+				"id": "state:tab",
+				"name": "tab",
+				"initial": "a"
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "div",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"text": "Next"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"text": "Tab"
+					}
+				]
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:0",
+				"parent": "h0",
+				"tests": [
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:n"
+						},
+						"right": {
+							"literal": 1
+						}
+					},
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:n"
+						},
+						"right": {
+							"literal": 2
+						}
+					},
+					{
+						"binary": "<",
+						"left": {
+							"cell": "state:n"
+						},
+						"right": {
+							"literal": 1
+						}
+					},
+					null
+				],
+				"arms": 4
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"text": "one"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "two"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "none yet"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:0",
+					"index": 2
+				}
+			},
+			{
+				"kind": "branch",
+				"id": "branch-site:1",
+				"parent": "h0",
+				"tests": [
+					null,
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:tab"
+						},
+						"right": {
+							"literal": "a"
+						}
+					},
+					{
+						"binary": "===",
+						"left": {
+							"cell": "state:tab"
+						},
+						"right": {
+							"literal": "b"
+						}
+					}
+				],
+				"arms": 3
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "other"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 0
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 1
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "first"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 1
+				}
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "p",
+				"parent": "h0",
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 2
+				}
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "second"
+					}
+				],
+				"arm": {
+					"branch": "branch-site:1",
+					"index": 2
+				}
+			}
+		],
+		"events": [
+			{
+				"host": "h1",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h2",
+				"event": "activate",
+				"handler": "handler:event:1"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:n",
+						"value": {
+							"binary": "+",
+							"left": {
+								"unary": "+",
+								"value": {
+									"cell": "state:n"
+								}
+							},
+							"right": {
+								"literal": 1
+							}
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:tab",
+						"value": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"cell": "state:tab"
+								},
+								"right": {
+									"literal": "a"
+								}
+							},
+							"whenTrue": {
+								"literal": "b"
+							},
+							"whenFalse": {
+								"if": {
+									"binary": "===",
+									"left": {
+										"cell": "state:tab"
+									},
+									"right": {
+										"literal": "b"
+									}
+								},
+								"whenTrue": {
+									"literal": "z"
+								},
+								"whenFalse": {
+									"literal": "a"
+								}
+							}
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		[
+			"h1:text0",
+			"Next"
+		],
+		[
+			"h2:text0",
+			"Tab"
+		],
+		[
+			"h5:text0",
+			"none yet"
+		],
+		[
+			"h7:text0",
+			"first"
+		]
+	],
+	"initialArms": [
+		[
+			"branch-site:0",
+			2
+		],
+		[
+			"branch-site:1",
+			1
+		]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:1",
+					"index": 2
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 1
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:1",
+					"index": 0
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h1"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:0",
+					"index": 3
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h2"
+			},
+			"journal": [
+				{
+					"op": "arm",
+					"node": "branch-site:1",
+					"index": 1
+				}
+			]
+		}
+	]
+}

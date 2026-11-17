@@ -860,6 +860,11 @@ export type SemanticBranchSite = {
 	readonly testComputedGraphNodeId?: string;
 	/** A plain `@if` test as a tree; absent for chains and `@switch`. */
 	readonly testExpression?: SemanticExpression;
+	/**
+	 * For an `@else if` chain or a `@switch` (native builds only): one test per arm in arm order, `null` for the `@else` or
+	 * `@default` arm. A `@switch` case's test is `discriminant === case`.
+	 */
+	readonly armTestExpressions?: ReadonlyArray<SemanticExpression | null>;
 	// An `@else if` chain or a non-literal-case `@switch` answers its arm index here, evaluated in place of `testSource`.
 	readonly armIndexSource?: string;
 	// The test reads an enclosing row's item, whose name shadows a graph binding.
@@ -1502,7 +1507,13 @@ type SemanticMarkupLocatedSlot = {
 
 export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 	(
-		| { readonly kind: 'text'; readonly residue: SemanticMarkupResidue; readonly raw?: boolean }
+		| {
+				readonly kind: 'text';
+				readonly residue: SemanticMarkupResidue;
+				readonly raw?: boolean;
+				/** The interpolation as a tree, for native builds only (`nativeFacts`). */
+				readonly nativeExpression?: SemanticExpression;
+		  }
 		| {
 				readonly kind: 'attribute';
 				readonly name: string;

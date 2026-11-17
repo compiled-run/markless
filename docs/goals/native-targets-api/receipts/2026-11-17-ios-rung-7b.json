@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 5.84022225,
+			"flowSeconds": 36.260174875
+		}
+	]
+}

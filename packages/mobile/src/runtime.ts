@@ -44,8 +44,8 @@ export type NativeRuntime = {
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 };
 
-/** How a value reads in text: JavaScript's `String(value)`, which every host reproduces exactly. */
-export const formatNativeValue = (value: Value): string => String(value);
+/** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
+export const formatNativeValue = (value: Value): string => (value === null ? '' : String(value));
 
 const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value } = {
 	String: (value) => String(value),
@@ -201,8 +201,14 @@ export function createNativeRuntime(
 	};
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
-	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null =>
-		evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null => {
+		if (branch.test) return evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
+		const tests = branch.tests ?? [];
+		const chosen = tests.findIndex((test) => test !== null && evaluate(test));
+		if (chosen >= 0) return chosen;
+		const fallback = tests.indexOf(null);
+		return fallback >= 0 ? fallback : null;
+	};
 	const shown = (node: NativeNode): boolean => {
 		if (!node.arm) return true;
 		const branch = branches.get(node.arm.branch);

@@ -38,7 +38,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^\d\d-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^\d\d[a-z]?-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort();
 
