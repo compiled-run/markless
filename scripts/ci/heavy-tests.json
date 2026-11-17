@@ -174,7 +174,8 @@
 		"packages/vitest-browser/test/ssr-module-cache-rerun.test.ts",
 		"packages/web/test/early-stream-events.test.ts",
 		"packages/web/test/native-census.test.ts",
-		"packages/web/test/served-census.test.ts"
+		"packages/web/test/served-census.test.ts",
+		"scripts/test-utils/built-server.test.ts"
 	],
 	"declared": [
 		{
