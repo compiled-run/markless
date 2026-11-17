@@ -547,10 +547,10 @@ function armBranchRange(
 			},
 		}));
 	// Branches the range's markup holds flip inside it, so the commit wires them again.
-	const branches = (set.branches ?? []).filter(
-		(branch) =>
-			branch.id !== branchSiteId && range.html.includes(`<!--markless:arm-branch:${drawnAt + branch.id}-->`),
-	);
+	const outer = new Map(anchors.map((anchor) => [anchor.id, anchor.outer]));
+	const inRange = (id: string | undefined): boolean =>
+		id !== undefined && (outer.get(id) === range.id || inRange(outer.get(id)));
+	const branches = (set.branches ?? []).filter((branch) => inRange(drawnAt + branch.id));
 	return {
 		...arm,
 		armRecords: {
