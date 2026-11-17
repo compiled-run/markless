@@ -59,6 +59,7 @@ const PORTABLE_ELEMENTS = new Set([
 	'li',
 	'button',
 	'input',
+	'a',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
@@ -129,7 +130,15 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 	prefix.length < path.length && prefix.every((step, i) => path[i] === step);
 
 /** Builds the native view of a module's root component from its semantic graph, or refuses with diagnostics. */
-export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeViewArtifact {
+export type NativeViewOptions = {
+	/** The page's route when the module is a page: the router's pattern and its param names. */
+	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
+};
+
+export function createNativeViewPayload(
+	graph: SemanticGraphArtifact,
+	options: NativeViewOptions = {},
+): NativeViewArtifact {
 	const diagnostics: CompilerDiagnostic[] = [];
 	const refuse = (message: string, span?: SourceSpan): null => {
 		diagnostics.push({
@@ -194,7 +203,22 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 		if (binding.propPath?.length === 1) names.set(binding.localName, binding.propPath[0]!);
 		propNames.set(binding.componentName, names);
 	}
-	const TOP: Scope = { component: root.componentName, prefix: '', locals: new Set(), items: new Map(), props: new Map() };
+	const TOP: Scope = {
+		component: root.componentName,
+		prefix: '',
+		locals: new Set(),
+		items: new Map(),
+		props: new Map<string, Prop>(
+			options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
+		),
+	};
+	const routerLinks = new Set(
+		graph.moduleImports.flatMap((entry) =>
+			entry.source === '@markless/router' && entry.importedName === 'Link' && !entry.typeOnly
+				? [entry.localName]
+				: [],
+		),
+	);
 
 	const exprOf = (
 		expression: SemanticExpression | undefined,
@@ -546,8 +570,41 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 				close();
 				const edge = edgesById.get(item.edge);
 				const template = chunks.get(item.template);
-				if (!edge || !template) {
-					refuse(`<${edge?.childComponentName ?? item.edge}>, a component from another module`);
+				if (!edge) {
+					refuse(`the component call ${item.edge}`);
+					continue;
+				}
+				if (routerLinks.has(edge.childComponentName)) {
+					const href = edge.props.find((prop) => prop.name === 'href');
+					const params = edge.props.find((prop) => prop.name === 'params');
+					const paramValues =
+						params?.kind === 'opaque' ? params.buildTimeValue?.value : params?.kind === 'serializable' ? params.value : {};
+					const projection = item.projection ? chunks.get(item.projection) : undefined;
+					if (
+						href?.kind !== 'serializable' ||
+						typeof href.value !== 'string' ||
+						!paramValues ||
+						typeof paramValues !== 'object' ||
+						Object.values(paramValues).some((value) => typeof value !== 'string') ||
+						edge.props.some((prop) => prop.name !== 'href' && prop.name !== 'params' && prop.name !== 'children') ||
+						(item.projection && !projection)
+					) {
+						refuse('a <Link> whose href and params are not fixed at build time');
+						continue;
+					}
+					const id = scope.prefix + edge.id;
+					nodes.push({ kind: 'element', id, element: 'a', parent, ...place });
+					if (projection) lowerChunk(projection, id, place, scope);
+					const handler = `handler:${id}`;
+					events.push({ host: id, event: 'activate', handler });
+					handlers.push({
+						id: handler,
+						ops: [{ op: 'navigate', route: href.value, params: paramValues as Record<string, string> }],
+					});
+					continue;
+				}
+				if (!template) {
+					refuse(`<${edge.childComponentName}>, a component from another module`);
 					continue;
 				}
 				if (item.projection) {
@@ -713,6 +770,7 @@ export function createNativeViewPayload(graph: SemanticGraphArtifact): NativeVie
 	return done({
 		version: NATIVE_VIEW_VERSION,
 		component: root.componentName,
+		...(options.route ? { route: { pattern: options.route.pattern, params: options.route.params } } : {}),
 		cells: cells.map((cell) =>
 			styledCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
 		),

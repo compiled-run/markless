@@ -6,6 +6,7 @@ import {
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
 } from '@markless/compiler';
+import { buildRouteManifestFromFileIds } from '@markless/router';
 import type { NativeViewPayload } from '@markless/serializer';
 
 export type NativeBuild = {
@@ -19,13 +20,21 @@ export type NativeBuild = {
 export async function compileNativeComponent(input: {
 	readonly filename: string;
 	readonly source: string;
+	/** The module's page file when it is a page (`pages/[fruit].tsrx`); the router derives its route. */
+	readonly page?: string;
 }): Promise<NativeBuild> {
+	const route = input.page ? buildRouteManifestFromFileIds([input.page]).routes[0] : undefined;
+	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
 	const compiled = await compileTsrxModule({
-		...input,
+		filename: input.filename,
+		source: input.source,
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
 	});
-	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph);
+	const native: NativeViewArtifact = createNativeViewPayload(
+		compiled.semanticGraph,
+		route ? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } } : {},
+	);
 	const errors = collectTsrxModuleDiagnostics(compiled).filter((diagnostic) => diagnostic.severity === 'error');
 	return {
 		payload: errors.length > 0 ? null : native.payload,

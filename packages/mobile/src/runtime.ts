@@ -21,6 +21,8 @@ type Value = NativeValue;
 export type NativeScope = {
 	readonly items: ReadonlyMap<string, Value>;
 	readonly locals: ReadonlyMap<string, Value>;
+	/** The page's route params. */
+	readonly params?: Readonly<Record<string, string>>;
 };
 
 const EMPTY_SCOPE: NativeScope = { items: new Map(), locals: new Map() };
@@ -64,6 +66,10 @@ export function evaluateNativeExpr(
 	scope: NativeScope = EMPTY_SCOPE,
 ): Value {
 	const evaluate = (e: NativeExpr): Value => evaluateNativeExpr(e, read, eventValue, scope);
+	if ('route' in expr) {
+		if (!scope.params) throw new Error('route params read on a component that is not a page');
+		return { ...scope.params };
+	}
 	if ('item' in expr) {
 		if (!scope.items.has(expr.item)) throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
@@ -88,6 +94,7 @@ export function evaluateNativeExpr(
 				? (...values: Value[]) =>
 						evaluateNativeExpr(argument.body, read, eventValue, {
 							items: scope.items,
+							...(scope.params ? { params: scope.params } : {}),
 							locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
 						})
 				: evaluate(argument),
@@ -168,7 +175,10 @@ export function createNativeRuntime(
 	payload: NativeViewPayload,
 	/** The device's kept values by storage key; read at mount, written on every change, kept across launches. */
 	store: Map<string, Value> = new Map(),
+	/** The route params the page opened with. */
+	params: Readonly<Record<string, string>> = {},
 ): NativeRuntime {
+	const base: NativeScope = { ...EMPTY_SCOPE, params };
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
@@ -190,7 +200,7 @@ export function createNativeRuntime(
 		return values.get(cell)!;
 	};
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
-		evaluateNativeExpr(expr, read, eventValue, scope);
+		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
 	const armOf = (branch: Extract<NativeNode, { kind: 'branch' }>): number | null =>
 		evaluate(branch.test) ? 0 : branch.arms > 1 ? 1 : null;
 	const shown = (node: NativeNode): boolean => {
@@ -215,12 +225,12 @@ export function createNativeRuntime(
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
 	const instances = (node: NativeNode): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!shown(node)) return [];
-		if (!node.row) return [{ id: node.id, scope: EMPTY_SCOPE }];
+		if (!node.row) return [{ id: node.id, scope: base }];
 		const repeat = repeats.get(node.row);
 		if (!repeat || !shown(repeat)) return [];
 		return rowsOf(repeat).map(({ key, item }) => ({
 			id: `${node.id}@${key}`,
-			scope: { items: new Map([[repeat.id, item]]), locals: new Map() },
+			scope: { ...base, items: new Map([[repeat.id, item]]) },
 		}));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
@@ -288,6 +298,7 @@ export function createNativeRuntime(
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			for (const op of handlers.get(event.handler) ?? []) {
+				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
 				const value = evaluate(op.value, eventValue);
 				values.set(op.cell, value);
 				const key = storageKeys.get(op.cell);

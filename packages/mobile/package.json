@@ -22,6 +22,7 @@
 	},
 	"dependencies": {
 		"@markless/compiler": "workspace:*",
+		"@markless/router": "workspace:*",
 		"@markless/serializer": "workspace:*",
 		"@markless/web": "workspace:*",
 		"yaml": "2.9.1"

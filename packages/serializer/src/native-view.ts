@@ -65,6 +65,8 @@ export type NativeExpr =
 	| { readonly local: string }
 	/** The current row's item of a list (`repeat` node id). */
 	| { readonly item: string }
+	/** The page's route params, an object of strings (the page component's `params` prop). */
+	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
 	| { readonly event: 'value' };
@@ -125,11 +127,16 @@ export type NativeNode = NativePlace &
 export type NativeEventName = 'activate' | 'input';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
-export type NativeOp = { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr };
+export type NativeOp =
+	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
+	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
+	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
 	readonly component: string;
+	/** The page's route as the router spells it, with its param names; absent for a component that is not a page. */
+	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/** `storage` names a device-kept value (iOS UserDefaults, Android SharedPreferences): read at mount, written on every change. */
 	readonly cells: ReadonlyArray<{
 		readonly id: string;
@@ -164,4 +171,6 @@ export type NativeJournalEntry =
 	 */
 	| { readonly op: 'rows'; readonly node: string; readonly keys: ReadonlyArray<string> }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
-	| { readonly op: 'arm'; readonly node: string; readonly index: number | null };
+	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
+	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
+	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };

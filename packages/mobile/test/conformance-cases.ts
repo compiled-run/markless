@@ -4,6 +4,9 @@ import type { NativeAction } from '../src/index.ts';
 export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly name: string;
 	readonly fixture: string;
+	/** For a page: its page file (the router derives the route) and the params it opens with. */
+	readonly page?: string;
+	readonly params?: Readonly<Record<string, string>>;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -66,6 +69,13 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'component-edge:1/h2' },
 			{ event: 'activate', host: 'component-edge:0/h2' },
 		],
+	},
+	{
+		name: 'route',
+		fixture: 'proofs/10-url-route/App.tsrx',
+		page: 'pages/[fruit].tsrx',
+		params: { fruit: 'apple' },
+		actions: [{ event: 'activate', host: 'component-edge:1' }],
 	},
 	{
 		name: 'input',
