@@ -57,6 +57,52 @@
 			"delta": -3,
 			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor (1,000 rows, cell no handler owns: 1,000 rows walked -> 1); downloaded with the module, runs only on that first click",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-keyed-repeats"
+			],
+			"delta": 179,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor: 1,000 rows, cell no handler owns, 1,000 rows walked -> 1 and 16.1 -> 0.62 ms (Chromium, cold page, median of 21); downloaded with the keyed-repeat chunk, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 40,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor: 1,000 rows, cell no handler owns, 1,000 rows walked -> 1 and 16.1 -> 0.62 ms (Chromium, cold page, median of 21); downloaded with the keyed-repeat chunk, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 40,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor: 1,000 rows, cell no handler owns, 1,000 rows walked -> 1 and 16.1 -> 0.62 ms (Chromium, cold page, median of 21); downloaded with the keyed-repeat chunk, runs only on that first click",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 40,
+			"reason": "a first click on a keyed row climbs from the target to its row instead of walking every row at each ancestor: 1,000 rows, cell no handler owns, 1,000 rows walked -> 1 and 16.1 -> 0.62 ms (Chromium, cold page, median of 21); downloaded with the keyed-repeat chunk, runs only on that first click",
+			"date": "2026-11-17"
 		}
 	]
 }
