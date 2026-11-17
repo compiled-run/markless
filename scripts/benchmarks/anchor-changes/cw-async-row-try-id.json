@@ -108,8 +108,8 @@
 				"docs /",
 				"jsGzipBytes"
 			],
-			"delta": 262,
-			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44154050170 vs 44146726533",
+			"delta": 282,
+			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44197742031 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -120,8 +120,8 @@
 				"docs /concepts/state",
 				"jsGzipBytes"
 			],
-			"delta": 262,
-			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44154050170 vs 44146726533",
+			"delta": 282,
+			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44197742031 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -132,8 +132,8 @@
 				"docs /ui/accordion",
 				"jsGzipBytes"
 			],
-			"delta": 262,
-			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44154050170 vs 44146726533",
+			"delta": 282,
+			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44197742031 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -144,8 +144,8 @@
 				"docs / playground",
 				"jsGzipBytes"
 			],
-			"delta": 11,
-			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44154050170 vs 44146726533",
+			"delta": 55,
+			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44197742031 vs 44193974219",
 			"date": "2026-11-17"
 		},
 		{
@@ -156,8 +156,8 @@
 				"docs /concepts/state playground",
 				"jsGzipBytes"
 			],
-			"delta": 11,
-			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44154050170 vs 44146726533",
+			"delta": 55,
+			"reason": "each keyed row's @try is its own boundary: the runtime docs pages load carries row-named @try settling; measured on CI runs 44197742031 vs 44193974219",
 			"date": "2026-11-17"
 		}
 	]
