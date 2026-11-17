@@ -251,3 +251,43 @@ export function Page() @{
 		expect(runtime.texts().map(([, text]) => text)).toEqual(['Door is open!']);
 	});
 });
+
+describe('computed values', () => {
+	it('inlines a sync computed wherever it is read, a computed of a computed included', async () => {
+		const build = await compileNativeComponent({
+			filename: 'src/Cart.tsrx',
+			source: `import { computed, state } from '@markless/core';
+export function Cart() @{
+	let items = state(1);
+	const total = computed(() => items * 3);
+	const label = computed(() => {
+		return total > 5 ? 'big' : 'small';
+	});
+	<main>
+		<p>{total} {label}</p>
+		@if (total > 5) { <p>Free shipping</p> }
+		<button onClick={() => items++}>Add</button>
+	</main>
+}`,
+		});
+		expect(build.diagnostics).toEqual([]);
+		const runtime = createNativeRuntime(build.payload!);
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['3 small', 'Add']);
+		runtime.dispatch({ event: 'activate', host: build.payload!.events[0]!.host });
+		expect(runtime.texts().map(([, text]) => text)).toEqual(['6 big', 'Free shipping', 'Add']);
+	});
+
+	it('refuses an async computed by name', async () => {
+		const build = await compileNativeComponent({
+			filename: 'src/Late.tsrx',
+			source: `import { computed, state } from '@markless/core';
+export function Late() @{
+	let n = state(1);
+	const later = computed(async () => n + 1);
+	<p>{n}</p>
+	<button onClick={() => n++}>Add {later}</button>
+}`,
+		});
+		expect(build.payload).toBeNull();
+	});
+});

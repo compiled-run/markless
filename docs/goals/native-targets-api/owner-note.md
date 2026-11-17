@@ -58,8 +58,8 @@ are not true/false; such components are refused at build time with the reason, n
 
 ## What the compiler must learn next
 
-Done tonight beyond the first ten rungs: `@else if` and `@switch`, state inside reused components, `{children}`, and
-components imported from other files. Still refused by name (each one is a build error that says so):
+Done tonight beyond the first ten rungs: `@else if` and `@switch`, state inside reused components, `{children}`,
+components imported from other files, and `computed()`. Still refused by name (each one is a build error that says so):
 
 - an app's whole route table (several pages, a back stack, how a page is presented);
 - async values (rung 11, your decision below), and any handler that calls your own functions or awaits;
@@ -93,6 +93,9 @@ attributes, and one overlay primitive. What is web-only today: about 25 direct u
 supply roles and states from ARIA, labels, focus (two kinds on a phone), screen-reader gestures mapped to the key and
 dismiss events families already handle, and a synchronous read of an element's last drawn position inside a handler. The
 `<style>` defaults under `@layer markless` go through Dragon like any other CSS. **Smallest first family: `toggle`.**
+Checked against tonight's compiler, `toggle` still needs: `shared()` state scoped to a component subtree, `element()`
+handles, spreading props onto an element (`{...rest}`), and methods on that shared state (`flip()`); each is refused by
+name today, and each is a next compiler step, not a redesign.
 
 ## Decisions I need from you
 

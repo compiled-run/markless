@@ -181,6 +181,13 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		edgesById: new Map(graph.componentEdges.map((edge) => [edge.id, edge])),
 		eventsByHost: index(graph.events, (event) => event.hostNodeId),
 		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
+		/** Sync computeds by component, then name: a read of one inlines its expression. */
+		computeds: graph.graphBindings.reduce((byComponent, binding) => {
+			if (binding.kind !== 'computed' || binding.async) return byComponent;
+			const names = byComponent.get(binding.componentName ?? '') ?? new Map<string, typeof binding>();
+			names.set(binding.name, binding);
+			return byComponent.set(binding.componentName ?? '', names);
+		}, new Map<string, Map<string, SemanticGraphArtifact['graphBindings'][number]>>()),
 		imports: new Map(
 			graph.moduleImports.filter((entry) => !entry.typeOnly).map((entry) => [entry.localName, entry]),
 		),
@@ -280,6 +287,7 @@ export function createNativeViewPayload(
 		const entry = scope.module.imports.get(name);
 		return entry?.source === '@markless/router' && entry.importedName === 'Link';
 	};
+	const inlining = new Set<string>();
 	const exprOf = (
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -298,6 +306,19 @@ export function createNativeViewPayload(
 				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(expression.name) ?? '');
 				if (prop?.kind === 'value') return prop.expr;
 				if (prop) return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
+				const computed =
+					scope.module.computeds.get(scope.component)?.get(expression.name) ??
+					scope.module.computeds.get('')?.get(expression.name);
+				if (computed) {
+					if (!computed.nativeExpression) return refuse(`${what} reads the computed \`${expression.name}\`, whose body needs a script engine`);
+					if (inlining.has(computed.id)) return refuse(`${what} reads the computed \`${expression.name}\` inside itself`);
+					inlining.add(computed.id);
+					try {
+						return exprOf(computed.nativeExpression, `the computed \`${expression.name}\``, scope);
+					} finally {
+						inlining.delete(computed.id);
+					}
+				}
 				const cell = cellOf(expression.name, scope);
 				return cell
 					? { cell }

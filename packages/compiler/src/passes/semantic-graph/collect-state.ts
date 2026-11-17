@@ -443,6 +443,7 @@ export function collectComputedBinding(input: {
 		dependencies,
 		functionSource:
 			inlined?.source ?? (body ? expressionSource(body, state.source) : undefined),
+		...computedNativeExpression(body, state),
 	};
 	state.graph.graphBindings.push(binding);
 	for (const read of [body, ...definitions])
@@ -2043,4 +2044,21 @@ function objectPropertyKey(node: AnyNode | undefined): string | null {
 	if (typeof node.name === 'string') return node.name;
 	if (typeof node.value === 'string' || typeof node.value === 'number') return String(node.value);
 	return null;
+}
+
+// For native builds: a computed's body as a tree, when it is one expression or a block that only returns one.
+function computedNativeExpression(
+	body: AnyNode | undefined,
+	state: WalkState,
+): Pick<SemanticGraphBinding, 'nativeExpression'> {
+	if (!state.nativeFacts || !body || body.async) return {};
+	const inner = body.body as AnyNode | undefined;
+	const statements = inner?.type === 'BlockStatement' ? (inner.body as AnyNode[] | undefined) : undefined;
+	const returned =
+		inner?.type === 'BlockStatement'
+			? statements?.length === 1 && statements[0]?.type === 'ReturnStatement'
+				? (statements[0].argument as AnyNode | undefined)
+				: undefined
+			: inner;
+	return returned ? { nativeExpression: state.nativeFacts.expression(returned as never) } : {};
 }

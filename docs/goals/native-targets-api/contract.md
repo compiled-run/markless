@@ -211,6 +211,13 @@ export function Counter() @{
   changes the cell (rung 8's `Use Bo`) does journal it.
 - Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
 
+### `computed()` (pushed 2026-11-17)
+
+- A sync `computed(() => expr)` (or a block that only returns one expression) is inlined wherever its name is read, in
+  the reader's scope; a computed of a computed works. The analyzer records the body as `SemanticGraphBinding.nativeExpression`
+  (native builds only). An async computed, or a body outside the expression tree, is refused by name. Hosts see ordinary
+  expressions; nothing new to build.
+
 ### Children passed into a component (pushed 2026-11-17)
 
 - The markup a caller writes between a component's tags lowers where the component renders `{children}`: as children of
