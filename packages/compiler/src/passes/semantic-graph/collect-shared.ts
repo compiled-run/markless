@@ -6,6 +6,7 @@ import type {
 	ModuleGraphInterfaceSharedDefinition,
 	SemanticGraphAlias,
 	SemanticGraphBinding,
+	SemanticGraphArtifact,
 	SemanticGraphDiagnostic,
 	SemanticModuleImport,
 	SemanticSharedDefinition,
@@ -451,6 +452,9 @@ function adoptSharedDefinition(
 		if (state.graph.graphBindings.some((item) => item.id === binding.id)) continue;
 		state.graph.graphBindings.push(binding);
 	}
+	for (const alias of published.methodAliases ?? []) {
+		if (!state.graph.aliases.includes(alias)) state.graph.aliases.push(alias);
+	}
 	for (const read of published.methodStateReads ?? []) {
 		if (!state.graph.stateReads.includes(read)) state.graph.stateReads.push(read);
 	}
@@ -616,6 +620,7 @@ export function moduleInterfaceSharedDefinitions(input: {
 	readonly moduleId: string;
 	readonly sharedDefinitions: ReadonlyArray<SemanticSharedDefinition>;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly stateWrites: ReadonlyArray<SemanticStateWrite>;
 }): ReadonlyArray<ModuleGraphInterfaceSharedDefinition> {
@@ -628,11 +633,22 @@ export function moduleInterfaceSharedDefinitions(input: {
 			return [];
 
 		const inMethod = methodSpanTest(definition);
-		const methodStateReads = input.stateReads.filter(
-			(read) => read.sharedDefinitionId === definition.id && inMethod(read.sourceSpan),
+		const ownState = ownStateTest(input, definition.id);
+		const methodAliases = input.aliases.filter(
+			(alias) => alias.sharedDefinitionId === definition.id && inMethod(alias.sourceSpan),
 		);
+		const methodStateReads = input.stateReads.filter(
+			(read) =>
+				read.sharedDefinitionId === definition.id &&
+				inMethod(read.sourceSpan) &&
+				ownState(read.source),
+		);
+		// A write to a method's own local stays plain JavaScript in the copy, so only state writes travel.
 		const methodStateWrites = input.stateWrites.filter(
-			(write) => write.sharedDefinitionId === definition.id && inMethod(write.targetSpan),
+			(write) =>
+				write.sharedDefinitionId === definition.id &&
+				inMethod(write.targetSpan) &&
+				ownState(writtenStateSource(write)),
 		);
 		return (exportNames.get(definition.name) ?? []).map((exportName) => ({
 			exportName,
@@ -640,10 +656,30 @@ export function moduleInterfaceSharedDefinitions(input: {
 			graphBindings: input.graphBindings.filter(
 				(binding) => binding.sharedDefinitionId === definition.id,
 			),
+			...(methodAliases.length > 0 ? { methodAliases } : {}),
 			...(methodStateReads.length > 0 ? { methodStateReads } : {}),
 			...(methodStateWrites.length > 0 ? { methodStateWrites } : {}),
 		}));
 	});
+}
+
+function ownStateTest(
+	graph: Pick<SemanticGraphArtifact, 'graphBindings' | 'aliases'>,
+	definitionId: string,
+): (source: string | null) => boolean {
+	const bindings = graphBindingMap(graph, definitionId);
+	const aliases = semanticAliasMap(graph, definitionId);
+	return (source) =>
+		source !== null &&
+		resolveGraphPath(source, bindings, aliases)?.binding.sharedDefinitionId === definitionId;
+}
+
+function writtenStateSource(write: SemanticStateWrite): string | null {
+	const through = write.through;
+	if (!through) return write.target;
+	if (through.kind === 'path') return through.target;
+	if (through.kind === 'element') return through.collection;
+	return null;
 }
 
 function methodSpanTest(

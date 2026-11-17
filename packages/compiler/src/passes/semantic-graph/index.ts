@@ -265,6 +265,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		moduleId,
 		sharedDefinitions: graph.sharedDefinitions,
 		graphBindings: graph.graphBindings,
+		aliases: graph.aliases,
 		stateReads: graph.stateReads,
 		stateWrites: graph.stateWrites,
 	});

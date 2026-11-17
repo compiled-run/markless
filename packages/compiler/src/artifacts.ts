@@ -402,6 +402,7 @@ export type ModuleGraphInterfaceSharedDefinition = {
 	readonly definition: SemanticSharedDefinition;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
 	/** State the definition's methods read and write, so a handler in another module that calls one lowers them. */
+	readonly methodAliases?: ReadonlyArray<SemanticGraphAlias>;
 	readonly methodStateReads?: ReadonlyArray<SemanticStateRead>;
 	readonly methodStateWrites?: ReadonlyArray<SemanticStateWrite>;
 };

@@ -216,6 +216,12 @@ export const tray = shared(() => {
 		retitle(next: string) {
 			slot.title = next;
 		},
+		stamp() {
+			const at = new Date(0);
+			at.setFullYear(2001);
+			const view = slot;
+			view.title = String(at.getFullYear());
+		},
 	};
 }, { scope: 'app' });
 `,
@@ -231,6 +237,7 @@ export default function Desk() @{
 		<b>{t.shown ? t.title : ''}</b>
 		<button data-swap onClick={() => t.swap()}>swap</button>
 		<button data-retitle onClick={() => t.retitle('inbox')}>retitle</button>
+		<button data-stamp onClick={() => t.stamp()}>stamp</button>
 	</div>
 }
 `,
@@ -240,7 +247,9 @@ export default function Desk() @{
 	const desk = results.at(-1)!;
 	expect(errors(desk)).toEqual([]);
 	const handlers = desk.symbolModules.modules.filter((item) => item.kind === 'event-handler');
-	expect(handlers).toHaveLength(2);
+	expect(handlers).toHaveLength(3);
+	// The method's own Date stays a plain local; only the state write is lowered.
+	expect(handlers[2]?.source).toContain('at.setFullYear(2001)');
 	for (const handler of handlers) {
 		expect(handler.source).toContain('graphNodeId: "shared:src/tray.tsrx#tray/state:slot"');
 	}
