@@ -1,0 +1,96 @@
+import { describe, expect, it } from 'vitest';
+import { createNativeViewPayload, NATIVE_UNSUPPORTED_CODE } from '../src/index.ts';
+import { buildSemanticGraph } from '../src/passes/semantic-graph/index.ts';
+
+const nativeView = async (source: string) =>
+	createNativeViewPayload(await buildSemanticGraph({ filename: 'src/App.tsrx', source }));
+
+describe('native view payload', () => {
+	it('lowers a counter to nodes, a semantic event and an add op', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Counter() @{
+	let count = state(0);
+	<main class="screen">
+		<h1 class="title">Counter</h1>
+		<button class="tap" onClick={() => count++}>Count {count}</button>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload).toEqual({
+			version: 'markless.native-view/0',
+			component: 'Counter',
+			cells: [{ id: 'state:count', name: 'count', initial: 0 }],
+			nodes: [
+				{ kind: 'element', id: 'h0', element: 'main', parent: null },
+				{ kind: 'element', id: 'h1', element: 'h1', parent: 'h0' },
+				{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ text: 'Counter' }] },
+				{ kind: 'element', id: 'h2', element: 'button', parent: 'h0' },
+				{
+					kind: 'text',
+					id: 'h2:text0',
+					parent: 'h2',
+					parts: [{ text: 'Count ' }, { cell: 'state:count' }],
+				},
+			],
+			events: [{ host: 'h2', event: 'activate', handler: 'handler:event:0' }],
+			handlers: [{ id: 'handler:event:0', ops: [{ op: 'add', cell: 'state:count', value: 1 }] }],
+		});
+	});
+
+	it('keeps text runs apart around an element and orders siblings as authored', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Tally() @{
+	let left = state(9);
+	let right = state(3);
+	<section>
+		<p>{left} before <b>bold</b> after {right}</p>
+		<button onClick={() => { left--; right++; }}>Move</button>
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes).toEqual([
+			{ kind: 'element', id: 'h0', element: 'section', parent: null },
+			{ kind: 'element', id: 'h1', element: 'p', parent: 'h0' },
+			{ kind: 'text', id: 'h1:text0', parent: 'h1', parts: [{ cell: 'state:left' }, { text: ' before ' }] },
+			{ kind: 'element', id: 'h2', element: 'b', parent: 'h1' },
+			{ kind: 'text', id: 'h2:text0', parent: 'h2', parts: [{ text: 'bold' }] },
+			{ kind: 'text', id: 'h1:text1', parent: 'h1', parts: [{ text: ' after ' }, { cell: 'state:right' }] },
+			{ kind: 'element', id: 'h3', element: 'button', parent: 'h0' },
+			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Move' }] },
+		]);
+		expect(payload?.handlers).toEqual([
+			{
+				id: 'handler:event:0',
+				ops: [
+					{ op: 'add', cell: 'state:left', value: -1 },
+					{ op: 'add', cell: 'state:right', value: 1 },
+				],
+			},
+		]);
+	});
+
+	it('refuses a handler that does more than write state', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Logger() @{
+	let count = state(0);
+	<button onClick={() => { count++; console.log(count); }}>Count {count}</button>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => [d.code, d.message])).toEqual([
+			[NATIVE_UNSUPPORTED_CODE, 'the click handler does more than write state'],
+		]);
+	});
+
+	it('refuses constructs with no native lowering yet', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Toggle() @{
+	let open = state(false);
+	<div>
+		@if (open) { <p>Open</p> }
+		<button onClick={() => (open = !open)}>Toggle</button>
+	</div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain('@if and @switch');
+	});
+});

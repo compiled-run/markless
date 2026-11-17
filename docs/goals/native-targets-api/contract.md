@@ -102,6 +102,36 @@ export function Counter() @{
   them. The TypeScript reference runtime in `packages/mobile/src/runtime.ts` defines the expected journal; each host must
   reproduce the conformance vectors byte for byte.
 
+### Building a payload and the conformance vectors (pushed)
+
+- Compile: `compileNativeComponent({ filename, source })` from `@markless/mobile` (`packages/mobile/src/compile.ts`) returns
+  `{ passId: 'native-view', payload, diagnostics }`. `payload` is `null` whenever there is a diagnostic (code
+  `MARKLESS_NATIVE_UNSUPPORTED`, one per construct with no native lowering yet: child components, `@if`/`@switch`, `@for`,
+  `@try`, `attach`, non-text bindings, handlers that read the event, are async, or do more than write state, and events other
+  than click). The pass itself is `createNativeViewPayload(semanticGraph)` in `packages/compiler/src/passes/native-view.ts`.
+- Reference runtime: `createNativeRuntime(payload)` in `packages/mobile/src/runtime.ts`: `texts()` gives every text node's
+  string in document order; `dispatch({ event: 'activate', host })` runs the handler's ops and returns the journal.
+- **Vector file** (`markless.native-conformance/0`), one JSON per component under `packages/mobile/conformance/<name>.json`,
+  written by `nativeConformance(payload, actions)`:
+
+```json
+{
+  "version": "markless.native-conformance/0",
+  "payload": { "version": "markless.native-view/0", "...": "the payload above" },
+  "initial": [["h1:text0", "Counter"], ["h2:text0", "Count 0"]],
+  "steps": [
+    { "action": { "event": "activate", "host": "h2" }, "journal": [{ "op": "text", "node": "h2:text0", "value": "Count 1" }] },
+    { "action": { "event": "activate", "host": "h2" }, "journal": [{ "op": "text", "node": "h2:text0", "value": "Count 2" }] }
+  ]
+}
+```
+
+  A host passes the vectors when, loading `payload`, its mounted text nodes read exactly `initial` (same order) and, for each
+  step in turn, dispatching `action` makes its runtime produce exactly `journal` (same entries, same order) and its views then
+  show those strings. Hosts run this headless in their own unit tests (XCTest / a JVM test with no device) and may also run it
+  in-app behind a launch flag. `packages/mobile/test/conformance.test.ts` fails if the committed vectors drift from what the
+  compiler and the reference runtime produce.
+
 ### Element to view (per platform, rungs 1 to 3)
 
 | Element | iOS (UIKit) | Android (Views) |
@@ -150,7 +180,8 @@ emulator, the web build of the same component as the reference. A rung green on 
 | 11 | Async value with `@try`/`@pending`/`@catch` | not started | not started | not started | |
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
-module) and `SemanticEvent.handlerWriteStatements`. The `native-view` pass is in progress.
+module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the
+reference runtime and the counter's vectors (`packages/mobile/test/conformance.test.ts`).
 
 ## 6. Decisions open for the owner
 
