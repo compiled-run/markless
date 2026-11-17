@@ -7810,6 +7810,43 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_NATIVE_KEYBOARD_ONLY',
+		title: 'A keyboard-only handler is left out of the native build',
+		area: 'internal',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error-or-warning',
+		description:
+			'A keyboard-only handler is left out of the native build: a Markless build error.',
+		printed: [
+			'MARKLESS_NATIVE_KEYBOARD_ONLY: <what> runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out',
+			'A touch or a screen reader moves neither key events nor keyboard focus on iOS and Android.',
+			'https://markless.dev/errors/MARKLESS_NATIVE_KEYBOARD_ONLY',
+		],
+		structured: true,
+		why: 'A touch or a screen reader moves neither key events nor keyboard focus on iOS and Android.',
+		allow: [
+			{
+				id: 'l0',
+				runs: [
+					{
+						id: 'r0',
+						text: '// markless-allow MARKLESS_NATIVE_KEYBOARD_ONLY: the reason you accept it',
+						style: 'color:#6a737d;--shiki-dark:var(--syntax-comment)',
+					},
+				],
+			},
+		],
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/native-view.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_NATIVE_UNSUPPORTED',
 		title: 'This component cannot be built for a native target yet',
 		area: 'internal',
