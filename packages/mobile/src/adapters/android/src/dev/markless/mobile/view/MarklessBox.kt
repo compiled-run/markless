@@ -3,6 +3,7 @@ package dev.markless.mobile.view
 import android.content.Context
 import android.graphics.Rect
 import android.view.View
+import android.widget.EditText
 import android.widget.FrameLayout
 
 /** The element view: children stack vertically until a style export assigns frames, then each child sits at its frame. */
@@ -24,7 +25,8 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 		var widest = 0
 		for (i in 0 until childCount) {
 			val child = getChildAt(i)
-			child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
+			// Text fields span the stack's width, as platform fields do; everything else takes its content width.
+			child.measure(MeasureSpec.makeMeasureSpec(width, if (child is EditText) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
 			height += child.measuredHeight
 			widest = maxOf(widest, child.measuredWidth)
 		}

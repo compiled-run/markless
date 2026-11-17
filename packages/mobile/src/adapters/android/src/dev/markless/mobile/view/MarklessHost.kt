@@ -11,7 +11,10 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.accessibility.AccessibilityNodeInfo
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.Button
+import android.widget.EditText
 import android.widget.TextView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.JournalEntry
@@ -58,13 +61,13 @@ class MarklessHost(
 	private val events = payload.events.groupBy { it.host }
 	private val views = HashMap<String, View>()
 	private val textViews = HashMap<String, TextView>()
-	private val classes = HashMap<String, String?>()
+	private var assignment = style?.initial ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
-	private val absolute: Map<String, Pair<Double, Double>> = style?.let {
+	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
-		absoluteOrigins(it)
-	} ?: emptyMap()
+		it.assignments.map { a -> absoluteOrigins(a.nodes) }
+	} ?: emptyList()
 
 	/** The root's frame inside the viewport, when a style export placed it. */
 	var rootFrame: Rect? = null
@@ -95,6 +98,15 @@ class MarklessHost(
 			when (entry) {
 				is JournalEntry.Text -> textView(entry.node).text = entry.value
 				is JournalEntry.Attribute -> attribute(entry.node, entry.name, entry.value)
+				is JournalEntry.Property -> {
+					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
+					if (field.text.toString() != entry.value) { field.setText(entry.value); field.setSelection(entry.value.length) }
+				}
+				is JournalEntry.State -> style?.let { st ->
+					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
+					for (node in payload.nodes) if (node !is Node.Branch) views[node.id]?.let { place(node, it, st) }
+					root.requestLayout()
+				}
 				is JournalEntry.Arm -> {
 					if (payload.nodes.none { it.id == entry.node && it is Node.Branch }) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					removeHidden()
@@ -111,7 +123,6 @@ class MarklessHost(
 			if (runtime.isShown(node) || node.id !in views) continue
 			val view = views.remove(node.id)!!
 			textViews.remove(node.id)
-			classes.remove(node.id)
 			if (node is Node.Text && view is Button) continue
 			expanded.remove(view)
 			(view.parent as? ViewGroup)?.let { p ->
@@ -147,12 +158,13 @@ class MarklessHost(
 		parent.addView(view, at)
 	}
 
-	private fun named(view: View, id: String, heading: Boolean = false) {
+	private fun named(view: View, id: String, heading: Boolean = false, control: Boolean = false) {
 		view.isAccessibilityHeading = heading
 		view.accessibilityDelegate = object : View.AccessibilityDelegate() {
 			override fun onInitializeAccessibilityNodeInfo(host: View, info: AccessibilityNodeInfo) {
 				super.onInitializeAccessibilityNodeInfo(host, info)
 				info.viewIdResourceName = id
+				if (control) info.className = Button::class.java.name
 				val state = expanded[host] ?: return
 				if (Build.VERSION.SDK_INT >= 36) info.expandedState = if (state) AccessibilityNodeInfo.EXPANDED_STATE_FULL else AccessibilityNodeInfo.EXPANDED_STATE_COLLAPSED
 				info.addAction(if (state) AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE else AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND)
@@ -172,14 +184,31 @@ class MarklessHost(
 				gravity = Gravity.TOP or Gravity.START
 				named(this, node.id)
 			}
-			else -> MarklessBox(context).apply { named(this, node.id, heading = node.element in HEADINGS) }
-		}
-		classes[node.id] = node.attributes["class"]
-		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			"input" -> EditText(context).apply {
+				isSingleLine = true
+				includeFontPadding = false
+				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
+				named(this, node.id)
+			}
+			else -> MarklessBox(context).apply { named(this, node.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }) }
 		}
 		views[node.id] = view
-		for (b in node.bindings) attribute(node.id, b.attribute, runtime.attribute(node, b))
+		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b))
+		for (e in events[node.id].orEmpty()) when (e.event) {
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
+				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+				override fun afterTextChanged(s: Editable) {
+					val text = s.toString()
+					// A property entry the applier just wrote reads back as the runtime's own value: not an edit.
+					if (node.bindings.any { it.property && it.name == "value" } && runtime.property(node.id, "value") == text) return
+					apply(runtime.dispatch(e.host, EventName.Input, text))
+				}
+			})
+		}
+		for ((name, value) in node.attributes) if (name != "class") attribute(node.id, name, value)
+		for (b in node.bindings) if (!b.property) attribute(node.id, b.name, runtime.attribute(b))
 		return view
 	}
 
@@ -199,7 +228,7 @@ class MarklessHost(
 		return view
 	}
 
-	/** Bound attributes per the contract's Android mapping; any other bound attribute has no Android meaning and is ignored. */
+	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
 		when (name) {
@@ -207,23 +236,20 @@ class MarklessHost(
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
-			"class" -> {
-				classes[id] = value
-				val s = style?.byId?.get(id)
-				if (s != null && s.variants.isNotEmpty()) paint(view, s, value)
-			}
 		}
 	}
 
 	private fun place(node: Node, view: View, style: StyleExport) {
-		val s = style.byId[node.id] ?: throw MarklessHostError("style export has no node \"${node.id}\"")
+		val styled = style.assignments[assignment]
+		val s = styled.byId[node.id] ?: throw MarklessHostError("style export has no node \"${node.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${node.id}\" is a ${s.kind}")
 		val frame = s.frame ?: throw MarklessHostError("style node \"${node.id}\" has no frame")
+		val absolute = absolutes[assignment]
 		val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${node.id}\" sits inside a box with no frame")
 		val parentId = node.parent
 		if (node is Node.Text && view is Button) {
 			val (bx, by) = absolute.getValue(node.parent)
-			val box = style.byId.getValue(node.parent).frame!!
+			val box = styled.byId.getValue(node.parent).frame!!
 			view.setPadding((ax - bx).roundToInt(), (ay - by).roundToInt(), (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
 		} else {
 			val (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
@@ -235,18 +261,20 @@ class MarklessHost(
 			}
 			if (parentId == null) rootFrame = rect else (views.getValue(parentId) as MarklessBox).frames[view] = rect
 		}
-		paint(view, s, classes[node.id])
+		paint(view, s)
 	}
 
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
 	fun frameDeviation(): Double {
 		val style = style ?: throw MarklessHostError("no style export to compare frames with")
+		val absolute = absolutes[assignment]
+		val styled = style.assignments[assignment]
 		val origin = absolute.getValue(payload.nodes.first().id)
 		val rootAt = IntArray(2).also { root.getLocationInWindow(it) }
 		var worst = 0.0
 		for (node in payload.nodes) {
 			val view = views[node.id] ?: continue
-			val frame = style.byId.getValue(node.id).frame!!
+			val frame = styled.byId.getValue(node.id).frame!!
 			val a = absolute.getValue(node.id)
 			val at = IntArray(2).also { view.getLocationInWindow(it) }
 			var x = (at[0] - rootAt[0]).toDouble(); var y = (at[1] - rootAt[1]).toDouble()
@@ -261,10 +289,10 @@ class MarklessHost(
 	}
 
 	/** Each framed style node's top-left in device px from the export's root; a node under an unframed box has none. */
-	private fun absoluteOrigins(style: StyleExport): Map<String, Pair<Double, Double>> {
+	private fun absoluteOrigins(nodes: List<StyledNode>): Map<String, Pair<Double, Double>> {
 		val absolute = HashMap<String, Pair<Double, Double>>()
 		val seen = HashSet<String>()
-		for (s in style.nodes) {
+		for (s in nodes) {
 			if (s.parent != null && s.parent !in seen) throw MarklessHostError("style node \"${s.id}\" precedes its parent")
 			seen.add(s.id)
 			val f = s.frame ?: continue
@@ -274,12 +302,12 @@ class MarklessHost(
 		return absolute
 	}
 
-	private fun paint(view: View, s: StyledNode, className: String?) {
+	private fun paint(view: View, s: StyledNode) {
 		var fill: Int? = null
 		var styles: List<String>? = null
 		var colors: List<Int>? = null
 		var radii: List<Double>? = null
-		for (w in s.writesFor(className)) when (w) {
+		for (w in s.writes) when (w) {
 			is StyleWrite.BackgroundColor -> fill = w.color.argb
 			StyleWrite.BorderWidths -> if (s.borderWidths == null) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
 			is StyleWrite.BorderStyles -> styles = w.styles
