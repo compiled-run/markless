@@ -1,0 +1,90 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.6507510830000027,
+			"flowSeconds": 6.933306125000003
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.6601599590000006,
+			"flowSeconds": 8.481640957999996
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.7565242079999953,
+			"flowSeconds": 11.606096082999997
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.6295557090000002,
+			"flowSeconds": 12.789569667000004
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.6446768750000047,
+			"flowSeconds": 14.236714542000001
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.5775660830000124,
+			"flowSeconds": 22.731255625000006
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.6155326669999922,
+			"flowSeconds": 14.5456535
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.7060041669999919,
+			"flowSeconds": 11.82156354199999
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.5565205410000054,
+			"flowSeconds": 12.513150125
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.6911882500000065,
+			"flowSeconds": 12.601131834
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.7298464580000146,
+			"flowSeconds": 12.326265208999976
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.700225832999975,
+			"flowSeconds": 18.249463208
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.5460388749999984,
+			"flowSeconds": 19.442487833999998
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.6206529589999991,
+			"flowSeconds": 8.915404958
+		}
+	]
+}

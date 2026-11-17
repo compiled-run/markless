@@ -33,8 +33,7 @@ this file changes in the same push. Status as of 2026-11-16, night one.
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
   segment, URL-decoded; any other segment matches itself) to get the params, then mounts with them; no route means the
   page's pattern must have no params. A `navigate` entry re-mounts with the entry's params.
-- **both hosts:** branch `tests` for `@else if` chains and `@switch` (section 4; vectors `choices.json`); `null` formats as
-  empty text, as on the web; child-component state arrives as ordinary cells with prefixed ids (nothing new to build).
+- **both hosts:** branch `tests` and `null` text are done (rung 5b green on both).
 - **native-proof-harness:** forward the `route` launch argument to the shells; run `node packages/mobile/src/style-export.ts
   <rung>` when a rung has styles and `MARKLESS_DRAGON_DIR` is set (or keep refusing a missing export, as now).
 - **native-ladder:** rung 7b is written by the lead (`proofs/07b-imported-component/`, rung number 7.5, importing
@@ -467,7 +466,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
 | 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing** (the clipped title is fixed: Android now draws Dragon-styled text at Dragon's unhinted advances) | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
-| 5b | `@else if` chains and `@switch` | passing | passing | not yet (host: branch `tests`) | not yet (host: branch `tests`) | `proofs/05b-choices/`; vectors `choices.json` |
+| 5b | `@else if` chains and `@switch` | passing | passing | **passing** | **passing** | `proofs/05b-choices/`; vectors `choices.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
 | 7b | A component imported from another file | passing | passing | **passing** | **passing** | `proofs/07b-imported-component/` imports `proofs/lib/Stepper.tsrx`; harness verdict passed on both |
@@ -478,12 +477,12 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not started | not started | stopped by design: owner decision (a declared fetch or a script engine) |
 
-**Device receipt (2026-11-17 05:00, tree `06b410c1a`):** one harness run of rungs 1 to 10 on both platforms, then
-`proof verdict`: **"proof passed on iOS and Android"** (Android first, then iOS; devices booted for the run and shut down
-after; mini-2, simulator `markless-lead`, iOS 27.2; AVD `markless_native`, Pixel 7, API 36). Reports and the verdict are
-committed under `docs/goals/native-targets-api/receipts/2026-11-17-*-rungs-1-to-10.*`; rung 7b's own run is beside them.
-Earlier partial runs (also committed) record emulator drops under load (`device offline`), which the harness names as
-device failures and never retries.
+**Final device receipt (2026-11-17 07:15, tree `760b38b1f`):** one harness run of all fourteen passing rungs (1, 2, 3, 4,
+5, 5b, 6, 7, 7b, 7c, 7d, 8, 9, 10), Android then iOS, then `proof verdict`: **"proof passed on iOS and Android"**, 14 of 14 on
+each. Devices were booted for the run and shut down after (mini-2; simulator `markless-lead`, iOS 27.2; AVD
+`markless_native`, Pixel 7, API 36). Reports and the verdict: `receipts/2026-11-17-final-*`. Earlier runs, including the
+ones where the emulator dropped under load, are committed beside them; the harness names a dropped device as a device
+failure and never retries.
 
 Compiler side done for rungs 1 and 3: static text positions (`SemanticMarkupChunk.texts`, kept out of the web render-data
 module), `SemanticEvent.handlerWriteStatements`, the `native-view` pass (`packages/compiler/test/native-view.test.ts`), the

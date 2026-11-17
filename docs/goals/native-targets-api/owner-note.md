@@ -49,7 +49,7 @@ stops on purpose: the value comes from your own JavaScript, and how a phone runs
 iPhone simulator and the Android emulator in a single run**, plus rung 7b (a component imported from another file).
 Three more rungs pass on all three: 7b (a component from another file), 7c (a reused component with its own state) and
 7d (a component that wraps the markup you pass it, `{children}`), the building blocks the headless library needs. Rung 5b (`@else if` and
-`@switch`) passes on web and waits on the phone hosts. Receipts and screenshots are committed. Rungs 2 and 4 are styled: the component's own CSS goes through Dragon at build
+`@switch`) passes on all three too. The last run took all fourteen rungs through both phones in one go: 14 of 14 on each. Receipts and screenshots are committed. Rungs 2 and 4 are styled: the component's own CSS goes through Dragon at build
 time, and both phones show the colours, borders, corners and Inter text Chrome shows (Dragon's numbers: every box within
 1 device pixel of Chrome). (An Android defect found tonight, a bold heading's last letter clipping, was traced to text hinting and fixed.)
 

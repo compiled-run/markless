@@ -1,0 +1,90 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 14.747030415999998,
+			"flowSeconds": 15.295482
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.24686220799999864,
+			"flowSeconds": 14.233351500000005
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.23239929200000187,
+			"flowSeconds": 15.845223707999997
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.25390000000000873,
+			"flowSeconds": 16.55936437499999
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.24323533399999725,
+			"flowSeconds": 17.82654016599999
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.23307337499999267,
+			"flowSeconds": 24.028710667000006
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.21500233399998978,
+			"flowSeconds": 17.112171833000016
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.23748520799999823,
+			"flowSeconds": 15.818067041000003
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.24352191599999787,
+			"flowSeconds": 16.58587379099999
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.24238320799998472,
+			"flowSeconds": 16.485741167
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.24988816600001884,
+			"flowSeconds": 16.451601583999988
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.24582533399999373,
+			"flowSeconds": 24.399765458000008
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.22044283300000825,
+			"flowSeconds": 24.797446041999997
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.22265037499999743,
+			"flowSeconds": 14.043509624999977
+		}
+	]
+}
