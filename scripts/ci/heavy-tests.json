@@ -100,6 +100,7 @@
 		"packages/cli/test/starter-build.test.ts",
 		"packages/router/test/navigate-promise.test.ts",
 		"packages/router/test/vite/api-pages.test.ts",
+		"packages/router/test/vite/arm-close-async-run.test.ts",
 		"packages/router/test/vite/async-child-ssr.test.ts",
 		"packages/router/test/vite/async-graph.test.ts",
 		"packages/router/test/vite/back-revalidate.test.ts",
