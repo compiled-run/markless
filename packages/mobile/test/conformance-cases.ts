@@ -1,6 +1,6 @@
 import type { NativeAction } from '../src/index.ts';
 
-/** Each committed vector file: its component fixture and the actions it records. */
+/** Each committed vector file: its component (a path inside packages/mobile) and the actions it records. */
 export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly name: string;
 	readonly fixture: string;
@@ -8,7 +8,7 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 }> = [
 	{
 		name: 'counter',
-		fixture: 'Counter.tsrx',
+		fixture: 'test/fixtures/Counter.tsrx',
 		actions: [
 			{ event: 'activate', host: 'h2' },
 			{ event: 'activate', host: 'h2' },
@@ -16,12 +16,29 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	},
 	{
 		name: 'switches',
-		fixture: 'Switches.tsrx',
+		fixture: 'test/fixtures/Switches.tsrx',
 		actions: [
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h3' },
 			{ event: 'activate', host: 'h4' },
 			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'attributes',
+		fixture: 'proofs/04-attributes/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h2' },
+		],
+	},
+	{
+		name: 'if',
+		fixture: 'proofs/05-if/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h2' },
 		],
 	},
 ];

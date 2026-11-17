@@ -127,14 +127,48 @@ export function Logger() @{
 
 	it('refuses constructs with no native lowering yet', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function List() @{
+	let items = state([{ id: 1, name: 'a' }]);
+	<ul>
+		@for (const item of items; key item.id) { <li>{item.name}</li> }
+	</ul>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain('@for');
+	});
+
+	it('lowers @if to a branch whose arms carry their place, and bindings to expressions', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function Toggle() @{
 	let open = state(false);
 	<div>
-		@if (open) { <p>Open</p> }
-		<button onClick={() => (open = !open)}>Toggle</button>
+		<button aria-expanded={open} onClick={() => (open = !open)}>{open ? 'Hide' : 'Show'}</button>
+		@if (open) { <p>Open</p> } @else { <p>Closed</p> }
 	</div>
 }`);
-		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain('@if and @switch');
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes).toEqual([
+			{ kind: 'element', id: 'h0', element: 'div', parent: null },
+			{
+				kind: 'element',
+				id: 'h1',
+				element: 'button',
+				parent: 'h0',
+				bindings: [{ attribute: 'aria-expanded', value: { cell: 'state:open' } }],
+			},
+			{
+				kind: 'text',
+				id: 'h1:text0',
+				parent: 'h1',
+				parts: [
+					{ expr: { if: { cell: 'state:open' }, whenTrue: { literal: 'Hide' }, whenFalse: { literal: 'Show' } } },
+				],
+			},
+			{ kind: 'branch', id: 'branch-site:0', parent: 'h0', test: { cell: 'state:open' }, arms: 2 },
+			{ kind: 'element', id: 'h2', element: 'p', parent: 'h0', arm: { branch: 'branch-site:0', index: 0 } },
+			{ kind: 'text', id: 'h2:text0', parent: 'h2', parts: [{ text: 'Open' }], arm: { branch: 'branch-site:0', index: 0 } },
+			{ kind: 'element', id: 'h3', element: 'p', parent: 'h0', arm: { branch: 'branch-site:0', index: 1 } },
+			{ kind: 'text', id: 'h3:text0', parent: 'h3', parts: [{ text: 'Closed' }], arm: { branch: 'branch-site:0', index: 1 } },
+		]);
 	});
 });

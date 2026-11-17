@@ -12,6 +12,8 @@ import { ifChainOf, isElseIfLink } from './if-chain.ts';
 import { propTestOf } from './prop-test.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
+import type { SemanticValueShape } from '../../artifacts.ts';
+import { valueShapeOf } from './value-shape.ts';
 
 /**
  * What counts as part of the read in a branch condition.
@@ -113,6 +115,7 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
+			...ifTestShape(test),
 			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
@@ -152,6 +155,11 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			...branchRow(state),
 		});
 	}
+}
+
+function ifTestShape(test: AnyNode | undefined): { testShape?: SemanticValueShape } {
+	const testShape = valueShapeOf(test);
+	return testShape ? { testShape } : {};
 }
 
 // An `@else if` chain is one site picked by index; a missing final `@else` is an empty last arm.
