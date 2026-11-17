@@ -78,7 +78,7 @@ export function nativeStyleInput(
 		component: payload.component,
 		nodes: payload.nodes.flatMap((node): NativeStyleInput['nodes'][number][] => {
 			const place = node.arm ? { arm: node.arm } : {};
-			if (node.kind === 'branch') return [];
+			if (node.kind === 'branch' || node.kind === 'repeat') return [];
 			if (node.kind === 'text')
 				return [
 					{

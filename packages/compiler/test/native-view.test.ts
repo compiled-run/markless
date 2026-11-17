@@ -242,15 +242,66 @@ export function Logger() @{
 	});
 
 	it('refuses constructs with no native lowering yet', async () => {
+		const { payload, diagnostics } = await nativeView(`function Label({ text }) @{
+	<span>{text}</span>
+}
+export function Page() @{
+	<div><Label text="a" /></div>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toContain('child components');
+	});
+
+	it('lowers a keyed @for to a list region whose rows read their item, and array writes to methods', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 export function List() @{
 	let items = state([{ id: 1, name: 'a' }]);
-	<ul>
-		@for (const item of items; key item.id) { <li>{item.name}</li> }
-	</ul>
+	<section>
+		<button onClick={() => (items = items.filter((item) => item.id !== 1))}>Drop</button>
+		<ul>
+			@for (const row of items; key row.id) { <li>{row.name}</li> }
+		</ul>
+	</section>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.cells[0]?.initial).toEqual([{ id: 1, name: 'a' }]);
+		expect(payload?.nodes.slice(4)).toEqual([
+			{ kind: 'repeat', id: 'repeat:0', parent: 'h2', list: { cell: 'state:items' }, key: ['id'] },
+			{ kind: 'element', id: 'h3', element: 'li', parent: 'h2', row: 'repeat:0' },
+			{
+				kind: 'text',
+				id: 'h3:text0',
+				parent: 'h3',
+				parts: [{ expr: { member: { item: 'repeat:0' }, property: 'name' } }],
+				row: 'repeat:0',
+			},
+		]);
+		expect(payload?.handlers[0]?.ops[0]?.value).toEqual({
+			method: 'filter',
+			target: { cell: 'state:items' },
+			arguments: [
+				{
+					lambda: ['item'],
+					body: {
+						binary: '!==',
+						left: { member: { local: 'item' }, property: 'id' },
+						right: { literal: 1 },
+					},
+				},
+			],
+		});
+	});
+
+	it('refuses reversing a state array in place', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function List() @{
+	let items = state([1, 2]);
+	<button onClick={() => (items = items.reverse())}>Flip {items.length}</button>
 }`);
 		expect(payload).toBeNull();
-		expect(diagnostics.map((d) => d.message)).toContain('@for');
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the click handler reverses an array in place; reverse a copy (`[...list].reverse()`)',
+		]);
 	});
 
 	it('lowers @if to a branch whose arms carry their place, and bindings to expressions', async () => {
