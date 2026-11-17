@@ -167,6 +167,101 @@
 			"delta": 87,
 			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "the range journal's one shared loader is its own module, so a pass can wait on it before its commits land",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 148,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 148,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 148,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 148,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 144,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 144,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 137,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
 		}
 	]
 }
