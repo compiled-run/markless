@@ -16,7 +16,6 @@ import type {
 	SemanticEvent,
 	SemanticGraphArtifact,
 	SemanticMarkupChunk,
-	SemanticTemplateRead,
 	SemanticExpression,
 	SemanticHandlerStatement,
 	SourceSpan,
@@ -106,6 +105,8 @@ type Prop =
 
 /** What names mean where an expression is: the component whose state it reads, its props, rows' items and parameters. */
 type Scope = {
+	/** The analysis of the module whose template is being lowered. */
+	readonly module: ModuleFacts;
 	readonly component: string;
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
@@ -133,7 +134,50 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 export type NativeViewOptions = {
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
+	/** The analyses of modules this one imports components from, by import specifier as written. */
+	readonly importedModules?: Readonly<Record<string, SemanticGraphArtifact>>;
 };
+
+/** One module's facts, indexed for lowering its templates. */
+type ModuleFacts = ReturnType<typeof moduleFactsOf>;
+
+function moduleFactsOf(graph: SemanticGraphArtifact) {
+	const index = <T, K>(items: ReadonlyArray<T>, key: (item: T) => K) => {
+		const map = new Map<K, T[]>();
+		for (const item of items) map.set(key(item), [...(map.get(key(item)) ?? []), item]);
+		return map;
+	};
+	const propNames = new Map<string, Map<string, string>>();
+	for (const binding of graph.componentPropBindings) {
+		const names = propNames.get(binding.componentName) ?? new Map<string, string>();
+		if (binding.propPath?.length === 1) names.set(binding.localName, binding.propPath[0]!);
+		propNames.set(binding.componentName, names);
+	}
+	return {
+		graph,
+		chunks: new Map(graph.markup.chunks.map((chunk) => [chunk.id, chunk])),
+		propNames,
+		readsByHost: index(graph.templateReads, (read) => read.hostNodeId),
+		computedReads: new Map(
+			graph.templateReads.flatMap((read) =>
+				read.computedGraphNodeId && read.target.kind === 'text'
+					? [[read.computedGraphNodeId, read] as const]
+					: [],
+			),
+		),
+		tagOf: new Map(graph.hostNodes.map((host) => [host.id, host.tagName])),
+		branchSites: new Map(graph.branchSites.map((site) => [site.id, site])),
+		propBindingIds: new Set(
+			graph.graphBindings.flatMap((binding) => (binding.kind === 'prop' ? [binding.id] : [])),
+		),
+		edgesById: new Map(graph.componentEdges.map((edge) => [edge.id, edge])),
+		eventsByHost: index(graph.events, (event) => event.hostNodeId),
+		repeatsById: new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat])),
+		imports: new Map(
+			graph.moduleImports.filter((entry) => !entry.typeOnly).map((entry) => [entry.localName, entry]),
+		),
+	};
+}
 
 export function createNativeViewPayload(
 	graph: SemanticGraphArtifact,
@@ -165,8 +209,8 @@ export function createNativeViewPayload(
 	if (!root) return done(refuse('the module has no root component'));
 	if (graph.asyncBoundaries.length > 0) refuse('@try');
 	if (graph.behaviors.length > 0) refuse('attach behaviours');
-	const chunks = new Map(graph.markup.chunks.map((chunk) => [chunk.id, chunk]));
-	const rootChunk = chunks.get(root.templateId);
+	const rootModule = moduleFactsOf(graph);
+	const rootChunk = rootModule.chunks.get(root.templateId);
 	if (!rootChunk) return done(refuse('the root template has no markup'));
 
 	const cells = graph.graphBindings.flatMap((binding) => {
@@ -197,13 +241,8 @@ export function createNativeViewPayload(
 	}
 	const cellOf = (name: string, scope: Scope): string | undefined =>
 		(cellsByComponent.get(scope.component) ?? cellsByComponent.get(root.componentName))?.get(name);
-	const propNames = new Map<string, Map<string, string>>();
-	for (const binding of graph.componentPropBindings) {
-		const names = propNames.get(binding.componentName) ?? new Map<string, string>();
-		if (binding.propPath?.length === 1) names.set(binding.localName, binding.propPath[0]!);
-		propNames.set(binding.componentName, names);
-	}
 	const TOP: Scope = {
+		module: rootModule,
 		component: root.componentName,
 		prefix: '',
 		locals: new Set(),
@@ -212,14 +251,20 @@ export function createNativeViewPayload(
 			options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
 		),
 	};
-	const routerLinks = new Set(
-		graph.moduleImports.flatMap((entry) =>
-			entry.source === '@markless/router' && entry.importedName === 'Link' && !entry.typeOnly
-				? [entry.localName]
-				: [],
-		),
-	);
-
+	const importedModuleFacts = new Map<string, ModuleFacts>();
+	const importedFacts = (specifier: string, imported: SemanticGraphArtifact): ModuleFacts => {
+		const known = importedModuleFacts.get(specifier);
+		if (known) return known;
+		const facts = moduleFactsOf(imported);
+		importedModuleFacts.set(specifier, facts);
+		for (const binding of imported.graphBindings)
+			if (binding.kind === 'state') refuse(`state \`${binding.name}\` declared in the imported module ${specifier}`);
+		return facts;
+	};
+	const isRouterLink = (scope: Scope, name: string): boolean => {
+		const entry = scope.module.imports.get(name);
+		return entry?.source === '@markless/router' && entry.importedName === 'Link';
+	};
 	const exprOf = (
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -235,7 +280,7 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
-				const prop = scope.props.get(propNames.get(scope.component)?.get(expression.name) ?? '');
+				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(expression.name) ?? '');
 				if (prop?.kind === 'value') return prop.expr;
 				if (prop) return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				const cell = cellOf(expression.name, scope);
@@ -332,14 +377,8 @@ export function createNativeViewPayload(
 		}
 	};
 
-	const readsByHost = new Map<string, SemanticTemplateRead[]>();
-	for (const read of graph.templateReads) {
-		const list = readsByHost.get(read.hostNodeId) ?? [];
-		list.push(read);
-		readsByHost.set(read.hostNodeId, list);
-	}
 	const bindingsOf = (host: string, scope: Scope): ElementBindings =>
-		(readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
+		(scope.module.readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
 			const target = read.target;
 			if (target.kind === 'text') return [];
 			if (target.kind === 'property' && target.name === 'value') {
@@ -374,49 +413,29 @@ export function createNativeViewPayload(
 			refuse(`a ${target.kind} binding${'name' in target ? ` (\`${target.name}\`)` : ''}`);
 			return [];
 		});
-	const computedReads = new Map(
-		graph.templateReads.flatMap((read) =>
-			read.computedGraphNodeId && read.target.kind === 'text'
-				? [[read.computedGraphNodeId, read] as const]
-				: [],
-		),
-	);
 	const textPartOf = (graphNodeId: string, scope: Scope): NativeTextPart | null => {
 		if (cellIds.has(graphNodeId)) return { cell: graphNodeId };
-		const read = computedReads.get(graphNodeId);
+		const read = scope.module.computedReads.get(graphNodeId);
 		const expr = read
 			? exprOf(read.expression, 'a text expression', scope)
 			: refuse('a text binding that is not state');
 		return expr && { expr };
 	};
 
-	const tagOf = new Map(graph.hostNodes.map((host) => [host.id, host.tagName]));
-	const branchSites = new Map(graph.branchSites.map((site) => [site.id, site]));
 	const nodes: NativeNode[] = [];
 	const textRuns = new Map<string, number>();
 	const lowered = new Set<string>();
 
-	const propBindingIds = new Set(
-		graph.graphBindings.flatMap((binding) => (binding.kind === 'prop' ? [binding.id] : [])),
-	);
-	const edgesById = new Map(graph.componentEdges.map((edge) => [edge.id, edge]));
-	const eventsByHost = new Map<string, SemanticEvent[]>();
-	for (const event of graph.events) {
-		const list = eventsByHost.get(event.hostNodeId) ?? [];
-		list.push(event);
-		eventsByHost.set(event.hostNodeId, list);
-	}
 	const events: NativeViewPayload['events'][number][] = [];
 	const handlers: NativeViewPayload['handlers'][number][] = [];
 	const loweredEvents = new Set<string>();
-	const repeatsById = new Map(graph.keyedRepeats.map((repeat) => [repeat.id, repeat]));
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
 		baseParent: string | null,
 		place: NativePlace,
 		scope: Scope,
 	) => {
-		lowered.add(chunk.id);
+		if (scope.module === rootModule) lowered.add(chunk.id);
 		const items: Item[] = [
 			...chunk.hosts.map((host): Item => ({
 				kind: 'host',
@@ -473,7 +492,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			const path = slot.residue.path;
-			if (propBindingIds.has(slot.residue.graphNodeId)) {
+			if (scope.module.propBindingIds.has(slot.residue.graphNodeId)) {
 				const [name, ...rest] = path;
 				const prop = name === undefined ? undefined : scope.props.get(name);
 				if (prop?.kind !== 'value') {
@@ -526,7 +545,7 @@ export function createNativeViewPayload(
 			const parent = parentOf(item.path);
 			if (item.kind === 'host') {
 				close();
-				const element = tagOf.get(item.id);
+				const element = scope.module.tagOf.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
 				else if (!PORTABLE_ELEMENTS.has(element)) refuse(`the <${element}> element`);
 				const attributes = (chunk.attributes ?? []).filter(
@@ -549,8 +568,8 @@ export function createNativeViewPayload(
 					...(bindings.length > 0 ? { bindings } : {}),
 					...place,
 				});
-				for (const event of eventsByHost.get(item.id) ?? []) {
-					loweredEvents.add(event.id);
+				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
+					if (scope.module === rootModule) loweredEvents.add(event.id);
 					const semantic = SEMANTIC_EVENTS[event.eventName];
 					if (!semantic) {
 						refuse(`the ${event.eventName} event has no native meaning yet`, event.handlerSpan);
@@ -568,18 +587,27 @@ export function createNativeViewPayload(
 			}
 			if (item.kind === 'child') {
 				close();
-				const edge = edgesById.get(item.edge);
-				const template = chunks.get(item.template);
+				const edge = scope.module.edgesById.get(item.edge);
+				const imported = edge ? scope.module.imports.get(edge.childComponentName) : undefined;
+				const importedModule =
+					imported?.importedName && options.importedModules?.[imported.source]
+						? importedFacts(imported.source, options.importedModules[imported.source]!)
+						: undefined;
+				const childModule = importedModule ?? scope.module;
+				const childComponent = importedModule ? imported!.importedName! : (edge?.childComponentName ?? '');
+				const template = importedModule
+					? importedModule.chunks.get(`template:${childComponent}`)
+					: scope.module.chunks.get(item.template);
 				if (!edge) {
 					refuse(`the component call ${item.edge}`);
 					continue;
 				}
-				if (routerLinks.has(edge.childComponentName)) {
+				if (isRouterLink(scope, edge.childComponentName)) {
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
 					const paramValues =
 						params?.kind === 'opaque' ? params.buildTimeValue?.value : params?.kind === 'serializable' ? params.value : {};
-					const projection = item.projection ? chunks.get(item.projection) : undefined;
+					const projection = item.projection ? scope.module.chunks.get(item.projection) : undefined;
 					if (
 						href?.kind !== 'serializable' ||
 						typeof href.value !== 'string' ||
@@ -624,7 +652,8 @@ export function createNativeViewPayload(
 					}
 				}
 				lowerChunk(template, parent, place, {
-					component: edge.childComponentName,
+					module: childModule,
+					component: childComponent,
 					prefix: `${scope.prefix}${edge.id}/`,
 					locals: new Set(),
 					items: new Map(),
@@ -634,8 +663,8 @@ export function createNativeViewPayload(
 			}
 			if (item.kind === 'repeat') {
 				close();
-				const repeat = repeatsById.get(item.id);
-				const rowChunk = chunks.get(item.row);
+				const repeat = scope.module.repeatsById.get(item.id);
+				const rowChunk = scope.module.chunks.get(item.row);
 				if (place.arm || place.row) {
 					refuse('@for inside an @if arm or another @for');
 					continue;
@@ -655,7 +684,7 @@ export function createNativeViewPayload(
 					refuse('@if inside a @for row');
 					continue;
 				}
-				const site = branchSites.get(item.id);
+				const site = scope.module.branchSites.get(item.id);
 				if (!site || site.kind !== 'if' || site.armIndexSource !== undefined) {
 					refuse('@else if chains and @switch');
 					continue;
@@ -672,7 +701,7 @@ export function createNativeViewPayload(
 					...place,
 				});
 				item.arms.forEach((armId, index) => {
-					const armChunk = chunks.get(armId);
+					const armChunk = scope.module.chunks.get(armId);
 					if (armChunk) lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
 					else refuse(`arm ${armId} has no markup`);
 				});
@@ -727,7 +756,7 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (statement.kind === 'invoke') {
-				const prop = scope.props.get(propNames.get(scope.component)?.get(statement.name) ?? '');
+				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(statement.name) ?? '');
 				if (prop?.kind !== 'callback' || !prop.statements || depth > 8) {
 					refuse(`${what} uses a call to \`${statement.name}\`, which needs a script engine`, span);
 					return [];

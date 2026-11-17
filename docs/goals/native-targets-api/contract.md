@@ -239,9 +239,14 @@ export function Counter() @{
   A callback prop called from the child (`onClick={() => onStep()}`) lowers to the caller's own statements, so the
   child's handler is the parent's `assign` ops. The analyzer records callback bodies (`nativeStatements`) and `name()`
   calls (`invoke` statements) for native builds only.
-- Not yet (each refused by name): state declared in a child component (instance-local cells), children passed into a
-  component (`{children}`), components from another module (`<Link>` included), a callback called with arguments or used
-  as a value.
+- **Components imported from another file (rung 7b, pushed 2026-11-17):** `compileNativeComponent({ ..., readModule })`
+  analyzes each relatively imported module (`./Stepper.tsrx`) and passes its analysis to the pass, which builds the
+  imported component in place exactly like a same-file one (ids prefixed by the call site; props and callbacks
+  substituted). File access is the caller's `readModule(specifier, importer)`; the harness and the ladder's reference
+  test pass `readRelativeModule` from `src/harness/rung.ts`. Without a reader, or for a package import other than the
+  router's `Link`, the component is refused by name. Tested in `packages/mobile/test/conformance.test.ts`.
+- Not yet (each refused by name): state declared in a child or imported component (instance-local cells), children
+  passed into a component (`{children}`), components from packages, a callback called with arguments or used as a value.
 - Vectors: `components.json` (rung 7).
 
 ### Additions for rung 10: routes and the URL (pushed 2026-11-17)
@@ -431,6 +436,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | failing (host has no lists yet) | passing | vectors `list.json`; not passed until iOS |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
+| 7b | A component imported from another file | not started | compiler side done (test fixture) | not yet | not yet | waits on the ladder's `proofs/07b-imported-component/` |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | failing (hosts take no launch route yet) | failing (same) | vectors `route.json` |

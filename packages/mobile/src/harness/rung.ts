@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
@@ -21,6 +21,12 @@ export type ProofRung = {
 };
 
 const COMPONENT_FILE = 'App.tsrx';
+
+/** Reads a module a rung imports by relative path (`./Stepper.tsrx`), so the build can lower its components in place. */
+export function readRelativeModule(specifier: string, importer: string) {
+	const filename = resolve(dirname(importer), specifier);
+	return existsSync(filename) ? { filename, source: readFileSync(filename, 'utf8') } : undefined;
+}
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
 /** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
@@ -78,6 +84,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			source: readFileSync(component, 'utf8'),
 			// A rung that is a page compiles as its page file, so the router derives its route.
 			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
+			readModule: readRelativeModule,
 		});
 		if (!build.payload) {
 			const lines = build.diagnostics.map(
