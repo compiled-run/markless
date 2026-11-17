@@ -104,15 +104,15 @@ Views are kept per instance (`h6:text0@pear` inside a list row). An `arm` or `ro
 longer shown, builds every shown instance without a view from current values, and moves each parent's retained children
 into place: document order, with a list's rows at the list's place in key order.
 
-## Through the shared harness (2026-11-17, 03:30)
+## Through the shared harness (2026-11-17)
 
 `pnpm --filter @markless/mobile proof --simulator native-android-host --avd native_android_host --port 5600 <rungs>` (both
-platforms, the harness's own shells):
+platforms, the harness's own shells). The lead's receipts on `cw/native-targets` record rungs 1, 3, 5, 7, 8 and 9 passing on
+both platforms. This host's runs:
 
 | Rung | Android | iOS |
 |---|---|---|
-| 01-static-text | PASS | PASS |
-| 03, 05, 07, 08, 09 | PASS | FAIL at launch: the iOS host in this tree refuses `unknown op "assign"` |
-| 06-keyed-for | PASS alone (`--platform android`); in both two-platform runs Maestro lost the Android device before the flow (`Device emulator-5600 was requested, but it is not connected`) | FAIL, as above |
+| 01, 03, 05, 07, 08, 09 | PASS | PASS in the lead's receipts (failed at launch on `unknown op "assign"` before the iOS host moved to `assign`) |
+| 06-keyed-for | PASS (04:15 run; an earlier two-platform run lost the Android device before the flow, `Device emulator-5600 was requested, but it is not connected`, and passed alone) | FAIL at launch: the iOS host has no lists yet |
+| 10-url-route | PASS (opened at `/apple`, navigates to pear) | FAIL at launch: the iOS host has no routes yet |
 | 02, 04 | refused by the harness: no Dragon `native-style.json` for the rung (request 11) | same |
-| 10 | not built by the harness: it compiles without `page` (request 12); passes from this folder's shell | same |
