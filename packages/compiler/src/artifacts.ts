@@ -1337,6 +1337,8 @@ export type SemanticBehavior = {
 	readonly functionParameters?: ReadonlyArray<string>;
 	/** `@catch (error, reset)` reset names the function calls, with the boundary each resets. */
 	readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	/** The graph reads the attach expression makes, as their source spellings. */
+	readonly readSources?: ReadonlyArray<string>;
 };
 
 /**

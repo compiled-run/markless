@@ -177,7 +177,17 @@ function collectBoundaryGateReads(
 		readonly path?: ReadonlyArray<string>;
 		// An `@if`/`@switch` test: the settled block picks its arm from it.
 		readonly branchTest?: true;
+		// A read inside an attach function: a name that is not a graph value is the function's own JS.
+		readonly attachRead?: true;
 	};
+	// attach on a @try arm element runs once the block settles, so its async reads gate the block.
+	const tryArmHosts = new Map(
+		semanticGraph.hostNodes.flatMap((host) =>
+			host.asyncBoundaryId && host.asyncBoundaryArm === 0
+				? [[host.id, host.asyncBoundaryId] as const]
+				: [],
+		),
+	);
 	const boundaryReads: ReadonlyArray<GateRead> = [
 		...semanticGraph.templateReads.flatMap((read): ReadonlyArray<GateRead> =>
 			read.asyncGateReads &&
@@ -215,6 +225,16 @@ function collectBoundaryGateReads(
 					: [],
 			),
 		),
+		...semanticGraph.behaviors.flatMap((behavior): ReadonlyArray<GateRead> => {
+			const host = tryArmHosts.get(behavior.hostNodeId);
+			return host
+				? (behavior.readSources ?? []).map((source) => ({
+						source,
+						asyncBoundaryId: host,
+						attachRead: true as const,
+					}))
+				: [];
+		}),
 		...semanticGraph.branchSites.flatMap((site): ReadonlyArray<GateRead> =>
 			site.asyncBoundaryId && site.asyncBoundaryArm === 0 && !site.testReadsRowItem
 				? [
@@ -248,7 +268,7 @@ function collectBoundaryGateReads(
 						? { binding: named, path: read.path ?? [] }
 						: resolveGraphPath(templateReadPath(read), bindings, aliases);
 				if (!resolved) {
-					if (!read.branchTest) unresolvedSources.push(read.source);
+					if (!read.branchTest && !read.attachRead) unresolvedSources.push(read.source);
 					continue;
 				}
 				if (resolved.binding.kind !== 'computed' || resolved.binding.asyncCapable !== true)
