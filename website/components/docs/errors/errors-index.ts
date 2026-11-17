@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 317,
+	total: 318,
 	guided: 51,
 	groups: [
 		{
@@ -1274,6 +1274,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'runtime error',
 					guided: false,
 					words: 'document.tsrx has an event handler markless_router_document_handlers_unsupported a markless runtime error from @markless/router.',
+				},
+				{
+					code: 'MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED',
+					title: 'document.tsrx reads shared()',
+					chip: 'error',
+					kind: 'runtime error',
+					guided: false,
+					words: 'document.tsrx reads shared() markless_router_document_shared_unsupported a markless runtime error from @markless/router.',
 				},
 				{
 					code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',

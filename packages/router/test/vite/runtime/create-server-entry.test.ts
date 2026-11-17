@@ -1015,6 +1015,38 @@ describe('server entry rendering', () => {
 		expect(html).toContain('theme');
 	});
 
+	it('refuses a document that reads a shared() instance no runtime ever binds it to', async () => {
+		const entry = createServerEntry({
+			dev: true,
+			documentModuleLoader: async () => ({
+				default: {
+					renderSsr: () => ({
+						html: '<head></head><body>__markless_router_document_children__</body>',
+						state: {
+							version: 2,
+							cells: [{ graphNodeId: 'shared:components/ui.tsrx#ui/state:box', name: 'box' }],
+							computed: [],
+							sharedDefinitions: [
+								{ id: 'shared:components/ui.tsrx#ui', name: 'ui', scope: 'app', version: 0 },
+							],
+						},
+					}),
+				},
+			}),
+			pageModuleLoaders: {
+				'pages/index.tsrx': async () => ({ default: page('<main>Home</main>') }),
+			},
+			routeFileIds: ['/pages/index.tsrx'],
+		});
+
+		const response = await entry.fetch(new Request('http://markless-router.test/'));
+
+		expect(response.status).toBe(500);
+		expect(await response.text()).toContain(
+			'MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED: the document reads shared() ui',
+		);
+	});
+
 	it('refuses a document whose render output wires event handlers', async () => {
 		const entry = createServerEntry({
 			dev: true,

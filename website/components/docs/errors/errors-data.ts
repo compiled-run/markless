@@ -10581,6 +10581,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED',
+		title: 'document.tsrx reads shared()',
+		area: 'router',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/router.',
+		printed: [
+			"MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED: the document reads shared() <names>, but the router serves only the document's HTML and never wires it in the browser, so it would keep showing the starting value after a write. Read the value in a component the page renders, and set the class or attribute on an element there.",
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/runtime/create-server-entry.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/runtime/create-server-entry.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',
 		title: 'document.tsrx uses storage()',
 		area: 'router',

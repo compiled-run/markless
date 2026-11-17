@@ -871,6 +871,8 @@ export function emitResumeModule(input: {
 	readonly linkedRowBranches?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
+	// A component this module renders, here or in a module it imports, resolves a shared() instance outliving the page.
+	readonly hasLiveSharedState?: boolean;
 	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
 	readonly storageCells?: boolean;
 	readonly installResumeSummary?: boolean;
@@ -977,6 +979,7 @@ export function emitResumeModule(input: {
 		// all. The loader stays unresolved until a resumed root turns out to carry
 		// a marked element, so having the mark somewhere is still not fetching it.
 		demandsOverlay(input.runtimeDemandMap) ? emitOverlayLoaderInstall() : null,
+		input.hasLiveSharedState === true ||
 		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
 			? emitSharedInstancesLoaderInstall()
 			: null,

@@ -25,7 +25,7 @@ import {
 	getFrameworkApiForCall,
 } from './imports.ts';
 import { collectComponentProps } from './collect-components.ts';
-import { componentsWithIdleRecords } from './idle-records.ts';
+import { componentsWithIdleRecords, componentsWithLiveShared } from './idle-records.ts';
 import { collectComponentPropSpends, collectElementRosterCounts } from './roster-count.ts';
 import { collectElementRosterPositions } from './roster-position.ts';
 import { spreadHostsField } from './spread-hosts.ts';
@@ -287,11 +287,13 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 	const rejectingHandlers = componentsWithRejectingHandlers(graph, input.importedModuleInterfaces);
 	const planes = moduleAsyncPlanes(graph, input.importedModuleInterfaces);
 	const idleComponents = componentsWithIdleRecords(graph, input.importedModuleInterfaces);
+	const liveSharedComponents = componentsWithLiveShared(graph, input.importedModuleInterfaces);
 	graph.moduleGraphInterface = {
 		...graph.moduleGraphInterface,
 		...(sharedDefinitions.length > 0 ? { sharedDefinitions } : {}),
 		...(planes ? { asyncPlanes: planes } : {}),
 		...(idleComponents.size > 0 ? { idleRecords: true as const } : {}),
+		...(liveSharedComponents.size > 0 ? { liveShared: true as const } : {}),
 		render: {
 			version: 1,
 			components: graph.components.flatMap((component) => {
@@ -349,6 +351,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 						...armMaterialField(graph, component.name, chunks),
 						...(rejectingHandlers.has(component.name) ? { rejectingHandlers: true as const } : {}),
 						...(idleComponents.has(component.name) ? { idleRecords: true as const } : {}),
+						...(liveSharedComponents.has(component.name) ? { liveShared: true as const } : {}),
 						...(containerRepeats.has(component.name)
 							? { containerRepeat: true as const }
 							: {}),
