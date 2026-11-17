@@ -9,6 +9,7 @@ import type {
 	ResumeArmRecordSet,
 	ResumeAsyncBoundaryRecord,
 	ResumeDomElement,
+	ShownAsyncArm,
 	ResumeSymbolContext,
 	ResumePreparedCore,
 	ResumeRuntimeInput,
@@ -162,6 +163,10 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 		if (disposed) return;
 		const releases: Array<() => void> = [];
 		releasesById.set(boundary.id, releases);
+		const read = boundary.asyncReads[0];
+		// A served @catch keeps its error through a retry, whose pending snapshot drops it.
+		if (boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.catch && read && !shownArms.has(boundary))
+			shownArms.set(boundary, shownFor(boundaryGateSnapshot(input.graph, boundary, read.graphNodeId, input.graph.read(read.graphNodeId, []))));
 		const painted = new Map(shown);
 		// A settle that resolves after disposal claims nothing, so it commits nothing.
 		const claimFor = (graphNodeId: string, snapshot: unknown) => {
@@ -208,6 +213,7 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 							input.settleTracker?.markSettled(boundary.id);
 							(asyncPlanes.busy?.set ?? setBoundaryBusy)(boundary, false);
 						}
+						shownArms.set(boundary, shownFor(snapshot));
 						return boundaryRangeJournal(boundary.id, {
 							type: 'async-boundary-snapshot',
 							boundaryId: boundary.id,
@@ -235,7 +241,6 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 		for (const asyncRead of boundary.asyncReads)
 			input.graph.read(asyncRead.graphNodeId, ['status']);
 		// A runner another reader demanded first can settle before this subscribed, and no write follows to announce it.
-		const read = boundary.asyncReads[0];
 		if (catchUp && boundary.updateSymbolId && read && !input.settleTracker?.hasSettledContent(boundary.id)) {
 			const snapshot = boundaryGateSnapshot(input.graph, boundary, read.graphNodeId, input.graph.read(read.graphNodeId, []));
 			if (isSettledStatus((snapshot as { readonly status?: unknown } | null)?.status)) {
@@ -255,6 +260,11 @@ export function wireAsyncBoundariesWithoutLoadingCapability(input: {
 				input.demandOnStart === true,
 			input.demandOnStart === true,
 		);
+	// An arm the browser re-renders draws each @try around it as this page shows it.
+	input.root.__marklessShownAsyncArm = (id) => {
+		const boundary = input.asyncBoundariesById.get(id);
+		return boundary && shownArm(boundary);
+	};
 	if (!disposed) {
 		stopReasking = reaskOnReturn(input.root, input.graph, input.asyncBoundariesById);
 		stopWriteRefresh = registerWriteRefresh(input.graph, input.asyncBoundariesById);
@@ -316,12 +326,25 @@ export function startAsyncBoundaries(
 	};
 }
 
-// What a boundary's range shows, as this runtime last committed it: one of its arms, or its @try content kept with the @catch drawn after it.
+// What a boundary's range shows as this runtime last committed it, else as served; KEPT has a @catch after @try content, PLAIN lacks in-place records.
 const SHOWN_TRY_KEPT = ASYNC_BOUNDARY_ARM.catch + 1;
-const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, number>();
+const SHOWN_TRY_PLAIN = ASYNC_BOUNDARY_ARM.catch + 2;
+const shownArms = new WeakMap<ResumeAsyncBoundaryRecord, ShownAsyncArm>();
+const shownArm = (boundary: ResumeAsyncBoundaryRecord): ShownAsyncArm => {
+	const shown = shownArms.get(boundary) ?? boundary.initiallyServedArm;
+	return shown === SHOWN_TRY_KEPT || shown === SHOWN_TRY_PLAIN ? ASYNC_BOUNDARY_ARM.try : shown;
+};
 const showsTry = (boundary: ResumeAsyncBoundaryRecord): boolean => {
 	const shown = shownArms.get(boundary) ?? boundary.initiallyServedArm;
-	return shown === ASYNC_BOUNDARY_ARM.try || shown === SHOWN_TRY_KEPT;
+	return (
+		shown === ASYNC_BOUNDARY_ARM.try ||
+		shown === SHOWN_TRY_KEPT ||
+		(shown === SHOWN_TRY_PLAIN && boundary.initiallyServedArm === ASYNC_BOUNDARY_ARM.try)
+	);
+};
+const shownFor = (snapshot: unknown): ShownAsyncArm => {
+	const { status, error } = (snapshot ?? {}) as { readonly status?: unknown; readonly error?: unknown };
+	return status === 'rejected' ? { arm: ASYNC_BOUNDARY_ARM.catch, error } : status === 'fulfilled' ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending;
 };
 const noRecords = (): ResumeArmRecordSet => ({ locators: [], events: [], behaviors: [], elementHandles: [] });
 
@@ -458,7 +481,7 @@ async function prepareBoundarySettle(
 		return landShown(
 			input,
 			boundary,
-			after ? SHOWN_TRY_KEPT : ownRecords || arm !== ASYNC_BOUNDARY_ARM.try ? arm : undefined,
+			after ? SHOWN_TRY_KEPT : arm === ASYNC_BOUNDARY_ARM.catch ? shownFor(snapshot) : ownRecords ? arm : SHOWN_TRY_PLAIN,
 			land,
 		);
 	};
@@ -522,8 +545,7 @@ async function prepareBoundarySettle(
 	}
 	// Plain .html updates (cheap parts tier) keep the journal string path.
 	const fragment = input.renderBranchHtml ? input.renderBranchHtml(update.html) : update.html;
-	if (arm === ASYNC_BOUNDARY_ARM.try) shownArms.delete(boundary);
-	else shownArms.set(boundary, arm);
+	shownArms.set(boundary, arm === ASYNC_BOUNDARY_ARM.try ? SHOWN_TRY_PLAIN : shownFor(snapshot));
 	input.settleTracker?.markSettled(boundary.id);
 	return boundaryRangeJournal(boundary.id, fragment);
 }
@@ -532,11 +554,11 @@ async function prepareBoundarySettle(
 function landShown(
 	input: SettleInput,
 	boundary: ResumeAsyncBoundaryRecord,
-	shown: number | undefined,
+	shown: ShownAsyncArm,
 	land: () => Promise<void>,
 ): RuntimeGraphCommit {
 	const before = shownArms.get(boundary);
-	const record = (arm: number | undefined) =>
+	const record = (arm: ShownAsyncArm | undefined) =>
 		arm === undefined ? shownArms.delete(boundary) : shownArms.set(boundary, arm);
 	record(shown);
 	return async () => {

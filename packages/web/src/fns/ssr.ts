@@ -1206,7 +1206,6 @@ function marklessSsrComposedView(
 			idPrefix,
 		),
 		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
-		asyncSnapshots,
 		idPrefix,
 	);
 	const renderedBranchIds = new Set(
@@ -1259,13 +1258,12 @@ export function marklessSsrArmizeBoundaries(
 		elementHandles: SsrHostedRecord[];
 		keyedRepeats: SsrKeyedRepeatRecord[];
 	},
-	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry> | undefined,
 	idPrefix = '',
 ) {
 	if (boundaries.length === 0) return boundaries;
 	const anchorById = new Map<
 		string,
-		{ readonly elementStart: number; readonly elementEnd: number }
+		{ readonly elementStart: number; readonly elementEnd: number; readonly arm?: number }
 	>(
 		structure.anchors
 			.filter((anchor) => anchor.kind === 'async')
@@ -1273,11 +1271,6 @@ export function marklessSsrArmizeBoundaries(
 	);
 	const armByBranchId = new Map(
 		structure.anchors.flatMap((anchor) => (anchor.kind === 'arm-branch' ? [[anchor.id, anchor.arm] as const] : [])),
-	);
-	// Keyed by the possibly-null runner id so a boundary without a runner looks
-	// up (and misses) exactly as it did untyped.
-	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
-		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
 	// Document order reversed: a nested boundary claims its own records before the arm around it does.
 	const armized = new Map(
@@ -1294,7 +1287,7 @@ export function marklessSsrArmizeBoundaries(
 		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const plannedArms: ReadonlyArray<SsrArmRecordSet> = boundary.armRecords;
 		const anchor = anchorById.get(idPrefix + boundary.id);
-		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
+		if (anchor?.arm === undefined) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
 		const opensStart = anchor.elementStart;
 		const opensEnd = anchor.elementEnd;
 		const armLocators: SsrLocatorRecord[] = [];
@@ -1308,28 +1301,7 @@ export function marklessSsrArmizeBoundaries(
 			});
 			streams.locators.splice(i, 1);
 		}
-		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
-		// Authored sync gates are the recorded settle nodes, while their snapshots
-		// are derived request-locally and intentionally absent from the serialized
-		// async snapshot list. In that case the expanded async-read closure tells us
-		// which arm SSR actually served.
-		const dependencyStatuses = (boundary.asyncReads ?? [])
-			.filter((read) => read.runnerSymbolId)
-			.map((read) => snapshotById.get(read.graphNodeId)?.status);
-		const status =
-			directStatus ??
-			(dependencyStatuses.includes('rejected')
-				? 'rejected'
-				: dependencyStatuses.length > 0 &&
-					  dependencyStatuses.every((candidate) => candidate === 'fulfilled')
-					? 'fulfilled'
-					: 'pending');
-		const takenArm =
-			status === 'fulfilled'
-				? ASYNC_BOUNDARY_ARM.try
-				: status === 'rejected'
-					? ASYNC_BOUNDARY_ARM.catch
-					: ASYNC_BOUNDARY_ARM.pending;
+		const takenArm = anchor.arm!;
 		const planned: SsrArmRecordSet = plannedArms[takenArm] ?? {};
 		const renderedArmLocators = new Map<string, SsrDataStructure['locators'][number]>();
 		for (const locator of structure.locators) {

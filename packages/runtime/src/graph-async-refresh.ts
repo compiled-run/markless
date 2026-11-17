@@ -19,15 +19,7 @@ import {
 	type RunCause,
 	type RuntimeAsyncComputedNode,
 } from './graph-async-load.ts';
-
-// The most recent fulfilled value and the key it was fetched for, carried through re-runs and failures.
-function lastGood(
-	snapshot: RuntimeGraphAsyncSnapshot,
-): { readonly value: unknown; readonly valueKey: unknown } | undefined {
-	if (snapshot.status === 'fulfilled') return { value: snapshot.value, valueKey: snapshot.key };
-	if (snapshot.status !== 'idle' && 'valueKey' in snapshot)
-		return { value: snapshot.value, valueKey: snapshot.valueKey };
-}
+import { lastGood } from './graph-kept.ts';
 
 // The publish that ends a save's mark: a failure says so, and a page left behind ends it without a word.
 function saysOutcome(snapshot: RuntimeGraphAsyncSnapshot, outcome: SavesOutcome): RuntimeGraphAsyncSnapshot {

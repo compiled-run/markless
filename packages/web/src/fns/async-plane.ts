@@ -1,3 +1,4 @@
+import { keysEqual, lastGood } from '@markless/runtime/graph-kept';
 import { createAsyncPlane, type AsyncRefreshModule } from '@markless/runtime/graph-async-load';
 import type {
 	AsyncComputedPlane,
@@ -55,6 +56,9 @@ const parts = {
 	},
 	awaitsAncestor(...args: Parameters<typeof awaitsAsyncAncestor>) {
 		return awaitsAsyncAncestor(...args);
+	},
+	showsKept(snapshot: RuntimeGraphAsyncSnapshot | undefined) {
+		return showsKeptAnswer(snapshot);
 	},
 	// A CSR mount serves no snapshot for a sync computed only an async key reads, so derive it once now.
 	async deriveAsyncKeys(
@@ -119,19 +123,17 @@ function awaitsAsyncAncestor(
 		visited.add(graphNodeId);
 		const record = byNode.get(graphNodeId)?.[0];
 		if (record?.async === true) {
-			if (!hasReadableValue(graph.read(graphNodeId, []))) return true;
+			if (!lastGood(graph.read(graphNodeId, []) as never)) return true;
 		} else if (record && awaitsAsyncAncestor(record, byNode, graph, visited)) return true;
 	}
 	return false;
 }
 
-// A re-run and a failed refresh keep the prior settled value readable (spec D8), so only a first run or first failure has nothing to read.
-function hasReadableValue(snapshot: unknown): boolean {
-	const { status, value } =
-		(snapshot as { readonly status?: unknown; readonly value?: unknown } | null) ?? {};
-	return status === 'fulfilled' || ((status === 'pending' || status === 'rejected') && value !== undefined);
+// A re-run that keeps an answer for the key it runs with shows that answer (spec D8).
+function showsKeptAnswer(snapshot: RuntimeGraphAsyncSnapshot | undefined): boolean {
+	const kept = lastGood(snapshot);
+	return snapshot?.status === 'pending' && !!kept && keysEqual(kept.valueKey, snapshot.key);
 }
-
 
 // A first render skips a sync computed while an async value it derives from has nothing to read yet.
 function awaitsAsyncValue(
@@ -141,10 +143,7 @@ function awaitsAsyncValue(
 ): boolean | undefined {
 	return state.computed
 		.find((record) => record.graphNodeId === graphNodeId)
-		?.asyncFrom?.some((id) => {
-			const snapshot = read(id, []) as { status?: unknown; value?: unknown } | undefined;
-			return snapshot?.status !== 'fulfilled' && snapshot?.value === undefined;
-		});
+		?.asyncFrom?.some((id) => !lastGood(read(id, []) as never));
 }
 
 type Decode = (payload: SerializedGraphPayload) => Promise<unknown>;
@@ -250,6 +249,7 @@ export type AsyncPlaneSlot = {
 	fromRecord?: typeof asyncComputedFromRecord;
 	awaits?: typeof awaitsAsyncValue;
 	awaitsAncestor?: typeof awaitsAsyncAncestor;
+	showsKept?: typeof showsKeptAnswer;
 	deriveAsyncKeys?: (
 		input: Omit<SyncRefresh, 'computed' | 'records'>,
 		records: ReadonlyArray<SyncRefresh['computed']>,

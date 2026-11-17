@@ -4,12 +4,12 @@ import { registerArmRecordSet } from '../src/resume-commit-arm.ts';
 import { marklessSsrArmizeBoundaries, marklessSsrComposeView } from '../src/fns/ssr.ts';
 
 test.each([
-	['fulfilled', ASYNC_BOUNDARY_ARM.try, 'try'],
-	['pending', ASYNC_BOUNDARY_ARM.pending, 'pending'],
-	['rejected', ASYNC_BOUNDARY_ARM.catch, 'catch'],
+	['try', ASYNC_BOUNDARY_ARM.try],
+	['pending', ASYNC_BOUNDARY_ARM.pending],
+	['catch', ASYNC_BOUNDARY_ARM.catch],
 ] as const)(
-	'SSR armization records the %s runner snapshot as the initially served arm',
-	(status, expectedArm, expectedMarker) => {
+	'SSR armization records the %s arm the render drew as the initially served arm',
+	(expectedMarker, expectedArm) => {
 		const boundary = {
 			id: 'boundary:alternate',
 			runnerGraphNodeId: 'computed:runner',
@@ -40,16 +40,13 @@ test.each([
 						elementStart: 0,
 						elementEnd: 1,
 						html: '<p>content</p>',
+						arm: expectedArm,
 					},
 				],
 				elementCount: 1,
 			},
 			[boundary],
 			{ locators: [], events: [], behaviors: [], elementHandles: [] },
-			[
-				{ graphNodeId: 'computed:dependency', snapshot: { status: 'pending' } },
-				{ graphNodeId: 'computed:runner', snapshot: { status } },
-			],
 		);
 
 		expect(armized.initiallyServedArm).toBe(expectedArm);
@@ -70,6 +67,7 @@ test('SSR armization records the served arm for an authored sync gate', () => {
 					elementStart: 0,
 					elementEnd: 1,
 					html: '<p>east-west</p>',
+					arm: ASYNC_BOUNDARY_ARM.try,
 				},
 			],
 			elementCount: 1,
@@ -90,10 +88,6 @@ test('SSR armization records the served arm for an authored sync gate', () => {
 			},
 		],
 		{ locators: [], events: [], behaviors: [], elementHandles: [] },
-		[
-			{ graphNodeId: 'computed:east', snapshot: { status: 'fulfilled' } },
-			{ graphNodeId: 'computed:west', snapshot: { status: 'fulfilled' } },
-		],
 	);
 
 	expect(armized.initiallyServedArm).toBe(ASYNC_BOUNDARY_ARM.try);
@@ -126,6 +120,7 @@ test('SSR composition keeps a rendered async-arm keyed repeat in the served arm 
 					elementStart: 1,
 					elementEnd: 3,
 					html: '<ul><li>Beacon</li></ul>',
+					arm: ASYNC_BOUNDARY_ARM.try,
 				},
 			],
 			elementCount: 3,
@@ -253,7 +248,7 @@ test('SSR armization names the arm each branch in the served @try arm painted', 
 		{
 			locators: [],
 			anchors: [
-				{ kind: 'async', id: 'c1:boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 2, html: '' },
+				{ kind: 'async', id: 'c1:boundary:0', startIndex: 0, endIndex: 1, elementStart: 0, elementEnd: 2, html: '', arm: 0 },
 				anchor('c1:branch-site:0', 0),
 				anchor('c1:branch-site:1', 1),
 			],
@@ -269,7 +264,6 @@ test('SSR armization names the arm each branch in the served @try arm painted', 
 			},
 		],
 		{ locators: [], events: [], domUpdates: [], behaviors: [], elementHandles: [], keyedRepeats: [] },
-		[{ graphNodeId: 'computed:order', snapshot: { status: 'fulfilled' } }],
 		'c1:',
 	);
 
