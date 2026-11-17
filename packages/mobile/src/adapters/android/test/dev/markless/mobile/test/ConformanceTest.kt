@@ -46,7 +46,8 @@ private fun runVector(file: File) {
 	val version = field(vector, "version", file.name).str("version")
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
-	val runtime = Runtime(payload)
+	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
+	val runtime = Runtime(payload, params = params)
 	val mounted = runtime.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
 	val initial = canonical(field(vector, "initial", file.name))
 	check("${file.name} initial", mounted == initial) { "expected $initial\n  actual   $mounted" }
@@ -182,6 +183,15 @@ private fun attributeRule() {
 	check("=== holds NaN unequal", !Js.strictEquals(JsValue.Num(Double.NaN), JsValue.Num(Double.NaN))) { "" }
 }
 
+private fun routes() {
+	val r = dev.markless.mobile.core.Route("/[fruit]", listOf("fruit"))
+	check("route matches one segment", r.match("/apple") == mapOf("fruit" to "apple")) { "${r.match("/apple")}" }
+	check("route decodes a segment", r.match("/p%C3%A9ar") == mapOf("fruit" to "péar")) { "${r.match("/p%C3%A9ar")}" }
+	check("route keeps a plus", r.match("/a+b") == mapOf("fruit" to "a+b")) { "${r.match("/a+b")}" }
+	check("route refuses another depth", r.match("/a/b") == null && r.match("/") == null) { "" }
+	check("a static route matches itself", dev.markless.mobile.core.Route("/about", emptyList()).match("/about/") == emptyMap<String, String>()) { "" }
+}
+
 private fun arrays() {
 	fun n(x: Double) = JsValue.Num(x)
 	fun str(x: String) = JsValue.Str(x)
@@ -218,6 +228,7 @@ private fun arrays() {
 }
 
 fun main(args: Array<String>) {
+	routes()
 	arrays()
 	attributeRule()
 	ops()

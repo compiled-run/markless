@@ -30,6 +30,11 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"rows\",\"node\":${jsonString(node)},\"keys\":${keys.joinToString(",", "[", "]", transform = ::jsonString)}}"
 	}
 
+	/** Leave this page: the host builds the page at [route] from scratch with [params]; [node] is the route. */
+	data class Navigate(override val node: String, val params: Map<String, String>) : JournalEntry {
+		override fun toJson() = "{\"op\":\"navigate\",\"route\":${jsonString(node)},\"params\":${params.entries.joinToString(",", "{", "}") { "${jsonString(it.key)}:${jsonString(it.value)}" }}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -71,7 +76,7 @@ data class Instance(val id: String, val node: Node, val scope: Scope, val rowKey
 data class Row(val key: String, val item: JsValue)
 
 /** Runs handler ops on cells and reports what changed on shown nodes as journal entries, in document order. Free of android.*. */
-class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
+class Runtime(val payload: Payload, private val store: Store = MemoryStore(), val params: Map<String, String> = emptyMap()) {
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
@@ -85,6 +90,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
 	fun evaluate(e: Expr, scope: Scope = Scope.EMPTY): JsValue {
 		fun eval(x: Expr) = evaluate(x, scope)
 		return when (e) {
+			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
 			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
 			is Expr.CellRef -> value(e.cell)
 			is Expr.Literal -> e.value
@@ -215,6 +221,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore()) {
 		eventValue = value
 		try {
 			for (op in handler.ops) when (op) {
+				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
 				is Op.Assign -> {
 					val v = evaluate(op.value)
 					values[op.cell] = v
