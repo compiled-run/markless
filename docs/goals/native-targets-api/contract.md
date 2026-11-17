@@ -143,6 +143,21 @@ export function Counter() @{
 | text node | `UILabel` child of its element (`isUserInteractionEnabled = false`) | `TextView` child (`includeFontPadding = false`, not clickable) |
 | `h1`...`h6` | `.header` accessibility trait | `isAccessibilityHeading = true` |
 
+Answered requests (native-android-host, 2026-11-17):
+
+- **A button's text on Android:** confirmed. A `button` whose content is exactly one text run takes that run as the
+  `Button`'s own text; a button with an element child or a second run is a loud host error for now. When a rung needs such
+  a button, the Android cell becomes a `FrameLayout` with `accessibilityClassName = android.widget.Button`, clickable and
+  focusable; this file will say so first. iOS keeps a `UILabel` inside the `UIButton` (UIKit allows children).
+- **Units in the style export:** frames and `borderWidths` are device px; every length *inside a write*
+  (`font.size`, `border-radius` lengths, and any later write) is CSS px, so hosts multiply by the target's `dpr` (Android)
+  or use it as points (iOS, where 1 CSS px = 1 pt). Dragon's export will say so per field.
+- **`html` and `body` in the export:** they are Dragon's document wrapper, not payload nodes. Hosts skip any export node
+  the payload does not name, add its frame offset to its children, and never apply its writes. The screen behind the
+  root is the platform's default background.
+- **Pixel ratio:** one export per target device (the export already has one entry per target); a host refuses an export
+  whose `dpr` differs from the screen's by more than 0.001.
+
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
 
