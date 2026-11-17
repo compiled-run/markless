@@ -65,6 +65,66 @@
 			"delta": 595,
 			"reason": "composition gives a child's relayed event the cancel its parent passed in that prop, so a passed-through submit handler cancels through middle components and in @if arms and @for rows",
 			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 160,
+			"reason": "a passed-through submit handler cancels through a middle component and in a child's @if and @for: the runtime docs pages load carries the relay; measured on CI runs 44198255532 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 160,
+			"reason": "a passed-through submit handler cancels through a middle component and in a child's @if and @for: the runtime docs pages load carries the relay; measured on CI runs 44198255532 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 160,
+			"reason": "a passed-through submit handler cancels through a middle component and in a child's @if and @for: the runtime docs pages load carries the relay; measured on CI runs 44198255532 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 224,
+			"reason": "a passed-through submit handler cancels through a middle component and in a child's @if and @for: the runtime docs pages load carries the relay; measured on CI runs 44198255532 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 224,
+			"reason": "a passed-through submit handler cancels through a middle component and in a child's @if and @for: the runtime docs pages load carries the relay; measured on CI runs 44198255532 vs 44193974219",
+			"date": "2026-11-17"
 		}
 	]
 }
