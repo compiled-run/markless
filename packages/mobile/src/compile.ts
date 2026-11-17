@@ -1,8 +1,10 @@
 import {
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
+	buildSemanticGraph,
 	createNativeViewPayload,
 	NATIVE_FACT_COLLECTORS,
+	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
 } from '@markless/compiler';
@@ -22,6 +24,14 @@ export async function compileNativeComponent(input: {
 	readonly source: string;
 	/** The module's page file when it is a page (`pages/[fruit].tsrx`); the router derives its route. */
 	readonly page?: string;
+	/**
+	 * Reads a module this one imports (`./Stepper.tsrx`), so its components can be built in place; the caller owns file
+	 * access. Without it, an imported component is refused.
+	 */
+	readonly readModule?: (
+		specifier: string,
+		importer: string,
+	) => { readonly filename: string; readonly source: string } | undefined;
 }): Promise<NativeBuild> {
 	const route = input.page ? buildRouteManifestFromFileIds([input.page]).routes[0] : undefined;
 	if (input.page && !route) throw new Error(`${input.page} is not a page the router routes`);
@@ -31,10 +41,17 @@ export async function compileNativeComponent(input: {
 		symbols: [],
 		nativeFacts: NATIVE_FACT_COLLECTORS,
 	});
-	const native: NativeViewArtifact = createNativeViewPayload(
-		compiled.semanticGraph,
-		route ? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } } : {},
-	);
+	const importedModules: Record<string, SemanticGraphArtifact> = {};
+	for (const entry of compiled.semanticGraph.moduleImports) {
+		if (entry.typeOnly || !entry.source.startsWith('.') || importedModules[entry.source]) continue;
+		const module = input.readModule?.(entry.source, input.filename);
+		if (module)
+			importedModules[entry.source] = await buildSemanticGraph({ ...module, nativeFacts: NATIVE_FACT_COLLECTORS });
+	}
+	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {
+		...(route ? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } } : {}),
+		importedModules,
+	});
 	const errors = collectTsrxModuleDiagnostics(compiled).filter((diagnostic) => diagnostic.severity === 'error');
 	return {
 		payload: errors.length > 0 ? null : native.payload,

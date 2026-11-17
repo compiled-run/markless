@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { basename, join, relative, resolve } from 'node:path';
-import { isDeepStrictEqual } from 'node:util';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { compileNativeComponent } from '../compile.ts';
+import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
 import { PROOF_FONTS_FOLDER, PROOF_PAYLOAD_PATH, PROOF_STYLE_PATH } from './proof-app.ts';
@@ -22,11 +22,18 @@ export type ProofRung = {
 
 const COMPONENT_FILE = 'App.tsrx';
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..', '..');
+
+/** Reads a module a rung imports by relative path (`./Stepper.tsrx`), so the build can lower its components in place. */
+export function readRelativeModule(specifier: string, importer: string) {
+	const file = resolve(repoRoot, dirname(importer), specifier);
+	return existsSync(file)
+		? { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') }
+		: undefined;
+}
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
-/** Both written by style-export.ts: what Markless handed Dragon, and Dragon's export made from it. */
+/** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
 const STYLE_INPUT = 'native-style-input.json';
-const STYLE_EXPORT = 'native-style.json';
 
 type StyleExportFonts = {
 	readonly fonts?: ReadonlyArray<{ readonly id: string; readonly file: string }>;
@@ -34,21 +41,22 @@ type StyleExportFonts = {
 
 /** The style export and every font face it names, checked against the face's `sha256:` id. */
 function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
-	const exportPath = join(dir, STYLE_EXPORT);
-	const bytes = readFileSync(exportPath);
-	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
-	const fonts = (JSON.parse(bytes.toString('utf8')) as StyleExportFonts).fonts ?? [];
-	const dragon = process.env.MARKLESS_DRAGON_DIR;
-	if (fonts.length > 0 && !dragon) {
+	const dragon = dragonDir();
+	let bytes: Uint8Array;
+	try {
+		bytes = dragonStyleExport(join(dir, STYLE_INPUT), dragon);
+	} catch (error) {
 		throw new Error(
-			`${name}: ${STYLE_EXPORT} names fonts; set MARKLESS_DRAGON_DIR to the Dragon checkout it came from`,
+			`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`,
 		);
 	}
+	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
+	const fonts = (JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts).fonts ?? [];
 	for (const font of fonts) {
-		const file = resolve(dragon!, font.file);
+		const file = resolve(dragon, font.file);
 		if (!existsSync(file)) {
 			throw new Error(
-				`${name}: font ${font.id} is not at ${file}; MARKLESS_DRAGON_DIR must be the Dragon checkout the export came from`,
+				`${name}: font ${font.id} is not at ${file} in the Dragon checkout ${dragon}`,
 			);
 		}
 		const face = readFileSync(file);
@@ -62,7 +70,7 @@ function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
 
 /**
  * Reads a rung folder and compiles its App.tsrx with the real compiler into the native payload both shells embed. A rung
- * with styles needs Dragon's export beside it, made from exactly the style input this build produces.
+ * with styles also writes Dragon's input and needs Dragon's export beside it.
  */
 export async function loadRung(dir: string): Promise<ProofRung> {
 	const name = basename(dir);
@@ -79,11 +87,12 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 	const assets: Array<[string, Uint8Array]> = [];
 	if (existsSync(component)) {
 		const build = await compileNativeComponent({
-			// Repo-relative: the scope class hashes the filename, and Dragon's export must match any checkout.
+			// Repo-relative: the scope class hashes the filename, so every checkout builds the same payload and style input.
 			filename: relative(repoRoot, component),
 			source: readFileSync(component, 'utf8'),
 			// A rung that is a page compiles as its page file, so the router derives its route.
 			...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
+			readModule: readRelativeModule,
 		});
 		if (!build.payload) {
 			const lines = build.diagnostics.map(
@@ -93,21 +102,10 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 		}
 		assets.push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))]);
 		if (build.styles.some((style) => style.cssText.length > 0)) {
-			const regenerate = `run node packages/mobile/src/style-export.ts ${relative(repoRoot, dir)}`;
-			if (!existsSync(join(dir, STYLE_EXPORT)) || !existsSync(join(dir, STYLE_INPUT))) {
-				throw new Error(
-					`${name}: the component has styles but no ${STYLE_EXPORT}; ${regenerate}`,
-				);
-			}
-			const committed: unknown = JSON.parse(readFileSync(join(dir, STYLE_INPUT), 'utf8'));
-			const current: unknown = JSON.parse(
-				JSON.stringify(nativeStyleInput(build.payload, build.styles)),
+			writeFileSync(
+				join(dir, STYLE_INPUT),
+				`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
 			);
-			if (!isDeepStrictEqual(committed, current)) {
-				throw new Error(
-					`${name}: ${STYLE_EXPORT} was made from a ${STYLE_INPUT} that is not what this build hands Dragon; ${regenerate}`,
-				);
-			}
 			assets.push(...styleAssets(dir, name));
 		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {

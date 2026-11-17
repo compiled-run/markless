@@ -1,33 +1,29 @@
-// Writes a rung's Dragon style export: `node packages/mobile/src/style-export.ts <rung folder>...` with MARKLESS_DRAGON_DIR
-// naming a Dragon checkout. Each folder gets native-style-input.json (from the compiler's facts), native-style.json
-// (dragon.native-style-export/1, from Dragon) and native-style.source.json (the Dragon commit it came from).
+// Runs Dragon's entry point on a component's style input and returns the export. Tonight's arrangement (the owner decides
+// how Markless depends on Dragon): Dragon is a sibling checkout named by DRAGON_DIR, never a package dependency.
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { compileNativeComponent } from './compile.ts';
-import { nativeStyleInput } from './style-input.ts';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 
-/** The Dragon command that turns a style input into an export; the contract names it. */
-const DRAGON_TOOL = 'examples/markless-counter/tools/markless-style.ts';
+/** The Dragon entry point that turns `markless.native-style-input/0` into `dragon.native-style-export/1`. */
+export const DRAGON_STYLE_ENTRY = 'examples/markless-counter/tools/markless-style.ts';
 
-const dragon = process.env.MARKLESS_DRAGON_DIR;
-if (!dragon) throw new Error('set MARKLESS_DRAGON_DIR to a Dragon checkout');
-const folders = process.argv.slice(2);
-if (folders.length === 0) throw new Error('usage: style-export.ts <rung folder>...');
-const commit = execFileSync('git', ['-C', dragon, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
-for (const folder of folders.map((f) => resolve(f))) {
-	const component = join(folder, 'App.tsrx');
-	const build = await compileNativeComponent({ filename: component, source: readFileSync(component, 'utf8') });
-	if (!build.payload) throw new Error(`${folder}: ${build.diagnostics.map((d) => d.message).join('; ')}`);
-	const inputPath = join(folder, 'native-style-input.json');
-	writeFileSync(inputPath, `${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`);
-	execFileSync(
-		process.execPath,
-		['--conditions=dragon-internal', DRAGON_TOOL, inputPath, join(folder, 'native-style.json')],
-		{ cwd: dragon, stdio: 'inherit' },
-	);
-	writeFileSync(
-		join(folder, 'native-style.source.json'),
-		`${JSON.stringify({ dragonCommit: commit, tool: DRAGON_TOOL }, null, '\t')}\n`,
-	);
+export const dragonDir = (): string =>
+	process.env.DRAGON_DIR ?? join(homedir(), 'wt', 'dragon', 'native-dragon-styles');
+
+/** The export for one style input file, generated now from the Dragon checkout; throws with the reason when it cannot be. */
+export function dragonStyleExport(inputPath: string, dir: string = dragonDir()): Uint8Array {
+	if (!existsSync(join(dir, DRAGON_STYLE_ENTRY)))
+		throw new Error(`Dragon's style entry ${DRAGON_STYLE_ENTRY} is not in ${dir}; set DRAGON_DIR to a Dragon checkout that has it`);
+	const scratch = mkdtempSync(join(tmpdir(), 'markless-style-'));
+	try {
+		const out = join(scratch, 'native-style.json');
+		execFileSync(process.execPath, ['--conditions=dragon-internal', DRAGON_STYLE_ENTRY, inputPath, out], {
+			cwd: dir,
+			stdio: ['ignore', 'ignore', 'inherit'],
+		});
+		return readFileSync(out);
+	} finally {
+		rmSync(scratch, { recursive: true, force: true });
+	}
 }

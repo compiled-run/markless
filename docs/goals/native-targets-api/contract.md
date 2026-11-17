@@ -28,8 +28,10 @@ this file changes in the same push. Status as of 2026-11-16, night one.
   Markless cell ids; apply the `state` journal entry by moving to `next[a][s][v]`), so rungs 2 and 4 run styled: today the
   shell stops with `style: unknown field "component"`. (2) keyed lists (`repeat`, row instances, the `rows` entry;
   `list.json`), rung 6. (3) a launch route (below), rung 10.
-- **native-android-host:** (1) rung 4 styled on the emulator (the export is committed; your last run lost the device at
-  launch, so re-run). (2) a launch route, rung 10.
+- **native-android-host:** (1) text drawn wider than Dragon's box clips: rung 4's `<h1>Attributes</h1>` (Inter Bold, 32 px)
+  shows "Attribute" in `proofs/04-attributes/screenshots/android/`. Find why Android's run is wider than Dragon's shaped
+  width (font padding, a second bold, letter spacing, text size units) and fix the cause; do not widen frames. (2) a launch
+  route, rung 10.
 - **both hosts, launch route (rung 10):** the shell receives the Maestro launch argument `route` (iOS launch argument,
   Android intent extra) and passes it to the host entry point (`MarklessViewController(payload:style:fonts:route:)`,
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
@@ -237,9 +239,14 @@ export function Counter() @{
   A callback prop called from the child (`onClick={() => onStep()}`) lowers to the caller's own statements, so the
   child's handler is the parent's `assign` ops. The analyzer records callback bodies (`nativeStatements`) and `name()`
   calls (`invoke` statements) for native builds only.
-- Not yet (each refused by name): state declared in a child component (instance-local cells), children passed into a
-  component (`{children}`), components from another module (`<Link>` included), a callback called with arguments or used
-  as a value.
+- **Components imported from another file (rung 7b, pushed 2026-11-17):** `compileNativeComponent({ ..., readModule })`
+  analyzes each relatively imported module (`./Stepper.tsrx`) and passes its analysis to the pass, which builds the
+  imported component in place exactly like a same-file one (ids prefixed by the call site; props and callbacks
+  substituted). File access is the caller's `readModule(specifier, importer)`; the harness and the ladder's reference
+  test pass `readRelativeModule` from `src/harness/rung.ts`. Without a reader, or for a package import other than the
+  router's `Link`, the component is refused by name. Tested in `packages/mobile/test/conformance.test.ts`.
+- Not yet (each refused by name): state declared in a child or imported component (instance-local cells), children
+  passed into a component (`{children}`), components from packages, a callback called with arguments or used as a value.
 - Vectors: `components.json` (rung 7).
 
 ### Additions for rung 10: routes and the URL (pushed 2026-11-17)
@@ -390,13 +397,20 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
    `border-colors { colors[4] }`, `border-radius { lengths[8] }`, `font { font: { family: <face id>, size } }`,
    `text-color { color }`, `synthetic-bold`; colours are `{ r, g, b, alpha }` 0 to 255. A face id is
    `sha256:<hex of the font file>` and `fonts` maps it to the vendored file the app bundles.
-3. **How a build obtains it (built 2026-11-17):** `MARKLESS_DRAGON_DIR=<dragon checkout> node packages/mobile/src/style-export.ts
-   <rung folder>...` compiles the rung, writes `native-style-input.json`, runs Dragon's
-   `examples/markless-counter/tools/markless-style.ts` (branch `cw/native-targets` of the Dragon repo) and writes
-   `native-style.json` (`/1`) plus `native-style.source.json` (the Dragon commit). Dragon's
+3. **How a build obtains it (planner's decision for tonight, 2026-11-17 04:00):** the proof harness generates the export at
+   proof time; nothing is committed and nothing is hand-written. For a rung with styles it writes
+   `native-style-input.json` from the compiler's facts and runs Dragon's entry point
+   (`examples/markless-counter/tools/markless-style.ts`, `DRAGON_STYLE_ENTRY` in `packages/mobile/src/style-export.ts`) from
+   a sibling Dragon checkout named by `DRAGON_DIR` (default `~/wt/dragon/native-dragon-styles`), with that input as its only
+   input. No Markless `package.json` depends on Dragon. If `DRAGON_DIR` lacks the entry, the harness refuses the styled rung
+   and says so. Fonts are read from the same checkout and checked against their `sha256:` ids. The format is
+   `dragon.native-style-export/1` as `docs/markless-native-styles.md` on the Dragon branch `cw/native-dragon-styles`
+   defines it; state keys in exports built from Markless input are the Markless cell ids. Dragon's
    `tools/markless-style-compare.ts` compares every frame of every state with Chrome (rung 2: 14 boxes, rung 4: 36, none
-   outside 1 device px; reports committed as `native-style.chrome-compare.json`). Both hosts read only `native-style.json`.
-   Whether Markless later depends on a Dragon prerelease is an owner decision.
+   outside 1 device px; reports committed as `native-style.chrome-compare.json`). How Markless depends on Dragon later
+   (workspace link or prerelease package) is an owner decision. **Tonight the entry exists only on the Dragon branch
+   `cw/native-targets`; native-dragon-styles, please carry it onto `cw/native-dragon-styles` (or replace it there with an
+   entry of the same name and contract) so the default `DRAGON_DIR` works.**
 4. **Hosts:** apply writes by `kind`; fail loudly on a kind they do not implement; place views by `frame` inside their parent
    (absolute), scaling device pixels by the screen scale (iOS points = px / 3 on the proof device, Android uses px); refuse
    to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
@@ -416,12 +430,13 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | # | Rung | Web | Native reference | iOS | Android | Notes |
 |---|---|---|---|---|---|---|
 | 1 | Static elements and text | passing | passing | **passing** | **passing** | screenshots in `proofs/01-static-text/screenshots/` |
-| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | failing (host reads only export `/0`) | **passing** | export committed; Chrome compare 14 boxes within 1 device px; styled screenshots in `proofs/02-styles/screenshots/android/` |
+| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | failing (host reads only export `/0`) | **passing** | export generated at proof time from `DRAGON_DIR`; Chrome compare 14 boxes within 1 device px; styled screenshots in `proofs/02-styles/screenshots/android/` |
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
-| 4 | Attributes and classes that follow state | passing | passing | failing (host reads only export `/0`) | not yet (emulator dropped at launch) | export with both states committed; Chrome compare 36 boxes within 1 device px |
+| 4 | Attributes and classes that follow state | passing | passing | failing (host reads only export `/0`) | flow passes; title visibly clipped (host defect above) | both states through Dragon; Chrome compare 36 boxes within 1 device px; the button turns `#ef476f` on tap in `proofs/04-attributes/screenshots/android/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | failing (host has no lists yet) | passing | vectors `list.json`; not passed until iOS |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
+| 7b | A component imported from another file | not started | compiler side done (test fixture) | not yet | not yet | waits on the ladder's `proofs/07b-imported-component/` |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | failing (hosts take no launch route yet) | failing (same) | vectors `route.json` |

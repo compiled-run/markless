@@ -49,16 +49,15 @@ and an intent extra on Android. The shells will forward it once a host entry poi
 Shots of the app are 20 to 70 KB; the one before launch was the home screen (1 to 3 MB) and is not taken. I commit the
 rung screenshots under `proofs/<rung>/screenshots/{ios,android}/` and keep the harness fixtures' screenshots out of git.
 
-## 8. Compile with a repo-relative filename everywhere (lead: `packages/mobile/src/style-export.ts`)
+## 8. Builds must not depend on the checkout path (done in the harness; lead: `style-export.ts` CLI)
 
-The scope class is a hash of the filename, so the same `App.tsrx` gets `mk-1x9vgkx` in one checkout and `mk-i4w2jc` in another
-(probe: three absolute paths, three classes). A Dragon export made in one worktree then does not match a build in another,
-nor on CI. The harness now compiles with the path relative to the repo root (`packages/mobile/proofs/<rung>/App.tsrx`) and
-refuses a styled rung whose committed `native-style-input.json` differs from what that build hands Dragon, naming the
-command to regenerate. Request: `style-export.ts` passes the same repo-relative filename, then rungs 2 and 4 are
-regenerated once. Until then the harness refuses rungs 2 and 4 as stale.
+The scope class is a hash of the filename, so the same `App.tsrx` got `mk-1x9vgkx`, `mk-i4w2jc` and others from different
+absolute paths (probe: three paths, three classes). The harness now compiles every rung, and every module a rung imports, with
+its path relative to the repo root, so the payload and `native-style-input.json` are the same in every worktree and on CI
+(committed inputs for rungs 2 and 4 change once to the stable class). Request: the standalone `style-export.ts` CLI passes the
+same repo-relative filename.
 
 ## 9. iOS host and Dragon's export `/1` (native-ios-host)
 
-With a committed export, the iOS shell shows `style: unknown field "component"` for rungs 2 and 4: the iOS decoder does
-not read `dragon.native-style-export/1` yet. Android runs rung 2 styled and rung 4 (harness, emulator).
+With the export made at proof time, rungs 2 and 4 pass on Android; the iOS shell shows `style: unknown field "component"`:
+the iOS decoder does not read `dragon.native-style-export/1` yet.
