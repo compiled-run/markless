@@ -1,0 +1,14 @@
+{
+	"rung": 4,
+	"name": "Attributes and classes that follow state",
+	"steps": [
+		{ "visible": ["Attributes", "Like"], "absent": ["Unlike"], "disabled": ["Clear"] },
+		{ "do": { "tap": "Like" }, "visible": ["Unlike", "Clear"], "absent": ["Like"] },
+		{
+			"do": { "tap": "Clear" },
+			"visible": ["Like"],
+			"absent": ["Unlike"],
+			"disabled": ["Clear"]
+		}
+	]
+}

@@ -1,0 +1,32 @@
+appId: ${APP_ID}
+name: 11-async
+---
+- launchApp:
+      clearState: true
+- assertVisible: Ask
+- assertVisible: Ask the sum
+- assertVisible: Ask the riddle
+- assertNotVisible: Thinking
+- assertNotVisible: The answer is 42
+- tapOn: Ask the sum
+- assertVisible: Thinking
+- assertVisible: Thinking
+- assertNotVisible: The answer is 42
+- extendedWaitUntil:
+      visible: The answer is 42
+      timeout: 12000
+- assertVisible: The answer is 42
+- assertNotVisible: Thinking
+- assertVisible: The answer is 42
+- assertNotVisible: Thinking
+- tapOn: Ask the riddle
+- assertVisible: Thinking
+- assertNotVisible: The answer is 42
+- assertVisible: Thinking
+- assertNotVisible: The answer is 42
+- extendedWaitUntil:
+      visible: No answer for the riddle
+      timeout: 12000
+- assertNotVisible: Thinking
+- assertVisible: No answer for the riddle
+- assertNotVisible: Thinking
