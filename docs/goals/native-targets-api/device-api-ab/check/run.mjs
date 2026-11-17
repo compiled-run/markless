@@ -15,21 +15,30 @@ writeFileSync(join(work, 'device', 'index.d.ts'), readFileSync(join(here, '..', 
 
 for (const file of files) {
 	const text = readFileSync(file, 'utf8');
-	let task = basename(file).match(/task(\d)/)?.[1];
-	const sections = text.split(/^#+ .*?Task (\d)\b.*$/im);
-	const chunks = task ? [[task, text]] : [];
-	if (!task) for (let i = 1; i < sections.length; i += 2) chunks.push([sections[i], sections[i + 1]]);
-	for (const [t, body] of chunks) {
-		let n = 0;
-		for (const m of body.matchAll(/```(tsrx|tsx|ts|typescript)?\n([\s\S]*?)```/g)) {
-			const code = m[2];
-			const first = code.split('\n')[0];
+	const fixedTask = file.match(/task(\d)\.md$/)?.[1];
+	let task = fixedTask;
+	let fence = null;
+	let count = {};
+	for (const line of text.split('\n')) {
+		const heading = !fence && line.match(/^#+ .*?Task (\d)\b/i);
+		if (heading && !fixedTask) task = heading[1];
+		const marker = line.match(/^```(\S*)\s*$/);
+		if (marker && !fence) { fence = { lang: marker[1], lines: [] }; continue; }
+		if (marker && fence && marker[1] === '') {
+			const { lang, lines } = fence;
+			fence = null;
+			if (!task || !['tsrx', 'tsx', 'ts', 'typescript', ''].includes(lang)) continue;
+			const first = lines[0] ?? '';
+			if (/\.(json|md)\s*$/.test(first)) continue;
 			const named = first.match(/\/\/\s*(?:file:\s*)?(?:task\d\/)?(?:src\/)?([\w.-]+\.(?:tsrx|ts))\s*$/);
-			const ext = m[1] === 'ts' || m[1] === 'typescript' ? 'ts' : 'tsrx';
-			const name = named ? named[1] : n++ === 0 ? `App.${ext}` : `Extra${n}.${ext}`;
-			mkdirSync(join(work, `task${t}`), { recursive: true });
-			writeFileSync(join(work, `task${t}`, name), code);
+			const ext = lang === 'ts' || lang === 'typescript' ? 'ts' : 'tsrx';
+			count[task] = (count[task] ?? 0) + 1;
+			const name = named ? named[1] : count[task] === 1 ? `App.${ext}` : `Extra${count[task]}.${ext}`;
+			mkdirSync(join(work, `task${task}`), { recursive: true });
+			writeFileSync(join(work, `task${task}`, name), lines.join('\n'));
+			continue;
 		}
+		if (fence) fence.lines.push(line);
 	}
 }
 const result = {};

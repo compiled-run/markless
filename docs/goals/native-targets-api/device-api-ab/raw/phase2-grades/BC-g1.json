@@ -1,0 +1,389 @@
+{
+ "label": "BC",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "assumes async computed reading getPosition runs in the browser, not during server render"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A2": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "assumes async computed reading getPosition runs in the browser, not during server render"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A3": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "assumes async computed reading getPosition runs in the browser, not during server render"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": [
+     "non-abort share errors rethrown from handler with no @try/@catch around the button"
+    ]
+   }
+  },
+  "A4": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "assumes async computed reading getPosition runs in the browser, not during server render"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A5": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "Try again relies on attach={locate(attempt, ...)} re-running when attempt changes; the primer does not state that a generic attach expression restarts on state change (the sheet says so only for cameraPreview)",
+     "hand-rolled loading/error state instead of computed(async) with @try/@pending/@catch and reset"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  }
+ }
+}

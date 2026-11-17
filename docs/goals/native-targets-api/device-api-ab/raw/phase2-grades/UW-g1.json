@@ -1,0 +1,384 @@
+{
+ "label": "UW",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A2": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": [
+     "unneeded <>...</> wrapper inside camera.root/recorder.root"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": [
+     "unneeded <>...</> wrapper inside recorder.root"
+    ]
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A3": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "heading() called twice with non-null assertion; works but redundant"
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A4": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 6,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  },
+  "A5": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": [
+     "heading() ?? 0 redundant after null check"
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 1,
+    "markless": []
+   }
+  }
+ }
+}

@@ -1,0 +1,397 @@
+{
+ "label": "MS",
+ "grader": "g1",
+ "answers": {
+  "A1": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": [
+     "device object kept in a body const and read by handlers; sheet allows it, possible MARKLESS_HANDLER_READS_RENDER_LOCAL risk (assumption noted by author)"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A2": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": [
+     "device object kept in a body const and read by handlers; sheet allows it, possible MARKLESS_HANDLER_READS_RENDER_LOCAL risk (assumption noted by author)",
+     "last photo shown only inside the non-denied branch; acceptable"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": []
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A3": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 10,
+    "markless": [
+     "device object kept in a body const and read by handlers; sheet allows it, possible MARKLESS_HANDLER_READS_RENDER_LOCAL risk (assumption noted by author)"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": [
+     "@else holds an @if/@else chain directly; the one-node-per-block rule may treat the chain as more than one node (wrap in <>…</> to be safe)"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": [
+     "@else holds an @if/@else chain directly; the one-node-per-block rule may treat the chain as more than one node (wrap in <>…</> to be safe)"
+    ]
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A4": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 10,
+    "markless": [
+     "device object kept in a body const and read by handlers; sheet allows it, possible MARKLESS_HANDLER_READS_RENDER_LOCAL risk (assumption noted by author)"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": [
+     "@else holds an @if/@else chain directly; the one-node-per-block rule may treat the chain as more than one node (wrap in <>…</> to be safe)"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": []
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  },
+  "A5": {
+   "1": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 3,
+    "markless": []
+   },
+   "2": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": [
+     "device object kept in a body const and read by handlers; sheet allows it, possible MARKLESS_HANDLER_READS_RENDER_LOCAL risk (assumption noted by author)"
+    ]
+   },
+   "3": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 9,
+    "markless": [
+     "@else holds an @if/@else chain directly; the one-node-per-block rule may treat the chain as more than one node (wrap in <>…</> to be safe)"
+    ]
+   },
+   "4": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 2,
+    "markless": []
+   },
+   "5": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 5,
+    "markless": []
+   },
+   "6": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 8,
+    "markless": [
+     "@else holds an @if/@else chain directly; the one-node-per-block rule may treat the chain as more than one node (wrap in <>…</> to be safe)"
+    ]
+   },
+   "7": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 7,
+    "markless": []
+   },
+   "8": {
+    "offSheet": 0,
+    "offSheetNames": [],
+    "misuse": 0,
+    "misuseNotes": [],
+    "missing": [],
+    "deviceNames": 4,
+    "markless": []
+   }
+  }
+ }
+}
