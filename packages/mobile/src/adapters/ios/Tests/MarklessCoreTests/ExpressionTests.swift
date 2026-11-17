@@ -17,7 +17,7 @@ private func field(_ value: JSONValue, _ key: String) -> JSONValue? {
 	#expect(cases.count > 40)
 	for item in cases {
 		guard case let .array(triple) = item, case let .string(name) = triple[0] else { Issue.record("bad case"); continue }
-		let value: NativeScalar = switch triple[1] {
+		let value: NativeValue = switch triple[1] {
 		case let .bool(flag): .bool(flag)
 		case let .number(number): .number(number)
 		case let .string(text): .string(text)
@@ -31,7 +31,7 @@ private func field(_ value: JSONValue, _ key: String) -> JSONValue? {
 // Written by Tests/write-expression-cases.ts from the reference evaluator.
 @Test func evaluatesExpressionsAsTheReferenceDoes() throws {
 	guard case let .array(cases) = try fixture("expression-cases") else { Issue.record("not an array"); return }
-	#expect(cases.count > 700)
+	#expect(cases.count > 1000)
 	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(Data("""
 		{"version":"markless.native-view/0","component":"E","cells":[],"nodes":[],"events":[],"handlers":[]}
 		""".utf8)))
@@ -43,10 +43,12 @@ private func field(_ value: JSONValue, _ key: String) -> JSONValue? {
 		case .string: "string"
 		case .bool: "boolean"
 		case .null: "null"
+		case .array, .object: "object"
 		}
 		let label = field(item, "expr")!.jsonText
 		#expect(.string(type) == field(item, "type"), "\(label)")
 		#expect(.string(value.text) == field(item, "text"), "\(label)")
+		#expect(.string(value.json.jsonText) == field(item, "json"), "\(label)")
 		let negativeZero = if case let .number(number) = value { number == 0 && number.sign == .minus } else { false }
 		#expect(.bool(negativeZero) == field(item, "negativeZero"), "\(label)")
 	}

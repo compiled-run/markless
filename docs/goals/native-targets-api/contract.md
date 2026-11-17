@@ -24,10 +24,8 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 
 ## 0b. Next items per worker (2026-11-17, 04:10)
 
-- **native-ios-host:** (1) read `dragon.native-style-export/1` (`states`, `assignments`, `initial`, `next`; state keys are
-  Markless cell ids; apply the `state` journal entry by moving to `next[a][s][v]`), so rungs 2 and 4 run styled: today the
-  shell stops with `style: unknown field "component"`. (2) keyed lists (`repeat`, row instances, the `rows` entry;
-  `list.json`), rung 6. (3) a launch route (below), rung 10.
+- **native-ios-host:** `/1` is done (the lead added `readiness` as an optional field the decoder reads past, in
+  `StyleExport.swift`, so the documented format decodes). Next: anything rungs 6 and 10 still need on the shared harness.
 - **native-android-host:** (1) text drawn wider than Dragon's box clips: rung 4's `<h1>Attributes</h1>` (Inter Bold, 32 px)
   shows "Attribute" in `proofs/04-attributes/screenshots/android/`. Find why Android's run is wider than Dragon's shaped
   width (font padding, a second bold, letter spacing, text size units) and fix the cause; do not widen frames. (2) a launch
@@ -397,20 +395,20 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
    `border-colors { colors[4] }`, `border-radius { lengths[8] }`, `font { font: { family: <face id>, size } }`,
    `text-color { color }`, `synthetic-bold`; colours are `{ r, g, b, alpha }` 0 to 255. A face id is
    `sha256:<hex of the font file>` and `fonts` maps it to the vendored file the app bundles.
-3. **How a build obtains it (planner's decision for tonight, 2026-11-17 04:00):** the proof harness generates the export at
-   proof time; nothing is committed and nothing is hand-written. For a rung with styles it writes
-   `native-style-input.json` from the compiler's facts and runs Dragon's entry point
-   (`examples/markless-counter/tools/markless-style.ts`, `DRAGON_STYLE_ENTRY` in `packages/mobile/src/style-export.ts`) from
-   a sibling Dragon checkout named by `DRAGON_DIR` (default `~/wt/dragon/native-dragon-styles`), with that input as its only
-   input. No Markless `package.json` depends on Dragon. If `DRAGON_DIR` lacks the entry, the harness refuses the styled rung
-   and says so. Fonts are read from the same checkout and checked against their `sha256:` ids. The format is
-   `dragon.native-style-export/1` as `docs/markless-native-styles.md` on the Dragon branch `cw/native-dragon-styles`
-   defines it; state keys in exports built from Markless input are the Markless cell ids. Dragon's
-   `tools/markless-style-compare.ts` compares every frame of every state with Chrome (rung 2: 14 boxes, rung 4: 36, none
-   outside 1 device px; reports committed as `native-style.chrome-compare.json`). How Markless depends on Dragon later
-   (workspace link or prerelease package) is an owner decision. **Tonight the entry exists only on the Dragon branch
-   `cw/native-targets`; native-dragon-styles, please carry it onto `cw/native-dragon-styles` (or replace it there with an
-   entry of the same name and contract) so the default `DRAGON_DIR` works.**
+3. **How a build obtains it (planner's decision for tonight, 2026-11-17):** the proof harness generates the export at
+   proof time; nothing is committed and nothing is hand-written. For a rung with styles it writes `native-style-input.json`
+   from the compiler's facts and runs Dragon's command from a sibling checkout:
+   `pnpm --silent --dir "${MARKLESS_DRAGON_DIR:-$HOME/wt/dragon/native-dragon-styles}" run markless:style-export --
+   native-style-input.json native-style.json` (`packages/mobile/src/style-export.ts`). The input is the file
+   `nativeStyleInput` writes, unchanged. No Markless `package.json` depends on Dragon. If the checkout lacks the command,
+   or Dragon refuses the styles (exit 1 with reasons), the harness refuses the rung and prints Dragon's reasons. Fonts are
+   read from the same checkout and checked against their `sha256:` ids. **Format:** `dragon.native-style-export/1` as
+   `docs/markless-native-styles.md` on the Dragon branch `cw/native-dragon-styles` defines it (`6a1c258671`): per target
+   `backend`, `viewport`, `dpr`, `readiness` (Dragon's verdict on its own device lanes; hosts read past it), `states`
+   (keyed by cell id, e.g. `state:liked`), `initial`, one full node list per assignment, and `next[a][s][v]`. Known limits:
+   Dragon refuses a node inside an `@if` arm or a `@for` row, and non-boolean states, so styled rungs with those are
+   refused by name for now. Dragon's Chrome comparison of the export: rung 2, 14 boxes; rung 4, 36 boxes; none outside
+   1 device px. How Markless depends on Dragon later (workspace link or prerelease package) is an owner decision.
 4. **Hosts:** apply writes by `kind`; fail loudly on a kind they do not implement; place views by `frame` inside their parent
    (absolute), scaling device pixels by the screen scale (iOS points = px / 3 on the proof device, Android uses px); refuse
    to run if the device's scale differs from the target's `dpr`. Text keeps Dragon's frame; after a journal entry the
@@ -430,9 +428,9 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | # | Rung | Web | Native reference | iOS | Android | Notes |
 |---|---|---|---|---|---|---|
 | 1 | Static elements and text | passing | passing | **passing** | **passing** | screenshots in `proofs/01-static-text/screenshots/` |
-| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | failing (host reads only export `/0`) | **passing** | export generated at proof time from `DRAGON_DIR`; Chrome compare 14 boxes within 1 device px; styled screenshots in `proofs/02-styles/screenshots/android/` |
+| 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | **passing** | **passing** | harness verdict passed on both; export made at proof time by Dragon's `markless:style-export`; styled screenshots in `proofs/02-styles/screenshots/` |
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
-| 4 | Attributes and classes that follow state | passing | passing | failing (host reads only export `/0`) | flow passes; title visibly clipped (host defect above) | both states through Dragon; Chrome compare 36 boxes within 1 device px; the button turns `#ef476f` on tap in `proofs/04-attributes/screenshots/android/` |
+| 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing**, with a visible defect: the title's last letter clips | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | failing (host has no lists yet) | passing | vectors `list.json`; not passed until iOS |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |

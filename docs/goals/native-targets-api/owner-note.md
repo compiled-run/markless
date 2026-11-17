@@ -45,11 +45,14 @@ web build as the reference. A rung counts only when both phones pass.
 The compiler now lowers rungs 1 to 10 (static text, styles, a counter, attributes and classes, `@if`, keyed lists, child
 components with callbacks, text input, storage, a route param and a link to another route); a checker that changes what
 it shows only through the update journal agrees with the web build on every step of all ten. Rung 11 (an async value)
-stops on purpose: the value comes from your own JavaScript, and how a phone runs that is your call (below). On devices, through one command that builds both apps and runs the same flow on each: rungs 1, 3, 5, 7, 8 and 9 pass
-on the iPhone simulator and the Android emulator (receipts and screenshots are committed; rung 1's Android pass came
-from a second run after the emulator dropped under load). Rung 6 passes on Android; iOS has no lists yet. Rung 10
-needs both phones to take a starting route. Rungs 2 and 4 wait on one missing piece: Dragon turning the component's CSS,
-as Markless hands it over, into a committed per-device style file.
+stops on purpose: the value comes from your own JavaScript, and how a phone runs that is your call (below). On devices, through one command that builds both apps and runs the same flow on each: rungs 1, 2, 3, 4, 5, 7, 8 and 9
+pass on the iPhone simulator and the Android emulator (receipts and screenshots are committed). Rungs 2 and 4 are styled:
+the component's own CSS goes through Dragon at build time, and the phones show the same colours, borders, corners and
+Inter text Chrome shows. One visible defect remains on Android: a bold heading's last letter clips. Rungs 6 and 10 pass on
+each phone in the hosts' own runs and are being run together next.
+
+Known styling limits tonight: Dragon refuses styles on elements inside an `@if` branch or a `@for` list row, and states that
+are not true/false; such components are refused at build time with the reason, not drawn wrong.
 
 ## What the compiler must learn next
 

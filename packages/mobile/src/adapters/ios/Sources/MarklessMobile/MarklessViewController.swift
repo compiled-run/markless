@@ -14,19 +14,44 @@ import UIKit
 /// Throws on anything this host does not implement; it never skips a node, op or style write.
 @MainActor
 public final class MarklessViewController: UIViewController {
-	private let runtime: NativeRuntime
-	private let layout: StyleLayout?
-	private let faces: [String: UIFontDescriptor]
+	private let payload: NativeViewPayload
+	private let style: StyleExport?
+	private let fonts: [String: Data]
+	private let store: NativeStore
+	private var runtime: NativeRuntime
+	private var layout: StyleLayout?
 	private(set) var tree: ViewTree?
 
-	public init(payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore()) throws {
-		let decoded = try NativeViewPayload.decode(payload)
-		let runtime = NativeRuntime(payload: decoded, store: store)
-		let texts = try runtime.texts()
-		self.runtime = runtime
-		layout = try style.map { try StyleExport.decode($0).resolve(for: decoded, initialTexts: texts) }
-		faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
+	/// `route`: the path a page opens at, matched against the payload's route; by default the `-route` launch argument.
+	public init(
+		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore(),
+		route: String? = MarklessViewController.launchRoute()
+	) throws {
+		self.payload = try NativeViewPayload.decode(payload)
+		self.style = try style.map { try StyleExport.decode($0) }
+		self.fonts = fonts
+		self.store = store
+		var params: [NativeRouteParam] = []
+		if let route {
+			guard let page = self.payload.route else { throw HostError("opened at \(route), but \(self.payload.component) is not a page") }
+			guard let matched = page.match(route) else { throw HostError("\(route) does not match the page's route \(page.pattern)") }
+			params = matched
+		}
+		runtime = NativeRuntime(payload: self.payload, store: store, params: params)
 		super.init(nibName: nil, bundle: nil)
+		try buildPage()
+	}
+
+	/// The `-route <path>` launch argument (Maestro's `launchApp: arguments: { route: ... }`).
+	public nonisolated static func launchRoute() -> String? {
+		let arguments = ProcessInfo.processInfo.arguments
+		guard let index = arguments.firstIndex(of: "-route"), index + 1 < arguments.count else { return nil }
+		return arguments[index + 1]
+	}
+
+	private func buildPage() throws {
+		layout = try style.map { try $0.resolve(for: payload, initialTexts: try runtime.texts(), value: runtime.value(of:)) }
+		let faces = try registerFaces(layout?.fontFiles ?? [], fonts: fonts)
 		tree = try ViewTree(runtime: runtime, layout: layout, faces: faces) { [weak self] action in
 			self?.perform(action)
 		}
@@ -53,10 +78,23 @@ public final class MarklessViewController: UIViewController {
 	public func perform(_ action: NativeAction) {
 		do {
 			let journal = try runtime.dispatch(action)
-			try tree?.apply(journal)
+			if case let .navigate(route, params)? = journal.last {
+				try navigate(route, params)
+			} else {
+				try tree?.apply(journal)
+			}
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
+	}
+
+	/// Builds the page at `route` from scratch with `params`; its state starts over.
+	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
+		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
+		runtime = NativeRuntime(payload: payload, store: store, params: params)
+		tree?.root.removeFromSuperview()
+		try buildPage()
+		if isViewLoaded { tree?.mount(in: view) }
 	}
 }
 

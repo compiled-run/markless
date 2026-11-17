@@ -4,9 +4,17 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"a", "audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
+	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
+
+/// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
+private struct Context {
+	var suffix = ""
+	var scope = NativeScope.empty
+	var button: UIButton?
+	var heading = false
+}
 
 /// The retained views of one payload: built by the view factory, then changed only by `apply(_:)`.
 @MainActor
@@ -17,17 +25,18 @@ final class ViewTree {
 	private let faces: [String: UIFontDescriptor]
 	private let onAction: (NativeAction) -> Void
 	private let nodes: [String: NativeNode]
-	private let order: [String]
-	/// The nodes each element, root (`""`) or branch arm (`branch#index`) places directly, in document order.
+	/// The nodes each element, root (`""`), branch arm (`branch#index`) or list row (`repeat id`) places directly.
 	private let slots: [String: [String]]
 	private let events: [String: [NativeEvent]]
 	private(set) var elements: [String: UIView] = [:]
 	private(set) var labels: [String: UILabel] = [:]
-	private var buttonOf: [String: UIButton] = [:]
-	private var headingOf: [String: Bool] = [:]
+	private var contexts: [String: Context] = [:]
+	private var templates: [String: String] = [:]
 	private var attributes: [String: [String: String]] = [:]
 	private var branches: [String: (anchor: UIView, index: Int?, built: [String])] = [:]
+	private var lists: [String: (anchor: UIView, keys: [String], built: [String: [String]])] = [:]
 	private var anchors = Set<ObjectIdentifier>()
+	private var assignment: Int
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 
 	init(
@@ -37,23 +46,27 @@ final class ViewTree {
 		self.layout = layout
 		self.faces = faces
 		self.onAction = onAction
+		assignment = layout?.start ?? 0
 		let payload = runtime.payload
-		nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
-		order = payload.nodes.map(\.id)
-		let branchParents = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node -> (String, String)? in
-			if case .branch = node { return (node.id, node.parent ?? "") }
-			return nil
-		})
+		let nodes = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
+		self.nodes = nodes
 		var slots: [String: [String]] = [:]
 		for node in payload.nodes {
 			let parent = node.parent ?? ""
-			let key = node.arm.flatMap { arm in branchParents[arm.branch] == parent ? "\(arm.branch)#\(arm.index)" : nil } ?? parent
+			let key: String
+			if let row = node.row, (nodes[row]?.parent ?? "") == parent {
+				key = row
+			} else if let arm = node.arm, (nodes[arm.branch]?.parent ?? "") == parent {
+				key = "\(arm.branch)#\(arm.index)"
+			} else {
+				key = parent
+			}
 			slots[key, default: []].append(node.id)
 		}
 		self.slots = slots
 		events = Dictionary(grouping: payload.events, by: \.host)
 		var index = 0
-		_ = try build("", in: root, at: &index, button: nil, heading: false)
+		_ = try build("", in: root, at: &index, Context())
 		if layout == nil { stackTree(root) }
 	}
 
@@ -76,53 +89,108 @@ final class ViewTree {
 			case let .text(node, value):
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
-				if let button = buttonOf[node] { refreshLabel(of: button) }
-			case .state:
-				if layout != nil { throw HostError("a styled cell changed, and switching styles needs dragon.native-style-export/1") }
+				if let button = contexts[node]?.button { refreshLabel(of: button) }
 			case let .property(node, _, value):
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
-				try applyAttributes(node, view)
-			case let .arm(node, index):
-				guard let branch = branches[node], case let .branch(_, parent, _, _, _) = nodes[node] else {
-					throw HostError("journal names branch \(node), which is not shown")
+				applyAttributes(node, view)
+			case .navigate:
+				throw HostError("a navigate entry reaches the page's controller, not its views")
+			case let .state(cell, value):
+				guard let layout else { continue }
+				assignment = try layout.next(from: assignment, cell: cell, value: value)
+				for (id, view) in elements.map({ ($0.key, $0.value as UIView) }) + labels.map({ ($0.key, $0.value as UIView) }) {
+					if let style = style(of: id) { try paint(view, style, faces: faces) }
 				}
-				let container = parent.flatMap { elements[$0] } ?? root
+			case let .arm(node, index):
+				guard let branch = branches[node], let context = contexts[node] else { throw HostError("journal names branch \(node), which is not shown") }
+				let container = branch.anchor.superview ?? root
 				for id in branch.built { remove(id) }
 				var position = (container.subviews.firstIndex(of: branch.anchor) ?? container.subviews.count) + 1
-				let built = try index.map {
-					try build("\(node)#\($0)", in: container, at: &position, button: buttonOf[parent ?? ""], heading: headingOf[parent ?? ""] ?? false)
-				} ?? []
+				let built = try index.map { try build("\(templates[node] ?? node)#\($0)", in: container, at: &position, context) } ?? []
 				branches[node] = (branch.anchor, index, built)
-				if let button = buttonOf[parent ?? ""] { refreshLabel(of: button) }
-				if layout == nil {
-					stack(container)
-					for id in built { if let view = elements[id] { stackTree(view) } }
+				settle(container, built: built, context)
+			case let .rows(node, keys):
+				guard let list = lists[node], let context = contexts[node] else { throw HostError("journal names list \(node), which is not shown") }
+				let container = list.anchor.superview ?? root
+				var built = list.built
+				for key in list.keys where !keys.contains(key) {
+					for id in built.removeValue(forKey: key) ?? [] { remove(id) }
 				}
+				let items = Dictionary(try runtime.rows(of: templates[node] ?? node).map { ($0.key, $0.item) }, uniquingKeysWith: { $1 })
+				var position = container.subviews.count
+				for key in keys where built[key] == nil {
+					guard let item = items[key] else { throw HostError("\(node) has no current row \(key)") }
+					built[key] = try buildRow(templates[node] ?? node, key: key, item: item, in: container, at: &position, context)
+				}
+				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
+				for key in keys {
+					for id in built[key] ?? [] {
+						guard let view = elements[id] ?? labels[id] else { continue }
+						container.insertSubview(view, at: position)
+						position += 1
+					}
+				}
+				lists[node] = (list.anchor, keys, built)
+				settle(container, built: keys.flatMap { built[$0] ?? [] }, context)
 			}
 		}
 	}
 
-	/// The view factory: builds the nodes of one slot list from current values, inserting them into `container` at `index`.
-	private func build(_ key: String, in container: UIView, at index: inout Int, button: UIButton?, heading: Bool) throws -> [String] {
-		let ids = slots[key] ?? []
-		for id in ids {
-			let node = nodes[id]!
-			switch node {
-			case let .element(_, element, _, staticAttributes, bindings, _):
+	private func style(of id: String) -> ResolvedStyle? {
+		guard let layout, let template = templates[id] else { return nil }
+		return layout.assignments[assignment][template]
+	}
+
+	private func settle(_ container: UIView, built: [String], _ context: Context) {
+		if let button = context.button { refreshLabel(of: button) }
+		if layout == nil {
+			stack(container)
+			for id in built { if let view = elements[id] { stackTree(view) } }
+		}
+	}
+
+	private func buildRow(_ list: String, key: String, item: NativeValue, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+		var row = context
+		row.suffix = "@\(key)"
+		row.scope.items[list] = item
+		return try build(list, in: container, at: &index, row)
+	}
+
+	private func anchor(in container: UIView, at index: inout Int) -> UIView {
+		let anchor = UIView()
+		anchor.isHidden = true
+		anchor.isAccessibilityElement = false
+		anchors.insert(ObjectIdentifier(anchor))
+		container.insertSubview(anchor, at: index)
+		index += 1
+		return anchor
+	}
+
+	/// The view factory: builds one slot list's instances from current values, inserting them into `container` at `index`.
+	private func build(_ key: String, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+		var built: [String] = []
+		for template in slots[key] ?? [] {
+			let node = nodes[template]!
+			let id = template + context.suffix
+			built.append(id)
+			templates[id] = template
+			contexts[id] = context
+			switch node.kind {
+			case let .element(element, staticAttributes, bindings):
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
-				if element == "button" {
-					if button != nil { throw HostError("<button> \(id) is inside another button") }
+				if element == "button" || element == "a" {
+					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
-					control.accessibilityTraits = .button
+					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
 				} else if element == "input" {
-					if button != nil { throw HostError("<input> \(id) is inside a button") }
+					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
 					if layout == nil {
 						field.borderStyle = .roundedRect
@@ -131,72 +199,86 @@ final class ViewTree {
 					view = field
 				} else {
 					view = UIView()
-					view.isUserInteractionEnabled = button == nil
+					view.isUserInteractionEnabled = context.button == nil
 				}
-				let enclosing = (view as? UIButton) ?? button
-				let isHeading = heading || headings.contains(element)
-				buttonOf[id] = enclosing
-				headingOf[id] = isHeading
+				var inner = context
+				inner.button = (view as? UIButton) ?? context.button
+				inner.heading = context.heading || headings.contains(element)
 				view.accessibilityIdentifier = id
 				elements[id] = view
-				if let style = layout?.styles[id] { try paint(view, style, faces: faces) }
+				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
-				let onAction = onAction
-				for event in events[id] ?? [] {
-					switch (event.event, view) {
-					case let (.activate, control as UIButton):
-						control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
-					case let (.input, field as UITextField):
-						field.addAction(
-							UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
-							for: .editingChanged)
-					default:
-						throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
-					}
-				}
+				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
-					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value))
-				}
-				if let field = view as? UITextField {
-					field.text = try runtime.properties().first { $0.node == id && $0.name == "value" }?.value ?? staticAttributes["value"]
+					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
 				}
 				attributes[id] = current
-				var inner = 0
-				_ = try build(id, in: view, at: &inner, button: enclosing, heading: isHeading)
-				try applyAttributes(id, view)
-			case let .text(_, _, parts, _):
+				if let field = view as? UITextField {
+					let bound = bindings.first { $0.isProperty && $0.name == "value" }
+					field.text = try bound.map { binding in
+						let value = try runtime.evaluate(binding.value, in: context.scope)
+						return value == .null ? "" : value.text
+					} ?? staticAttributes["value"]
+				}
+				var childIndex = 0
+				_ = try build(template, in: view, at: &childIndex, inner)
+				applyAttributes(id, view)
+			case let .text(parts):
 				let label = UILabel()
 				label.isUserInteractionEnabled = false
 				label.numberOfLines = 0
 				label.accessibilityIdentifier = id
-				label.text = try runtime.text(of: parts)
-				if let button {
+				label.text = try runtime.text(of: parts, in: context.scope)
+				if context.button != nil {
 					label.isAccessibilityElement = false
-					buttonOf[id] = button
 					if layout == nil { label.textColor = .tintColor }
-				} else if heading {
+				} else if context.heading {
 					label.accessibilityTraits.insert(.header)
 				}
-				if let style = layout?.styles[id] { try paint(label, style, faces: faces) }
+				if let style = style(of: id) { try paint(label, style, faces: faces) }
 				labels[id] = label
 				container.insertSubview(label, at: index)
 				index += 1
-				if let button { refreshLabel(of: button) }
+				if let button = context.button { refreshLabel(of: button) }
 			case .branch:
-				let anchor = UIView()
-				anchor.isHidden = true
-				anchor.isAccessibilityElement = false
-				anchors.insert(ObjectIdentifier(anchor))
-				container.insertSubview(anchor, at: index)
-				index += 1
-				let arm = try runtime.arm(of: id)
-				let built = try arm.map { try build("\(id)#\($0)", in: container, at: &index, button: button, heading: heading) } ?? []
-				branches[id] = (anchor, arm, built)
+				if !context.suffix.isEmpty { throw HostError("@if inside a list row (\(id)) has no iOS host support yet") }
+				let marker = anchor(in: container, at: &index)
+				let arm = try runtime.arm(of: template)
+				let armViews = try arm.map { try build("\(template)#\($0)", in: container, at: &index, context) } ?? []
+				branches[id] = (marker, arm, armViews)
+			case .repeat:
+				if !context.suffix.isEmpty { throw HostError("a list inside a list row (\(id)) has no iOS host support yet") }
+				let marker = anchor(in: container, at: &index)
+				var rows: [String: [String]] = [:]
+				var keys: [String] = []
+				for row in try runtime.rows(of: template) {
+					if rows[row.key] != nil { throw HostError("\(id) has two rows keyed \(row.key)") }
+					keys.append(row.key)
+					rows[row.key] = try buildRow(template, key: row.key, item: row.item, in: container, at: &index, context)
+				}
+				lists[id] = (marker, keys, rows)
 			}
 		}
-		return ids
+		return built
+	}
+
+	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String, inRow: Bool) throws {
+		let onAction = onAction
+		for event in bound {
+			if inRow { throw HostError("a \(event.event.rawValue) handler on a list row (\(id)) has no iOS host support yet") }
+			switch (event.event, view) {
+			case let (.activate, control as UIButton):
+				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)
+			case let (.input, field as UITextField):
+				field.addAction(
+					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
+					for: .editingChanged)
+			default:
+				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
+			}
+		}
 	}
 
 	private func remove(_ id: String) {
@@ -204,21 +286,26 @@ final class ViewTree {
 			for inner in branch.built { remove(inner) }
 			anchors.remove(ObjectIdentifier(branch.anchor))
 			branch.anchor.removeFromSuperview()
-			return
+		} else if let list = lists.removeValue(forKey: id) {
+			for inner in list.built.values.joined() { remove(inner) }
+			anchors.remove(ObjectIdentifier(list.anchor))
+			list.anchor.removeFromSuperview()
+		} else if let template = templates[id] {
+			let suffix = String(id.dropFirst(template.count))
+			for child in slots[template] ?? [] { remove(child + suffix) }
 		}
-		for child in slots[id] ?? [] { remove(child) }
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		if let view = elements.removeValue(forKey: id) {
 			stackConstraints.removeValue(forKey: ObjectIdentifier(view))
 			view.removeFromSuperview()
 		}
-		buttonOf.removeValue(forKey: id)
-		headingOf.removeValue(forKey: id)
+		contexts.removeValue(forKey: id)
+		templates.removeValue(forKey: id)
 		attributes.removeValue(forKey: id)
 	}
 
-	/// Bound and static attributes as platform state; `class` reaches views only through the style export.
-	private func applyAttributes(_ id: String, _ view: UIView) throws {
+	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
+	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
 		if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
@@ -235,13 +322,19 @@ final class ViewTree {
 		view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
 	}
 
+	/// A button reads as its `aria-label`, or else its text in view order.
 	private func refreshLabel(of button: UIButton) {
-		guard let id = button.accessibilityIdentifier else { return }
-		if let label = attributes[id]?["aria-label"] {
+		if let id = button.accessibilityIdentifier, let label = attributes[id]?["aria-label"] {
 			button.accessibilityLabel = label
 			return
 		}
-		button.accessibilityLabel = order.compactMap { node in buttonOf[node] === button ? labels[node]?.text : nil }.joined()
+		func texts(_ view: UIView) -> [String] {
+			view.subviews.flatMap { child -> [String] in
+				if let label = child as? UILabel { return [label.text ?? ""] }
+				return texts(child)
+			}
+		}
+		button.accessibilityLabel = texts(button).joined()
 	}
 
 	private func stackTree(_ view: UIView) {

@@ -98,7 +98,10 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
 	defaults.removePersistentDomain(forName: "markless-ios-host-tests")
 	let store = UserDefaultsStore(defaults)
-	for value: NativeScalar in [.string("1"), .number(1), .bool(true), .number(-2.5), .string("")] {
+	for value: NativeValue in [
+		.string("1"), .number(1), .bool(true), .number(-2.5), .string(""),
+		.array([.null, .number(1), .object([(key: "b", value: .string("x")), (key: "a", value: .bool(false))])]),
+	] {
 		store.write("k", value)
 		#expect(store.read("k") == value)
 	}
@@ -122,6 +125,79 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	try #require(views.elements["h4"] as? UIButton).sendActions(for: .touchUpInside)
 	#expect(field.text == "Bo")
 	#expect(views.labels["h3:text0"]?.text == "Hello Bo")
+}
+
+@MainActor @Test func rowsAreBuiltRemovedAndMovedNotRebuilt() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("list"), store: MemoryStore())
+	let views = try tree(controller)
+	let list = try #require(views.elements["h5"])
+	let rows = { list.subviews.filter { !$0.isHidden }.compactMap(\.accessibilityIdentifier) }
+	#expect(rows() == ["h6@apple", "h6@pear"])
+	let pear = try #require(views.labels["h6:text0@pear"])
+	controller.perform(NativeAction(event: .activate, host: "h2"))
+	#expect(rows() == ["h6@apple", "h6@pear", "h6@plum"])
+	#expect(views.labels["h6:text0@plum"]?.text == "Plum")
+	controller.perform(NativeAction(event: .activate, host: "h3"))
+	#expect(rows() == ["h6@pear", "h6@plum"])
+	#expect(views.labels["h6:text0@apple"] == nil)
+	controller.perform(NativeAction(event: .activate, host: "h4"))
+	#expect(rows() == ["h6@plum", "h6@pear"])
+	#expect(views.labels["h6:text0@pear"] === pear)
+}
+
+@MainActor @Test func aPageOpensAtItsRouteAndNavigatesFromScratch() throws {
+	let controller = try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple")
+	let before = try tree(controller)
+	#expect(before.labels["h1:text0"]?.text == "Fruit apple")
+	let link = try #require(before.elements["component-edge:1"] as? UIButton)
+	#expect(link.accessibilityTraits.contains(.link))
+	#expect(link.accessibilityLabel == "Go to pear")
+	link.sendActions(for: .touchUpInside)
+	let after = try #require(controller.tree)
+	#expect(after !== before)
+	#expect(after.labels["h1:text0"]?.text == "Fruit pear")
+	#expect(after.root.superview === controller.view)
+	#expect(before.root.superview == nil)
+	#expect(throws: HostError.self) { try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple/seeds") }
+}
+
+/// The attributes rung's payload with a `/1` export written from it: two assignments that differ in the heart's background.
+private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) {
+	var url = URL(fileURLWithPath: #filePath)
+	for _ in 0..<6 { url.deleteLastPathComponent() }
+	guard case let .object(fields) = try JSONValue.parse(Data(contentsOf: url.appendingPathComponent("conformance/attributes.json"))),
+		let json = fields.first(where: { $0.0 == "payload" })?.1
+	else { throw PayloadError(path: "vector", reason: "no payload") }
+	let payload = try NativeViewPayload.decode(json)
+	let texts = Dictionary(uniqueKeysWithValues: try NativeRuntime(payload: payload).texts().map { ($0.node, $0.text) })
+	func nodes(_ red: Int) -> String {
+		payload.nodes.map { node in
+			let text = node.isText ? "\"\(texts[node.id]!)\"" : "null"
+			let writes = node.isText ? "" : #"{"kind":"background-color","color":{"r":\#(node.id == "h2" ? red : 0),"g":0,"b":0,"alpha":255},"key":"backgroundColor"}"#
+			return #"{"id":"\#(node.id)","parent":\#(node.parent.map { "\"\($0)\"" } ?? "null"),"kind":"\#(node.isText ? "text" : "element")","native":"\#(node.isText ? "DragonTextView" : "DragonBoxView")","text":\#(text),"frame":{"x":0,"y":0,"width":30,"height":30},"borderWidths":\#(node.isText ? "null" : #"{"top":0,"right":0,"bottom":0,"left":0}"#),"writes":[\#(writes)]}"#
+		}.joined(separator: ",")
+	}
+	let export = #"""
+		{"schema":"dragon.native-style-export/1","units":"device px; frames relative to the parent box","fonts":[],"targets":{"ios":{"backend":"uikit","viewport":{"width":402,"height":778},"dpr":3,
+		"states":[{"key":"doc/app#state:liked","domain":[false,true]}],"initial":\#(initial),
+		"assignments":[{"values":{"doc/app#state:liked":false},"nodes":[\#(nodes(10))]},{"values":{"doc/app#state:liked":true},"nodes":[\#(nodes(200))]}],
+		"next":[[[0,1]],[[0,1]]]}}}
+		"""#
+	return (payload, Data(export.utf8))
+}
+
+@MainActor @Test func aStyledCellMovesEveryViewToTheNextAssignment() throws {
+	let (_, export) = try toggleExport()
+	let controller = try MarklessViewController(payload: vectorPayload("attributes"), style: export, store: MemoryStore())
+	let views = try tree(controller)
+	let heart = try #require(views.elements["h2"] as? UIButton)
+	var red: CGFloat = 0
+	heart.backgroundColor?.getRed(&red, green: nil, blue: nil, alpha: nil)
+	#expect(Int((red * 255).rounded()) == 10)
+	heart.sendActions(for: .touchUpInside)
+	heart.backgroundColor?.getRed(&red, green: nil, blue: nil, alpha: nil)
+	#expect(Int((red * 255).rounded()) == 200)
+	#expect(heart.accessibilityLabel == "Unlike")
 }
 
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
