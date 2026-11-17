@@ -114,3 +114,19 @@ test('wake-try/RowTryNames.tsrx: rows keyed by their own value settle their @try
 			.toEqual(['south t2 ready', 'north t2 ready']);
 	});
 }, 120_000);
+
+test.fails('wake-try/RowTryAdd.tsrx (waits on #776 and #784 landing together): a row added with its own @try shows its value, again after it is removed, and follows writes', async () => {
+	await withWokenPage('wake-try/RowTryAdd.tsrx', async (tab) => {
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 3']);
+		await tab.locator('[data-add]').click();
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 3', 'Ink: 5']);
+		await tab.locator('[data-drop]').click();
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 3']);
+		await tab.locator('[data-add]').click();
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 3', 'Ink: 5']);
+		await tab.locator('[data-rename]').click();
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 3', 'Nib: 5']);
+		await tab.locator('[data-again]').click();
+		await expect.poll(() => texts(tab, '[data-count]')).toEqual(['Pen: 4', 'Nib: 6']);
+	});
+}, 120_000);
