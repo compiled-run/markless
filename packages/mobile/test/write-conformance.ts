@@ -1,8 +1,9 @@
 // Rewrites conformance/*.json from the fixtures: `node packages/mobile/test/write-conformance.ts`.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compileNativeComponent, nativeConformance } from '../src/index.ts';
-import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { compileNativeComponent, nativeAppConformance, nativeConformance } from '../src/index.ts';
+import { compileRungApp } from '../src/harness/rung.ts';
+import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
 
 for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
@@ -17,5 +18,14 @@ for (const entry of CONFORMANCE_CASES) {
 	writeFileSync(
 		file,
 		`${JSON.stringify(nativeConformance(payload, entry.actions, entry.params), null, '\t')}\n`,
+	);
+}
+
+for (const entry of APP_CONFORMANCE_CASES) {
+	const { payload, diagnostics } = await compileRungApp(join(import.meta.dirname, '..', entry.app));
+	if (!payload) throw new Error(`${entry.app}: ${diagnostics.map((d) => d.message).join('; ')}`);
+	writeFileSync(
+		new URL(`../conformance/${entry.name}.json`, import.meta.url),
+		`${JSON.stringify(nativeAppConformance(payload, entry.open, entry.actions), null, '\t')}\n`,
 	);
 }

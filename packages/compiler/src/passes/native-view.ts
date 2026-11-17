@@ -81,7 +81,13 @@ type Item =
 			readonly row: string;
 			readonly path: ReadonlyArray<number>;
 	  }
-	| { readonly kind: 'child'; readonly edge: string; readonly template: string; readonly projection?: string; readonly path: ReadonlyArray<number> }
+	| {
+			readonly kind: 'child';
+			readonly edge: string;
+			readonly template: string;
+			readonly projection?: string;
+			readonly path: ReadonlyArray<number>;
+	  }
 	| { readonly kind: 'children'; readonly path: ReadonlyArray<number> };
 
 const isNativeValue = (value: unknown): value is NativeValue =>
@@ -126,8 +132,21 @@ type Scope = {
 
 /** Methods with JavaScript meaning that return a new value; `reverse` mutates, so only a fresh array may take it. */
 const METHODS = new Set<string>([
-	'filter', 'map', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
-	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
+	'filter',
+	'map',
+	'findIndex',
+	'some',
+	'every',
+	'includes',
+	'indexOf',
+	'join',
+	'concat',
+	'slice',
+	'reverse',
+	'toReversed',
+	'toUpperCase',
+	'toLowerCase',
+	'trim',
 ]);
 
 const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
@@ -144,6 +163,17 @@ export type NativeViewOptions = {
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
 	/** The analyses of modules this one imports components from, by import specifier as written. */
 	readonly importedModules?: Readonly<Record<string, SemanticGraphArtifact>>;
+	/** An app build's routes: links and `navigate()` must name one of them, with its params. */
+	readonly routes?: ReadonlyArray<{
+		readonly pattern: string;
+		readonly params: ReadonlyArray<string>;
+	}>;
+	/** Matches a path written in `navigate()` against the app's routes, as the router matches a URL. */
+	readonly resolvePath?: (
+		path: string,
+	) =>
+		| { readonly pattern: string; readonly params: Readonly<Record<string, string>> }
+		| undefined;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -184,12 +214,15 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		/** Sync computeds by component, then name: a read of one inlines its expression. */
 		computeds: graph.graphBindings.reduce((byComponent, binding) => {
 			if (binding.kind !== 'computed' || binding.async) return byComponent;
-			const names = byComponent.get(binding.componentName ?? '') ?? new Map<string, typeof binding>();
+			const names =
+				byComponent.get(binding.componentName ?? '') ?? new Map<string, typeof binding>();
 			names.set(binding.name, binding);
 			return byComponent.set(binding.componentName ?? '', names);
 		}, new Map<string, Map<string, SemanticGraphArtifact['graphBindings'][number]>>()),
 		imports: new Map(
-			graph.moduleImports.filter((entry) => !entry.typeOnly).map((entry) => [entry.localName, entry]),
+			graph.moduleImports
+				.filter((entry) => !entry.typeOnly)
+				.map((entry) => [entry.localName, entry]),
 		),
 	};
 }
@@ -230,7 +263,12 @@ export function createNativeViewPayload(
 
 	const cells: NativeViewPayload['cells'][number][] = [];
 	/** A component instance's cells: its own state, named by its prefix, plus its module's top-level state, shared. */
-	const instanceCells = (module: ModuleFacts, component: string, prefix: string, shared: boolean) => {
+	const instanceCells = (
+		module: ModuleFacts,
+		component: string,
+		prefix: string,
+		shared: boolean,
+	) => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
 		for (const binding of module.graph.graphBindings) {
@@ -242,7 +280,9 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (!moduleLevel && prefix !== '' && binding.storage) {
-				refuse(`storage \`${binding.name}\` declared inside the child component ${component}`);
+				refuse(
+					`storage \`${binding.name}\` declared inside the child component ${component}`,
+				);
 				continue;
 			}
 			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
@@ -287,6 +327,53 @@ export function createNativeViewPayload(
 		const entry = scope.module.imports.get(name);
 		return entry?.source === '@markless/router' && entry.importedName === 'Link';
 	};
+	/** A link's params: strings fixed at build time, or values this build computes when the link is followed. */
+	const linkParams = (
+		prop: SemanticGraphArtifact['componentEdges'][number]['props'][number],
+		scope: Scope,
+	): Record<string, string | NativeExpr> | null => {
+		const fixed =
+			prop.kind === 'opaque'
+				? prop.buildTimeValue?.value
+				: prop.kind === 'serializable'
+					? prop.value
+					: undefined;
+		if (
+			fixed &&
+			typeof fixed === 'object' &&
+			Object.values(fixed).every((value) => typeof value === 'string')
+		)
+			return fixed as Record<string, string>;
+		const tree = 'nativeExpression' in prop ? prop.nativeExpression : undefined;
+		if (tree?.kind !== 'object') return null;
+		const entries: [string, string | NativeExpr][] = [];
+		for (const [name, value] of tree.entries) {
+			const lowered = exprOf(value, `the link param \`${name}\``, scope);
+			if (!lowered) return null;
+			entries.push([
+				name,
+				'literal' in lowered && typeof lowered.literal === 'string'
+					? lowered.literal
+					: lowered,
+			]);
+		}
+		return Object.fromEntries(entries);
+	};
+	/** A link or `navigate()` target as a route pattern and params, checked against the app's routes when they are known. */
+	const linkRoute = (
+		pattern: string,
+		params: Record<string, string | NativeExpr>,
+	): { route: string; params: Record<string, string | NativeExpr> } | null => {
+		const known = options.routes?.find((route) => route.pattern === pattern);
+		if (options.routes && !known)
+			return refuse(`a link to ${pattern}, which is not a route of this app`);
+		const names = Object.keys(params).sort().join(',');
+		if (known && [...known.params].sort().join(',') !== names)
+			return refuse(
+				`a link to ${pattern} with the params ${names || 'none'}, not ${known.params.join(', ') || 'none'}`,
+			);
+		return { route: pattern, params };
+	};
 	const inlining = new Set<string>();
 	const exprOf = (
 		expression: SemanticExpression | undefined,
@@ -303,18 +390,31 @@ export function createNativeViewPayload(
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
-				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(expression.name) ?? '');
+				const prop = scope.props.get(
+					scope.module.propNames.get(scope.component)?.get(expression.name) ?? '',
+				);
 				if (prop?.kind === 'value') return prop.expr;
-				if (prop) return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
+				if (prop)
+					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				const computed =
 					scope.module.computeds.get(scope.component)?.get(expression.name) ??
 					scope.module.computeds.get('')?.get(expression.name);
 				if (computed) {
-					if (!computed.nativeExpression) return refuse(`${what} reads the computed \`${expression.name}\`, whose body needs a script engine`);
-					if (inlining.has(computed.id)) return refuse(`${what} reads the computed \`${expression.name}\` inside itself`);
+					if (!computed.nativeExpression)
+						return refuse(
+							`${what} reads the computed \`${expression.name}\`, whose body needs a script engine`,
+						);
+					if (inlining.has(computed.id))
+						return refuse(
+							`${what} reads the computed \`${expression.name}\` inside itself`,
+						);
 					inlining.add(computed.id);
 					try {
-						return exprOf(computed.nativeExpression, `the computed \`${expression.name}\``, scope);
+						return exprOf(
+							computed.nativeExpression,
+							`the computed \`${expression.name}\``,
+							scope,
+						);
 					} finally {
 						inlining.delete(computed.id);
 					}
@@ -392,18 +492,28 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
-				if (!METHODS.has(expression.method)) return refuse(`${what} calls \`.${expression.method}()\``);
+				if (!METHODS.has(expression.method))
+					return refuse(`${what} calls \`.${expression.method}()\``);
 				if (expression.method === 'reverse' && expression.object.kind !== 'array')
-					return refuse(`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`);
+					return refuse(
+						`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`,
+					);
 				const target = exprOf(expression.object, what, scope);
 				const args = expression.arguments.map((argument) => {
 					if (argument.kind !== 'lambda') return exprOf(argument, what, scope);
-					const inner: Scope = { ...scope, locals: new Set([...scope.locals, ...argument.parameters]) };
+					const inner: Scope = {
+						...scope,
+						locals: new Set([...scope.locals, ...argument.parameters]),
+					};
 					const lambdaBody = exprOf(argument.body, what, inner);
 					return lambdaBody && { lambda: argument.parameters, body: lambdaBody };
 				});
 				return target && args.every((argument) => argument !== null)
-					? { method: expression.method as NativeMethod, target, arguments: args as NativeExpr[] }
+					? {
+							method: expression.method as NativeMethod,
+							target,
+							arguments: args as NativeExpr[],
+						}
 					: null;
 			}
 			case 'lambda':
@@ -498,7 +608,12 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (slot.kind === 'repeat') {
-				items.push({ kind: 'repeat', id: slot.repeatId, row: slot.rowTemplateId, path: slot.coordinate.path });
+				items.push({
+					kind: 'repeat',
+					id: slot.repeatId,
+					row: slot.rowTemplateId,
+					path: slot.coordinate.path,
+				});
 				if (slot.emptyTemplateId) refuse('@empty');
 				continue;
 			}
@@ -521,7 +636,12 @@ export function createNativeViewPayload(
 			}
 			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
 				const expr = exprOf(slot.nativeExpression, 'a text expression', scope);
-				if (expr) items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
+				if (expr)
+					items.push({
+						kind: 'part',
+						part: 'cell' in expr ? { cell: expr.cell } : { expr },
+						path: slot.coordinate.path,
+					});
 				continue;
 			}
 			if (slot.residue.kind === 'repeat-item') {
@@ -542,11 +662,20 @@ export function createNativeViewPayload(
 				const [name, ...rest] = path;
 				const prop = name === undefined ? undefined : scope.props.get(name);
 				if (prop?.kind !== 'value') {
-					refuse(`a text binding that reads the prop \`${name ?? ''}\` this instance was not given as a value`);
+					refuse(
+						`a text binding that reads the prop \`${name ?? ''}\` this instance was not given as a value`,
+					);
 					continue;
 				}
-				const expr = rest.reduce<NativeExpr>((object, property) => ({ member: object, property }), prop.expr);
-				items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
+				const expr = rest.reduce<NativeExpr>(
+					(object, property) => ({ member: object, property }),
+					prop.expr,
+				);
+				items.push({
+					kind: 'part',
+					part: 'cell' in expr ? { cell: expr.cell } : { expr },
+					path: slot.coordinate.path,
+				});
 				continue;
 			}
 			if (path.length > 1 || (path.length === 1 && path[0] !== 'length')) {
@@ -593,7 +722,11 @@ export function createNativeViewPayload(
 				close();
 				const element = scope.module.tagOf.get(item.id);
 				if (!element || element === '*') refuse(`host ${item.id} has no static tag`);
-				else if (!PORTABLE_ELEMENTS.has(element)) refuse(`the <${element}> element`);
+				else if (
+					!PORTABLE_ELEMENTS.has(element) &&
+					!(element === 'title' && scope.module === rootModule && scope.prefix === '')
+				)
+					refuse(`the <${element}> element`);
 				const attributes = (chunk.attributes ?? []).filter(
 					(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
 				);
@@ -618,11 +751,17 @@ export function createNativeViewPayload(
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					const semantic = SEMANTIC_EVENTS[event.eventName];
 					if (!semantic) {
-						refuse(`the ${event.eventName} event has no native meaning yet`, event.handlerSpan);
+						refuse(
+							`the ${event.eventName} event has no native meaning yet`,
+							event.handlerSpan,
+						);
 						continue;
 					}
 					if (place.row) {
-						refuse(`the ${event.eventName} handler inside a @for row`, event.handlerSpan);
+						refuse(
+							`the ${event.eventName} handler inside a @for row`,
+							event.handlerSpan,
+						);
 						continue;
 					}
 					const handler = `handler:${scope.prefix}${event.id}`;
@@ -645,13 +784,17 @@ export function createNativeViewPayload(
 			if (item.kind === 'child') {
 				close();
 				const edge = scope.module.edgesById.get(item.edge);
-				const imported = edge ? scope.module.imports.get(edge.childComponentName) : undefined;
+				const imported = edge
+					? scope.module.imports.get(edge.childComponentName)
+					: undefined;
 				const importedModule =
 					imported?.importedName && options.importedModules?.[imported.source]
 						? importedFacts(imported.source, options.importedModules[imported.source]!)
 						: undefined;
 				const childModule = importedModule ?? scope.module;
-				const childComponent = importedModule ? imported!.importedName! : (edge?.childComponentName ?? '');
+				const childComponent = importedModule
+					? imported!.importedName!
+					: (edge?.childComponentName ?? '');
 				const template = importedModule
 					? importedModule.chunks.get(`template:${childComponent}`)
 					: scope.module.chunks.get(item.template);
@@ -662,21 +805,31 @@ export function createNativeViewPayload(
 				if (isRouterLink(scope, edge.childComponentName)) {
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
-					const paramValues =
-						params?.kind === 'opaque' ? params.buildTimeValue?.value : params?.kind === 'serializable' ? params.value : {};
-					const projection = item.projection ? scope.module.chunks.get(item.projection) : undefined;
+					const replace = edge.props.find((prop) => prop.name === 'replace');
+					const projection = item.projection
+						? scope.module.chunks.get(item.projection)
+						: undefined;
+					const paramValues = params ? linkParams(params, scope) : {};
 					if (
 						href?.kind !== 'serializable' ||
 						typeof href.value !== 'string' ||
 						!paramValues ||
-						typeof paramValues !== 'object' ||
-						Object.values(paramValues).some((value) => typeof value !== 'string') ||
-						edge.props.some((prop) => prop.name !== 'href' && prop.name !== 'params' && prop.name !== 'children') ||
+						(replace &&
+							(replace.kind !== 'serializable' ||
+								typeof replace.value !== 'boolean')) ||
+						edge.props.some(
+							(prop) =>
+								!['href', 'params', 'replace', 'children'].includes(prop.name),
+						) ||
 						(item.projection && !projection)
 					) {
-						refuse('a <Link> whose href and params are not fixed at build time');
+						refuse(
+							'a <Link> whose href is not fixed at build time, or whose params are not strings this build can compute',
+						);
 						continue;
 					}
+					const route = linkRoute(href.value, paramValues);
+					if (!route) continue;
 					const id = scope.prefix + edge.id;
 					nodes.push({ kind: 'element', id, element: 'a', parent, ...place });
 					if (projection) lowerChunk(projection, id, place, scope);
@@ -684,7 +837,15 @@ export function createNativeViewPayload(
 					events.push({ host: id, event: 'activate', handler });
 					handlers.push({
 						id: handler,
-						ops: [{ op: 'navigate', route: href.value, params: paramValues as Record<string, string> }],
+						ops: [
+							{
+								op: 'navigate',
+								...route,
+								...(replace?.kind === 'serializable' && replace.value === true
+									? { replace: true as const }
+									: {}),
+							},
+						],
 					});
 					continue;
 				}
@@ -692,7 +853,9 @@ export function createNativeViewPayload(
 					refuse(`<${edge.childComponentName}>, a component from another module`);
 					continue;
 				}
-				const projected = item.projection ? scope.module.chunks.get(item.projection) : undefined;
+				const projected = item.projection
+					? scope.module.chunks.get(item.projection)
+					: undefined;
 				if (item.projection && !projected) {
 					refuse(`children passed to <${edge.childComponentName}> that have no markup`);
 					continue;
@@ -702,11 +865,25 @@ export function createNativeViewPayload(
 				);
 				for (const prop of edge.props) {
 					if (prop.kind === 'callback') {
-						props.set(prop.name, { kind: 'callback', statements: prop.nativeStatements, scope });
+						props.set(prop.name, {
+							kind: 'callback',
+							statements: prop.nativeStatements,
+							scope,
+						});
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
-						props.set(prop.name, { kind: 'value', expr: { literal: prop.value as NativeScalar } });
-					} else if (prop.kind === 'graph-reference' && scope.cells.byBinding.has(prop.graphNodeId) && prop.path.length === 0) {
-						props.set(prop.name, { kind: 'value', expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! } });
+						props.set(prop.name, {
+							kind: 'value',
+							expr: { literal: prop.value as NativeScalar },
+						});
+					} else if (
+						prop.kind === 'graph-reference' &&
+						scope.cells.byBinding.has(prop.graphNodeId) &&
+						prop.path.length === 0
+					) {
+						props.set(prop.name, {
+							kind: 'value',
+							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
+						});
 					} else {
 						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`);
 					}
@@ -715,7 +892,12 @@ export function createNativeViewPayload(
 				lowerChunk(template, parent, place, {
 					module: childModule,
 					component: childComponent,
-					cells: instanceCells(childModule, childComponent, childPrefix, childModule === rootModule),
+					cells: instanceCells(
+						childModule,
+						childComponent,
+						childPrefix,
+						childModule === rootModule,
+					),
 					prefix: childPrefix,
 					locals: new Set(),
 					items: new Map(),
@@ -731,13 +913,33 @@ export function createNativeViewPayload(
 					refuse('@for inside an @if arm or another @for');
 					continue;
 				}
-				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !scope.cells.byBinding.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
-					refuse('a @for over something other than a state list keyed by a path of its item');
+				if (
+					!repeat ||
+					!rowChunk ||
+					repeat.collectionGraphNodeId === undefined ||
+					!scope.cells.byBinding.has(repeat.collectionGraphNodeId) ||
+					(repeat.collectionPath?.length ?? 0) > 0 ||
+					!repeat.keyPath
+				) {
+					refuse(
+						'a @for over something other than a state list keyed by a path of its item',
+					);
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				nodes.push({ kind: 'repeat', id: repeatId, parent, list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }, key: repeat.keyPath });
-				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });
+				nodes.push({
+					kind: 'repeat',
+					id: repeatId,
+					parent,
+					list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! },
+					key: repeat.keyPath,
+				});
+				lowerChunk(
+					rowChunk,
+					parent,
+					{ row: repeatId },
+					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
+				);
 				continue;
 			}
 			if (item.kind === 'branch') {
@@ -754,7 +956,9 @@ export function createNativeViewPayload(
 				const plain = site.kind === 'if' && site.armIndexSource === undefined;
 				const test = plain ? exprOf(site.testExpression, 'the @if test', scope) : undefined;
 				const recorded = site.armTestExpressions?.map((expression) =>
-					expression === null ? null : exprOf(expression, `the @${site.kind} test`, scope),
+					expression === null
+						? null
+						: exprOf(expression, `the @${site.kind} test`, scope),
 				);
 				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
 				const tests =
@@ -764,8 +968,10 @@ export function createNativeViewPayload(
 							? [...recorded, null]
 							: recorded;
 				if (plain ? !test : !tests || tests.length !== item.arms.length) {
-					if (!plain && !tests) refuse(`a @${site.kind} whose arm tests the compiler did not record`);
-					if (tests && tests.length !== item.arms.length) refuse(`a @${site.kind} with an empty arm`);
+					if (!plain && !tests)
+						refuse(`a @${site.kind} whose arm tests the compiler did not record`);
+					if (tests && tests.length !== item.arms.length)
+						refuse(`a @${site.kind} with an empty arm`);
 					continue;
 				}
 				const branchId = scope.prefix + item.id;
@@ -779,7 +985,8 @@ export function createNativeViewPayload(
 				});
 				item.arms.forEach((armId, index) => {
 					const armChunk = scope.module.chunks.get(armId);
-					if (armChunk) lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
+					if (armChunk)
+						lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
 					else refuse(`arm ${armId} has no markup`);
 				});
 				continue;
@@ -833,16 +1040,32 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (statement.kind === 'invoke') {
-				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(statement.name) ?? '');
-				if (prop?.kind !== 'callback' || !prop.statements || depth > 8) {
-					refuse(`${what} uses a call to \`${statement.name}\`, which needs a script engine`, span);
+				const imported = scope.module.imports.get(statement.name);
+				if (imported?.source === '@markless/router' && imported.importedName === 'navigate')
+					return navigateOps(statement.arguments ?? [], what, span);
+				const prop = scope.props.get(
+					scope.module.propNames.get(scope.component)?.get(statement.name) ?? '',
+				);
+				if (
+					prop?.kind !== 'callback' ||
+					!prop.statements ||
+					depth > 8 ||
+					statement.arguments
+				) {
+					refuse(
+						`${what} uses a call to \`${statement.name}\`, which needs a script engine`,
+						span,
+					);
 					return [];
 				}
 				return statementOps(prop.statements, prop.scope, what, span, depth + 1);
 			}
 			const cell = cellOf(statement.target, scope);
 			if (!cell) {
-				refuse(`${what} assigns \`${statement.target}\`, which is not state of this component`, span);
+				refuse(
+					`${what} assigns \`${statement.target}\`, which is not state of this component`,
+					span,
+				);
 				return [];
 			}
 			const value = exprOf(statement.value, what, scope);
@@ -850,11 +1073,67 @@ export function createNativeViewPayload(
 		});
 	}
 
+	/** `navigate('/orders/42', { replace: true })`: a path fixed at build time, resolved against the app's routes. */
+	function navigateOps(
+		args: ReadonlyArray<SemanticExpression>,
+		what: string,
+		span: SourceSpan | undefined,
+	): NativeOp[] {
+		const [href, settings] = args;
+		const path =
+			href?.kind === 'literal' && typeof href.value === 'string' ? href.value : undefined;
+		const replace =
+			settings === undefined
+				? false
+				: settings.kind === 'object' &&
+					  settings.entries.every(
+							([name, value]) =>
+								name === 'replace' &&
+								value.kind === 'literal' &&
+								typeof value.value === 'boolean',
+					  )
+					? settings.entries.some(
+							([, value]) => value.kind === 'literal' && value.value === true,
+						)
+					: undefined;
+		if (path === undefined || replace === undefined || args.length > 2) {
+			refuse(
+				`${what} calls navigate() with a path or options this build cannot fix at build time`,
+				span,
+			);
+			return [];
+		}
+		const matched = options.resolvePath?.(path);
+		if (!matched) {
+			refuse(`${what} navigates to ${path}, which is not a route of this app`, span);
+			return [];
+		}
+		const route = linkRoute(matched.pattern, matched.params);
+		return route
+			? [{ op: 'navigate', ...route, ...(replace ? { replace: true as const } : {}) }]
+			: [];
+	}
+
 	lowerChunk(rootChunk, null, {}, TOP);
+	const titles = nodes.filter((node) => node.kind === 'element' && node.element === 'title');
+	let title: NativeTextPart[] | undefined;
+	if (titles.length > 1) refuse('more than one <title>');
+	for (const element of titles) {
+		const inside = nodes.filter((node) => node.parent === element.id);
+		if (element.arm || element.row) refuse('a <title> inside an @if arm or a @for row');
+		if (inside.some((node) => node.kind !== 'text'))
+			refuse('a <title> holding something other than text');
+		if (events.some((event) => event.host === element.id))
+			refuse('a <title> with an event handler');
+		title = inside.flatMap((node) => (node.kind === 'text' ? node.parts : []));
+		const removed = new Set([element.id, ...inside.map((node) => node.id)]);
+		nodes.splice(0, nodes.length, ...nodes.filter((node) => !removed.has(node.id)));
+	}
 	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))
 		refuse('markup outside the root template, its @if arms and its @for rows');
 	for (const event of graph.events)
-		if (!loweredEvents.has(event.id)) refuse(`the ${event.eventName} handler on an element this build does not show`);
+		if (!loweredEvents.has(event.id))
+			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
 	const styledCells = new Set<string>();
 	const collectCells = (expr: NativeExpr): void => {
@@ -876,12 +1155,15 @@ export function createNativeViewPayload(
 	return done({
 		version: NATIVE_VIEW_VERSION,
 		component: root.componentName,
-		...(options.route ? { route: { pattern: options.route.pattern, params: options.route.params } } : {}),
+		...(options.route
+			? { route: { pattern: options.route.pattern, params: options.route.params } }
+			: {}),
 		cells: cells.map((cell) =>
 			styledCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
 		),
 		nodes,
 		events,
 		handlers,
+		...(title ? { title } : {}),
 	});
 }

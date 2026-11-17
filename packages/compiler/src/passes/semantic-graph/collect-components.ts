@@ -6,6 +6,7 @@ import type {
 	SemanticAsyncArmPlacement,
 	SemanticComponentEdge,
 	SemanticComponentPropBinding,
+	SemanticExpression,
 	SemanticHandlerStatement,
 } from '../../artifacts.ts';
 import {
@@ -374,10 +375,12 @@ function componentPropBindings(
 					: {}),
 				...(inlined?.catchResets.size
 					? {
-							catchResets: [...inlined.catchResets].map(([resetName, boundaryId]) => ({
-								name: resetName,
-								boundaryId,
-							})),
+							catchResets: [...inlined.catchResets].map(
+								([resetName, boundaryId]) => ({
+									name: resetName,
+									boundaryId,
+								}),
+							),
 						}
 					: {}),
 			});
@@ -558,7 +561,8 @@ function componentPropBindings(
 			});
 			continue;
 		}
-		const rowRead = expression && opaqueSource === source ? rowItemRead(expression, state) : null;
+		const rowRead =
+			expression && opaqueSource === source ? rowItemRead(expression, state) : null;
 		const fixedValue =
 			!rowRead &&
 			!constant?.value.ok &&
@@ -571,6 +575,7 @@ function componentPropBindings(
 			sourceSpan: span,
 			...(rowRead ? { rowRead } : {}),
 			...(fixedValue ? { fixedValue: true as const } : {}),
+			...nativeExpressionOf(expression, state),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
@@ -819,7 +824,9 @@ function relayedHandlerSource(
 	state: WalkState,
 ): { readonly source: string; readonly parameter: string } | undefined {
 	const source =
-		expression.type === 'Identifier' ? getIdentifierName(expression) : staticPropsMember(expression);
+		expression.type === 'Identifier'
+			? getIdentifierName(expression)
+			: staticPropsMember(expression);
 	if (!source) return undefined;
 	const root = source.split('.')[0]!;
 	if (repeatRowBindsName(root, state)) return undefined;
@@ -917,6 +924,14 @@ function asyncArmPlacement(state: WalkState): SemanticAsyncArmPlacement {
 				asyncBoundaryArm: state.currentAsyncBoundaryArm ?? 0,
 			}
 		: {};
+}
+
+function nativeExpressionOf(
+	expression: AnyNode | undefined,
+	state: WalkState,
+): { nativeExpression?: SemanticExpression } {
+	const nativeExpression = expression && state.nativeFacts?.expression(expression as never);
+	return nativeExpression ? { nativeExpression } : {};
 }
 
 function nativeStatementsOf(

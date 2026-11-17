@@ -1,0 +1,82 @@
+appId: ${APP_ID}
+name: n2-orders
+---
+- launchApp:
+      clearState: true
+      arguments:
+          route: /orders
+- assertVisible: Your orders
+- assertVisible: Desk lamp
+- assertVisible: Oak chair
+- assertVisible: Wool rug
+- assertVisible:
+      text: Oak chair
+      below: Desk lamp
+- assertVisible:
+      text: Wool rug
+      below: Oak chair
+- assertVisible: Orders
+- tapOn: Reverse order
+- assertVisible:
+      text: Oak chair
+      below: Wool rug
+- assertVisible:
+      text: Desk lamp
+      below: Oak chair
+- assertVisible: Your orders
+- assertVisible: Desk lamp
+- assertVisible: Oak chair
+- assertVisible: Wool rug
+- assertVisible:
+      text: Oak chair
+      below: Wool rug
+- assertVisible:
+      text: Desk lamp
+      below: Oak chair
+- assertVisible: Orders
+- tapOn: Oak chair
+- assertNotVisible: Your orders
+- assertNotVisible: Wool rug
+- assertVisible: Order 42
+- assertVisible: Details for order 42
+- assertNotVisible: Your orders
+- assertNotVisible: Wool rug
+- assertVisible: Order 42
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Your orders
+- assertVisible: Wool rug
+- assertNotVisible: Details for order 42
+- assertVisible:
+      text: Oak chair
+      below: Wool rug
+- assertVisible:
+      text: Desk lamp
+      below: Oak chair
+- assertVisible: Orders
+- assertVisible: Your orders
+- assertVisible: Wool rug
+- assertNotVisible: Details for order 42
+- assertVisible:
+      text: Oak chair
+      below: Wool rug
+- assertVisible:
+      text: Desk lamp
+      below: Oak chair
+- assertVisible: Orders
+- tapOn: Wool rug
+- assertNotVisible: Your orders
+- assertVisible: Order 108
+- assertVisible: Details for order 108
+- assertNotVisible: Your orders
+- assertNotVisible: Details for order 42
+- assertVisible: Order 108

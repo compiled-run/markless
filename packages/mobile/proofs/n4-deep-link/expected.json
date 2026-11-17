@@ -1,0 +1,35 @@
+{
+	"rung": "N4",
+	"name": "Opening at a deep link lands on its route with the routes above it on the back stack",
+	"start": "/orders/42",
+	"open": "link",
+	"steps": [
+		{
+			"visible": ["Details for order 42"],
+			"absent": ["Your orders", "Shop front"],
+			"title": "Order 42"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Your orders", "Desk lamp", "Oak chair"],
+			"absent": ["Details for order 42"],
+			"title": "Orders",
+			"onWeb": {
+				"why": "a browser opened at a link has no earlier entry, so Back leaves the site",
+				"leaves": true
+			}
+		},
+		{
+			"do": { "back": "gesture" },
+			"visible": ["Shop front", "See orders"],
+			"absent": ["Your orders"],
+			"title": "Shop"
+		},
+		{
+			"do": { "tap": "See orders" },
+			"visible": ["Your orders", "Oak chair"],
+			"absent": ["Shop front"],
+			"title": "Orders"
+		}
+	]
+}

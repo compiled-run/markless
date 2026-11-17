@@ -1,0 +1,51 @@
+{
+	"rung": "N2",
+	"name": "A route with a parameter, reached from a keyed list; the title shows in the navigation bar",
+	"start": "/orders",
+	"steps": [
+		{
+			"visible": ["Your orders", "Desk lamp", "Oak chair", "Wool rug"],
+			"order": ["Desk lamp", "Oak chair", "Wool rug"],
+			"title": "Orders"
+		},
+		{
+			"do": {
+				"tap": "Reverse order"
+			},
+			"visible": ["Your orders", "Desk lamp", "Oak chair", "Wool rug"],
+			"order": ["Wool rug", "Oak chair", "Desk lamp"],
+			"title": "Orders"
+		},
+		{
+			"do": {
+				"tap": "Oak chair"
+			},
+			"visible": ["Details for order 42"],
+			"absent": ["Your orders", "Wool rug"],
+			"title": "Order 42"
+		},
+		{
+			"do": {
+				"back": "button"
+			},
+			"visible": ["Your orders", "Wool rug"],
+			"absent": ["Details for order 42"],
+			"order": ["Wool rug", "Oak chair", "Desk lamp"],
+			"title": "Orders",
+			"onWeb": {
+				"why": "the web restores a page on Back from the server HTML it cached, so the page's state starts over; a native stack keeps the screen as it was left",
+				"visible": ["Your orders", "Wool rug"],
+				"absent": ["Details for order 42"],
+				"order": ["Desk lamp", "Oak chair", "Wool rug"]
+			}
+		},
+		{
+			"do": {
+				"tap": "Wool rug"
+			},
+			"visible": ["Details for order 108"],
+			"absent": ["Your orders", "Details for order 42"],
+			"title": "Order 108"
+		}
+	]
+}

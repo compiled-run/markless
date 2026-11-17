@@ -52,14 +52,22 @@ export type NativeExpr =
 			readonly left: NativeExpr;
 			readonly right: NativeExpr;
 	  }
-	| { readonly logical: '&&' | '||' | '??'; readonly left: NativeExpr; readonly right: NativeExpr }
+	| {
+			readonly logical: '&&' | '||' | '??';
+			readonly left: NativeExpr;
+			readonly right: NativeExpr;
+	  }
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
 	| { readonly template: ReadonlyArray<string | NativeExpr> }
 	/** `length` of a string or array, or an own property of an object; anything else is a runtime error. */
 	| { readonly member: NativeExpr; readonly property: string }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
-	| { readonly method: NativeMethod; readonly target: NativeExpr; readonly arguments: ReadonlyArray<NativeExpr> }
+	| {
+			readonly method: NativeMethod;
+			readonly target: NativeExpr;
+			readonly arguments: ReadonlyArray<NativeExpr>;
+	  }
 	/** Only as a method argument: the parameters read as `{ local }` inside `body`. */
 	| { readonly lambda: ReadonlyArray<string>; readonly body: NativeExpr }
 	| { readonly local: string }
@@ -134,8 +142,17 @@ export type NativeEventName = 'activate' | 'input';
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
 	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
-	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	/**
+	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
+	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
+	 * `replace` takes the place of the current screen instead of pushing a new one.
+	 */
+	| {
+			readonly op: 'navigate';
+			readonly route: string;
+			readonly params: Readonly<Record<string, string | NativeExpr>>;
+			readonly replace?: true;
+	  };
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -158,16 +175,43 @@ export type NativeViewPayload = {
 		readonly event: NativeEventName;
 		readonly handler: string;
 	}>;
-	readonly handlers: ReadonlyArray<{ readonly id: string; readonly ops: ReadonlyArray<NativeOp> }>;
+	readonly handlers: ReadonlyArray<{
+		readonly id: string;
+		readonly ops: ReadonlyArray<NativeOp>;
+	}>;
+	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
+	readonly title?: ReadonlyArray<NativeTextPart>;
+};
+
+export const NATIVE_APP_VERSION = 'markless.native-app/0';
+
+/** An app of several routes: each route's page, in the router's match order (static before `[param]` segments). */
+export type NativeAppPayload = {
+	readonly version: typeof NATIVE_APP_VERSION;
+	readonly routes: ReadonlyArray<{
+		readonly pattern: string;
+		readonly params: ReadonlyArray<string>;
+		readonly page: NativeViewPayload;
+	}>;
 };
 
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
-	| { readonly op: 'attribute'; readonly node: string; readonly name: string; readonly value: string | null }
+	| {
+			readonly op: 'attribute';
+			readonly node: string;
+			readonly name: string;
+			readonly value: string | null;
+	  }
 	/** An input's text, as `String(value)`; never sent for the field whose edit caused it while it already shows that text. */
-	| { readonly op: 'property'; readonly node: string; readonly name: 'value'; readonly value: string }
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'value';
+			readonly value: string;
+	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }
 	/**
@@ -177,5 +221,15 @@ export type NativeJournalEntry =
 	| { readonly op: 'rows'; readonly node: string; readonly keys: ReadonlyArray<string> }
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
-	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	/**
+	 * Leave this page for the page at `route` with `params`, built from scratch. In an app the host pushes it as a new
+	 * screen, keeping this one as it is for Back, or with `replace` puts it in this screen's place.
+	 */
+	| {
+			readonly op: 'navigate';
+			readonly route: string;
+			readonly params: Readonly<Record<string, string>>;
+			readonly replace?: true;
+	  }
+	/** The page's `<title>` text changed: the host writes it to the screen's navigation bar. */
+	| { readonly op: 'title'; readonly value: string };
