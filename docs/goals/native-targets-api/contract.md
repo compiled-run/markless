@@ -456,9 +456,11 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
 | 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing**, with a visible defect: the title's last letter clips | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
+| 5b | `@else if` chains and `@switch` | passing | passing | not yet (host: branch `tests`) | not yet (host: branch `tests`) | `proofs/05b-choices/`; vectors `choices.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
 | 7 | Child component with props and a callback | passing | passing | **passing** | **passing** | vectors `components.json` |
 | 7b | A component imported from another file | passing | passing | **passing** | **passing** | `proofs/07b-imported-component/` imports `proofs/lib/Stepper.tsrx`; harness verdict passed on both |
+| 7c | State inside a reused component, one per instance (with joined text) | passing | passing | **passing** | **passing** | `proofs/07c-child-state/` uses `proofs/lib/Panel.tsrx` twice; harness verdict passed on both |
 | 8 | Text input and two-way state | passing | passing | **passing** | **passing** | vectors `input.json` |
 | 9 | Storage | passing | passing | **passing** | **passing** | relaunch keeps the value |
 | 10 | State from the URL and one route change | passing | passing | **passing** | **passing** | harness verdict passed on both (opens at `/apple`, the link rebuilds the page at `/pear`); vectors `route.json` |

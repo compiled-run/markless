@@ -52,3 +52,8 @@
     `test/ladder-native-reference.test.ts` does) the compiler emits the payload. The Android side is ready: `MarklessActivity`
     reads the Maestro launch argument `route` (an intent string extra), matches it against `payload.route.pattern`, and
     rebuilds the page on a `navigate` entry.
+13. **Which Dragon checkout the harness needs (2026-11-17, 04:45).** The harness on `cw/native-targets` looks for
+    `examples/markless-counter/tools/markless-style.ts`, which exists only in the Dragon worktree on branch
+    `cw/native-targets` (`~/wt/dragon/native-targets`), not in the default `~/wt/dragon/native-dragon-styles`, whose
+    command is `pnpm run markless:style-export` (`6a1c258671`). Rungs 2 and 4 pass on Android with
+    `MARKLESS_DRAGON_DIR=~/wt/dragon/native-targets`. Please make the default and the entry agree.

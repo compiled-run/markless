@@ -48,3 +48,23 @@ and an intent extra on Android. The shells will forward it once a host entry poi
 
 Shots of the app are 20 to 70 KB; the one before launch was the home screen (1 to 3 MB) and is not taken. I commit the
 rung screenshots under `proofs/<rung>/screenshots/{ios,android}/` and keep the harness fixtures' screenshots out of git.
+
+## 8. Builds must not depend on the checkout path (done in the harness; lead: `style-export.ts` CLI)
+
+The scope class is a hash of the filename, so the same `App.tsrx` got `mk-1x9vgkx`, `mk-i4w2jc` and others from different
+absolute paths (probe: three paths, three classes). The harness now compiles every rung, and every module a rung imports, with
+its path relative to the repo root, so the payload and `native-style-input.json` are the same in every worktree and on CI
+(committed inputs for rungs 2 and 4 change once to the stable class). Request: the standalone `style-export.ts` CLI passes the
+same repo-relative filename.
+
+## 9. iOS host and Dragon's export `/1` (native-ios-host)
+
+With the export made at proof time, rungs 2 and 4 pass on Android; the iOS shell shows `style: unknown field "component"`:
+the iOS decoder does not read `dragon.native-style-export/1` yet.
+
+## 10. Rung 8 on the CI runner's iOS (native-ios-host)
+
+On GitHub's `macos-15` runner (its default Xcode and `iPhone 16` simulator) rung 8 fails at the flow's `hideKeyboard`:
+"Couldn't hide the keyboard. This can happen if the app uses a custom input or doesn't expose a standard dismiss action"
+(native-proofs run 44068173427). It passes on mini-2's iOS 27.2 simulator. Likely fix: the text field resigns first
+responder on Return (`textFieldShouldReturn`), which Maestro uses to dismiss. Rung 8 is out of the CI list until it passes there.

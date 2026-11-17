@@ -17,10 +17,13 @@ abstract class MarklessActivity : Activity() {
 
 	open fun styleExportBytes(): ByteArray? = null
 
-	/** The params of the launch `route` extra (`/apple`), matched against the payload's route pattern. */
+	/** The path the app opens at (`/apple`); the Maestro launch argument `route` arrives as this intent extra. */
+	open fun route(): String? = intent.getStringExtra("route")
+
+	/** The params of [route], matched against the payload's route pattern; no route opens a page whose pattern has no params. */
 	private fun launchParams(payload: ByteArray): Map<String, String> {
 		val route = Payload.decode(payload).route
-		val path = intent.getStringExtra("route") ?: if (route == null) return emptyMap() else throw MarklessHostError("launched with no route; this payload is the page at ${route.pattern}")
+		val path = route() ?: if (route == null || route.params.isEmpty()) return emptyMap() else throw MarklessHostError("launched with no route; this payload is the page at ${route.pattern}")
 		if (route == null) throw MarklessHostError("launched at $path, but the payload is not a page")
 		return route.match(path) ?: throw MarklessHostError("launched at $path, which does not match ${route.pattern}")
 	}

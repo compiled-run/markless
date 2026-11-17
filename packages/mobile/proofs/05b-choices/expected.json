@@ -1,0 +1,11 @@
+{
+	"rung": 5.5,
+	"name": "@else if chains and @switch",
+	"steps": [
+		{ "visible": ["Not started", "List view"], "absent": ["Halfway", "Done", "Grid view", "Other view"] },
+		{ "do": { "tap": "Step" }, "visible": ["Halfway"], "absent": ["Not started", "Done"] },
+		{ "do": { "tap": "Step" }, "visible": ["Done"], "absent": ["Halfway", "Grid view"] },
+		{ "do": { "tap": "Switch view" }, "visible": ["Grid view"], "absent": ["List view", "Other view"] },
+		{ "do": { "tap": "Switch view" }, "visible": ["Other view"], "absent": ["Grid view"] }
+	]
+}

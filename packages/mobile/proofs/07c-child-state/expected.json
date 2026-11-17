@@ -1,0 +1,9 @@
+{
+	"rung": 7.75,
+	"name": "State inside a reused component, one per instance",
+	"steps": [
+		{ "visible": ["Own state", "Door is shut", "Window is shut"], "absent": ["Door is open", "Window is open"] },
+		{ "do": { "tap": "Window is shut" }, "visible": ["Door is shut", "Window is open"], "absent": ["Door is open"] },
+		{ "do": { "tap": "Door is shut" }, "visible": ["Door is open", "Window is open"], "absent": ["Door is shut"] }
+	]
+}
