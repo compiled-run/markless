@@ -2,6 +2,7 @@ import {
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
 	createNativeViewPayload,
+	NATIVE_FACT_COLLECTORS,
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
 } from '@markless/compiler';
@@ -19,7 +20,11 @@ export async function compileNativeComponent(input: {
 	readonly filename: string;
 	readonly source: string;
 }): Promise<NativeBuild> {
-	const compiled = await compileTsrxModule({ ...input, symbols: [] });
+	const compiled = await compileTsrxModule({
+		...input,
+		symbols: [],
+		nativeFacts: NATIVE_FACT_COLLECTORS,
+	});
 	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph);
 	const errors = collectTsrxModuleDiagnostics(compiled).filter((diagnostic) => diagnostic.severity === 'error');
 	return {

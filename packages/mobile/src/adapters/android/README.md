@@ -6,7 +6,8 @@ by applying journal entries. No JavaScript engine, no web view, no custom drawin
 | Part | File | Uses `android.*` |
 |---|---|---|
 | Payload decoder (strict: unknown version, node kind, op, event, field or style kind is an error) | `src/dev/markless/mobile/core/Payload.kt`, `Json.kt` | no |
-| Op interpreter (cells, `add`, JavaScript `String(value)`, journal) | `core/Runtime.kt`, `core/JsString.kt` | no |
+| Op interpreter (`assign` over the expression tree with ECMAScript meaning, storage cells, journal) | `core/Runtime.kt`, `core/Js.kt`, `core/JsString.kt`, `core/AttributeValue.kt` | no |
+| Storage cells in `SharedPreferences` (values kept as JSON scalars) | `view/PreferencesStore.kt` | yes |
 | Dragon style export reader (`dragon.native-style-export/0`, target `android`) | `style/StyleExport.kt` | no |
 | View factory and journal applier | `view/MarklessHost.kt`, `view/MarklessBox.kt` | yes |
 | Activity base | `view/MarklessActivity.kt` | yes |
@@ -75,11 +76,25 @@ unstyled stack in `screenshots/counter-stack-*.png`.
 
 Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
 `maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
-AVD (android-36):
+AVD (android-36), from the `assign`-shaped payloads (`a989dc47f` and later). The in-app conformance run logged `pass` for
+`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json` and `switches.json`.
 
 | Rung | Result | Screenshot |
 |---|---|---|
 | 01-static-text | flow passes | `screenshots/rung-01-static-text.png` |
 | 02-styles | flow passes **without styles**: no Dragon export for this rung's component yet. Styles on device are proven only with Dragon's counter export (above). | `screenshots/rung-02-styles.png` |
 | 03-counter | flow passes | `screenshots/rung-03-counter.png` |
-| 04 to 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+| 04-attributes | flow passes (accessible name from `aria-label`, `enabled: false` from `disabled`); styles that follow the class (`state` entries over a `/1` export) are implemented and checked on the JVM against Dragon's toggle export, but unproven on device: no `/1` export with Markless ids exists yet | `screenshots/rung-04-attributes.png` |
+| 05-if | flow passes (arms removed and built by `arm` journal entries) | `screenshots/rung-05-if.png` |
+| 08-text-input | flow passes (`EditText`; typing dispatches `input` with the whole text through a `TextWatcher`; `Use Bo` writes the field through a `property` entry) | `screenshots/rung-08-text-input.png` |
+| 09-storage | flow passes, including `stopApp` then `launchApp` reading `Kept 2` back (`SharedPreferences`, `PreferencesStore`) | `screenshots/rung-09-storage.png` |
+| 06, 07, 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+
+Bound attributes on Android: `aria-label` sets `contentDescription`; `disabled` present sets `isEnabled = false`;
+`aria-pressed`/`aria-selected` `"true"` sets `isSelected`; `aria-expanded` sets the accessibility expanded state (API 36) and
+the expand/collapse action; `class` does not reach views (styles follow state through `state` entries: the host moves to `next[current][s][v]` of the
+`dragon.native-style-export/1` and re-applies that assignment's frames and writes). Other attributes are ignored. Static
+attributes use the same mapping. An element with an `activate` event that is not a button reports `android.widget.Button` as
+its accessibility class.
+An `arm` entry removes the views of nodes no longer shown and builds every shown node without a view, in document order,
+from current values, each inserted at its document position among its parent's children.

@@ -9,7 +9,15 @@ export type NativeConformance = {
 	readonly payload: NativeViewPayload;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
-	readonly initialAttributes?: ReadonlyArray<readonly [node: string, name: string, value: string | null]>;
+	readonly initialAttributes?: ReadonlyArray<
+		readonly [node: string, name: string, value: string | null]
+	>;
+	/** Present when the payload binds an input's value: `[node, 'value', text]`. */
+	readonly initialProperties?: ReadonlyArray<
+		readonly [node: string, name: 'value', value: string]
+	>;
+	/** Present when the payload has lists: `[repeat, keys]`. */
+	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	readonly steps: ReadonlyArray<{
@@ -26,12 +34,16 @@ export function nativeConformance(
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
+	const initialProperties = runtime.properties();
+	const initialRows = runtime.rows();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
+		...(initialProperties.length > 0 ? { initialProperties } : {}),
 		...(initialArms.length > 0 ? { initialArms } : {}),
+		...(initialRows.length > 0 ? { initialRows } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }

@@ -47,6 +47,17 @@ export type SemanticGraphInput = {
 	 * renders it as a child, so its props never change in the browser.
 	 */
 	readonly routeRoot?: boolean;
+	/**
+	 * Collects the facts only native targets read (value expressions and handler bodies as trees). Passed by native
+	 * builds alone, so web and browser compiles neither run nor bundle it.
+	 */
+	readonly nativeFacts?: NativeFactCollectors;
+};
+
+/** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
+export type NativeFactCollectors = {
+	readonly expression: (node: never) => SemanticExpression;
+	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
 };
 
 export type ElementOnlyAttribute = {
@@ -154,6 +165,8 @@ export type SemanticComponentPropBinding =
 			readonly sourceSpan?: SourceSpan;
 			// Body-local definitions spliced into a callback `source`; their reads are its too.
 			readonly definitionSpans?: ReadonlyArray<SourceSpan>;
+			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
+			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
 			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
@@ -1189,12 +1202,28 @@ export type SemanticExpression =
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
 	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	| {
+			readonly kind: 'array';
+			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
+	  }
+	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
+	/** A method of an array or string value, called with JavaScript's meaning. */
+	| {
+			readonly kind: 'method';
+			readonly method: string;
+			readonly object: SemanticExpression;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
+	/** An arrow function passed to a method: its parameters read as names inside `body`. */
+	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
 	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
+	/** `name()`: calls a function the component received, such as a callback prop. */
+	| { readonly kind: 'invoke'; readonly name: string }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {

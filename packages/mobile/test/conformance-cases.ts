@@ -49,4 +49,31 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h2' },
 		],
 	},
+	{
+		name: 'list',
+		fixture: 'proofs/06-keyed-for/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
+	{
+		name: 'components',
+		fixture: 'proofs/07-child-component/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:1/h2' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+		],
+	},
+	{
+		name: 'input',
+		fixture: 'proofs/08-text-input/App.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'Samantha' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'input', host: 'h2', value: '' },
+		],
+	},
 ];

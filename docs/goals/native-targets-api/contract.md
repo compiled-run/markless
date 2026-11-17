@@ -11,7 +11,9 @@ this file changes in the same push. Status as of 2026-11-16, night one.
    `toggle` are gone from payloads. Both hosts' decoders correctly refuse the new vectors today
    (`test-jvm.sh`: 44 passed, 5 failed on unknown `assign`, `bindings` and `expr` parts). The host work next: an `NativeExpr`
    evaluator with ECMAScript meaning (pinned by `arithmetic.json`), element `bindings` and the `attribute` journal entry
-   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells.
+   (`attributes.json`), `branch` nodes, `arm` places and the `arm` journal entry (`if.json`), `storage` cells, the
+   `input` element and `property` entry (`input.json`), `state` entries for Dragon's per-state export, and lists:
+   JSON values, array methods, `repeat` nodes and `rows` entries (`list.json`).
 2. **Device rungs 1 to 3 need a re-run** after that: their payloads now use `assign`, so the earlier green flows were on
    the older payload shape.
 3. Vectors to pass: every file in `packages/mobile/conformance/`.
@@ -53,6 +55,7 @@ Spec `specs/framework/11-platform-organization.md` is the authority: no package 
 | `packages/mobile/src/adapters/ios/` | Swift package `MarklessMobile` (UIKit host runtime: payload decoder, view factory, op interpreter, journal applier) and the iOS app shell. Built with `swiftc`/`xcrun`, no Xcode project required. | native-ios-host |
 | `packages/mobile/src/adapters/android/` | Kotlin host runtime (`dev.markless.mobile`: same four parts on Android Views) and the APK shell, built from SDK tools alone (aapt2, kotlinc, d8, zipalign, apksigner), as Dragon does. | native-android-host |
 | `packages/mobile/proofs/<nn>-<name>/` | One ladder rung: `App.tsrx`, `flow.yaml` (one Maestro flow run on both platforms), `expected.json` (the visible texts before and after each step, checked against the web build), screenshots under `screenshots/{ios,android,web}/`. | native-ladder (component + web check), native-proof-harness (flows, shells, screenshots, CI placement) |
+| `packages/mobile/src/harness/` (README there) | The proof harness: `pnpm --filter @markless/mobile proof <rung>...` compiles a rung, builds the iOS and Android app shells around the hosts (no Xcode project, no Gradle), runs the rung's one Maestro flow on both, screenshots each step and fails unless both pass. `.github/workflows/native-proofs.yml` is its CI proposal. | native-proof-harness |
 | Dragon repo `examples/markless-counter/` (branch `cw/native-targets`) | Component CSS to native paint and frames as data, plus the Chrome comparison. | native-dragon-styles |
 
 Shared vs per platform: the payload, the op semantics, the journal semantics and the conformance vectors are written once
@@ -155,9 +158,69 @@ export function Counter() @{
   `isSelected`; `aria-expanded` to the expanded state (`accessibilityValue` on iOS, `AccessibilityNodeInfo` expanded state
   on Android). `class` is not applied by hosts as text: it selects the element's Dragon style (below). Unknown bound
   attributes are ignored by hosts, not errors, so web-only attributes do not break a build.
-- **Styles that follow a class** (for native-dragon-styles): the style export may give an element `variants: [{ class,
-  writes }]`, one per class string the binding can produce (both literals of the `if` above); a host applies the variant
-  whose `class` equals the current value, after the node's base writes. Frames do not change with a variant yet.
+- **Styles that follow state: Dragon's `dragon.native-style-export/1`** (the native-dragon-styles design replaces the
+  class-variant idea; adopted). Each target has `states` (`[{ key, domain }]`), `assignments` (each a complete node list
+  with its `values`), `initial` and `next[a][s][v]`. Markless side: a cell a class binding reads is marked `styled: true`
+  in the payload; after each handler the journal starts with `{ op: 'state', cell, value }` for every styled cell that
+  changed (cell order); the host moves to `next[current][s][v]` (the export's state `s` is the one whose key names that
+  cell) and applies that assignment's frames and writes to the retained views. Hosts ignore `attribute` entries for
+  `class`. The style input gives Dragon `states: [{ cell, domain: [false, true], initial }]` and, per element,
+  `classByState: [{ when: { <cell>: boolean }, value }]`; non-boolean styled cells are refused for now.
+
+### Additions for rung 8: text input (pushed 2026-11-17)
+
+- `input` joins the portable elements: iOS `UITextField`, Android `EditText`; its accessible name is `aria-label`.
+- Semantic event `input` (iOS `.editingChanged`, Android a `TextWatcher`), dispatched with the field's whole text:
+  action `{ event: 'input', host, value }`. In its handler, `event.currentTarget.value` (or `event.target.value`) lowers
+  to the expression `{ event: 'value' }`; any other read of the event is refused.
+- An element binding may be `{ property: 'value', value: expr }`. Journal entry `{ op: 'property', node, name: 'value',
+  value: string }` (`String(value)`, null reads `''`). The runtime never journals the edited field's own value when it
+  already equals what was typed, so a host does not write back into the field under the cursor; another handler that
+  changes the cell (rung 8's `Use Bo`) does journal it.
+- Vectors: `initialProperties: [[node, 'value', text]]` when present; new file `input.json`.
+
+### Additions for rung 6: keyed lists (pushed 2026-11-17)
+
+- **Values:** a cell's `initial` may be any JSON (`NativeValue`): arrays and objects too.
+- **Expressions** gain `{ array: [{ spread, value }] }`, `{ object: [[key, expr]] }`, `{ member: expr, property }`
+  (`length` of a string or array, or an own property of an object; anything else is a runtime error),
+  `{ method, target, arguments }` for `filter`, `map`, `findIndex`, `some`, `every`, `includes`, `indexOf`, `join`,
+  `concat`, `slice`, `reverse` (only on a fresh array such as `[...list]`; reversing state in place is refused),
+  `toReversed`, `toUpperCase`, `toLowerCase`, `trim`, all with JavaScript meaning (a method giving `undefined` is a runtime
+  error); `{ lambda: [params], body }` only as a method argument, its parameters read as `{ local }`; and `{ item: <repeat
+  id> }`, the current row's item.
+- **List region:** `{ kind: 'repeat', id: 'repeat:0', parent, list: { cell }, key: ['id'] }`. The row template's nodes
+  follow it with `row: 'repeat:0'`. Each row is an instance keyed by `String()` of the item at `key`; an instance's id is
+  `<node>@<key>` (`h6:text0@pear`). Not yet: `@empty`, a list inside an arm or another list, `@if` inside a row, and
+  handlers on row elements (each refused by name).
+- **Journal:** `{ op: 'rows', node: 'repeat:0', keys: [...] }` when the key order changes: remove rows whose key left,
+  build new rows from current values, move the rest into this order. `text`/`attribute` entries for kept rows name the
+  instance (`h6:text0@pear`).
+- **Vectors:** `initialRows: [[repeat, keys]]` when present; new file `list.json` (rung 6: add, remove, reverse). Text
+  nodes in rows appear in `initial` as instances.
+
+### Additions for rung 7: child components (pushed 2026-11-17)
+
+- A component defined in the same module is **inlined at each call site**: its nodes appear in the parent's place with
+  ids prefixed by the call site (`component-edge:0/h2`, `component-edge:0/h1:text0`); handler ids likewise
+  (`handler:component-edge:0/event:0`). Hosts see one flat tree, as before; no new node kind.
+- Props are substituted at build time: a literal prop becomes `{ literal }`, a prop bound to state becomes `{ cell }`.
+  A callback prop called from the child (`onClick={() => onStep()}`) lowers to the caller's own statements, so the
+  child's handler is the parent's `assign` ops. The analyzer records callback bodies (`nativeStatements`) and `name()`
+  calls (`invoke` statements) for native builds only.
+- Not yet (each refused by name): state declared in a child component (instance-local cells), children passed into a
+  component (`{children}`), components from another module (`<Link>` included), a callback called with arguments or used
+  as a value.
+- Vectors: `components.json` (rung 7).
+
+### Where the native facts are collected (pushed 2026-11-17)
+
+The expression trees (`SemanticTemplateRead.expression`, `SemanticBranchSite.testExpression`,
+`SemanticEvent.handlerStatements`) are collected in the same analysis walk, but only when the build passes
+`nativeFacts: NATIVE_FACT_COLLECTORS` (`compileNativeComponent` does). Web and in-browser compiles neither run nor bundle
+that code: the docs pages load the compiler in a worker, and collecting the trees for every compile grew every docs page
+by about 500 B gzip (perf-guards G16). Static text and attribute positions stay unconditional (small, and kept out of
+the browser's render-data module).
 
 ### Building a payload and the conformance vectors (pushed)
 
@@ -217,6 +280,37 @@ Answered requests (native-android-host, 2026-11-17):
 - **Pixel ratio:** one export per target device (the export already has one entry per target); a host refuses an export
   whose `dpr` differs from the screen's by more than 0.001.
 
+Answered requests (native-ios-host, 2026-11-17):
+
+- **1, 2, pixel ratio:** as answered for Android above (write lengths CSS px; wrapper boxes only offset; 0.001).
+- **3, text frames after a journal entry:** keep the build-time frame and never resize, for now. The real answer is
+  linking Dragon's on-device layout engine (generated Swift/Kotlin, `packages/layout/generated/`) and re-laying out after
+  text entries; that is a later rung, listed in the owner note.
+- **4, `activate` on a non-button:** hosts support it: iOS adds a `UITapGestureRecognizer` and the `.button` trait;
+  Android sets a click listener and `accessibilityClassName = android.widget.Button`. The compiler does not refuse it.
+- **5, element names:** the compiler refuses them, once, for both hosts (below), so hosts need no list of their own; a host
+  may still refuse defensively.
+- **6, test ids:** adopted. Node ids are the test ids on both platforms (iOS `accessibilityIdentifier`, Android the id
+  Maestro's `id:` matches). Flows may match by text or by id. A button's accessibility label is its text runs joined; text
+  inside a button is not its own accessibility element; text in `h1`-`h6` carries the header trait.
+- **7, `@markless/core` devDependency:** kept.
+- **8, fonts:** every `font` write must name a face listed in `fonts`; anything else is a host error. Ahem appears only in
+  Dragon's own fixtures.
+- **9, `synthetic-bold` and `anonymous`:** Dragon's definitions apply (native-dragon-styles documents them); until then
+  refusing is right.
+- **10, export `/1`:** adopted, with the `state` journal entry above.
+
+Answered requests (native-proof-harness, 2026-11-17): **1** the harness row is in the table above. **2** the host entry
+points it calls (`MarklessViewController(payload:style:fonts:)`, `MarklessActivity` with `payloadBytes()` and
+`styleExportBytes()`) are the contract; a host that changes one says so here first. **3** one app id on both,
+`dev.markless.proof`, adopted. **4** `flowSteps()` in `proofs/ladder.ts`, adopted. **5** `fonts[].file` in a Dragon export is
+relative to the root of the Dragon checkout it came from (`vendor/fonts/...`); the harness's SHA-256 check stays. **6**
+routes at launch arrive with rung 10. **7** rung screenshots are committed under `proofs/<rung>/screenshots/{ios,android}/`.
+
+**Portable elements (compiler-checked).** A native build accepts `main`, `div`, `section`, `article`, `header`, `footer`,
+`nav`, `aside`, `h1`-`h6`, `p`, `span`, `b`, `strong`, `em`, `i`, `ul`, `ol`, `li` and `button`; any other element is
+refused with `MARKLESS_NATIVE_UNSUPPORTED` naming it. Rungs add to this list (`input` with rung 8).
+
 Rungs 1 and 3 run without Dragon: hosts stack children vertically (start-aligned, system font, platform default size). This
 is a temporary layout so the state rungs do not wait on styling; rung 2 replaces it with Dragon frames.
 
@@ -274,14 +368,14 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 
 | # | Rung | Web | Native reference | iOS | Android | Notes |
 |---|---|---|---|---|---|---|
-| 1 | Static elements and text | passing | passing | not yet | not yet |  |
+| 1 | Static elements and text | passing | passing | **passing** | **passing** | harness, both platforms, one flow; `proofs/01-static-text/screenshots/` |
 | 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | not yet | not yet | style: Dragon Chrome compare green |
-| 3 | A state write updates text | passing | passing | not yet | not yet | vectors `counter.json` |
+| 3 | A state write updates text | passing | passing | not yet (host moving to `assign`) | flow passes from the host's own shell | vectors `counter.json`; passed on both through the harness before the `assign` change |
 | 4 | Attributes and classes that follow state | passing | passing | not yet | not yet | vectors `attributes.json` |
 | 5 | `@if` | passing | passing | not yet | not yet | vectors `if.json` |
-| 6 | Keyed `@for` (add, remove, reorder) | passing | refused | not yet | not yet | needs list regions and array-op facts |
-| 7 | Child component with props and a callback | passing | refused | not yet | not yet | needs instance inlining, callback props |
-| 8 | Text input and two-way state | passing | refused | not yet | not yet | needs input element, `value` property, input event |
+| 6 | Keyed `@for` (add, remove, reorder) | passing | passing | not yet | not yet | vectors `list.json` |
+| 7 | Child component with props and a callback | passing | passing | not yet | not yet | vectors `components.json` |
+| 8 | Text input and two-way state | passing | passing | not yet | not yet | vectors `input.json` |
 | 9 | Storage | passing | passing (relaunch keeps the value) | not yet | not yet | cell `storage.key`; no vector file yet (relaunch is a harness step) |
 | 10 | State from the URL and one route change | passing | refused | not yet | not yet | needs routes, `Link`, navigation |
 | 11 | Async value with `@try`/`@pending`/`@catch` | passing | refused | not yet | not yet | the value comes from author JavaScript: owner decision |

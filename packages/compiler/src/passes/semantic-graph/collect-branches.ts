@@ -12,7 +12,6 @@ import { ifChainOf, isElseIfLink } from './if-chain.ts';
 import { propTestOf } from './prop-test.ts';
 import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
 import type { WalkState } from './types.ts';
-import { expressionTreeOf } from './expression-tree.ts';
 
 /**
  * What counts as part of the read in a branch condition.
@@ -114,7 +113,9 @@ export function collectBranchSite(node: AnyNode, state: WalkState): void {
 			kind: 'if',
 			armCount: (node.consequent ? 1 : 0) + (node.alternate ? 1 : 0),
 			...ifTest,
-			...(test ? { testExpression: expressionTreeOf(test) } : {}),
+			...(test && state.nativeFacts
+				? { testExpression: state.nativeFacts.expression(test as never) }
+				: {}),
 			...(ifPropTest ? { propTest: ifPropTest } : {}),
 			anchorOrder: state.nextAnchorOrder++,
 			...(state.currentComponentName ? { componentName: state.currentComponentName } : {}),
