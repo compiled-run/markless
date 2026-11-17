@@ -1,4 +1,4 @@
-import type { DomJournalEntry } from '@markless/runtime';
+import type { DomJournalEntry, DomJournalListener } from '@markless/runtime';
 
 type RangeJournal = typeof import('./dom-journal.ts');
 // Even an evaluated module's import() costs a task.
@@ -23,7 +23,12 @@ export function loadRangeJournal(): RangeJournal | Promise<RangeJournal> {
 	);
 }
 
-/** The range journal's load while `entries` need it and it has not arrived. */
-export function rangeJournalCode(entries: ReadonlyArray<DomJournalEntry>): unknown {
-	return entries.every(isDirectJournalEntry) ? undefined : loadRangeJournal();
+/** Tells the pass to wait for the range journal before its commits land, while `entries` need it and it has not arrived. */
+export function withRangeJournalCode(
+	listener: (entries: ReadonlyArray<DomJournalEntry>) => Promise<void>,
+): DomJournalListener {
+	return Object.assign(listener, {
+		code: (entries: ReadonlyArray<DomJournalEntry>) =>
+			entries.every(isDirectJournalEntry) ? undefined : loadRangeJournal(),
+	});
 }

@@ -2,7 +2,7 @@ import { PROTOCOL_VISIBLE_EVENT_NAME } from '../../serializer/src/protocol-event
 import type { DomJournalEntry, DomJournalResult } from '@markless/runtime';
 // Only resume.ts loads this module, and it imports the locators statically already.
 import { elementsBetweenAnchors, hostIdsInsideRemovedElements } from './resume-locators.ts';
-import { rangeJournalCode } from './dom-journal-load.ts';
+import { withRangeJournalCode } from './dom-journal-load.ts';
 import type { AsyncBoundarySettleTracker, AsyncBoundaryWiring } from './resume-async-wiring.ts';
 import type { ArmCommitUpdate } from './resume-commit-arm.ts';
 import type { OverlayHiddenBoundRoot } from './overlay-handoff.ts';
@@ -134,26 +134,24 @@ export async function startResumeRuntime(input: {
 	await events.prepareSyncPolicy(runtimeInput.view.events, [...rowEvents, ...armEvents]);
 	if (runtimeInput.applyDomJournal) {
 		storeContainerSubscription(
-			runtimeInput.graph.subscribeJournal(
-				Object.assign(async (entries: ReadonlyArray<DomJournalEntry>) => {
-					await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
-					const branchRuntime = input.branchRuntime();
-					if (branchRuntime) {
-						await branchRuntime.disposeRemovedRangeHosts(
-							entries,
-							disposeHost,
-							prepared.asyncBoundariesById,
-						);
-					}
-					if (input.rowComponentHost.disposed?.()) return;
-					await runtimeInput.applyDomJournal!(entries);
-					await input
-						.branchRuntime()
-						?.materializeFlippedBranchArms(entries, (hostNodeId) =>
-							input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
-						);
-				}, { code: rangeJournalCode }),
-			),
+			runtimeInput.graph.subscribeJournal(withRangeJournalCode(async (entries) => {
+				await disposeRemovedAsyncRangeHosts(runtimeInput, prepared, entries, disposeHost);
+				const branchRuntime = input.branchRuntime();
+				if (branchRuntime) {
+					await branchRuntime.disposeRemovedRangeHosts(
+						entries,
+						disposeHost,
+						prepared.asyncBoundariesById,
+					);
+				}
+				if (input.rowComponentHost.disposed?.()) return;
+				await runtimeInput.applyDomJournal!(entries);
+				await input
+					.branchRuntime()
+					?.materializeFlippedBranchArms(entries, (hostNodeId) =>
+						input.behaviorRuntime()!.activateBehaviors(hostNodeId, { flush: false }),
+					);
+			})),
 		);
 	}
 	if ((runtimeInput.view.keyedRepeats ?? []).length > 0) {
