@@ -19,6 +19,7 @@ import type {
 	SemanticModuleImport,
 	SourceSpan,
 	SemanticBranchArm,
+	SemanticExpression,
 } from '../../artifacts.ts';
 import {
 	getFrameworkApiForCall,
@@ -2053,12 +2054,38 @@ function computedNativeExpression(
 ): Pick<SemanticGraphBinding, 'nativeExpression'> {
 	if (!state.nativeFacts || !body || body.async) return {};
 	const inner = body.body as AnyNode | undefined;
-	const statements = inner?.type === 'BlockStatement' ? (inner.body as AnyNode[] | undefined) : undefined;
-	const returned =
-		inner?.type === 'BlockStatement'
-			? statements?.length === 1 && statements[0]?.type === 'ReturnStatement'
-				? (statements[0].argument as AnyNode | undefined)
-				: undefined
-			: inner;
-	return returned ? { nativeExpression: state.nativeFacts.expression(returned as never) } : {};
+	if (inner?.type !== 'BlockStatement')
+		return inner ? { nativeExpression: state.nativeFacts.expression(inner as never) } : {};
+	const tree = returnChainExpression(asNodes(inner.body), state.nativeFacts);
+	return tree ? { nativeExpression: tree } : {};
+}
+
+// `if (a) return x; if (b) return y; return z;` reads as `a ? x : b ? y : z`; any other block has no tree.
+function returnChainExpression(
+	statements: ReadonlyArray<AnyNode>,
+	facts: NonNullable<WalkState['nativeFacts']>,
+): SemanticExpression | undefined {
+	const [first, ...rest] = statements;
+	if (!first) return undefined;
+	const returned = (node: AnyNode | undefined): AnyNode | undefined => {
+		if (node?.type === 'ReturnStatement')
+			return (node.argument as AnyNode | undefined) ?? undefined;
+		const inner = node?.type === 'BlockStatement' ? asNodes(node.body) : undefined;
+		return inner?.length === 1 ? returned(inner[0]) : undefined;
+	};
+	if (first.type === 'ReturnStatement')
+		return rest.length === 0 && first.argument
+			? facts.expression(first.argument as never)
+			: undefined;
+	if (first.type !== 'IfStatement' || first.alternate) return undefined;
+	const whenTrue = returned(first.consequent as AnyNode | undefined);
+	const otherwise = returnChainExpression(rest, facts);
+	return whenTrue && otherwise
+		? {
+				kind: 'conditional',
+				test: facts.expression(first.test as never),
+				consequent: facts.expression(whenTrue as never),
+				alternate: otherwise,
+			}
+		: undefined;
 }

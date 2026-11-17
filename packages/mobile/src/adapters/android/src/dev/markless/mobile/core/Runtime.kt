@@ -223,15 +223,20 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		eventValue = value
-		try {
-			for (op in handler.ops) when (op) {
-				is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params))
+		fun run(ops: List<Op>): JournalEntry.Navigate? {
+			for (op in ops) when (op) {
+				is Op.Navigate -> return JournalEntry.Navigate(op.route, op.params)
 				is Op.Assign -> {
 					val v = evaluate(op.value)
 					values[op.cell] = v
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
+				is Op.If -> run(if (Js.truthy(evaluate(op.test))) op.then else op.otherwise)?.let { return it }
 			}
+			return null
+		}
+		try {
+			run(handler.ops)?.let { return listOf(it) }
 		} finally {
 			eventValue = null
 		}

@@ -4,7 +4,7 @@ import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "label", "object", "option",
+	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "img", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -39,6 +39,7 @@ final class ViewTree {
 	private var anchors = Set<ObjectIdentifier>()
 	private var assignment: Int
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
+	private var forwards: [LabelForward] = []
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
@@ -75,6 +76,7 @@ final class ViewTree {
 			root.addGestureRecognizer(gesture)
 		}
 		if layout == nil { stackTree(root) }
+		refreshRelations()
 	}
 
 	func mount(in screen: UIView) {
@@ -144,6 +146,29 @@ final class ViewTree {
 				lists[node] = (list.anchor, keys, built)
 				settle(container, built: keys.flatMap { built[$0] ?? [] }, context)
 			}
+		}
+		refreshRelations()
+	}
+
+	/// The text an element shows, in view order: what `aria-labelledby` and `aria-describedby` read from it.
+	private func text(within view: UIView) -> String {
+		if let label = view as? UILabel { return label.text ?? "" }
+		return view.subviews.map { text(within: $0) }.filter { !$0.isEmpty }.joined(separator: " ")
+	}
+
+	/// Labels and hints taken from the elements an attribute names by id, kept current after every journal; a `<label for>`
+	/// names its control, so VoiceOver reads it there and not a second time on the label.
+	private func refreshRelations() {
+		for (id, view) in elements {
+			let current = attributes[id] ?? [:]
+			let named = { (attribute: String) -> String? in
+				current[attribute].map { ids in
+					ids.split(separator: " ").compactMap { self.elements[String($0)] }.map { self.text(within: $0) }.joined(separator: " ")
+				}
+			}
+			if current["aria-label"] == nil, let label = named("aria-labelledby") { view.accessibilityLabel = label }
+			if let hint = named("aria-describedby") { view.accessibilityHint = hint }
+			if current["for"].flatMap({ elements[$0] }) != nil { view.accessibilityElementsHidden = true }
 		}
 	}
 
@@ -218,6 +243,14 @@ final class ViewTree {
 				container.insertSubview(view, at: index)
 				index += 1
 				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
+				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
+				if element == "label", let target = staticAttributes["for"] ?? boundFor {
+					// A press on a label activates its control, as a browser does.
+					let forward = LabelForward(target: target, onAction: onAction)
+					forwards.append(forward)
+					view.isUserInteractionEnabled = true
+					view.addGestureRecognizer(UITapGestureRecognizer(target: forward, action: #selector(LabelForward.press)))
+				}
 				var current = staticAttributes
 				for binding in bindings where !binding.isProperty {
 					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
@@ -233,6 +266,11 @@ final class ViewTree {
 				var childIndex = 0
 				_ = try build(template, in: view, at: &childIndex, inner)
 				applyAttributes(id, view)
+				// The stacking layout sizes a control by its text; one with none (a switch's thumb) gets the 44 pt touch target.
+				if layout == nil, view is UIButton, text(within: view).isEmpty {
+					view.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+					view.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+				}
 			case let .text(parts):
 				let label = UILabel()
 				label.isUserInteractionEnabled = false
@@ -321,12 +359,26 @@ final class ViewTree {
 		} else {
 			view.accessibilityLabel = current["aria-label"]
 		}
+		if current["role"] == "switch" {
+			if #available(iOS 17.0, *) { view.accessibilityTraits.insert(.toggleButton) }
+			view.accessibilityValue = current["aria-checked"] == "true" ? "1" : "0"
+			return
+		}
 		if current["aria-pressed"] == "true" || current["aria-selected"] == "true" {
 			view.accessibilityTraits.insert(.selected)
 		} else {
 			view.accessibilityTraits.remove(.selected)
 		}
 		view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
+		view.accessibilityElementsHidden = current["aria-hidden"] == "true"
+		// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
+		if layout == nil {
+			let hidden = current["hidden"] != nil
+			if view.isHidden != hidden {
+				view.isHidden = hidden
+				if let parent = view.superview, !(parent is UIButton) { stack(parent) }
+			}
+		}
 	}
 
 	/// A button reads as its `aria-label`, or else its text in view order.
@@ -355,7 +407,7 @@ final class ViewTree {
 		NSLayoutConstraint.deactivate(stackConstraints[ObjectIdentifier(container)] ?? [])
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
-		for child in container.subviews where !anchors.contains(ObjectIdentifier(child)) {
+		for child in container.subviews where !anchors.contains(ObjectIdentifier(child)) && !child.isHidden {
 			child.translatesAutoresizingMaskIntoConstraints = false
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
@@ -370,6 +422,18 @@ final class ViewTree {
 	}
 }
 
+/// Sends a label's tap to the control its `for` names.
+@MainActor
+final class LabelForward: NSObject {
+	private let target: String
+	private let onAction: (NativeAction) -> Void
+	init(target: String, onAction: @escaping (NativeAction) -> Void) {
+		self.target = target
+		self.onAction = onAction
+	}
+	@objc func press() { onAction(NativeAction(event: .activate, host: target)) }
+}
+
 /// A tap or drag outside a field puts the keyboard away, as a scrolling screen does.
 @MainActor
 final class KeyboardDismisser: NSObject {
@@ -380,7 +444,12 @@ final class KeyboardDismisser: NSObject {
 
 @MainActor
 private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFontDescriptor]) throws {
-	guard let frame = style.frame else { throw HostError("\(view.accessibilityIdentifier ?? "a view") has no frame in the style export") }
+	// Dragon gives an element it does not render (`display: none`, `[hidden]`) no frame.
+	guard let frame = style.frame else {
+		view.isHidden = true
+		return
+	}
+	view.isHidden = false
 	view.frame = CGRect(x: frame.x, y: frame.y, width: frame.width, height: frame.height)
 	view.backgroundColor = style.background.map(uiColor) ?? .clear
 	view.layer.borderWidth = style.borderWidth

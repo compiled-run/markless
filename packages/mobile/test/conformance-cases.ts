@@ -98,4 +98,18 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'input', host: 'h2', value: '' },
 		],
 	},
+	{
+		name: 'guards',
+		fixture: 'test/fixtures/Guards.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
 ];

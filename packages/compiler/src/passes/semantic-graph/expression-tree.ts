@@ -2,6 +2,7 @@ import type { AnyNode } from '../../ast/nodes.ts';
 import { asNodes } from '../../ast/nodes.ts';
 import type {
 	NativeFactCollectors,
+	SemanticComponentNativeFacts,
 	SemanticExpression,
 	SemanticHandlerStatement,
 } from '../../artifacts.ts';
@@ -153,72 +154,191 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 	}
 }
 
+/** `a.b.c` as its root name and member path, or null for anything else. */
+function memberPath(
+	node: AnyNode | undefined,
+): { readonly name: string; readonly path: string[] } | null {
+	if (node?.type === 'Identifier' && typeof node.name === 'string')
+		return { name: node.name, path: [] };
+	if (node?.type === 'MemberExpression' && !node.computed) {
+		const object = memberPath(node.object as AnyNode | undefined);
+		const property = (node.property as AnyNode | undefined)?.name;
+		return object && typeof property === 'string'
+			? { name: object.name, path: [...object.path, property] }
+			: null;
+	}
+	return null;
+}
+
+const assignTo = (
+	target: { readonly name: string; readonly path: ReadonlyArray<string> },
+	value: SemanticExpression,
+): SemanticHandlerStatement => ({
+	kind: 'assign',
+	target: target.name,
+	...(target.path.length > 0 ? { path: target.path } : {}),
+	value,
+});
+
+const readOf = (target: {
+	readonly name: string;
+	readonly path: ReadonlyArray<string>;
+}): SemanticExpression =>
+	target.path.reduce<SemanticExpression>(
+		(object, property) => ({ kind: 'member', object, property }),
+		{
+			kind: 'read',
+			name: target.name,
+		},
+	);
+
 const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
-	if (!expression) return { kind: 'unsupported', construct: 'a statement other than an expression' };
-	if (expression.type === 'ParenthesizedExpression')
+	if (!expression)
+		return { kind: 'unsupported', construct: 'a statement other than an expression' };
+	if (expression.type === 'ParenthesizedExpression' || expression.type === 'ChainExpression')
 		return statementOf((expression.expression as AnyNode | undefined) ?? null);
-	if (
-		expression.type === 'CallExpression' &&
-		(expression.callee as AnyNode | undefined)?.type === 'Identifier' &&
-		asNodes(expression.arguments).length === 0 &&
-		!BUILTINS.has(String((expression.callee as AnyNode).name))
-	)
-		return { kind: 'invoke', name: String((expression.callee as AnyNode).name) };
+	if (expression.type === 'CallExpression') {
+		const callee = memberPath(expression.callee as AnyNode | undefined);
+		if (callee && !BUILTINS.has([callee.name, ...callee.path].join('.'))) {
+			const args = asNodes(expression.arguments).map(expressionTreeOf);
+			return {
+				kind: 'invoke',
+				name: callee.name,
+				...(callee.path.length > 0 ? { path: callee.path } : {}),
+				...(args.length > 0 ? { arguments: args } : {}),
+				...(expression.optional === true ? { optional: true as const } : {}),
+			};
+		}
+	}
 	if (expression.type === 'UpdateExpression') {
-		const target = expression.argument as AnyNode | undefined;
-		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
-			return { kind: 'unsupported', construct: 'an update of something other than a name' };
-		const read: SemanticExpression = { kind: 'read', name: target.name };
-		return {
-			kind: 'assign',
-			target: target.name,
-			value: {
-				kind: 'binary',
-				operator: expression.operator === '--' ? '-' : '+',
-				left: { kind: 'unary', operator: '+', value: read },
-				right: { kind: 'literal', value: 1 },
-			},
-		};
+		const target = memberPath(expression.argument as AnyNode | undefined);
+		if (!target)
+			return {
+				kind: 'unsupported',
+				construct: 'an update of something other than a name or member',
+			};
+		return assignTo(target, {
+			kind: 'binary',
+			operator: expression.operator === '--' ? '-' : '+',
+			left: { kind: 'unary', operator: '+', value: readOf(target) },
+			right: { kind: 'literal', value: 1 },
+		});
 	}
 	if (expression.type === 'AssignmentExpression') {
-		const target = expression.left as AnyNode | undefined;
-		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
-			return { kind: 'unsupported', construct: 'an assignment to something other than a name' };
+		const target = memberPath(expression.left as AnyNode | undefined);
+		if (!target)
+			return {
+				kind: 'unsupported',
+				construct: 'an assignment to something other than a name or member',
+			};
 		const value = expressionTreeOf(expression.right as AnyNode | undefined);
 		const operator = String(expression.operator);
-		if (operator === '=') return { kind: 'assign', target: target.name, value };
+		if (operator === '=') return assignTo(target, value);
 		return COMPOUND.has(operator)
-			? {
-					kind: 'assign',
-					target: target.name,
-					value: {
-						kind: 'binary',
-						operator: operator.slice(0, -1) as Extract<SemanticExpression, { kind: 'binary' }>['operator'],
-						left: { kind: 'read', name: target.name },
-						right: value,
-					},
-				}
+			? assignTo(target, {
+					kind: 'binary',
+					operator: operator.slice(0, -1) as Extract<
+						SemanticExpression,
+						{ kind: 'binary' }
+					>['operator'],
+					left: readOf(target),
+					right: value,
+				})
 			: { kind: 'unsupported', construct: `the \`${operator}\` assignment` };
 	}
 	const tree = expressionTreeOf(expression);
 	return { kind: 'unsupported', construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement' };
 };
 
-/** A handler's body as statements a native host runs: assignments to names, each value a tree. */
-export function handlerStatementsOf(node: AnyNode | undefined): ReadonlyArray<SemanticHandlerStatement> | undefined {
-	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression')) return undefined;
+function blockStatementsOf(statement: AnyNode | undefined): SemanticHandlerStatement[] {
+	if (!statement) return [];
+	if (statement.type === 'BlockStatement')
+		return asNodes(statement.body).flatMap(blockStatementsOf);
+	if (statement.type === 'EmptyStatement') return [];
+	if (statement.type === 'ExpressionStatement')
+		return [statementOf(statement.expression as AnyNode)];
+	if (statement.type === 'ReturnStatement')
+		return statement.argument
+			? [{ kind: 'unsupported', construct: 'a `return` with a value' }]
+			: [{ kind: 'return' }];
+	if (statement.type === 'IfStatement')
+		return [
+			{
+				kind: 'if',
+				test: expressionTreeOf(statement.test as AnyNode),
+				whenTrue: blockStatementsOf(statement.consequent as AnyNode),
+				whenFalse: blockStatementsOf((statement.alternate as AnyNode | null) ?? undefined),
+			},
+		];
+	return [{ kind: 'unsupported', construct: `a ${String(statement.type)}` }];
+}
+
+/** A handler's body as statements a native host runs: assignments, calls, `if` and bare `return`, each value a tree. */
+export function handlerStatementsOf(
+	node: AnyNode | undefined,
+): ReadonlyArray<SemanticHandlerStatement> | undefined {
+	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
+		return undefined;
 	if (node.async) return [{ kind: 'unsupported', construct: 'an async handler' }];
 	const body = node.body as AnyNode | undefined;
 	if (body?.type !== 'BlockStatement') return [statementOf(body ?? null)];
-	return asNodes(body.body).map((statement) =>
-		statement.type === 'ExpressionStatement'
-			? statementOf(statement.expression as AnyNode)
-			: { kind: 'unsupported', construct: `a ${String(statement.type)}` },
-	);
+	return blockStatementsOf(body);
+}
+
+/** A component's prop defaults, rest spread, `state()` initializers and the writes its body makes while rendering. */
+export function componentNativeFactsOf(
+	node: AnyNode,
+	isFrameworkCall: (node: AnyNode, api: 'state') => boolean,
+): SemanticComponentNativeFacts {
+	const propDefaults: Record<string, SemanticExpression> = {};
+	let restProp: string | undefined;
+	const pattern = asNodes(node.params)[0];
+	if (pattern?.type === 'ObjectPattern') {
+		for (const property of asNodes(pattern.properties)) {
+			if (property.type === 'RestElement') {
+				const argument = property.argument as AnyNode | undefined;
+				if (argument?.type === 'Identifier' && typeof argument.name === 'string')
+					restProp = argument.name;
+				continue;
+			}
+			const value = property.value as AnyNode | undefined;
+			const local =
+				value?.type === 'AssignmentPattern'
+					? (value.left as AnyNode | undefined)
+					: undefined;
+			if (
+				value?.type === 'AssignmentPattern' &&
+				local?.type === 'Identifier' &&
+				typeof local.name === 'string'
+			)
+				propDefaults[local.name] = expressionTreeOf(value.right as AnyNode);
+		}
+	}
+	const stateInitializers: Record<string, SemanticExpression> = {};
+	const renderStatements: SemanticHandlerStatement[] = [];
+	const body = node.body as AnyNode | undefined;
+	for (const statement of asNodes(body?.body)) {
+		if (statement.type === 'VariableDeclaration') {
+			for (const declarator of asNodes(statement.declarations)) {
+				const id = declarator.id as AnyNode | undefined;
+				const init = declarator.init as AnyNode | undefined;
+				if (id?.type !== 'Identifier' || typeof id.name !== 'string' || !init) continue;
+				if (init.type === 'CallExpression' && isFrameworkCall(init, 'state'))
+					stateInitializers[id.name] = expressionTreeOf(asNodes(init.arguments)[0]);
+			}
+			continue;
+		}
+		if (statement.type !== 'ExpressionStatement') continue;
+		const expression = statement.expression as AnyNode | undefined;
+		if (expression?.type?.startsWith('JSX')) continue;
+		renderStatements.push(statementOf(expression ?? null));
+	}
+	return { propDefaults, ...(restProp ? { restProp } : {}), stateInitializers, renderStatements };
 }
 
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
+	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
 };

@@ -1,0 +1,12 @@
+{
+	"rung": 105,
+	"name": "@markless/ui toggle: a switch named by its label and described by its description",
+	"steps": [
+		{
+			"visible": ["Toggle", "Wi-Fi", "Join known networks", "Wi-Fi is off"],
+			"absent": ["Wi-Fi is on"]
+		},
+		{ "do": { "tap": "Wi-Fi" }, "visible": ["Wi-Fi is on"], "absent": ["Wi-Fi is off"] },
+		{ "do": { "tap": "Wi-Fi" }, "visible": ["Wi-Fi is off"], "absent": ["Wi-Fi is on"] }
+	]
+}

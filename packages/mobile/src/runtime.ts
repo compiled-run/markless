@@ -3,6 +3,7 @@ import type {
 	NativeExpr,
 	NativeJournalEntry,
 	NativeNode,
+	NativeOp,
 	NativeTextPart,
 	NativeValue,
 	NativeViewPayload,
@@ -303,13 +304,26 @@ export function createNativeRuntime(
 			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
-			for (const op of handlers.get(event.handler) ?? []) {
-				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
-				const value = evaluate(op.value, eventValue);
-				values.set(op.cell, value);
-				const key = storageKeys.get(op.cell);
-				if (key !== undefined) store.set(key, value);
-			}
+			const run = (ops: ReadonlyArray<NativeOp>): NativeJournalEntry | undefined => {
+				for (const op of ops) {
+					if (op.op === 'navigate')
+						return { op: 'navigate', route: op.route, params: op.params };
+					if (op.op === 'if') {
+						const taken = run(
+							evaluate(op.test, eventValue) ? op.whenTrue : op.whenFalse,
+						);
+						if (taken) return taken;
+						continue;
+					}
+					const value = evaluate(op.value, eventValue);
+					values.set(op.cell, value);
+					const key = storageKeys.get(op.cell);
+					if (key !== undefined) store.set(key, value);
+				}
+				return undefined;
+			};
+			const navigated = run(handlers.get(event.handler) ?? []);
+			if (navigated) return [navigated];
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());

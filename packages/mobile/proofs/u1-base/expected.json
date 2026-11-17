@@ -1,0 +1,13 @@
+{
+	"rung": 101,
+	"name": "@markless/ui base: button, separator and label",
+	"steps": [
+		{
+			"visible": ["Base parts", "Save", "Not saved", "Draft", "Send"],
+			"absent": ["Saved"],
+			"disabled": ["Send"]
+		},
+		{ "do": { "tap": "Save" }, "visible": ["Saved"], "absent": ["Not saved"] },
+		{ "do": { "tap": "Save" }, "visible": ["Not saved"], "absent": ["Saved"] }
+	]
+}

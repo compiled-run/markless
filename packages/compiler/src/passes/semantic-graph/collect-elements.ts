@@ -1390,6 +1390,9 @@ function collectAttribute(
 					componentName: state.currentComponentName ?? undefined,
 					sourceSpan: sourceSpan(entry, state.filename),
 					keyedRepeatScopeIds: [...state.currentKeyedRepeatScopeIds],
+					...(state.nativeFacts
+						? { nativeHandle: state.nativeFacts.expression(entry as never) }
+						: {}),
 				});
 		}
 		return;

@@ -1,0 +1,114 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.5349077500000021,
+			"flowSeconds": 15.574486791
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.238796792000001,
+			"flowSeconds": 13.794939166999997
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.24190325000000304,
+			"flowSeconds": 15.79453645900001
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.25328724999999397,
+			"flowSeconds": 16.978819667000003
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.2362260420000239,
+			"flowSeconds": 18.190442959000006
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.2451642910000228,
+			"flowSeconds": 24.362268209000003
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.2462930420000048,
+			"flowSeconds": 17.262623166999983
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.23377412499999628,
+			"flowSeconds": 16.120190167000022
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.24345770799997263,
+			"flowSeconds": 16.97856837500003
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.24600687500002094,
+			"flowSeconds": 17.112114332999976
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.2444083329999703,
+			"flowSeconds": 17.061919832999994
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.23791837500000837,
+			"flowSeconds": 25.188306749999988
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.24904020799999124,
+			"flowSeconds": 25.160555292000005
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.24293700000003446,
+			"flowSeconds": 14.213033750000003
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.2405106660000165,
+			"flowSeconds": 16.852004125000036
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.24285891700000503,
+			"flowSeconds": 17.798151083000004
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 0.2437074169999687,
+			"flowSeconds": 21.133962541999995
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.2506889579999261,
+			"flowSeconds": 16.45819649999996
+		}
+	]
+}

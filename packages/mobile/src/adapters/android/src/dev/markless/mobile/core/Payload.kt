@@ -88,6 +88,8 @@ sealed interface Op {
 	data class Assign(val cell: String, val value: Expr) : Op
 	/** Opens the page at [route] with [params]; ops after it do not run. */
 	data class Navigate(val route: String, val params: Map<String, String>) : Op
+	/** Runs [then] when [test] is truthy, else [otherwise]; the test is evaluated once, before either. */
+	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
 }
 
 /** A page's route as the router spells it (`/[fruit]`) and its param names. */
@@ -352,6 +354,14 @@ data class Payload(
 				o.only(setOf("op", "route", "params"), what)
 				val params = o.field("params", what).obj("$what.params").entries.associateTo(LinkedHashMap()) { (k, v) -> k to v.str("$what.params.$k") }
 				return Op.Navigate(o.field("route", what).str("$what.route"), params)
+			}
+			if (name == "if") {
+				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)
+				val test = expr(o.field("test", what), "$what.test")
+				for (c in cellsOf(test)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val then = o.field("whenTrue", what).arr("$what.whenTrue").mapIndexed { n, inner -> op(inner, "$what.whenTrue[$n]", cells) }
+				val otherwise = o.field("whenFalse", what).arr("$what.whenFalse").mapIndexed { n, inner -> op(inner, "$what.whenFalse[$n]", cells) }
+				return Op.If(test, then, otherwise)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

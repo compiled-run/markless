@@ -4,7 +4,7 @@ import { expect, test } from 'vitest';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type { NativeValue, NativeViewPayload } from '@markless/serializer';
 import { compileNativeComponent, createNativeRuntime } from '../src/index.ts';
-import { readRelativeModule } from '../src/harness/rung.ts';
+import { readWorkspaceModule } from '../src/harness/rung.ts';
 import { proofsDir, readRung, rungFolders, type LadderStep } from '../proofs/ladder.ts';
 
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
@@ -46,12 +46,45 @@ function walk(
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
+	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
+	const hiddenWithin = (id: string): boolean => {
+		const at = id.indexOf('@');
+		const suffix = at < 0 ? '' : id.slice(at);
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (!node) return false;
+		if (node.kind === 'element') {
+			const bound = attributes.get(`${id}\0hidden`);
+			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
+				return true;
+		}
+		return (
+			node.parent !== null &&
+			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
+		);
+	};
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
-			const bound = attributes.get(`${node.id}\0aria-label`);
-			const label = bound !== undefined ? bound : (node.attributes?.['aria-label'] ?? null);
+			const attribute = (name: string) => {
+				const bound = attributes.get(`${node.id}\0${name}`);
+				return bound !== undefined ? bound : (node.attributes?.[name] ?? null);
+			};
+			// aria-labelledby names an element by the text of the elements it lists, as the hosts read it.
+			const labelledBy = attribute('aria-labelledby');
+			const label =
+				attribute('aria-label') ??
+				(labelledBy === null
+					? null
+					: labelledBy
+							.split(' ')
+							.map((id) =>
+								[...texts]
+									.filter(([text]) => nodeOf.get(text)?.parent === id)
+									.map(([, shown]) => shown)
+									.join(' '),
+							)
+							.join(' '));
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	const elementReading = (text: string) => {
@@ -128,7 +161,12 @@ function walk(
 			const host = elementReading(field);
 			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
-		const shown = [...texts.values(), ...labels().map(([, label]) => label)];
+		const shown = [
+			...[...texts].filter(([id]) => !hiddenWithin(id)).map(([, text]) => text),
+			...labels()
+				.filter(([id]) => !hiddenWithin(id))
+				.map(([, label]) => label),
+		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
 		if (step.order)
@@ -164,7 +202,7 @@ test.each(rungFolders())(
 			filename,
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
-			readModule: readRelativeModule,
+			readModule: readWorkspaceModule,
 		});
 		if (build.payload === null) {
 			expect(build.diagnostics.length).toBeGreaterThan(0);

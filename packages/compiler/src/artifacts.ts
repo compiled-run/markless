@@ -57,7 +57,13 @@ export type SemanticGraphInput = {
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
-	readonly handlerStatements: (node: never) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	readonly handlerStatements: (
+		node: never,
+	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	readonly component: (
+		node: never,
+		isFrameworkCall: (node: never, api: 'state') => boolean,
+	) => SemanticComponentNativeFacts;
 };
 
 export type ElementOnlyAttribute = {
@@ -129,6 +135,20 @@ export type SemanticComponent = {
 	readonly name: string;
 	/** How this module exports the component: `default`, the export name, or absent. */
 	readonly exportName?: string;
+	/** Native builds only (`nativeFacts`). */
+	readonly native?: SemanticComponentNativeFacts;
+};
+
+/** What a native build lowers from a component's own body, collected only when `nativeFacts` is passed. */
+export type SemanticComponentNativeFacts = {
+	/** Destructured prop defaults (`open = false`) as trees, by local name. */
+	readonly propDefaults: Readonly<Record<string, SemanticExpression>>;
+	/** The local name of a `...rest` prop spread, when the component takes one. */
+	readonly restProp?: string;
+	/** Each `state(initial)` the body declares, its initializer as a tree, by local name. */
+	readonly stateInitializers: Readonly<Record<string, SemanticExpression>>;
+	/** Statements the body runs while it renders (`collapsible.open = open`), in order. */
+	readonly renderStatements: ReadonlyArray<SemanticHandlerStatement>;
 };
 
 // An authored prop binding is identified by its declaration span, not by the
@@ -702,6 +722,9 @@ export type SemanticSharedReturnProperty =
 			readonly name: string;
 			readonly source: string;
 			readonly sourceSpan?: SourceSpan;
+			/** The method's body as statements and its parameter names, for native builds only (`nativeFacts`). */
+			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			readonly parameters?: ReadonlyArray<string>;
 	  }
 	| {
 			// A function-typed placeholder on the returned object: a slot the widget
@@ -1228,9 +1251,32 @@ export type SemanticExpression =
 
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
-	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
-	/** `name()`: calls a function the component received, such as a callback prop. */
-	| { readonly kind: 'invoke'; readonly name: string }
+	/** `target = value`, or `target.a.b = value` when `path` is set. */
+	| {
+			readonly kind: 'assign';
+			readonly target: string;
+			readonly path?: ReadonlyArray<string>;
+			readonly value: SemanticExpression;
+	  }
+	/**
+	 * `name(...)`, or `name.a.b(...)` when `path` is set: calls a function the component received (a callback prop) or a
+	 * method of a shared instance. `optional` is `?.(`: an absent function is not called.
+	 */
+	| {
+			readonly kind: 'invoke';
+			readonly name: string;
+			readonly path?: ReadonlyArray<string>;
+			readonly arguments?: ReadonlyArray<SemanticExpression>;
+			readonly optional?: true;
+	  }
+	| {
+			readonly kind: 'if';
+			readonly test: SemanticExpression;
+			readonly whenTrue: ReadonlyArray<SemanticHandlerStatement>;
+			readonly whenFalse: ReadonlyArray<SemanticHandlerStatement>;
+	  }
+	/** `return;` with no value: the rest of the body does not run. */
+	| { readonly kind: 'return' }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {
@@ -1271,6 +1317,8 @@ export type SemanticTemplateRead = {
 export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
+	/** The handle expression as a tree (`collapsible.triggerEl`), for native builds only (`nativeFacts`). */
+	readonly nativeHandle?: SemanticExpression;
 	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;

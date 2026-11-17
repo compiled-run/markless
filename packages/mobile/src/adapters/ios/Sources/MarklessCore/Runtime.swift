@@ -295,15 +295,21 @@ public final class NativeRuntime {
 		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
-		for op in handlers[bound.handler] ?? [] {
-			switch op {
-			case let .navigate(route, params): return [.navigate(route: route, params: params)]
-			case let .assign(cell, expr):
-				let value = try evaluate(expr)
-				values[cell] = value
-				if let key = storageKeys[cell] { store.write(key, value) }
+		func run(_ ops: [NativeOp]) throws -> NativeJournalEntry? {
+			for op in ops {
+				switch op {
+				case let .navigate(route, params): return .navigate(route: route, params: params)
+				case let .assign(cell, expr):
+					let value = try evaluate(expr)
+					values[cell] = value
+					if let key = storageKeys[cell] { store.write(key, value) }
+				case let .when(test, then, otherwise):
+					if let taken = try run(try evaluate(test).isTruthy ? then : otherwise) { return taken }
+				}
 			}
+			return nil
 		}
+		if let navigated = try run(handlers[bound.handler] ?? []) { return [navigated] }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
 		let afterAttributes = keyed(try attributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })

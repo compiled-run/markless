@@ -166,6 +166,16 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph.components.push({
 			name: componentFunction.name,
 			...(exportName ? { exportName } : {}),
+			...(state.nativeFacts
+				? {
+						native: state.nativeFacts.component(
+							componentFunction.node as never,
+							((call: AnyNode, api: 'state') =>
+								getFrameworkApiForCall(call, state.frameworkApiImports) ===
+								api) as never,
+						),
+					}
+				: {}),
 		});
 		const previousComponentName = state.currentComponentName;
 		const previousComponentId = state.currentComponentId;

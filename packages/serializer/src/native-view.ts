@@ -134,6 +134,13 @@ export type NativeEventName = 'activate' | 'input';
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
 	| { readonly op: 'assign'; readonly cell: string; readonly value: NativeExpr }
+	/** Runs `whenTrue` when `test` is truthy, else `whenFalse`; the test is evaluated once, before either. */
+	| {
+			readonly op: 'if';
+			readonly test: NativeExpr;
+			readonly whenTrue: ReadonlyArray<NativeOp>;
+			readonly whenFalse: ReadonlyArray<NativeOp>;
+	  }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
 
@@ -178,4 +185,16 @@ export type NativeJournalEntry =
 	/** Shows arm `index` of a branch (null: none), building its nodes from current values and removing the old arm's. */
 	| { readonly op: 'arm'; readonly node: string; readonly index: number | null }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
-	| { readonly op: 'navigate'; readonly route: string; readonly params: Readonly<Record<string, string>> };
+	| {
+			readonly op: 'navigate';
+			readonly route: string;
+			readonly params: Readonly<Record<string, string>>;
+	  };
+
+/**
+ * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
+ * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
+ * out of the style input, since Dragon does not model their rendering effect.
+ */
+export const isNativeStyleStateAttribute = (name: string): boolean =>
+	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);

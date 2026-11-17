@@ -68,6 +68,8 @@ class MarklessHost(
 	private val textViews = HashMap<String, TextView>()
 	private var assignment = style?.initial ?: 0
 	private val expanded = HashMap<View, Boolean?>()
+	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
+	private val attrs = HashMap<String, HashMap<String, String>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
@@ -92,6 +94,7 @@ class MarklessHost(
 		if (payload.nodes.count { it.parent == null } != 1) throw MarklessHostError("payload has more than one root")
 		buildShown()
 		root = views.getValue(top.id)
+		refreshRelations()
 	}
 
 	fun view(id: String): View = views[id] ?: throw MarklessHostError("no view for \"$id\"")
@@ -135,6 +138,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		refreshRelations()
 		onJournal?.invoke(journal)
 	}
 
@@ -216,6 +220,13 @@ class MarklessHost(
 				super.onInitializeAccessibilityNodeInfo(host, info)
 				info.viewIdResourceName = id
 				if (control) info.className = Button::class.java.name
+				val current = attrs[id].orEmpty()
+				if (current["role"] == "switch") {
+					info.className = "android.widget.Switch"
+					info.isCheckable = true
+					info.isChecked = current["aria-checked"] == "true"
+				}
+				current["aria-describedby"]?.let { info.hintText = textOf(it) }
 				if (link) info.extras.putCharSequence("AccessibilityNodeInfo.roleDescription", "link")
 				val state = expanded[host] ?: return
 				if (Build.VERSION.SDK_INT >= 36) info.expandedState = if (state) AccessibilityNodeInfo.EXPANDED_STATE_FULL else AccessibilityNodeInfo.EXPANDED_STATE_COLLAPSED
@@ -226,7 +237,10 @@ class MarklessHost(
 
 	private fun element(node: Node.Element, inst: Instance): View {
 		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
-		val view = when (node.element) {
+		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
+		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
+			"box-button" -> MarklessBox(context).apply { isClickable = true; isFocusable = true; named(this, inst.id, control = true) }
 			"button" -> Button(context).apply {
 				background = null
 				minWidth = 0; minHeight = 0; minimumWidth = 0; minimumHeight = 0
@@ -284,11 +298,38 @@ class MarklessHost(
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
+		val current = attrs.getOrPut(id) { HashMap() }
+		if (value == null) current.remove(name) else current[name] = value
 		when (name) {
+			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
+			"for" -> if (value != null) {
+				view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+				view.setOnClickListener { views[value]?.performClick() }
+			}
 			"aria-label" -> view.contentDescription = value
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
+			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE
+		}
+	}
+
+	/** The text the elements named by a space-separated id list show, in view order. */
+	private fun textOf(ids: String): String = ids.split(' ').mapNotNull { views[it] }.joinToString(" ") { textWithin(it) }
+
+	private fun textWithin(view: View): String = when (view) {
+		is TextView -> view.text.toString()
+		is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it)) }.filter { it.isNotEmpty() }.joinToString(" ")
+		else -> ""
+	}
+
+	/** `aria-labelledby` as the content description, kept current after every journal. */
+	private fun refreshRelations() {
+		for ((id, current) in attrs) {
+			val view = views[id] ?: continue
+			if (current["aria-label"] == null) current["aria-labelledby"]?.let { view.contentDescription = textOf(it) }
 		}
 	}
 
@@ -297,9 +338,16 @@ class MarklessHost(
 		val styled = style.assignments[assignment]
 		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
-		val frame = s.frame ?: throw MarklessHostError("style node \"${inst.id}\" has no frame")
 		val absolute = absolutes[assignment]
-		val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${inst.id}\" sits inside a box with no frame")
+		val frame = s.frame
+		val origin = absolute[s.id]
+		// Dragon gives an element it does not render (`display: none`, `[hidden]`), and everything inside it, no frame.
+		if (frame == null || origin == null) {
+			view.visibility = View.GONE
+			return
+		}
+		view.visibility = View.VISIBLE
+		val (ax, ay) = origin
 		val parentId = parentOf(inst)
 		if (node is Node.Text && view is Button) {
 			val (bx, by) = absolute.getValue(parentId!!)
@@ -329,6 +377,7 @@ class MarklessHost(
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) {
 			val node = inst.node
 			val view = views.getValue(inst.id)
+			if (view.visibility == View.GONE) continue
 			val frame = styled.byId.getValue(inst.id).frame!!
 			val a = absolute.getValue(inst.id)
 			val at = IntArray(2).also { view.getLocationInWindow(it) }

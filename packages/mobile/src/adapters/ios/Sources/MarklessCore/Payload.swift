@@ -119,6 +119,8 @@ public enum NativeOp: Equatable, Sendable {
 	case assign(cell: String, value: NativeExpr)
 	/// Opens the page at `route` with these params; ops after it do not run.
 	case navigate(route: String, params: [NativeRouteParam])
+	/// Runs `then` when `test` is truthy, else `otherwise`; the test is evaluated once, before either.
+	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -276,7 +278,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		}
 		let handlers = try fields["handlers"].array().map { handler in
 			let field = try handler.object(["id", "ops"])
-			let ops = try field["ops"].array().map { op -> NativeOp in
+			func decodeOp(_ op: Reader) throws -> NativeOp {
 				let name = try op.field("op").string()
 				switch name {
 				case "assign":
@@ -285,10 +287,17 @@ public struct NativeViewPayload: Equatable, Sendable {
 				case "navigate":
 					let opField = try op.object(["op", "route", "params"])
 					return .navigate(route: try opField["route"].string(), params: try decodeParams(try opField["params"]))
+				case "if":
+					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
+					return .when(
+						test: try decodeExpr(try opField["test"]),
+						then: try opField["whenTrue"].array().map(decodeOp),
+						otherwise: try opField["whenFalse"].array().map(decodeOp))
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
 			}
+			let ops = try field["ops"].array().map(decodeOp)
 			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
 		let route: NativeRoute? = fields.has("route") ? try {

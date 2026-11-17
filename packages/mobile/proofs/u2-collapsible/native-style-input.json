@@ -1,0 +1,213 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "App",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "mk-1qj2r46"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h1",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1qj2r46"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h1:text0",
+			"parent": "h1",
+			"text": "Collapsible"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:0/h0",
+			"element": "div",
+			"parent": "h0",
+			"attributes": {
+				"aria-live": "polite"
+			},
+			"attributesByState": {
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:1/h1",
+			"element": "button",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "trigger mk-1qj2r46",
+				"type": "button",
+				"aria-disabled": "false",
+				"aria-controls": "component-edge:2/h2"
+			},
+			"attributesByState": {
+				"aria-expanded": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": "false"
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": "true"
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:1/h1:text0",
+			"parent": "component-edge:1/h1",
+			"text": "Shipping"
+		},
+		{
+			"kind": "element",
+			"id": "component-edge:2/h2",
+			"element": "div",
+			"parent": "component-edge:0/h0",
+			"attributes": {
+				"class": "panel mk-1qj2r46"
+			},
+			"attributesByState": {
+				"hidden": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": null
+					}
+				],
+				"ui-open": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": null
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": ""
+					}
+				],
+				"ui-closed": [
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": false
+						},
+						"value": ""
+					},
+					{
+						"when": {
+							"component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open": true
+						},
+						"value": null
+					}
+				]
+			}
+		},
+		{
+			"kind": "text",
+			"id": "component-edge:2/h2:text0",
+			"parent": "component-edge:2/h2",
+			"text": "Ships in two days"
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-1qj2r46"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Changes 0"
+		}
+	],
+	"css": ".trigger.mk-1qj2r46 {\n\t\t\t\tdisplay: block;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tmargin: 12px 0;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t}\n\t\t\t.trigger[ui-open].mk-1qj2r46 {\n\t\t\t\tbackground: #ffd166;\n\t\t\t}\n\t\t\t.panel.mk-1qj2r46 {\n\t\t\t\tpadding: 12px;\n\t\t\t\tborder: 2px solid #8d99ae;\n\t\t\t}",
+	"states": [
+		{
+			"cell": "component-edge:0/shared:packages/headless/components/src/collapsible/collapsible.tsrx#collapsibleState/state:collapsible.open",
+			"domain": [false, true],
+			"initial": false
+		}
+	]
+}

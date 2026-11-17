@@ -1373,11 +1373,20 @@ function collectReturnedObjectProperties(input: {
 			// records reads at assignment sites, which leaves a method local
 			// (`const next = s.checked !== true`) closing over the factory local.
 			collectExpressionReads(value.body as AnyNode | undefined, input.state);
+			const nativeStatements = input.state.nativeFacts?.handlerStatements(value as never);
 			properties.push({
 				kind: 'method',
 				name,
 				source: propertySource,
 				sourceSpan: sourceSpan(property, input.state.filename),
+				...(nativeStatements
+					? {
+							nativeStatements,
+							parameters: asNodes(value.params).map((parameter) =>
+								parameter.type === 'Identifier' ? String(parameter.name) : '',
+							),
+						}
+					: {}),
 			});
 			continue;
 		}
