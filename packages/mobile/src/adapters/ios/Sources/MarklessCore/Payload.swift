@@ -91,8 +91,8 @@ public struct NativeNode: Equatable, Sendable {
 	public enum Kind: Equatable, Sendable {
 		case element(element: String, attributes: [String: String], bindings: [NativeBinding])
 		case text(parts: [NativeTextPart])
-		/// An `@if`: arm 0 while `test` is truthy, arm 1 (when there is an `@else`) otherwise.
-		case branch(test: NativeExpr, arms: Int)
+		/// An `@if` chain or `@switch`: the first arm whose test is truthy, else the arm with no test, else none.
+		case branch(tests: [NativeExpr?])
 		/// A keyed `@for`: one row per item of `list`, keyed by `String()` of the item at `key`.
 		case `repeat`(list: NativeExpr, key: [String])
 	}
@@ -239,12 +239,23 @@ public struct NativeViewPayload: Equatable, Sendable {
 					id: try field["id"].string(), parent: try field["parent"].string(), arm: try decodeArm(field), row: try decodeRow(field),
 					kind: .text(parts: parts))
 			case "branch":
-				let field = try node.object(required: ["kind", "id", "parent", "test", "arms"], optional: place)
+				let field = try node.object(required: ["kind", "id", "parent", "arms"], optional: place + ["test", "tests"])
 				let arms = try field["arms"].number()
-				guard arms == 1 || arms == 2 else { throw PayloadError(path: node.path + ".arms", reason: "a branch has 1 or 2 arms") }
+				let tests: [NativeExpr?]
+				switch (field.has("test"), field.has("tests")) {
+				case (true, false):
+					guard arms == 1 || arms == 2 else { throw PayloadError(path: node.path + ".arms", reason: "an @if with one test has 1 or 2 arms") }
+					tests = [try decodeExpr(try field["test"])] + (arms == 2 ? [nil] : [])
+				case (false, true):
+					tests = try field["tests"].array().map { $0.isNull ? nil : try decodeExpr($0) }
+					guard Double(tests.count) == arms, tests.filter({ $0 == nil }).count <= 1 else {
+						throw PayloadError(path: node.path + ".tests", reason: "a branch has one test per arm and at most one arm without a test")
+					}
+				default: throw PayloadError(path: node.path, reason: "a branch has either test or tests")
+				}
 				return NativeNode(
 					id: try field["id"].string(), parent: try field["parent"].optionalString(), arm: try decodeArm(field),
-					row: try decodeRow(field), kind: .branch(test: try decodeExpr(try field["test"]), arms: Int(arms)))
+					row: try decodeRow(field), kind: .branch(tests: tests))
 			case "repeat":
 				let field = try node.object(required: ["kind", "id", "parent", "list", "key"], optional: place)
 				return NativeNode(
@@ -302,7 +313,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 		guard fields.has("arm") else { return nil }
 		let arm = try fields["arm"].object(["branch", "index"])
 		let index = try arm["index"].number()
-		guard index == 0 || index == 1 else { throw PayloadError(path: try fields["arm"].path, reason: "arm index must be 0 or 1") }
+		guard index >= 0, index == index.rounded() else { throw PayloadError(path: try fields["arm"].path, reason: "arm index must be a whole number") }
 		return NativeArmPlace(branch: try arm["branch"].string(), index: Int(index))
 	}
 
@@ -410,9 +421,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 					case let .expr(expr): return expr
 					}
 				})
-			case let .branch(test, arms):
-				branchArms[node.id] = arms
-				try checkCells(node, [test])
+			case let .branch(tests):
+				branchArms[node.id] = tests.count
+				try checkCells(node, tests.compactMap { $0 })
 			case let .repeat(list, _):
 				repeats.insert(node.id)
 				try checkCells(node, [list])

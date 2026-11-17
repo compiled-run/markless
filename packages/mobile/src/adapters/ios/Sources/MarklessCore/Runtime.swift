@@ -185,8 +185,11 @@ public final class NativeRuntime {
 
 	/// The arm a branch shows now (nil: none).
 	public func arm(of branch: String) throws -> Int? {
-		guard let node = nodesById[branch], case let .branch(test, arms) = node.kind else { throw RuntimeError(reason: "unknown branch \(branch)") }
-		return try evaluate(test).isTruthy ? 0 : arms > 1 ? 1 : nil
+		guard let node = nodesById[branch], case let .branch(tests) = node.kind else { throw RuntimeError(reason: "unknown branch \(branch)") }
+		for (index, test) in tests.enumerated() {
+			if let test, try evaluate(test).isTruthy { return index }
+		}
+		return tests.firstIndex { $0 == nil }
 	}
 
 	public func isShown(_ place: NativeArmPlace?) throws -> Bool {
@@ -223,11 +226,14 @@ public final class NativeRuntime {
 		try parts.map { part in
 			switch part {
 			case let .text(text): return text
-			case let .cell(cell): return try read(cell).text
-			case let .expr(expr): return try evaluate(expr, in: scope).text
+			case let .cell(cell): return textOf(try read(cell))
+			case let .expr(expr): return textOf(try evaluate(expr, in: scope))
 			}
 		}.joined()
 	}
+
+	/// How a value reads in text, as the web writes it: null is empty, anything else `String(value)`.
+	private func textOf(_ value: NativeValue) -> String { value == .null ? "" : value.text }
 
 	/// Every shown text instance's current string, in document order.
 	public func texts() throws -> [(node: String, text: String)] {

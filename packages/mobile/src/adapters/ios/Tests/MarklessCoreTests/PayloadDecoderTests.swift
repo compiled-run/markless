@@ -60,3 +60,13 @@ func rejectsWhatItDoesNotKnow(find: String, replace: String, reason: String) thr
 	#expect(route.match("/veg/apple") == nil)
 	#expect(route.match("/fruits/a/b") == nil)
 }
+
+@Test func nullReadsAsEmptyTextButNullInATemplate() throws {
+	let runtime = NativeRuntime(payload: try decode("""
+		{"version":"markless.native-view/0","component":"N","cells":[{"id":"state:x","name":"x","initial":null}],
+		"nodes":[{"kind":"element","id":"h0","element":"p","parent":null},
+		{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"text":"["},{"cell":"state:x"},{"expr":{"template":["<",{"cell":"state:x"},">"]}},{"text":"]"}]}],
+		"events":[],"handlers":[]}
+		"""))
+	#expect(try runtime.texts().map(\.text) == ["[<null>]"])
+}
