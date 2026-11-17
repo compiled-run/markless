@@ -26,10 +26,8 @@ this file changes in the same push. Status as of 2026-11-16, night one.
 
 - **native-ios-host:** `/1` is done (the lead added `readiness` as an optional field the decoder reads past, in
   `StyleExport.swift`, so the documented format decodes). Next: anything rungs 6 and 10 still need on the shared harness.
-- **native-android-host:** (1) text drawn wider than Dragon's box clips: rung 4's `<h1>Attributes</h1>` (Inter Bold, 32 px)
-  shows "Attribute" in `proofs/04-attributes/screenshots/android/`. Find why Android's run is wider than Dragon's shaped
-  width (font padding, a second bold, letter spacing, text size units) and fix the cause; do not widen frames. (2) a launch
-  route, rung 10.
+- **native-android-host:** the clipped-title defect is fixed at its cause (text drawn with unhinted subpixel advances, as
+  Dragon shapes it; re-run green 2026-11-17 05:46). Next: branch `tests` (rung 5b).
 - **both hosts, launch route (rung 10):** the shell receives the Maestro launch argument `route` (iOS launch argument,
   Android intent extra) and passes it to the host entry point (`MarklessViewController(payload:style:fonts:route:)`,
   `MarklessActivity.route()`). The host matches it against `payload.route.pattern` (a `[name]` segment matches one path
@@ -454,7 +452,7 @@ result. **iOS** and **Android** pass only with the rung's Maestro flow green on 
 | 1 | Static elements and text | passing | passing | **passing** | **passing** | screenshots in `proofs/01-static-text/screenshots/` |
 | 2 | Styles through Dragon | passing (texts, counter) | passing (texts, counter) | **passing** | **passing** | harness verdict passed on both; export made at proof time by Dragon's `markless:style-export`; styled screenshots in `proofs/02-styles/screenshots/` |
 | 3 | A state write updates text | passing | passing | **passing** | **passing** | vectors `counter.json` |
-| 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing**, with a visible defect: the title's last letter clips | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
+| 4 | Attributes and classes that follow state | passing | passing | **passing** | **passing** (the clipped title is fixed: Android now draws Dragon-styled text at Dragon's unhinted advances) | harness verdict passed on both; the button turns `#ef476f` on tap through Dragon's next style assignment; screenshots in `proofs/04-attributes/screenshots/` |
 | 5 | `@if` | passing | passing | **passing** | **passing** | vectors `if.json` |
 | 5b | `@else if` chains and `@switch` | passing | passing | not yet (host: branch `tests`) | not yet (host: branch `tests`) | `proofs/05b-choices/`; vectors `choices.json` |
 | 6 | Keyed `@for` (add, remove, reorder) | passing | passing | **passing** | **passing** | harness verdict passed on both; vectors `list.json` |
