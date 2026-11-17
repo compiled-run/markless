@@ -1648,7 +1648,8 @@ export type RenderDataBranch = {
 	readonly asyncBoundaryArm?: number;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
-	readonly update: 'range' | 'boundary';
+	// 'row-arm': inside a keyed row's @try arm, which has no row template, so the row's boundary redraws its arm when the test changes.
+	readonly update: 'range' | 'boundary' | 'row-arm';
 };
 
 export type RenderDataRepeat = {

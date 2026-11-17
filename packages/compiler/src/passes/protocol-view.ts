@@ -29,6 +29,7 @@ import {
 	resolveRowChunkMint,
 	resolveRowComponentMint,
 	rowComponentReadsIndex,
+	slotReadsRow,
 	stepsAfterNestedRows,
 	type RowComponentMint,
 } from './row-mint.ts';
@@ -761,7 +762,10 @@ function rowArmRerenderReadsField(
 	input: ProtocolViewPayloadInput,
 	boundaryId: string,
 	asyncReads: ReadonlyArray<{ readonly graphNodeId: string }>,
-): { readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> } {
+): {
+	readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
+	readonly rerendersOnRefresh?: true;
+} {
 	const data = renderDataOf(input);
 	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
 		?.armChunkIds.try;
@@ -780,17 +784,35 @@ function rowArmRerenderReadsField(
 	const add = (read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }) => {
 		if (!settledBy.has(read.graphNodeId)) reads.set(`${read.graphNodeId}:${read.path.join('.')}`, read);
 	};
+	let readsRow = false;
 	for (const chunkId of chunkIdsForChunkTree(input, tryChunkId, new Set(), false)) {
 		const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+		const slotValue = (slot: SemanticMarkupSlot) =>
+			mintableSlotValue(slot) ??
+			(chunk?.componentName ? expressionSlotValue(slot, graph, chunk.componentName, rowNames) : null);
 		for (const slot of chunk?.slots ?? []) {
-			const value =
-				mintableSlotValue(slot) ??
-				(chunk?.componentName ? expressionSlotValue(slot, graph, chunk.componentName, rowNames) : null);
+			const branch =
+				slot.kind === 'branch'
+					? data.branches.find((candidate) => candidate.branchSiteId === slot.branchSiteId)
+					: undefined;
+			if (slot.kind === 'branch' && !branch) continue;
+			const shown = branch ? branchTestSlot(branch, slot.coordinate) : slot;
+			const value = branch ? branchTestValue(input, branch, shown, slotValue) : slotValue(slot);
 			if (value && 'graphNodeId' in value) add({ graphNodeId: value.graphNodeId, path: value.graphPath });
 			else if (value && 'reads' in value) for (const read of value.reads ?? []) add(read);
+			readsRow ||= slotReadsRow(shown, rowNames);
 		}
 	}
-	return reads.size > 0 ? { rerenderReads: [...reads.values()] } : {};
+	// An item written under its key keeps its row, so an arm reading it is redrawn from the list's write.
+	const asyncNodes = asyncComputedGraphNodeIds(graph);
+	for (const repeat of readsRow ? enclosing : [])
+		if (repeat.collectionGraphNodeId && !asyncNodes.has(repeat.collectionGraphNodeId))
+			add({ graphNodeId: repeat.collectionGraphNodeId, path: repeat.collectionPath });
+	return {
+		...(reads.size > 0 && { rerenderReads: [...reads.values()] }),
+		// Text reading the row has no record to update in place, so a refresh redraws the arm.
+		...(readsRow && { rerendersOnRefresh: true as const }),
+	};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost
@@ -1038,20 +1060,7 @@ function rowBranchSlot(
 	);
 	if (!branch || branch.update !== 'range' || branch.asyncBoundaryId) return null;
 	if (branch.kind === 'switch' && !branch.armTests) return null;
-	const test: ProtocolRowTemplateSlotValue | null =
-		branch.testReads.length === 1
-			? {
-					graphNodeId: branch.testReads[0]!.graphNodeId,
-					graphPath: browserTestReads(input, branch.testReads)[0]!.path,
-				}
-			: slotValue({
-					kind: 'text',
-					residue: {
-						kind: 'authored-expression',
-						source: branch.armIndexSource ?? branch.testSource,
-					},
-					coordinate: slot.coordinate,
-				} as SemanticMarkupSlot);
+	const test = branchTestValue(input, branch, branchTestSlot(branch, slot.coordinate), slotValue);
 	if (!test) return null;
 	const root = rowBranchIsRow(rowChunk, slot);
 	const unwired = new Set([
@@ -1094,6 +1103,33 @@ function rowBranchSlot(
 		arms,
 		...test,
 	};
+}
+
+// What a branch's test reads, answered like a row slot when the test reads the row's item.
+function branchTestValue(
+	input: ProtocolViewPayloadInput,
+	branch: RenderDataArtifact['branches'][number],
+	test: SemanticMarkupSlot,
+	slotValue: (slot: SemanticMarkupSlot) => ProtocolRowTemplateSlotValue | null,
+): ProtocolRowTemplateSlotValue | null {
+	return branch.testReads.length === 1
+		? {
+				graphNodeId: branch.testReads[0]!.graphNodeId,
+				graphPath: browserTestReads(input, branch.testReads)[0]!.path,
+			}
+		: slotValue(test);
+}
+
+// A branch's test, read as a text slot at the branch's place.
+function branchTestSlot(
+	branch: RenderDataArtifact['branches'][number],
+	coordinate: SemanticMarkupSlot['coordinate'],
+): SemanticMarkupSlot {
+	return {
+		kind: 'text',
+		residue: { kind: 'authored-expression', source: branch.armIndexSource ?? branch.testSource },
+		coordinate,
+	} as SemanticMarkupSlot;
 }
 
 // The branch is everything the row renders, so the arm it shows is the row itself.
@@ -1496,7 +1532,7 @@ function armScopedBranchHostIds(
 	return new Set(
 		renderDataOf(input)
 			.branches.filter(
-				(branch) => branch.asyncBoundaryId === boundaryId && branch.update !== 'boundary',
+				(branch) => branch.asyncBoundaryId === boundaryId && branch.update === 'range',
 			)
 			.flatMap((branch) =>
 				branch.armChunkIds.flatMap((chunkId) => hostIdsForChunkTree(input, chunkId)),
@@ -1545,7 +1581,8 @@ function armScopedBranchRecords(
 	arm: number,
 ): ReadonlyArray<NonNullable<ProtocolViewArmRecordSet['branches']>[number]> | undefined {
 	const branches = renderDataOf(input).branches.filter(
-		(branch) => branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm,
+		(branch) =>
+			branch.asyncBoundaryId === boundaryId && branch.asyncBoundaryArm === arm && branch.update !== 'row-arm',
 	);
 	if (branches.length === 0) return undefined;
 	const branchSymbols = new Map(

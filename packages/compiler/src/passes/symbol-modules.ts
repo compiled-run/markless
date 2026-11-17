@@ -1447,7 +1447,7 @@ function renderBranchArms(
 		),
 	);
 	for (const branch of renderData.branches ?? []) {
-		if (rowFlipped.has(branch.branchSiteId)) continue;
+		if (rowFlipped.has(branch.branchSiteId) || branch.update === 'row-arm') continue;
 		// A @try arm's branch holding a component flips its own range from a render of the page.
 		if (branch.update === 'boundary') {
 			const symbol =

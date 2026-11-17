@@ -191,16 +191,23 @@ function branchRecord(
 		...(site.asyncBoundaryArm !== undefined ? { asyncBoundaryArm: site.asyncBoundaryArm } : {}),
 		...(site.armTests ? { armTests: site.armTests } : {}),
 		...(declaredEmptyArms.length > 0 ? { declaredEmptyArms } : {}),
-		update:
-			site.asyncBoundaryId &&
-			(slot?.armTemplateIds ?? []).some((chunkId) =>
-				chunks
-					.find((chunk) => chunk.id === chunkId)
-					?.slots.some((candidate) => candidate.kind === 'child-component'),
-			)
-				? 'boundary'
-				: 'range',
+		update: branchUpdate(site, slot, chunks),
 	};
+}
+
+function branchUpdate(
+	site: SemanticGraphArtifact['branchSites'][number],
+	slot: Extract<SemanticMarkupSlot, { readonly kind: 'branch' }> | undefined,
+	chunks: SemanticGraphArtifact['markup']['chunks'],
+): RenderDataBranch['update'] {
+	if (!site.asyncBoundaryId) return 'range';
+	if (site.keyedRepeatId && site.asyncBoundaryArm === 0) return 'row-arm';
+	const holdsComponent = (slot?.armTemplateIds ?? []).some((chunkId) =>
+		chunks
+			.find((chunk) => chunk.id === chunkId)
+			?.slots.some((candidate) => candidate.kind === 'child-component'),
+	);
+	return holdsComponent ? 'boundary' : 'range';
 }
 
 /**
