@@ -77,7 +77,7 @@ unstyled stack in `screenshots/counter-stack-*.png`.
 Each rung's `App.tsrx` compiled with `compileNativeComponent`, built with `./build-apk.sh <payload> <apk>`, then
 `maestro --device <serial> test -e APP_ID=dev.markless.mobile.shell packages/mobile/proofs/<rung>/flow.yaml` on the Pixel 7
 AVD (android-36), from the `assign`-shaped payloads (`a989dc47f` and later). The in-app conformance run logged `pass` for
-`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json`, `list.json`, `components.json` and `switches.json`; it also checks
+`arithmetic.json`, `attributes.json`, `counter.json`, `if.json`, `input.json`, `list.json`, `components.json`, `route.json` and `switches.json`; it also checks
 that views exist for exactly the shown instances and that each list's rows sit in their parent in key order.
 
 | Rung | Result | Screenshot |
@@ -91,7 +91,8 @@ that views exist for exactly the shown instances and that each list's rows sit i
 | 07-child-component | flow passes; no host change (the compiler inlines same-module components into the flat tree) | `screenshots/rung-07-child-component.png` |
 | 08-text-input | flow passes (`EditText`; typing dispatches `input` with the whole text through a `TextWatcher`; `Use Bo` writes the field through a `property` entry) | `screenshots/rung-08-text-input.png` |
 | 09-storage | flow passes, including `stopApp` then `launchApp` reading `Kept 2` back (`SharedPreferences`, `PreferencesStore`) | `screenshots/rung-09-storage.png` |
-| 10, 11 | not run: the compiler refuses these payloads (`MARKLESS_NATIVE_UNSUPPORTED`) | |
+| 10-url-route | flow passes, opened with the launch argument `route: /apple` (intent extra), `Go to pear` rebuilds the page through a `navigate` entry; payload compiled with `page: 'pages/[fruit].tsrx'` | `screenshots/rung-10-url-route.png` |
+| 11 | not run: the compiler refuses it by design (owner decision) | |
 
 Bound attributes on Android: `aria-label` sets `contentDescription`; `disabled` present sets `isEnabled = false`;
 `aria-pressed`/`aria-selected` `"true"` sets `isSelected`; `aria-expanded` sets the accessibility expanded state (API 36) and
@@ -102,3 +103,16 @@ its accessibility class.
 Views are kept per instance (`h6:text0@pear` inside a list row). An `arm` or `rows` entry removes the views of instances no
 longer shown, builds every shown instance without a view from current values, and moves each parent's retained children
 into place: document order, with a list's rows at the list's place in key order.
+
+## Through the shared harness (2026-11-17, 03:30)
+
+`pnpm --filter @markless/mobile proof --simulator native-android-host --avd native_android_host --port 5600 <rungs>` (both
+platforms, the harness's own shells):
+
+| Rung | Android | iOS |
+|---|---|---|
+| 01-static-text | PASS | PASS |
+| 03, 05, 07, 08, 09 | PASS | FAIL at launch: the iOS host in this tree refuses `unknown op "assign"` |
+| 06-keyed-for | PASS alone (`--platform android`); in both two-platform runs Maestro lost the Android device before the flow (`Device emulator-5600 was requested, but it is not connected`) | FAIL, as above |
+| 02, 04 | refused by the harness: no Dragon `native-style.json` for the rung (request 11) | same |
+| 10 | not built by the harness: it compiles without `page` (request 12); passes from this folder's shell | same |

@@ -19,8 +19,9 @@ abstract class MarklessActivity : Activity() {
 
 	/** The params of the launch `route` extra (`/apple`), matched against the payload's route pattern. */
 	private fun launchParams(payload: ByteArray): Map<String, String> {
-		val path = intent.getStringExtra("route") ?: return emptyMap()
-		val route = Payload.decode(payload).route ?: throw MarklessHostError("launched at $path, but the payload is not a page")
+		val route = Payload.decode(payload).route
+		val path = intent.getStringExtra("route") ?: if (route == null) return emptyMap() else throw MarklessHostError("launched with no route; this payload is the page at ${route.pattern}")
+		if (route == null) throw MarklessHostError("launched at $path, but the payload is not a page")
 		return route.match(path) ?: throw MarklessHostError("launched at $path, which does not match ${route.pattern}")
 	}
 

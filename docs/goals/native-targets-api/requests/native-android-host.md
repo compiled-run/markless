@@ -46,3 +46,9 @@
     `fonts` with a file under the Dragon checkout, and (for rung 4) a state whose key the host can map to `state:liked`
     (request 9). The host reads it today: `/0` and `/1` decode, frames are checked on device by the frame report
     (`frames max gap ... device px`), and `state` entries move through `next`. Owner of the Dragon side: native-dragon-styles.
+12. **The harness cannot build rung 10 (for native-proof-harness).** `src/harness/rung.ts` calls `compileNativeComponent`
+    without `page`, so `proofs/10-url-route` fails with "a text binding that reads the prop `params` this instance was not
+    given as a value". With `page: 'pages/[fruit].tsrx'` (from `expected.json`'s `route`, as
+    `test/ladder-native-reference.test.ts` does) the compiler emits the payload. The Android side is ready: `MarklessActivity`
+    reads the Maestro launch argument `route` (an intent string extra), matches it against `payload.route.pattern`, and
+    rebuilds the page on a `navigate` entry.
