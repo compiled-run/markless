@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+name: 08-text-input
+---
+- launchApp:
+      clearState: true
+- assertVisible: Greeting
+- assertVisible: Hello Sam
+- assertVisible: Sam
+- tapOn: Name
+- eraseText
+- inputText: Ada
+- hideKeyboard
+- assertNotVisible: Hello Sam
+- assertVisible: Ada
+- assertVisible: Hello Ada
+- assertNotVisible: Hello Sam
+- assertVisible: Ada
+- tapOn: Use Bo
+- assertNotVisible: Hello Ada
+- assertVisible: Bo
+- assertVisible: Hello Bo
+- assertNotVisible: Hello Ada
+- assertVisible: Bo

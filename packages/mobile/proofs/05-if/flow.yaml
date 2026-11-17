@@ -1,0 +1,24 @@
+appId: ${APP_ID}
+name: 05-if
+---
+- launchApp:
+      clearState: true
+- assertVisible: Details
+- assertVisible: Show details
+- assertVisible: Nothing shown yet
+- assertNotVisible: The details are here
+- tapOn: Show details
+- assertVisible: The details are here
+- assertNotVisible: Show details
+- assertNotVisible: Nothing shown yet
+- assertVisible: Hide details
+- assertVisible: The details are here
+- assertNotVisible: Show details
+- assertNotVisible: Nothing shown yet
+- tapOn: Hide details
+- assertVisible: Show details
+- assertVisible: Nothing shown yet
+- assertNotVisible: The details are here
+- assertVisible: Show details
+- assertVisible: Nothing shown yet
+- assertNotVisible: The details are here

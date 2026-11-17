@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: 09-storage
+---
+- launchApp:
+      clearState: true
+- assertVisible: Kept count
+- assertVisible: Kept 0
+- assertNotVisible: Kept 1
+- tapOn: Kept 0
+- assertVisible: Kept 1
+- assertNotVisible: Kept 0
+- assertVisible: Kept 1
+- assertNotVisible: Kept 0
+- assertNotVisible: Kept 2
+- tapOn: Kept 1
+- assertVisible: Kept 2
+- assertNotVisible: Kept 1
+- assertVisible: Kept 2
+- assertNotVisible: Kept 1
+- assertNotVisible: Kept 3
+- stopApp
+- launchApp
+- assertVisible: Kept count
+- assertVisible: Kept 2
+- assertNotVisible: Kept 0
+- assertNotVisible: Kept 3
+- tapOn: Kept 2
+- assertVisible: Kept 3
+- assertNotVisible: Kept 2
+- assertVisible: Kept 3
+- assertNotVisible: Kept 2
