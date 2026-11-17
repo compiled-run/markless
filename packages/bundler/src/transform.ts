@@ -3,7 +3,6 @@ import { dirname, isAbsolute, resolve } from 'pathe';
 import { parseSync, transformSync } from 'rolldown/experimental';
 import { sourceForModuleId } from './module-id.ts';
 import {
-	DEVICE_TARGET_FACTS,
 	artifactChildCandidates,
 	collectTsrxModuleDiagnostics,
 	compileTsrxModule,
@@ -1380,6 +1379,7 @@ type CompiledTransformInput = Pick<
 	| 'executionLog'
 	| 'serverOnlyProps'
 	| 'elementOnlyAttributes'
+	| 'deviceTargetFacts'
 	| 'routeRoot'
 >;
 
@@ -1394,7 +1394,7 @@ export function transformCompileInput(input: CompiledTransformInput): CompileTsr
 			? { elementOnlyAttributes: input.elementOnlyAttributes }
 			: {}),
 		...(input.routeRoot ? { routeRoot: true } : {}),
-		deviceTargetFacts: DEVICE_TARGET_FACTS,
+		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
 		buildId: input.buildId,
 		resolverId: `${MARKLESS_VIRTUAL_PREFIX}resolver:${encodeURIComponent(input.filename)}`,
 		symbols: input.symbols ?? [],

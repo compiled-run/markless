@@ -117,6 +117,7 @@ export function planTransformHookRequest(
 		source: code,
 		serverOnlyProps: internalOptions.serverOnlyProps?.(moduleIdFor(source, ctx.getRoot())),
 		elementOnlyAttributes: internalOptions.elementOnlyAttributes,
+		deviceTargetFacts: internalOptions.deviceTargetFacts,
 		routeRoot:
 			internalOptions.unimportedRouteModule?.(moduleIdFor(source, ctx.getRoot())) === true,
 		dev: plan.dev,
@@ -228,6 +229,7 @@ export function interfaceCompileInput(ctx: MarklessHookContext) {
 			buildId: internalOptions.buildId,
 			serverOnlyProps: internalOptions.serverOnlyProps?.(moduleId),
 			elementOnlyAttributes: internalOptions.elementOnlyAttributes,
+			deviceTargetFacts: internalOptions.deviceTargetFacts,
 			routeRoot: internalOptions.unimportedRouteModule?.(moduleId) === true,
 			executionLog: normalizeExecutionLogMode(internalOptions.executionLog),
 		});
