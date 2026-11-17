@@ -74,6 +74,7 @@ import { createCompileErrorPayload, MarklessCompileError } from './dev-error/ind
 import { modulePropFlow } from './prop-flow.ts';
 import {
 	emitPrerenderBoundaryRendererModule,
+	prerenderRowBoundarySites,
 	emitPrerenderTriggerGroupModule,
 	planPrerenderTriggerGroups,
 	triggerGroupVirtualModuleId,
@@ -796,7 +797,13 @@ export async function transformTsrxModuleWithPrerenderWakeClosure(
 					{
 						id: selfWakeArmRendererId,
 						type: 'trigger-group' as const,
-						source: emitPrerenderBoundaryRendererModule(renderDataId),
+						source: emitPrerenderBoundaryRendererModule(
+							renderDataId,
+							prerenderRowBoundarySites(
+								containerScopedResumeView(compiled.protocolView),
+								input.prerenderRecordData?.boundarySites,
+							),
+						),
 					},
 				]
 			: []),
