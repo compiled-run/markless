@@ -77,6 +77,8 @@ final class ViewTree {
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
 				if let button = buttonOf[node] { refreshLabel(of: button) }
+			case .state:
+				if layout != nil { throw HostError("a styled cell changed, and switching styles needs dragon.native-style-export/1") }
 			case let .attribute(node, name, value):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
@@ -196,7 +198,7 @@ final class ViewTree {
 		attributes.removeValue(forKey: id)
 	}
 
-	/// Bound and static attributes, as platform state: aria-label, disabled, aria-pressed/selected, aria-expanded, class.
+	/// Bound and static attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) throws {
 		let current = attributes[id] ?? [:]
 		if let button = view as? UIButton {
@@ -212,9 +214,6 @@ final class ViewTree {
 			view.accessibilityTraits.remove(.selected)
 		}
 		view.accessibilityValue = current["aria-expanded"].map { $0 == "true" ? "expanded" : "collapsed" }
-		if let style = layout?.styles[id], !style.variants.isEmpty {
-			try paint(view, current["class"].flatMap { style.variants[$0] } ?? style, faces: faces)
-		}
 	}
 
 	private func refreshLabel(of button: UIButton) {

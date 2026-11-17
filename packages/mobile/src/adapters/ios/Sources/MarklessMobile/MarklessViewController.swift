@@ -9,6 +9,7 @@ import UIKit
 /// - `payload`: the compiler's `markless.native-view/0` JSON.
 /// - `style`: Dragon's `dragon.native-style-export/0` JSON; without it children stack vertically in the system font.
 /// - `fonts`: the bytes of every font face the style export names, keyed by its `sha256:` id.
+/// - `store`: where storage cells keep their values (`UserDefaults.standard` by default).
 ///
 /// Throws on anything this host does not implement; it never skips a node, op or style write.
 @MainActor
@@ -18,9 +19,9 @@ public final class MarklessViewController: UIViewController {
 	private let faces: [String: UIFontDescriptor]
 	private(set) var tree: ViewTree?
 
-	public init(payload: Data, style: Data? = nil, fonts: [String: Data] = [:]) throws {
+	public init(payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore()) throws {
 		let decoded = try NativeViewPayload.decode(payload)
-		let runtime = NativeRuntime(payload: decoded)
+		let runtime = NativeRuntime(payload: decoded, store: store)
 		let texts = try runtime.texts()
 		self.runtime = runtime
 		layout = try style.map { try StyleExport.decode($0).resolve(for: decoded, initialTexts: texts) }

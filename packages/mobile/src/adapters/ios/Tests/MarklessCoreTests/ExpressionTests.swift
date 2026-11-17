@@ -2,10 +2,18 @@ import Foundation
 @testable import MarklessCore
 import Testing
 
+private func fixture(_ name: String) throws -> JSONValue {
+	try JSONValue.parse(Data(contentsOf: try #require(Bundle.module.url(forResource: "Fixtures/\(name)", withExtension: "json"))))
+}
+
+private func field(_ value: JSONValue, _ key: String) -> JSONValue? {
+	guard case let .object(fields) = value else { return nil }
+	return fields.first { $0.0 == key }?.1
+}
+
 // Written by marklessAttributeValue (packages/web/src/dom-attribute.ts) for each [name, value] pair.
 @Test func writesAttributesAsTheWebDoes() throws {
-	let url = try #require(Bundle.module.url(forResource: "Fixtures/attribute-values", withExtension: "json"))
-	guard case let .array(cases) = try JSONValue.parse(Data(contentsOf: url)) else { Issue.record("not an array"); return }
+	guard case let .array(cases) = try fixture("attribute-values") else { Issue.record("not an array"); return }
 	#expect(cases.count > 40)
 	for item in cases {
 		guard case let .array(triple) = item, case let .string(name) = triple[0] else { Issue.record("bad case"); continue }
@@ -13,22 +21,50 @@ import Testing
 		case let .bool(flag): .bool(flag)
 		case let .number(number): .number(number)
 		case let .string(text): .string(text)
-		default: .string("unreachable")
+		default: .null
 		}
 		let expected: String? = if case let .string(text) = triple[2] { text } else { nil }
 		#expect(marklessAttributeValue(name, value) == expected, "\(item.jsonText)")
 	}
 }
 
-@Test func evaluatesExpressionsWithJavaScriptMeaning() throws {
+// Written by Tests/write-expression-cases.ts from the reference evaluator.
+@Test func evaluatesExpressionsAsTheReferenceDoes() throws {
+	guard case let .array(cases) = try fixture("expression-cases") else { Issue.record("not an array"); return }
+	#expect(cases.count > 700)
 	let runtime = NativeRuntime(payload: try NativeViewPayload.decode(Data("""
-		{"version":"markless.native-view/0","component":"E","cells":[{"id":"state:n","name":"n","initial":0},{"id":"state:s","name":"s","initial":"0"}],
-		"nodes":[],"events":[],"handlers":[]}
+		{"version":"markless.native-view/0","component":"E","cells":[],"nodes":[],"events":[],"handlers":[]}
 		""".utf8)))
-	#expect(try runtime.evaluate(.equals(.cell("state:n"), .cell("state:s"))) == .bool(false))
-	#expect(try runtime.evaluate(.equals(.cell("state:n"), .literal(.number(-0.0)))) == .bool(true))
-	#expect(try runtime.evaluate(.not(.cell("state:s"))) == .bool(false))
-	#expect(try runtime.evaluate(.conditional(test: .cell("state:n"), whenTrue: .literal(.string("a")), whenFalse: .literal(.string("b")))) == .string("b"))
+	for item in cases {
+		let expr = try NativeViewPayload.decodeExpression(try #require(field(item, "expr")))
+		let value = try runtime.evaluate(expr)
+		let type = switch value {
+		case .number: "number"
+		case .string: "string"
+		case .bool: "boolean"
+		case .null: "null"
+		}
+		let label = field(item, "expr")!.jsonText
+		#expect(.string(type) == field(item, "type"), "\(label)")
+		#expect(.string(value.text) == field(item, "text"), "\(label)")
+		let negativeZero = if case let .number(number) = value { number == 0 && number.sign == .minus } else { false }
+		#expect(.bool(negativeZero) == field(item, "negativeZero"), "\(label)")
+	}
+}
+
+@Test func storageIsReadAtMountAndWrittenOnEveryWrite() throws {
+	let payload = try NativeViewPayload.decode(Data("""
+		{"version":"markless.native-view/0","component":"S","cells":[{"id":"state:visits","name":"visits","initial":0,"storage":{"key":"visits"}}],
+		"nodes":[{"kind":"element","id":"h0","element":"button","parent":null},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"state:visits"}]}],
+		"events":[{"host":"h0","event":"activate","handler":"handler:0"}],
+		"handlers":[{"id":"handler:0","ops":[{"op":"assign","cell":"state:visits","value":{"binary":"+","left":{"cell":"state:visits"},"right":{"literal":1}}}]}]}
+		""".utf8))
+	let store = MemoryStore()
+	#expect(try NativeRuntime(payload: payload, store: store).texts().map(\.text) == ["0"])
+	let first = NativeRuntime(payload: payload, store: store)
+	_ = try first.dispatch(NativeAction(event: .activate, host: "h0"))
+	#expect(store.values["visits"] == .number(1))
+	#expect(try NativeRuntime(payload: payload, store: store).texts().map(\.text) == ["1"])
 }
 
 @Test func nestedArmsShowOnlyUnderAShownBranch() throws {
@@ -41,7 +77,8 @@ import Testing
 		{"kind":"element","id":"h1","element":"button","parent":"h0"},
 		{"kind":"text","id":"h1:text0","parent":"h1","parts":[{"text":"go"}]}],
 		"events":[{"host":"h1","event":"activate","handler":"handler:0"}],
-		"handlers":[{"id":"handler:0","ops":[{"op":"toggle","cell":"state:a"},{"op":"toggle","cell":"state:b"}]}]}
+		"handlers":[{"id":"handler:0","ops":[{"op":"assign","cell":"state:a","value":{"unary":"!","value":{"cell":"state:a"}}},
+		{"op":"assign","cell":"state:b","value":{"unary":"!","value":{"cell":"state:b"}}}]}]}
 		""".utf8)))
 	#expect(try runtime.texts().map(\.node) == ["h1:text0"])
 	#expect(try runtime.arms().map(\.node) == ["branch-site:0"])

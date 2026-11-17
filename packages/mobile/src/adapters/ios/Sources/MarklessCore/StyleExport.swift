@@ -32,7 +32,6 @@ public struct StyleNode: Sendable {
 	public let frame: Frame?
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
 	public let writes: [StyleWrite]
-	public let variants: [(className: String, writes: [StyleWrite])]
 }
 
 /// One target of a decoded `dragon.native-style-export/0` file.
@@ -77,8 +76,7 @@ public struct StyleExport: Sendable {
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(
-			required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["variants"])
+		let field = try node.object(["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
@@ -103,11 +101,7 @@ public struct StyleExport: Sendable {
 		return StyleNode(
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
-			writes: try field["writes"].array().map(decodeWrite),
-			variants: field.has("variants") ? try field["variants"].array().map { variant in
-				let v = try variant.object(["class", "writes"])
-				return (className: try v["class"].string(), writes: try v["writes"].array().map(decodeWrite))
-			} : [])
+			writes: try field["writes"].array().map(decodeWrite))
 	}
 
 	private static func decodeWrite(_ write: Reader) throws -> StyleWrite {

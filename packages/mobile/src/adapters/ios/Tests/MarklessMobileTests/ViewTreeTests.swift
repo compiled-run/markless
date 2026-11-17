@@ -94,6 +94,18 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h3:text0", value: "gone")]) }
 }
 
+@Test func userDefaultsKeepEachValueAsItsOwnType() throws {
+	let defaults = try #require(UserDefaults(suiteName: "markless-ios-host-tests"))
+	defaults.removePersistentDomain(forName: "markless-ios-host-tests")
+	let store = UserDefaultsStore(defaults)
+	for value: NativeScalar in [.string("1"), .number(1), .bool(true), .number(-2.5), .string("")] {
+		store.write("k", value)
+		#expect(store.read("k") == value)
+	}
+	store.write("k", .null)
+	#expect(store.read("k") == nil)
+}
+
 @MainActor @Test func journalNamingAnUnknownNodeIsAnError() throws {
 	let views = try tree(try MarklessViewController(payload: counterPayload()))
 	#expect(throws: HostError.self) { try views.apply([.text(node: "h9:text0", value: "x")]) }

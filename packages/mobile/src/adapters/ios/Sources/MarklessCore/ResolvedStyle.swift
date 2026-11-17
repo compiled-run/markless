@@ -7,13 +7,11 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var cornerRadius: Double = 0
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
-	/// The look for each class string a `class` binding can produce: base writes, then the variant's.
-	public var variants: [String: ResolvedStyle] = [:]
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.variants == b.variants
+			&& a.textColor == b.textColor
 	}
 }
 
@@ -58,15 +56,9 @@ extension StyleExport {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)
-			for variant in styled.variants {
-				var look = try resolve(styled, styled.writes + variant.writes)
-				look.variants = [:]
-				style.variants[variant.className] = look
-			}
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
-			for key in Array(style.variants.keys) { style.variants[key]?.frame = style.frame }
 			styles[node.id] = style
 		}
 		return StyleLayout(styles: styles, viewport: viewport, dpr: dpr, fontFiles: fonts)

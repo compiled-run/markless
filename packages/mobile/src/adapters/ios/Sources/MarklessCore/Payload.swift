@@ -2,10 +2,12 @@ import Foundation
 
 public let nativeViewVersion = "markless.native-view/0"
 
+/// A value as JavaScript holds it: a number (IEEE double), string, boolean or null.
 public enum NativeScalar: Equatable, Sendable {
 	case number(Double)
 	case string(String)
 	case bool(Bool)
+	case null
 
 	/// JavaScript's `Boolean(value)`.
 	public var isTruthy: Bool {
@@ -13,6 +15,16 @@ public enum NativeScalar: Equatable, Sendable {
 		case let .number(value): return value != 0 && !value.isNaN
 		case let .string(value): return !value.isEmpty
 		case let .bool(value): return value
+		case .null: return false
+		}
+	}
+
+	var json: JSONValue {
+		switch self {
+		case let .number(value): return .number(value)
+		case let .string(value): return .string(value)
+		case let .bool(value): return .bool(value)
+		case .null: return .null
 		}
 	}
 
@@ -22,27 +34,44 @@ public enum NativeScalar: Equatable, Sendable {
 		case let .number(value): return formatJavaScriptNumber(value)
 		case let .string(value): return value
 		case let .bool(value): return value ? "true" : "false"
+		case .null: return "null"
 		}
 	}
 }
 
-/// A value computed from cells as data: JavaScript truthiness for `not` and `if`, `===` for `equals`.
+public enum NativeBuiltin: String, Sendable {
+	case string = "String", number = "Number", boolean = "Boolean"
+	case abs = "Math.abs", floor = "Math.floor", max = "Math.max", min = "Math.min", round = "Math.round"
+}
+
+/// A value computed from cells, with JavaScript's meaning (see `JavaScript.swift`).
 public indirect enum NativeExpr: Equatable, Sendable {
 	case cell(String)
 	case literal(NativeScalar)
-	case not(NativeExpr)
+	case unary(String, NativeExpr)
+	case binary(String, NativeExpr, NativeExpr)
+	case logical(String, NativeExpr, NativeExpr)
 	case conditional(test: NativeExpr, whenTrue: NativeExpr, whenFalse: NativeExpr)
-	case equals(NativeExpr, NativeExpr)
+	case template([NativeTemplatePart])
+	case length(NativeExpr)
+	case call(NativeBuiltin, [NativeExpr])
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
 		case .literal: return []
-		case let .not(inner): return inner.cells
+		case let .unary(_, inner), let .length(inner): return inner.cells
+		case let .binary(_, a, b), let .logical(_, a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
-		case let .equals(a, b): return a.cells + b.cells
+		case let .template(parts): return parts.flatMap { if case let .expr(e) = $0 { e.cells } else { [String]() } }
+		case let .call(_, arguments): return arguments.flatMap(\.cells)
 		}
 	}
+}
+
+public enum NativeTemplatePart: Equatable, Sendable {
+	case text(String)
+	case expr(NativeExpr)
 }
 
 public enum NativeTextPart: Equatable, Sendable {
@@ -92,22 +121,20 @@ public enum NativeEventName: String, Sendable {
 	case activate
 }
 
-public enum NativeOp: Equatable, Sendable {
-	case add(cell: String, value: Double)
-	case set(cell: String, value: NativeScalar)
-	case toggle(cell: String)
-
-	public var cell: String {
-		switch self {
-		case let .add(cell, _), let .set(cell, _), let .toggle(cell): return cell
-		}
-	}
+/// A state write: the cell takes the expression's value, evaluated before the write.
+public struct NativeOp: Equatable, Sendable {
+	public let cell: String
+	public let value: NativeExpr
 }
 
 public struct NativeCell: Equatable, Sendable {
 	public let id: String
 	public let name: String
 	public let initial: NativeScalar
+	/// The device-kept value's key: read at mount, written on every write.
+	public let storageKey: String?
+	/// A class binding reads this cell, so its changes are journalled as `state`.
+	public let styled: Bool
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -141,8 +168,17 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(["id", "name", "initial"])
-			return NativeCell(id: try field["id"].string(), name: try field["name"].string(), initial: try field["initial"].scalar())
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled"])
+			let initial = try field["initial"].scalar()
+			if initial == .null { throw PayloadError(path: try field["initial"].path, reason: "a cell's initial value is a number, string or boolean") }
+			var styled = false
+			if field.has("styled") {
+				guard try field["styled"].bool() else { throw PayloadError(path: try field["styled"].path, reason: "styled is only ever true") }
+				styled = true
+			}
+			return NativeCell(
+				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
+				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
@@ -195,14 +231,9 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let ops = try field["ops"].array().map { op -> NativeOp in
 				let name = try op.field("op").string()
 				switch name {
-				case "add":
+				case "assign":
 					let opField = try op.object(["op", "cell", "value"])
-					return .add(cell: try opField["cell"].string(), value: try opField["value"].number())
-				case "set":
-					let opField = try op.object(["op", "cell", "value"])
-					return .set(cell: try opField["cell"].string(), value: try opField["value"].scalar())
-				case "toggle":
-					return .toggle(cell: try op.object(["op", "cell"])["cell"].string())
+					return NativeOp(cell: try opField["cell"].string(), value: try decodeExpr(try opField["value"]))
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
@@ -223,20 +254,43 @@ public struct NativeViewPayload: Equatable, Sendable {
 		return NativeArmPlace(branch: try arm["branch"].string(), index: Int(index))
 	}
 
+	static func decodeExpression(_ json: JSONValue) throws -> NativeExpr { try decodeExpr(try Reader(json, at: "expr")) }
+
 	private static func decodeExpr(_ reader: Reader) throws -> NativeExpr {
 		let keys = try reader.keys()
+		let field = { (key: String) throws -> Reader in try reader.field(key) }
+		let oneOf = { (key: String, allowed: Set<String>) throws -> String in
+			let name = try field(key).string()
+			guard allowed.contains(name) else { throw PayloadError(path: reader.path + "." + key, reason: "unknown operator \"\(name)\"") }
+			return name
+		}
 		switch keys.sorted() {
-		case ["cell"]: return .cell(try reader.field("cell").string())
-		case ["literal"]: return .literal(try reader.field("literal").scalar())
-		case ["not"]: return .not(try decodeExpr(try reader.field("not")))
+		case ["cell"]: return .cell(try field("cell").string())
+		case ["literal"]: return .literal(try field("literal").scalar())
+		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+"]), try decodeExpr(try field("value")))
+		case ["binary", "left", "right"]:
+			return .binary(
+				try oneOf("binary", ["+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">="]),
+				try decodeExpr(try field("left")), try decodeExpr(try field("right")))
+		case ["left", "logical", "right"]:
+			return .logical(try oneOf("logical", ["&&", "||", "??"]), try decodeExpr(try field("left")), try decodeExpr(try field("right")))
 		case ["if", "whenFalse", "whenTrue"]:
 			return .conditional(
-				test: try decodeExpr(try reader.field("if")), whenTrue: try decodeExpr(try reader.field("whenTrue")),
-				whenFalse: try decodeExpr(try reader.field("whenFalse")))
-		case ["equals"]:
-			let pair = try reader.field("equals").array()
-			guard pair.count == 2 else { throw PayloadError(path: reader.path + ".equals", reason: "equals takes two expressions") }
-			return .equals(try decodeExpr(pair[0]), try decodeExpr(pair[1]))
+				test: try decodeExpr(try field("if")), whenTrue: try decodeExpr(try field("whenTrue")),
+				whenFalse: try decodeExpr(try field("whenFalse")))
+		case ["template"]:
+			return .template(try field("template").array().map { part in
+				if case let .string(text) = part.value { return .text(text) }
+				return .expr(try decodeExpr(part))
+			})
+		case ["member", "property"]:
+			let property = try field("property").string()
+			guard property == "length" else { throw PayloadError(path: reader.path + ".property", reason: "unknown property \"\(property)\"") }
+			return .length(try decodeExpr(try field("member")))
+		case ["arguments", "call"]:
+			let name = try field("call").string()
+			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }
+			return .call(builtin, try field("arguments").array().map(decodeExpr))
 		default: throw PayloadError(path: reader.path, reason: "unknown expression with keys \(keys)")
 		}
 	}
@@ -286,8 +340,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard handlerIds.insert(handler.id).inserted else {
 				throw PayloadError(path: "payload.handlers", reason: "duplicate handler \(handler.id)")
 			}
-			for op in handler.ops where !cellIds.contains(op.cell) {
-				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) writes unknown cell \(op.cell)")
+			for op in handler.ops where !cellIds.contains(op.cell) || !op.value.cells.allSatisfy(cellIds.contains) {
+				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
 			}
 		}
 		for event in events {
@@ -372,7 +426,8 @@ struct Reader {
 		case let .number(number): return .number(number)
 		case let .string(text): return .string(text)
 		case let .bool(flag): return .bool(flag)
-		default: throw fail("expected a number, string or boolean")
+		case .null: return .null
+		default: throw fail("expected a number, string, boolean or null")
 		}
 	}
 

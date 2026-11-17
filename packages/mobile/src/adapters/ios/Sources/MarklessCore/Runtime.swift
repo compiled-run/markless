@@ -12,6 +12,8 @@ public struct NativeAction: Equatable, Sendable {
 /// One change the host applies to its retained views after a handler runs.
 public enum NativeJournalEntry: Equatable, Sendable {
 	case text(node: String, value: String)
+	/// A styled cell's new value: the host moves to the style export's next assignment.
+	case state(cell: String, value: NativeScalar)
 	/// nil removes the attribute; "" is a bare attribute.
 	case attribute(node: String, name: String, value: String?)
 	/// Shows arm `index` of a branch (nil: none), built from current values; the old arm's views go.
@@ -20,6 +22,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	public var json: JSONValue {
 		switch self {
 		case let .text(node, value): return .object([("op", .string("text")), ("node", .string(node)), ("value", .string(value))])
+		case let .state(cell, value):
+			return .object([("op", .string("state")), ("cell", .string(cell)), ("value", value.json)])
 		case let .attribute(node, name, value):
 			return .object([("op", .string("attribute")), ("node", .string(node)), ("name", .string(name)), ("value", value.map(JSONValue.string) ?? .null)])
 		case let .arm(node, index):
@@ -33,16 +37,35 @@ public struct RuntimeError: Error, CustomStringConvertible, Equatable {
 	public var description: String { reason }
 }
 
+/// Device-kept values by storage key (iOS: `UserDefaults`).
+public protocol NativeStore: AnyObject {
+	func read(_ key: String) -> NativeScalar?
+	func write(_ key: String, _ value: NativeScalar)
+}
+
+public final class MemoryStore: NativeStore {
+	public private(set) var values: [String: NativeScalar]
+	public init(_ values: [String: NativeScalar] = [:]) { self.values = values }
+	public func read(_ key: String) -> NativeScalar? { values[key] }
+	public func write(_ key: String, _ value: NativeScalar) { values[key] = value }
+}
+
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
 	private var values: [String: NativeScalar]
+	private let store: NativeStore
+	private let storageKeys: [String: String]
 	private let handlers: [String: [NativeOp]]
 	private let branches: [String: (test: NativeExpr, arms: Int, arm: NativeArmPlace?)]
 
-	public init(payload: NativeViewPayload) {
+	public init(payload: NativeViewPayload, store: NativeStore = MemoryStore()) {
 		self.payload = payload
-		values = Dictionary(uniqueKeysWithValues: payload.cells.map { ($0.id, $0.initial) })
+		self.store = store
+		values = Dictionary(uniqueKeysWithValues: payload.cells.map { cell in
+			(cell.id, cell.storageKey.flatMap(store.read) ?? cell.initial)
+		})
+		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		branches = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .branch(id, _, test, arms, arm) = node { return (id, (test, arms, arm)) }
@@ -55,13 +78,41 @@ public final class NativeRuntime {
 		return value
 	}
 
+	/// The current value of a cell.
+	public func value(of cell: String) throws -> NativeScalar { try read(cell) }
+
 	public func evaluate(_ expr: NativeExpr) throws -> NativeScalar {
 		switch expr {
 		case let .cell(cell): return try read(cell)
 		case let .literal(value): return value
-		case let .not(inner): return .bool(!(try evaluate(inner).isTruthy))
+		case let .unary(op, inner):
+			let value = try evaluate(inner)
+			switch op {
+			case "!": return .bool(!value.isTruthy)
+			case "-": return .number(-value.number)
+			default: return .number(value.number)
+			}
+		case let .binary(op, left, right): return try evaluateBinary(op, evaluate(left), evaluate(right))
+		case let .logical(op, left, right):
+			let value = try evaluate(left)
+			switch op {
+			case "&&": return value.isTruthy ? try evaluate(right) : value
+			case "||": return value.isTruthy ? value : try evaluate(right)
+			default: return value == .null ? try evaluate(right) : value
+			}
 		case let .conditional(test, whenTrue, whenFalse): return try evaluate(test).isTruthy ? evaluate(whenTrue) : evaluate(whenFalse)
-		case let .equals(a, b): return .bool(try evaluate(a) == evaluate(b))
+		case let .template(parts):
+			return .string(try parts.map { part in
+				switch part {
+				case let .text(text): return text
+				case let .expr(inner): return try evaluate(inner).text
+				}
+			}.joined())
+		case let .length(inner):
+			let value = try evaluate(inner)
+			guard case let .string(text) = value else { throw RuntimeError(reason: ".length of a \(value == .null ? "null" : "non-string")") }
+			return .number(Double(text.utf16.count))
+		case let .call(builtin, arguments): return evaluateCall(builtin, try arguments.map(evaluate))
 		}
 	}
 
@@ -116,27 +167,23 @@ public final class NativeRuntime {
 		guard let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event }) else {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
 		}
+		let cellsBefore = values
 		let beforeTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
 		let beforeAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		for op in handlers[bound.handler] ?? [] {
-			switch op {
-			case let .add(cell, amount):
-				guard case let .number(value) = try read(cell) else {
-					throw RuntimeError(reason: "add on \(cell), which does not hold a number")
-				}
-				values[cell] = .number(value + amount)
-			case let .set(cell, value):
-				_ = try read(cell)
-				values[cell] = value
-			case let .toggle(cell):
-				values[cell] = .bool(!(try read(cell).isTruthy))
-			}
+			let value = try evaluate(op.value)
+			values[op.cell] = value
+			if let key = storageKeys[op.cell] { store.write(key, value) }
 		}
 		let afterTexts = Dictionary(uniqueKeysWithValues: try texts().map { ($0.node, $0.text) })
 		let afterAttributes = Dictionary(uniqueKeysWithValues: try attributes().map { ("\($0.node)\u{0}\($0.name)", $0.value) })
 		let afterArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
-		return payload.nodes.flatMap { node -> [NativeJournalEntry] in
+		let styles = payload.cells.compactMap { cell -> NativeJournalEntry? in
+			guard cell.styled, let before = cellsBefore[cell.id], let after = values[cell.id], !before.strictlyEquals(after) else { return nil }
+			return .state(cell: cell.id, value: after)
+		}
+		return styles + payload.nodes.flatMap { node -> [NativeJournalEntry] in
 			switch node {
 			case let .text(id, _, _, _):
 				guard let before = beforeTexts[id], let after = afterTexts[id], before != after else { return [] }
