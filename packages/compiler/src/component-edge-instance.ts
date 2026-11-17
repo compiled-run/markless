@@ -162,6 +162,8 @@ export type ComponentEdgeSymbolRoute = {
 	readonly componentEdgeId: string;
 	/** The child's own symbol ids this edge binds, to the bound row that carries the edge's captures. */
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	/** The bound ids the child answers for a callback this module hands it to forward, to this module's row. */
+	readonly forwardedSymbols?: Readonly<Record<string, string>>;
 } & ({ readonly importSource: string; readonly selfRecursive?: true } | { readonly self: true });
 
 // Whether a same-module edge sits on a cycle: the component it places reaches
@@ -223,6 +225,7 @@ export function componentEdgeSymbolRoutes(
 		]),
 	);
 	const boundByEdge = edgeBoundSymbols(compiled.captureAnalysis);
+	const forwardedByEdge = edgeForwardedSymbols(compiled.captureAnalysis);
 	const boundByInstance = instanceBoundSymbols(compiled.captureAnalysis, boundByEdge);
 	return compiled.semanticGraph.componentEdges
 		.flatMap((edge, index): ComponentEdgeSymbolRoute[] => {
@@ -257,11 +260,19 @@ export function componentEdgeSymbolRoutes(
 			// route strips the instance path and answers from the page's own
 			// resolver. It never names an import, so it never reaches the
 			// manifest's import resolution.
-			if (edge.importSource)
+			if (edge.importSource) {
+				const forwardedSymbols = forwardedByEdge.get(edge.id);
 				return [
 					...instanceRoutes,
-					{ prefix, importSource: edge.importSource, componentEdgeId: edge.id, ...bound },
+					{
+						prefix,
+						importSource: edge.importSource,
+						componentEdgeId: edge.id,
+						...bound,
+						...(forwardedSymbols ? { forwardedSymbols } : {}),
+					},
 				];
+			}
 			// A cyclic same-module edge is entered once per rendered level, so what
 			// is left after one strip may carry more of the same segments. Naming
 			// this module itself re-enters this route table instead of dropping to
@@ -302,6 +313,19 @@ function edgeBoundSymbols(
 	const byEdge = new Map<string, Record<string, string>>();
 	for (const entry of componentEdgeBoundSymbolEntries(captureAnalysis)) {
 		if (entry.via !== 'own' || entry.forwarded) continue;
+		byEdge.set(entry.edgeId, { ...byEdge.get(entry.edgeId), [entry.key]: entry.rowId });
+	}
+	return byEdge;
+}
+
+function edgeForwardedSymbols(
+	captureAnalysis:
+		| Pick<CaptureAnalysisArtifact, 'boundResolverRows' | 'extractedSymbols'>
+		| undefined,
+): ReadonlyMap<string, Readonly<Record<string, string>>> {
+	const byEdge = new Map<string, Record<string, string>>();
+	for (const entry of componentEdgeBoundSymbolEntries(captureAnalysis)) {
+		if (entry.via !== 'own' || !entry.forwarded) continue;
 		byEdge.set(entry.edgeId, { ...byEdge.get(entry.edgeId), [entry.key]: entry.rowId });
 	}
 	return byEdge;

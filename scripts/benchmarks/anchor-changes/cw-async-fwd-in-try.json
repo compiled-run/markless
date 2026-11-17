@@ -1,0 +1,88 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"executedChars"
+			],
+			"delta": 331,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 358,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 357,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 354,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 320,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 320,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion playground",
+				"jsGzipBytes"
+			],
+			"delta": 1,
+			"reason": "a forwarded row callback runs when the row changes inside a @try: the runtime docs pages load carries the forwarding path; measured on CI runs 44188923468 vs 44185564136",
+			"date": "2026-11-17"
+		}
+	]
+}

@@ -30,6 +30,7 @@ export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly forwardedSymbols?: Readonly<Record<string, string>>;
 };
 
 // A child declared in the SAME module carries an instance path like any other

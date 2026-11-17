@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
 import GuardedForwarded from './forwarded-row-callback/guarded-forwarded.tsrx';
+import GuardedRenamed from './forwarded-row-callback/guarded-renamed.tsrx';
 import GuardedRow from './forwarded-row-callback/guarded-row.tsrx';
 import OneLevel from './forwarded-row-callback/one-level.tsrx';
 import ThreeLevels from './forwarded-row-callback/three-levels.tsrx';
@@ -88,9 +89,7 @@ test('SSR resume: a row child calls its callback from a button inside its own @t
 		'solo',
 	]);
 });
-// A handler mounted in the browser with the child's own @try arm is looked up through each module's symbol
-// route table, which does not carry callbacks a middle module forwards, so it reads the middle's prop instead.
-test.fails("CSR: a forwarded row callback called from inside the row child's own @try", async () => {
+test("CSR: a forwarded row callback called from inside the row child's own @try", async () => {
 	await savingInsideATryRunsTheCallback(
 		(await render(GuardedForwarded)).container as HTMLElement,
 		['right', 'left'],
@@ -100,5 +99,29 @@ test("SSR resume: a forwarded row callback called from inside the row child's ow
 	await savingInsideATryRunsTheCallback(
 		(await renderSSR(GuardedForwarded)).container as HTMLElement,
 		['right', 'left'],
+	);
+});
+
+async function takingSlotsInsideATryRunsTheCallback(container: HTMLElement) {
+	const taken = () => container.querySelector('[data-taken]')?.textContent;
+	const slot = (code: string) => container.querySelector<HTMLElement>(`[data-slot="${code}"]`);
+	await withoutPageErrors(async () => {
+		for (const code of ['k7', 'm2', 'q9'])
+			await expect.poll(() => slot(code)?.textContent).toBe(`take ${code}`);
+		slot('q9')!.click();
+		await expect.poll(taken).toBe('q9');
+		slot('k7')!.click();
+		await expect.poll(taken).toBe('q9,k7');
+	});
+}
+
+test("CSR: a callback renamed down three components runs from inside the row child's own @try", async () => {
+	await takingSlotsInsideATryRunsTheCallback(
+		(await render(GuardedRenamed)).container as HTMLElement,
+	);
+});
+test("SSR resume: a callback renamed down three components runs from inside the row child's own @try", async () => {
+	await takingSlotsInsideATryRunsTheCallback(
+		(await renderSSR(GuardedRenamed)).container as HTMLElement,
 	);
 });
