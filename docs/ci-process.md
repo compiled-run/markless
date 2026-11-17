@@ -157,6 +157,7 @@ An entry is a table row naming the test, its expiry date, its owner and why it i
 
 | Test | Expires | Owner | Why |
 | --- | --- | --- | --- |
+| `packages/router/test/vite/first-write-sync.test.ts`, production build, `/` | 2026-12-01 | thejackshelton | A product race, not the test. The page's first press evaluates its route pack, which warms the roster pack on a `setTimeout`. When the handler's write reaches the `disabled={hand.length === deck.length}` sync computed before that timer, the roster loads by native `import()` a task later, and the flush holds `{hand.length} cards` behind it, past the view transition's "after" snapshot. Failed `unit (1/3)` on #737 (CI run 44026595611), and was reported on #709. With the browser CPU slowed 6x, 18 of 20 runs fail on `main` at `ae49000ea` and 0 of 20 on #722 merged onto it (load average 15 to 21); unslowed, 0 of 20 fail. #722, which loads the code a press's writes reach before the handler runs, roster included, is the fix; it removes this entry. |
 
 ### Quarantine list
 

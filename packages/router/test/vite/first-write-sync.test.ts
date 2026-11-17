@@ -13,6 +13,15 @@ import { launchBrowser } from '../../../../scripts/test-utils/browser.ts';
 
 vi.setConfig({ testTimeout: 60_000 });
 
+// docs/ci-process.md "Quarantined tests": skipped until it expires, then it fails instead of skipping.
+const QUARANTINED = {
+	path: '/',
+	owner: 'thejackshelton',
+	expires: '2026-12-01',
+	fix: 'https://github.com/compiled-run/markless/pull/722',
+};
+const today = () => new Date().toISOString().slice(0, 10);
+
 const packagesRoot = resolve(import.meta.dirname, '../../..');
 const roots: string[] = [];
 let browser: Browser | undefined;
@@ -100,8 +109,18 @@ describe('production build', () => {
 	}, 240_000);
 	afterAll(() => server?.close());
 
-	for (const { path, rows, seen } of pages)
-		test(`${path}: every write, the first included, has reached the page when the handler returns`, async () => {
+	for (const { path, rows, seen } of pages) {
+		const name = `${path}: every write, the first included, has reached the page when the handler returns`;
+		if (path === QUARANTINED.path && today() <= QUARANTINED.expires) {
+			test.skip(name);
+			continue;
+		}
+		test(name, async () => {
+			if (path === QUARANTINED.path)
+				throw new Error(
+					`The quarantine of "${path}" expired on ${QUARANTINED.expires} (owner ${QUARANTINED.owner}): land ${QUARANTINED.fix} or renew the entry in docs/ci-process.md.`,
+				);
 			expect(await seenAfterWrites(server!.origin, path, rows)).toEqual(seen);
 		});
+	}
 });
