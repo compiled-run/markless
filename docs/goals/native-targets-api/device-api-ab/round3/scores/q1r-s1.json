@@ -1,0 +1,272 @@
+{
+ "HN-1": {
+  "1a": 0,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 1,
+  "3": 0,
+  "4": 0,
+  "confidence": 3,
+  "zeros": {
+   "1a": "You see a live camera preview once the browser has asked for camera permission",
+   "1b": "If you allow it, you see \"You are at <lat>, <lon>\"",
+   "1d": "When the connection drops, \"You are offline\" appears at the top.",
+   "1e": "In Safari, and probably recent Chrome, the macOS share menu opens",
+   "3": "Like always counts, so the button never does nothing ... Share may do nothing in browsers without Web Share, such as Firefox",
+   "4": "No line is limited to certain builds ... camera() ... and geolocation(): native APIs in the apps, browser permission APIs on the web"
+  }
+ },
+ "HN-2": {
+  "1a": 0,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 0,
+  "4": 0,
+  "confidence": 3,
+  "zeros": {
+   "1a": "The camera area probably shows a live webcam preview through the browser's camera API",
+   "1b": "If the visitor allows it, the page shows \"You are at lat, lng\"",
+   "1d": "\"You are offline\" appears when the connection drops",
+   "1e": "In browsers with the Web Share API (Safari, recent Chrome on macOS), the macOS share menu opens",
+   "2f": "modifierKey is probably not '⌘' and the hint reads \"Press Ctrl+K to search\"",
+   "3": "No button is clearly dead for everyone.",
+   "4": "No line in this file is explicitly conditional on the build ... Every line exists in all four builds"
+  }
+ },
+ "HN-3": {
+  "1a": 0,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 1,
+  "3": 0,
+  "4": 0,
+  "confidence": 3,
+  "zeros": {
+   "1a": "base.camera shows a live preview from the Mac's webcam",
+   "1b": "If they allow it, the text becomes \"You are at 12.3456, -7.8901\"",
+   "1d": "When the connection drops, \"You are offline\" appears at the top",
+   "1e": "On browsers that support web sharing (Safari, recent Chrome), I'd expect the macOS share menu to open",
+   "3": "Mostly no",
+   "4": "as far as this file shows, every line runs in all four builds ... getUserMedia (the browser camera interface) on the web"
+  }
+ },
+ "QT-1": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "I lean towards it appearing.",
+   "1e": "If it appears, clicking it opens the system share sheet ... If not, there is no button. (no lean)",
+   "2f": "If modifierKey is '⌘' ... \"Press ⌘K\". If it is something else or null, it shows \"Press Ctrl+K\" (no lean)"
+  }
+ },
+ "QT-2": {
+  "1a": 1,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1b": "If geolocation.supported is false on the web ... If it is true (browsers do have a location API), they see \"Finding you…\" (no lean)",
+   "1d": "network.supported is probably true. When the connection drops, \"You are offline\" appears",
+   "1e": "Safari has it ... If the button shows, it opens the macOS share menu",
+   "2f": "modifierKey is probably not '⌘' ... The text then reads \"Press Ctrl+K to search\""
+  }
+ },
+ "QT-3": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "If network.supported is true on web, which is likely ... \"You are offline\" appears",
+   "1e": "Safari on Mac has a share menu ... If shown, pressing it opens the system share menu",
+   "2f": "Probably \"Press Ctrl+K to search\""
+  }
+ },
+ "VR-1": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 1,
+  "1e": 1,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 3,
+  "zeros": {}
+ },
+ "VR-2": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 1,
+  "1e": 1,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 3,
+  "zeros": {}
+ },
+ "VR-3": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 1,
+  "1e": 1,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 3,
+  "zeros": {}
+ },
+ "LX-1": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "I'm guessing that network() works on the web ... \"You are offline\" appears",
+   "1e": "If the browser supports the share sheet (Safari on Mac does), the system share panel opens ... Which of these happens is a guess.",
+   "2f": "Probably \"Press Ctrl+K to search\""
+  }
+ },
+ "LX-2": {
+  "1a": 1,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 1,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1b": "If geolocation() throws on the web ... If it works through the browser, they first see \"Finding you…\" (no lean)",
+   "1d": "I lean towards it working",
+   "2f": "This is unclear ... \"Press ⌘K\" ... or \"Press Ctrl+K\" (no lean)"
+  }
+ },
+ "LX-3": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 1,
+  "2ae": 1,
+  "2f": 0,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "I expect network() to work. When the connection drops, \"You are offline\" appears",
+   "1e": "My guess is that it depends on the browser.",
+   "2f": "The hint likely says \"Press Ctrl+K to search\""
+  }
+ },
+ "GP-1": {
+  "1a": 1,
+  "1b": 0,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 0,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1b": "Browsers have a location API, so geolocation.supported may be true ... the visitor sees \"Finding you…\"",
+   "1d": "The banner probably appears.",
+   "1e": "Safari on a Mac supports web sharing, so the Share button would show",
+   "1f": "This is ambiguous. ... \"Press ⌘K\" ... \"Ctrl+K\" (no lean)"
+  }
+ },
+ "GP-2": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 0,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "I'm guessing it is supported.",
+   "1e": "Safari on a Mac likely does, so the button appears and opens the system share menu",
+   "1f": "The name suggests it describes the device, but the code doesn't say which."
+  }
+ },
+ "GP-3": {
+  "1a": 1,
+  "1b": 1,
+  "1c": 1,
+  "1d": 0,
+  "1e": 0,
+  "1f": 0,
+  "2ae": 1,
+  "2f": 1,
+  "3": 1,
+  "4": 1,
+  "confidence": 2,
+  "zeros": {
+   "1d": "I'm guessing network.supported is true in browsers ... \"You are offline\" appears",
+   "1e": "I'm guessing Safari on macOS has one, so the Share button appears",
+   "1f": "I lean slightly toward ⌘K."
+  }
+ }
+}

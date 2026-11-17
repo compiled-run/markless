@@ -1,0 +1,11 @@
+1: `settings.open()` opens the phone's Settings app. `cameraApp.open()` opens the phone's own camera app. `photoLibrary.open()` opens the phone's photo library or picker. `sharesheet.open({ url: last.url })` opens the phone's share sheet. Settings, the camera app and the photo picker are partly guesses based on their names.
+
+2: `cam.takePhoto()`, where `cam` is the `camera()` object shown by `<base.camera el={cam} />`.
+
+3: `settings.open()` seems to return nothing that is used. The code doesn't await it, so it may return a promise, but I'm guessing. `cam.takePhoto()` returns a Promise of a `Photo`, which has `.url`. The code assigns it straight to `last`, so I assume it never returns null. If it fails, it probably throws. `cameraApp.open()` returns a Promise of `Photo` or null/undefined. `?? last` means a missing result keeps the previous photo, which I guess happens when the user cancels. `photoLibrary.open()` works the same way: a Promise of `Photo` or null/undefined, empty when cancelled (a guess). `sharesheet.open({ url })` has its result ignored and isn't awaited. It may return a promise that says whether sharing finished, but that is a guess.
+
+4: "Use phone camera" leaves the page for the phone's own camera app, where the user takes a new photo. "Choose a photo" opens the photo library, where the user picks a photo that already exists. Both return a `Photo` or nothing if cancelled, and both keep the previous `last` when nothing comes back. Neither uses the camera shown on the page, and neither depends on `cam.ready` or on camera access.
+
+5: `camera()` and `cameraApp` are easy to mix up: one is the camera shown on the page, the other is the phone's own camera app, and only the "App" suffix tells them apart. `<base.camera el={cam} />` also reuses the word "camera". `cam.access === 'denied'` made me unsure. I can't tell whether it covers `cameraApp` too, or what the other values are (perhaps 'prompt' or 'granted'). I also can't tell whether `cam.ready` is false while access is denied. `settings.open()` is a bit vague: it could be the app's own settings rather than the phone's Settings, though the "Camera access is off" text suggests the phone's.
+
+Tools used: none

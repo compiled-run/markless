@@ -1,0 +1,425 @@
+{
+ "HN-1": {
+  "web": {
+   "camera": "empty preview; 'Take photo' disabled forever; no photo",
+   "location": "'Finding you…' forever (access stays 'unknown')",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (online stays true)",
+   "share": "'Share' button; promise never settles, nothing happens",
+   "hint": "'Press ⌘K to search' (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever)",
+   "Share (does nothing)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Writer's website description is accurate."
+ },
+ "HN-2": {
+  "web": {
+   "camera": "empty preview; 'Take photo' disabled forever; no photo",
+   "location": "'Finding you…' forever (access stays 'unknown')",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (online stays true)",
+   "share": "'Share' button; promise never settles, nothing happens",
+   "hint": "'Press ⌘K to search' (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever)",
+   "Share (does nothing)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Writer's website description is accurate."
+ },
+ "HN-3": {
+  "web": {
+   "camera": "empty preview; 'Take photo' disabled forever; no photo",
+   "location": "'Finding you…' forever (access stays 'unknown')",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (online stays true)",
+   "share": "'Share' button; promise never settles, nothing happens",
+   "hint": "'Press ⌘K to search' (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever)",
+   "Share (does nothing)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Also shows a camera-refused message on the phone (never on web)."
+ },
+ "HN-4": {
+  "web": {
+   "camera": "empty preview; 'Take photo' disabled forever; no photo",
+   "location": "'Finding you…' forever (access stays 'unknown')",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (online stays true)",
+   "share": "'Share' button; promise never settles, nothing happens",
+   "hint": "'Press ⌘K to search' (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever)",
+   "Share (does nothing)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Split into child components; adds a 'taking' flag. Website description accurate."
+ },
+ "HN-5": {
+  "web": {
+   "camera": "empty preview; 'Take photo' disabled forever; no photo",
+   "location": "'Finding you…' forever (access stays 'unknown')",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (online stays true)",
+   "share": "'Share' button; promise never settles, nothing happens",
+   "hint": "'Press ⌘K to search' (modifierKey reads visitor's system)"
+  },
+  "deadButtons": [
+   "Take photo (disabled forever)",
+   "Share (does nothing)"
+  ],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Writer's website description is accurate."
+ },
+ "QT-1": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown (guarded by network.supported)",
+   "share": "'Copy link' button copies url, label changes to 'Link copied'",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "All field reads, awaits and the camera element sit inside supported guards."
+ },
+ "QT-2": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Copy link' button copies url, label changes to 'Link copied'",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Take photo has no disabled state on phone; takePhoto waits until ready, so fine."
+ },
+ "QT-3": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "plain link showing the url (no button)",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Share fallback is just an <a href={url}>; no web share action."
+ },
+ "QT-4": {
+  "web": {
+   "camera": "message: photos in iPhone/Android apps",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "text 'Share this post:' with a link to the page",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Redundant supported check inside handlers; all uses guarded."
+ },
+ "QT-5": {
+  "web": {
+   "camera": "message: open in iPhone/Android app to take photos",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "link 'Link to this page: <title>' (no button)",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "Split into CameraPanel and Location files; each guards its own uses."
+ },
+ "VR-1": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Share' calls navigator.share (browser share panel) or, where absent, silently copies url",
+   "hint": "'Press ⌘K to search' via userAgent sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.userAgent (/Mac/), navigator.share, navigator.clipboard",
+  "notes": "In a Mac browser without navigator.share (e.g. Firefox) Share silently copies with no visible feedback. Hint computed once in component body from navigator; server render would give Ctrl+K."
+ },
+ "VR-2": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Share' calls navigator.share or, where absent, silently copies url",
+   "hint": "'Press ⌘K to search' via navigator.platform sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.platform (/Mac/), navigator.share, navigator.clipboard",
+  "notes": "Same silent-copy caveat as VR-1 for browsers without navigator.share."
+ },
+ "VR-3": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Share' calls navigator.share or, where absent, silently copies url",
+   "hint": "'Press ⌘K to search' via userAgent sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.userAgent.includes('Mac'), navigator.share, navigator.clipboard",
+  "notes": "Same silent-copy caveat as VR-1."
+ },
+ "VR-4": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "text 'Share this page:' with link to url",
+   "hint": "'Press ⌘K (Mac) or Ctrl+K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [
+   "<base.camera el={cam} />",
+   "disabled={!cam.ready}",
+   "photo = await cam.takePhoto();",
+   "@if (cam.access === 'denied')",
+   "@if (geo.access === 'denied')",
+   "@if (geo.position === null)",
+   "{geo.position.latitude.toFixed(5)}, {geo.position.longitude.toFixed(5)} (within {Math.round(geo.position.accuracy)} m)"
+  ],
+  "macWebHint": "both",
+  "phoneOk": true,
+  "extraWebCode": false,
+  "notes": "CameraPanel and LocationPanel use their objects with no guard of their own; they are only mounted inside a platform guard in Post, but the sheet defines a guard as an @if/if around the use, so the build would reject these. Web behaviour assumes it built."
+ },
+ "VR-5": {
+  "web": {
+   "camera": "nothing (empty section, no message)",
+   "location": "nothing (empty section, no message)",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "link to page plus 'Copy link' button (copies url, label changes)",
+   "hint": "'Press ⌘K to search' via navigator.platform sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.platform (/Mac|iPhone|iPad/), navigator.clipboard",
+  "notes": "Website visitor gets no explanation that camera/location are missing: two empty sections."
+ },
+ "LX-1": {
+  "web": {
+   "camera": "@catch fallback: camera in iPhone/Android apps",
+   "location": "@catch fallback: location in iPhone/Android apps",
+   "like": "count works; tap throws, caught in handler",
+   "offline": "@catch shows empty hidden span; no banner",
+   "share": "'Share' rejects NotSupportedError, falls back to clipboard copy with 'Link copied' note",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Six components; each device part wrapped in @try in Post."
+ },
+ "LX-2": {
+  "web": {
+   "camera": "@catch fallback: camera in iPhone/Android apps",
+   "location": "@catch fallback: location in iPhone/Android apps",
+   "like": "count works; tap throws, caught in handler",
+   "offline": "@catch renders empty fragment; no banner",
+   "share": "'Share' falls back to clipboard copy with 'Link copied' note",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Any sharesheet rejection (not only NotSupportedError) falls back to copy."
+ },
+ "LX-3": {
+  "web": {
+   "camera": "@catch fallback: camera in iPhone/Android apps",
+   "location": "@catch fallback: location in iPhone/Android apps",
+   "like": "count works; tap throws, caught in handler",
+   "offline": "empty fragment; no banner",
+   "share": "'Share' uses navigator.share (browser share panel) or clipboard copy with 'Link copied'",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.share, navigator.clipboard",
+  "notes": "Take photo not disabled on phone; takePhoto waits until ready, fine."
+ },
+ "LX-4": {
+  "web": {
+   "camera": "@catch fallback: camera in iPhone/Android apps",
+   "location": "@catch fallback: location in iPhone/Android apps",
+   "like": "count works; tap throws, caught in handler",
+   "offline": "empty fragment; no banner",
+   "share": "'Share' uses navigator.share or clipboard copy with 'Link copied'",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.share, navigator.clipboard",
+  "notes": ""
+ },
+ "LX-5": {
+  "web": {
+   "camera": "@catch fallback: camera in iPhone/Android apps",
+   "location": "@catch fallback: location in iPhone/Android apps",
+   "like": "count works; tap throws NotSupportedError, caught in handler",
+   "offline": "empty fragment; no banner",
+   "share": "'Share' uses navigator.share or clipboard copy with 'Link copied.'",
+   "hint": "'Press ⌘K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": null,
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.share, navigator.clipboard",
+  "notes": "@catch arms branch on error.name and show other errors' messages."
+ },
+ "GP-1": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Share' button uses navigator.share, else (or on cancel) copies url and label becomes 'Link copied'",
+   "hint": "'Press ⌘K to search' via navigator.platform/userAgent sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.platform/userAgent, navigator.share, navigator.clipboard",
+  "notes": "Cancelling the browser share panel falls through to a clipboard copy. Hint computed once in component body from navigator."
+ },
+ "GP-2": {
+  "web": {
+   "camera": "message: photos in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Copy link' button copies url, label becomes 'Link copied'",
+   "hint": "'Press Ctrl+K to search' (platform.macos false in website build)"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "Ctrl+K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Mac website visitor gets the wrong hint."
+ },
+ "GP-3": {
+  "web": {
+   "camera": "message: camera in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Copy link' button copies url, label becomes 'Link copied'",
+   "hint": "'Press Ctrl+K to search' (platform.macos false)"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "Ctrl+K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Mac website visitor gets the wrong hint."
+ },
+ "GP-4": {
+  "web": {
+   "camera": "message: photos in iPhone/Android apps",
+   "location": "message: location shown in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Copy link' button copies url, label becomes 'Link copied'",
+   "hint": "'Press ⌘K (on a Mac) or Ctrl+K to search'"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "both",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.clipboard.writeText",
+  "notes": "Redundant 'camera.supported &&' inner tests; all uses guarded."
+ },
+ "GP-5": {
+  "web": {
+   "camera": "message: photos in iPhone/Android apps",
+   "location": "message: location in iPhone/Android apps",
+   "like": "count works; tap does nothing",
+   "offline": "never shown",
+   "share": "'Share' uses navigator.share or clipboard copy with 'Link copied' note",
+   "hint": "'Press ⌘K to search' via navigator.platform sniff"
+  },
+  "deadButtons": [],
+  "unguarded": [],
+  "macWebHint": "⌘K",
+  "phoneOk": true,
+  "extraWebCode": "true: navigator.platform, navigator.share, navigator.clipboard",
+  "notes": ""
+ }
+}

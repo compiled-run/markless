@@ -1,0 +1,488 @@
+{
+ "q2blind": {
+  "W1": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "platform.os === 'ios'",
+    "platform.isIOS / platform.isWeb"
+   ],
+   "prefers": "platform === 'ios'",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  },
+  "W2": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "device.platform === 'ios'",
+    "isIOS / isWeb",
+    "platform.is('ios')"
+   ],
+   "prefers": "platform === 'ios'",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  },
+  "W3": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "device.os === 'macos'",
+    "platform.isIOS / platform.isWeb"
+   ],
+   "prefers": "platform === 'macos'",
+   "macWeb": "false-build",
+   "webMacWorkaround": true
+  },
+  "W4": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "platform.os / platform.isWeb",
+    "Platform.OS === 'ios'"
+   ],
+   "prefers": "platform.isIOS / platform.isWeb",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  },
+  "W5": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "platform.os === 'ios' with platform.isWeb",
+    "isIOS / isMacOS / isWeb"
+   ],
+   "prefers": "isIOS / isMacOS / isWeb (booleans; string second)",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  },
+  "W6": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "device.platform",
+    "os === 'ios'"
+   ],
+   "prefers": "platform (the name, over os)",
+   "macWeb": "false-build",
+   "webMacWorkaround": true
+  },
+  "W7": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "platform.os === 'ios'",
+    "platform.isIOS / platform.isWeb"
+   ],
+   "prefers": "platform === 'ios'",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  },
+  "W8": {
+   "form": "platform === 'ios'",
+   "alternatives": [
+    "platform.os === 'ios'",
+    "isIOS() / platform.is('ios')"
+   ],
+   "prefers": "platform === 'ios'",
+   "macWeb": "false-build",
+   "webMacWorkaround": false
+  }
+ },
+ "q2readers": {
+  "DL-1": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 4,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "DL-2": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 4,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "DL-3": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 4,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "JE-1": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 3,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "JE-2": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 3,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "JE-3": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 3,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "UF-1": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 3,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "UF-2": {
+   "letter": "c",
+   "iphoneWallet": "unsure",
+   "confidence": 2,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "UF-3": {
+   "letter": "c",
+   "iphoneWallet": "unsure",
+   "confidence": 2,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "XB-1": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 4,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "XB-2": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 3,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  },
+  "XB-3": {
+   "letter": "b",
+   "iphoneWallet": "no",
+   "confidence": 4,
+   "ranking": null,
+   "prefers": null,
+   "changed": null
+  }
+ },
+ "q4readers": {
+  "KD-1": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "share": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "storage",
+     "with": "localStorage",
+     "kind": "doubt"
+    },
+    {
+     "name": "settings",
+     "with": "in-app settings page",
+     "kind": "doubt"
+    },
+    {
+     "name": "share",
+     "with": "shared",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "KD-2": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "share": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "settings",
+     "with": "in-app settings page",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "KD-3": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "share": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "settings",
+     "with": "in-app settings page",
+     "kind": "doubt"
+    },
+    {
+     "name": "storage",
+     "with": "localStorage",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "KD-4": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "share": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "storage",
+     "with": "localStorage",
+     "kind": "doubt"
+    },
+    {
+     "name": "shared",
+     "with": "sharing between users",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "PY-1": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "sharesheet": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "settings",
+     "with": "in-app settings page",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "PY-2": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "sharesheet": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "storage",
+     "with": "localStorage",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "PY-3": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "sharesheet": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  },
+  "PY-4": {
+   "names": {
+    "shared": 1,
+    "state": 1,
+    "storage": 1,
+    "location": 1,
+    "network": 1,
+    "notifications": 1,
+    "settings": 1,
+    "sharesheet": 1
+   },
+   "buttons": {
+    "text-size": 1,
+    "save-for-later": 1,
+    "share": 1,
+    "remind": 1,
+    "settings": 1
+   },
+   "zeros": {},
+   "confusions": [
+    {
+     "name": "location",
+     "with": "window.location",
+     "kind": "doubt"
+    },
+    {
+     "name": "settings",
+     "with": "in-app settings page",
+     "kind": "doubt"
+    }
+   ],
+   "clearer": "sharesheet",
+   "mistakable": [
+    "share"
+   ]
+  }
+ }
+}
