@@ -30,6 +30,8 @@ import {
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
 const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
+// The one-screen rungs a native build refuses today; every other rung must lower, so a rung cannot stop lowering unseen.
+const REFUSED_RUNGS = new Set(['11-async', 'y4-sheet-beside-drawer']);
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
 function mirror(
@@ -727,12 +729,14 @@ test.each(
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});
+		const refusal = build.diagnostics.map((d) => d.message).join('; ');
+		expect(
+			build.payload === null,
+			build.payload === null
+				? `${folder} is refused but not listed in REFUSED_RUNGS: ${refusal}`
+				: `${folder} lowers but is listed in REFUSED_RUNGS`,
+		).toBe(REFUSED_RUNGS.has(folder));
 		if (build.payload === null) {
-			// The device ladder's rungs are only written once they lower.
-			expect(
-				typeof rung.rung,
-				`${folder} is refused: ${build.diagnostics.map((d) => d.message).join('; ')}`,
-			).toBe('number');
 			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
 			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
 			expect(
