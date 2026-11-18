@@ -82,6 +82,7 @@
 		"@markless/web": "workspace:*",
 		"@tsrx/yuku": "0.8.0",
 		"@virtualstate/navigation": "1.0.1-alpha.212",
+		"confbox": "0.2.4",
 		"hast-util-to-html": "catalog:",
 		"nitro": "catalog:",
 		"pathe": "catalog:",

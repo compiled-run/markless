@@ -66,7 +66,7 @@ export function createRenderData(input: {
 				boundaryId: boundary.id,
 				anchorOrder: boundary.anchorOrder,
 				runnerGraphNodeId: runner?.runnerGraphNodeId ?? null,
-				initiallyServedArm: ASYNC_BOUNDARY_ARM.pending,
+				initiallyServedArm: runner?.waitsOnNothing ? ASYNC_BOUNDARY_ARM.try : ASYNC_BOUNDARY_ARM.pending,
 				reads: runner?.reads ?? [],
 				unresolvedSources: runner?.unresolvedSources ?? [],
 				armChunkIds: slot?.armTemplateIds ?? {

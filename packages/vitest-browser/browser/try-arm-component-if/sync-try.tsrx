@@ -6,7 +6,7 @@ export default function Page() @{
 	<main>
 		<button data-open onClick={() => (open = true)}>Open</button>
 		@try {
-			<div>
+			<div data-arm>
 				@if (open) {
 					<p data-shown>shown</p>
 				}

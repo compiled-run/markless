@@ -4,6 +4,7 @@ import NestedElse from './try-arm-component-if/nested-else.tsrx';
 import NestedInline from './try-arm-component-if/nested-inline.tsrx';
 import Page from './try-arm-component-if/page.tsrx';
 import PanelPage from './try-arm-component-if/panel-page.tsrx';
+import SyncCatch from './try-arm-component-if/sync-catch.tsrx';
 import SyncTry from './try-arm-component-if/sync-try.tsrx';
 
 // A component an @if opens inside an async @try keeps its own @if live: the
@@ -133,10 +134,43 @@ test('client: an @if/@else nested in the @else of an unopened @if inside an asyn
 	expect(errors).toEqual([]);
 });
 
-// A @try whose arm reads no async value renders @pending and never settles to its arm.
-test.fails('client: a @try that reads nothing async shows its arm', async () => {
+async function openAtOnce(container: Element) {
+	expect(container.querySelector('[data-arm]')).not.toBeNull();
+	expect(container.querySelector('[hidden]')).toBeNull();
+	container.querySelector<HTMLButtonElement>('[data-open]')!.click();
+	await expect.poll(() => container.querySelector('[data-shown]')?.textContent).toBe('shown');
+}
+
+async function failThenDismiss(container: Element) {
+	const text = (selector: string) => container.querySelector(selector)?.textContent ?? null;
+	expect(text('[data-note]')).toBe('Idle');
+	expect(text('[data-error]')).toBeNull();
+
+	container.querySelector<HTMLButtonElement>('[data-save]')!.click();
+	await expect.poll(() => text('[data-error]')).toBe('Save failed');
+	expect(text('[data-note]')).toBe('Saving');
+
+	container.querySelector<HTMLButtonElement>('[data-dismiss]')!.click();
+	await expect.poll(() => text('[data-error]')).toBeNull();
+	expect(text('[data-note]')).toBe('Saving');
+}
+
+test('served: a @try that reads nothing async shows its arm at once', async () => {
+	const { container } = await renderSSR(SyncTry);
+	await openAtOnce(container);
+});
+
+test('client: a @try that reads nothing async shows its arm at once', async () => {
 	const { container } = await render(SyncTry);
-	await expect.poll(() => container.querySelector('[data-open]')?.textContent, { timeout: 500 }).toBe('Open');
-	container.querySelector<HTMLButtonElement>('[data-open]')?.click();
-	await expect.poll(() => container.querySelector('[data-shown]'), { timeout: 500 }).not.toBeNull();
+	await openAtOnce(container);
+});
+
+test('served: a @try with nothing async shows its content, then @catch when a handler fails, and reset clears it', async () => {
+	const { container } = await renderSSR(SyncCatch);
+	await failThenDismiss(container);
+});
+
+test('client: a @try with nothing async shows its content, then @catch when a handler fails, and reset clears it', async () => {
+	const { container } = await render(SyncCatch);
+	await failThenDismiss(container);
 });

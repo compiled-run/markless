@@ -199,6 +199,12 @@ function markedFrom(node: RuntimeAsyncComputedNode): number | undefined {
 	return hold?.version === node.version && hold.previous.status !== 'pending' ? node.version - 1 : undefined;
 }
 
+/** Settled past a save's mark while the save is still written; a run's answer waits for the save then, so only a handler's failure settles it. */
+function failedUnderMark(node: RuntimeAsyncComputedNode): boolean {
+	const hold = node.entryHold;
+	return node.phase === NODE_SETTLED && hold !== undefined && hold.writing > 0 && hold.version !== node.version;
+}
+
 function peek(node: RuntimeAsyncComputedNode, path: ReadonlyArray<string>): unknown {
 	const head = path[0];
 	return head === undefined || isAsyncSnapshotMetaKey(head)
@@ -390,8 +396,8 @@ export function createAsyncPlane(
 			const due: RuntimeAsyncComputedNode[] = [];
 			for (const [graphNodeId, version] of versions) {
 				const node = nodes.get(graphNodeId);
-				// A value that ran again since the writes settled already has their answer; a save's mark is not a run.
-				if (!node || (node.version !== version && markedFrom(node) !== version)) continue;
+				// A value that ran again since the writes settled already has their answer, as does one a handler's failure settled under a save's mark; the mark itself is not a run.
+				if (!node || (node.version !== version && markedFrom(node) !== version) || failedUnderMark(node)) continue;
 				if (node.phase === NODE_SETTLED) moveNode(node, NODE_PLANNED);
 				// A read still in flight from before the writes settled may carry the old answer, so it starts over.
 				if (node.phase === NODE_PLANNED || node.phase === NODE_RUNNING) due.push(node);
