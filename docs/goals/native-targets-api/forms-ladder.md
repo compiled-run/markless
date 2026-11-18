@@ -9,15 +9,20 @@ driven in Chromium, `ladder-web.test.ts`), **reference** (the payload walked by 
 
 ## Rungs
 
-| Rung    | What it proves                                                                                                                                                                          | Web  | Reference | iOS         | Android     |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------- | ----------- | ----------- |
-| f1 (51) | two named text fields (one with a `value` attribute) and a submit button; the handler reads them with `new FormData(event.currentTarget)`, `get` and `has`                              | pass | pass      | see receipt | see receipt |
-| f2 (52) | the return key submits a form with one text field and no button, and in a form with a submit button clicks that button (its `onClick` runs first, as Chromium does)                     | pass | pass      | see receipt | see receipt |
-| f3 (53) | `toggle` and `checkbox` families with `field` parts in a form: checked ones send name and value (`value` or "on"), unchecked ones nothing                                               | pass | pass      | see receipt | see receipt |
-| f4 (54) | a required text field and a required toggle stop the submit; the first one missing a value is focused and its message shown                                                             | pass | pass      | see receipt | see receipt |
-| f5 (55) | an `async` submit handler that awaits a timer promise: the form is `aria-busy` and its button `aria-disabled` until it succeeds, then until it fails into `catch`                       | pass | pass      | see receipt | see receipt |
-| f6 (56) | a disabled submit button sends nothing until enabled; a disabled field (also `required`) is left out of the data and of validation                                                      | pass | pass      | see receipt | see receipt |
-| f7 (57) | a checkbox and a radio group a person ticks: `onChange` reads `event.currentTarget.checked`, one radio per group, a required checked box unticked stops the submit, and their form data | pass | pass      | see receipt | see receipt |
+| Rung    | What it proves                                                                                                                                                                          | Web  | Reference | iOS  | Android |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- | --------- | ---- | ------- |
+| f1 (51) | two named text fields (one with a `value` attribute) and a submit button; the handler reads them with `new FormData(event.currentTarget)`, `get` and `has`                              | pass | pass      | pass | pass    |
+| f2 (52) | the return key submits a form with one text field and no button, and in a form with a submit button clicks that button (its `onClick` runs first, as Chromium does)                     | pass | pass      | pass | pass    |
+| f3 (53) | `toggle` and `checkbox` families with `field` parts in a form: checked ones send name and value (`value` or "on"), unchecked ones nothing                                               | pass | pass      | pass | pass    |
+| f4 (54) | a required text field and a required toggle stop the submit; the first one missing a value is focused and its message shown                                                             | pass | pass      | pass | pass    |
+| f5 (55) | an `async` submit handler that awaits a timer promise: the form is `aria-busy` and its button `aria-disabled` until it succeeds, then until it fails into `catch`                       | pass | pass      | pass | pass    |
+| f6 (56) | a disabled submit button sends nothing until enabled; a disabled field (also `required`) is left out of the data and of validation                                                      | pass | pass      | pass | pass    |
+| f7 (57) | a checkbox and a radio group a person ticks: `onChange` reads `event.currentTarget.checked`, one radio per group, a required checked box unticked stops the submit, and their form data | pass | pass      | pass | pass    |
+
+Receipt: one harness run of the fourteen core rungs, f1 to f7, u1 to u5 and u11 to u14 on simulator `markless-forms` (iPhone 17,
+iOS 27.2) and AVD `markless_forms` (API 36, port 5600): 30 of 30 on each, `proof passed on iOS and Android`
+(`receipts/2026-11-18-forms-{ios,android}-30-rungs.json`, `receipts/2026-11-18-forms-verdict.txt`); screenshots under
+`packages/mobile/proofs/<rung>/screenshots/{ios,android}/`. Nothing in the device columns is a test double.
 
 ## What the phone does, and where it comes from on the web
 
