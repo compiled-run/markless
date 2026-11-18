@@ -223,6 +223,16 @@ const isNativeValue = (value: unknown): value is NativeValue =>
 		Object.getPrototypeOf(value) === Object.prototype &&
 		Object.values(value as object).every(isNativeValue));
 
+/** A first value as a native cell holds it: `undefined` is null, as a native expression spells it. */
+const nativeInitialOf = (value: unknown): unknown =>
+	value === undefined
+		? null
+		: Array.isArray(value)
+			? value.map(nativeInitialOf)
+			: typeof value === 'object' && value !== null && Object.getPrototypeOf(value) === Object.prototype
+				? Object.fromEntries(Object.entries(value).map(([key, field]) => [key, nativeInitialOf(field)]))
+				: value;
+
 /** What names mean where an expression is: an input handler's event, arrow parameters, and enclosing rows' items. */
 /** A prop as an instance sees it: a value lowered where it was passed, or a callback lowered where it is called. */
 type Prop =
@@ -1055,6 +1065,18 @@ export function createNativeViewPayload(
 
 	const cells: NativeViewPayload['cells'][number][] = [];
 	const cellIndex = new Map<string, number>();
+	/** Cells whose first value is `undefined` on the web; a native cell holds null there. */
+	const undefinedFirst = new Set<string>();
+	const holdsUndefined = (value: unknown): boolean =>
+		value === undefined ||
+		(value !== null && typeof value === 'object' && Object.values(value).some(holdsUndefined));
+	const noteUndefined = (id: string, first: unknown) => {
+		if (!holdsUndefined(first)) return;
+		undefinedFirst.add(id);
+		if (first !== null && typeof first === 'object')
+			for (const [field, value] of Object.entries(first))
+				if (holdsUndefined(value)) undefinedFirst.add(`${id}.${field}`);
+	};
 	const addCell = (cell: NativeViewPayload['cells'][number]) => {
 		if (cellIndex.has(cell.id)) return;
 		cellIndex.set(cell.id, cells.length);
@@ -1122,7 +1144,8 @@ export function createNativeViewPayload(
 		for (const binding of owner.graph.graphBindings) {
 			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
 			const id = `${prefix}${binding.id}`;
-			const value = binding.initialValue;
+			const value = nativeInitialOf(binding.initialValue);
+			noteUndefined(id, binding.initialValue);
 			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
 				refuse(
 					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
@@ -1259,7 +1282,8 @@ export function createNativeViewPayload(
 				continue;
 			}
 			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
-			let value: unknown = binding.initialValue;
+			let value: unknown = nativeInitialOf(binding.initialValue);
+			noteUndefined(id, binding.initialValue);
 			let known = binding.initialValueKnown === true;
 			const initializer = native?.stateInitializers[binding.name];
 			if (!known && initializer?.kind === 'call' && initializer.callee === 'Date.now' && initializer.arguments.length === 0 && !binding.storage) {
@@ -2092,6 +2116,24 @@ export function createNativeViewPayload(
 				const left = exprOf(expression.left, what, scope);
 				const right = exprOf(expression.right, what, scope);
 				if (!left || !right) return null;
+				// Strict equality tells undefined from null on the web; a native value does not, so a cell first holding the other one is refused.
+				if (expression.kind === 'binary' && (expression.operator === '===' || expression.operator === '!=='))
+					for (const [written, other] of [
+						[expression.left, right],
+						[expression.right, left],
+					] as const) {
+						if (written.kind !== 'literal' || written.value !== null) continue;
+						const spelled = written.undefined ? 'undefined' : 'null';
+						const mixed = [...cellsOf(other)].some((cell) =>
+							written.undefined
+								? initialOf(cell) === null && !undefinedFirst.has(cell)
+								: undefinedFirst.has(cell),
+						);
+						if (mixed)
+							return refuse(
+								`${what} compares with \`${spelled}\` a value whose first value is \`${written.undefined ? 'null' : 'undefined'}\`; a native value does not tell undefined from null`,
+							);
+					}
 				return expression.kind === 'binary'
 					? { binary: expression.operator, left, right }
 					: { logical: expression.operator, left, right };

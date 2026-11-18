@@ -90,7 +90,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		case 'TSTypeAssertion':
 			return expressionTreeOf(node.expression as AnyNode | undefined);
 		case 'Identifier':
-			if (node.name === 'undefined') return { kind: 'literal', value: null };
+			if (node.name === 'undefined') return { kind: 'literal', value: null, undefined: true };
 			return typeof node.name === 'string'
 				? { kind: 'read', name: node.name }
 				: unsupported('a name');
