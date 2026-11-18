@@ -1,10 +1,10 @@
 {
 	"perPage": {
-		"/": 12649,
-		"/team": 13175
+		"/": 12743,
+		"/team": 13269
 	},
-	"perPageTotal": 25824,
-	"app": 17815,
+	"perPageTotal": 26012,
+	"app": 18003,
 	"targets": {
 		"ios": {
 			"writeLists": 9,

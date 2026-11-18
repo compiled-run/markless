@@ -19,6 +19,8 @@ import dev.markless.mobile.core.jsonValue
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
+import dev.markless.mobile.style.BAND_KEY
+import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.StyleExport
 import java.io.File
 import kotlin.system.exitProcess
@@ -263,6 +265,29 @@ private fun arrays() {
 	check("a method the target lacks is an error", err == ".toUpperCase() of a array") { "$err" }
 }
 
+/** The S5 rung's app style: body's background, light and dark, is each assignment's canvas. */
+private fun appCanvas(fixtures: File) {
+	val bytes = File(fixtures, "s5-page-canvas.native-app-style.json").readBytes()
+	val decoded = runCatching { StyleExport.decodeApp(bytes) }
+	check("decodes the S5 app style", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	val routes = decoded.getOrNull() ?: return
+	val paper = Rgba(244, 239, 230, 255)
+	val night = Rgba(29, 27, 22, 255)
+	for (pattern in listOf("/", "/notes")) {
+		val style = routes.getValue(pattern)
+		check("$pattern has a light and a dark assignment", style.assignments.size == 2) { "${style.assignments.size}" }
+		for (a in style.assignments) {
+			val dark = a.values[BAND_KEY] == JsValue.Num(1.0)
+			check("$pattern's ${if (dark) "dark" else "light"} canvas", a.canvas == (if (dark) night else paper)) { "${a.canvas}" }
+		}
+	}
+	val text = canonical(Json.parse(bytes))
+	val changed = text.replace("\"canvas\":{\"r\":244,\"g\":239,\"b\":230,\"alpha\":255}", "\"canvas\":{\"r\":244,\"g\":239,\"b\":230,\"alpha\":128}")
+	check("the translucent edit applied", changed != text) { "" }
+	val err = try { StyleExport.decodeApp(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+	check("app style refuses a translucent canvas", err != null && err.contains("canvas is not opaque")) { "error was: $err" }
+}
+
 private fun appStyle(fixtures: File) {
 	val bytes = File(fixtures, "s3-app.native-app-style.json").readBytes()
 	val decoded = runCatching { StyleExport.decodeApp(bytes) }
@@ -291,7 +316,7 @@ private fun appStyle(fixtures: File) {
 	check("next over the band keeps the cell", settings.assignments[onDark].values == mapOf("state:on" to JsValue.Bool(true), "@env#band" to JsValue.Num(1.0))) { "${settings.assignments[onDark].values}" }
 	check("the dark band paints the page dark", settings.assignments[onDark].byId.getValue("h0").writes != settings.assignments[onLight].byId.getValue("h0").writes) { "" }
 	check("a page without @media has no band state", routes.getValue("/").bandState == -1 && routes.getValue("/").start(emptyList(), { JsValue.Null }, true) == routes.getValue("/").initial) { "" }
-	val text = String(bytes)
+	val text = canonical(Json.parse(bytes))
 	fun refusesApp(name: String, changed: String, fragment: String) {
 		check("$name: the edit applied", changed != text) { "" }
 		val err = try { StyleExport.decodeApp(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
@@ -312,6 +337,7 @@ fun main(args: Array<String>) {
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)
 	val files = dirs.flatMap { d -> d.listFiles { f -> f.name.endsWith(".json") }?.sortedBy { it.name } ?: error("no vector directory $d") }

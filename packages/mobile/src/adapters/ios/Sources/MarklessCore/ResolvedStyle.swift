@@ -25,6 +25,8 @@ public struct ResolvedStyle: Equatable, Sendable {
 public struct StyleLayout: Sendable {
 	/// Each assignment's look per payload node.
 	public let assignments: [[String: ResolvedStyle]]
+	/// Each assignment's canvas: the colour behind the page and the system bars; nil when the export names none (white).
+	public let canvases: [RGBA?]
 	/// The assignment matching the cells' values at mount.
 	public let start: Int
 	/// For each export state, the payload cell it follows, or `@env#band` for the `@media` band.
@@ -83,6 +85,7 @@ extension StyleExport {
 			assignments: try assignments.indices.map { index in
 				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
 			},
+			canvases: assignments.map(\.canvas),
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, dpr: dpr, fontFiles: fonts, bands: bands)
 	}

@@ -76,6 +76,7 @@ public final class MarklessViewController: UIViewController {
 			guard now != band else { return }
 			try tree?.apply([.state(cell: StyleBands.state, value: .number(Double(now)))])
 			self.band = now
+			paintCanvas()
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
@@ -103,11 +104,15 @@ public final class MarklessViewController: UIViewController {
 	required init?(coder: NSCoder) { fatalError("MarklessViewController is created from a payload") }
 
 	public override func loadView() {
-		let screen = UIView()
-		// A styled page is the web document Dragon laid out, whose canvas is white in either colour scheme.
-		screen.backgroundColor = style == nil ? .systemBackground : .white
-		view = screen
-		tree?.mount(in: screen)
+		view = UIView()
+		paintCanvas()
+		tree?.mount(in: view)
+	}
+
+	/// A styled page shows its canvas behind the page and the bars, as a browser does; an unstyled one the system background.
+	private func paintCanvas() {
+		guard isViewLoaded else { return }
+		view.backgroundColor = tree?.canvas ?? .systemBackground
 	}
 
 	public override func viewIsAppearing(_ animated: Bool) {
@@ -136,6 +141,7 @@ public final class MarklessViewController: UIViewController {
 				journal.removeLast()
 			}
 			try tree?.apply(journal)
+			paintCanvas()
 		} catch {
 			fatalError("Markless iOS host: \(error)")
 		}
@@ -147,6 +153,7 @@ public final class MarklessViewController: UIViewController {
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
 		tree?.root.removeFromSuperview()
 		try buildPage()
+		paintCanvas()
 		if isViewLoaded { tree?.mount(in: view) }
 	}
 }

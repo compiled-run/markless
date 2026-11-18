@@ -1,0 +1,1567 @@
+{
+	"version": "markless.native-app-style/0",
+	"units": "device px; frames relative to the parent box",
+	"warnings": [],
+	"fonts": [
+		{
+			"id": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+			"file": "vendor/fonts/Inter/Inter-Bold.ttf"
+		},
+		{
+			"id": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+			"file": "vendor/fonts/Inter/Inter-Regular.ttf"
+		}
+	],
+	"targets": {
+		"ios": {
+			"backend": "uikit",
+			"viewport": { "width": 402, "height": 778 },
+			"dpr": 3,
+			"writes": [
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 26,
+							"specifiedSize": { "kind": "px", "value": 26 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 129, "g": 178, "b": 154, "alpha": 255 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					},
+					{
+						"kind": "border-radius",
+						"lengths": [
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 }
+						],
+						"key": "dragonRadius.radiiPx"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "backgroundColor"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widths" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 26,
+							"specifiedSize": { "kind": "px", "value": 26 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 24,
+							"specifiedSize": { "kind": "px", "value": 24 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 24,
+							"specifiedSize": { "kind": "px", "value": 24 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "font"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "foregroundColor"
+					}
+				]
+			],
+			"routes": [
+				{
+					"pattern": "/",
+					"component": "Garden",
+					"compiler": "5e518beb989ad3e74ebe153fb12338c4817ff9b6dbd5f20d2a2249418c799ca0",
+					"readiness": {
+						"kind": "analysis-only",
+						"reason": "The iOS output is analysis-only: no committed lanes verdict was given to this compilation, so the generated UIKit Swift stays internal to the native lanes."
+					},
+					"states": [{ "key": "@env#band", "domain": [0, 1] }],
+					"initial": 0,
+					"next": [[[0, 1]], [[0, 1]]],
+					"bands": {
+						"atoms": [
+							{
+								"feature": "prefers-color-scheme",
+								"comparisons": [],
+								"keyword": "dark"
+							}
+						],
+						"bands": [[false], [true]],
+						"conditions": [
+							"(not (prefers-color-scheme: dark))",
+							"(prefers-color-scheme: dark)"
+						]
+					},
+					"assignments": [
+						{
+							"values": { "@env#band": 0 },
+							"canvas": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 1
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 72, "y": 124.25, "width": 1062, "height": 95 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Seed tray",
+									"frame": { "x": 0, "y": 0, "width": 361.828125, "height": 95 },
+									"borderWidths": null,
+									"writes": 3
+								},
+								{
+									"id": "component-edge:0",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 72, "y": 271.5, "width": 1062, "height": 121 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 4
+								},
+								{
+									"id": "component-edge:0:text0",
+									"parent": "component-edge:0",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Open notes",
+									"frame": { "x": 48, "y": 30, "width": 278, "height": 61 },
+									"borderWidths": null,
+									"writes": 5
+								}
+							]
+						},
+						{
+							"values": { "@env#band": 1 },
+							"canvas": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 6
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 464.5 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 72, "y": 124.25, "width": 1062, "height": 95 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Seed tray",
+									"frame": { "x": 0, "y": 0, "width": 361.828125, "height": 95 },
+									"borderWidths": null,
+									"writes": 8
+								},
+								{
+									"id": "component-edge:0",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 72, "y": 271.5, "width": 1062, "height": 121 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 4
+								},
+								{
+									"id": "component-edge:0:text0",
+									"parent": "component-edge:0",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Open notes",
+									"frame": { "x": 48, "y": 30, "width": 278, "height": 61 },
+									"borderWidths": null,
+									"writes": 5
+								}
+							]
+						}
+					]
+				},
+				{
+					"pattern": "/notes",
+					"component": "Notes",
+					"compiler": "82f4b8708865b9da340e6f149ffa4fd6a8a05f76777e94fca958f764c389c8bc",
+					"readiness": {
+						"kind": "analysis-only",
+						"reason": "The iOS output is analysis-only: no committed lanes verdict was given to this compilation, so the generated UIKit Swift stays internal to the native lanes."
+					},
+					"states": [{ "key": "@env#band", "domain": [0, 1] }],
+					"initial": 0,
+					"next": [[[0, 1]], [[0, 1]]],
+					"bands": {
+						"atoms": [
+							{
+								"feature": "prefers-color-scheme",
+								"comparisons": [],
+								"keyword": "dark"
+							}
+						],
+						"bands": [[false], [true]],
+						"conditions": [
+							"(not (prefers-color-scheme: dark))",
+							"(prefers-color-scheme: dark)"
+						]
+					},
+					"assignments": [
+						{
+							"values": { "@env#band": 0 },
+							"canvas": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 1
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 72,
+										"y": 120.234375,
+										"width": 1062,
+										"height": 87
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Watering",
+									"frame": { "x": 0, "y": 0, "width": 320.390625, "height": 87 },
+									"borderWidths": null,
+									"writes": 9
+								},
+								{
+									"id": "h3",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 72,
+										"y": 255.46875,
+										"width": 1062,
+										"height": 61
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h3:text0",
+									"parent": "h3",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Mist the tray each morning",
+									"frame": { "x": 0, "y": 0, "width": 645.71875, "height": 61 },
+									"borderWidths": null,
+									"writes": 10
+								}
+							]
+						},
+						{
+							"values": { "@env#band": 1 },
+							"canvas": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 6
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1206, "height": 439.46875 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 72,
+										"y": 120.234375,
+										"width": 1062,
+										"height": 87
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Watering",
+									"frame": { "x": 0, "y": 0, "width": 320.390625, "height": 87 },
+									"borderWidths": null,
+									"writes": 11
+								},
+								{
+									"id": "h3",
+									"parent": "h0",
+									"kind": "element",
+									"native": "DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 72,
+										"y": 255.46875,
+										"width": 1062,
+										"height": 61
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h3:text0",
+									"parent": "h3",
+									"kind": "text",
+									"native": "DragonTextView",
+									"text": "Mist the tray each morning",
+									"frame": { "x": 0, "y": 0, "width": 645.71875, "height": 61 },
+									"borderWidths": null,
+									"writes": 12
+								}
+							]
+						}
+					]
+				}
+			]
+		},
+		"android": {
+			"backend": "android-views",
+			"viewport": { "width": 411, "height": 818 },
+			"dpr": 2.625,
+			"writes": [
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 },
+							{ "r": 61, "g": 64, "b": 91, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 26,
+							"specifiedSize": { "kind": "px", "value": 26 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 129, "g": 178, "b": 154, "alpha": 255 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							{ "r": 29, "g": 27, "b": 22, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					},
+					{
+						"kind": "border-radius",
+						"lengths": [
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 },
+							{ "percent": false, "value": 10 }
+						],
+						"key": "dragonRadius.radiiPx"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 },
+							{ "r": 0, "g": 0, "b": 0, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "background-color",
+						"color": { "r": 0, "g": 0, "b": 0, "alpha": 0 },
+						"key": "background.color"
+					},
+					{ "kind": "border-widths", "key": "dragonBorder.widthsPx" },
+					{
+						"kind": "border-styles",
+						"styles": ["none", "none", "none", "none"],
+						"key": "dragonBorder.styles"
+					},
+					{
+						"kind": "border-colors",
+						"colors": [
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							{ "r": 244, "g": 239, "b": 230, "alpha": 255 }
+						],
+						"key": "dragonBorder.colors"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 26,
+							"specifiedSize": { "kind": "px", "value": 26 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 24,
+							"specifiedSize": { "kind": "px", "value": 24 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 61, "g": 64, "b": 91, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:288316099b1e0a47a4716d159098005eef7c0066921f34e3200393dbdb01947f",
+							"size": 24,
+							"specifiedSize": { "kind": "px", "value": 24 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				],
+				[
+					{
+						"kind": "font",
+						"font": {
+							"family": "sha256:40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+							"size": 17,
+							"specifiedSize": { "kind": "px", "value": 17 },
+							"absoluteSize": true
+						},
+						"key": "textPaint.typeface"
+					},
+					{
+						"kind": "text-color",
+						"color": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+						"key": "textPaint.color"
+					}
+				]
+			],
+			"routes": [
+				{
+					"pattern": "/",
+					"component": "Garden",
+					"compiler": "5e518beb989ad3e74ebe153fb12338c4817ff9b6dbd5f20d2a2249418c799ca0",
+					"readiness": {
+						"kind": "analysis-only",
+						"reason": "The Android output is analysis-only: no committed lanes verdict was given to this compilation, so the generated Android Views Kotlin stays internal to the native lanes."
+					},
+					"states": [{ "key": "@env#band", "domain": [0, 1] }],
+					"initial": 0,
+					"next": [[[0, 1]], [[0, 1]]],
+					"bands": {
+						"atoms": [
+							{
+								"feature": "prefers-color-scheme",
+								"comparisons": [],
+								"keyword": "dark"
+							}
+						],
+						"bands": [[false], [true]],
+						"conditions": [
+							"(not (prefers-color-scheme: dark))",
+							"(prefers-color-scheme: dark)"
+						]
+					},
+					"assignments": [
+						{
+							"values": { "@env#band": 0 },
+							"canvas": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 1
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 108.71875,
+										"width": 953,
+										"height": 82
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Seed tray",
+									"frame": { "x": 0, "y": 0, "width": 316.59375, "height": 82 },
+									"borderWidths": null,
+									"writes": 3
+								},
+								{
+									"id": "component-edge:0",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 236.4375,
+										"width": 953,
+										"height": 106.5
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 4
+								},
+								{
+									"id": "component-edge:0:text0",
+									"parent": "component-edge:0",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Open notes",
+									"frame": {
+										"x": 42,
+										"y": 26.25,
+										"width": 243.21875,
+										"height": 54
+									},
+									"borderWidths": null,
+									"writes": 5
+								}
+							]
+						},
+						{
+							"values": { "@env#band": 1 },
+							"canvas": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 6
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 405.9375 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 108.71875,
+										"width": 953,
+										"height": 82
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Seed tray",
+									"frame": { "x": 0, "y": 0, "width": 316.59375, "height": 82 },
+									"borderWidths": null,
+									"writes": 8
+								},
+								{
+									"id": "component-edge:0",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 236.4375,
+										"width": 953,
+										"height": 106.5
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 4
+								},
+								{
+									"id": "component-edge:0:text0",
+									"parent": "component-edge:0",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Open notes",
+									"frame": {
+										"x": 42,
+										"y": 26.25,
+										"width": 243.21875,
+										"height": 54
+									},
+									"borderWidths": null,
+									"writes": 5
+								}
+							]
+						}
+					]
+				},
+				{
+					"pattern": "/notes",
+					"component": "Notes",
+					"compiler": "82f4b8708865b9da340e6f149ffa4fd6a8a05f76777e94fca958f764c389c8bc",
+					"readiness": {
+						"kind": "analysis-only",
+						"reason": "The Android output is analysis-only: no committed lanes verdict was given to this compilation, so the generated Android Views Kotlin stays internal to the native lanes."
+					},
+					"states": [{ "key": "@env#band", "domain": [0, 1] }],
+					"initial": 0,
+					"next": [[[0, 1]], [[0, 1]]],
+					"bands": {
+						"atoms": [
+							{
+								"feature": "prefers-color-scheme",
+								"comparisons": [],
+								"keyword": "dark"
+							}
+						],
+						"bands": [[false], [true]],
+						"conditions": [
+							"(not (prefers-color-scheme: dark))",
+							"(prefers-color-scheme: dark)"
+						]
+					},
+					"assignments": [
+						{
+							"values": { "@env#band": 0 },
+							"canvas": { "r": 244, "g": 239, "b": 230, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 1
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 105.203125,
+										"width": 953,
+										"height": 76
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Watering",
+									"frame": { "x": 0, "y": 0, "width": 280.34375, "height": 76 },
+									"borderWidths": null,
+									"writes": 9
+								},
+								{
+									"id": "h3",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 223.40625,
+										"width": 953,
+										"height": 54
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 2
+								},
+								{
+									"id": "h3:text0",
+									"parent": "h3",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Mist the tray each morning",
+									"frame": { "x": 0, "y": 0, "width": 564.953125, "height": 54 },
+									"borderWidths": null,
+									"writes": 10
+								}
+							]
+						},
+						{
+							"values": { "@env#band": 1 },
+							"canvas": { "r": 29, "g": 27, "b": 22, "alpha": 255 },
+							"nodes": [
+								{
+									"id": "html",
+									"parent": null,
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "body",
+									"parent": "html",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 6
+								},
+								{
+									"id": "h0",
+									"parent": "body",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": { "x": 0, "y": 0, "width": 1079, "height": 385.03125 },
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 0
+								},
+								{
+									"id": "h2",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 105.203125,
+										"width": 953,
+										"height": 76
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h2:text0",
+									"parent": "h2",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Watering",
+									"frame": { "x": 0, "y": 0, "width": 280.34375, "height": 76 },
+									"borderWidths": null,
+									"writes": 11
+								},
+								{
+									"id": "h3",
+									"parent": "h0",
+									"kind": "element",
+									"native": "dev.dragon.views.DragonBoxView",
+									"text": null,
+									"frame": {
+										"x": 63,
+										"y": 223.40625,
+										"width": 953,
+										"height": 54
+									},
+									"borderWidths": {
+										"top": 0,
+										"right": 0,
+										"bottom": 0,
+										"left": 0
+									},
+									"writes": 7
+								},
+								{
+									"id": "h3:text0",
+									"parent": "h3",
+									"kind": "text",
+									"native": "dev.dragon.views.DragonTextView",
+									"text": "Mist the tray each morning",
+									"frame": { "x": 0, "y": 0, "width": 564.953125, "height": 54 },
+									"borderWidths": null,
+									"writes": 12
+								}
+							]
+						}
+					]
+				}
+			]
+		}
+	}
+}

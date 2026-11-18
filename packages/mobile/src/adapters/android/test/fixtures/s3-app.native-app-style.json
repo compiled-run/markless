@@ -648,7 +648,7 @@
 				{
 					"pattern": "/",
 					"component": "Home",
-					"compiler": "68bd2a44701802c0829604ce542b8486ef743da56acb04c7e62880dfb76787e5",
+					"compiler": "208dc39bbba9d029e450e9194694434d5ebe50a41f2745ea9819f004a01f7f40",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The iOS output is analysis-only: no committed lanes verdict was given to this compilation, so the generated UIKit Swift stays internal to the native lanes."
@@ -659,6 +659,7 @@
 					"assignments": [
 						{
 							"values": {},
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -767,7 +768,7 @@
 				{
 					"pattern": "/help",
 					"component": "Help",
-					"compiler": "7394729d4e4662ace34b80937c86c208ddd3c3e472abdbed2aa8e30cd5f8afd3",
+					"compiler": "44ee952795153f4c2639b06ea98b280967e1fe449103f20a68bf9331708525ba",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The iOS output is analysis-only: no committed lanes verdict was given to this compilation, so the generated UIKit Swift stays internal to the native lanes."
@@ -792,6 +793,7 @@
 					"assignments": [
 						{
 							"values": { "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -872,6 +874,7 @@
 						},
 						{
 							"values": { "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -955,7 +958,7 @@
 				{
 					"pattern": "/settings",
 					"component": "Settings",
-					"compiler": "96f04a7efa782109466320f53875c2028eedfe4a41eef176931494f141c7575d",
+					"compiler": "af84b518542bd74c398d1e91a3e5d5523f1f9b10a1a0076d1db46e619b327baf",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The iOS output is analysis-only: no committed lanes verdict was given to this compilation, so the generated UIKit Swift stays internal to the native lanes."
@@ -1000,6 +1003,7 @@
 					"assignments": [
 						{
 							"values": { "state:on": false, "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -1150,6 +1154,7 @@
 						},
 						{
 							"values": { "state:on": true, "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -1300,6 +1305,7 @@
 						},
 						{
 							"values": { "state:on": false, "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -1450,6 +1456,7 @@
 						},
 						{
 							"values": { "state:on": true, "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2226,7 +2233,7 @@
 				{
 					"pattern": "/",
 					"component": "Home",
-					"compiler": "68bd2a44701802c0829604ce542b8486ef743da56acb04c7e62880dfb76787e5",
+					"compiler": "208dc39bbba9d029e450e9194694434d5ebe50a41f2745ea9819f004a01f7f40",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The Android output is analysis-only: no committed lanes verdict was given to this compilation, so the generated Android Views Kotlin stays internal to the native lanes."
@@ -2237,6 +2244,7 @@
 					"assignments": [
 						{
 							"values": {},
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2355,7 +2363,7 @@
 				{
 					"pattern": "/help",
 					"component": "Help",
-					"compiler": "7394729d4e4662ace34b80937c86c208ddd3c3e472abdbed2aa8e30cd5f8afd3",
+					"compiler": "44ee952795153f4c2639b06ea98b280967e1fe449103f20a68bf9331708525ba",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The Android output is analysis-only: no committed lanes verdict was given to this compilation, so the generated Android Views Kotlin stays internal to the native lanes."
@@ -2380,6 +2388,7 @@
 					"assignments": [
 						{
 							"values": { "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2460,6 +2469,7 @@
 						},
 						{
 							"values": { "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2543,7 +2553,7 @@
 				{
 					"pattern": "/settings",
 					"component": "Settings",
-					"compiler": "96f04a7efa782109466320f53875c2028eedfe4a41eef176931494f141c7575d",
+					"compiler": "af84b518542bd74c398d1e91a3e5d5523f1f9b10a1a0076d1db46e619b327baf",
 					"readiness": {
 						"kind": "analysis-only",
 						"reason": "The Android output is analysis-only: no committed lanes verdict was given to this compilation, so the generated Android Views Kotlin stays internal to the native lanes."
@@ -2588,6 +2598,7 @@
 					"assignments": [
 						{
 							"values": { "state:on": false, "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2763,6 +2774,7 @@
 						},
 						{
 							"values": { "state:on": true, "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -2938,6 +2950,7 @@
 						},
 						{
 							"values": { "state:on": false, "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",
@@ -3113,6 +3126,7 @@
 						},
 						{
 							"values": { "state:on": true, "@env#band": 1 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "html",

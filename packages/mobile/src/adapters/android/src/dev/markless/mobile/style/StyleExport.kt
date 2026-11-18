@@ -40,8 +40,8 @@ sealed interface StyleWrite {
 
 data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
 
-/** One reachable combination of style states: every node's frame and writes, complete. */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>) {
+/** One reachable combination of style states: every node's frame and writes, complete, and the canvas behind the page (null: white). */
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -149,7 +149,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val assignments = t.field("assignments", target).arr("assignments").mapIndexed { a, v ->
 				val o = v.obj("assignments[$a]")
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) })
+				val canvas = o["canvas"]?.let { color(it, "assignments[$a].canvas") }
+				if (canvas != null && canvas.alpha != 255) throw MarklessDecodeError("assignments[$a].canvas is not opaque")
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]", writesOf) }, canvas)
 			}
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
@@ -204,6 +206,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					if (i != Math.floor(i) || i.toInt() !in lists.indices) throw MarklessDecodeError("$what.writes is $i, not an index of the app's write lists")
 					lists[i.toInt()]
 				}
+				val missing = routes.getValue(pattern).assignments.indexOfFirst { it.canvas == null }
+				if (missing >= 0) throw MarklessDecodeError("routes[$n] ($pattern).assignments[$missing] has no canvas")
 			}
 			return routes
 		}

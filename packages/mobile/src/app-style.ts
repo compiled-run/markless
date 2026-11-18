@@ -6,6 +6,10 @@ export const DRAGON_STYLE_EXPORT_SCHEMA = 'dragon.native-style-export/1';
 
 type Json = unknown;
 
+const fail = (reason: string): never => {
+	throw new Error(reason);
+};
+
 type DragonNode = {
 	readonly id: string;
 	readonly writes: ReadonlyArray<Json>;
@@ -22,6 +26,8 @@ type DragonTarget = {
 	readonly assignments: ReadonlyArray<{
 		readonly values: Json;
 		readonly nodes: ReadonlyArray<DragonNode>;
+		/** The colour Chrome paints behind the page (html's background, else body's, else white). */
+		readonly canvas: Json;
 	}>;
 	readonly next: Json;
 	readonly bands?: Json;
@@ -49,6 +55,7 @@ export type NativeAppStyleRoute = Omit<
 	readonly assignments: ReadonlyArray<{
 		readonly values: Json;
 		readonly nodes: ReadonlyArray<Omit<DragonNode, 'writes'> & { readonly writes: number }>;
+		readonly canvas: Json;
 	}>;
 };
 
@@ -138,8 +145,11 @@ export function nativeAppStyle(
 				component: exported.component,
 				compiler: exported.compiler,
 				...rest,
-				assignments: assignments.map((assignment) => ({
+				assignments: assignments.map((assignment, index) => ({
 					values: assignment.values,
+					canvas:
+						assignment.canvas ??
+						fail(`${pattern}: the ${name} export's assignment ${index} has no canvas`),
 					nodes: assignment.nodes.map((node) => ({
 						...node,
 						writes: intern(node.writes),
