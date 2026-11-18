@@ -1,0 +1,30 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "f3-families",
+			"failure": null,
+			"installSeconds": 6.199120625,
+			"flowSeconds": 35.05564875000001
+		},
+		{
+			"name": "r136-visible",
+			"failure": null,
+			"installSeconds": 2.896313958000006,
+			"flowSeconds": 15.054291167000002
+		},
+		{
+			"name": "y1-sheet-open-close",
+			"failure": null,
+			"installSeconds": 2.70219183299999,
+			"flowSeconds": 31.41743645800001
+		},
+		{
+			"name": "s4-global-tokens",
+			"failure": null,
+			"installSeconds": 2.4099459579999967,
+			"flowSeconds": 15.702016583000018
+		}
+	]
+}

@@ -306,8 +306,8 @@ web runtime behaviour changed; the native pass and the hosts supply what the fam
 
 | Rung | Family | Web | Reference | iOS | Android | Styles |
 |---|---|---|---|---|---|---|
-| u20 | `modal` (and `alert`): trigger, backdrop, content, title, description, close | fails at step 8 (Escape), web defect below; steps 0 to 7 pass | pass | pass | pass (back gesture included) | none: stacking layout, centred top layer |
-| u21 | `popover`: trigger, content, title, description, close | fails at step 2 (outside press), web defect below | pass | pass | see receipt | none |
+| u20 | `modal` (and `alert`): trigger, backdrop, content, title, description, close | pass | pass | see the conformance report | see the conformance report | none: stacking layout, centred top layer |
+| u21 | `popover`: trigger, content, title, description, close | pass | pass | see the conformance report | see the conformance report | none |
 
 What the families read, and how each is supplied without a change to them:
 
@@ -324,16 +324,16 @@ What the families read, and how each is supplied without a change to them:
   every touch's down and up on the innermost element under it (a touch on the top layer outside the lifted view is a
   touch on the overlay element itself), and the runtime runs the pointer handlers on it and each element it is inside.
   No new mark was needed.
-- **Focus moves.** `el.focus()` is a `focus` op whose node is an expression (`isTriggerOpened ? trigger : origin`);
+- **Focus moves.** `el.focus()` is the `command` op, whose node may be an expression (`isTriggerOpened ? trigger : origin`);
   elements are values (node ids), with `contains`, `document.activeElement`, `instanceof HTMLElement` and
   `ownerDocument.body`. Hosts move VoiceOver and TalkBack focus. Not observable from Maestro, so focus is proven by the
   vectors (`overlay.json`, `popover.json`), not on the device flows.
-- **Helpers.** The families' plain functions in sibling `.ts` files are inlined (as statements, or as values; one with
-  effects whose value a `const` reads runs as ops into a cell). Draft #816 adds overlapping helper inlining, `event.target`
-  and `focus()` as a `command` op with a fixed node; the two branches will conflict in `native-view.ts`,
-  `expression-tree.ts` and the runtimes, and modal needs a focus target computed at run time.
+- **Helpers.** The families' plain functions in sibling `.ts` files run on #816's shapes: `apply` evaluates one for its
+  value, a handler statement's `invoke` runs one for its effects (its body as handler statements), and one with effects
+  whose value a `const` reads runs as ops into a cell. Elements the build knows (handles) stay build-time values and are
+  written as node ids where they meet a run-time element (`event.target`, `document.activeElement`, the focus origin).
 
-Not proven on a device: VoiceOver's escape gesture (Maestro cannot perform it; the iOS flow skips the back step), and
+Not proven on a device: VoiceOver's escape gesture (Maestro cannot perform it; the iOS flow skips the `escape` step), and
 where focus lands. Drawer was not attempted: its drag is an owner decision not yet made, and it is still refused for its
 shared state's first value and `style={...}`. Menu is still refused: a `style` binding, `contextmenu`, a helper with a
 script-only body (`takeReturn`) and keyboard handlers.
@@ -342,6 +342,8 @@ script-only body (`takeReturn`) and keyboard handlers.
 never installed. The resume runtime reads `globalThis.__marklessOverlay` once at its start, and the app module that
 assigns it initializes later; on the u21 page the loader is defined but no element carries `__marklessOverlayInstalled`,
 and a press outside the open popover raises `pointerdown` but no `dismiss`. So on the web, popover's outside press and
-Escape, and modal's Escape, do nothing on router-built pages. Not fixed here (web and bundler code, outside this job).
+Escape, and modal's Escape, did nothing on router-built pages. Fixed (a root that starts first waits in
+`__marklessOverlayPending`; +144 B rendered `resume-runtime-start`, recorded in `cw-ui-overlay.json`).
 
-Family probe: 3 of 46 families built a payload before, 5 after (modal and popover moved to "works").
+Family probe: on `cw/native-integration`, 5 of 46 families built a payload before this port, 7 after (modal and popover
+moved to "works"; none moved back).

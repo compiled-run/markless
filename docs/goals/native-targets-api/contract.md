@@ -305,13 +305,16 @@ export function Counter() @{
   `#body`, when nothing has focus), `a.contains(b)` is `{ contains, node }`, `x instanceof HTMLElement` is `{ isElement }`,
   `x.ownerDocument.body` is `#body`, and the overlay behaviour's focus-origin property (`OVERLAY_FOCUS_ORIGIN_PROPERTY`
   in `@markless/web`) is `{ focusOrigin }`, the focus as it was when that overlay last joined the stack. `el.focus()` is
-  `{ op: 'focus', node }` with `node` an expression; a press focuses the control it presses, as Chromium does on a click.
+  the `command` op, whose `node` is a fixed id or an expression evaluated when it runs (null or the body does nothing);
+  the journal's `command` entry names the resolved element. A press focuses the control it presses, as Chromium does on a
+  click.
 - **Pointer events:** `pointerdown`/`pointerup` with `{ event: 'target' | 'button' }` (the element the touch is on; 0).
   Hosts report every touch's down and up on the innermost element under it; the runtime runs the handlers on it and each
   element it is inside, innermost first.
-- **Plain functions and module sets:** a module's plain functions are inlined where they are called (as statements, or
-  as the value they return; one with effects whose value a `const` reads runs as ops and leaves its value in a cell), and
-  a module-level `new WeakSet()`/`new Set()` is one cell holding its members (`add`, `delete`, `has`).
+- **Plain functions and module sets:** a module function is evaluated for its value where an expression calls it
+  (`apply`), and run as ops where a handler statement calls it for its effects (`invoke`, through its `effects` body);
+  one with effects whose value a `const` reads runs as ops and leaves its value in a cell. A module-level empty
+  `new WeakSet()`/`new Set()` is one cell holding its members (`add`, `delete`, `has`; any other method is refused).
 - **Styled cells:** a true/false cell some handler writes is `styled` when any attribute binding reads it, not only `class`;
   the style input carries those attributes per state (`attributesByState`).
 
