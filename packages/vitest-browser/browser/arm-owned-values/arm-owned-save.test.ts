@@ -157,6 +157,8 @@ for (const mode of ['CSR', 'SSR'] as const)
 			settleAll('save', 1);
 		}
 		await expect.poll(panel).toBe('save 1');
+		// The shelf's @try and the panel's commit independently: the button is ready only once the shelf's arm has.
+		await expect.poll(() => document.querySelector('[data-save]')).not.toBeNull();
 		click('[data-save]');
 		await expect.poll(() => saves.length).toBe(1);
 		click('[data-close]');
