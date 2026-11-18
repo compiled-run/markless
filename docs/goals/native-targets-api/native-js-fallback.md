@@ -74,6 +74,38 @@ Simulator and emulator numbers on a shared M-series Mac, not phones; sizes do no
 | First JavaScript tap, warmed at idle | 0.60 to 0.65 ms                                                      | 0.4 to 0.7 ms                                                                      |
 | A data-only screen                   | engine never started (`engine starts: 0`)                            | engine never started                                                               |
 
+## Values the page renders (J8 to J10)
+
+A text run, an attribute (`aria-label` included) or a `@for` list whose value calls app code the data path cannot lower
+is a `{ script, bindings }` expression, the same shape a J5 computed has. A host evaluates it when it builds the view and
+again when a cell it reads changes; rendering stays native. A value that is not JSON (a `RegExp`, a class instance)
+arrives as the text the web shows for it. A render value that reads `Date`, `crypto` or `performance` stays refused,
+since the web reads it once and a host would read it again on every change. Dragon's style input evaluates such values
+with the reference engine at build time, so a styled page measures the text the script gives.
+
+| Rung             | What                                                                                                            | Web  | Reference | iOS simulator | Android emulator |
+| ---------------- | --------------------------------------------------------------------------------------------------------------- | ---- | --------- | ------------- | ---------------- |
+| j8-render-values | text and an `aria-label` through app functions (a regex, another module)                                        | pass | pass      | pass          | pass             |
+| j9-render-list   | a `@for` over an app function's sorted copy                                                                     | pass | pass      | pass          | pass             |
+| j10-first-render | a data-only screen (engine starts 0), and one whose first frame needs the engine (1 on arrival, before any tap) | pass | pass      | pass          | pass             |
+
+`handler-paths.test.ts` checks that every committed vector without a script starts no engine through its render and
+every action, and that J10's second screen starts the engine at its first render and not before.
+
+**Time to first frame, with and without the engine at first render** (J10's app launched straight at `/` and at
+`/words`, cold process each run; simulator and emulator numbers, not phones):
+
+|                               | iOS: `/` (no engine)         | iOS: `/words`                | Android: `/` (no engine)          | Android: `/words`                                      |
+| ----------------------------- | ---------------------------- | ---------------------------- | --------------------------------- | ------------------------------------------------------ |
+| Runs, from process start (ms) | 394, 397, 426, 456, 498, 477 | 449, 423, 454, 452, 495, 459 | 169, 201, 210, 185, 165, 210, 181 | 263, 188, 193, 175, 244, 204, 229                      |
+| Median                        | 441                          | 453 (+12.5)                  | 185                               | 204 (+19)                                              |
+| Engine start alone            |                              | 3.6 ms                       |                                   | 4.4 ms (8.6 ms with the script load and first compute) |
+
+The difference is inside the run-to-run spread on both platforms (about 100 ms on iOS, 45 ms on Android); the cost of
+the engine itself, measured directly, is 3.6 ms on iOS and about 9 ms on Android. iOS measures to the end of the
+run-loop turn that committed the first views (the render server draws one display frame later); Android to the first
+draw. Opening `/words` directly also builds the `/` screen behind it, which both figures include.
+
 ## Host services
 
 Provided, in the order the probe's handlers use them: timers (`setTimeout`, `setInterval`, the clears, through the data
@@ -81,40 +113,58 @@ path's `timer` entry), `fetch` (text bodies; the request is a journal entry the 
 `Intl` (the engines' own), `crypto.randomUUID` and `getRandomValues` (ChaCha20 keyed by 32 bytes from the platform's
 secure random source per call), `queueMicrotask`, and `storage()` state, which is a cell like any other.
 
-Refused by name, with the pages that use each in the probe: `URL` (530), `URLSearchParams` (500), `performance` (486),
-`structuredClone` (11), `Blob` (10), `ClipboardItem` (10), `AbortSignal` (1). No page is blocked by these alone: every
+Refused by name, with the pages that use each in the probe: `URLSearchParams` (506), `URL` (503), `performance` (486),
+`structuredClone` (10), `Blob` (10), `ClipboardItem` (10), `AbortSignal` (1). No page is blocked by these alone: every
 page that uses them is also blocked by the web page itself (`document`, the window), so adding them unblocks no page yet.
 
 ## The real-app probe, before and after
 
-`node packages/mobile/proofs/real-app-probe.ts --migrate <markless-migrate 8e6eb21> --out <file>`; before is the base
-`753a0ddc7` (with real-values, real-elements, forms and scroll), after is this branch. 1,078 pages from 40 apps.
+`node packages/mobile/proofs/real-app-probe.ts --migrate <markless-migrate 8e6eb21> --out <file>`. Three trees: the base
+`743b2d7c1`, this branch with handlers only (`7013bad5b`), and with render values (`adec7ef1c`). 1,078 pages from 40 apps.
 
-|                                                                             | Before | After                                 |
-| --------------------------------------------------------------------------- | ------ | ------------------------------------- |
-| Pages that build                                                            | 18     | 20 (`demos/dbmon`, `demos/memo-wall`) |
-| Pages blocked by "needs a script engine" (calls into app code and the like) | 895    | 337                                   |
-| Pages blocked by a JavaScript refusal                                       | 0      | 869                                   |
-| Pages with neither                                                          | 183    | 184                                   |
+|                                                                               | Base | Handlers | + render values |
+| ----------------------------------------------------------------------------- | ---- | -------- | --------------- |
+| Pages that build                                                              | 18   | 20       | 20              |
+| Pages refused with "needs a script engine" (calls into app code and the like) | 895  | 337      | 96              |
+| Pages refused for what their JavaScript uses                                  | 0    | 869      | 927             |
+| Apps with at least one page that builds                                       | 7    | 9        | 9               |
+| Apps whose every page builds                                                  | 2    | 4        | 4               |
+| Apps with a "needs a script engine" page                                      | 34   | 25       | 25              |
 
-By app, only the demos moved (13 to 15 of 45). The ports moved none: the calls the data path refused are now JavaScript,
-and that JavaScript is the migrator's port of the old site's behaviour, which works on the web page itself.
+By app (pages that build / pages with "needs a script engine" / pages with a JavaScript refusal / pages):
 
-What the 869 pages' JavaScript refusals are (a page counts once per kind; outside the docusaurus and htmx documentation
-sites in brackets):
+| App                             | Base        | Handlers      | + render values |
+| ------------------------------- | ----------- | ------------- | --------------- |
+| demos/dbmon                     | 0/1/0/1     | 1/0/0/1       | 1/0/0/1         |
+| demos/memo-wall                 | 0/1/0/1     | 1/0/0/1       | 1/0/0/1         |
+| demos (the other 18)            | 13/22/0/43  | 13/18/8/43    | 13/16/8/43      |
+| website                         | 0/5/0/80    | 0/5/4/80      | 0/5/5/80        |
+| docusaurus port                 | 2/483/0/485 | 2/0/483/485   | 2/0/483/485     |
+| htmx.org port                   | 0/188/0/188 | 0/188/188/188 | 0/8/188/188     |
+| alpinejs.dev port               | 0/80/0/82   | 0/58/80/82    | 0/1/80/82       |
+| vite.dev port                   | 0/2/0/57    | 0/1/2/57      | 0/1/57/57       |
+| vite-site port                  | 3/3/0/7     | 3/1/2/7       | 3/1/3/7         |
+| hn-graphql port                 | 0/22/0/38   | 0/0/21/38     | 0/0/21/38       |
+| the other 13 ports and fixtures | 0/88/0/96   | 0/66/81/96    | 0/64/82/96      |
 
-| Kind                                                                                                    | Pages     |
-| ------------------------------------------------------------------------------------------------------- | --------- |
-| the web page: `document`, the window, browser storage, the DOM                                          | 672 (174) |
-| a host service not provided (above)                                                                     | 784 (113) |
-| an import the build could not read (packages not installed in the migrate checkout: `nprogress`, `zod`) | 503 (20)  |
-| `shared()` objects, device objects or element handles, which a script cannot reach yet                  | 248 (60)  |
-| a name JavaScript cannot reach (not state, a prop value, a row item or a computed)                      | 82 (77)   |
-| framework state or components used by module code                                                       | 30 (30)   |
-| an event field a phone lacks                                                                            | 5 (4)     |
+Only two demos moved. The ports moved none: their calls into app code now run as JavaScript (htmx 188 to 8 pages, alpinejs
+58 to 1), and that JavaScript is the migrator's port of the old sites' behaviour, which works on the web page itself.
 
-The 337 pages still refused as "needs a script engine" are not handlers: calls in attribute values (272), text (199) and
-`@for` lists, which render. The same mechanism (a `{ script }` expression) would run them; that is the next step if wanted.
+What the JavaScript refusals are, after render values (a page counts once per kind; outside the docusaurus and htmx
+documentation sites in brackets):
+
+| Kind | Pages |
+| --- | --- |
+| the web page: `document`, the window, browser storage, the DOM | 824 (153) |
+| an import the build could not read (packages not installed in the migrate checkout: `nprogress`, `zod`) | 558 (75) |
+| a global no phone script has: `URLSearchParams` 506, `URL` 503, `performance` 486, and DOM classes the page list does not name yet (`HTMLAnchorElement` 486, `HashChangeEvent` 476, other `HTML…Element` and `…Event` classes 10 to 13 each) | 527 (50) |
+| `shared()` objects, device objects or element handles | 248 (60) |
+| a name JavaScript cannot reach (not state, a prop value, a row item or a computed) | 82 (77) |
+| framework state or components used by module code | 10 (10) |
+| an event field a phone lacks | 5 (4) |
+
+The 96 pages still refused as "needs a script engine" are mostly class tests, first values of state and submit handlers,
+which stay data by design here.
 
 ## Limits
 
