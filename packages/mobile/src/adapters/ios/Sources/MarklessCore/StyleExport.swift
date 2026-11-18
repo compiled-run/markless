@@ -31,7 +31,7 @@ public enum StyleWrite: Sendable {
 	/// The text a clip-path leaves exposed to the screen reader; a clip does not change accessibility, so nothing to apply.
 	case clipText
 	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
-	case paintOrder(host: String)
+	case paintOrder(host: String, bucket: Int, rank: Int)
 }
 
 /// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
@@ -397,10 +397,8 @@ public struct StyleExport: Sendable {
 		case "paint-order":
 			let f = try write.object(["kind", "host", "bucket", "rank", "index", "key"])
 			try expectKey(f, "dragonStacking.order")
-			_ = try f["bucket"].number()
-			_ = try f["rank"].number()
 			_ = try f["index"].number()
-			return .paintOrder(host: try f["host"].string())
+			return .paintOrder(host: try f["host"].string(), bucket: Int(try f["bucket"].number()), rank: Int(try f["rank"].number()))
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

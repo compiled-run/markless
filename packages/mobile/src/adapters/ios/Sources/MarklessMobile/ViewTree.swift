@@ -697,6 +697,8 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
 	view.clipsToBounds = style.clipsChildren
+	// Siblings draw by zPosition: in-flow boxes at 0, negative z-index below them, positioned boxes above in their context's order.
+	view.layer.zPosition = style.paintOrder.map { CGFloat($0.bucket) * 100_000 + CGFloat($0.rank) + 1 } ?? 0
 	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
 	if let r = style.clipRect {
 		let mask = view.layer.mask ?? CALayer()

@@ -15,12 +15,16 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var clipsChildren = false
 	/// clip-path: inset(): the rect in points, relative to the box, the box and everything in it are clipped to; empty when nothing shows.
 	public var clipRect: Frame?
+	/// Painted in a stacking context's layer order (a positioned or z-index box): its bucket (-1 below the flow, 1 auto or 0, 2 above)
+	/// and its rank there; the host orders it among its view's siblings, after (or, for -1, before) the boxes in flow.
+	public var paintOrder: (bucket: Int, rank: Int)?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
 			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
+			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
 	}
 
 	public struct DashedBorder: Equatable, Sendable {
@@ -148,6 +152,9 @@ extension StyleExport {
 				throw styleError("\(node.id)'s parent is \(node.parent ?? "none") in the payload, \(cursor ?? "none") in the style export")
 			}
 			var style = try resolve(styled, styled.writes)
+			// A box that paints nothing (an empty clip) has no order to keep.
+			if style.clipRect.map({ $0.width == 0 || $0.height == 0 }) ?? false { style.paintOrder = nil }
+			if style.paintOrder != nil, let host = reHostOf(styled.writes) { try checkSiblingOrderSuffices(styled, host: host, byId: byId, nodes: nodes) }
 			if let frame = style.frame {
 				style.frame = Frame(x: frame.x + offset.x / dpr, y: frame.y + offset.y / dpr, width: frame.width, height: frame.height)
 			}
@@ -158,12 +165,34 @@ extension StyleExport {
 
 
 
+	private func reHostOf(_ writes: [StyleWrite]) -> String? {
+		for case let .paintOrder(host, _, _) in writes { return host }
+		return nil
+	}
+
+	/// Ordering a box among its own siblings paints it where its stacking context does when the context is its parent, or when every
+	/// box between them is the last painting child of its parent and clips nothing: then nothing of the context paints after it
+	/// outside the parent. Anything else is refused by name.
+	private func checkSiblingOrderSuffices(_ node: StyleNode, host: String, byId: [String: StyleNode], nodes: [StyleNode]) throws {
+		var cursor = node.parent
+		guard case let .paintOrder(_, bucket, _)? = node.writes.first(where: { if case .paintOrder = $0 { return true } else { return false } }) else { return }
+		while let id = cursor, id != host {
+			guard let between = byId[id] else { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
+			let painting = nodes.filter { $0.parent == between.parent && $0.frame != nil }
+			let clips = between.writes.contains { if case .paddingBoxClip = $0 { return true }; if case .clipPathInset = $0 { return true }; return false }
+			guard bucket >= 0, painting.last?.id == between.id, !clips else {
+				throw styleError("\(node.id): painting in \(host)'s stacking order past \(between.id), which has later siblings or clips, is not implemented on iOS")
+			}
+			cursor = between.parent
+		}
+		if cursor == nil { throw styleError("\(node.id)'s stacking context \(host) is not an ancestor") }
+	}
+
 	private func resolve(_ node: StyleNode, _ writes: [StyleWrite]) throws -> ResolvedStyle {
 		var style = ResolvedStyle()
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
-		var reHosted: String?
 		for write in writes {
 			switch write {
 			case let .backgroundColor(color): style.background = color
@@ -186,12 +215,8 @@ extension StyleExport {
 				let r = frame.width - edge(1, frame.width), b = frame.height - edge(2, frame.height)
 				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
 			case .clipText: break
-			case let .paintOrder(host): reHosted = host
+			case let .paintOrder(_, bucket, rank): style.paintOrder = (bucket, rank)
 			}
-		}
-		// Re-hosting a box into another stacking context's order is not built here; a box that paints nothing has no order to keep.
-		if let host = reHosted, !(style.clipRect.map { $0.width == 0 || $0.height == 0 } ?? false) {
-			throw styleError("\(node.id): painting in \(host)'s stacking order (a positioned or z-index box) is not implemented on iOS")
 		}
 		if let ops = node.borderOps {
 			guard borderColors.count == 4, style.cornerRadius == 0, !style.clipsChildren else {

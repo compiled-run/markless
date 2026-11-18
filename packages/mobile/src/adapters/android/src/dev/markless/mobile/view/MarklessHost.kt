@@ -32,6 +32,7 @@ import dev.markless.mobile.core.Node
 import dev.markless.mobile.core.Payload
 import dev.markless.mobile.core.Runtime
 import dev.markless.mobile.core.Store
+import dev.markless.mobile.style.Assignment
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.StyleExport
 import dev.markless.mobile.style.StyleWrite
@@ -559,6 +560,9 @@ class MarklessHost(
 			if (parentId == null) rootFrame = rect else (views.getValue(parentId) as MarklessBox).frames[view] = rect
 		}
 		paint(view, s)
+		// A box that paints nothing (an empty clip) has no order to keep.
+		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
+		(view.parent as? MarklessBox)?.order(view, s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.takeIf { !paintsNothing }?.let { checkSiblingOrderSuffices(s, it, styled); it.bucket * 100_000 + it.rank + 1 } ?: 0)
 	}
 
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */
@@ -602,6 +606,23 @@ class MarklessHost(
 		return absolute
 	}
 
+	/**
+	 * Ordering a box among its own siblings paints it where its stacking context does when the context is its parent, or when every
+	 * box between them is the last painting child of its parent and clips nothing: then nothing of the context paints after it
+	 * outside the parent. Anything else is refused by name.
+	 */
+	private fun checkSiblingOrderSuffices(s: StyledNode, order: StyleWrite.PaintOrder, styled: Assignment) {
+		var cursor = s.parent
+		while (cursor != null && cursor != order.host) {
+			val between = styled.byId[cursor] ?: throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+			val painting = styled.nodes.filter { it.parent == between.parent && it.frame != null }
+			val clips = between.writes.any { it == StyleWrite.PaddingBoxClip || it is StyleWrite.ClipPathInset }
+			if (order.bucket < 0 || painting.lastOrNull()?.id != between.id || clips) throw MarklessHostError("\"${s.id}\" paints in ${order.host}'s stacking order past ${between.id}, which has later siblings or clips; not implemented on Android")
+			cursor = between.parent
+		}
+		if (cursor == null) throw MarklessHostError("\"${s.id}\"'s stacking context ${order.host} is not an ancestor")
+	}
+
 	private fun paint(view: View, s: StyledNode) {
 		var fill: Int? = null
 		var styles: List<String>? = null
@@ -609,7 +630,6 @@ class MarklessHost(
 		var radii: List<Double>? = null
 		var clipsChildren = false
 		var clip: Rect? = null
-		var reHosted: String? = null
 		for (w in s.writes) when (w) {
 			is StyleWrite.BackgroundColor -> fill = w.color.argb
 			StyleWrite.BorderWidths -> if (s.borderWidths == null) throw MarklessHostError("\"${s.id}\" writes border widths but has none")
@@ -632,10 +652,8 @@ class MarklessHost(
 				clip = if (r <= l || b <= t) Rect() else Rect(l.roundToInt(), t.roundToInt(), r.roundToInt(), b.roundToInt())
 			}
 			StyleWrite.ClipText -> {}
-			is StyleWrite.PaintOrder -> reHosted = w.host
+			is StyleWrite.PaintOrder -> {}
 		}
-		// Re-hosting a box into another stacking context's order is not built here; a box that paints nothing has no order to keep.
-		if (reHosted != null && clip?.isEmpty != true) throw MarklessHostError("\"${s.id}\" paints in $reHosted's stacking order (a positioned or z-index box), which is not implemented on Android")
 		if (s.kind != "text") {
 			val edges = s.borderWidths
 			if (clipsChildren && edges != null && listOf(edges.top, edges.right, edges.bottom, edges.left).any { it != 0.0 }) throw MarklessHostError("\"${s.id}\" clips overflow to its padding box past borders, which is not implemented on Android")

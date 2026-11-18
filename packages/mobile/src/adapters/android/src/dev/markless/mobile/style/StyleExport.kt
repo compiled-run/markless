@@ -43,7 +43,7 @@ sealed interface StyleWrite {
 	/** The text a clip-path leaves exposed to the screen reader; a canvas clip does not change accessibility, so nothing to apply. */
 	data object ClipText : StyleWrite
 	/** The box paints in another stacking context's order (Dragon's re-hosting); [host] is that context's node. */
-	data class PaintOrder(val host: String) : StyleWrite
+	data class PaintOrder(val host: String, val bucket: Int, val rank: Int) : StyleWrite
 }
 
 /** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
@@ -314,7 +314,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					e.field("value", what).num("value") to (unit == "%")
 				}.also { if (it.size != 4) throw MarklessDecodeError("$what has ${it.size} inset edges, not 4") })
 				"clip-text" -> StyleWrite.ClipText.also { o.field("texts", what).arr("texts").forEach { t -> t.str("$what.texts[]") } }
-				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"))
+				"paint-order" -> StyleWrite.PaintOrder(o.field("host", what).str("host"), o.field("bucket", what).num("bucket").toInt(), o.field("rank", what).num("rank").toInt())
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

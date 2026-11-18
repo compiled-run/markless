@@ -8,7 +8,7 @@
 			"element": "main",
 			"parent": null,
 			"attributes": {
-				"class": "mk-ad243g"
+				"class": "mk-ydmpcx"
 			}
 		},
 		{
@@ -17,7 +17,7 @@
 			"element": "h1",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-ad243g"
+				"class": "mk-ydmpcx"
 			}
 		},
 		{
@@ -32,7 +32,7 @@
 			"element": "div",
 			"parent": "h0",
 			"attributes": {
-				"class": "bar mk-ad243g"
+				"class": "bar mk-ydmpcx"
 			}
 		},
 		{
@@ -41,7 +41,7 @@
 			"element": "button",
 			"parent": "h2",
 			"attributes": {
-				"class": "trigger mk-ad243g"
+				"class": "trigger mk-ydmpcx"
 			}
 		},
 		{
@@ -56,7 +56,7 @@
 			"element": "div",
 			"parent": "h2",
 			"attributes": {
-				"class": "hint mk-ad243g"
+				"class": "hint mk-ydmpcx"
 			}
 		},
 		{
@@ -71,7 +71,7 @@
 			"element": "div",
 			"parent": "h2",
 			"attributes": {
-				"class": "panel mk-ad243g"
+				"class": "panel mk-ydmpcx"
 			},
 			"attributesByState": {
 				"hidden": [
@@ -102,7 +102,7 @@
 			"element": "div",
 			"parent": "h2",
 			"attributes": {
-				"class": "low mk-ad243g"
+				"class": "low mk-ydmpcx"
 			}
 		},
 		{
@@ -117,7 +117,7 @@
 			"element": "div",
 			"parent": "h2",
 			"attributes": {
-				"class": "above mk-ad243g"
+				"class": "above mk-ydmpcx"
 			}
 		},
 		{
@@ -132,7 +132,7 @@
 			"element": "p",
 			"parent": "h0",
 			"attributes": {
-				"class": "mk-ad243g"
+				"class": "mk-ydmpcx"
 			}
 		},
 		{
@@ -156,7 +156,7 @@
 			]
 		}
 	],
-	"css": ".bar.mk-ad243g {\n\t\t\t\tposition: relative;\n\t\t\t\theight: 320px;\n\t\t\t\tanchor-scope: --details, --low;\n\t\t\t}\n\t\t\t.trigger.mk-ad243g {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px 0 0 40px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t\tanchor-name: --details;\n\t\t\t}\n\t\t\t.panel.mk-ad243g {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --details;\n\t\t\t\tposition-area: block-end;\n\t\t\t\twidth: anchor-size(width);\n\t\t\t\tbox-sizing: border-box;\n\t\t\t\tpadding: 8px;\n\t\t\t\tborder: 2px solid #8d99ae;\n\t\t\t\tbackground: #ffd166;\n\t\t\t}\n\t\t\t.hint.mk-ad243g {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --details;\n\t\t\t\tposition-area: inline-end;\n\t\t\t\tmargin-left: 8px;\n\t\t\t\tpadding: 4px 8px;\n\t\t\t\tbackground: #caf0f8;\n\t\t\t}\n\t\t\t.low.mk-ad243g {\n\t\t\t\tposition: absolute;\n\t\t\t\tleft: 40px;\n\t\t\t\tbottom: 16px;\n\t\t\t\tpadding: 6px 12px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tanchor-name: --low;\n\t\t\t}\n\t\t\t.above.mk-ad243g {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --low;\n\t\t\t\tposition-area: block-end span-inline-end;\n\t\t\t\tposition-try-fallbacks: flip-block;\n\t\t\t\theight: 60px;\n\t\t\t\tpadding: 6px;\n\t\t\t\tbackground: #ef476f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}",
+	"css": ".bar.mk-ydmpcx {\n\t\t\t\tposition: relative;\n\t\t\t\theight: 320px;\n\t\t\t\tanchor-scope: --details, --low;\n\t\t\t}\n\t\t\t.trigger.mk-ydmpcx {\n\t\t\t\tdisplay: block;\n\t\t\t\tmargin: 12px 0 0 40px;\n\t\t\t\tfont-family: inherit;\n\t\t\t\tfont-size: 18px;\n\t\t\t\tpadding: 10px 18px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tborder-radius: 10px;\n\t\t\t\tbackground: #e9ecef;\n\t\t\t\tcolor: #22223b;\n\t\t\t\tanchor-name: --details;\n\t\t\t}\n\t\t\t.panel.mk-ydmpcx {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --details;\n\t\t\t\tposition-area: block-end;\n\t\t\t\twidth: anchor-size(width);\n\t\t\t\tbox-sizing: border-box;\n\t\t\t\tpadding: 8px;\n\t\t\t\tborder: 2px solid #8d99ae;\n\t\t\t\tbackground: #ffd166;\n\t\t\t}\n\t\t\t.hint.mk-ydmpcx {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --details;\n\t\t\t\tposition-area: inline-end;\n\t\t\t\tmargin-left: 8px;\n\t\t\t\tpadding: 4px 8px;\n\t\t\t\tbackground: #caf0f8;\n\t\t\t}\n\t\t\t.low.mk-ydmpcx {\n\t\t\t\tposition: absolute;\n\t\t\t\tleft: 40px;\n\t\t\t\tbottom: 16px;\n\t\t\t\tpadding: 6px 12px;\n\t\t\t\tborder: 2px solid #22223b;\n\t\t\t\tanchor-name: --low;\n\t\t\t}\n\t\t\t.above.mk-ydmpcx {\n\t\t\t\tposition: absolute;\n\t\t\t\tposition-anchor: --low;\n\t\t\t\tposition-area: block-end span-inline-end;\n\t\t\t\tposition-try-fallbacks: flip-block;\n\t\t\t\theight: 60px;\n\t\t\t\tpadding: 6px;\n\t\t\t\tbackground: #ef476f;\n\t\t\t\tcolor: #ffffff;\n\t\t\t}",
 	"states": [
 		{
 			"cell": "state:open",
