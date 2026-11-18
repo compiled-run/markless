@@ -57,6 +57,8 @@ export type SemanticGraphInput = {
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
+	/** A computed's block body (its statements) as one tree. */
+	readonly computedBody: (node: never) => SemanticExpression;
 	readonly handlerStatements: (
 		node: never,
 	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
@@ -1246,6 +1248,8 @@ export type SemanticExpression =
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
 	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
+	/** A computed body's `const name = value`: `name` reads `value` inside `body`. */
+	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression; readonly body: SemanticExpression }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
@@ -1277,6 +1281,8 @@ export type SemanticHandlerStatement =
 	  }
 	/** `return;` with no value: the rest of the body does not run. */
 	| { readonly kind: 'return' }
+	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
+	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {

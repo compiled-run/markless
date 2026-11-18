@@ -1382,9 +1382,10 @@ function collectReturnedObjectProperties(input: {
 				...(nativeStatements
 					? {
 							nativeStatements,
-							parameters: asNodes(value.params).map((parameter) =>
-								parameter.type === 'Identifier' ? String(parameter.name) : '',
-							),
+							parameters: asNodes(value.params).map((parameter) => {
+								const named = parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode) : parameter;
+								return named.type === 'Identifier' ? String(named.name) : '';
+							}),
 						}
 					: {}),
 			});

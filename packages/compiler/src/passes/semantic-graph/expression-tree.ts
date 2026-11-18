@@ -47,6 +47,10 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		case 'ParenthesizedExpression':
 		case 'JSXExpressionContainer':
 		case 'ChainExpression':
+		case 'TSAsExpression':
+		case 'TSSatisfiesExpression':
+		case 'TSNonNullExpression':
+		case 'TSTypeAssertion':
 			return expressionTreeOf(node.expression as AnyNode | undefined);
 		case 'Identifier':
 			if (node.name === 'undefined') return { kind: 'literal', value: null };
@@ -250,11 +254,56 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 	return { kind: 'unsupported', construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement' };
 };
 
-function blockStatementsOf(statement: AnyNode | undefined): SemanticHandlerStatement[] {
+/** `const a = x` and `const { a, b: c } = x` as names and values, or the construct no native build binds. */
+function constBindingsOf(
+	declaration: AnyNode,
+): ReadonlyArray<readonly [string, SemanticExpression]> | string {
+	if (declaration.kind !== 'const') return `a \`${String(declaration.kind)}\` declaration`;
+	const bindings: (readonly [string, SemanticExpression])[] = [];
+	for (const declarator of asNodes(declaration.declarations)) {
+		const id = declarator.id as AnyNode | undefined;
+		const value = expressionTreeOf(declarator.init as AnyNode | undefined);
+		if (id?.type === 'Identifier' && typeof id.name === 'string') {
+			bindings.push([id.name, value]);
+			continue;
+		}
+		if (id?.type !== 'ObjectPattern') return 'an array destructuring';
+		for (const property of asNodes(id.properties)) {
+			const key = property.key as AnyNode | undefined;
+			const local = property.value as AnyNode | undefined;
+			if (
+				property.type !== 'Property' ||
+				property.computed ||
+				key?.type !== 'Identifier' ||
+				typeof key.name !== 'string' ||
+				local?.type !== 'Identifier' ||
+				typeof local.name !== 'string'
+			)
+				return 'a destructuring with a default, rest or computed key';
+			bindings.push([local.name, { kind: 'member', object: value, property: key.name }]);
+		}
+	}
+	return bindings;
+}
+
+const declaresDirectly = (block: AnyNode): AnyNode | undefined =>
+	asNodes(block.body).find((statement) => statement.type === 'VariableDeclaration');
+
+function blockStatementsOf(statement: AnyNode | undefined, inList = false): SemanticHandlerStatement[] {
 	if (!statement) return [];
-	if (statement.type === 'BlockStatement')
-		return asNodes(statement.body).flatMap(blockStatementsOf);
+	if (statement.type === 'BlockStatement') {
+		const declaration = inList ? declaresDirectly(statement) : undefined;
+		if (declaration)
+			return [{ kind: 'unsupported', construct: `a \`${String(declaration.kind)}\` inside a bare block` }];
+		return asNodes(statement.body).flatMap((inner) => blockStatementsOf(inner, true));
+	}
 	if (statement.type === 'EmptyStatement') return [];
+	if (statement.type === 'VariableDeclaration') {
+		const bindings = constBindingsOf(statement);
+		return typeof bindings === 'string'
+			? [{ kind: 'unsupported', construct: bindings }]
+			: bindings.map(([name, value]) => ({ kind: 'const', name, value }));
+	}
 	if (statement.type === 'ExpressionStatement')
 		return [statementOf(statement.expression as AnyNode)];
 	if (statement.type === 'ReturnStatement')
@@ -273,16 +322,112 @@ function blockStatementsOf(statement: AnyNode | undefined): SemanticHandlerState
 	return [{ kind: 'unsupported', construct: `a ${String(statement.type)}` }];
 }
 
-/** A handler's body as statements a native host runs: assignments, calls, `if` and bare `return`, each value a tree. */
+/** Whether `name` is read in `tree` where it means the outer binding (not a lambda parameter or `let` of that name). */
+function readsName(tree: SemanticExpression, name: string): boolean {
+	switch (tree.kind) {
+		case 'read':
+			return tree.name === name;
+		case 'literal':
+		case 'unsupported':
+			return false;
+		case 'unary':
+			return readsName(tree.value, name);
+		case 'binary':
+		case 'logical':
+			return readsName(tree.left, name) || readsName(tree.right, name);
+		case 'conditional':
+			return [tree.test, tree.consequent, tree.alternate].some((part) => readsName(part, name));
+		case 'template':
+			return tree.parts.some((part) => typeof part !== 'string' && readsName(part, name));
+		case 'member':
+			return readsName(tree.object, name);
+		case 'call':
+			return tree.arguments.some((argument) => readsName(argument, name));
+		case 'method':
+			return readsName(tree.object, name) || tree.arguments.some((argument) => readsName(argument, name));
+		case 'array':
+			return tree.items.some((item) => readsName(item.value, name));
+		case 'object':
+			return tree.entries.some(([, value]) => readsName(value, name));
+		case 'lambda':
+			return !tree.parameters.includes(name) && readsName(tree.body, name);
+		case 'let':
+			return readsName(tree.value, name) || (tree.name !== name && readsName(tree.body, name));
+	}
+}
+
+/**
+ * A computed's statements as one tree, `after` being what the statements following their block give: `const` is a
+ * `let`, `if` a conditional, `return` its value and falling off the end `undefined`.
+ */
+function returnChainOf(statements: ReadonlyArray<AnyNode>, after: SemanticExpression): SemanticExpression {
+	const [first, ...rest] = statements;
+	if (!first) return after;
+	const branch = (node: AnyNode | null | undefined, otherwise: SemanticExpression) =>
+		!node ? otherwise : returnChainOf(node.type === 'BlockStatement' ? asNodes(node.body) : [node], otherwise);
+	switch (first.type) {
+		case 'EmptyStatement':
+			return returnChainOf(rest, after);
+		case 'ReturnStatement':
+			return first.argument ? expressionTreeOf(first.argument as AnyNode) : { kind: 'literal', value: null };
+		case 'BlockStatement':
+			return branch(first, returnChainOf(rest, after));
+		case 'IfStatement': {
+			const otherwise = returnChainOf(rest, after);
+			return {
+				kind: 'conditional',
+				test: expressionTreeOf(first.test as AnyNode),
+				consequent: branch(first.consequent as AnyNode, otherwise),
+				alternate: branch(first.alternate as AnyNode | null, otherwise),
+			};
+		}
+		case 'VariableDeclaration': {
+			const bindings = constBindingsOf(first);
+			if (typeof bindings === 'string') return unsupported(bindings);
+			if (bindings.some(([name]) => readsName(after, name)))
+				return unsupported('a `const` that hides a name read after its block');
+			return bindings.reduceRight<SemanticExpression>(
+				(body, [name, value]) => ({ kind: 'let', name, value, body }),
+				returnChainOf(rest, after),
+			);
+		}
+		default:
+			return unsupported(`a ${String(first.type)}`);
+	}
+}
+
+/** A computed's block body as one tree a native host evaluates. */
+export function computedBodyOf(node: AnyNode): SemanticExpression {
+	return returnChainOf(asNodes(node.body), { kind: 'literal', value: null });
+}
+
+/** A handler's body as statements a native host runs: assignments, calls, `const`, `if` and bare `return`, each value a tree. */
 export function handlerStatementsOf(
 	node: AnyNode | undefined,
 ): ReadonlyArray<SemanticHandlerStatement> | undefined {
 	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
 		return undefined;
 	if (node.async) return [{ kind: 'unsupported', construct: 'an async handler' }];
+	// A parameter's default applies when no value (undefined, which native values spell null) is passed.
+	const defaults = asNodes(node.params).flatMap((parameter): SemanticHandlerStatement[] => {
+		const name = (parameter.left as AnyNode | undefined)?.name;
+		return parameter.type === 'AssignmentPattern' && typeof name === 'string'
+			? [
+					{
+						kind: 'const',
+						name,
+						value: {
+							kind: 'logical',
+							operator: '??',
+							left: { kind: 'read', name },
+							right: expressionTreeOf(parameter.right as AnyNode),
+						},
+					},
+				]
+			: [];
+	});
 	const body = node.body as AnyNode | undefined;
-	if (body?.type !== 'BlockStatement') return [statementOf(body ?? null)];
-	return blockStatementsOf(body);
+	return [...defaults, ...(body?.type === 'BlockStatement' ? blockStatementsOf(body) : [statementOf(body ?? null)])];
 }
 
 /** A component's prop defaults, rest spread, `state()` initializers and the writes its body makes while rendering. */
@@ -339,6 +484,7 @@ export function componentNativeFactsOf(
 /** What a native build passes as `nativeFacts`; nothing else imports this module. */
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
+	computedBody: computedBodyOf as NativeFactCollectors['computedBody'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
 };

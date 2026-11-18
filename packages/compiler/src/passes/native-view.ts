@@ -825,6 +825,18 @@ export function createNativeViewPayload(
 		return entry?.source === '@markless/router' && entry.importedName === 'Link';
 	};
 	const inlining = new Set<string>();
+	/** `scope` where `name` reads `value`, hiding any outer meaning of that name. */
+	const bindName = (scope: Scope, name: string, value: NativeExpr): Scope => {
+		const objects = new Map(scope.objects);
+		objects.delete(name);
+		return {
+			...scope,
+			args: new Map(scope.args).set(name, value),
+			locals: new Set([...scope.locals].filter((local) => local !== name)),
+			objects,
+			...(scope.event === name ? { event: undefined } : {}),
+		};
+	};
 	function exprOf(
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -980,6 +992,10 @@ export function createNativeViewPayload(
 				return target && args.every((argument) => argument !== null)
 					? { method: expression.method as NativeMethod, target, arguments: args as NativeExpr[] }
 					: null;
+			}
+			case 'let': {
+				const value = exprOf(expression.value, what, scope);
+				return value && exprOf(expression.body, what, bindName(scope, expression.name, value));
 			}
 			case 'lambda':
 				return refuse(`${what} uses a function value outside a method call`);
@@ -1308,7 +1324,7 @@ export function createNativeViewPayload(
 					}
 					const handler = `handler:${scope.prefix}${event.id}`;
 					events.push({ host: id, event: semantic, handler });
-					handlers.push({ id: handler, ops: handlerOps(event, scope) });
+					handlers.push({ id: handler, ops: handlerOps(event, scope, handler) });
 				}
 				continue;
 			}
@@ -1520,7 +1536,7 @@ export function createNativeViewPayload(
 		}
 		close();
 	};
-	function handlerOps(event: SemanticEvent, scope: Scope): NativeOp[] {
+	function handlerOps(event: SemanticEvent, scope: Scope, handler: string): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
 		const [parameter, ...more] = event.handlerParameters;
 		if (more.length > 0) {
@@ -1537,8 +1553,44 @@ export function createNativeViewPayload(
 				: event.eventName === 'input'
 					? { ...scope, event: parameter }
 					: { ...scope, opaque: parameter };
+		snapshots = { handler, count: 0 };
 		return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0).ops;
 	}
+
+	/** The handler being lowered, which owns the cells its `const`s are kept in when what they read changes. */
+	let snapshots = { handler: '', count: 0 };
+
+	/**
+	 * Lowers `run` with each name bound to its value. When the ops it gives may change what a value reads before reading
+	 * it, lowers again with that value kept, as it was here, in a cell of its own that is written first.
+	 */
+	function lowerBound(
+		bindings: ReadonlyArray<readonly [string, NativeExpr]>,
+		run: (values: ReadonlyArray<NativeExpr>) => { readonly ops: NativeOp[]; readonly returns: boolean },
+	): { readonly ops: NativeOp[]; readonly returns: boolean } {
+		const marks = { diagnostics: diagnostics.length, dialogOps: dialogOps.length, cells: cells.length, count: snapshots.count };
+		const first = run(bindings.map(([, value]) => value));
+		const kept = bindings.map(([, value]) => mayChangeBeforeRead(first.ops, cellsOf(value)));
+		if (!kept.includes(true)) return first;
+		diagnostics.length = marks.diagnostics;
+		dialogOps.length = marks.dialogOps;
+		for (const dropped of cells.splice(marks.cells)) cellIndex.delete(dropped.id);
+		snapshots.count = marks.count;
+		const ops: NativeOp[] = [];
+		const values = bindings.map(([name, value], index): NativeExpr => {
+			if (!kept[index]) return value;
+			const cell = `${snapshots.handler}/kept:${snapshots.count++}`;
+			addCell({ id: cell, name, initial: null });
+			ops.push({ op: 'assign', cell, value });
+			return { cell };
+		});
+		const second = run(values);
+		return { ops: [...ops, ...second.ops], returns: second.returns };
+	}
+
+	/** Whether running `ops` may change a cell of `read` before a later op reads it; one assignment reads before it writes. */
+	const mayChangeBeforeRead = (ops: ReadonlyArray<NativeOp>, read: ReadonlySet<string>): boolean =>
+		!(ops.length === 1 && ops[0]!.op === 'assign') && [...writesOf(ops)].some((cell) => read.has(cell));
 
 	/** Cells an op list may write, inside `if` ops too. */
 	const writesOf = (ops: ReadonlyArray<NativeOp>, into = new Set<string>()): Set<string> => {
@@ -1567,6 +1619,16 @@ export function createNativeViewPayload(
 		for (let index = 0; index < statements.length; index++) {
 			const statement = statements[index]!;
 			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'const') {
+				const value = exprOf(statement.value, what, scope);
+				if (!value) return { ops, returns: true };
+				const rest = statements.slice(index + 1);
+				const after = lowerBound([[statement.name, value]], ([bound]) =>
+					lowerStatements(rest, bindName(scope, statement.name, bound!), what, span, depth),
+				);
+				ops.push(...after.ops);
+				return { ops, returns: after.returns };
+			}
 			if (statement.kind === 'if') {
 				const then = lowerStatements(statement.whenTrue, scope, what, span, depth);
 				const otherwise = lowerStatements(statement.whenFalse, scope, what, span, depth);
@@ -1596,7 +1658,7 @@ export function createNativeViewPayload(
 	}
 
 	function statementOps(
-		statement: Exclude<SemanticHandlerStatement, { kind: 'if' } | { kind: 'return' }>,
+		statement: Exclude<SemanticHandlerStatement, { kind: 'if' } | { kind: 'return' } | { kind: 'const' }>,
 		scope: Scope,
 		what: string,
 		span: SourceSpan | undefined,
@@ -1659,33 +1721,21 @@ export function createNativeViewPayload(
 				exprOf(argument, `${what}'s call to \`${callee}\``, scope),
 			);
 			if (args.some((argument) => argument === null)) return [];
-			const bound = new Map(body.scope.args);
-			body.parameters.forEach((name, index) =>
-				bound.set(name, args[index] ?? { literal: null }),
-			);
-			const lowered = lowerStatements(
-				body.statements,
-				{
-					...body.scope,
-					args: bound,
-					locals: new Set([...body.scope.locals].filter((name) => !bound.has(name))),
+			const { statements, parameters, scope: inner } = body;
+			return lowerBound(
+				parameters.map((name, index) => [name, args[index] ?? { literal: null }] as const),
+				(values) => {
+					const bound = new Map(inner.args);
+					parameters.forEach((name, index) => bound.set(name, values[index]!));
+					return lowerStatements(
+						statements,
+						{ ...inner, args: bound, locals: new Set([...inner.locals].filter((name) => !bound.has(name))) },
+						what,
+						span,
+						depth + 1,
+					);
 				},
-				what,
-				span,
-				depth + 1,
 			).ops;
-			const argumentCells = new Set(args.flatMap((argument) => [...cellsOf(argument!)]));
-			if (
-				lowered.length > 1 &&
-				[...writesOf(lowered)].some((cell) => argumentCells.has(cell))
-			) {
-				refuse(
-					`${what} calls \`${callee}\` with a value its body changes before reading it`,
-					span,
-				);
-				return [];
-			}
-			return lowered;
 		}
 		if (statement.path && statement.path.length > 0) {
 			const object = scope.objects.get(statement.target);

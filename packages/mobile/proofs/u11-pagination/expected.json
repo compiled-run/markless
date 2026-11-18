@@ -1,0 +1,33 @@
+{
+	"rung": 111,
+	"name": "@markless/ui pagination: methods that keep a const and a defaulted parameter, and a computed with a block body",
+	"steps": [
+		{
+			"visible": ["Pages", "Previous page", "One", "Two", "Three", "Next page", "Page 2"],
+			"absent": ["Last page", "Page 1"]
+		},
+		{
+			"do": { "tap": "Next page" },
+			"visible": ["Last page"],
+			"absent": ["Page 2"],
+			"disabled": ["Next page"]
+		},
+		{
+			"do": { "tap": "One" },
+			"visible": ["Page 1"],
+			"absent": ["Last page"],
+			"disabled": ["Previous page"]
+		},
+		{
+			"do": { "tap": "Next page" },
+			"visible": ["Page 2"],
+			"absent": ["Page 1"]
+		},
+		{
+			"do": { "tap": "Previous page" },
+			"visible": ["Page 1"],
+			"absent": ["Page 2"],
+			"disabled": ["Previous page"]
+		}
+	]
+}

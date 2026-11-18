@@ -432,4 +432,195 @@ export function Toggle() @{
 			},
 		]);
 	});
+
+	it('reads a handler const as its value where nothing the handler writes changes it', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Steps() @{
+	let size = state(2);
+	let total = state(0);
+	let last = state(0);
+	<button onClick={() => { const step = (size * 2) as number; total = total + step; last = step; }}>{total} {last}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const step = { binary: '*', left: { cell: 'state:size' }, right: { literal: 2 } };
+		expect(payload?.cells.map((cell) => cell.id)).toEqual([
+			'state:size',
+			'state:total',
+			'state:last',
+		]);
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{
+				op: 'assign',
+				cell: 'state:total',
+				value: { binary: '+', left: { cell: 'state:total' }, right: step },
+			},
+			{ op: 'assign', cell: 'state:last', value: step },
+		]);
+	});
+
+	it('keeps a handler const at the value it had when declared once the handler writes what it read', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+export function Door() @{
+	let open = state(false);
+	let closes = state(0);
+	<button onClick={() => { const { length } = 'ab'; const wasOpen = open; open = !wasOpen; if (wasOpen) closes = closes + length; }}>{open} {closes}</button>
+}`);
+		expect(diagnostics).toEqual([]);
+		const snapshot = payload?.cells.find((cell) => cell.name === 'wasOpen');
+		expect(snapshot).toEqual({ id: 'handler:event:0/kept:0', name: 'wasOpen', initial: null });
+		expect(payload?.handlers[0]?.ops).toEqual([
+			{ op: 'assign', cell: snapshot!.id, value: { cell: 'state:open' } },
+			{
+				op: 'assign',
+				cell: 'state:open',
+				value: { unary: '!', value: { cell: snapshot!.id } },
+			},
+			{
+				op: 'if',
+				test: { cell: snapshot!.id },
+				whenTrue: [
+					{
+						op: 'assign',
+						cell: 'state:closes',
+						value: {
+							binary: '+',
+							left: { cell: 'state:closes' },
+							right: { member: { literal: 'ab' }, property: 'length' },
+						},
+					},
+				],
+				whenFalse: [],
+			},
+		]);
+	});
+
+	it('lowers a computed whose block body declares consts, a lambda parameter shadowing one', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { computed, state } from '@markless/core';
+export function Sizes() @{
+	let count = state(1);
+	let names = state(['a']);
+	const label = computed(() => {
+		const doubled = count * 2;
+		const item = '!';
+		if (doubled > 4) {
+			const big = 'big';
+			return big + item;
+		}
+		return names.map((item) => item + doubled).join(item);
+	});
+	<p>{label}</p>
+}`);
+		expect(diagnostics).toEqual([]);
+		const doubled = { binary: '*', left: { cell: 'state:count' }, right: { literal: 2 } };
+		expect(payload?.nodes[1]).toMatchObject({
+			kind: 'text',
+			parts: [
+				{
+					expr: {
+						if: { binary: '>', left: doubled, right: { literal: 4 } },
+						whenTrue: {
+							binary: '+',
+							left: { literal: 'big' },
+							right: { literal: '!' },
+						},
+						whenFalse: {
+							method: 'join',
+							target: {
+								method: 'map',
+								target: { cell: 'state:names' },
+								arguments: [
+									{
+										lambda: ['item'],
+										body: {
+											binary: '+',
+											left: { local: 'item' },
+											right: doubled,
+										},
+									},
+								],
+							},
+							arguments: [{ literal: '!' }],
+						},
+					},
+				},
+			],
+		});
+	});
+
+	it('names what a handler const or a computed body uses that has no native lowering', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { computed, state } from '@markless/core';
+export function Odd() @{
+	let count = state(1);
+	const label = computed(() => {
+		for (const step of [1]) count + step;
+		return 'x';
+	});
+	<button onClick={() => { { const inner = 1; count = inner; } let moving = count; }}>{label}</button>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the computed `label` uses a ForOfStatement, which needs a script engine',
+			'the click handler uses a `const` inside a bare block, which needs a script engine',
+			'the click handler uses a `let` declaration, which needs a script engine',
+		]);
+	});
+
+	it('keeps a method argument and a defaulted parameter as they were at the call when the body changes what they read', async () => {
+		const { payload, diagnostics } =
+			await nativeView(`import { shared, state } from '@markless/core';
+const pagerState = shared(() => {
+	const pager = state({ page: 1, last: 0 });
+	return {
+		...pager,
+		go(step = 1) {
+			const next = pager.page + step;
+			pager.page = next;
+			pager.last = step;
+		},
+	};
+}, { scope: 'subtree' });
+export function Pager() @{
+	const pager = pagerState();
+	<div>
+		<button onClick={() => pager.go()}>{pager.page}</button>
+		<button onClick={() => pager.go(pager.page)}>{pager.last}</button>
+	</div>
+}`);
+		expect(diagnostics).toEqual([]);
+		const page = { cell: 'shared:src/App.tsrx#pagerState/state:pager.page' };
+		const last = 'shared:src/App.tsrx#pagerState/state:pager.last';
+		const stepOf = (passed: object) => ({ logical: '??', left: passed, right: { literal: 1 } });
+		expect(payload?.handlers.map((handler) => handler.ops)).toEqual([
+			[
+				{
+					op: 'assign',
+					cell: 'handler:event:0/kept:0',
+					value: { binary: '+', left: page, right: stepOf({ literal: null }) },
+				},
+				{ op: 'assign', cell: page.cell, value: { cell: 'handler:event:0/kept:0' } },
+				{ op: 'assign', cell: last, value: stepOf({ literal: null }) },
+			],
+			[
+				{ op: 'assign', cell: 'handler:event:1/kept:0', value: page },
+				{
+					op: 'assign',
+					cell: 'handler:event:1/kept:1',
+					value: {
+						binary: '+',
+						left: page,
+						right: stepOf({ cell: 'handler:event:1/kept:0' }),
+					},
+				},
+				{ op: 'assign', cell: page.cell, value: { cell: 'handler:event:1/kept:1' } },
+				{ op: 'assign', cell: last, value: stepOf({ cell: 'handler:event:1/kept:0' }) },
+			],
+		]);
+		expect(payload?.cells.slice(2).map((cell) => [cell.id, cell.name, cell.initial])).toEqual([
+			['handler:event:0/kept:0', 'next', null],
+			['handler:event:1/kept:0', 'step', null],
+			['handler:event:1/kept:1', 'next', null],
+		]);
+	});
 });

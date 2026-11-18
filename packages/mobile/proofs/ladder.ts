@@ -40,7 +40,7 @@ export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
 		.filter((entry) => entry.isDirectory() && /^(\d\d[a-z]?|u\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 export const readRung = (folder: string): LadderRung =>
 	JSON.parse(readFileSync(join(proofsDir, folder, 'expected.json'), 'utf8')) as LadderRung;

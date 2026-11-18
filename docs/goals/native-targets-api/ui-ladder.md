@@ -18,6 +18,7 @@ simulator and the emulator through the proof harness). No family source was chan
 | u4b | `modal` | stopped | stopped | stopped | stopped | |
 | u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
+| u11 | `pagination`: root, back and forward, three items with triggers; an author computed with a block body | pass | pass | pass | pass | none |
 
 Receipts: one harness run of the fourteen core rungs and u1 to u5, both platforms, `proof passed on iOS and Android`,
 19 of 19 on each
@@ -117,6 +118,28 @@ box that reads as a Button; on iOS's stacking layout a control with no text (the
 thumb) gets the 44 pt touch target, since it was 0 by 0 and untappable. The optional `toggle.field` part is refused (`checked` as a property binding on a hidden
 `<input>`); #735's researched default is that it renders nothing on a phone, which is an owner call.
 
+u11 receipt: the fourteen core rungs, u1 to u5 and u11 on simulator `markless-ui-hb` (iPhone 17, iOS 27.2) and AVD
+`markless_ui_hb` (API 36), 20 of 20 on each, `proof passed on iOS and Android`
+(`receipts/2026-11-17-ui-hb-{ios,android}-20-rungs.json`, `receipts/2026-11-17-ui-hb-verdict.txt`). The iOS report comes from
+a run whose Android half lost the emulator (`device offline` at launch on five rungs, none of them u11); Android was then run
+again alone over all twenty.
+
+**u11 pagination (handler bodies).** The family's methods declare `const` locals and then write the state those locals
+read (`const next = pagination.page + 1; pagination.page = next; pagination.onChange?.(next)`), and `goTo(value = 1)` has a
+defaulted parameter. The analyzer now records a handler's `const` (including `const { a, b: c } = x`) as a statement, a
+parameter default as `const value = value ?? 1`, TypeScript-only wrappers (`as`, `satisfies`, `!`) as the value they wrap,
+and a computed's block body as one tree: `const` becomes a `let` node, `if`/`else` a conditional, falling off the end
+`undefined`. The native pass reads a `const` as its value where it is read; when the statements after it may write a cell the
+value reads before reading the `const` (the pagination shape), the value is first written to a cell the build makes for it
+(`handler:<id>/kept:<n>`, named after the `const`) and the rest reads that cell, so the `const` keeps the value it had where
+it was declared. A call argument the called body changes before reading is kept the same way; before, such a call was refused,
+and a call whose body was a single `if` op slipped past that check and lowered with the value read after the write (popover's
+`setOpen(popover.open !== true)`). No payload, host or runtime change: a kept value is an ordinary cell and an `assign` op.
+Still refused by name: `let`/`var` declarations, a declaration in a bare `{ }` block inside a handler, array destructuring,
+destructuring with a default, rest or computed key, and in a computed any statement other than `const`, `if` and `return`.
+The app's `label` computed (`const last = shown === 3; if (last) return 'Last page'; return \`Page ${shown}\``) runs on the
+phones; no family's block-bodied computed is free of other blockers yet (most remaining ones use `typeof` or a helper call).
+
 ## Handler gaps each proved family hit (against draft #807's handler-boundary study)
 
 #807 counts what lowers on the base branch; this branch adds some of its named extensions. Per family, what it hit and how
@@ -135,6 +158,8 @@ it got past it, with no family source changed:
   each module analyzed with the interfaces of what it imports.
 - **plain `<dialog>`:** element commands (`dialog.showModal()`, `dialog.close()`): a `dialog` op the hosts run. Other element
   commands (`focus`, `scrollIntoView`) are not built.
+- **pagination:** `const` locals written back to the state they read, and a defaulted method parameter: kept values and
+  parameter defaults (u11).
 - **modal and drawer (stopped):** the gaps they hit that this branch did not close are #807's "touch the page" class (the
   focus-origin expando, a module-level `WeakSet`, `getBoundingClientRect`, per-frame pointer math) and the pointer and
   `dismiss` events no payload event maps. They are recorded above, not dodged.
@@ -152,7 +177,8 @@ does not have.
 and `ui-family-probe.json` beside this note is its output. Synthetic usage, so a refusal names a missing capability, not a
 verdict on a real app. Verdicts:
 
-- **Works with what now exists** (rung or probe payload): base, collapsible, tabs, toggle (without `field`).
+- **Works with what now exists** (rung or probe payload): base, collapsible, tabs, toggle (without `field`); pagination's
+  root, back, forward, item and item trigger (u11; `entries` and `itemlink` are still refused, below).
 - **Needs one capability:** checkbox (the `field` part's `checked` property: render nothing, or a property binding);
   textbox (`<textarea>`); tree (a `@for` whose rows render components from another module); hovercard, tooltip (overlay
   primitive and pointer hover; hovercard is web-only per #735).
