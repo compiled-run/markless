@@ -1,10 +1,11 @@
 #if canImport(UIKit)
+import AVFoundation
 import MarklessCore
 import UIKit
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "dialog", "embed", "form", "iframe", "label", "object", "option",
+	"canvas", "details", "dialog", "embed", "form", "iframe", "label", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -110,8 +111,8 @@ final class ViewTree {
 				applyAttributes(node, view)
 			case .navigate:
 				throw HostError("a navigate entry reaches the page's controller, not its views")
-			case .call:
-				throw HostError("a call entry reaches the page's device, not its views")
+			case .call, .release:
+				throw HostError("a \(entry.json.jsonText) entry reaches the page's device, not its views")
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -211,6 +212,15 @@ final class ViewTree {
 						view.widthAnchor.constraint(equalToConstant: 240).isActive = true
 						view.heightAnchor.constraint(equalToConstant: 180).isActive = true
 					}
+				} else if element == "audio" {
+					if context.button != nil { throw HostError("<audio> \(id) is inside a button") }
+					if !(slots[template] ?? []).isEmpty { throw HostError("<audio> \(id)'s children have no iOS view yet") }
+					let audio = AudioButton()
+					if layout == nil {
+						audio.widthAnchor.constraint(equalToConstant: 120).isActive = true
+						audio.heightAnchor.constraint(equalToConstant: 44).isActive = true
+					}
+					view = audio
 				} else if element == "img" {
 					let image = UIImageView()
 					image.contentMode = .scaleAspectFit
@@ -339,7 +349,10 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
-		if let button = view as? UIButton {
+		if let audio = view as? AudioButton {
+			audio.isHidden = current["controls"] == nil
+			audio.update(source: current["src"], label: current["aria-label"])
+		} else if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
 			if button.isEnabled { button.accessibilityTraits.remove(.notEnabled) } else { button.accessibilityTraits.insert(.notEnabled) }
 			refreshLabel(of: button)
@@ -373,7 +386,7 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
-		guard !(view is UILabel || view is UITextField) else { return }
+		guard !(view is UILabel || view is UITextField || view is AudioButton) else { return }
 		stack(view)
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
@@ -395,6 +408,60 @@ final class ViewTree {
 		constraints.append(above.constraint(equalTo: container.bottomAnchor))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
+	}
+}
+
+/// `<audio controls>`: a button reading "Play", or "Pause" while its file plays.
+@MainActor
+final class AudioButton: UIButton, AVAudioPlayerDelegate {
+	private var player: AVAudioPlayer?
+	private var source: String?
+	private var label: String?
+
+	init() {
+		super.init(frame: .zero)
+		configuration = .plain()
+		isAccessibilityElement = true
+		accessibilityTraits = .button
+		addAction(UIAction { [weak self] _ in self?.toggle() }, for: .touchUpInside)
+		refresh()
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("AudioButton is made in code") }
+
+	/// A new `src` replaces the player; `label` (`aria-label`) is read instead of the title.
+	func update(source: String?, label: String?) {
+		self.label = label
+		if source != self.source {
+			self.source = source
+			player?.stop()
+			player = nil
+		}
+		refresh()
+	}
+
+	private func toggle() {
+		if let player, player.isPlaying {
+			player.pause()
+		} else {
+			if player == nil, let url = source.flatMap(URL.init(string:)) {
+				player = try? AVAudioPlayer(contentsOf: url)
+				player?.delegate = self
+			}
+			player?.play()
+		}
+		refresh()
+	}
+
+	private func refresh() {
+		let title = player?.isPlaying == true ? "Pause" : "Play"
+		configuration?.title = title
+		accessibilityLabel = label ?? title
+	}
+
+	nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+		Task { @MainActor in self.refresh() }
 	}
 }
 

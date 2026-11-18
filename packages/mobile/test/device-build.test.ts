@@ -29,13 +29,13 @@ describe('device features in a native build', () => {
 		});
 	});
 
-	it('fails the build naming the Info.plist key when the usage text is missing', async () => {
+	it('fails the build naming the feature and the Info.plist key when the usage text is missing', async () => {
 		const result = await build(locationApp);
 		expect(result.payload).toBeNull();
 		expect(result.diagnostics.map((d) => [d.code, d.message])).toEqual([
 			[
 				DEVICE_USAGE_MISSING_CODE,
-				'NSLocationWhenInUseUsageDescription has no usage text; add device.usage.location to the app config',
+				'location needs usage text for NSLocationWhenInUseUsageDescription; add device.usage.location to the app config',
 			],
 		]);
 	});

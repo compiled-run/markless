@@ -1,11 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type { NativeJournalEntry, NativeValue, NativeViewPayload } from '@markless/serializer';
 import { compileNativeComponent, createNativeRuntime } from '../src/index.ts';
-import { readRelativeModule } from '../src/harness/rung.ts';
-import type { DeviceAppConfig } from '../src/permissions.ts';
+import { readAppConfig, readRelativeModule } from '../src/harness/rung.ts';
 import {
 	proofsDir,
 	readRung,
@@ -27,11 +26,23 @@ function walk(
 	target: 'ios' | 'android',
 ) {
 	const store = new Map<string, NativeValue>();
-	const calls: string[] = [];
+	let calls: string[] = [];
 	// A fake device, as a host's: location permission, where it is, and the calls waiting on the person's answer.
 	let permission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let cameraPermission: 'unknown' | 'granted' | 'denied' = 'unknown';
+	let microphonePermission: 'unknown' | 'granted' | 'denied' = 'unknown';
 	let waiting: string[] = [];
+	// Recorders: those recording and their seconds, and those whose start waits on the microphone prompt.
+	const recording = new Map<string, number>();
+	let waitingForMicrophone: string[] = [];
+	const askedAgain = new Set<string>();
+	// A shown <audio> control is playing; the share sheet's open call waits for the sheet to close.
+	let playing = false;
+	let sheet: string | undefined;
+	const objectCell = (object: string, name: string) =>
+		payload.cells.find((cell) => cell.object === object && cell.device === name)!.id;
+	const setObject = (object: string, name: string, value: NativeValue) =>
+		runtime.dispatch({ event: 'device', cell: objectCell(object, name), value });
 	// The emulator's camera faces back only; the simulator's test camera faces either way.
 	const facings = target === 'android' ? ['back'] : ['back', 'front'];
 	const deviceValue = (name: string): NativeValue => {
@@ -39,6 +50,10 @@ function walk(
 		if (name === 'camera.access') return cameraPermission;
 		if (name === 'camera.ready') return cameraPermission === 'granted';
 		if (name === 'camera.facing') return 'back';
+		if (name === 'recorder.access') return microphonePermission;
+		if (name === 'recorder.active') return false;
+		if (name === 'recorder.seconds') return 0;
+		if (name === 'recorder.clip') return null;
 		if (name === 'network.online') return true;
 		throw new Error(`no fake ${name}`);
 	};
@@ -61,6 +76,7 @@ function walk(
 	const startTasks = () => {
 		waiting = [];
 		for (const task of runtime.tasks()) {
+			calls.push(task.call);
 			if (permission === 'unknown') waiting.push(task.result!);
 			else apply(answer(task.result!), -1);
 		}
@@ -97,10 +113,17 @@ function walk(
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
 			const bound = attributes.get(`${node.id}\0aria-label`);
+			// A host shows an <audio controls> with a clip as one control named for what it does next.
+			if (node.element === 'audio')
+				return shownNode(node.id) && attributes.get(`${node.id}\0src`) != null
+					? [[node.id, playing ? 'Pause' : 'Play'] as const]
+					: [];
 			const label =
 				bound !== undefined
 					? bound
-					: (node.attributes?.['aria-label'] ?? (node.element === 'img' ? node.attributes?.alt : undefined) ?? null);
+					: (node.attributes?.['aria-label'] ??
+						(node.element === 'img' ? node.attributes?.alt : undefined) ??
+						null);
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	const elementReading = (text: string) => {
@@ -117,20 +140,74 @@ function walk(
 				if (entry.call === 'camera.takePhoto' && entry.resume) {
 					const continuation = entry.resume;
 					answered.push(() =>
-						runtime.dispatch({
-							event: 'resume',
-							continuation,
-							value: { url: 'file:///proof/photo.png', width: 640, height: 480 },
-						}),
+						cameraPermission === 'granted'
+							? runtime.dispatch({
+									event: 'resume',
+									continuation,
+									value: {
+										url: 'file:///proof/photo.png',
+										width: 640,
+										height: 480,
+									},
+								})
+							: runtime.dispatch({
+									event: 'reject',
+									continuation,
+									error: {
+										name: 'NotAllowedError',
+										message: 'The camera was refused',
+									},
+								}),
 					);
 				}
-				if (entry.call === 'camera.facing' && !facings.includes(String(entry.arguments[0]))) {
-					// The device has no camera facing that way: the setting snaps back to the camera it uses.
-					const cell = payload.cells.find((candidate) => candidate.device === 'camera.facing' && candidate.object === entry.object);
-					if (cell) answered.push(() => runtime.dispatch({ event: 'device', cell: cell.id, value: 'back' }));
+				if (entry.call === 'recorder.active') {
+					const object = entry.object!;
+					if (entry.arguments[0] === true) {
+						if (
+							microphonePermission === 'unknown' ||
+							(target === 'android' &&
+								microphonePermission === 'denied' &&
+								!askedAgain.has(object))
+						) {
+							askedAgain.add(object);
+							waitingForMicrophone.push(object);
+						} else if (microphonePermission === 'granted') recording.set(object, 0);
+						// A refused microphone snaps the setting back.
+						else answered.push(() => setObject(object, 'recorder.active', false));
+					} else if (recording.delete(object))
+						answered.push(() =>
+							setObject(object, 'recorder.clip', 'file:///proof/clip.m4a'),
+						);
 				}
-			}
-			else if (entry.op === 'text') texts.set(entry.node, entry.value);
+				if (entry.call === 'sharesheet.open') sheet = entry.resume;
+				if (
+					entry.call === 'camera.facing' &&
+					!facings.includes(String(entry.arguments[0]))
+				) {
+					// The device has no camera facing that way: the setting snaps back to the camera it uses.
+					const cell = payload.cells.find(
+						(candidate) =>
+							candidate.device === 'camera.facing' &&
+							candidate.object === entry.object,
+					);
+					if (cell)
+						answered.push(() =>
+							runtime.dispatch({ event: 'device', cell: cell.id, value: 'back' }),
+						);
+				}
+			} else if (entry.op === 'release') {
+				const object = entry.object;
+				recording.delete(object);
+				for (const [name, value] of [
+					['recorder.active', false],
+					['recorder.seconds', 0],
+					['recorder.clip', null],
+				] as const)
+					if (
+						payload.cells.some((cell) => cell.object === object && cell.device === name)
+					)
+						answered.push(() => setObject(object, name, value));
+			} else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 			else if (entry.op === 'property') properties.set(entry.node, entry.value);
@@ -174,11 +251,39 @@ function walk(
 		}
 		for (const next of answered) apply(next(), index);
 	}
+	function refreshAccess(index: number) {
+		for (const cell of payload.cells)
+			if (
+				cell.device === 'location.access' ||
+				cell.device === 'camera.access' ||
+				cell.device === 'camera.ready' ||
+				cell.device === 'recorder.access'
+			)
+				apply(
+					runtime.dispatch({
+						event: 'device',
+						cell: cell.id,
+						value: deviceValue(cell.device),
+					}),
+					index,
+				);
+	}
 	startTasks();
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';
+			// Android remembers a refusal across a revoke: access stays denied, and the system still asks again.
+			if (action.permissions?.microphone === 'unset')
+				microphonePermission =
+					target === 'android' && microphonePermission === 'denied'
+						? 'denied'
+						: 'unknown';
+			recording.clear();
+			askedAgain.clear();
+			playing = false;
+			// The test build's call label starts over with the app.
+			calls = [];
 			runtime = start();
 			mount();
 			startTasks();
@@ -189,15 +294,38 @@ function walk(
 						apply(runtime.dispatch({ event: 'device', cell: cell.id, value }), index);
 		} else if (action && 'answer' in action) {
 			const given = action.answer === 'allow' ? 'granted' : 'denied';
-			if (payload.cells.some((cell) => cell.device?.startsWith('camera.'))) cameraPermission = given;
+			if (payload.cells.some((cell) => cell.device?.startsWith('recorder.')))
+				microphonePermission = given;
+			else if (payload.cells.some((cell) => cell.device?.startsWith('camera.')))
+				cameraPermission = given;
 			else permission = given;
-			for (const cell of payload.cells)
-				if (cell.device === 'location.access' || cell.device === 'camera.access' || cell.device === 'camera.ready')
-					apply(
-						runtime.dispatch({ event: 'device', cell: cell.id, value: deviceValue(cell.device) }),
-						index,
-					);
+			refreshAccess(index);
 			for (const cell of waiting.splice(0)) apply(answer(cell), index);
+			for (const object of waitingForMicrophone.splice(0))
+				if (given === 'granted') recording.set(object, 0);
+				else apply(setObject(object, 'recorder.active', false), index);
+		} else if (action && 'wait' in action) {
+			for (const [object, seconds] of recording) {
+				const now = seconds + Math.floor(action.wait / 1000);
+				recording.set(object, now);
+				apply(setObject(object, 'recorder.seconds', now), index);
+			}
+		} else if (action && 'dismiss' in action) {
+			if (sheet === undefined) throw new Error(`step ${index}: no share sheet is open`);
+			const continuation = sheet;
+			sheet = undefined;
+			apply(runtime.dispatch({ event: 'resume', continuation, value: null }), index);
+		} else if (action && 'settings' in action) {
+			if (!calls.includes('settings.open'))
+				throw new Error(`step ${index}: Settings was never opened`);
+			// The person allows, in Settings, the feature the page asked for.
+			if (payload.cells.some((cell) => cell.device === 'location.access'))
+				permission = 'granted';
+			refreshAccess(index);
+		} else if (action && 'tap' in action && (action.tap === 'Play' || action.tap === 'Pause')) {
+			if (!labels().some(([, label]) => label === action.tap))
+				throw new Error(`step ${index}: no audio control reads "${action.tap}"`);
+			playing = action.tap === 'Play';
 		} else if (action && !('tap' in action) && !('type' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action) {
@@ -222,10 +350,17 @@ function walk(
 			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
+		if (step.microphone)
+			expect(recording.size > 0 ? 'on' : 'off', `step ${index}: the microphone`).toBe(
+				step.microphone,
+			);
 		if (step.camera) {
 			const running =
 				cameraPermission === 'granted' &&
-				payload.nodes.some((node) => node.kind === 'element' && node.element === 'camera' && shownNode(node.id));
+				payload.nodes.some(
+					(node) =>
+						node.kind === 'element' && node.element === 'camera' && shownNode(node.id),
+				);
 			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
 		}
 		const shown = [...texts.values(), ...labels().map(([, label]) => label)];
@@ -254,14 +389,6 @@ function walk(
 	}
 }
 
-// A rung's app config (`app.json`): the device usage text a native build needs.
-const appConfig = (folder: string): { device?: DeviceAppConfig } => {
-	const file = join(proofsDir, folder, 'app.json');
-	return existsSync(file)
-		? (JSON.parse(readFileSync(file, 'utf8')) as { device?: DeviceAppConfig })
-		: {};
-};
-
 test.each(
 	rungFolders().flatMap((folder) =>
 		(['ios', 'android'] as const).map((target) => [folder, target] as const),
@@ -277,7 +404,7 @@ test.each(
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
 			readModule: readRelativeModule,
-			...appConfig(folder),
+			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});
 		if (build.payload === null) {

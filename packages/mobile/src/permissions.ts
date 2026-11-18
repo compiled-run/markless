@@ -3,7 +3,7 @@ import { DEVICE_FEATURES, type NativeDeviceFeature } from '@markless/serializer/
 
 export const DEVICE_USAGE_MISSING_CODE = 'MARKLESS_DEVICE_USAGE_MISSING';
 
-/** The app config's device section: the text each platform shows when it asks for a feature. */
+/** The app config's device section, one per app: the text each platform shows when it asks for a feature. */
 export type DeviceAppConfig = {
 	readonly usage?: Readonly<Partial<Record<NativeDeviceFeature, string>>>;
 };
@@ -34,7 +34,7 @@ export function deviceManifest(
 					severity: 'error',
 					phase: 'serialization',
 					title: 'A device feature has no usage text',
-					message: `${key} has no usage text; add device.usage.${feature} to the app config`,
+					message: `${feature} needs usage text for ${key}; add device.usage.${feature} to the app config`,
 					why: `The app uses ${feature}, and iOS refuses to ask for it without a sentence saying why.`,
 					passId: 'native-view',
 					suggestions: [

@@ -77,6 +77,14 @@ private fun runVector(file: File) {
 			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 			continue
 		}
+		if (event == "reject") {
+			val error = field(action, "error", "action").obj("action.error")
+			val journal = runtime.reject(field(action, "continuation", "action").str("action.continuation"), field(error, "name", "error").str("name"), field(error, "message", "error").str("message"))
+			val expected = canonical(field(s, "journal", "steps[$n]"))
+			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+			check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+			continue
+		}
 		if (event == "device" || event == "settle") {
 			val cell = field(action, "cell", "action").str("action.cell")
 			val error = action["error"]?.obj("action.error")

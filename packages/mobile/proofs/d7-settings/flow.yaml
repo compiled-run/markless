@@ -1,0 +1,86 @@
+appId: ${APP_ID}
+name: d7-settings
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - stopApp: com.apple.Preferences
+- setLocation:
+    latitude: 51.5
+    longitude: -0.125
+- launchApp:
+    clearState: true
+    permissions:
+      location: unset
+- assertVisible:
+    text: Allow .?Proof.? to (use your|access this device.s) location\?
+- tapOn:
+    text: Don.t Allow|Don.t allow
+- assertVisible: Open Settings
+- assertNotVisible: Access unknown
+- assertNotVisible: Locating
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current"
+- assertVisible: Access denied
+- assertVisible: Location is off for this app
+- assertVisible: Open Settings
+- assertVisible: NotAllowedError
+- assertNotVisible: Access unknown
+- assertNotVisible: Locating
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current"
+- tapOn: Open Settings
+- assertVisible:
+    text: ALLOW .?PROOF.? TO ACCESS|Allow .?Proof.? to access|App info|Apple Account
+- assertVisible:
+    text: ALLOW .?PROOF.? TO ACCESS|Allow .?Proof.? to access|App info|Apple Account
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: Apps
+      - tapOn: Apps
+      - scrollUntilVisible:
+          element:
+            text: Proof
+      - tapOn: Proof
+      - scrollUntilVisible:
+          element:
+            text: Location
+      - tapOn: Location
+      - scrollUntilVisible:
+          element:
+            text: While Using the App
+      - tapOn: While Using the App
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: Permissions
+      - tapOn: Permissions
+      - scrollUntilVisible:
+          element:
+            text: Location
+      - tapOn: Location
+      - scrollUntilVisible:
+          element:
+            text: Allow only while using the app
+      - tapOn: Allow only while using the app
+- launchApp:
+    stopApp: false
+- assertNotVisible: Open Settings
+- assertVisible: Access granted
+- assertVisible: NotAllowedError
+- assertNotVisible: Access denied
+- assertNotVisible: Location is off for this app
+- assertNotVisible: Open Settings
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: location\\.current, settings\\.open"

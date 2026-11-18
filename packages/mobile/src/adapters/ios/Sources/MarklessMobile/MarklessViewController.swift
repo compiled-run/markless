@@ -75,9 +75,11 @@ public final class MarklessViewController: UIViewController {
 		try runCalls(try runtime.tasks())
 	}
 
-	/// Hands `call` entries to the device; a call with a result settles its task cell when the device answers.
-	private func runCalls(_ calls: [NativeJournalEntry]) throws {
-		for case let .call(name, object, arguments, result, resume) in calls {
+	/// Hands `release` and `call` entries to the device; a call with a result settles its task cell when the device answers.
+	private func runCalls(_ journal: [NativeJournalEntry]) throws {
+		for entry in journal {
+			if case let .release(object) = entry { device.release(object) }
+			guard case let .call(name, object, arguments, result, resume) = entry else { continue }
 			let runtime = self.runtime
 			let answer: (@MainActor (DeviceOutcome) -> Void)?
 			if let cell = result {
@@ -91,10 +93,14 @@ public final class MarklessViewController: UIViewController {
 					}
 				}
 			} else if let continuation = resume {
-				// An awaited call from a handler: the rest of the handler runs with the answer; a refusal ends it.
 				answer = { [weak self] outcome in
-					guard let self, self.runtime === runtime, case let .value(value) = outcome else { return }
-					self.apply { try runtime.resume(continuation, value: value) }
+					guard let self, self.runtime === runtime else { return }
+					self.apply {
+						switch outcome {
+						case let .value(value): return try runtime.resume(continuation, value: value)
+						case let .error(name, message): return try runtime.reject(continuation, name: name, message: message)
+						}
+					}
 				}
 			} else {
 				answer = nil
@@ -106,7 +112,7 @@ public final class MarklessViewController: UIViewController {
 	private func apply(_ journalOf: () throws -> [NativeJournalEntry]) {
 		do {
 			let journal = try journalOf()
-			try tree?.apply(journal.filter { if case .call = $0 { false } else { true } })
+			try tree?.apply(journal.filter(\.isForViews))
 			try runCalls(journal)
 		} catch {
 			fatalError("Markless iOS host: \(error)")
@@ -137,7 +143,7 @@ public final class MarklessViewController: UIViewController {
 			if case let .navigate(route, params)? = journal.last {
 				try navigate(route, params)
 			} else {
-				try tree?.apply(journal.filter { if case .call = $0 { false } else { true } })
+				try tree?.apply(journal.filter(\.isForViews))
 				try runCalls(journal)
 			}
 		} catch {
@@ -148,6 +154,7 @@ public final class MarklessViewController: UIViewController {
 	/// Builds the page at `route` from scratch with `params`; its state starts over.
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
+		for object in payload.objects { device.release(object.id) }
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
 		tree?.root.removeFromSuperview()
 		try buildPage()
@@ -167,6 +174,16 @@ private func registerFaces(_ files: [(id: String, file: String)], fonts: [String
 		faces[id] = descriptor as UIFontDescriptor
 	}
 	return faces
+}
+
+extension NativeJournalEntry {
+	/// Every entry but the ones the page's device runs.
+	var isForViews: Bool {
+		switch self {
+		case .call, .release: false
+		default: true
+		}
+	}
 }
 
 public struct HostError: Error, CustomStringConvertible {

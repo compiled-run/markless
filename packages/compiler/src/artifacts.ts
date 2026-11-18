@@ -56,11 +56,6 @@ export type SemanticGraphInput = {
 	/** What the build compiles for (`web` by default): `@markless/device` and `platform` fold to its constants. */
 	readonly target?: BuildTarget;
 	/**
-	 * On the web, what a device use that needs an answer does: `build-error` refuses it unless a `supported` check the
-	 * build can see rules it out (candidate a); `reject` leaves it to the web module, which rejects (candidate b).
-	 */
-	readonly deviceWebAnswers?: 'build-error' | 'platform-only' | 'reject';
-	/**
 	 * Folds `@markless/device` and `platform` to the target's constants and makes features absent on the web. Passed by
 	 * Node builds (the bundler, native builds); the browser's in-page compiler leaves it out and folds nothing.
 	 */
@@ -75,7 +70,6 @@ export type DeviceTargetFacts = {
 	readonly collectWebDeviceAbsence: (
 		ast: never,
 		state: never,
-		answers: 'build-error' | 'platform-only' | 'reject',
 	) => ReadonlyArray<{ readonly start: number; readonly end: number; readonly text: string }>;
 	readonly deviceObjectOf: (init: never, state: never) => string | null;
 	readonly collectDeviceObjects: (statements: never, state: never) => ReadonlyArray<SemanticDeviceObject>;

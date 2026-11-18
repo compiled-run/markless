@@ -2,14 +2,18 @@ package dev.markless.mobile.view
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.HapticFeedbackConstants
 import dev.markless.mobile.core.JsValue
 
@@ -34,6 +38,12 @@ interface NativeDevice {
 	fun view(obj: String, device: String): android.view.View
 	/** The activity's permission answer, forwarded by [MarklessActivity]. */
 	fun permissionsAnswered(requestCode: Int) {}
+	/** The device object [obj] ended (its owner left the screen, or its page was replaced). */
+	fun release(obj: String) {}
+	/** The activity came back to the front, forwarded by [MarklessActivity]: the person may have changed a permission in Settings. */
+	fun resumed() {}
+	/** An activity this device started returned, forwarded by [MarklessActivity]. */
+	fun activityResult(requestCode: Int) {}
 }
 
 /** The phone's own features. */
@@ -42,7 +52,14 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	private val connectivity = activity.getSystemService(ConnectivityManager::class.java)
 	private val watchers = HashMap<String, MutableList<(JsValue) -> Unit>>()
 	private val cameras = HashMap<String, CameraObject>()
-	private var askedCamera = activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).getBoolean("asked-camera", false)
+	private val recorders = HashMap<String, RecorderObject>()
+	private val prefs = activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE)
+	private var askedCamera = prefs.getBoolean("asked-camera", false)
+	private var askedRecorder = prefs.getBoolean("asked-recorder", false)
+	private val waitingForMicrophone = LinkedHashSet<String>()
+	private var sharing: ((DeviceOutcome) -> Unit)? = null
+	/** Each access value as last read or emitted, to tell what changed while the app was away. */
+	private val lastAccess = HashMap<String, String>()
 
 	private fun key(name: String, obj: String?) = obj?.let { "$it#$name" } ?: name
 
@@ -53,6 +70,25 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	private fun camera(obj: String): CameraObject = cameras.getOrPut(obj) {
 		CameraObject(activity) { field, value -> emit(key("camera.$field", obj), value) }
 	}
+
+	private fun recorder(obj: String): RecorderObject = recorders.getOrPut(obj) {
+		RecorderObject(activity) { field, value -> emit(key("recorder.$field", obj), value) }
+	}
+
+	private fun recorderAccess(): String = when {
+		activity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED -> "granted"
+		!askedRecorder -> "unknown"
+		activity.shouldShowRequestPermissionRationale(Manifest.permission.RECORD_AUDIO) -> "denied"
+		else -> "blocked"
+	}
+
+	private fun access(name: String): String = when (name) {
+		"location.access" -> locationAccess()
+		"camera.access" -> cameraAccess()
+		else -> recorderAccess()
+	}.also { lastAccess[name] = it }
+
+	private fun emitAccess(name: String) = emit(name, JsValue.Str(access(name)))
 
 	private fun cameraAccess(): String = when {
 		activity.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> "granted"
@@ -69,14 +105,14 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 			camera.shown(preview)
 			if (cameraAccess() != "granted" && cameraAccess() != "blocked") {
 				askedCamera = true
-				activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).edit().putBoolean("asked-camera", true).apply()
+				prefs.edit().putBoolean("asked-camera", true).apply()
 				activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), CAMERA_REQUEST)
 			}
 		}
 	}
 	private var online: Boolean? = null
 	private val waitingForAccess = ArrayList<() -> Unit>()
-	private var askedLocation = activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).getBoolean("asked-location", false)
+	private var askedLocation = prefs.getBoolean("asked-location", false)
 
 	/** Starts following connectivity on first use: only a payload that reads it declares ACCESS_NETWORK_STATE. */
 	private fun networkOnline(): Boolean = online ?: run {
@@ -107,10 +143,12 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 
 	override fun read(name: String, obj: String?): JsValue = when {
 		name == "network.online" && obj == null -> JsValue.Bool(networkOnline())
-		name == "location.access" && obj == null -> JsValue.Str(locationAccess())
-		name == "camera.access" && obj == null -> JsValue.Str(cameraAccess())
+		name in ACCESS && obj == null -> JsValue.Str(access(name))
 		name == "camera.ready" && obj != null -> JsValue.Bool(camera(obj).ready)
 		name == "camera.facing" && obj != null -> JsValue.Str(camera(obj).facing)
+		name == "recorder.active" && obj != null -> JsValue.Bool(recorder(obj).active)
+		name == "recorder.seconds" && obj != null -> JsValue.Num(recorder(obj).seconds.toDouble())
+		name == "recorder.clip" && obj != null -> recorder(obj).clip?.let { JsValue.Str(it) } ?: JsValue.Null
 		else -> throw MarklessHostError("this device has no live value $name")
 	}
 
@@ -122,8 +160,13 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	override fun call(name: String, obj: String?, arguments: List<JsValue>, settle: ((DeviceOutcome) -> Unit)?) {
 		if (obj != null) {
 			when (name) {
-				"camera.takePhoto" -> camera(obj).takePhoto { settle?.invoke(it) }
+				"camera.takePhoto" -> {
+					val access = cameraAccess()
+					if (access == "denied" || access == "blocked") settle?.invoke(CAMERA_REFUSED)
+					else camera(obj).takePhoto { settle?.invoke(it) }
+				}
 				"camera.facing" -> camera(obj).setFacing((arguments.firstOrNull() as? JsValue.Str)?.value ?: throw MarklessHostError("camera.facing takes one string"))
+				"recorder.active" -> record(obj, (arguments.firstOrNull() as? JsValue.Bool)?.value ?: throw MarklessHostError("recorder.active takes one boolean"))
 				else -> throw MarklessHostError("this device has no call $name on an object")
 			}
 			return
@@ -139,11 +182,73 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 				if (locationAccess() == "blocked") return answer(REFUSED)
 				waitingForAccess.add { if (locationGranted()) locate(answer) else answer(REFUSED) }
 				askedLocation = true
-				activity.getSharedPreferences("markless-device", Context.MODE_PRIVATE).edit().putBoolean("asked-location", true).apply()
+				prefs.edit().putBoolean("asked-location", true).apply()
 				activity.requestPermissions(LOCATION, LOCATION_REQUEST)
+			}
+			"sharesheet.open" -> {
+				val options = (arguments.firstOrNull() as? JsValue.Obj)?.fields ?: throw MarklessHostError("sharesheet.open takes one object")
+				val url = (options["url"] as? JsValue.Str)?.value ?: throw MarklessHostError("sharesheet.open needs a string url")
+				val title = (options["title"] as? JsValue.Str)?.value
+				sharing?.invoke(DeviceOutcome.Value(JsValue.Null))
+				val answer = settle ?: {}
+				sharing = answer
+				val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url).putExtra(Intent.EXTRA_TITLE, title)
+				try {
+					activity.startActivityForResult(Intent.createChooser(send, title), SHARE_REQUEST)
+				} catch (_: ActivityNotFoundException) {
+					sharing = null
+					answer(DeviceOutcome.Error("Error", "The share sheet failed"))
+				}
+			}
+			"settings.open" -> {
+				activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)))
+				settle?.invoke(DeviceOutcome.Value(JsValue.Null))
 			}
 			else -> throw MarklessHostError("this device has no call $name")
 		}
+	}
+
+	/** A handler wrote `active`: start (asking for the microphone first if it may) or stop; a refused start snaps `active` back. */
+	private fun record(obj: String, on: Boolean) {
+		val recorder = recorder(obj)
+		if (!on) {
+			waitingForMicrophone.remove(obj)
+			return recorder.stop(keep = true)
+		}
+		when (recorderAccess()) {
+			"granted" -> recorder.start()
+			"blocked" -> {
+				recorder.snapBack()
+				emitAccess("recorder.access")
+			}
+			else -> {
+				waitingForMicrophone.add(obj)
+				askedRecorder = true
+				prefs.edit().putBoolean("asked-recorder", true).apply()
+				activity.requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), RECORDER_REQUEST)
+			}
+		}
+	}
+
+	override fun release(obj: String) {
+		waitingForMicrophone.remove(obj)
+		recorders[obj]?.release()
+	}
+
+	override fun resumed() {
+		for (name in ACCESS) {
+			val last = lastAccess[name] ?: continue
+			if (access(name) == last) continue
+			emitAccess(name)
+			if (name == "camera.access") for (camera in cameras.values) camera.open()
+		}
+	}
+
+	override fun activityResult(requestCode: Int) {
+		if (requestCode != SHARE_REQUEST) return
+		val answer = sharing ?: return
+		sharing = null
+		answer(DeviceOutcome.Value(JsValue.Null))
 	}
 
 	private fun locate(answer: (DeviceOutcome) -> Unit) {
@@ -163,13 +268,21 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 	}
 
 	override fun permissionsAnswered(requestCode: Int) {
+		if (requestCode == RECORDER_REQUEST) {
+			emitAccess("recorder.access")
+			val granted = recorderAccess() == "granted"
+			val waiting = ArrayList(waitingForMicrophone)
+			waitingForMicrophone.clear()
+			for (obj in waiting) if (granted) recorder(obj).start() else recorder(obj).snapBack()
+			return
+		}
 		if (requestCode == CAMERA_REQUEST) {
-			emit("camera.access", JsValue.Str(cameraAccess()))
+			emitAccess("camera.access")
 			for (camera in cameras.values) camera.open()
 			return
 		}
 		if (requestCode != LOCATION_REQUEST) return
-		emit("location.access", JsValue.Str(locationAccess()))
+		emitAccess("location.access")
 		val waiting = ArrayList(waitingForAccess)
 		waitingForAccess.clear()
 		for (resume in waiting) resume()
@@ -179,6 +292,10 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 		private val LOCATION = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
 		private const val LOCATION_REQUEST = 4101
 		private const val CAMERA_REQUEST = 4102
+		private const val RECORDER_REQUEST = 4103
+		private const val SHARE_REQUEST = 4104
+		private val ACCESS = listOf("location.access", "camera.access", "recorder.access")
 		private val REFUSED = DeviceOutcome.Error("NotAllowedError", "Location was refused")
+		private val CAMERA_REFUSED = DeviceOutcome.Error("NotAllowedError", "The camera was refused")
 	}
 }

@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
@@ -25,6 +26,16 @@ abstract class MarklessActivity : Activity() {
 		device.permissionsAnswered(requestCode)
 	}
 
+	override fun onResume() {
+		super.onResume()
+		device.resumed()
+	}
+
+	override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+		super.onActivityResult(requestCode, resultCode, data)
+		device.activityResult(requestCode)
+	}
+
 	/** The path the app opens at (`/apple`); the Maestro launch argument `route` arrives as this intent extra. */
 	open fun route(): String? = intent.getStringExtra("route")
 
@@ -44,7 +55,7 @@ abstract class MarklessActivity : Activity() {
 	/** Builds the page from scratch with [params]: one page per payload, so a link names this page's own route. */
 	private fun open(params: Map<String, String>) {
 		val bytes = payloadBytes()
-		if (::host.isInitialized) host.released = true
+		if (::host.isInitialized) host.release()
 		host = MarklessHost(this, bytes, styleExportBytes(), params = params, device = device)
 		host.onNavigate = { route, next ->
 			if (route != host.payload.route?.pattern) throw MarklessHostError("navigate to $route; this app holds only ${host.payload.route?.pattern}")
