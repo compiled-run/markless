@@ -151,6 +151,7 @@ extension StyleExport {
 		var scrollAxes: (x: Bool, y: Bool)?
 		var indicators = true
 		var bounce = (x: true, y: true)
+		var clips = false
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
@@ -170,8 +171,12 @@ extension StyleExport {
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
 			case let .scrollContainer(x, y): scrollAxes = (x, y)
 			case .scrollIndicatorsHidden: indicators = false
+			case .paddingBoxClip: clips = true
 			case let .scrollBounce(x, y): bounce = (x, y)
 			}
+		}
+		if clips, scrollAxes == nil {
+			throw styleError("\(node.id): a padding-box clip without scrolling (overflow hidden or clip) is not implemented on iOS")
 		}
 		if let axes = scrollAxes {
 			guard let range = node.scrollRange else { throw styleError("\(node.id) is a scroll container with no scroll range") }

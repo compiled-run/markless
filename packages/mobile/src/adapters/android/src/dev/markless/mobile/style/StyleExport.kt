@@ -36,6 +36,8 @@ sealed interface StyleWrite {
 	data class ScrollContainer(val x: Boolean, val y: Boolean) : StyleWrite
 	/** `scrollbar-width: none`. */
 	data object ScrollIndicatorsHidden : StyleWrite
+	/** Children clipped to the padding box (`overflow` other than visible); a scroll container's scroll view is that clip. */
+	data object PaddingBoxClip : StyleWrite
 	/** `overscroll-behavior: none` on an axis; Android draws no bounce, so it is read and kept only. */
 	data class ScrollBounce(val x: Boolean, val y: Boolean) : StyleWrite
 }
@@ -166,6 +168,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 				"text-color" -> StyleWrite.TextColor(color(o.field("color", what), "$what.color"))
 				"scroll-container" -> StyleWrite.ScrollContainer((o.field("x", what) as? Json.Bool ?: throw MarklessDecodeError("$what.x must be a boolean")).value, (o.field("y", what) as? Json.Bool ?: throw MarklessDecodeError("$what.y must be a boolean")).value)
 				"scroll-indicators-hidden" -> StyleWrite.ScrollIndicatorsHidden
+				"padding-box-clip" -> StyleWrite.PaddingBoxClip
 				"scroll-bounce" -> StyleWrite.ScrollBounce((o.field("bounceX", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceX must be a boolean")).value, (o.field("bounceY", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceY must be a boolean")).value)
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}

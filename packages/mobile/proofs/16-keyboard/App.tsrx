@@ -54,7 +54,37 @@ export default function App() @{
 		<p>Line 48</p>
 		<p>Line 49</p>
 		<p>Line 50</p>
-		<input aria-label="Note" value={note} onInput={(event) => (note = event.currentTarget.value)} />
+		<p>Line 51</p>
+		<p>Line 52</p>
+		<p>Line 53</p>
+		<p>Line 54</p>
+		<p>Line 55</p>
+		<p>Line 56</p>
+		<p>Line 57</p>
+		<p>Line 58</p>
+		<p>Line 59</p>
+		<p>Line 60</p>
+		<p>Line 61</p>
+		<p>Line 62</p>
+		<p>Line 63</p>
+		<p>Line 64</p>
+		<p>Line 65</p>
+		<p>Line 66</p>
+		<p>Line 67</p>
+		<p>Line 68</p>
+		<p>Line 69</p>
+		<p>Line 70</p>
+		<p>Line 71</p>
+		<p>Line 72</p>
+		<p>Line 73</p>
+		<p>Line 74</p>
+		<p>Line 75</p>
+		<p>Line 76</p>
+		<p>Line 77</p>
+		<p>Line 78</p>
+		<p>Line 79</p>
+		<p>Line 80</p>
 		<p>Note says {note}</p>
+		<input aria-label="Note" value={note} onInput={(event) => (note = event.currentTarget.value)} />
 	</main>
 }

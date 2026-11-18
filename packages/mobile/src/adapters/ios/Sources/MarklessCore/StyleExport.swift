@@ -28,6 +28,8 @@ public enum StyleWrite: Sendable {
 	case scrollContainer(x: Bool, y: Bool)
 	/// `scrollbar-width: none`.
 	case scrollIndicatorsHidden
+	/// Children clipped to the padding box (`overflow` other than visible); a scroll container's scroll view is that clip.
+	case paddingBoxClip
 	/// `overscroll-behavior: none` on an axis.
 	case scrollBounce(x: Bool, y: Bool)
 }
@@ -251,6 +253,9 @@ public struct StyleExport: Sendable {
 			let f = try write.object(["kind", "x", "y", "key"])
 			try expectKey(f, "dragonScroll.range")
 			return .scrollContainer(x: try f["x"].bool(), y: try f["y"].bool())
+		case "padding-box-clip":
+			try expectKey(try write.object(["kind", "key"]), "dragonClip.frame")
+			return .paddingBoxClip
 		case "scroll-indicators-hidden":
 			try expectKey(try write.object(["kind", "key"]), "dragonScroll.indicators")
 			return .scrollIndicatorsHidden

@@ -280,8 +280,8 @@ class MarklessHost(
 
 	/**
 	 * A scroll container gets the platform's scroll views over its padding box: a ScrollView for the block axis, a
-	 * HorizontalScrollView for the inline axis, nested when both have a range. A scroll that reaches the end of a box goes on to
-	 * the page, as the web chains it.
+	 * HorizontalScrollView for the inline axis, nested when both have a range. A drag that starts toward an end the box is
+	 * already at goes to the page, as the web chains it.
 	 */
 	private fun scrollContainer(id: String, view: View, styled: StyledNode) {
 		val w = styled.writes.filterIsInstance<StyleWrite.ScrollContainer>().singleOrNull() ?: return
@@ -291,8 +291,8 @@ class MarklessHost(
 		val x = w.x && range.maxX > 0
 		val y = w.y && range.maxY > 0
 		val indicators = StyleWrite.ScrollIndicatorsHidden !in styled.writes
-		val vertical = ScrollView(context).apply { isNestedScrollingEnabled = true; isVerticalScrollBarEnabled = indicators; isFillViewport = true }
-		val horizontal = HorizontalScrollView(context).apply { isNestedScrollingEnabled = true; isHorizontalScrollBarEnabled = indicators; isFillViewport = true }
+		val vertical = BoxScrollView(context).apply { isVerticalScrollBarEnabled = indicators; isFillViewport = true }
+		val horizontal = BoxHorizontalScrollView(context).apply { isHorizontalScrollBarEnabled = indicators; isFillViewport = true }
 		val chain: List<FrameLayout> = when {
 			x && y -> listOf(vertical, horizontal)
 			x -> listOf(horizontal)
@@ -474,7 +474,7 @@ class MarklessHost(
 				setTextSize(TypedValue.COMPLEX_UNIT_PX, (w.size * dpr).toFloat())
 			}
 			is StyleWrite.TextColor -> (view as? TextView ?: throw MarklessHostError("text colour on \"${s.id}\", which is not text")).setTextColor(w.color.argb)
-			is StyleWrite.ScrollContainer, StyleWrite.ScrollIndicatorsHidden, is StyleWrite.ScrollBounce -> if (s.id !in scrollers) throw MarklessHostError("\"${s.id}\" has scroll writes but no scroll views")
+			is StyleWrite.ScrollContainer, StyleWrite.ScrollIndicatorsHidden, is StyleWrite.ScrollBounce, StyleWrite.PaddingBoxClip -> if (s.id !in scrollers) throw MarklessHostError("\"${s.id}\" has scroll writes but no scroll views")
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null

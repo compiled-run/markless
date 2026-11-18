@@ -12,7 +12,7 @@
 				"swipe": {
 					"from": [50, 80],
 					"to": [50, 25],
-					"until": "End of list"
+					"until": "Reached 0"
 				}
 			},
 			"visible": ["End of list", "Row 480", "Row 500", "Reached 0"],

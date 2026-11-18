@@ -11,7 +11,7 @@ name: 15-long-list
 - repeat:
       times: 80
       while:
-          notVisible: End of list
+          notVisible: Reached 0
       commands:
           - swipe:
                 start: 50%, 80%
