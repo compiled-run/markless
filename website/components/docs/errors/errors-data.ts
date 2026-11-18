@@ -4781,22 +4781,22 @@ export const errorEntries: readonly ErrorEntry[] = [
 	},
 	{
 		code: 'MARKLESS_DEVICE_WEB_ABSENT',
-		title: 'A device feature is absent on the web',
+		title: 'A native element does not exist on the web',
 		area: 'internal',
 		packageName: '@markless/compiler',
 		stage: 'compile',
 		severity: 'error',
-		description: 'A device feature is absent on the web: a Markless build error.',
+		description: 'A native element does not exist on the web: a Markless build error.',
 		printed: [
-			'MARKLESS_DEVICE_WEB_ABSENT: `<expressionSource>` needs an answer from `<name>`, which a web build does not have; put it inside a `platform` check, such as `@if (!platform.web)`, in the component that uses it (a check in a parent in another file does not cover it)',
-			'On the web, @markless/device features are absent: there is no value to show or wait for.',
-			'Wrap the use in @if (!platform.web) { ... } in the markup of the component that uses it, or start the handler with if (platform.web) return;',
+			"MARKLESS_DEVICE_WEB_ABSENT: `<<name>>` is the platform's own piece and does not exist on the web; put it inside a `platform` check, such as `@if (!platform.web)`, in the component that renders it, and use `drawer`, `modal` or `<dialog>` for the web",
+			'Everything under native.* is drawn by iOS or Android; a web build removes a guarded use and has nothing to draw for any other.',
+			'Wrap it in @if (!platform.web) { ... } @else { ... } and draw the web version with drawer, modal or <dialog> from @markless/ui.',
 			'https://markless.dev/errors/MARKLESS_DEVICE_WEB_ABSENT',
 		],
 		structured: true,
-		why: 'On the web, @markless/device features are absent: there is no value to show or wait for.',
+		why: 'Everything under native.* is drawn by iOS or Android; a web build removes a guarded use and has nothing to draw for any other.',
 		suggestion:
-			'Wrap the use in @if (!platform.web) { ... } in the markup of the component that uses it, or start the handler with if (platform.web) return;',
+			'Wrap it in @if (!platform.web) { ... } @else { ... } and draw the web version with drawer, modal or <dialog> from @markless/ui.',
 		sources: [
 			{
 				id: 'f0',
