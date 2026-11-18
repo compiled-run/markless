@@ -1,0 +1,238 @@
+# Native integration: conformance report, 2026-11-17
+
+Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet
+and headless-UI branches together. On it, 42 of 45 buildable rungs pass on the iPhone simulator and 44 of 45 on the
+Android emulator; the 4 phone failures are the iOS system sheet (also broken on its own branch today) and Android's
+return from Settings (broken only by combining the branches).
+
+| Area | Rungs | iOS | Android | What is missing |
+|---|---|---|---|---|
+| One-screen basics | 01 to 11 (15) | 14 of 14 | 14 of 14 | Async values: rung 11 is refused (`a @try inside an @if arm, a @for row or another @try`), stopped by owner decision |
+| Device | D1 to D7, D4b, P1 (9) | 9 of 9 | 8 of 9 | D7 on Android: back from Settings leaves Settings on top (only together: the Android launch-mode choice, below) |
+| System sheet | Y1 to Y4 (4) | 0 of 3 | 3 of 3 | iOS: the sheet does not present on tap (also on `cw/system-sheet` today); Y4 refused (the headless drawer beside it) |
+| Headless UI | U1 to U6, U11 to U14 (10) | 10 of 10 | 10 of 10 | 43 of 46 families still refused by the probe: dismiss, pointer events, style bindings, more |
+| Navigation | N1 to N4 (4) | 4 of 4 | 4 of 4 | A modal-sheet route (N5) not built; state lost when the system kills the app |
+| Styled apps | S1 to S5 (5) | 5 of 5 | 5 of 5 | `:active`, `:focus-visible`, `:disabled`, width `@media`, the system font (G1 to G4, G7); Android cuts off some text (already on the branch) |
+
+Counts are rung folders that build for the phones (45 of 47; 11 and Y4 are refused by name). The web column passes all 47.
+
+## 1. Typecheck and fast CI
+
+- `pnpm run typecheck`: passes on the integrated tree.
+- `pnpm ci:local --fast`: passes (agent-files, typecheck, typecheck-ts7, unit: 1,007 test files, 8,344 tests passed, 21 expected failures, 34 skipped).
+- PR CI on `67f84a28e`: green except **perf-guards G16**: the docs page downloads 1,709,593 B gzip at load, 217 B more than its anchor (1,709,376; 48 B allowed). It passes on #811 alone, so the growth comes from combining the branches (the docs page bundles the compiler, which grows with every native pass). Not accepted: raising the anchor is the owner's call. `unit (1/3)` failed twice on `packages/router/test/vite/first-write-sync.test.ts` (from main's #730, already reported on #736) and passed on a rerun of that job; it passes 3 of 3 locally. The `ios` job failed on the first push (an iOS 26 API in CI's Xcode 16.4) and passes after the fix in section "Added on this branch".
+
+## 2. Conformance vectors
+
+26 vector files (`packages/mobile/conformance/*.json`: 23 one-screen, 3 navigation).
+
+| Runtime | Files reproduced exactly | Mismatches |
+|---|---|---|
+| Reference runtime (`conformance.test.ts`: every committed file equals a fresh build) | 26 of 26 | none |
+| Swift host (`swift test` in `src/adapters/ios`: 23 one-screen cases and 3 app cases) | 26 of 26 | none |
+| Kotlin host (`test-jvm.sh`: 500 checks over the 26 files) | 26 of 26 | none |
+
+## 3. The ladder
+
+Two harness runs, because the Android emulator disappeared five rungs into the first (no emulator process left; another
+session's emulator was running afterwards): run 1 gives iOS for all 45 and Android for rungs 01 to 04; run 2 is Android alone
+over all 45. Both on `markless-integ` (iPhone 17, iOS 27.2) and `markless_integ` (API 36, port 5598), through the heavy
+queue, Dragon from a worktree that merges dragoncss #590, #591 and #592. Receipts:
+`receipts/2026-11-18-integration-{ios,android}-45-rungs.json` and `receipts/2026-11-18-integration-verdict.txt`. Web:
+`ladder-web.test.ts`, 65 of 65 tests over 47 folders. Reference: `ladder-native-reference.test.ts` (45 walked, 2 refused by
+name). "On its own branch" is that branch's latest committed phone receipt, and for the 4 failures a rerun today on a clean
+checkout of `cw/system-sheet`.
+
+The simulator had to be made by hand: the harness asked for the newly installed `iOS-27-2-iPhone19-4` runtime, which
+rejects an iPhone 17 (`Incompatible device`); `markless-integ` was created on `iOS-27-2`.
+
+| Rung | Web | Reference | iOS | Android | On its own branch |
+|---|---|---|---|---|---|
+| 01-static-text | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 02-styles | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 03-counter | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 04-attributes | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 05-if | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 05b-choices | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 06-keyed-for | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 07-child-component | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 07b-imported-component | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 07c-child-state | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 07d-children | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 08-text-input | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 09-storage | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 10-url-route | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| 11-async | pass | refused by name | refused | refused | refused there too |
+| d1-network | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d2-haptics | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d3-location | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d4-camera | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d4b-photo-refused | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d5-recorder | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d6-sharesheet | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| d7-settings | pass | pass | pass | **fail** step 3 (settings): Assertion is false: "Access granted" is visible | only together: passes on `cw/system-sheet` tip (rerun today) |
+| p1-platform | pass | pass | pass | pass | passes both phones (receipt on `cw/system-sheet`) |
+| u1-base | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u2-collapsible | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u3-tabs | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u4-dialog | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u5-toggle | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u6-base-rows | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-rows`) |
+| u11-pagination | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-next-blockers`) |
+| u12-buttongroup | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-next-blockers`) |
+| u13-accordion | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-next-blockers`) |
+| u14-gridlist | pass | pass | pass | pass | passes both phones (receipt on `cw/ui-next-blockers`) |
+| y1-sheet-open-close | pass | pass | **fail** step 1 (tap): Assertion is false: "Filters" is visible | pass | also fails on `cw/system-sheet` tip (rerun today) |
+| y2-sheet-pick | pass | pass | **fail** step 1 (tap): Assertion is false: "Choose a city" is visible | pass | also fails on `cw/system-sheet` tip (rerun today) |
+| y3-sheet-heights | pass | pass | **fail** step 1 (tap): Assertion is false: "All items" is visible | pass | also fails on `cw/system-sheet` tip (rerun today) |
+| y4-sheet-beside-drawer | pass | refused by name | refused | refused | refused there too |
+| n1-two-routes | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| n2-orders | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| n3-navigate | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| n4-deep-link | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| s1-page-styles | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| s2-shared-component | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| s3-state-styles | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| s4-global-tokens | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+| s5-page-canvas | pass | pass | pass | pass | passes both phones (receipt on `cw/native-style-gaps`) |
+
+Why Y1 to Y3 fail on iOS: their only phone receipt (about 19:50) predates later commits on that branch (the
+`<native.sheet>` commit at 19:57, `native` moving into `@markless/device` at 21:19 and 21:28); rerun today on that branch's tip,
+the sheet does not present either. The iOS sheet code here is identical to the branch's.
+
+## 4. Family probe
+
+`node packages/mobile/proofs/ui-family-probe.ts` over 46 `@markless/ui` families: 3 build (collapsible, gridlist, tabs), 43
+refused. Against `cw/ui-next-blockers`' committed probe, 5 families differ: `base` builds there and not here (the device
+chain added `base.camera`, which the synthetic probe app renders without the `el={…}` it needs; only together), and `ink`,
+`select`, `taglist`, `tokenbox` give different refusal reasons (#813's `@for` changes; `select`'s refusal on #816 was
+recorded before its own later change). Top refusal reasons, by number of refused families:
+
+| Families | Refusal |
+|---|---|
+| 21 | `markup outside the root template, its @if arms and its @for rows` |
+| 13 | `the dismiss event has no native meaning yet` |
+| 11 | `the pointerdown event has no native meaning yet` |
+| 10 | `the pointerup event has no native meaning yet` |
+| 10 | `a style binding` |
+| 9 | `the pointermove event has no native meaning yet` |
+| 8 | `the @if test reads the callback `children` as a value` |
+| 8 | `the pointerover event has no native meaning yet` |
+| 7 | `the <output> element` |
+| 7 | `the pointercancel event has no native meaning yet` |
+
+## 5. Web byte-identity
+
+Every `.tsrx` file the two trees share (3,419) compiled through the web pipeline (`compileTsrxModule`, no native facts) on
+this branch and on `710c44d48`, the `main` commit the native work branches from; a SHA-256 over each module's render module,
+payload scripts, protocol payloads and render plan. 3,418 identical, 1 fails to parse identically on both (`Expected '>' to
+close a type assertion`), 0 differ. The bundler's own committed-output fixtures pass in the unit suite.
+
+## 6. What an app author cannot do on phones yet
+
+Names in backticks are the build's refusal messages (`MARKLESS_NATIVE_UNSUPPORTED` unless said).
+
+**Events.** Pointer events (`the pointerdown event has no native meaning yet`, likewise pointerup, pointermove, pointerover,
+pointerout, pointercancel); keyboard events (`the keydown event has no native meaning yet`; focusin/keydown handlers are left
+out with `MARKLESS_NATIVE_KEYBOARD_ONLY`); `blur`; reading a click event's fields other than the modifier keys
+(`reads event.clientX, which a tap on a phone does not have`); an `await` inside an `if` in a handler (new on this branch:
+`awaits inside an if`); `focus()` or `scrollIntoView()` options other than `preventScroll`.
+
+**Styles.** A `style={…}` binding (`a style binding`); `:active`, `:focus-visible` and `:disabled` (styles contract G1 to G3,
+not built); the system font for `sans-serif` (G4); a width `@media` variant (G7); styles on rows (the style input has no rows);
+an unstyled `<Link>` inside a styled page. An unstyled page gets no browser default styles on either phone (see the contact
+sheet). Android cuts off the end of some labels (rung 2, S2; already on `cw/native-style-gaps`).
+
+**Overlays.** `dismiss` (`the dismiss event has no native meaning yet`, 13 families; `cw/ui-overlay` pending); a non-modal
+`<dialog open>`; popover (u15, stopped on dismiss); a drawer (`shared state \`drawer\` of drawerState needs a JSON initial
+value known at build time`, Y4); `<native.sheet>` with `modal={false}`, inside `@if` or `@for`, or with state-driven options;
+styled sheet content (`cw/sheet-styled-content` pending). The iOS system sheet does not present today (Y1 to Y3).
+
+**Scrolling.** No page scrolls on either phone; `scrollIntoView` and focus scrolling do nothing yet (`cw/native-scroll`
+pending).
+
+**Navigation.** A modal-sheet route (N5, owner decision); saving screens across process death; a `<Link>` whose href or
+class is not fixed at build time (`a <Link> whose href or class is not fixed at build time, ...`); on Android, coming back from
+a system screen opened in the app's task (D7, this branch only).
+
+**Async values.** `@try` inside an `@if` arm, a `@for` row or another `@try` (rung 11); an async computed whose body is more
+than one device call (`whose body is not one device call; it needs a script engine`); more than one device value per `@try`.
+
+**Device features.** Only the calls and values in `@markless/device`'s native table (haptics, network, location, camera,
+recorder, share sheet, Settings); `sharesheet.open` cannot say whether something was shared; components such as `<output>`,
+property bindings like `checked`, markup outside a component's template (`markup outside the root template, its @if arms and
+its @for rows`, 21 families) and `children` read as a value (8 families) block most remaining UI families.
+
+## Findings beside the conformance
+
+- `ladder-native-reference.test.ts` accepts any numbered rung that is refused by name, so a rung that lowers on its own
+  branch could start being refused and the test would still pass. It was caught here only by the harness load (all ten UI rungs
+  looked refused through a stale local install). A list of the rungs expected to lower would close it; owner of the ladder.
+- The harness picks the newest iOS runtime; a device-specific runtime (`iOS-27-2-iPhone19-4`) breaks simulator creation.
+
+## Decisions taken without the owner (all reversible)
+
+- Each branch chain was merged at its tip, not commit by commit (one resolution per conflict).
+- The run's 682 changed proof screenshots (59 MB) were not committed; the branches' own screenshots stay, and this run's
+  launch screens are in the contact sheet (downscaled) and its results in the receipts. The style files the run rewrote
+  (rung 4's style input, S1 to S5's `style-size.json`) are committed, as their tools wrote them.
+- The contact sheet compares the launch screen (step 0) of every rung; the web column is Chromium at the iOS proof device's
+  size for every rung, captured with the web ladder's own build path.
+- Everything under "Resolved: one implementation kept" below.
+
+## 7. Contact sheet
+
+`docs/goals/native-targets-api/contact-sheet/index.html`: every rung at its launch screen, web (Chromium at 402×778, 3×) beside
+iOS and Android, with the visible differences listed at the top.
+
+
+## Conflicts
+
+Each chain was merged at its tip (the tip carries its parents' commits), in the order nav and styles, device, headless UI,
+UI rows. Every resolution below is in a merge commit on `cw/native-integration`; nothing was pushed to the source branches.
+
+### Resolved: both sides kept, side by side
+
+- **Ladder types and Maestro flows** (`proofs/ladder.ts`): nav's back, appearance, title, deep link and `onWeb` beside device's
+  permissions, prompts, system screens, sheets, scroll and device links. Nav's 400 ms edge swipe (Back) and the sheet's
+  300 ms back gesture are kept as two constants, so every committed `flow.yaml` stays what its own branch generated (the
+  flow test regenerates all 47 and compares).
+- **Payload and journal types** (`serializer/native-view.ts`, `Payload.swift`, `Payload.kt`, `Runtime.*`): navigate with
+  evaluated params and `replace`, `title`, device `call` with continuations, `sheet`, `release`, `if`, `dialog`,
+  `command`, row cells (`row`), the `dismiss` and `cancel` events.
+- **Reference runtime, Swift and Kotlin runtimes**: device's split into `run` and `change` kept; nav's evaluated link
+  params and title journal, #816's `if`, `dialog` and `command` ops, and #813's row slots folded into it.
+- **iOS and Android hosts**: device objects and sheets beside nav's navigation stack, title and appearance; the device is
+  passed through `MarklessRoot` and `MarklessNavigationController` to every screen.
+- **Rung folders and numbering**: no folder collides. The ordering test lists all 37 numbered and named rungs in folder
+  order.
+- **Generated files** regenerated with their tools: `errors-index.ts` (`node website/tooling/errors.ts`),
+  `ui-family-probe.json` (the probe), style inputs and `style-size.json` (written by the harness run).
+
+### Resolved: one implementation kept, the other needs its owner
+
+| What | Kept | Left | Why |
+|---|---|---|---|
+| Handler statements in the analyzer: `obj.field = v`, `obj.method()`, calls by name | #816's shapes (`assign`/`invoke` with a member `path`, `method`, `apply` for module helpers) | device's `assign-field`, `effect` of a call, `call.calleePath` | One syntax needs one shape. #816's is the general one; device's readings are re-expressed over it in the native-view pass (a method call on a `@markless/device` import or a device object is a device call; a one-field write to a device object is a setting). Device's `await` node and `effect` for awaited statements are kept: #816 has neither. **Device owner to review `native-view.ts` `methodCallSite`, `isDeviceCallSite` and the device branch of `statementOps`.** |
+| Handler lowering | #816's `lowerStatements` (with `if`, `const`, `return`, kept values) and its late lowering of handlers | device's `statementOps` loop | Device's await continuations moved into `lowerStatements`. New limit: an `await` inside an `if` branch is refused by name (device had no `if`). Handlers inside a `@try` arm lower when their arm does (the `@catch` arm needs to know whether a handler writes its error); elsewhere they lower after the tree, as #816 does. |
+| Values bound to a callback's parameters | #816's `args` | device's `bound` | Same capability. The sheet's `onChange(false)` now binds through `args`. |
+| Which component module an import names | #816's `modules` (analysis by filename, package specifiers resolved) | nav's and device's `importedModules` (by relative specifier) | #816's covers `@markless/ui` packages; nav's imported-module style collection is kept beside it in `compile.ts`. |
+| Which bound attributes reach Dragon per state | #816's `isNativeStyleStateAttribute` (`ui-*`, `aria-*`, `data-*`, `hidden`, `role`; only written true/false cells add assignments) | #811's `nativeStyleAttribute` (`class` and `ui-*`) | #816's is the wider rule. Visible effect: rung 4's style input now carries `aria-label` and `aria-pressed` by state, and S1 to S5's style sizes move by 1 to 2 bytes (Dragon side, below). |
+| A row instance's handler (`<node>@<key>`) | #813's instance scope (row item and row state) | #800's `scopeOf` (row item only) | Same id format; #813's also reaches row state. Removed nav's `scopeOf` in TS, Swift and Kotlin. |
+| Android launch mode | standard (nav: one activity per screen of the stack) | device's `singleTask` | `singleTask` allows one activity per task, which breaks nav's back stack. Measured consequence: D7 fails on Android, only together (after granting location in Settings, relaunching the app leaves Settings on top, because Settings opened inside the app's task and only `singleTask` cleared it); D1's device link still works. **Device owner: return from Settings without `singleTask`, or nav owner: a stack that survives it.** Nav's deep-link reader now ignores links whose host is not `app`. |
+| Link schemes | one scheme (`PROOF_LINK_SCHEME = PROOF_URL_SCHEME`, both `markless-proof`) | a second constant with the same value | The iOS shell routes host `device` to the test device and anything else to the app stack. |
+| Reference test for a refused rung | every error is `MARKLESS_NATIVE_UNSUPPORTED`, every warning `MARKLESS_NATIVE_KEYBOARD_ONLY`, at least one error | every diagnostic `MARKLESS_NATIVE_UNSUPPORTED` | #816 added a keyboard-only warning; y4, refused on its own branch, now also carries two of them. |
+| Dragon: Markless node ids | #590's reversible encoding (`treeId`/`marklessId`) | #592's `m<k>` renaming (`dragonElementIds`) | Same capability; #590's hidden-node handling depends on its encoding. #592's page canvas is kept. |
+| Dragon: attributes by state | #590's per-combination check and compile | #592's grouped conditions | Same capability, same input format. |
+
+### Added on this branch (small, reversible, recorded)
+
+- iOS host: `interactiveContentPopGestureRecognizer` (iOS 26 SDK, from #800) is compiled only with Swift 6.2 or later, so the
+  host builds on CI's Xcode 16.4. The `ios` CI job does not run on the source PRs, so this never compiled there.
+- No public API changed.
+
+### Left out
+
+- `cw/native-handlers` (#807): 19 conflicting files (`native-view.ts`, `expression-tree.ts`, `artifacts.ts`, both hosts'
+  runtimes and payload decoders, the harness). Study branch; not merged.
+- Pending, not included: `cw/ui-overlay`, `cw/native-scroll`, `cw/sheet-styled-content`.
