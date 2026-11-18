@@ -360,13 +360,40 @@ async function executionCost(browser, origin, name, caseId, read) {
 	}
 }
 
+/** The URL paths a site's build lists as its <Code> playground's prefetch, or undefined for a site without one. */
+export function readPlaygroundPrefetch(publicDir, site) {
+	const name = SITES[site].playgroundPrefetch;
+	if (!name) return undefined;
+	const file = join(publicDir, name);
+	if (!existsSync(file))
+		throw new Error(`${site} build wrote no ${name}; G16 cannot tell the page's own code from the playground's`);
+	const manifest = JSON.parse(readFileSync(file, 'utf8'));
+	return new Set(
+		[manifest.session, manifest.live, manifest.cache, ...Object.values(manifest.blocks)].flat(),
+	);
+}
+
+/**
+ * Splits the JS fetched at load into the page's own code and the playground's prefetch: a file the playground
+ * lists is the page's own when the page's HTML preloads it too.
+ */
+export function splitLoadFiles(loaded, { playground, preloaded }) {
+	if (!playground) return { page: loaded, playground: undefined };
+	const own = new Set(preloaded);
+	const prefetched = (path) => playground.has(path) && !own.has(path);
+	return { page: loaded.filter((path) => !prefetched(path)), playground: loaded.filter(prefetched) };
+}
+
 // What a reader's browser downloads and runs from load until the page goes idle, before any input: JS downloaded
 // (gzip bytes of the files fetched, read from the build) and JS executed (V8 coverage), each the lowest of `loads` runs.
 // The window ends where G2's first input starts, at the first idle period that starts no request.
-async function loadWeight(browser, origin, route, read, loads = LOAD_WEIGHT_RUNS) {
+// A site with a <Code> playground reports its prefetch apart, as `playground`.
+async function loadWeight(browser, origin, route, read, split, loads = LOAD_WEIGHT_RUNS) {
 	let executedChars = Infinity;
 	let jsGzipBytes = Infinity;
 	let files = [];
+	let playground = split.playground && { jsGzipBytes: Infinity, files: [] };
+	const bytesOf = (paths) => paths.reduce((total, path) => total + (read(path)?.gzipBytes ?? 0), 0);
 	for (let run = 0; run < loads; run++) {
 		const visit = await openPage(browser, { coverage: true });
 		try {
@@ -384,16 +411,20 @@ async function loadWeight(browser, origin, route, read, loads = LOAD_WEIGHT_RUNS
 						.map((url) => new URL(url).pathname),
 				),
 			].sort();
-			const bytes = loaded.reduce((total, path) => total + (read(path)?.gzipBytes ?? 0), 0);
+			const parts = splitLoadFiles(loaded, split);
+			const bytes = bytesOf(parts.page);
 			if (bytes < jsGzipBytes) {
 				jsGzipBytes = bytes;
-				files = loaded;
+				files = parts.page;
 			}
+			const prefetched = parts.playground && bytesOf(parts.playground);
+			if (playground && prefetched < playground.jsGzipBytes)
+				playground = { jsGzipBytes: prefetched, files: parts.playground };
 		} finally {
 			await visit.close();
 		}
 	}
-	return { executedChars, jsGzipBytes, files };
+	return { executedChars, jsGzipBytes, files, ...(playground ? { playground } : {}) };
 }
 
 async function sameTask(browser, origin, probe) {
@@ -533,6 +564,7 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 		const read = createFileReader(publicDir, SITES[site].base);
 		const attribution = readAttribution(publicDir);
 		const demand = readDemand(publicDir);
+		const playground = readPlaygroundPrefetch(publicDir, site);
 		if (!attribution)
 			throw new Error(
 				`${site} build emitted no byte attribution; the framework-overhead guards cannot run`,
@@ -582,7 +614,10 @@ export async function measure({ build = true, sites = ['bench', 'docs'], log = (
 						: {}),
 				};
 				log(`${site} ${route}: load weight`);
-				routes[route].load = await loadWeight(browser, server.origin, route, read);
+				routes[route].load = await loadWeight(browser, server.origin, route, read, {
+					playground,
+					preloaded: staticInfo.files,
+				});
 				routes[route].html = staticInfo.html;
 				routes[route].resumeData = resumeDataBreakdown(staticInfo.html).total;
 			}

@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, renderSSR } from '../src/index.ts';
+import NestedSeedPage from './shared-readers/nested-seed-page.tsrx';
 import PlainPage from './shared-readers/plain-page.tsrx';
 import ReadersPage from './shared-readers/readers-page.tsrx';
 import SeededPage from './shared-readers/seeded-page.tsrx';
@@ -48,8 +49,13 @@ test('SSR: two server requests do not share a visitor value', async () => {
 	expect(text(plain.container, '[data-reader]')).toBe('paper');
 });
 
-// Open defect, same on main: a sibling rendered after the component that seeds an app-scoped value renders the unseeded value on the server.
-test.fails('SSR: a sibling of the seeding component renders the seeded value', async () => {
+test('SSR: a sibling of the seeding component renders the seeded value', async () => {
 	const { container } = await renderSSR(SeededPage);
 	expect(text(container, '[data-reader]')).toBe('ink');
+});
+
+test('SSR: a seed written inside a sibling component reaches a reader in a later @if arm', async () => {
+	const { container } = await renderSSR(NestedSeedPage);
+	expect(text(container, '[data-seeded]')).toBe('ink');
+	expect(text(container, '[data-footnote]')).toBe('ink');
 });

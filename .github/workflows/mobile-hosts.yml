@@ -1,17 +1,19 @@
 name: Mobile hosts
 
-# The phone hosts' own tests on every pull request that touches them, whatever its base: the iOS package's tests, its
-# UIKit ones included, on a simulator, and the Kotlin host's JVM conformance test. The proof harness runs the same
-# command before any rung (`node src/harness/cli.ts host-tests`). Without a Dragon checkout here, the two UIKit tests that
-# paint with Dragon's font files are skipped by name and listed in the log; the harness runs them.
+# The phone hosts' own tests on every pull request that changes a package, and on main: the iOS package's tests, its
+# UIKit ones included, on a simulator, and the Kotlin host's JVM conformance test. A change to the compiler or the web
+# runtime can change what a phone receives, so it runs these too. The proof harness runs the same command before any rung
+# (`node src/harness/cli.ts host-tests`). Without a Dragon checkout here, the two UIKit tests that paint with Dragon's font
+# files are skipped by name and listed in the log; the harness runs them.
 
 on:
     workflow_dispatch:
+    push:
+        branches: [main]
     pull_request:
         paths:
-            - packages/mobile/src/adapters/**
-            - packages/mobile/conformance/**
-            - packages/mobile/src/harness/**
+            - packages/**
+            - pnpm-lock.yaml
             - .github/workflows/mobile-hosts.yml
 
 concurrency:

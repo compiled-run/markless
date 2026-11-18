@@ -58,6 +58,9 @@ renders none anywhere, recorded there as a researched default. It cannot stand
 here — the period's `aria-valuenow` is 0 or 1, and a reader speaking a bare "0"
 has conveyed nothing. The numeric boxes keep the sibling's bare-number behaviour,
 so the divergence is confined to the one box where a number means nothing.
+An empty box of any type carries `aria-valuetext="Empty"`, as `datebox` and
+React Aria do: with no value text Chrome reports 0 and VoiceOver spoke "-9.1%
+hour input stepper".
 
 The period box is named `"AM or PM"` rather than `"dayperiod input"`: the Intl
 part type is the right name for the *part*, not for what a reader should hear.

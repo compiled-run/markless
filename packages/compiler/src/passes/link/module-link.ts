@@ -426,7 +426,8 @@ function republishedClaimInputs(
 				(kind) =>
 					kind !== 'passthrough-route' &&
 					kind !== 'compiler-known-constant' &&
-					kind !== 'graph-reference',
+					kind !== 'graph-reference' &&
+					kind !== 'row-local',
 			)
 		)
 			return [];

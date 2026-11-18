@@ -133,6 +133,15 @@ export function rowComponentReadsIndex(
 	);
 }
 
+/** A text or attribute slot reads the row it renders in, its item or a name bound beside it. */
+export function slotReadsRow(slot: SemanticMarkupSlot, rowNames: ReadonlySet<string>): boolean {
+	if (slot.kind !== 'text' && slot.kind !== 'attribute') return false;
+	if (slot.residue.kind === 'repeat-item') return true;
+	if (slot.residue.kind !== 'authored-expression') return false;
+	const names = readResidueNames(slot.residue.source, 'expression');
+	return [...rowNames].some((name) => residueReferences(names, name));
+}
+
 /**
  * A row whose markup an @if or @switch picks from the row item, rendered whole
  * by the client the way the server rendered it.
@@ -157,7 +166,7 @@ export function resolveRowChunkMint(
 	if (!chunk?.componentName || !input.semanticGraph || input.rowElementCount < 1) return null;
 	// Rows with one component and no branch take the component mint or the row template instead.
 	if (
-		!chunk.slots.some((slot) => slot.kind === 'branch') &&
+		!chunk.slots.some((slot) => slot.kind === 'branch' || slot.kind === 'async') &&
 		chunk.slots.filter((slot) => slot.kind === 'child-component').length < 2
 	)
 		return null;
@@ -210,6 +219,10 @@ function rowContentIsMintable(
 				rowContentIsMintable(input, armChunkId, seen, rowNames),
 			);
 		}
+		if (slot.kind === 'async')
+			return Object.values(slot.armTemplateIds).every(
+				(armChunkId) => !armChunkId || rowArmIsMintable(input, armChunkId, seen, rowNames),
+			);
 		if (slot.kind !== 'child-component') return false;
 		if (
 			slot.projectionChunkId !== undefined &&
@@ -222,6 +235,27 @@ function rowContentIsMintable(
 		if (edge.children.childCount > 0 && slot.projectionChunkId === undefined) return false;
 		return childIsMintable(input, edge, slot.childTemplateId, new Set());
 	});
+}
+
+// A row @try's arm is drawn again whenever a value it reads is written, so its text may read the page beside the row.
+function rowArmIsMintable(
+	input: RowMintInput,
+	chunkId: string,
+	seen: Set<string>,
+	rowNames: ReadonlyArray<string>,
+): boolean {
+	if (seen.has(chunkId)) return false;
+	seen.add(chunkId);
+	const chunk = input.chunks.find((candidate) => candidate.id === chunkId);
+	if (!chunk?.componentName || !input.semanticGraph || !input.recordHostIds) return false;
+	if (chunk.hosts.some((host) => input.recordHostIds!.has(host.hostNodeId))) return false;
+	return chunk.slots.every(
+		(slot) =>
+			(slot.kind === 'text' || slot.kind === 'attribute') &&
+			(slot.residue.kind === 'repeat-item' ||
+				expressionSlotValue(slot, input.semanticGraph!, chunk.componentName!, new Set(rowNames)) !==
+					null),
+	);
 }
 
 // The row renders with an empty owner view, so an owner element it projects must need no record.

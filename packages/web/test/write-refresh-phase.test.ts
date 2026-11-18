@@ -13,6 +13,10 @@ import {
 	WRITE_WRITING_SUCCEEDED,
 	type WritePhase,
 } from '../src/resume-return-reask.ts';
+import { createRuntimeGraph } from '@markless/runtime';
+import type { AsyncRefreshModule } from '@markless/runtime/graph-async';
+import { createAsyncPlane } from '@markless/runtime/graph-async-load';
+import * as asyncRefresh from '@markless/runtime/graph-async-refresh';
 import { dispatchSpans, runAsDispatchOwn, type DispatchSpan } from '../src/event-current-target.ts';
 import { IN_PLACE_LOCATION_HEADER } from '../src/fns/in-place-headers.ts';
 
@@ -166,6 +170,44 @@ test('a reload whose screen update throws still clears the sending control, and 
 		expect(unhandled).toEqual([]);
 	} finally {
 		process.off('unhandledRejection', onUnhandled);
+		release();
+	}
+});
+
+test("a list shown from the server loads again after a save, though the save's busy mark lands after the save answered", async () => {
+	const { answers } = saveRig();
+	let loadRefresh!: (module: AsyncRefreshModule) => void;
+	const refreshLoads = new Promise<AsyncRefreshModule>((resolve) => (loadRefresh = resolve));
+	const runs: unknown[] = [];
+	const graph = createRuntimeGraph({
+		cells: [],
+		async: (internals, asyncComputed) => createAsyncPlane(internals, asyncComputed, () => refreshLoads),
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:tickets',
+				dependencies: [],
+				key: () => 'all',
+				run: ({ key }: { key: unknown }) => (runs.push(key), new Promise(() => {})),
+				initialSnapshot: { status: 'fulfilled', version: 1, key: 'all', value: [] },
+			},
+		],
+	} as never);
+	const release = registerWriteRefresh(graph, new Map([['b', { asyncReads: [{ graphNodeId: 'computed:tickets' }] }]]));
+	try {
+		const span: DispatchSpan = { open: true };
+		dispatchSpans().add(span);
+		void runAsDispatchOwn(span, () => fetch('/save', { method: 'POST' }));
+		answers[0]!(new Response('{}'));
+		await turns();
+		loadRefresh(asyncRefresh);
+		await turns();
+		expect(graph.read('computed:tickets', ['status'])).toBe('pending');
+		span.open = false;
+		dispatchSpans().delete(span);
+		span.closed?.();
+		await turns();
+		expect(runs).toEqual(['all']);
+	} finally {
 		release();
 	}
 });

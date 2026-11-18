@@ -103,6 +103,11 @@ beforeAll(async () => {
 		join(root, 'package.json'),
 		'{ "name": "markless-cloudflare-test", "private": true }\n',
 	);
+	// An app that names its own version binding: the edge cache keys on that one.
+	await writeFile(
+		join(root, 'wrangler.json'),
+		JSON.stringify({ version_metadata: { binding: 'APP_VERSION' } }),
+	);
 	// Like unicorn-magic: its default build, for runtimes without Node's APIs, lacks what its Node build exports.
 	const nodeOnly = join(root, 'node_modules/node-build-only');
 	await mkdir(nodeOnly, { recursive: true });
@@ -120,6 +125,20 @@ beforeAll(async () => {
 	);
 	await writeFile(join(nodeOnly, 'default.js'), 'export const other = 1;\n');
 	await mkdir(join(root, 'api'), { recursive: true });
+	// Each answer counts itself, so an answer from the edge cache shows the count of the one it stored.
+	await writeFile(
+		join(root, 'api/counted.ts'),
+		[
+			'let answers = 0;',
+			'export default (event) => {',
+			'\tanswers++;',
+			"\tconst headers = { 'cache-control': 'public, max-age=0, s-maxage=600' };",
+			"\tif (event.url.searchParams.has('session')) headers['set-cookie'] = 'sid=1';",
+			"\tif (event.url.searchParams.has('lang')) headers.vary = 'Accept-Language';",
+			'\treturn Response.json({ answers }, { headers });',
+			'};',
+		].join('\n'),
+	);
 	// Like typescript.js inside ts-morph: CommonJS that reads __filename as it loads.
 	const commonjs = join(root, 'node_modules/reads-filename');
 	await mkdir(commonjs, { recursive: true });
@@ -194,6 +213,9 @@ function startWrangler(config: string): Promise<string> {
 			'--ip',
 			'127.0.0.1',
 			'--port',
+			'0',
+			// wrangler probes 9229 upward for a free inspector port and binds it later, so two at once can pick the same one.
+			'--inspector-port',
 			'0',
 			'--show-interactive-dev-session=false',
 		],
@@ -513,4 +535,26 @@ test('a Pages build, or one whose run_worker_first sends files to the Worker, ke
 	} as never);
 	expect(resolve('#nitro/virtual/public-assets-data')).toBeUndefined();
 	await rm(above, { recursive: true, force: true });
+});
+
+test('a Worker answer marked for shared caches is answered from the edge cache for the same URL, never with a cookie on either side', async () => {
+	const answers = async (path: string, init?: RequestInit) =>
+		((await (await fetch(origin + path, init)).json()) as { answers: number }).answers;
+	const first = await answers('/api/counted?a=1');
+	expect(await answers('/api/counted?a=1')).toBe(first);
+	expect(await answers('/api/counted?a=2')).toBeGreaterThan(first);
+	const fresh = await answers('/api/counted?a=1', { headers: { cookie: 'sid=2' } });
+	expect(fresh).toBeGreaterThan(first);
+	const varied = await answers('/api/counted?lang=1');
+	expect(await answers('/api/counted?lang=1')).toBeGreaterThan(varied);
+	const cookie = await answers('/api/counted?session=1');
+	expect(await answers('/api/counted?session=1')).toBeGreaterThan(cookie);
+});
+
+test("the edge cache keeps an app's own __markless_version query apart from the deployed version", async () => {
+	const answers = async (path: string) =>
+		((await (await fetch(origin + path)).json()) as { answers: number }).answers;
+	const first = await answers('/api/counted?__markless_version=one');
+	expect(await answers('/api/counted?__markless_version=one')).toBe(first);
+	expect(await answers('/api/counted?__markless_version=two')).toBeGreaterThan(first);
 });

@@ -1212,6 +1212,9 @@ function sharedInstanceReferenceDiagnostic(
 			{
 				message: `Do not hoist the method into a local first (\`const handler = ${reference.name}.<method>;\`). That is the same read one line earlier and fails the same way.`,
 			},
+			{
+				message: `To pass "${reference.name}" itself to a function, have its definition return only one state object (\`return { ...box }\`) with no methods. Then "${reference.name}" is that object, and the function's changes reach the page.`,
+			},
 		],
 		docsUrl: `https://markless.dev/errors/${SYMBOL_MODULE_UNRESOLVED_GRAPH_REFERENCE_CODE}`,
 	};
@@ -1388,9 +1391,13 @@ function withoutAcceptedArmRefusals(
 	branchArms: Pick<ReturnType<typeof renderBranchArms>, 'diagnostics' | 'escalationCandidates'>,
 	modules: ReadonlyArray<GeneratedSymbolModule>,
 ): ReadonlyArray<SymbolModulesDiagnostic> {
+	// A render module withheld for the render plan's own error leaves that error as the one to fix.
+	const planRefused =
+		input.publicRenderPlan?.diagnostics.some((diagnostic) => diagnostic.severity === 'error') ??
+		false;
 	if (
 		branchArms.escalationCandidates.length === 0 ||
-		!input.publicRenderModule?.renderDataModuleSource ||
+		(!input.publicRenderModule?.renderDataModuleSource && !planRefused) ||
 		!input.semanticGraph ||
 		!prerenderInterfacesComplete({ semanticGraph: input.semanticGraph }, input.source ?? {})
 	)
@@ -1440,7 +1447,7 @@ function renderBranchArms(
 		),
 	);
 	for (const branch of renderData.branches ?? []) {
-		if (rowFlipped.has(branch.branchSiteId)) continue;
+		if (rowFlipped.has(branch.branchSiteId) || branch.update === 'row-arm') continue;
 		// A @try arm's branch holding a component flips its own range from a render of the page.
 		if (branch.update === 'boundary') {
 			const symbol =
@@ -7657,6 +7664,17 @@ function readsAssignedNode(node: AnyNode, target: AssignedTarget, rewrite: Event
 	return false;
 }
 
+// Whether the handler writes the assigned path, or a path holding or inside it, anywhere but this assignment: a once
+// part run ahead of the update could reach that write, which JavaScript runs after reading the value it replaces.
+function writesOverlapElsewhere(authored: LoweredStateWrite, target: AssignedTarget, rewrite: EventHandlerRewrite): boolean {
+	return (rewrite.symbol.writes ?? []).some((other) => {
+		if (other === authored || other.graphNodeId !== target.graphNodeId) return false;
+		const path = other.through ? other.through.path : other.path;
+		const shared = Math.min(path.length, target.path.length);
+		return path.slice(0, shared).every((segment, index) => segment === target.path[index]);
+	});
+}
+
 // The value with each once part standing as the parameter that carries its result.
 function withOnceParameters(node: AnyNode, parts: ReadonlyArray<OncePart>, names: ReadonlyArray<string>): AnyNode {
 	const index = parts.findIndex((part) => part.node === node);
@@ -7867,13 +7885,14 @@ function loweredEventWriteNode(
 		const logical = write.assignmentOperator === '&&=' || write.assignmentOperator === '||=' || write.assignmentOperator === '??=';
 		const replayable = !containsWriteExpression(right) && !pausesOutsideFunctions(right);
 		// A plain assignment whose value reads exactly what it replaces is an update, so a page still showing an earlier value applies it there too.
-		const parts = !replayable
+		const onceParts = !replayable
 			? null
 			: write.assignmentOperator
 				? replayedValueParts(right, write, rewrite, logical)
 				: !write.row && !write.through && readsAssignedState(right, write, rewrite)
 					? replayedValueParts(right, write, rewrite)
 					: null;
+		const parts = !onceParts || (onceParts.length > 0 && writesOverlapElsewhere(authored, write, rewrite)) ? null : onceParts;
 		const names = parts ? onceParameterNames(right, parts.length) : [];
 		const replayed = parts && parts.length > 0 ? withOnceParameters(right, parts, names) : right;
 		const updaterRead =

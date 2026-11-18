@@ -3,7 +3,7 @@ import { render, renderSSR } from '../../src/index.ts';
 import BadgePage from './b-badge-page.tsrx';
 import HeaderPage from './b-header-page.tsrx';
 import { installServer, resetServer, type Board } from './grid-server.ts';
-import { fullTimeline, oneStep, type Shape } from './timeline.ts';
+import { fullTimeline, type Shape } from './timeline.ts';
 
 // An other-file child in a page @try reading the async prop in an attribute and in an @if test.
 installServer();
@@ -32,13 +32,7 @@ const badge = (mode: 'CSR' | 'SSR', mount: () => Promise<unknown>) =>
 	({ shape: shape(badgeView), openAtLoad: true, mode, mount }) as const;
 
 // The header's @if flips only when the subject changes the row count; the badge's flips on every reload.
-test('CSR', () => fullTimeline(header('CSR', () => render(HeaderPage)), ['switch subject while open']));
-test('SSR', () => fullTimeline(header('SSR', () => renderSSR(HeaderPage)), ['switch subject while open']));
-test('renamed: CSR', () => fullTimeline(badge('CSR', () => render(BadgePage)), ['reload while open']));
-test('renamed: SSR', () => fullTimeline(badge('SSR', () => renderSSR(BadgePage)), ['reload while open']));
-
-// Known defect: an @if test computed over a member of the prop is not re-run when the prop reloads, so the arm stays.
-test.fails('CSR: the @if follows a subject switch', () => oneStep(header('CSR', () => render(HeaderPage)), 'switch subject while open'));
-test.fails('SSR: the @if follows a subject switch', () => oneStep(header('SSR', () => renderSSR(HeaderPage)), 'switch subject while open'));
-test.fails('renamed: CSR: the @if follows a reload', () => oneStep(badge('CSR', () => render(BadgePage)), 'reload while open'));
-test.fails('renamed: SSR: the @if follows a reload', () => oneStep(badge('SSR', () => renderSSR(BadgePage)), 'reload while open'));
+test('CSR', () => fullTimeline(header('CSR', () => render(HeaderPage))));
+test('SSR', () => fullTimeline(header('SSR', () => renderSSR(HeaderPage))));
+test('renamed: CSR', () => fullTimeline(badge('CSR', () => render(BadgePage))));
+test('renamed: SSR', () => fullTimeline(badge('SSR', () => renderSSR(BadgePage))));

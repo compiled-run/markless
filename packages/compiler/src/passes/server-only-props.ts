@@ -172,10 +172,12 @@ function payloadSeedReads(
 	component: ServerOnlyComponent,
 ): BrowserRead[] {
 	const { propName } = component.declared;
+	// A handler's own read is refused where it is written, so only markup reads count here.
 	const seeds = ssrPropCellSeedsForCell(
 		input,
 		PROTOCOL_PROPS_GRAPH_NODE_ID,
 		component.componentName,
+		false,
 	);
 	const carried = seeds.some((seed) =>
 		seed.graphNodeId === PROTOCOL_PROPS_GRAPH_NODE_ID

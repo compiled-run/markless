@@ -57,7 +57,21 @@ export type GraphReadScope = {
 export type CompositeReadOptions = {
 	readonly methodCalls?: boolean;
 	readonly unaryOperators?: boolean;
+	/** A component prop says yes: `rows ?? []` falls back to a literal that reads only what it is built from. */
+	readonly literalBranches?: boolean;
+	/** The derive's reads into a prop follow the caller's value, so an object or array prop is lowered too. */
+	readonly readsIntoProps?: boolean;
+	/** A call may take an expression-bodied arrow, `opened.some((id) => id === post.id)`; names it binds are not reads. */
+	readonly arrowArguments?: boolean;
 };
+
+type ArrowReadOptions = CompositeReadOptions & {
+	readonly arrowRegions?: ReadonlyArray<{ readonly start: number; readonly end: number }>;
+};
+
+function bindsInsideArrow(node: AnyNode, state: WalkState, options: ArrowReadOptions): boolean {
+	return (options.arrowRegions ?? []).some((region) => rootBindsInsideRegion(node, state, region));
+}
 
 export function isCompositeTemplateExpression(
 	node: AnyNode,
@@ -173,13 +187,18 @@ function isNamedFunctionCall(node: AnyNode): boolean {
 export function pureCompositeReadSources(
 	node: AnyNode | undefined,
 	state: WalkState,
-	options: CompositeReadOptions = {},
+	options: ArrowReadOptions = {},
 ): ReadonlyArray<GraphReadSource> | null {
 	if (!node) return [];
 	if (node.type === 'ChainExpression' || node.type === 'ParenthesizedExpression') {
 		return pureCompositeReadSources(node.expression as AnyNode | undefined, state, options);
 	}
 	if (isLiteralExpression(node)) return [];
+	if (
+		(node.type === 'Identifier' || node.type === 'MemberExpression') &&
+		bindsInsideArrow(node, state, options)
+	)
+		return [];
 	if (node.type === 'Identifier') {
 		// `undefined` is an Identifier to the parser but a value here, like false
 		// or null; reporting it as a read source kills the computed mint.
@@ -195,11 +214,17 @@ export function pureCompositeReadSources(
 	if (node.type === 'ConditionalExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.test as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.consequent as AnyNode | undefined, state, options),
-			pureCompositeReadSources(node.alternate as AnyNode | undefined, state, options),
+			branchReadSources(node.consequent as AnyNode | undefined, state, options),
+			branchReadSources(node.alternate as AnyNode | undefined, state, options),
 		]);
 	}
-	if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+	if (node.type === 'LogicalExpression') {
+		return joinReadSources([
+			branchReadSources(node.left as AnyNode | undefined, state, options),
+			branchReadSources(node.right as AnyNode | undefined, state, options),
+		]);
+	}
+	if (node.type === 'BinaryExpression') {
 		return joinReadSources([
 			pureCompositeReadSources(node.left as AnyNode | undefined, state, options),
 			pureCompositeReadSources(node.right as AnyNode | undefined, state, options),
@@ -215,6 +240,17 @@ export function pureCompositeReadSources(
 		);
 	}
 	return null;
+}
+
+function branchReadSources(
+	node: AnyNode | undefined,
+	state: WalkState,
+	options: CompositeReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	return options.literalBranches === true &&
+		(node?.type === 'ArrayExpression' || node?.type === 'ObjectExpression')
+		? callOperandReadSources(node, state, options)
+		: pureCompositeReadSources(node, state, options);
 }
 
 // The receiver and the arguments are the whole dependency set of a method call:
@@ -277,7 +313,31 @@ function callOperandReadSources(
 			),
 		);
 	}
+	if (node?.type === 'ArrowFunctionExpression') return arrowReadSources(node, state, options);
 	return pureCompositeReadSources(node, state, options);
+}
+
+/** The reads an arrow argument makes, or null when its body is not one expression this collector can read. */
+export function arrowReadSources(
+	node: AnyNode,
+	state: WalkState,
+	options: ArrowReadOptions,
+): ReadonlyArray<GraphReadSource> | null {
+	const body = node.body as AnyNode | undefined;
+	if (
+		options.arrowArguments !== true ||
+		node.async === true ||
+		!body ||
+		body.type === 'BlockStatement' ||
+		typeof node.start !== 'number' ||
+		typeof node.end !== 'number'
+	)
+		return null;
+	const region = { start: node.start, end: node.end };
+	return pureCompositeReadSources(body, state, {
+		...options,
+		arrowRegions: [...(options.arrowRegions ?? []), region],
+	});
 }
 
 function callsModuleFunction(callee: AnyNode, offset: number, state: WalkState): boolean {
@@ -326,6 +386,9 @@ function memberReadSources(
 		]);
 	}
 	if (readsThroughDynamicKey(object)) return pureCompositeReadSources(object, state, options);
+	// `opened.filter((id) => id <= post.id).length`: a member of a call's answer reads what the call reads.
+	if (object?.type === 'CallExpression' && options.arrowArguments === true)
+		return pureCompositeReadSources(object, state, options);
 	if (object?.type === 'CallExpression' || object?.type === 'NewExpression') return null;
 	const source = expressionSource(node, state.source);
 	if (!source) return null;
@@ -405,6 +468,8 @@ export function collectCompositeTemplateExpression(
 		options.scope,
 		false,
 		memberRoots(node),
+		false,
+		options.readsIntoProps,
 	);
 }
 
@@ -456,12 +521,14 @@ export function mintTemplateExpressionComputed(
 	// A prop cell carries only scalars, so a derive reading into an object prop would see undefined.
 	propObjectRoots?: ReadonlySet<string>,
 	joinsText = false,
+	readsIntoProps = false,
 ): { readonly graphNodeId: string } | null {
 	const dependencies = graphReadDependencies(readSources, state, scope);
 	if (!dependencies) return null;
 	if (dependencies.length === 0 && !allowConstant) return null;
 	if (
 		!allowConstant &&
+		!readsIntoProps &&
 		!armRebuildsFromGraph(state) &&
 		propMemberReads(dependencies, propObjectRoots).length > 0
 	)

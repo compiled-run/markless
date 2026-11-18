@@ -56,10 +56,7 @@ export type MarklessVirtualModuleType =
 	| 'trigger-group'
 	| 'style';
 
-export type BuiltPrerenderRecords = {
-	readonly state: import('@markless/serializer').ProtocolStatePayload;
-	readonly view: import('@markless/serializer').ProtocolViewPayload;
-};
+export type BuiltPrerenderRecords = import('./build/prerender.ts').BuiltPrerenderRecords;
 
 export interface MarklessVirtualModule {
 	id: string;
@@ -134,6 +131,8 @@ export interface TransformTsrxModuleResult {
 	map: null;
 	virtualModules: MarklessVirtualModule[];
 	manifest: MarklessTransformManifest;
+	/** Warning diagnostics this compile raised that no `markless-allow` comment suppressed. */
+	compilerWarnings?: ReadonlyArray<CompilerDiagnostic>;
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];

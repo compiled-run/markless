@@ -101,6 +101,17 @@ export default function ShelfEdit() @{
 ```
 </Code>
 
+`@empty` holds plain elements, text and values. A component, `@if` or `@for` inside it stops the build with `MARKLESS_PUBLIC_RENDER_UNSUPPORTED_CONSTRUCT`. When the empty state needs a component, put an `@if` beside the list instead:
+
+```tsrx
+@for (const book of books; key book.id) {
+	<li>{book.title}</li>
+}
+@if (books.length === 0) {
+	<EmptyShelf />
+}
+```
+
 ## A row's own state moves with its key
 
 When a row needs state of its own, like a tick, make the row a component in its own file, here `book-row.tsrx`. Each row gets its own `state()`, and the key keeps it with its book when the list moves.
@@ -203,6 +214,38 @@ export default function ReadFlags() @{
 </Code>
 
 A row component can't write to the object it was given. Pass it a function to call instead, as [Components](/build/components) shows.
+
+## Give a row component plain props
+
+To mark the picked row, pass the row its own value and the picked one as separate props, and compare them inside the row:
+
+```tsrx
+@for (const item of items; key item.id) {
+	<Row id={item.id} picked={picked} />
+}
+```
+
+```tsrx
+export function Row({
+	id,
+	picked,
+}: {
+	id: string;
+	picked: string;
+}) @{
+	<li
+		id={'item-' + id}
+		class={id === picked ? 'on' : ''}
+	>
+		{id}
+	</li>
+}
+```
+
+Two shapes that look the same do not build yet:
+
+- A prop that mixes the row's item with other state, like `<Row active={item.id === picked} />`, stops the build with `MARKLESS_COMPONENT_PROP_EXPRESSION_UNSUPPORTED`. A component row is built again only when its own item or place changes, so nothing would move it when `picked` does.
+- Inside the row, an expression that reads into a prop, like `id={'item-' + item.id}` when the row was given the whole `item`, warns with `MARKLESS_TEMPLATE_EXPRESSION_STATIC`, and the build stops when the list can change. The row holds each prop as one plain value, so it can't follow a member of an object. A plain read, `{item.id}` or `id={item.id}`, is fine.
 
 ## Filter and sort with a computed
 

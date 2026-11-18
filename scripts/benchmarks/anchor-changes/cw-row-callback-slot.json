@@ -1,0 +1,40 @@
+{
+	"changes": [
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "callback-slot composer path drops a trailing row segment so a family root in a @for row reaches the app callback; +14 B gzip of runtime per docs page, CI run 44224418809 against merge-queue run 44219456365",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "callback-slot composer path drops a trailing row segment so a family root in a @for row reaches the app callback; +14 B gzip of runtime per docs page, CI run 44224418809 against merge-queue run 44219456365",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 14,
+			"reason": "callback-slot composer path drops a trailing row segment so a family root in a @for row reaches the app callback; +14 B gzip of runtime per docs page, CI run 44224418809 against merge-queue run 44219456365",
+			"date": "2026-11-18"
+		}
+	]
+}

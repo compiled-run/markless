@@ -1,4 +1,5 @@
 import { ASYNC_PROTOCOL_VERSION, protocolInstanceQualifies } from '@markless/serializer';
+import { MARKLESS_SYMBOL_UNKNOWN } from '@markless/web/fns/symbol-unknown';
 import type { SymbolResolverModuleInput, SymbolResolverModuleManifest } from '../artifacts.ts';
 import { decodeBoundRow, factorBoundRows, type JsonBoundRow } from './bound-row-table.ts';
 
@@ -83,7 +84,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 				]
 			: []),
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, input.literalImports)),
 		';',
 		'',
 		input.literalImports
@@ -94,19 +95,7 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		...boundRowLookup(input.boundSymbols ?? []),
 		'const callbackRoute = "callback-route";',
 		'',
-		'export async function loadSymbol(id) {',
-		'	const bound = boundRow(id);',
-		'	if (bound) return loadBoundSymbol(bound);',
-		'	const row = symbolRows[id];',
-		'	if (!row) throw createUnknownSymbolError(id);',
-		input.literalImports
-			? '\treturn moduleLoads[id]()'
-			: '	return import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'		.then((mod) => {',
-		'			runGeneratedSymbolChunkInitializers(mod);',
-		'			return mod[exportNames[row[1]]];',
-		'		});',
-		'}',
+		...emitLoadSymbolFunction(input.literalImports === true, true),
 		'',
 		'async function loadBoundSymbol(bound) {',
 		scopesInstances
@@ -214,10 +203,10 @@ export function emitSymbolResolverModule(input: SymbolResolverModuleInput): stri
 		'',
 		'function createUnknownSymbolError(id) {',
 		'	return Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'		code: "MARKLESS_SYMBOL_UNKNOWN",',
+		`		code: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'		phase: "resume",',
 		'		symbolId: String(id),',
-		'		docsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`		docsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'	});',
 		'}',
 		'',
@@ -369,24 +358,14 @@ function emitTableSymbolResolverModule(
 ): string {
 	return [
 		'export const symbolManifest = ',
-		JSON.stringify(manifest),
+		JSON.stringify(shippedManifest(manifest, literalImports)),
 		';',
 		'',
 		literalImports ? literalModuleLoads(manifest) : 'const moduleUrls = symbolManifest[3];',
 		'const exportNames = symbolManifest[4];',
 		'const symbolRows = symbolManifest[5];',
 		'',
-		'export async function loadSymbol(id) {',
-		'\tconst row = symbolRows[id];',
-		'\tif (!row) throw createUnknownSymbolError(id);',
-		literalImports
-			? '\treturn moduleLoads[id]()'
-			: '\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
-		'\t\t.then((mod) => {',
-		'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
-		'\t\t\treturn mod[exportNames[row[1]]];',
-		'\t\t});',
-		'}',
+		...emitLoadSymbolFunction(literalImports, false),
 		'',
 		'function runGeneratedSymbolChunkInitializers(mod) {',
 		'\tfor (const name of Reflect.ownKeys(mod)) {',
@@ -398,14 +377,57 @@ function emitTableSymbolResolverModule(
 		'',
 		'function createUnknownSymbolError(id) {',
 		'\treturn Object.assign(new Error(`Unknown async symbol ${id}`), {',
-		'\t\tcode: "MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tcode: "${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t\tphase: "resume",',
 		'\t\tsymbolId: String(id),',
-		'\t\tdocsUrl: "https://markless.dev/errors/MARKLESS_SYMBOL_UNKNOWN",',
+		`\t\tdocsUrl: "https://markless.dev/errors/${MARKLESS_SYMBOL_UNKNOWN}",`,
 		'\t});',
 		'}',
 		'',
 	].join('\n');
+}
+
+// A packed load already on the page answers in the caller's task, as a direct symbol load does.
+function emitLoadSymbolFunction(literalImports: boolean, bound: boolean): string[] {
+	const head = [
+		literalImports ? 'export function loadSymbol(id) {' : 'export async function loadSymbol(id) {',
+		...(bound ? ['\tconst bound = boundRow(id);', '\tif (bound) return loadBoundSymbol(bound);'] : []),
+		'\tconst row = symbolRows[id];',
+	];
+	if (!literalImports)
+		return [
+			...head,
+			'\tif (!row) throw createUnknownSymbolError(id);',
+			'\treturn import(/* @vite-ignore */ moduleUrls[row[0]])',
+			'\t\t.then((mod) => {',
+			'\t\t\trunGeneratedSymbolChunkInitializers(mod);',
+			'\t\t\treturn mod[exportNames[row[1]]];',
+			'\t\t});',
+			'}',
+		];
+	return [
+		`import { marklessWhenLoaded } from '@markless/web/fns/resident-load';`,
+		...head,
+		'\tif (!row) return Promise.reject(createUnknownSymbolError(id));',
+		'\treturn marklessWhenLoaded(moduleLoads[id](), (mod) => {',
+		'\t\trunGeneratedSymbolChunkInitializers(mod);',
+		'\t\treturn mod[exportNames[row[1]]];',
+		'\t});',
+		'}',
+	];
+}
+
+// Literal loads name each module in its own import(), so the URL list and each row's index into it are dead.
+function shippedManifest(
+	manifest: SymbolResolverModuleManifest,
+	literalImports: boolean | undefined,
+): SymbolResolverModuleManifest {
+	if (!literalImports) return manifest;
+	const [protocolVersion, buildId, resolverId, , exportNames, symbols] = manifest;
+	const rows = Object.fromEntries(
+		Object.entries(symbols).map(([id, [, exportIndex]]) => [id, [0, exportIndex] as const]),
+	);
+	return [protocolVersion, buildId, resolverId, [], exportNames, rows];
 }
 
 function literalModuleLoads(manifest: SymbolResolverModuleManifest): string {

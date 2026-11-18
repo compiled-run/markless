@@ -28,7 +28,7 @@ import {
 	protocolInstanceQualifies,
 	valueAlongPaths,
 } from '@markless/serializer';
-import { componentEdgeInstancePath } from '../component-edge-instance.ts';
+import { componentEdgeInstancePath, componentEdgePathsEndingAt } from '../component-edge-instance.ts';
 import { asNodes, childNodes, unwrapTypeAssertion, type AnyNode } from '../ast/nodes.ts';
 import { isEventAttribute } from '../ast/events.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
@@ -237,7 +237,7 @@ function importedCaptureSymbols(
 		// A child's own claim it could not bind: its slots already name the child's routes, save the props it forwards.
 		const republished = captureSymbol.innerInstancePath !== undefined;
 		// One route per ancestry the edge is rendered under, as a local symbol's routes are.
-		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges);
+		const edgePaths = componentEdgePathsEndingAt(edge, input.semanticGraph);
 		// An absent prop reads as undefined unless a handler calls it, or reads into it, with no guard.
 		const absentUse = (slot: CaptureSlot) =>
 			captureSymbol.kind !== 'event-handler' && captureSymbol.kind !== 'callback-prop'
@@ -846,16 +846,20 @@ function propReadForLazySymbol(
 	];
 }
 
-// A computed minted for one markup expression reads the props of the component that wrote it.
+// A computed minted for one markup expression or branch condition reads the props of the component that wrote it.
 function templateComputedPropDeclaration(
 	symbol: PlannedSymbol,
 	source: string,
 	input: CaptureAnalysisInput,
 ): SemanticComponentPropDeclaration | undefined {
 	if (symbol.kind !== 'sync-computed-derive') return undefined;
-	const componentName = input.semanticGraph.templateReads.find(
-		(read) => read.computedGraphNodeId === symbol.graphNodeId,
-	)?.componentName;
+	const componentName =
+		input.semanticGraph.templateReads.find(
+			(read) => read.computedGraphNodeId === symbol.graphNodeId,
+		)?.componentName ??
+		input.semanticGraph.branchSites.find(
+			(site) => site.testComputedGraphNodeId === symbol.graphNodeId,
+		)?.componentName;
 	const name = rootIdentifierName(source);
 	if (!componentName || !name) return undefined;
 	return input.semanticGraph.componentPropBindings.find(
@@ -1080,7 +1084,7 @@ function propCaptureRoutes(
 	}
 
 	return edges.flatMap((edge) =>
-		componentEdgePathsEndingAt(edge, input.semanticGraph.componentEdges).map((path) =>
+		componentEdgePathsEndingAt(edge, input.semanticGraph).map((path) =>
 			propCaptureRoute(path, propName, readPath, input, absentPropIsUndefined, deriveRead),
 		),
 	);
@@ -1396,23 +1400,6 @@ function composesItself(
 	return false;
 }
 
-function componentEdgePathsEndingAt(
-	edge: SemanticComponentEdge,
-	edges: ReadonlyArray<SemanticComponentEdge>,
-	seen: ReadonlySet<string> = new Set(),
-): ReadonlyArray<ReadonlyArray<SemanticComponentEdge>> {
-	if (seen.has(edge.id)) return [];
-	const nextSeen = new Set(seen).add(edge.id);
-	const incoming = edges.filter(
-		(candidate) =>
-			candidate.childComponentName === edge.parentComponentName &&
-			!nextSeen.has(candidate.id),
-	);
-	if (incoming.length === 0) return [[edge]];
-	return incoming.flatMap((parent) =>
-		componentEdgePathsEndingAt(parent, edges, nextSeen).map((path) => [...path, edge]),
-	);
-}
 
 /**
  * The fields of a destructured prop a symbol reaches: one path per use of the

@@ -168,13 +168,14 @@ test('a module with no style block emits the same class bytes it always did', as
 test('an array or object class on a component call-site is never string-joined with the scope', async () => {
 	const source = CALL_SITES.replace(
 		'<accordion.item class={cls}>b</accordion.item>',
-		'<accordion.item class={[cls, "card"]}>b</accordion.item>\n\t\t<accordion.item class={{ card: on }}>d</accordion.item>',
+		'<accordion.item class={[cls, "card"]}>b</accordion.item>\n\t\t<accordion.item class={{ card: on }}>d</accordion.item>\n\t\t<accordion.item class={on ? [cls, "card"] : []}>e</accordion.item>',
 	);
 	const { props, computeds } = await callSiteClassProps(source);
 
 	expect(computeds.filter((binding) => binding.functionSource?.includes('.join('))).toEqual([]);
 	expect(props[1]).not.toMatchObject({ graphBindingKind: 'computed' });
 	expect(props[2]).not.toMatchObject({ graphBindingKind: 'computed' });
+	expect(props[3]).not.toMatchObject({ graphBindingKind: 'computed' });
 });
 
 test('a joined array class on a component call-site composes the scope onto the joined string', async () => {

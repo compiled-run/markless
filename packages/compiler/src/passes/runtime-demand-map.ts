@@ -324,6 +324,13 @@ export function createRuntimeDemandMap(
 		armActions: armActionDemandRecords(scope, dispatchCore),
 		capabilityModuleIds: [
 			...capabilityModuleIds(input.symbolResolver, input.protocolView, input.protocolState),
+			// A cancel passed as a prop lands on a child's record only when the page composes it.
+			...((Array.isArray(input.componentEdges)
+				? (input.componentEdges as ReadonlyArray<SemanticComponentEdge>)
+				: []
+			).some((edge) => edge.props.some((prop) => prop.kind === 'callback' && prop.syncPolicy))
+				? SYNC_POLICY
+				: []),
 			...((input.publicRenderModule.componentDefinitions ?? []).some((definition) => definition.placements)
 				? OWNER_PLACEMENT
 				: []),

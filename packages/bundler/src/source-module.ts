@@ -30,6 +30,7 @@ export type SourceSymbolRoute = {
 	readonly prefix: string;
 	readonly importSource: string;
 	readonly boundSymbols?: Readonly<Record<string, string>>;
+	readonly forwardedSymbols?: Readonly<Record<string, string>>;
 };
 
 // A child declared in the SAME module carries an instance path like any other
@@ -873,6 +874,8 @@ export function emitResumeModule(input: {
 	readonly linkedRowBranches?: boolean;
 	// The page's component tree derives from an element() roster, possibly through a child module whose computeds this payload never holds.
 	readonly rosterDerivation?: boolean;
+	// A component this module renders, here or in a module it imports, resolves a shared() instance outliving the page.
+	readonly hasLiveSharedState?: boolean;
 	// The page's tree reaches a storage() cell, possibly in a child module whose cells this payload never holds.
 	readonly storageCells?: boolean;
 	readonly installResumeSummary?: boolean;
@@ -981,6 +984,7 @@ export function emitResumeModule(input: {
 		// A page whose overlay lives in a child component loads that child's module only on interaction, after the runtime
 		// read the installer at its start, so the page's own resume module names it.
 		demandsOverlay(input.runtimeDemandMap) || input.rendersOverlay === true ? emitOverlayLoaderInstall() : null,
+		input.hasLiveSharedState === true ||
 		hasLiveSharedDefinitions(input.payloadState as Parameters<typeof hasLiveSharedDefinitions>[0])
 			? emitSharedInstancesLoaderInstall()
 			: null,
@@ -1554,6 +1558,7 @@ function emitResumeContainerEvent(
 					'\tconst { runtime } = await resumePrerenderTriggerGroup({',
 					'\t\t...records, groupId: group.groupId, graphNodeIds: group.graphNodeIds,',
 					'\t\troot: handoff.root, loadSymbol: group.loadSymbol, prepareBoundaryArm: group.prepareBoundaryArm, renderBoundaryArm: group.renderBoundaryArm,',
+					...renderDataEntry('\t\t', 'marklessLoadPrerenderData()'),
 					'\t});',
 					'\tawait runtime.dispatch(handoff.event, { syncPolicyAlreadyApplied: handoff.syncPolicyAlreadyApplied === true, propagationStopped: handoff.propagationStopped === true, ignoreUnmatched: true });',
 					'}',
@@ -2323,9 +2328,10 @@ function emitLoadSymbol(
 	}
 
 	return [
+		`import { marklessWhenLoaded as marklessSymbolResolverWhenLoaded } from '${RESIDENT_LOAD_MODULE}';`,
 		`const marklessSymbolResolverModule = () => import(${singleQuoted(input.resolverId)});`,
 		'function loadSymbol(symbolId) {',
-		'	return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+		'	return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		'}',
 	].join('\n');
 }

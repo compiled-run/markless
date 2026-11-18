@@ -500,6 +500,10 @@ export type ModuleGraphInterfaceSharedDefinition = {
 	readonly exportName: string;
 	readonly definition: SemanticSharedDefinition;
 	readonly graphBindings: ReadonlyArray<SemanticGraphBinding>;
+	/** State the definition's methods read and write, so a handler in another module that calls one lowers them. */
+	readonly methodAliases?: ReadonlyArray<SemanticGraphAlias>;
+	readonly methodStateReads?: ReadonlyArray<SemanticStateRead>;
+	readonly methodStateWrites?: ReadonlyArray<SemanticStateWrite>;
 };
 
 export type ModuleGraphInterfaceArtifact = {
@@ -516,6 +520,8 @@ export type ModuleGraphInterfaceArtifact = {
 	readonly idleRecords?: true;
 	/** A component of this module renders an `overlay` mark, itself or through a component it renders. */
 	readonly overlayRecords?: true;
+	/** A component of this module resolves a shared() instance that outlives the page, itself or through a component it renders. */
+	readonly liveShared?: true;
 	readonly render: {
 		readonly version: 1;
 		readonly components: ReadonlyArray<{
@@ -541,6 +547,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly rootBoundary?: true;
 			readonly projection?: ModuleGraphInterfaceProjection;
 			readonly spreadHosts?: ReadonlyArray<ModuleGraphInterfaceSpreadHost>;
+			/** Props the component hands to an event as is, in its own markup or through a child it passes them on to. */
+			readonly relayedProps?: ReadonlyArray<string>;
 			/** Props this component files into a widget callback slot. */
 			readonly callbackSlotProps?: ReadonlyArray<string>;
 			readonly armMaterial?: ModuleGraphInterfaceArmMaterial;
@@ -550,6 +558,8 @@ export type ModuleGraphInterfaceArtifact = {
 			readonly idleRecords?: true;
 			/** This component or one it renders carries an `overlay` mark. */
 			readonly overlayRecords?: true;
+			/** This component or one it renders resolves a shared() instance that outlives the page. */
+			readonly liveShared?: true;
 			readonly seedsFromProps?: ReadonlyArray<ModuleGraphInterfaceSeedFromProp>;
 			readonly propSpends?: ReadonlyArray<ModuleGraphInterfacePropSpend>;
 			/**
@@ -850,6 +860,12 @@ export type SemanticSharedDefinition = {
 	 */
 	readonly factoryModuleImports?: ReadonlyArray<SemanticModuleImport>;
 	readonly factoryModuleScope?: ReadonlyArray<SemanticSharedModuleDeclaration>;
+	/**
+	 * The state node an instance IS, when the factory returns exactly one state
+	 * object's fields under their own names and nothing else. Only then does the
+	 * instance have a value to pass whole, such as `flip(s)`.
+	 */
+	readonly instanceGraphNodeId?: string;
 	readonly sourceSpan?: SourceSpan;
 };
 
@@ -1055,6 +1071,8 @@ export type SemanticEvent = {
 	readonly handlerMayReject?: true;
 	// Such a handler's rejection is caught by the dispatcher and shown in this boundary's `@catch`.
 	readonly dispatchCatchBoundaryId?: string;
+	/** The handler is the component's own prop of this name, handed to the element as is (`onSubmit={props.onSave}`). */
+	readonly relayedPropName?: string;
 	readonly handlerParameters: ReadonlyArray<string>;
 	/** The inline handler's body as statements, for hosts that run handlers as data; absent for a named or relayed handler. */
 	readonly handlerStatements?: ReadonlyArray<SemanticHandlerStatement>;
@@ -1155,6 +1173,7 @@ export type SemanticGraphDiagnostic = CompilerDiagnostic & {
 		| 'MARKLESS_TEMPLATE_AS_VALUE'
 		| 'MARKLESS_SUBMODULE_UNSUPPORTED'
 		| 'MARKLESS_COMPONENT_TAG_UNRESOLVED'
+		| 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED'
 		| 'MARKLESS_ALLOW_ERROR_UNSUPPRESSIBLE'
 		| 'MARKLESS_ALLOW_REASON_REQUIRED'
 		| 'MARKLESS_ALLOW_STALE'
@@ -1517,6 +1536,11 @@ export type SemanticTemplateRead = {
 	// into that child, so this module owns no element for it to write.
 	readonly projectedComponentEdgeId?: string;
 	readonly computedGraphNodeId?: string;
+	// On a joined text inside a flipped arm: the computed each composite interpolation rebuilds from.
+	readonly armHoles?: ReadonlyArray<{
+		readonly sourceSpan: SourceSpan;
+		readonly computedGraphNodeId: string;
+	}>;
 	// Names a composite read with no route reads, resolved by scope analysis.
 	readonly readNames?: ReadonlyArray<string>;
 	// The reads into a prop's members that kept the composite from a computed, such as `label.length`.
@@ -1681,6 +1705,8 @@ export type SemanticBehavior = {
 	readonly functionParameters?: ReadonlyArray<string>;
 	/** `@catch (error, reset)` reset names the function calls, with the boundary each resets. */
 	readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	/** The graph reads the attach expression makes, as their source spellings. */
+	readonly readSources?: ReadonlyArray<string>;
 };
 
 /**
@@ -2003,7 +2029,8 @@ export type RenderDataBranch = {
 	readonly asyncBoundaryArm?: number;
 	readonly armTests?: ReadonlyArray<unknown>;
 	readonly declaredEmptyArms?: ReadonlyArray<number>;
-	readonly update: 'range' | 'boundary';
+	// 'row-arm': inside a keyed row's @try arm, which has no row template, so the row's boundary redraws its arm when the test changes.
+	readonly update: 'range' | 'boundary' | 'row-arm';
 };
 
 export type RenderDataRepeat = {

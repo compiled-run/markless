@@ -1,0 +1,45 @@
+name: Stale merge-queue runs
+
+# A merge queue rebuild deletes its gh-readonly-queue/* branches but leaves their runs waiting for runners: on
+# 2026-10-28 five such runs, about 32 jobs each, queued behind the live groups. This cancels a merge_group run
+# whose branch is gone, and lists what it cancelled.
+on:
+    schedule:
+        - cron: '*/10 * * * *'
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+concurrency:
+    group: stale-queue-runs
+    cancel-in-progress: false
+
+jobs:
+    cancel:
+        runs-on: ubuntu-latest
+        timeout-minutes: 5
+        permissions:
+            actions: write
+        steps:
+            - name: Cancel merge_group runs whose queue branch is gone
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  set -euo pipefail
+                  echo '| Run | Workflow | Branch |' >> "$GITHUB_STEP_SUMMARY"
+                  echo '| --- | --- | --- |' >> "$GITHUB_STEP_SUMMARY"
+                  for status in queued in_progress waiting pending requested; do
+                    gh api --paginate "repos/$GITHUB_REPOSITORY/actions/runs?event=merge_group&status=$status&per_page=100" \
+                      --jq '.workflow_runs[] | [.id, .name, .head_branch] | @tsv'
+                  done | sort -u | while IFS=$'\t' read -r id name branch; do
+                    encoded=$(jq -rn --arg b "$branch" '$b | @uri')
+                    if gh api "repos/$GITHUB_REPOSITORY/branches/$encoded" --silent 2>/dev/null; then continue; fi
+                    gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" --silent || true
+                    sleep 5
+                    if [ "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq .status)" != completed ]; then
+                      gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/force-cancel" --silent || true
+                    fi
+                    echo "cancelled $id ($name) on $branch"
+                    echo "| $id | $name | $branch |" >> "$GITHUB_STEP_SUMMARY"
+                  done

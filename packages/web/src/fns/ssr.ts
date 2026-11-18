@@ -6,6 +6,7 @@ import {
 	marklessComposeState,
 	marklessComposeWidgetRegistry,
 	marklessRegisterComposedWidgets,
+	marklessRelayedPolicy,
 	marklessCsrChildReadIsStatic,
 	marklessCsrRemapChildGraph,
 	marklessCsrRemapChildDomUpdate,
@@ -111,6 +112,7 @@ type SsrBoundaryRecord = SsrAnchoredRecord & {
 	readonly runnerGraphNodeId?: string | null;
 	readonly updateSymbolId?: string;
 	readonly asyncReads?: ReadonlyArray<SsrAsyncReadRecord>;
+	readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
 	readonly armRecords?: SsrArmRecordSet | ReadonlyArray<SsrArmRecordSet>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
@@ -1130,7 +1132,10 @@ function marklessSsrComposedView(
 		...(view.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
 		...(view.asyncBoundaries ?? []).flatMap((boundary) =>
 			renderedAnchorIds.has(idPrefix + boundary.id)
-				? [boundary.armRecords ?? []].flat().flatMap((set) => set.branches ?? [])
+				? [boundary.armRecords ?? []].flat().flatMap((set) =>
+						// A list under an @if the boundary did not draw reached no served byte; the commit that renders the @if brings its own record.
+						(set.branches ?? []).filter((branch) => renderedAnchorIds.has(idPrefix + branch.id)),
+					)
 				: [],
 		),
 	]))
@@ -1180,20 +1185,30 @@ function marklessSsrComposedView(
 	}
 	locators.sort((a, b) => a.index - b.index);
 	// Every component of a module carries the module's whole view, so a boundary counts only where this render placed it.
-	const renderedBoundaryIds = new Set(
-		structure.anchors.filter((anchor) => anchor.kind === 'async').map((anchor) => anchor.id),
+	// A @try in a keyed row is one boundary per row, each named by the row it rendered in; a child's records already are.
+	const renderedBoundaryIds = new Map<string, Set<string>>();
+	for (const anchor of structure.anchors)
+		if (anchor.kind === 'async')
+			for (const name of new Set([anchor.id, anchor.site ?? anchor.id]))
+				renderedBoundaryIds.set(name, (renderedBoundaryIds.get(name) ?? new Set()).add(anchor.id));
+	const renderedBoundaries = asyncBoundaries.flatMap((boundary) =>
+		[...(renderedBoundaryIds.get(idPrefix + boundary.id) ?? [])].map((id) => ({ ...boundary, id: id.slice(idPrefix.length) })),
 	);
-	const renderedBoundaries = asyncBoundaries.filter((boundary) =>
-		renderedBoundaryIds.has(idPrefix + boundary.id),
+	// An arm's @if nested in a closed @if drew no anchors, so it has nothing to resume until a flip renders it.
+	const renderedArmBranchIds = new Set(
+		structure.anchors.filter((anchor) => anchor.kind === 'arm-branch').map((anchor) => anchor.id),
 	);
 	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
+		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const composed = boundaryArmBranches.get(boundary.id);
-		if (!composed?.size || !Array.isArray(boundary.armRecords)) return boundary;
 		return {
 			...boundary,
-			armRecords: boundary.armRecords.map((arm, index) => {
-				const armBranches = composed.get(index);
-				return armBranches ? { ...arm, branches: [...(arm.branches ?? []), ...armBranches] } : arm;
+			armRecords: boundary.armRecords.map((arm: SsrArmRecordSet, index) => {
+				const own = arm.branches?.filter((branch) => renderedArmBranchIds.has(idPrefix + branch.id));
+				const armBranches = composed?.get(index);
+				return own === undefined && !armBranches
+					? arm
+					: { ...arm, branches: [...(own ?? []), ...(armBranches ?? [])] };
 			}),
 		};
 	});
@@ -1206,7 +1221,6 @@ function marklessSsrComposedView(
 			idPrefix,
 		),
 		{ locators, events, domUpdates, behaviors, elementHandles, keyedRepeats },
-		asyncSnapshots,
 		idPrefix,
 	);
 	const renderedBranchIds = new Set(
@@ -1259,13 +1273,12 @@ export function marklessSsrArmizeBoundaries(
 		elementHandles: SsrHostedRecord[];
 		keyedRepeats: SsrKeyedRepeatRecord[];
 	},
-	asyncSnapshots: ReadonlyArray<SsrAsyncSnapshotEntry> | undefined,
 	idPrefix = '',
 ) {
 	if (boundaries.length === 0) return boundaries;
 	const anchorById = new Map<
 		string,
-		{ readonly elementStart: number; readonly elementEnd: number }
+		{ readonly elementStart: number; readonly elementEnd: number; readonly arm?: number }
 	>(
 		structure.anchors
 			.filter((anchor) => anchor.kind === 'async')
@@ -1273,11 +1286,6 @@ export function marklessSsrArmizeBoundaries(
 	);
 	const armByBranchId = new Map(
 		structure.anchors.flatMap((anchor) => (anchor.kind === 'arm-branch' ? [[anchor.id, anchor.arm] as const] : [])),
-	);
-	// Keyed by the possibly-null runner id so a boundary without a runner looks
-	// up (and misses) exactly as it did untyped.
-	const snapshotById = new Map<string | null | undefined, SsrAsyncSnapshot | undefined>(
-		(asyncSnapshots ?? []).map((entry) => [entry.graphNodeId, entry.snapshot]),
 	);
 	// Document order reversed: a nested boundary claims its own records before the arm around it does.
 	const armized = new Map(
@@ -1294,7 +1302,7 @@ export function marklessSsrArmizeBoundaries(
 		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const plannedArms: ReadonlyArray<SsrArmRecordSet> = boundary.armRecords;
 		const anchor = anchorById.get(idPrefix + boundary.id);
-		if (!anchor) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
+		if (anchor?.arm === undefined) throw new Error(`MARKLESS_SSR_DATA_ANCHOR_MISSING: async:${boundary.id}`);
 		const opensStart = anchor.elementStart;
 		const opensEnd = anchor.elementEnd;
 		const armLocators: SsrLocatorRecord[] = [];
@@ -1308,28 +1316,7 @@ export function marklessSsrArmizeBoundaries(
 			});
 			streams.locators.splice(i, 1);
 		}
-		const directStatus = snapshotById.get(boundary.runnerGraphNodeId)?.status;
-		// Authored sync gates are the recorded settle nodes, while their snapshots
-		// are derived request-locally and intentionally absent from the serialized
-		// async snapshot list. In that case the expanded async-read closure tells us
-		// which arm SSR actually served.
-		const dependencyStatuses = (boundary.asyncReads ?? [])
-			.filter((read) => read.runnerSymbolId)
-			.map((read) => snapshotById.get(read.graphNodeId)?.status);
-		const status =
-			directStatus ??
-			(dependencyStatuses.includes('rejected')
-				? 'rejected'
-				: dependencyStatuses.length > 0 &&
-					  dependencyStatuses.every((candidate) => candidate === 'fulfilled')
-					? 'fulfilled'
-					: 'pending');
-		const takenArm =
-			status === 'fulfilled'
-				? ASYNC_BOUNDARY_ARM.try
-				: status === 'rejected'
-					? ASYNC_BOUNDARY_ARM.catch
-					: ASYNC_BOUNDARY_ARM.pending;
+		const takenArm = anchor.arm!;
 		const planned: SsrArmRecordSet = plannedArms[takenArm] ?? {};
 		const renderedArmLocators = new Map<string, SsrDataStructure['locators'][number]>();
 		for (const locator of structure.locators) {
@@ -1614,20 +1601,23 @@ export function marklessSsrAppendChildView(context: {
 		for (const symbolId of symbolIds)
 			if (callbackSymbolId || context.child.externalSymbolIds.has(symbolId))
 				context.externalSymbolIds.add(symbolId);
-		const composed = {
-			...event,
-			hostNodeId: context.child.hostPrefix + event.hostNodeId,
-			symbolIds,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
-		};
+		const composed = marklessRelayedPolicy(
+			{
+				...event,
+				hostNodeId: context.child.hostPrefix + event.hostNodeId,
+				symbolIds,
+				...(event.syncPolicy
+					? {
+							syncPolicy: marklessComposedSyncPolicy(
+								event.syncPolicy,
+								context.child.graphProps,
+								childInstancePath,
+							),
+						}
+					: {}),
+			},
+			context.child.graphProps,
+		);
 		// The consumer's `{...rest}` handler for this same element was forwarded
 		// into the PARENT's payload, so the part's own record and the consumer's
 		// only meet here. One element, one listener list: they merge into one
@@ -1681,26 +1671,31 @@ export function marklessSsrAppendChildView(context: {
 			childInstancePath,
 		);
 		if (!mapped) continue;
-		const rowEvents = repeat.rowEvents.map((event) => ({
-			...event,
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							context.child.graphProps,
-							childInstancePath,
-						),
-					}
-				: {}),
-			symbolIds: event.symbolIds.map((symbolId) => {
-				const callbackSymbolId = callbackSymbolIds.get(symbolId);
-				if (callbackSymbolId) {
-					context.externalSymbolIds.add(callbackSymbolId);
-					return callbackSymbolId;
-				}
-				return marklessBoundSymbolId(context.child, symbolId);
-			}),
-		}));
+		const rowEvents = repeat.rowEvents.map((event) =>
+			marklessRelayedPolicy(
+				{
+					...event,
+					...(event.syncPolicy
+						? {
+								syncPolicy: marklessComposedSyncPolicy(
+									event.syncPolicy,
+									context.child.graphProps,
+									childInstancePath,
+								),
+							}
+						: {}),
+					symbolIds: event.symbolIds.map((symbolId) => {
+						const callbackSymbolId = callbackSymbolIds.get(symbolId);
+						if (callbackSymbolId) {
+							context.externalSymbolIds.add(callbackSymbolId);
+							return callbackSymbolId;
+						}
+						return marklessBoundSymbolId(context.child, symbolId);
+					}),
+				},
+				context.child.graphProps,
+			),
+		);
 		context.keyedRepeats.push({
 			...repeat,
 			id: context.child.hostPrefix + repeat.id,
@@ -1760,6 +1755,12 @@ export function marklessSsrAppendChildView(context: {
 						childGraphNodeId(read),
 						sources.map(childGraphNodeId),
 					]),
+				),
+			}),
+			// A literal prop never changes, so a read of one has nothing to re-render for.
+			...(boundary.rerenderReads && {
+				rerenderReads: boundary.rerenderReads.flatMap(
+					(read) => marklessSsrRemapChildGraph(read, context.child.graphProps, childInstancePath) ?? [],
 				),
 			}),
 			asyncReads: marklessSsrRemapChildReads(
@@ -2078,24 +2079,29 @@ export function marklessSsrPrefixArmRecord(arm: SsrArmRecordSet, child: SsrPrefi
 	const instancePath = marklessComposedInstancePath(child);
 	return {
 		...arm,
-		events: (arm.events ?? []).map((event) => ({
-			...event,
-			// A child's own arm records already carry the bound ids its module minted for this edge.
-			symbolIds: event.symbolIds.map((symbolId) =>
-				Object.values(child.boundSymbols ?? {}).includes(symbolId)
-					? symbolId
-					: marklessBoundSymbolId(child, symbolId),
+		events: (arm.events ?? []).map((event) =>
+			marklessRelayedPolicy(
+				{
+					...event,
+					// A child's own arm records already carry the bound ids its module minted for this edge.
+					symbolIds: event.symbolIds.map((symbolId) =>
+						Object.values(child.boundSymbols ?? {}).includes(symbolId)
+							? symbolId
+							: marklessBoundSymbolId(child, symbolId),
+					),
+					...(event.syncPolicy
+						? {
+								syncPolicy: marklessComposedSyncPolicy(
+									event.syncPolicy,
+									child.graphProps,
+									instancePath,
+								),
+							}
+						: {}),
+				},
+				child.graphProps,
 			),
-			...(event.syncPolicy
-				? {
-						syncPolicy: marklessComposedSyncPolicy(
-							event.syncPolicy,
-							child.graphProps,
-							instancePath,
-						),
-					}
-				: {}),
-		})),
+		),
 		domUpdates: (arm.domUpdates ?? []).flatMap((update) => {
 			const mapped = marklessCsrRemapChildDomUpdate(
 				update,

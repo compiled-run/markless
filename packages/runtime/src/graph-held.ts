@@ -5,6 +5,7 @@ import type {
 	RuntimeAsyncInput,
 } from './graph-async-load.ts';
 import { readPath } from './graph-core.ts';
+import { keysEqual, lastGood } from './graph-kept.ts';
 import { isAsyncSnapshotMetaKey } from './graph-scheduler.ts';
 import type {
 	RuntimeGraphAsyncComputed,
@@ -35,17 +36,10 @@ const inputId = (input: { readonly graphNodeId: string; readonly path?: Readonly
 const startsWith = (path: ReadonlyArray<string>, prefix: ReadonlyArray<string>) =>
 	prefix.length <= path.length && prefix.every((segment, index) => path[index] === segment);
 
-function keysEqual(left: unknown, right: unknown): boolean {
-	if (Object.is(left, right)) return true;
-	if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-	return left.every((value, index) => Object.is(value, right[index]));
-}
-
 // The latest kept value's key, through re-runs and failures.
 const keptKey = (node: RuntimeAsyncComputedNode): { readonly key: unknown } | undefined => {
-	const snapshot = node.snapshot as { readonly status: string; readonly key?: unknown; readonly valueKey?: unknown };
-	if (snapshot.status === 'fulfilled') return { key: snapshot.key };
-	if ('valueKey' in snapshot) return { key: snapshot.valueKey };
+	const kept = lastGood(node.snapshot);
+	return kept && { key: kept.valueKey };
 };
 
 export const createHeldInputsPlane: HeldInputsPlaneFactory = (context) => {

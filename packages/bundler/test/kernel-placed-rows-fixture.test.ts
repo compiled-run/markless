@@ -319,8 +319,7 @@ describe('a list added in component rows, answered in the browser of a productio
 		}
 	}, 180_000);
 
-	// Fails on main too: the arm commit looks for the list's element among the arm's own, not inside the @if.
-	test.fails('evaluator-drawn rows inside an @if follow the owner state when it hides and shows them', async () => {
+	test('evaluator-drawn rows inside an @if follow the owner state when it hides and shows them', async () => {
 		const url = await buildAndServe('hidden');
 		const browser = await chromium.launch();
 		try {
@@ -361,8 +360,7 @@ describe('a list added in component rows, answered in the browser of a productio
 		}
 	}, 180_000);
 
-	// Fails on main too: the row callback's name joins the importer's path to the exporting module's own.
-	test.fails('a list component imported from a module whose own root renders it keeps its row callbacks', async () => {
+	test('a list component imported from a module whose own root renders it keeps its row callbacks', async () => {
 		const url = await buildAndServe('edits');
 		const browser = await chromium.launch();
 		try {

@@ -27,24 +27,22 @@ test('a member of an object prop read as the whole test flips the arm', async ()
 	await flipsBothWays();
 });
 
-// Known defect: a test that computes over a prop's member is not re-run when the prop changes, so the first arm stays
-// while the text inside it follows the new value.
-test.fails('CSR: a test computed over a member of a sync object prop flips the arm', async () => {
+test('CSR: a test computed over a member of a sync object prop flips the arm', async () => {
 	await render(SyncOther);
 	await flipsBothWays();
 });
 
-test.fails('CSR: a test computed over a member of an async object prop flips the arm', async () => {
+test('CSR: a test computed over a member of an async object prop flips the arm', async () => {
 	await render(AsyncOther);
 	await flipsBothWays();
 });
 
-test.fails('SSR: a test computed over a member of an async object prop flips the arm', async () => {
+test('SSR: a test computed over a member of an async object prop flips the arm', async () => {
 	await renderSSR(AsyncOther);
 	await flipsBothWays();
 });
 
-test.fails('CSR: the same with the child in the page file', async () => {
+test('CSR: the same with the child in the page file', async () => {
 	await render(AsyncSame);
 	await flipsBothWays();
 });

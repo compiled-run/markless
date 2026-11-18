@@ -1,10 +1,9 @@
 # Native integration: conformance report, 2026-11-17
 
-Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet,
-headless-UI, scrolling, forms, element, value and styled-sheet branches together. Latest full run (round two, below): 77 of
-81 buildable rungs passed on the iPhone simulator and 80 of 81 on the Android emulator; both kinds of failure are fixed and
-proven since: rung 17 on both phones (round two) and the iOS system sheet, Y1 to Y3 (round three, with #822, where Y1 to Y3
-and the six styled-sheet rungs Z1 to Z6 pass on both phones). The table below is round one's.
+Branch `cw/native-integration` (PR #820) holds today's navigation, styles, device, sheet, headless-UI, scrolling, forms,
+element, value and styled-sheet branches together. **Final full run** (below): all 87 rungs that build pass on the iPhone
+simulator and on the Android emulator, with the hosts' own tests passing first on both; 2 rungs (11-async, y4) are refused
+by name and run on the web only. The table below is round one's; the rounds after it say what changed.
 
 | Area | Rungs | iOS | Android | What is missing |
 |---|---|---|---|---|
@@ -339,10 +338,75 @@ only for phone builds; the device-target folding and the option plumbing also se
 docs figure after it: 1,709,247 B gzip at load (G16 passes; anchor 1,709,376 B), 20 B less than before, so 685 B over `main`. What remains are call sites inside the shared analyzer; removing them needs the owner's
 choice between a `browser` export condition with no-op hooks and a separate native walk (above, unchanged).
 
+## Native facts fold out of the docs' in-browser compiler (2026-11-18, owner decision)
+
+Decision: one analysis, used everywhere; no separate native walk. The single walk still collects native facts, but every
+call of the native collectors in the shared analyzer goes through one module,
+`compiler/src/passes/semantic-graph/native-facts-flag.ts`, behind its constant `NATIVE_FACTS`: true wherever
+`__MARKLESS_NATIVE_FACTS__` is undefined (Node, tests, every bundler build), false where a build defines it, as
+`__MARKLESS_DEV_ENABLED__` already works for web builds. The website defines it false for the compile worker
+(`COMPILE_WORKER_DEFINE` in `website/tooling/code-client.ts`), so the minifier drops each guarded call site there. The walk
+holds the collectors as an opaque handle, so a call that skips the module does not typecheck. Native builds are unchanged:
+the flag is true there, and the native tests (5,442) pass.
+
+**Test.** `website/tooling/compile-worker-graph.test.ts` builds the compile worker as the site ships it (minified, with the
+site's swaps and define) and reads its source maps: the native-facts module accounts for 0 bytes of the shipped worker, and
+for more than 0 in the same build without the define (so the test can fail). Checked both ways: with one call site's guard
+removed (`collect-repeat.ts`), the module came back with 12 bytes and the test failed; restored, it passes.
+
+**Per module, against `main`** (`710c44d48`): minified bytes each source module accounts for in the shipped worker chunk,
+read from its source maps, so the figures add up to the chunk. 224 of the 240 modules are byte-for-byte the size they are on
+`main`; the worker is 3,587,044 B against 3,585,416 B, +1,628 B minified.
+
+| Module | Over `main` | What remains |
+|---|---|---|
+| `compiler/.../semantic-graph/index.ts` | +628 | Device-target folding (`@if` arms and `{expr}` texts decided by `platform`, components a target never renders, web device edits) and the option plumbing |
+| `compiler/.../semantic-graph/collect-markup.ts` | +311 | Device-target folding in the markup walk (folded arms and texts, absent components) |
+| `website/.../code/worker-sources.ts` | +128 | The playground's `@markless/ui` sources: `base.camera` |
+| `compiler/.../semantic-graph/types.ts` | +117 | The walk state's target fields |
+| `compiler/.../semantic-graph/render-local-inline.ts`, `collect-expressions.ts` | +80, +41 | Device objects belong to their component; a write to one is no state write |
+| `bundler/src/hooks/transform-request.ts`, `bundler/src/transform.ts`, `compiler/src/compile-cache.ts`, `compile-module.ts` | +76, +66, +68, +61 | Passing `target` and `deviceTargetFacts` through, and keying the compile cache on them |
+| `compiler/.../semantic-graph/collect-components.ts` | +48 | The imported member path of `<ui.part>` tags (web builds use it) |
+| five more | +2, +2, +1, +1, -2 | Minifier naming |
+
+What is native-only and still there, named rather than rounded to zero: a `nativeFacts: null` field in three state objects,
+the compile cache's flag for it, a `false` argument at the seven places a markup chunk is created, and a small helper that
+writes a static attribute (it also records the attribute for native builds, folded here). Their bytes are part of the
+`index.ts`, `types.ts`, `collect-markup.ts` and `compile-cache.ts` rows above; I did not measure them on their own. `collect-elements.ts`, `collect-branches.ts`, `collect-repeat.ts`, `collect-state.ts` and `collect-shared.ts` now
+measure as on `main`.
+
+**CI** (`db0e62d53`): docs `/` downloads 1,708,624 B gzip at load, **62 B over `main`** (1,708,562 B), down from 685 B; G16
+passes against its anchor (1,709,376 B) and no record was raised. The anchor still holds the two records the native
+branches accepted earlier (`cw-native-targets.json` +584 B, `cw-device-slice.json` +230 B on the docs pages); without them
+the limit is `main` + 48 B, so docs `/` would fail by 14 B. Those 62 B are what web builds use (device-target folding,
+option passing, `base.camera`). Web output: byte-identical to `main` for all 3,418 shared `.tsrx` files that compile (one
+fails to parse identically on both), hashed over the render module, payload scripts, protocol payloads, render plan, symbol
+modules and symbol resolver module.
+
+## Final full run (2026-11-18)
+
+One harness run over every rung that builds, on the final tree (`db0e62d53` plus this report): 87 rungs, iOS
+(`markless-integ`, iPhone 17, iOS 27.2) and Android (`markless_integ`, API 36, port 5598), Dragon from
+`compiled-run/dragoncss` `cw/native-integration` (`3312b9e420`). The hosts' own tests ran first and passed on both.
+
+| | Rungs | iOS | Android |
+|---|---|---|---|
+| Built for the phones | 87 | 87 pass | 87 pass |
+| Refused by name (web only) | 2: `11-async`, `y4-sheet-beside-drawer` | refused | refused |
+| Failures | | 0 | 0 |
+
+By group (each on both phones): one-screen basics 01 to 10 (14), scrolling 12 to 17 (6), device D1 to D7, D4b and P1 (9),
+forms F1 to F7 (7), elements R101 to R115 (15), values R131 to R138 (8), headless UI U1 to U6 and U11 to U14 (10), system
+sheet Y1 to Y3 (3), navigation N1 to N4 (4), styled apps S1 to S5 (5), styled sheets Z1 to Z6 (6). Receipts:
+`receipts/2026-11-18-integration-final-{ios,android}-87-rungs.json` and `-final-verdict.txt`.
+
 ## 7. Contact sheet
 
-`docs/goals/native-targets-api/contact-sheet/index.html`: every rung at its launch screen, web (Chromium at 402×778, 3×) beside
-iOS and Android, with the visible differences listed at the top.
+`docs/goals/native-targets-api/contact-sheet/index.html`, regenerated from the final run: every rung at its launch screen,
+web (Chromium at 402×778, 3×, built as the web ladder builds it) beside iOS and Android, with the visible differences listed
+at the top. New findings there: the harness does not reset the phone's appearance for a rung that does not set it (this
+run's unstyled iOS screens are dark, left so by the run before), and an unstyled native page follows the system's dark
+mode while the web's does not; unstyled phone pages now have the browser's heading sizes and emphasis but no block margins.
 
 
 ## Conflicts

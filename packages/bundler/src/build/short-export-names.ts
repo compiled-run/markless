@@ -1,6 +1,7 @@
 import { dirname, join, normalize } from 'pathe';
 import { RolldownMagicString, type Plugin } from 'rolldown';
-import { parseChunkCode, renderedChunkCount } from './chunk-ast.ts';
+import { parseChunkCode } from './chunk-ast.ts';
+import { everyChunkArrived, watchRenderChunkFailures } from './render-barrier.ts';
 import { runChunkTask } from './chunk-workers.ts';
 import { PACK_LOAD, PACK_LOADER_PREFIX } from './pack-loader-names.ts';
 
@@ -496,6 +497,10 @@ export function shortExportNamesPlugin(
 	};
 	return {
 		name: 'markless-short-export-names',
+		options(input) {
+			watchRenderChunkFailures(input.plugins);
+			return null;
+		},
 		renderStart() {
 			pending = new Map();
 			exports = new Map();
@@ -517,8 +522,13 @@ export function shortExportNamesPlugin(
 					resolve,
 					reject,
 				});
-				if (pending.size !== renderedChunkCount(meta.chunks)) return;
-				void planWhenAnalyzed(pending, options);
+				const waiting = pending;
+				const abandon = () => {
+					for (const item of waiting.values()) item.resolve(null);
+					waiting.clear();
+				};
+				if (!everyChunkArrived(meta.chunks, waiting, () => waiting.size, abandon)) return;
+				void planWhenAnalyzed(waiting, options);
 			});
 		},
 		renderError(error) {

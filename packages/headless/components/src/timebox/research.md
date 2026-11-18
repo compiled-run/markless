@@ -142,7 +142,9 @@ pointing at `error` then `description`, and `aria-invalid`. The root is a
 stand here: the period segment's `aria-valuenow` is `0` or `1`, and a reader that
 speaks a bare "0" has conveyed nothing. The numeric segments keep the sibling's
 bare-number behaviour, so the divergence is confined to the one segment where a
-number is genuinely meaningless.
+number is genuinely meaningless. An empty segment of any type carries
+`aria-valuetext="Empty"` (React Aria's spin button word), because a spinbutton
+with no `aria-valuenow` reaches VoiceOver as a percentage of its range.
 
 Readers voice a spinbutton's value as a phrase wrapped around the number rather
 than as a fixed word, which is why `timebox.sr.ts` carries its own word table
