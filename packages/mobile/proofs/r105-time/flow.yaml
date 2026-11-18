@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+name: r105-time
+---
+- launchApp:
+      clearState: true
+- assertVisible: Time
+- assertVisible: Posted November 18
+- assertVisible: Due November 18
+- assertVisible: Batch No\. 398
+- tapOn: Postpone
+- assertNotVisible: Due November 18
+- assertVisible: Due November 19
+- assertNotVisible: Due November 18

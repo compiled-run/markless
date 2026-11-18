@@ -1,0 +1,12 @@
+{
+	"rung": "R105",
+	"name": "<time> and <data> read as their text",
+	"steps": [
+		{ "visible": ["Time", "Posted November 18", "Due November 18", "Batch No. 398"] },
+		{
+			"do": { "tap": "Postpone" },
+			"visible": ["Due November 19"],
+			"absent": ["Due November 18"]
+		}
+	]
+}

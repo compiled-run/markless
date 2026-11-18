@@ -1,0 +1,44 @@
+appId: ${APP_ID}
+name: r104-line-breaks
+---
+- launchApp:
+      clearState: true
+- assertVisible: Line breaks
+- assertVisible: Longword
+- assertVisible: Now in Lyon
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - assertVisible: |-
+                Ada Lovelace
+                12 Rue Example
+                Lyon
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - assertVisible: |-
+                Ada Lovelace
+                12 Rue Example
+                Lyon
+- tapOn: Move
+- assertNotVisible: Now in Lyon
+- assertVisible: Now in Paris
+- assertNotVisible: Now in Lyon
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - assertVisible: |-
+                Ada Lovelace
+                12 Rue Example
+                Paris
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - assertVisible: |-
+                Ada Lovelace
+                12 Rue Example
+                Paris

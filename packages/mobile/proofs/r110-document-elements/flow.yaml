@@ -1,0 +1,13 @@
+appId: ${APP_ID}
+name: r110-document-elements
+---
+- launchApp:
+      clearState: true
+- assertVisible: Metadata
+- assertVisible: Visits 0
+- assertNotVisible: Template content
+- assertNotVisible: Scripts are off
+- tapOn: Visit
+- assertNotVisible: Visits 0
+- assertVisible: Visits 1
+- assertNotVisible: Visits 0

@@ -7,7 +7,7 @@ import UIKit.UIGestureRecognizerSubclass
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
 	"canvas", "details", "embed", "iframe", "object", "option",
-	"picture", "select", "summary", "svg", "textarea", "video",
+	"picture", "select", "summary", "textarea", "video",
 ]
 
 /// Where an instance is built: its row (`@key`, empty outside lists), the names its expressions see, and what encloses it.
@@ -16,6 +16,147 @@ private struct Context {
 	var scope = NativeScope.empty
 	var button: UIButton?
 	var heading = false
+	/// The text look the browser's default stylesheet gives what is inside (bold headings, monospace `<pre>`).
+	var look = TextLook()
+}
+
+/// Text properties a block's or a phrase element's default style passes to the text inside it.
+struct TextLook: Equatable {
+	var bold = false
+	var italic = false
+	var monospace = false
+	var scale: CGFloat = 1
+	var line: String?
+	var shift: String?
+	var highlight = false
+	var preformatted = false
+
+	func applying(_ style: NativeDefaultStyle?) -> TextLook {
+		guard let style else { return self }
+		var next = self
+		next.bold = bold || style.bold
+		next.italic = italic || style.italic
+		next.monospace = monospace || style.monospace
+		next.scale = scale * CGFloat(style.size ?? 1)
+		next.line = style.line ?? line
+		next.shift = style.shift ?? shift
+		next.highlight = highlight || style.highlight
+		next.preformatted = preformatted || style.preformatted
+		return next
+	}
+
+	/// The label font size the stacking layout starts from (UILabel's own).
+	static let baseSize: CGFloat = 17
+
+	var attributes: [NSAttributedString.Key: Any] {
+		let size = TextLook.baseSize * scale
+		var font = monospace
+			? UIFont.monospacedSystemFont(ofSize: size, weight: bold ? .bold : .regular)
+			: UIFont.systemFont(ofSize: size, weight: bold ? .bold : .regular)
+		if italic, let descriptor = font.fontDescriptor.withSymbolicTraits(font.fontDescriptor.symbolicTraits.union(.traitItalic)) {
+			font = UIFont(descriptor: descriptor, size: size)
+		}
+		var attributes: [NSAttributedString.Key: Any] = [.font: font]
+		if line == "underline" { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+		if line == "line-through" { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+		if shift == "super" { attributes[.baselineOffset] = TextLook.baseSize * 0.33 }
+		if shift == "sub" { attributes[.baselineOffset] = -TextLook.baseSize * 0.2 }
+		if highlight {
+			attributes[.backgroundColor] = UIColor.yellow
+			attributes[.foregroundColor] = UIColor.black
+		}
+		return attributes
+	}
+}
+
+/// One paragraph of the stacking layout: a run of text nodes and phrase elements shown as one label.
+@MainActor
+final class Paragraph {
+	/// The run's templates, in order.
+	let nodes: [String]
+	/// The row suffix of this instance (`@key`, or empty).
+	let suffix: String
+	let look: TextLook
+	let label: UILabel
+	/// The label, or the sideways scroller around it for preformatted text.
+	let view: UIView
+	init(nodes: [String], suffix: String, look: TextLook, label: UILabel, view: UIView) {
+		self.nodes = nodes
+		self.suffix = suffix
+		self.look = look
+		self.label = label
+		self.view = view
+	}
+}
+
+/// A `<pre>` paragraph's sideways scroller: its line is never wrapped.
+final class PreformattedScroll: UIScrollView {}
+
+/// An inline `<svg>`: draws the shapes compiled when the app was built, fitted into its box as the web fits the viewBox.
+final class DrawingView: UIView {
+	let drawing: NativeDrawing
+	var currentColor: UIColor = .black { didSet { setNeedsDisplay() } }
+
+	init(_ drawing: NativeDrawing) {
+		self.drawing = drawing
+		super.init(frame: .zero)
+		isOpaque = false
+		backgroundColor = .clear
+		contentMode = .redraw
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("DrawingView is made in code") }
+
+	override func draw(_ rect: CGRect) {
+		guard let context = UIGraphicsGetCurrentContext() else { return }
+		if let box = drawing.viewBox, box[2] > 0, box[3] > 0 {
+			// SVG 2 xMidYMid meet: one scale that fits both axes, the rest centred.
+			let scale = min(bounds.width / box[2], bounds.height / box[3])
+			context.translateBy(x: -box[0] * scale + (bounds.width - box[2] * scale) / 2, y: -box[1] * scale + (bounds.height - box[3] * scale) / 2)
+			context.scaleBy(x: scale, y: scale)
+		}
+		for shape in drawing.shapes {
+			let path = CGMutablePath()
+			var i = 0
+			let p = shape.path
+			while i < p.count {
+				switch Int(p[i]) {
+				case 0: path.move(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+				case 1: path.addLine(to: CGPoint(x: p[i + 1], y: p[i + 2])); i += 3
+				case 3:
+					path.addCurve(to: CGPoint(x: p[i + 5], y: p[i + 6]), control1: CGPoint(x: p[i + 1], y: p[i + 2]), control2: CGPoint(x: p[i + 3], y: p[i + 4]))
+					i += 7
+				case 4: path.closeSubpath(); i += 1
+				default: i = p.count
+				}
+			}
+			context.saveGState()
+			if let t = shape.transform { context.concatenate(CGAffineTransform(a: t[0], b: t[1], c: t[2], d: t[3], tx: t[4], ty: t[5])) }
+			if let fill = shape.fill {
+				context.addPath(path)
+				context.setFillColor(color(fill).cgColor)
+				context.fillPath(using: shape.evenOdd ? .evenOdd : .winding)
+			}
+			if let stroke = shape.stroke, shape.width > 0 {
+				context.addPath(path)
+				context.setStrokeColor(color(stroke).cgColor)
+				context.setLineWidth(shape.width)
+				context.setLineCap(shape.cap == "round" ? .round : shape.cap == "square" ? .square : .butt)
+				context.setLineJoin(shape.join == "round" ? .round : shape.join == "bevel" ? .bevel : .miter)
+				context.setMiterLimit(shape.miterLimit)
+				context.strokePath()
+			}
+			context.restoreGState()
+		}
+	}
+
+	private func color(_ paint: NativeShape.Paint) -> UIColor {
+		switch paint {
+		case .currentColor: currentColor
+		case let .color(c): UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: c.alpha / 255)
+		}
+	}
 }
 
 /// The retained views of one payload: built by the view factory, then changed only by `apply(_:)`.
@@ -53,6 +194,29 @@ final class ViewTree {
 	private var stackConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
 	private var forwards: [LabelForward] = []
 	private var dialogIds = Set<String>()
+	/// The stacking layout's paragraphs, by each text node and phrase element instance in them.
+	private var paragraphs: [String: Paragraph] = [:]
+	/// The current text of each text node instance shown in a paragraph.
+	private var paragraphTexts: [String: String] = [:]
+	/// Phrase element instances, which flow in a paragraph and have no view.
+	private var flowing = Set<String>()
+	/// Views the stacking layout sizes itself or never stacks into (a rule, a drawing, a list marker).
+	private var leaves = Set<ObjectIdentifier>()
+	/// Views stacked across their container's whole width.
+	private var fullWidth = Set<ObjectIdentifier>()
+	/// Start-side insets of blocks, in points.
+	private var indents: [ObjectIdentifier: CGFloat] = [:]
+	/// Lists and the marker kind their items show; each item's marker label.
+	private var listMarkers: [ObjectIdentifier: String] = [:]
+	private var itemMarkers: [ObjectIdentifier: UILabel] = [:]
+	/// Table structure: tables, their rows and the rows' cells.
+	private var tables = Set<ObjectIdentifier>()
+	private var tableRows = Set<ObjectIdentifier>()
+	private var tableCells = Set<ObjectIdentifier>()
+	private var columnConstraints: [ObjectIdentifier: [NSLayoutConstraint]] = [:]
+	private var tableViews: [ObjectIdentifier: UIView] = [:]
+	/// Views a container holds that the stacking layout does not place (a list marker, a rule's line).
+	private var decorations = Set<ObjectIdentifier>()
 	/// The open dialog's top layer and the place in the page its view returns to.
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
 	/// The scroll view each scroll container hosts its children in.
@@ -106,6 +270,7 @@ final class ViewTree {
 		if layout == nil {
 			stackTree(root)
 			for sheet in sheets.values { stackTree(sheet.content) }
+			alignTables()
 		} else {
 			try sizePage()
 		}
@@ -248,6 +413,12 @@ final class ViewTree {
 		for entry in journal {
 			switch entry {
 			case let .text(node, value):
+				if let paragraph = paragraphs[node] {
+					paragraphTexts[node] = value
+					try render(paragraph)
+					if let button = contexts[node]?.button { refreshLabel(of: button) }
+					continue
+				}
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
@@ -261,6 +432,10 @@ final class ViewTree {
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
+				if flowing.contains(node) {
+					attributes[node, default: [:]][name] = value
+					continue
+				}
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				attributes[node, default: [:]][name] = value
 				applyAttributes(node, view)
@@ -328,9 +503,10 @@ final class ViewTree {
 					built[key] = try buildRow(templates[node] ?? node, key: key, item: item, in: container, at: &position, context)
 				}
 				position = (container.subviews.firstIndex(of: list.anchor) ?? 0) + 1
+				var placed = Set<ObjectIdentifier>()
 				for key in keys {
 					for id in built[key] ?? [] {
-						guard let view = elements[id] ?? labels[id] else { continue }
+						guard let view = paragraphs[id]?.view ?? elements[id] ?? labels[id], placed.insert(ObjectIdentifier(view)).inserted else { continue }
 						container.insertSubview(view, at: position)
 						position += 1
 					}
@@ -340,6 +516,7 @@ final class ViewTree {
 			}
 		}
 		refreshRelations()
+		if layout == nil { alignTables() }
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
@@ -460,8 +637,22 @@ final class ViewTree {
 	/// The view factory: builds one slot list's instances from current values, inserting them into `container` at `index`.
 	private func build(_ key: String, in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
 		var built: [String] = []
-		for template in slots[key] ?? [] {
+		let slot = slots[key] ?? []
+		var position = 0
+		while position < slot.count {
+			let template = slot[position]
 			let node = nodes[template]!
+			if layout == nil, node.isText || node.defaultStyle?.flow != nil {
+				// A run of text and phrase elements is one paragraph (`nativeParagraphs`).
+				var run: [String] = []
+				while position < slot.count, let next = nodes[slot[position]], next.isText || next.defaultStyle?.flow != nil {
+					run.append(slot[position])
+					position += 1
+				}
+				built += try buildParagraph(run, in: container, at: &index, context)
+				continue
+			}
+			position += 1
 			let id = template + context.suffix
 			built.append(id)
 			templates[id] = template
@@ -470,7 +661,36 @@ final class ViewTree {
 			case let .element(element, staticAttributes, bindings):
 				if unimplementedElements.contains(element) { throw HostError("<\(element)> \(id) has no iOS view yet") }
 				let view: UIView
-				if element == "button" || element == "a" {
+				if let drawing = node.drawing {
+					let drawn = DrawingView(drawing)
+					drawn.isUserInteractionEnabled = context.button == nil
+					if layout == nil {
+						leaves.insert(ObjectIdentifier(drawn))
+						let ratio = drawing.viewBox.map { $0[3] / $0[2] }
+						let unit = drawing.em ? Double(TextLook.baseSize * context.look.scale) : 1
+						switch (drawing.width.map { $0 * unit }, drawing.height.map { $0 * unit }) {
+						case let (width?, height?):
+							drawn.widthAnchor.constraint(equalToConstant: width).isActive = true
+							drawn.heightAnchor.constraint(equalToConstant: height).isActive = true
+						case let (width?, nil):
+							drawn.widthAnchor.constraint(equalToConstant: width).isActive = true
+							drawn.heightAnchor.constraint(equalToConstant: width * (ratio ?? 0.5)).isActive = true
+						case let (nil, height?):
+							drawn.heightAnchor.constraint(equalToConstant: height).isActive = true
+							drawn.widthAnchor.constraint(equalToConstant: height / (ratio ?? 0.5)).isActive = true
+						case (nil, nil):
+							if let ratio {
+								// The web's inline svg without a size: the container's width, the viewBox's ratio.
+								fullWidth.insert(ObjectIdentifier(drawn))
+								drawn.heightAnchor.constraint(equalTo: drawn.widthAnchor, multiplier: ratio).isActive = true
+							} else {
+								drawn.widthAnchor.constraint(equalToConstant: 300).isActive = true
+								drawn.heightAnchor.constraint(equalToConstant: 150).isActive = true
+							}
+						}
+					}
+					view = drawn
+				} else if element == "button" || element == "a" {
 					if context.button != nil { throw HostError("<\(element)> \(id) is inside another control") }
 					let control = UIButton(type: .custom)
 					control.isAccessibilityElement = true
@@ -540,6 +760,9 @@ final class ViewTree {
 				var inner = context
 				inner.button = (view as? UIButton) ?? context.button
 				inner.heading = context.heading || headings.contains(element)
+				inner.look = context.look.applying(node.defaultStyle)
+				if layout == nil, let style = node.defaultStyle { applyBlockStyle(style, to: view) }
+				if layout == nil, element == "li", listMarkers[ObjectIdentifier(container)] != nil { addMarker(to: view) }
 				view.accessibilityIdentifier = id
 				elements[id] = view
 				if element == "dialog" {
@@ -677,6 +900,9 @@ final class ViewTree {
 		}
 		labels.removeValue(forKey: id)?.removeFromSuperview()
 		scrollViews.removeValue(forKey: id)
+		paragraphs.removeValue(forKey: id)?.view.removeFromSuperview()
+		paragraphTexts.removeValue(forKey: id)
+		flowing.remove(id)
 		if let view = elements.removeValue(forKey: id) {
 			stackConstraints.removeValue(forKey: ObjectIdentifier(view))
 			view.removeFromSuperview()
@@ -696,6 +922,11 @@ final class ViewTree {
 		} else if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
 			refreshLabel(of: button)
+		} else if let drawing = view as? DrawingView {
+			// A named svg is an image to VoiceOver; an unnamed one, or one inside a control, is decoration.
+			drawing.accessibilityLabel = current["aria-label"]
+			drawing.isAccessibilityElement = current["aria-label"] != nil && contexts[id]?.button == nil
+			drawing.accessibilityTraits = .image
 		} else if let image = view as? UIImageView {
 			image.accessibilityLabel = current["aria-label"] ?? current["alt"]
 			image.image = current["src"].flatMap { URL(string: $0) }.flatMap { $0.isFileURL ? UIImage(contentsOfFile: $0.path) : nil }
@@ -758,7 +989,7 @@ final class ViewTree {
 	}
 
 	private func stackTree(_ view: UIView) {
-		guard !(view is UILabel || view is UITextField || view is AudioButton) else { return }
+		guard !(view is UILabel || view is UITextField || view is AudioButton), !leaves.contains(ObjectIdentifier(view)) else { return }
 		stack(view)
 		for child in view.subviews where !anchors.contains(ObjectIdentifier(child)) { stackTree(child) }
 	}
@@ -766,20 +997,282 @@ final class ViewTree {
 	/// The temporary layout for rungs without Dragon: children top to bottom, start-aligned.
 	private func stack(_ container: UIView) {
 		NSLayoutConstraint.deactivate(stackConstraints[ObjectIdentifier(container)] ?? [])
+		if tableRows.contains(ObjectIdentifier(container)) {
+			stackRow(container)
+			return
+		}
 		var constraints: [NSLayoutConstraint] = []
 		var above = container.topAnchor
-		for child in container.subviews where !anchors.contains(ObjectIdentifier(child)) && !child.isHidden {
+		let indent = indents[ObjectIdentifier(container)] ?? 0
+		var top = container
+		while let parent = top.superview { top = parent }
+		for child in stacked(container) {
 			child.translatesAutoresizingMaskIntoConstraints = false
+			let wide = fullWidth.contains(ObjectIdentifier(child))
 			constraints += [
 				child.topAnchor.constraint(equalTo: above),
-				child.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-				child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
+				child.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: indent),
+				wide
+					? child.trailingAnchor.constraint(equalTo: container.trailingAnchor)
+					: child.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor),
 			]
+			if wide {
+				// As wide as the page allows: a box with no width of its own (a rule, a code block) takes the line.
+				let page = child.widthAnchor.constraint(equalTo: top.widthAnchor)
+				page.priority = .defaultHigh
+				constraints.append(page)
+			}
 			above = child.bottomAnchor
 		}
 		constraints.append(above.constraint(equalTo: container.bottomAnchor))
 		NSLayoutConstraint.activate(constraints)
 		stackConstraints[ObjectIdentifier(container)] = constraints
+		if let kind = listMarkers[ObjectIdentifier(container)] {
+			var number = 0
+			for child in stacked(container) {
+				guard let marker = itemMarkers[ObjectIdentifier(child)] else { continue }
+				number += 1
+				marker.text = kind == "decimal" ? "\(number)." : "\u{2022}"
+			}
+		}
+	}
+
+	/// The children the stacking layout places: not anchors, decorations (a marker, a rule's line) or hidden views.
+	private func stacked(_ container: UIView) -> [UIView] {
+		container.subviews.filter { child in
+			!anchors.contains(ObjectIdentifier(child)) && !decorations.contains(ObjectIdentifier(child)) && !child.isHidden
+		}
+	}
+
+	/// A table row: its cells side by side, top-aligned; `alignTables` makes each column as wide as its widest cell.
+	private func stackRow(_ row: UIView) {
+		var constraints: [NSLayoutConstraint] = []
+		var leading = row.leadingAnchor
+		let cells = stacked(row)
+		for (index, cell) in cells.enumerated() {
+			cell.translatesAutoresizingMaskIntoConstraints = false
+			let fit = row.bottomAnchor.constraint(equalTo: cell.bottomAnchor)
+			fit.priority = .defaultLow
+			let narrow = cell.widthAnchor.constraint(equalToConstant: 0)
+			narrow.priority = .defaultLow
+			constraints += [
+				cell.topAnchor.constraint(equalTo: row.topAnchor),
+				cell.leadingAnchor.constraint(equalTo: leading, constant: index == 0 ? 0 : 12),
+				row.bottomAnchor.constraint(greaterThanOrEqualTo: cell.bottomAnchor),
+				fit,
+				narrow,
+			]
+			leading = cell.trailingAnchor
+		}
+		if cells.isEmpty { constraints.append(row.topAnchor.constraint(equalTo: row.bottomAnchor)) }
+		else { constraints.append(leading.constraint(lessThanOrEqualTo: row.trailingAnchor)) }
+		NSLayoutConstraint.activate(constraints)
+		stackConstraints[ObjectIdentifier(row)] = constraints
+	}
+
+	/// Lines each table's cells up in columns across all its rows (thead, tbody, tfoot and list rows alike).
+	private func alignTables() {
+		for table in tableViews.values {
+			NSLayoutConstraint.deactivate(columnConstraints[ObjectIdentifier(table)] ?? [])
+			var rows: [UIView] = []
+			func collect(_ view: UIView) {
+				for child in stacked(view) {
+					if tableRows.contains(ObjectIdentifier(child)) { rows.append(child) }
+					else if !tables.contains(ObjectIdentifier(child)) { collect(child) }
+				}
+			}
+			collect(table)
+			let columns = rows.map { stacked($0) }
+			var constraints: [NSLayoutConstraint] = []
+			for column in 0..<(columns.map(\.count).max() ?? 0) {
+				let cells = columns.compactMap { $0.count > column ? $0[column] : nil }
+				for cell in cells.dropFirst() { constraints.append(cell.widthAnchor.constraint(equalTo: cells[0].widthAnchor)) }
+			}
+			NSLayoutConstraint.activate(constraints)
+			columnConstraints[ObjectIdentifier(table)] = constraints
+		}
+	}
+
+	/// The stacking layout's part of an element's default style: insets, rules, list markers and table structure.
+	private func applyBlockStyle(_ style: NativeDefaultStyle, to view: UIView) {
+		let id = ObjectIdentifier(view)
+		if let indent = style.indent { indents[id] = CGFloat(indent) }
+		if style.rule {
+			// Chrome's hr: a 1 px inset line with 0.5em above and below.
+			leaves.insert(id)
+			fullWidth.insert(id)
+			view.isAccessibilityElement = false
+			view.heightAnchor.constraint(equalToConstant: 17).isActive = true
+			let line = UIView()
+			line.backgroundColor = .systemGray3
+			line.translatesAutoresizingMaskIntoConstraints = false
+			view.addSubview(line)
+			decorations.insert(ObjectIdentifier(line))
+			NSLayoutConstraint.activate([
+				line.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+				line.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+				line.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+				line.heightAnchor.constraint(equalToConstant: 1),
+			])
+		}
+		if let marker = style.marker { listMarkers[id] = marker }
+		switch style.table {
+		case "table":
+			tables.insert(id)
+			tableViews[id] = view
+		case "row": tableRows.insert(id)
+		case "cell": tableCells.insert(id)
+		default: break
+		}
+	}
+
+	/// A list item's marker, beside it in its list's inset; it is neither read nor part of the item's text.
+	private func addMarker(to item: UIView) {
+		let marker = UILabel()
+		marker.isAccessibilityElement = false
+		marker.isUserInteractionEnabled = false
+		marker.translatesAutoresizingMaskIntoConstraints = false
+		item.addSubview(marker)
+		decorations.insert(ObjectIdentifier(marker))
+		itemMarkers[ObjectIdentifier(item)] = marker
+		NSLayoutConstraint.activate([
+			marker.trailingAnchor.constraint(equalTo: item.leadingAnchor, constant: -6),
+			marker.topAnchor.constraint(equalTo: item.topAnchor),
+		])
+	}
+
+	/// A run of text nodes and phrase elements as one label (`nativeParagraphs`), kept current by `render`.
+	private func buildParagraph(_ run: [String], in container: UIView, at index: inout Int, _ context: Context) throws -> [String] {
+		let label = UILabel()
+		label.isUserInteractionEnabled = false
+		label.numberOfLines = 0
+		label.accessibilityIdentifier = run[0] + context.suffix
+		if context.button != nil {
+			label.isAccessibilityElement = false
+		} else if context.heading {
+			label.accessibilityTraits.insert(.header)
+		}
+		var outer: UIView = label
+		if context.look.preformatted {
+			let scroll = PreformattedScroll()
+			scroll.alwaysBounceVertical = false
+			scroll.showsVerticalScrollIndicator = false
+			label.translatesAutoresizingMaskIntoConstraints = false
+			scroll.addSubview(label)
+			NSLayoutConstraint.activate([
+				label.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+				label.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+				label.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+				label.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+				scroll.frameLayoutGuide.heightAnchor.constraint(equalTo: scroll.contentLayoutGuide.heightAnchor),
+			])
+			leaves.insert(ObjectIdentifier(scroll))
+			fullWidth.insert(ObjectIdentifier(scroll))
+			outer = scroll
+		}
+		// A table cell is as wide as its text: the column widens rather than wrapping a short word.
+		if tableCells.contains(ObjectIdentifier(container)) {
+			label.setContentCompressionResistancePriority(.required - 1, for: .horizontal)
+			// A fixed wrap width keeps UIKit from wrapping at the narrow width it tries first.
+			label.preferredMaxLayoutWidth = root.window?.windowScene?.screen.bounds.width ?? 390
+		}
+		let paragraph = Paragraph(nodes: run, suffix: context.suffix, look: context.look, label: label, view: outer)
+		func register(_ template: String) throws {
+			let id = template + context.suffix
+			templates[id] = template
+			contexts[id] = context
+			paragraphs[id] = paragraph
+			switch nodes[template]!.kind {
+			case let .text(parts):
+				paragraphTexts[id] = try runtime.text(of: parts, in: context.scope)
+				labels[id] = label
+			case let .element(_, staticAttributes, bindings):
+				flowing.insert(id)
+				var current = staticAttributes
+				for binding in bindings where !binding.isProperty {
+					current[binding.name] = marklessAttributeValue(binding.name, try runtime.evaluate(binding.value, in: context.scope))
+				}
+				attributes[id] = current
+				for child in slots[template] ?? [] { try register(child) }
+			default:
+				throw HostError("\(id) cannot flow in a paragraph")
+			}
+		}
+		for template in run { try register(template) }
+		try render(paragraph)
+		container.insertSubview(outer, at: index)
+		index += 1
+		if let button = context.button { refreshLabel(of: button) }
+		return run.map { $0 + context.suffix }
+	}
+
+	private enum Piece {
+		case text(String, TextLook)
+		case lineBreak
+	}
+
+	/// The paragraph's text from its current values: each phrase element's look on its text, `<br>` a new line, `<q>` in
+	/// quotes, and whitespace collapsed as CSS `white-space: normal` does, except in preformatted text.
+	private func render(_ paragraph: Paragraph) throws {
+		var pieces: [Piece] = []
+		func walk(_ template: String, _ look: TextLook) {
+			guard let node = nodes[template] else { return }
+			if node.isText {
+				pieces.append(.text(paragraphTexts[template + paragraph.suffix] ?? "", look))
+				return
+			}
+			let style = node.defaultStyle
+			if style?.flow == .break {
+				pieces.append(.lineBreak)
+				return
+			}
+			let inner = look.applying(style)
+			if style?.quotes == true { pieces.append(.text("\u{201C}", inner)) }
+			for child in slots[template] ?? [] { walk(child, inner) }
+			if style?.quotes == true { pieces.append(.text("\u{201D}", inner)) }
+		}
+		for template in paragraph.nodes { walk(template, paragraph.look) }
+		let out = NSMutableAttributedString()
+		var run = ""
+		var runLook = paragraph.look
+		func flush() {
+			if !run.isEmpty { out.append(NSAttributedString(string: run, attributes: runLook.attributes)) }
+			run = ""
+		}
+		func emit(_ text: String, _ look: TextLook) {
+			if look != runLook { flush(); runLook = look }
+			run += text
+		}
+		let preformatted = paragraph.look.preformatted
+		var pending: TextLook?
+		var atLineStart = true
+		for piece in pieces {
+			switch piece {
+			case .lineBreak:
+				pending = nil
+				emit("\n", paragraph.look)
+				atLineStart = true
+			case let .text(text, look):
+				if preformatted {
+					emit(text, look)
+					continue
+				}
+				for character in text {
+					if [" ", "\t", "\n", "\r", "\r\n", "\u{0C}"].contains(character) {
+						if pending == nil { pending = look }
+						continue
+					}
+					if let space = pending, !atLineStart { emit(" ", space) }
+					pending = nil
+					atLineStart = false
+					emit(String(character), look)
+				}
+			}
+		}
+		flush()
+		paragraph.label.attributedText = out
+		// UIKit's own label for a UILabel reads its line breaks as spaces; the text a person reads keeps them.
+		paragraph.label.accessibilityLabel = out.string
 	}
 }
 
@@ -881,6 +1374,11 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
 	paintSides(view, style.sides)
+	if let drawing = view as? DrawingView {
+		// An svg's text colour is what its currentColor paints.
+		if let color = style.textColor { drawing.currentColor = uiColor(color) }
+		return
+	}
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return

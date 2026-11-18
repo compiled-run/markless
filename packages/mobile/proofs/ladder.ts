@@ -185,7 +185,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fuy]\d+)-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fruy]\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 

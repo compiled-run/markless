@@ -1,0 +1,5 @@
+{
+	"rung": "R109",
+	"name": "Text at the top of a page, outside any element, shows as the page's text",
+	"steps": [{ "visible": ["A page that is only text."] }]
+}

@@ -4,8 +4,11 @@ export { NATIVE_FACT_COLLECTORS } from './passes/semantic-graph/expression-tree.
 export { DEVICE_TARGET_FACTS } from './passes/semantic-graph/device-target.ts';
 export {
 	createNativeViewPayload,
+	nativeRefusal,
 	nativeUnsupported,
+	NATIVE_REFUSALS,
 	NATIVE_UNSUPPORTED_CODE,
+	type NativeRefusalKind,
 	type NativeViewArtifact,
 	type NativeViewOptions,
 } from './passes/native-view.ts';

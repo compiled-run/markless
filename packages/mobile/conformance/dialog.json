@@ -21,7 +21,11 @@
 				"kind": "element",
 				"id": "h1",
 				"element": "h1",
-				"parent": "h0"
+				"parent": "h0",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -94,7 +98,11 @@
 				"kind": "element",
 				"id": "h6",
 				"element": "h2",
-				"parent": "h5"
+				"parent": "h5",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
 			},
 			{
 				"kind": "text",
@@ -151,7 +159,11 @@
 				"kind": "element",
 				"id": "h10",
 				"element": "h2",
-				"parent": "h9"
+				"parent": "h9",
+				"defaultStyle": {
+					"bold": true,
+					"size": 1.5
+				}
 			},
 			{
 				"kind": "text",

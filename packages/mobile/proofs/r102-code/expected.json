@@ -1,0 +1,19 @@
+{
+	"rung": "R102",
+	"name": "Code, keys and output read as monospace text in their paragraph",
+	"steps": [
+		{
+			"visible": [
+				"Code",
+				"Call state() to keep a value",
+				"Press Ctrl + C to copy",
+				"The shell prints done"
+			]
+		},
+		{
+			"do": { "tap": "Use Mac keys" },
+			"visible": ["Press Cmd + C to copy"],
+			"absent": ["Press Ctrl + C to copy"]
+		}
+	]
+}

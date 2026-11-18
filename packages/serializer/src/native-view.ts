@@ -122,6 +122,189 @@ export type NativeArmPlace = { readonly branch: string; readonly index: number }
 /** Where a node sits: in an `@if` arm, or in a list row (`row` names the `repeat` node). */
 export type NativePlace = { readonly arm?: NativeArmPlace; readonly row?: string };
 
+/**
+ * How an element looks and flows under the browser's default stylesheet, as data, so hosts need no table of tags. Hosts
+ * apply it only when no style export decides the element's look (Dragon's export already holds the default stylesheet).
+ */
+export type NativeDefaultStyle = {
+	/**
+	 * `inline`: the element's text flows on in its parent's text, as one paragraph (`<strong>`, `<code>`, `<time>`).
+	 * `break`: a line break inside that text (`<br>`). Absent: a box that stacks.
+	 */
+	readonly flow?: 'inline' | 'break';
+	readonly bold?: true;
+	readonly italic?: true;
+	readonly monospace?: true;
+	/** Font size as a multiple of the parent's (`<h1>` 2, `<small>` 0.833, `<code>` 0.8125). */
+	readonly size?: number;
+	readonly line?: 'underline' | 'line-through';
+	readonly shift?: 'sub' | 'super';
+	/** `<mark>`: black text on yellow. */
+	readonly highlight?: true;
+	/** `<q>`: the text inside curly quotes. */
+	readonly quotes?: true;
+	/** `<pre>`: whitespace and line breaks kept, no wrapping; a longer line scrolls sideways. */
+	readonly preformatted?: true;
+	/** Space before the content on the start side, in CSS pixels (`<blockquote>`, `<dd>`, `<ul>`). */
+	readonly indent?: number;
+	/** `<hr>`: a thin horizontal line across the box. */
+	readonly rule?: true;
+	/** On `<ul>` and `<ol>`: the marker each item shows before its content. */
+	readonly marker?: 'disc' | 'decimal';
+	/** Table structure: `<td>` and `<th>` cells line up in columns across the rows of their `<table>`. */
+	readonly table?: 'table' | 'row' | 'cell';
+};
+
+const MONOSPACE: NativeDefaultStyle = { monospace: true, size: 0.8125 };
+const SMALLER = 1 / 1.2;
+
+/**
+ * The HTML elements every native host builds, with their look under Chrome's default stylesheet where it is more than a box
+ * of plain text. Elements the web never shows are in `NATIVE_UNSHOWN_ELEMENTS`; anything else is refused by the compiler.
+ */
+export const NATIVE_ELEMENTS: Readonly<Record<string, NativeDefaultStyle>> = {
+	main: {},
+	div: {},
+	section: {},
+	article: {},
+	header: {},
+	footer: {},
+	nav: {},
+	aside: {},
+	hgroup: {},
+	search: {},
+	p: {},
+	h1: { bold: true, size: 2 },
+	h2: { bold: true, size: 1.5 },
+	h3: { bold: true, size: 1.17 },
+	h4: { bold: true },
+	h5: { bold: true, size: 0.83 },
+	h6: { bold: true, size: 0.67 },
+	address: { italic: true },
+	blockquote: { indent: 40 },
+	figure: { indent: 40 },
+	figcaption: {},
+	hr: { rule: true },
+	pre: { ...MONOSPACE, preformatted: true },
+	ul: { indent: 40, marker: 'disc' },
+	ol: { indent: 40, marker: 'decimal' },
+	menu: { indent: 40, marker: 'disc' },
+	li: {},
+	dl: {},
+	dt: {},
+	dd: { indent: 40 },
+	table: { table: 'table' },
+	caption: {},
+	thead: {},
+	tbody: {},
+	tfoot: {},
+	tr: { table: 'row' },
+	td: { table: 'cell' },
+	th: { table: 'cell', bold: true },
+	span: { flow: 'inline' },
+	b: { flow: 'inline', bold: true },
+	strong: { flow: 'inline', bold: true },
+	i: { flow: 'inline', italic: true },
+	em: { flow: 'inline', italic: true },
+	cite: { flow: 'inline', italic: true },
+	var: { flow: 'inline', italic: true },
+	dfn: { flow: 'inline', italic: true },
+	code: { flow: 'inline', ...MONOSPACE },
+	kbd: { flow: 'inline', ...MONOSPACE },
+	samp: { flow: 'inline', ...MONOSPACE },
+	tt: { flow: 'inline', ...MONOSPACE },
+	small: { flow: 'inline', size: SMALLER },
+	sub: { flow: 'inline', size: SMALLER, shift: 'sub' },
+	sup: { flow: 'inline', size: SMALLER, shift: 'super' },
+	u: { flow: 'inline', line: 'underline' },
+	ins: { flow: 'inline', line: 'underline' },
+	s: { flow: 'inline', line: 'line-through' },
+	del: { flow: 'inline', line: 'line-through' },
+	strike: { flow: 'inline', line: 'line-through' },
+	mark: { flow: 'inline', highlight: true },
+	q: { flow: 'inline', quotes: true },
+	abbr: { flow: 'inline' },
+	time: { flow: 'inline' },
+	data: { flow: 'inline' },
+	bdi: { flow: 'inline' },
+	bdo: { flow: 'inline' },
+	wbr: { flow: 'inline' },
+	br: { flow: 'break' },
+	button: {},
+	input: {},
+	a: {},
+	img: {},
+	audio: {},
+	label: {},
+	dialog: {},
+	form: {},
+	svg: {},
+};
+
+/**
+ * Elements the web never shows in the page, so a native page shows nothing for them either: document metadata and hints
+ * (`<meta>`, `<link>` but a stylesheet, `<base>`), inert markup (`<template>`), and content for browsers that run no scripts
+ * (`<noscript>`), since a native app runs its handlers.
+ */
+export const NATIVE_UNSHOWN_ELEMENTS: ReadonlySet<string> = new Set([
+	'meta',
+	'link',
+	'template',
+	'noscript',
+]);
+
+/**
+ * `<script type>` values that hold data rather than code (structured data for search engines, markup a script reads):
+ * the browser runs nothing for them, so a native page shows nothing for them either. A script of any other type runs code.
+ */
+export const NATIVE_DATA_SCRIPT_TYPES: ReadonlySet<string> = new Set([
+	'application/ld+json',
+	'application/json',
+	'importmap',
+	'speculationrules',
+	'text/html',
+	'text/template',
+]);
+
+/** A colour as eight-bit red, green, blue and alpha. */
+export type NativeColor = {
+	readonly r: number;
+	readonly g: number;
+	readonly b: number;
+	readonly alpha: number;
+};
+
+/** One shape of a drawing; numbers are in the drawing's user units. */
+export type NativeShape = {
+	/**
+	 * The outline as verb-coded numbers (Dragon's svg-shapes coding): 0 move x y, 1 line x y, 3 cubic x1 y1 x2 y2 x y,
+	 * 4 close. Arcs, quadratics and every other SVG shape arrive as these.
+	 */
+	readonly path: ReadonlyArray<number>;
+	/** `currentColor` is the svg's text colour: its style export's, else the page's default black. */
+	readonly fill: NativeColor | 'currentColor' | null;
+	readonly fillRule: 'nonzero' | 'evenodd';
+	readonly stroke: NativeColor | 'currentColor' | null;
+	readonly width: number;
+	readonly cap: 'butt' | 'round' | 'square';
+	readonly join: 'miter' | 'round' | 'bevel';
+	readonly miterLimit: number;
+	/** The affine map from the shape's units to the drawing's (`[a, b, c, d, e, f]`), from `transform` on it and its groups. */
+	readonly transform?: readonly [number, number, number, number, number, number];
+};
+
+/** An inline `<svg>`, compiled when the app is built: the host draws `shapes` in the element's box. */
+export type NativeDrawing = {
+	/** min-x, min-y, width and height; drawn centred and scaled to fit the box (`xMidYMid meet`), as the web does. */
+	readonly viewBox: readonly [number, number, number, number] | null;
+	/** The `width` and `height` attributes in CSS pixels; without a size the box is the web's: full width, the viewBox's ratio. */
+	readonly width?: number;
+	readonly height?: number;
+	/** `width` and `height` are in ems of the svg's font size (`width="1em"`), not CSS pixels. */
+	readonly em?: true;
+	readonly shapes: ReadonlyArray<NativeShape>;
+};
+
 export type NativeNode = NativePlace &
 	(
 		| {
@@ -130,6 +313,10 @@ export type NativeNode = NativePlace &
 				/** The authored tag; each platform maps it to the view it builds. */
 				readonly element: string;
 				readonly parent: string | null;
+				/** The browser's default look of this element, when it differs from a plain box of plain text. */
+				readonly defaultStyle?: NativeDefaultStyle;
+				/** On an `<svg>`: what it draws. Its shapes are not nodes. */
+				readonly drawing?: NativeDrawing;
 				/** Attributes fixed at build time (`class` carries the component's scope class); absent when none. */
 				readonly attributes?: Readonly<Record<string, string>>;
 				/** The device object a `camera` element shows (`<base.camera el={cam} />`). */
@@ -142,9 +329,9 @@ export type NativeNode = NativePlace &
 		  }
 		| {
 				readonly kind: 'text';
-				/** `<host>:text<n>`, the n-th text run of its element. */
+				/** `<host>:text<n>`, the n-th text run of its element; `text<n>` at the top of the page. */
 				readonly id: string;
-				readonly parent: string;
+				readonly parent: string | null;
 				readonly parts: ReadonlyArray<NativeTextPart>;
 		  }
 		| {

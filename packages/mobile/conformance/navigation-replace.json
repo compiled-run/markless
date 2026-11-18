@@ -25,7 +25,11 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "h1",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
 						},
 						{
 							"kind": "text",
@@ -102,7 +106,11 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "h1",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
 						},
 						{
 							"kind": "text",
@@ -162,7 +170,11 @@
 							"kind": "element",
 							"id": "h2",
 							"element": "h1",
-							"parent": "h0"
+							"parent": "h0",
+							"defaultStyle": {
+								"bold": true,
+								"size": 2
+							}
 						},
 						{
 							"kind": "text",

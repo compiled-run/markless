@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from 'vitest';
+import { NATIVE_REFUSALS } from '@markless/compiler/native';
 import { buildRouteManifestFromFileIds, matchRouteManifest } from '@markless/router';
 import type {
 	NativeAppPayload,
@@ -12,6 +13,7 @@ import {
 	compileNativeComponent,
 	createNativeAppRuntime,
 	createNativeRuntime,
+	nativeShownTexts,
 	type NativeRuntime,
 } from '../src/index.ts';
 import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
@@ -38,6 +40,7 @@ function mirror(
 	payload: NativeViewPayload,
 	opened: NativeRuntime,
 	store: Map<string, NativeValue> = new Map(),
+	styled = false,
 ) {
 	let runtime = opened;
 	const texts = new Map<string, string>();
@@ -144,7 +147,9 @@ function mirror(
 					value,
 				);
 			}
-			const shown = [...texts.values(), ...labels().map(([, label]) => label)];
+			// Without a style export a host flows text as the browser's default stylesheet does; with one, Dragon lays it out.
+			const read = styled ? [...texts.values()] : nativeShownTexts(payload, texts);
+			const shown = [...read, ...labels().map(([, label]) => label)];
 			expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 			for (const text of step.absent ?? [])
 				expect(shown, `step ${index}`).not.toContain(text);
@@ -182,12 +187,19 @@ function mirror(
  * The navigation column: a stack of mirrored screens. A `navigate` entry pushes (or replaces the top with) a new
  * screen built from the app runtime's own; Back pops and the screen below must still show what it was left with.
  */
-function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: string) {
+function walkApp(
+	app: NativeAppPayload,
+	steps: readonly LadderStep[],
+	start: string,
+	styled: ReadonlySet<string> = new Set(),
+) {
 	const appRuntime = createNativeAppRuntime(app, start);
 	const pageOf = (route: string) => app.routes.find((entry) => entry.pattern === route)!.page;
 	const stack = appRuntime
 		.screens()
-		.map((screen) => mirror(pageOf(screen.route), screen.runtime));
+		.map((screen) =>
+			mirror(pageOf(screen.route), screen.runtime, new Map(), styled.has(screen.route)),
+		);
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
 		if (action && 'back' in action) {
@@ -219,7 +231,14 @@ function walkApp(app: NativeAppPayload, steps: readonly LadderStep[], start: str
 				const opened = appRuntime.screens().at(-1)!;
 				expect(opened.route, `step ${index}: the screen opened`).toBe(entry.route);
 				if (entry.replace) stack.pop();
-				stack.push(mirror(pageOf(opened.route), opened.runtime));
+				stack.push(
+					mirror(
+						pageOf(opened.route),
+						opened.runtime,
+						new Map(),
+						styled.has(opened.route),
+					),
+				);
 			}
 		}
 		expect(stack.length, `step ${index}: the stack`).toBe(appRuntime.screens().length);
@@ -234,6 +253,7 @@ function walk(
 	params: Readonly<Record<string, string>>,
 	position: LadderRung['location'],
 	target: 'ios' | 'android',
+	styled = false,
 ) {
 	const store = new Map<string, NativeValue>();
 	let calls: string[] = [];
@@ -736,9 +756,14 @@ function walk(
 			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
 		}
 		const shown = [
-			...shownTexts()
-				.filter(([id]) => !hiddenWithin(id))
-				.map(([, text]) => text),
+			...(styled
+				? shownTexts()
+						.filter(([id]) => !hiddenWithin(id))
+						.map(([, text]) => text)
+				: nativeShownTexts(
+						payload,
+						new Map(shownTexts().filter(([id]) => !hiddenWithin(id))),
+					)),
 			...labels()
 				.filter(([id]) => !hiddenWithin(id))
 				.map(([, label]) => label),
@@ -810,12 +835,16 @@ test.each(
 		if (build.payload === null) {
 			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
 			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+			const refusalCodes = new Set<string>([
+				NATIVE_UNSUPPORTED,
+				...Object.values(NATIVE_REFUSALS).map((refusal) => refusal.code),
+			]);
 			expect(
 				build.diagnostics.map((diagnostic) => [diagnostic.severity, diagnostic.code]),
 			).toEqual(
 				build.diagnostics.map((diagnostic) =>
-					diagnostic.severity === 'error'
-						? ['error', NATIVE_UNSUPPORTED]
+					diagnostic.severity === 'error' && refusalCodes.has(diagnostic.code)
+						? ['error', diagnostic.code]
 						: ['warning', NATIVE_KEYBOARD_ONLY],
 				),
 			);
@@ -829,7 +858,14 @@ test.each(
 			...step,
 			visible: [...step.visible, ...(step.visibleOn?.[target] ?? [])],
 		}));
-		walk(build.payload, steps, opened?.params ?? {}, rung.location, target);
+		walk(
+			build.payload,
+			steps,
+			opened?.params ?? {},
+			rung.location,
+			target,
+			build.styles.length > 0 || build.stylesheets.length > 0,
+		);
 	},
 );
 
@@ -841,6 +877,11 @@ test.each([...navRungFolders(), ...styleRungFolders()])(
 		expect(
 			build.diagnostics.map((diagnostic) => `${diagnostic.page}: ${diagnostic.message}`),
 		).toEqual([]);
-		walkApp(build.payload!, rung.steps, rung.start ?? '/');
+		walkApp(
+			build.payload!,
+			rung.steps,
+			rung.start ?? '/',
+			new Set(build.styleInputs.map((input) => input.pattern)),
+		);
 	},
 );

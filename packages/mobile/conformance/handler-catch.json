@@ -32,7 +32,11 @@
 				"kind": "element",
 				"id": "h7",
 				"element": "h1",
-				"parent": "h6"
+				"parent": "h6",
+				"defaultStyle": {
+					"bold": true,
+					"size": 2
+				}
 			},
 			{
 				"kind": "text",
@@ -265,12 +269,29 @@
 		]
 	},
 	"initial": [
-		["h7:text0", "Camera"],
-		["component-edge:1/h1:text0", "Access unknown"],
-		["component-edge:1/h3:text0", "Take photo"],
-		["component-edge:1/h4:text0", "Photos 0"]
+		[
+			"h7:text0",
+			"Camera"
+		],
+		[
+			"component-edge:1/h1:text0",
+			"Access unknown"
+		],
+		[
+			"component-edge:1/h3:text0",
+			"Take photo"
+		],
+		[
+			"component-edge:1/h4:text0",
+			"Photos 0"
+		]
 	],
-	"initialArms": [["component-edge:1/boundary:0", 0]],
+	"initialArms": [
+		[
+			"component-edge:1/boundary:0",
+			0
+		]
+	],
 	"steps": [
 		{
 			"action": {

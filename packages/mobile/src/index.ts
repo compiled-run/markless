@@ -24,6 +24,7 @@ export {
 	type NativeAppConformance,
 	type NativeConformance,
 } from './conformance.ts';
+export { nativeParagraphs, nativeShownTexts, type NativeParagraph } from './paragraphs.ts';
 export {
 	createNativeRuntime,
 	evaluateNativeExpr,
