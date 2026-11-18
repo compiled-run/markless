@@ -72,6 +72,7 @@ import {
 	uncoveredSyncPolicyCall,
 	unextractableSyncPolicyDiagnostic,
 } from './collect-sync-policy.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectComponentProps(component: AnyNode, state: WalkState): void {
 	const firstParam = asNodes(component.params)[0];
@@ -356,7 +357,7 @@ function componentPropBindings(
 				name,
 				source: inlined?.source ?? expressionSource(callback, state.source),
 				kind: 'callback',
-				...nativeStatementsOf(factoryCall ? undefined : callback, state),
+				...(NATIVE_FACTS ? nativeStatementsOf(factoryCall ? undefined : callback, state) : {}),
 				...(inlined?.definitionSpans.length
 					? { definitionSpans: inlined.definitionSpans }
 					: {}),
@@ -574,12 +575,9 @@ function componentPropBindings(
 			source: opaqueSource,
 			kind: 'opaque',
 			sourceSpan: span,
-			...(expression && state.nativeFacts
-				? { nativeExpression: state.nativeFacts.expression(expression as never) }
-				: {}),
 			...(rowRead ? { rowRead } : {}),
 			...(fixedValue ? { fixedValue: true as const } : {}),
-			...nativeExpressionOf(expression, state),
+			...(NATIVE_FACTS ? nativeExpressionOf(expression, state) : {}),
 			...(constant?.value.ok ? { buildTimeValue: { value: constant.value.value } } : {}),
 			...(constant && constant.importedConstants.length > 0
 				? { importedConstants: constant.importedConstants }
@@ -936,7 +934,7 @@ function nativeExpressionOf(
 	expression: AnyNode | undefined,
 	state: WalkState,
 ): { nativeExpression?: SemanticExpression } {
-	const nativeExpression = expression && state.nativeFacts?.expression(expression as never);
+	const nativeExpression = expression && state.nativeFacts && nativeCollectors(state.nativeFacts).expression(expression as never);
 	return nativeExpression ? { nativeExpression } : {};
 }
 
@@ -944,6 +942,6 @@ function nativeStatementsOf(
 	callback: AnyNode | undefined,
 	state: WalkState,
 ): { nativeStatements?: ReadonlyArray<SemanticHandlerStatement> } {
-	const nativeStatements = callback && state.nativeFacts?.handlerStatements(callback as never);
+	const nativeStatements = callback && state.nativeFacts && nativeCollectors(state.nativeFacts).handlerStatements(callback as never);
 	return nativeStatements ? { nativeStatements } : {};
 }

@@ -39,6 +39,7 @@ import { getCallName, getFrameworkApiForCall, isFrameworkApiName } from './impor
 import { ownedModuleAst } from './shared-ast.ts';
 import { getComponentFunction } from '../../ast/tsrx.ts';
 import type { SemanticGraphWalk, WalkState } from './types.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export function collectSharedDefinition(input: {
 	readonly name: string;
@@ -1373,14 +1374,15 @@ function collectReturnedObjectProperties(input: {
 			// records reads at assignment sites, which leaves a method local
 			// (`const next = s.checked !== true`) closing over the factory local.
 			collectExpressionReads(value.body as AnyNode | undefined, input.state);
-			const nativeStatements = input.state.nativeFacts?.handlerStatements(value as never);
+			const facts = NATIVE_FACTS ? input.state.nativeFacts : null;
+			const nativeStatements = facts ? nativeCollectors(facts).handlerStatements(value as never) : undefined;
 			properties.push({
 				kind: 'method',
 				name,
 				source: propertySource,
 				sourceSpan: sourceSpan(property, input.state.filename),
 				...(nativeStatements
-					? { nativeStatements, parameters: input.state.nativeFacts!.parameterNames(value as never) }
+					? { nativeStatements, parameters: nativeCollectors(facts!).parameterNames(value as never) }
 					: {}),
 			});
 			continue;

@@ -101,6 +101,7 @@ import {
 import { collectSubmitHoldFacts } from './submit-hold-marks.ts';
 import { collectInPlaceForms } from './in-place-forms.ts';
 import { chunkRootIsOneElement } from '../row-range.ts';
+import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
 export async function buildSemanticGraph(
 	input: SemanticGraphInput,
@@ -135,7 +136,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		importedFunctionWrites: input.importedFunctionWrites,
 		serverOnlyProps: input.serverOnlyProps,
 		routeRoot: input.routeRoot,
-		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
+		...(NATIVE_FACTS && input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
 		...(input.target ? { target: input.target } : {}),
 		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
 	});
@@ -151,9 +152,10 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
-	if (state.nativeFacts) {
-		graph.moduleFunctions = state.nativeFacts.moduleFunctions(statements as never, state.helperFunctions as never);
-		graph.moduleConstants = state.nativeFacts.moduleConstants(
+	if (NATIVE_FACTS && state.nativeFacts) {
+		const facts = nativeCollectors(state.nativeFacts);
+		graph.moduleFunctions = facts.moduleFunctions(statements as never, state.helperFunctions as never);
+		graph.moduleConstants = facts.moduleConstants(
 			statements as never,
 			namesMutatedInModule(ownedModuleAst(state, state.source, state.filename)),
 			state.filename,
@@ -182,9 +184,9 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph.components.push({
 			name: componentFunction.name,
 			...(exportName ? { exportName } : {}),
-			...(state.nativeFacts
+			...(NATIVE_FACTS && state.nativeFacts
 				? {
-						native: state.nativeFacts.component(
+						native: nativeCollectors(state.nativeFacts).component(
 							componentFunction.node as never,
 							((call: AnyNode, api: 'state') =>
 								getFrameworkApiForCall(call, state.frameworkApiImports) ===
@@ -269,7 +271,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph,
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
-		nativeFacts: state.nativeFacts,
+		nativeFacts: NATIVE_FACTS ? state.nativeFacts : null,
 		foldedIfs: state.foldedIfs,
 		foldedTexts: state.foldedTexts,
 		absentComponents,
