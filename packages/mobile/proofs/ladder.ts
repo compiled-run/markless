@@ -58,7 +58,14 @@ export type LadderAction =
 	/** The platform's own way back: the edge-swipe gesture, or the back button (iOS navigation bar, Android system back). */
 	| { readonly back: 'gesture' | 'button' }
 	/** The device's light or dark appearance, switched in the system while the app runs (`prefers-color-scheme` on the web). */
-	| { readonly appearance: 'light' | 'dark' };
+	| { readonly appearance: 'light' | 'dark' }
+	/** Escape on the web, the back gesture on Android; iOS has none a flow can perform, so the step runs on Android only. */
+	| { readonly escape: true }
+	/** A press that starts and ends on the topmost overlay element itself, beside what it holds (a modal's backdrop). */
+	| { readonly pressBackdrop: true };
+
+/** Where a phone flow presses the backdrop: above a centred surface, below the status bar. */
+export const BACKDROP_POINT = '50%,8%';
 
 /** Permissions a rung sets or clears, by the name Maestro's `launchApp` takes. */
 export type DevicePermission = 'location' | 'camera' | 'microphone';
@@ -416,6 +423,8 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			},
 		];
 	}
+	if ('escape' in action) return ['back'];
+	if ('pressBackdrop' in action) return [{ tapOn: { point: BACKDROP_POINT } }];
 	return [
 		{
 			extendedWaitUntil: {
@@ -452,7 +461,8 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 		: [];
 	// The Settings app keeps its place between runs; stopping it makes it open at its root every time.
 	const visitsSettings = rung.steps.some((step) => step.do && 'settings' in step.do);
-	return rung.steps.map((step, index) => [
+	return rung.steps.map((step, index) => {
+		const commands = [
 		...(index === 0 && visitsSettings
 			? [{ runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] } }]
 			: []),
@@ -467,7 +477,11 @@ export function flowSteps(rung: LadderRung): unknown[][] {
 				})
 			: []),
 		...assertions(step),
-	]);
+		];
+		return step.do && 'escape' in step.do
+			? [{ runFlow: { when: { platform: 'Android' }, commands } }]
+			: commands;
+	});
 }
 
 /** The one Maestro flow for a rung, written from its expected.json so the two never drift. */

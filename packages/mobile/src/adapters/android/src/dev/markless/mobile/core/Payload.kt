@@ -2,6 +2,9 @@ package dev.markless.mobile.core
 
 const val NATIVE_VIEW_VERSION = "markless.native-view/0"
 
+/** The element id that stands for the document body, which no node has. */
+const val NATIVE_DOCUMENT_BODY = "#body"
+
 /** A JavaScript value a cell or expression holds; arrays and objects compare by identity, as `===` does. */
 sealed interface JsValue {
 	data object Null : JsValue
@@ -52,8 +55,15 @@ sealed interface Expr {
 	/** The current row's item of a list. */
 	data class Item(val repeat: String) : Expr
 	data class Call(val name: String, val arguments: List<Expr>) : Expr
-	/** In an `input` handler: the field's whole text after the edit. */
-	data object EventValue : Expr
+	/** A field of the event running the handler: `value`, `reason`, `pressTarget`, `target` or `button`. */
+	data class Event(val field: String) : Expr
+	/** The focused element's id, or [NATIVE_DOCUMENT_BODY] when none has focus. */
+	data object Focused : Expr
+	/** Whether the element [node] is [within] or inside it. */
+	data class Contains(val within: Expr, val node: Expr) : Expr
+	/** The element that had focus when the overlay [overlay] was last shown, or null. */
+	data class FocusOrigin(val overlay: Expr) : Expr
+	data class IsElement(val value: Expr) : Expr
 	/** The page's route params, an object of strings. */
 	data object RouteParams : Expr
 	/** `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order. */
@@ -134,8 +144,8 @@ data class Shape(val path: List<Double>, val fill: ShapePaint?, val evenOdd: Boo
 /** An inline `<svg>` compiled to shapes. */
 data class Drawing(val viewBox: List<Double>?, val width: Double?, val height: Double?, val shapes: List<Shape>, val em: Boolean = false)
 
-/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible") }
+/** [Enter] is the return key in a single-line text field; [Submit] is a form's, run only by a `submit` op. [Dismiss] is a sheet's platform close or an overlay's Escape or outside press. [Idle] and [Visible] run once for each shown instance of their element: when the host is idle after it appeared, and the first time any of it is on screen. */
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel"), Enter("enter"), Submit("submit"), Idle("idle"), Visible("visible"), PointerDown("pointerdown"), PointerUp("pointerup") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -149,8 +159,8 @@ sealed interface Op {
 	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
 	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
 	data class Dialog(val node: String, val open: Boolean) : Op
-	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
-	data class Command(val node: String, val command: String, val preventScroll: Boolean) : Op
+	/** `focus()` or `scrollIntoView()` on the element [node] evaluates to (a fixed id is a literal), once the views show the handler's writes; null or the body does nothing. */
+	data class Command(val node: Expr, val command: String, val preventScroll: Boolean) : Op
 	/** Submits [form] as pressing [submitter] does (null: the return key with no submit button). */
 	data class Submit(val form: String, val submitter: String?) : Op
 	/** After [ms], [ops] run with each [capture] name holding the value it had when this op ran. */
@@ -261,7 +271,7 @@ data class Payload(
 			for (e in events) {
 				val host = seen[e.host]
 				if (e.event == EventName.Dismiss) {
-					if (host !is Node.Sheet) throw MarklessDecodeError("dismiss event on \"${e.host}\" names no sheet")
+					if (host !is Node.Sheet && !(host is Node.Element && OVERLAY_ATTRIBUTE in host.attributes)) throw MarklessDecodeError("dismiss event on \"${e.host}\" names no sheet or overlay")
 				} else if (host !is Node.Element) throw MarklessDecodeError("event on \"${e.host}\" names no element")
 				if (e.handler !in handlerIds) throw MarklessDecodeError("event on \"${e.host}\" names unknown handler \"${e.handler}\"")
 			}
@@ -301,13 +311,17 @@ data class Payload(
 			is Expr.Lambda -> cellsOf(e.body)
 			is Expr.Local, is Expr.Item, Expr.RouteParams -> emptyList()
 			is Expr.Call -> e.arguments.flatMap(::cellsOf)
-			Expr.EventValue, is Expr.FormData, is Expr.Checked -> emptyList()
+			is Expr.Event, Expr.Focused, is Expr.FormData, is Expr.Checked -> emptyList()
+			is Expr.Contains -> cellsOf(e.within) + cellsOf(e.node)
+			is Expr.FocusOrigin -> cellsOf(e.overlay)
+			is Expr.IsElement -> cellsOf(e.value)
 		}
 
 		private val UNARY = setOf("!", "-", "+", "typeof")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
+		private val EVENT_FIELDS = setOf("value", "reason", "pressTarget", "target", "button")
 		private val BUILTINS = setOf("String", "Number", "Boolean", "Math.abs", "Math.floor", "Math.max", "Math.min", "Math.round", "Date.now", "Date.toISOString")
 
 		private fun oneOf(o: Map<String, Json>, key: String, allowed: Set<String>, what: String): String {
@@ -361,7 +375,15 @@ data class Payload(
 					Expr.Call(oneOf(o, "call", BUILTINS, what), o.field("arguments", what).arr("$what.arguments").mapIndexed { n, a -> expr(a, "$what.arguments[$n]") })
 				}
 				o.containsKey("route") -> { o.only(setOf("route"), what); oneOf(o, "route", setOf("params"), what); Expr.RouteParams }
-				o.containsKey("event") -> { o.only(setOf("event"), what); oneOf(o, "event", setOf("value"), what); Expr.EventValue }
+				o.containsKey("event") -> { o.only(setOf("event"), what); Expr.Event(oneOf(o, "event", EVENT_FIELDS, what)) }
+				o.containsKey("focused") -> {
+					o.only(setOf("focused"), what)
+					if (o.field("focused", what) != Json.Bool(true)) throw MarklessDecodeError("$what.focused must be true")
+					Expr.Focused
+				}
+				o.containsKey("contains") -> { o.only(setOf("contains", "node"), what); Expr.Contains(sub("contains"), sub("node")) }
+				o.containsKey("focusOrigin") -> { o.only(setOf("focusOrigin"), what); Expr.FocusOrigin(sub("focusOrigin")) }
+				o.containsKey("isElement") -> { o.only(setOf("isElement"), what); Expr.IsElement(sub("isElement")) }
 				o.containsKey("checked") -> { o.only(setOf("checked"), what); Expr.Checked(o.field("checked", what).str("$what.checked")) }
 				o.containsKey("formData") -> { o.only(setOf("formData"), what); Expr.FormData(o.field("formData", what).str("$what.formData")) }
 				else -> throw MarklessDecodeError("$what is an unknown expression (fields ${o.keys})")
@@ -591,7 +613,10 @@ data class Payload(
 				val command = o.field("command", what).str("$what.command")
 				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
 				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
-				return Op.Command(o.field("node", what).str("$what.node"), command, preventScroll)
+				val raw = o.field("node", what)
+				val node = if (raw is Json.Str) Expr.Literal(JsValue.Str(raw.value)) else expr(raw, "$what.node")
+				for (c in cellsOf(node)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				return Op.Command(node, command, preventScroll)
 			}
 			if (name == "if") {
 				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)

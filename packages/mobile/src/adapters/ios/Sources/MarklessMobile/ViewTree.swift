@@ -226,6 +226,7 @@ final class ViewTree {
 	private var touches: TouchWatcher?
 	/// Each drawn checkbox (false) or radio button (true) and whether it is checked.
 	private var ticks: [String: (radio: Bool, checked: Bool)] = [:]
+	private var overlays: OverlayHost!
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void,
@@ -275,6 +276,13 @@ final class ViewTree {
 			try sizePage()
 		}
 		refreshRelations()
+		overlays = OverlayHost(
+			runtime: runtime, root: root, onAction: onAction,
+			nodeOf: { [unowned self] view in
+				view.accessibilityIdentifier.flatMap { id in self.elements[id] === view ? self.templates[id] : nil }
+			},
+			viewOf: { [unowned self] id in self.elements[id] },
+			restack: { [unowned self] container in if self.layout == nil { self.stack(container) } })
 	}
 
 	/// Whether any of `view`'s box is inside `frame` (in `screen`'s space): an IntersectionObserver with no threshold, where a
@@ -326,6 +334,7 @@ final class ViewTree {
 		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
 		screen.addGestureRecognizer(watcher)
 		touches = watcher
+		do { try overlays.mount(in: screen) } catch { fatalError("Markless iOS host: \(error)") }
 		guard layout == nil else { return }
 		root.translatesAutoresizingMaskIntoConstraints = false
 		let content = page.contentLayoutGuide
@@ -466,7 +475,7 @@ final class ViewTree {
 				if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
-					UIAccessibility.post(notification: .layoutChanged, argument: view)
+					try overlays.focus(node)
 				}
 			case let .invalid(node, text):
 				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
@@ -483,6 +492,8 @@ final class ViewTree {
 					guard let self, self.root.superview != nil else { return }
 					self.onAction(NativeAction(event: .timer, timer: timer))
 				}
+			case let .overlay(node, open, modal):
+				if open { try overlays.open(node, modal: modal) } else { overlays.close(node) }
 			case let .state(cell, value):
 				guard let layout else { continue }
 				assignment = try layout.next(from: assignment, cell: cell, value: value)
@@ -526,6 +537,7 @@ final class ViewTree {
 		}
 		refreshRelations()
 		if layout == nil { alignTables() }
+		overlays.flush()
 	}
 
 	/// The top layer: a full-screen view above the page and the bars holding the dialog's own view (styled by its CSS, not a
@@ -762,6 +774,10 @@ final class ViewTree {
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
 					}
 					view = field
+				} else if OverlayHost.isOverlay(staticAttributes) {
+					let overlay = OverlayElementView()
+					overlay.onEscape = { [unowned self] in self.overlays.escape() }
+					view = overlay
 				} else {
 					view = UIView()
 					view.isUserInteractionEnabled = context.button == nil
@@ -888,8 +904,8 @@ final class ViewTree {
 					for: .editingChanged)
 			case let (.enter, field as UITextField):
 				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
-			case (.idle, _), (.visible, _):
-				// Raised by the screen's controller when the run loop goes idle or the element comes on screen.
+			case (.idle, _), (.visible, _), (.dismiss, _), (.pointerdown, _), (.pointerup, _):
+				// Raised elsewhere: idle and visible by the screen's controller, dismiss and pointer events by the overlay host.
 				continue
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
@@ -973,7 +989,7 @@ final class ViewTree {
 			let hidden = current["hidden"] != nil
 			if view.isHidden != hidden {
 				view.isHidden = hidden
-				if let parent = view.superview, !(parent is UIButton) { stack(parent) }
+				if let parent = view.superview, !(parent is UIButton || parent is OverlayCard) { stack(parent) }
 			}
 		}
 	}

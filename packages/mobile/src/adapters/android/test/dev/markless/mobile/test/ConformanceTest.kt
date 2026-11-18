@@ -130,7 +130,8 @@ private fun runVector(file: File) {
 		}
 		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
 		val value = action["value"]?.str("action.value")
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value).joinToString(",", "[", "]") { it.toJson() }
+		val reason = action["reason"]?.str("action.reason")
+		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value, reason).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}
@@ -415,11 +416,25 @@ private fun scrollVectors(dir: File) {
 	}
 }
 
+private fun overlays() {
+	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"open","name":"open","initial":true},{"id":"r","name":"r","initial":""}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null},{"kind":"element","id":"h1","element":"div","parent":"h0","attributes":{"overlay":""},"bindings":[{"attribute":"hidden","value":{"unary":"!","value":{"cell":"open"}}}]},{"kind":"element","id":"h2","element":"button","parent":"h0"},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"r"}]}],"events":[{"host":"h1","event":"dismiss","handler":"d"},{"host":"h2","event":"activate","handler":"a"}],"handlers":[{"id":"d","ops":[{"op":"assign","cell":"r","value":{"template":[{"event":"reason"}," ",{"event":"pressTarget"}]}},{"op":"assign","cell":"open","value":{"literal":false}},{"op":"command","node":{"focusOrigin":{"literal":"h1"}},"command":"focus"}]},{"id":"a","ops":[{"op":"assign","cell":"r","value":{"event":"target"}}]}]}"""
+	val r = Runtime(Payload.decode(payload.toByteArray()))
+	check("an overlay shown at mount is enlisted", r.overlays() == listOf("h1" to false) && r.focused() == null) { "${r.overlays()} ${r.focused()}" }
+	val outside = r.dispatch("h2", EventName.PointerDown).joinToString(",") { it.toJson() }
+	check("a press outside dismisses the topmost overlay; focus on the body moves nothing", outside == """{"op":"attribute","node":"h1","name":"hidden","value":""},{"op":"text","node":"h0:text0","value":"outside-press h2"},{"op":"overlay","node":"h1","open":false,"modal":false}""") { outside }
+	check("a released overlay leaves the stack", r.overlays().isEmpty()) { "${r.overlays()}" }
+	val err = runCatching { r.dispatch("h2", EventName.Activate) }.exceptionOrNull()?.message
+	check("an event field the event lacks is an error", err == "the event's target read where the event has none") { "$err" }
+	check("a press focuses its control", r.focused() == "h2") { "${r.focused()}" }
+	refuses("focused other than true", payload.replace("{\"focusOrigin\":{\"literal\":\"h1\"}}", "{\"focused\":false}"), "focused must be true")
+}
+
 fun main(args: Array<String>) {
 	routes()
 	arrays()
 	attributeRule()
 	ops()
+	overlays()
 	jsOps()
 	numberFormatting()
 	styleExport(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))

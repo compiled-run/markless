@@ -689,6 +689,18 @@ function walk(
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
+		} else if (action && ('escape' in action || 'pressBackdrop' in action)) {
+			const top = runtime.overlays().at(-1)?.[0];
+			if (!top) throw new Error(`step ${index}: no overlay is open to ${Object.keys(action)[0]}`);
+			apply(
+				'escape' in action
+					? runtime.dispatch({ event: 'dismiss', host: top, reason: 'escape' })
+					: [
+							...runtime.dispatch({ event: 'pointerdown', host: top }),
+							...runtime.dispatch({ event: 'pointerup', host: top }),
+						],
+				index,
+			);
 		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
@@ -713,7 +725,16 @@ function walk(
 				if (properties.has(host)) properties.set(host, action.type.text);
 				else typed.set(host, action.type.text);
 			}
-			// A touch reaches the nearest element around it that handles a press, as on a phone.
+			// A tap is a touch going down and up on what it lands on, then the activation of the nearest element around it
+			// that handles a press, as on a phone.
+			const touched =
+				'tap' in action
+					? [
+							...runtime.dispatch({ event: 'pointerdown', host }),
+							...runtime.dispatch({ event: 'pointerup', host }),
+						]
+					: [];
+			apply(touched, index);
 			let pressed: string | null | undefined = host;
 			while (
 				pressed &&
@@ -726,9 +747,15 @@ function walk(
 			const returns = payload.events.some(
 				(event) => event.host === host && event.event === 'enter',
 			);
+			// A row's copy (`<node>@<key>`) is not in the tree by that id: it activates as itself.
+			const activates = !!pressed || host.includes('@');
+			if ('tap' in action && !activates && touched.length === 0)
+				throw new Error(`step ${index}: "${name}" is not a control and the press changed nothing`);
 			const dispatched =
 				'tap' in action
-					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
+					? activates
+						? runtime.dispatch({ event: 'activate', host: pressed ?? host })
+						: []
 					: 'type' in action
 						? runtime.dispatch({ event: 'input', host, value: action.type.text })
 						: returns

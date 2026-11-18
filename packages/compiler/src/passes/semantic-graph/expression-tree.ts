@@ -18,6 +18,8 @@ const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
 const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round', 'Date.now']);
+/** The DOM interfaces `instanceof` may test: element values. */
+const ELEMENT_TYPES = new Set(['Element', 'HTMLElement']);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
 	const parameters = asNodes(node.params);
@@ -123,6 +125,12 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 					}
 				: unsupported(`the \`${String(node.operator)}\` operator`);
 		case 'BinaryExpression':
+			if (node.operator === 'instanceof') {
+				const type = (node.right as AnyNode | undefined)?.name;
+				return typeof type === 'string' && ELEMENT_TYPES.has(type)
+					? { kind: 'instanceof', value: expressionTreeOf(node.left as AnyNode), type }
+					: unsupported('`instanceof` of something other than an element type');
+			}
 			return typeof node.operator === 'string' && BINARY.has(node.operator)
 				? {
 						kind: 'binary',
@@ -331,6 +339,18 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 					: {}),
 			};
 		}
+		const member = expression.callee as AnyNode | undefined;
+		const method = member?.type === 'MemberExpression' && !member.computed ? (member.property as AnyNode | undefined)?.name : undefined;
+		if (!callee && typeof method === 'string') {
+			const args = asNodes(expression.arguments).map(expressionTreeOf);
+			return {
+				kind: 'method-call',
+				object: expressionTreeOf(member!.object as AnyNode),
+				method,
+				...(args.length > 0 ? { arguments: args } : {}),
+				...(expression.optional === true || member!.optional === true ? { optional: true as const } : {}),
+			};
+		}
 	}
 	if (expression.type === 'UpdateExpression') {
 		const target = memberPath(expression.argument as AnyNode | undefined);
@@ -435,10 +455,15 @@ function blockStatementsOf(
 	}
 	if (statement.type === 'ExpressionStatement')
 		return [statementOf(statement.expression as AnyNode)];
-	if (statement.type === 'ReturnStatement')
-		return statement.argument
-			? [{ kind: 'unsupported', construct: 'a `return` with a value' }]
-			: [{ kind: 'return' }];
+	if (statement.type === 'ReturnStatement') {
+		const argument = statement.argument as AnyNode | null | undefined;
+		if (!argument) return [{ kind: 'return' }];
+		const inner = argument.type === 'ChainExpression' ? (argument.expression as AnyNode) : argument;
+		// `return f()` runs the call as a statement; its value is known only to a caller that drops it.
+		if (inner.type === 'CallExpression')
+			return [statementOf(argument), { kind: 'return', value: unsupported("a returned call's value") }];
+		return [{ kind: 'return', value: expressionTreeOf(argument) }];
+	}
 	if (statement.type === 'IfStatement')
 		return [
 			{
@@ -495,6 +520,8 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 		case 'apply':
 		case 'new':
 			return tree.arguments.some((argument) => readsName(argument, name));
+		case 'instanceof':
+			return readsName(tree.value, name);
 		case 'await':
 			return readsName(tree.value, name);
 		case 'function':
@@ -795,7 +822,12 @@ export function functionBodyOf(node: AnyNode): {
 export function handlerStatementsOf(
 	node: AnyNode | undefined,
 ): ReadonlyArray<SemanticHandlerStatement> | undefined {
-	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
+	if (
+		!node ||
+		(node.type !== 'ArrowFunctionExpression' &&
+			node.type !== 'FunctionExpression' &&
+			node.type !== 'FunctionDeclaration')
+	)
 		return undefined;
 	// A parameter's default applies when no value (undefined, which native values spell null) is passed.
 	const defaults = asNodes(node.params).flatMap((parameter): SemanticHandlerStatement[] => {
@@ -929,11 +961,15 @@ function moduleFunctionsOf(
 	functions: ReadonlyMap<string, AnyNode>,
 ): SemanticModuleFunction[] {
 	const exportNames = localExportNames(statements);
-	return [...functions].map(([name, node]) => ({
-		name,
-		exportNames: exportNames.get(name) ?? [],
-		native: functionBodyOf(node),
-	}));
+	return [...functions].map(([name, node]) => {
+		const effects = node.async || node.generator ? undefined : handlerStatementsOf(node);
+		return {
+			name,
+			exportNames: exportNames.get(name) ?? [],
+			native: functionBodyOf(node),
+			...(effects ? { effects } : {}),
+		};
+	});
 }
 
 const spanOf = (node: AnyNode, filename: string): { span?: SourceSpan } => {
@@ -976,8 +1012,13 @@ function moduleConstantsOf(
 				const name = getIdentifierName(id);
 				if (name) names.push([name, value]);
 			}
+			// An empty set's members change through its methods, which a native build keeps as one cell; the binding never does.
+			const emptySet =
+				value.kind === 'new' &&
+				(value.callee === 'Set' || value.callee === 'WeakSet') &&
+				value.arguments.length === 0;
 			for (const [name, read] of names) {
-				if (mutated.has(name)) continue;
+				if (mutated.has(name) && !emptySet) continue;
 				constants.push({
 					name,
 					exportNames: exportNames.get(name) ?? [],
