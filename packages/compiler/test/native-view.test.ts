@@ -433,6 +433,27 @@ export function Page() @{
 		);
 	});
 
+	it('reads children that are one run of text as that string, and any children as present in a bare @if test', async () => {
+		const source = (badge: string) => `import { computed, type Children } from '@markless/core';
+function Badge({ children }: { readonly children?: Children }) @{
+	const spoken = computed(() => (typeof children === 'string' ? children : 'none'));
+	<div>
+		<p>{spoken}</p>
+		@if (children) { <span>{children}</span> }
+	</div>
+}
+export function Page() @{
+	<main>${badge}</main>
+}`;
+		const text = await nativeView(source('<Badge>Plain</Badge>'));
+		expect(text.diagnostics).toEqual([]);
+		const markup = await nativeView(source('<Badge><b>Bold</b></Badge>'));
+		expect(markup.payload).toBeNull();
+		expect(markup.diagnostics.map((d) => d.message)).toContain(
+			'the computed `spoken` reads the callback `children` as a value',
+		);
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
