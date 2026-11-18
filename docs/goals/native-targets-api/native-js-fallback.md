@@ -37,13 +37,18 @@ only the statements the handlers reach, so a module whose other function touches
 
 | Rung                | What                                                             | Web              | Reference                                     | iOS simulator | Android emulator |
 | ------------------- | ---------------------------------------------------------------- | ---------------- | --------------------------------------------- | ------------- | ---------------- |
-| j1-loop-local       | a loop with a local and string work                              | pass             | pass                                          | see PR        | see PR           |
-| j2-app-and-library  | a function from another app module, and `scule` from npm         | pass             | pass                                          | see PR        | see PR           |
-| j3-await-catch      | `await` with code after it; a rejection in `@catch`              | pass (see below) | pass                                          | see PR        | see PR           |
-| j4-timers-fetch     | `setInterval`/`clearInterval`, `fetch` to the test's echo server | pass             | pass                                          | see PR        | see PR           |
-| j5-engine-computed  | a computed whose body needs the engine                           | pass             | pass                                          | see PR        | see PR           |
-| j6-engine-on-demand | a data-only screen beside a JavaScript screen                    | pass             | pass                                          | see PR        | see PR           |
+| j1-loop-local       | a loop with a local and string work                              | pass             | pass                                          | pass          | pass             |
+| j2-app-and-library  | a function from another app module, and `scule` from npm         | pass             | pass                                          | pass          | pass             |
+| j3-await-catch      | `await` with code after it; a rejection in `@catch`              | pass (see below) | pass                                          | pass          | pass             |
+| j4-timers-fetch     | `setInterval`/`clearInterval`, `fetch` to the test's echo server | pass             | pass                                          | pass          | pass             |
+| j5-engine-computed  | a computed whose body needs the engine                           | pass             | pass                                          | pass          | pass             |
+| j6-engine-on-demand | a data-only screen beside a JavaScript screen                    | pass             | pass                                          | pass          | pass             |
 | j7-page-refused     | `document.title =` in a handler                                  | pass             | refused at build time, by name, file and line | n/a           | n/a              |
+
+Device runs (one harness run per platform, on the simulator `markless-js` and the emulator `markless_js`) also passed
+03-counter, 08-text-input, n1-two-routes and r135-idle as regressions, and r137-clock on iOS. Host conformance: `swift
+test` 32 tests (every vector, the `script-*` ones through JavaScriptCore); Android `test-jvm.sh` 749 checks, 0 failed
+(the `script-*` vectors through a `node` engine, as the JVM has no Hermes).
 
 J1's "both paths": `handler-paths.test.ts` builds every committed vector twice, once as the compiler chooses and once
 with every handler a script can run forced into the engine (`all`); the screens and journals are the same in all of them
