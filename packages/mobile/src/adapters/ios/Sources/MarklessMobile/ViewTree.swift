@@ -244,6 +244,7 @@ final class ViewTree {
 		var row = context
 		row.suffix = "@\(key)"
 		row.scope.items[list] = item
+		row.scope.keys[list] = key
 		return try build(list, in: container, at: &index, row)
 	}
 
@@ -302,7 +303,7 @@ final class ViewTree {
 				if let style = style(of: id) { try paint(view, style, faces: faces) }
 				container.insertSubview(view, at: index)
 				index += 1
-				try wire(events[template] ?? [], on: view, element: element, id: id, inRow: !context.suffix.isEmpty)
+				try wire(events[template] ?? [], on: view, element: element, id: id)
 				let boundFor = try bindings.first { $0.name == "for" }.map { try runtime.evaluate($0.value, in: context.scope).text }
 				if element == "label", let target = staticAttributes["for"] ?? boundFor {
 					// A press on a label activates its control, as a browser does.
@@ -369,10 +370,10 @@ final class ViewTree {
 		return built
 	}
 
-	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String, inRow: Bool) throws {
+	/// `id` is the view's own id, a row's copy included (`<node>@<key>`): the runtime runs the handler in that row.
+	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String) throws {
 		let onAction = onAction
 		for event in bound {
-			if inRow { throw HostError("a \(event.event.rawValue) handler on a list row (\(id)) has no iOS host support yet") }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
 				control.addAction(UIAction { _ in onAction(NativeAction(event: .activate, host: id)) }, for: .touchUpInside)

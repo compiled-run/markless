@@ -111,7 +111,8 @@ data class Route(val pattern: String, val params: List<String>) {
 	}
 }
 
-data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false)
+/** [row]: state of a component a list row renders, one value per row of that `repeat`, [initial] when the row is built. */
+data class Cell(val id: String, val name: String, val initial: JsValue, val storageKey: String? = null, val styled: Boolean = false, val row: String? = null)
 data class Event(val host: String, val event: EventName, val handler: String)
 data class Handler(val id: String, val ops: List<Op>)
 
@@ -160,6 +161,7 @@ data class Payload(
 				}
 				for (e in reads) for (c in cellsOf(e)) if (c !in cellIds) throw MarklessDecodeError("node \"${node.id}\" reads unknown cell \"$c\"")
 			}
+			for (c in cells) c.row?.let { r -> if (seen[r] !is Node.Repeat) throw MarklessDecodeError("cell \"${c.id}\" is state of rows of \"$r\", which is not a list") }
 			val handlers = root.field("handlers", "payload").arr("payload.handlers").mapIndexed { n, h -> handler(h, "handlers[$n]", cellIds) }
 			val handlerIds = HashSet<String>()
 			for (h in handlers) if (!handlerIds.add(h.id)) throw MarklessDecodeError("duplicate handler \"${h.id}\"")
@@ -271,10 +273,10 @@ data class Payload(
 
 		private fun cell(v: Json, what: String): Cell {
 			val o = v.obj(what)
-			o.only(setOf("id", "name", "initial", "storage", "styled"), what)
+			o.only(setOf("id", "name", "initial", "storage", "styled", "row"), what)
 			val styled = o["styled"]?.let { if (it != Json.Bool(true)) throw MarklessDecodeError("$what.styled must be true when present"); true } ?: false
 			val storage = o["storage"]?.obj("$what.storage")?.let { it.only(setOf("key"), "$what.storage"); it.field("key", what).str("$what.storage.key") }
-			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled)
+			return Cell(o.field("id", what).str("$what.id"), o.field("name", what).str("$what.name"), JsValue.fromJson(o.field("initial", what)), storage, styled, o["row"]?.str("$what.row"))
 		}
 
 		private fun node(v: Json, what: String): Node {

@@ -242,7 +242,6 @@ class MarklessHost(
 	}
 
 	private fun element(node: Node.Element, inst: Instance): View {
-		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
 		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
 		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
 		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
@@ -268,7 +267,7 @@ class MarklessHost(
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
-			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
+			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Cancel -> {}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -276,8 +275,8 @@ class MarklessHost(
 				override fun afterTextChanged(s: Editable) {
 					val text = s.toString()
 					// A property entry the applier just wrote reads back as the runtime's own value: not an edit.
-					if (node.bindings.any { it.property && it.name == "value" } && runtime.property(node.id, "value") == text) return
-					apply(runtime.dispatch(e.host, EventName.Input, text))
+					if (node.bindings.firstOrNull { it.property && it.name == "value" }?.let { runtime.property(it, inst.scope) } == text) return
+					apply(runtime.dispatch(inst.id, EventName.Input, text))
 				}
 			})
 		}

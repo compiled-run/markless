@@ -23,6 +23,8 @@ type Value = NativeValue;
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
 export type NativeScope = {
 	readonly items: ReadonlyMap<string, Value>;
+	/** The row keys by repeat id, where a row's own state is read. */
+	readonly keys?: ReadonlyMap<string, string>;
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
@@ -66,7 +68,7 @@ const BUILTINS: { readonly [name in NativeBuiltin]: (...args: Value[]) => Value 
 /** The meaning of an expression: JavaScript's own, run here so the hosts have one definition to match. */
 export function evaluateNativeExpr(
 	expr: NativeExpr,
-	read: (cell: string) => Value,
+	read: (cell: string, scope: NativeScope) => Value,
 	eventValue?: string,
 	scope: NativeScope = EMPTY_SCOPE,
 ): Value {
@@ -111,7 +113,7 @@ export function evaluateNativeExpr(
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
-	if ('cell' in expr) return read(expr.cell);
+	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
 	if ('event' in expr) {
 		if (eventValue === undefined)
@@ -206,9 +208,20 @@ export function createNativeRuntime(
 	const repeats = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'repeat' ? [[node.id, node] as const] : [])),
 	);
-	const read = (cell: string): Value => {
+	const rowOfCell = new Map(payload.cells.flatMap((cell) => (cell.row ? [[cell.id, cell.row] as const] : [])));
+	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
+	const slotOf = (cell: string, scope: NativeScope): string => {
+		const row = rowOfCell.get(cell);
+		if (row === undefined) return cell;
+		const key = scope.keys?.get(row);
+		if (key === undefined) throw new Error(`the row state ${cell} read outside its row`);
+		return `${cell}@${key}`;
+	};
+	/** A row's state reads its first value until the row writes it. */
+	const read = (cell: string, scope: NativeScope = base): Value => {
 		if (!values.has(cell)) throw new Error(`unknown cell ${cell}`);
-		return values.get(cell)!;
+		const slot = slotOf(cell, scope);
+		return values.has(slot) ? values.get(slot)! : values.get(cell)!;
 	};
 	const evaluate = (expr: NativeExpr, eventValue?: string, scope?: NativeScope): Value =>
 		evaluateNativeExpr(expr, read, eventValue, scope ?? base);
@@ -247,7 +260,7 @@ export function createNativeRuntime(
 		if (!repeat || !shown(repeat)) return [];
 		return rowsOf(repeat).map(({ key, item }) => ({
 			id: `${node.id}@${key}`,
-			scope: { ...base, items: new Map([[repeat.id, item]]) },
+			scope: { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) },
 		}));
 	};
 	const render = (parts: ReadonlyArray<NativeTextPart>, scope: NativeScope): string =>
@@ -255,7 +268,7 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue('cell' in part ? read(part.cell) : evaluate(part.expr, undefined, scope)),
+					: formatNativeValue('cell' in part ? read(part.cell, scope) : evaluate(part.expr, undefined, scope)),
 			)
 			.join('');
 
@@ -304,7 +317,17 @@ export function createNativeRuntime(
 		dialogs: () => [...dialogs],
 		rows,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
+			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
+			const at = action.host.indexOf('@');
+			const host = at < 0 ? action.host : action.host.slice(0, at);
+			const event = payload.events.find((candidate) => candidate.host === host && candidate.event === action.event);
+			const instance = event
+				? payload.nodes
+						.flatMap((node) => (node.id === host ? instances(node) : []))
+						.find((shown) => shown.id === action.host)
+				: undefined;
+			if (event && !instance) throw new Error(`${action.host} is not shown`);
+			const scope = instance?.scope ?? base;
 			if (action.event === 'cancel') {
 				if (dialogs.get(action.host) !== true) throw new Error(`${action.host} is not an open dialog`);
 			} else if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
@@ -330,13 +353,13 @@ export function createNativeRuntime(
 					}
 					if (op.op === 'if') {
 						const taken = run(
-							evaluate(op.test, eventValue) ? op.whenTrue : op.whenFalse,
+							evaluate(op.test, eventValue, scope) ? op.whenTrue : op.whenFalse,
 						);
 						if (taken) return taken;
 						continue;
 					}
-					const value = evaluate(op.value, eventValue);
-					values.set(op.cell, value);
+					const value = evaluate(op.value, eventValue, scope);
+					values.set(slotOf(op.cell, scope), value);
 					const key = storageKeys.get(op.cell);
 					if (key !== undefined) store.set(key, value);
 				}
@@ -344,6 +367,13 @@ export function createNativeRuntime(
 			};
 			const navigated = event ? run(handlers.get(event.handler) ?? []) : undefined;
 			if (navigated) return [navigated];
+			// A row that left takes its state with it; a later row with the same key starts from the first values.
+			const kept = new Set(rows().flatMap(([list, keys]) => keys.map((key) => `${list}\0${key}`)));
+			for (const slot of values.keys()) {
+				const at = slot.indexOf('@');
+				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
+				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
+			}
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
 			const afterProperties = keyed(properties());

@@ -68,7 +68,8 @@ class MemoryStore(private val values: MutableMap<String, JsValue> = HashMap()) :
 }
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
-data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap()) {
+/** [keys]: the row keys by repeat id, where a row's own state is read. */
+data class Scope(val items: Map<String, JsValue> = emptyMap(), val locals: Map<String, JsValue> = emptyMap(), val keys: Map<String, String> = emptyMap()) {
 	companion object {
 		val EMPTY = Scope()
 	}
@@ -85,10 +86,22 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	private val values = LinkedHashMap<String, JsValue>().apply { for (c in payload.cells) put(c.id, c.storageKey?.let(store::get) ?: c.initial) }
 	private val storageKeys = payload.cells.mapNotNull { c -> c.storageKey?.let { c.id to it } }.toMap()
 	private val handlers = payload.handlers.associateBy { it.id }
+	/** Row state's list by cell id: its values are kept as `<cell>@<key>`. */
+	private val rowOfCell = payload.cells.mapNotNull { c -> c.row?.let { c.id to it } }.toMap()
 	private val byId = payload.nodes.associateBy { it.id }
 	private var eventValue: String? = null
 
 	fun value(cell: String): JsValue = values[cell] ?: throw MarklessRuntimeError("unknown cell \"$cell\"")
+
+	/** Where a cell's value is kept: its id, or `<id>@<key>` for a row's own state, read in that row. */
+	private fun slot(cell: String, scope: Scope): String {
+		val row = rowOfCell[cell] ?: return cell
+		val key = scope.keys[row] ?: throw MarklessRuntimeError("the row state $cell read outside its row")
+		return "$cell@$key"
+	}
+
+	/** A row's state reads its first value until the row writes it. */
+	private fun read(cell: String, scope: Scope): JsValue = value(cell).let { values[slot(cell, scope)] ?: it }
 
 	fun node(id: String): Node = byId[id] ?: throw MarklessRuntimeError("unknown node \"$id\"")
 
@@ -97,7 +110,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
 			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
-			is Expr.CellRef -> value(e.cell)
+			is Expr.CellRef -> read(e.cell, scope)
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
 			is Expr.Local -> scope.locals[e.name] ?: throw MarklessRuntimeError("the parameter ${e.name} read outside its function")
@@ -169,7 +182,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val r = node.row ?: return listOf(Instance(node.id, node, Scope.EMPTY))
 		val repeat = byId[r] as? Node.Repeat ?: return emptyList()
 		if (!isShown(repeat)) return emptyList()
-		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item)), it.key) }
+		return rowsOf(repeat).map { Instance("${node.id}@${it.key}", node, Scope(items = mapOf(repeat.id to it.item), keys = mapOf(repeat.id to it.key)), it.key) }
 	}
 
 	fun text(t: Node.Text, scope: Scope): String = buildString {
@@ -226,7 +239,10 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** Runs the handler for [event] on [host]; an `input` event carries the field's whole text as [value]. */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
-		val handlerId = handlerFor(host, event)
+		// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
+		val template = host.substringBefore('@')
+		val handlerId = handlerFor(template, event)
+		val scope = if (handlerId == null) Scope.EMPTY else (instances(node(template)).firstOrNull { it.id == host } ?: throw MarklessRuntimeError("\"$host\" is not shown")).scope
 		if (event == EventName.Cancel) {
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 		} else if (handlerId == null) throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
@@ -246,11 +262,11 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			for (op in ops) when (op) {
 				is Op.Navigate -> return JournalEntry.Navigate(op.route, op.params)
 				is Op.Assign -> {
-					val v = evaluate(op.value)
-					values[op.cell] = v
+					val v = evaluate(op.value, scope)
+					values[slot(op.cell, scope)] = v
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
-				is Op.If -> run(if (Js.truthy(evaluate(op.test))) op.then else op.otherwise)?.let { return it }
+				is Op.If -> run(if (Js.truthy(evaluate(op.test, scope))) op.then else op.otherwise)?.let { return it }
 				is Op.Dialog -> {
 					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 					dialogs[op.node] = op.open
@@ -262,6 +278,12 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			handler?.let { h -> run(h.ops)?.let { return listOf(it) } }
 		} finally {
 			eventValue = null
+		}
+		// A row that left takes its state with it; a later row with the same key starts from the first values.
+		val kept = rows().flatMap { (list, keys) -> keys.map { "$list\u0000$it" } }.toSet()
+		values.keys.removeAll { slot ->
+			val list = rowOfCell[slot.substringBefore('@')]
+			list != null && '@' in slot && "$list\u0000${slot.substringAfter('@')}" !in kept
 		}
 		val afterTexts = texts().toMap()
 		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }

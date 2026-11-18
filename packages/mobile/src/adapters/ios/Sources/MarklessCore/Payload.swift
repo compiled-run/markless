@@ -163,6 +163,8 @@ public struct NativeCell: Equatable, Sendable {
 	public let storageKey: String?
 	/// A class binding reads this cell, so its changes are journalled as `state`.
 	public let styled: Bool
+	/// State of a component a list row renders: one value per row of this `repeat`, `initial` when the row is built.
+	public var row: String? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -197,7 +199,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "row"])
 			let initial = NativeValue(json: try field["initial"].value)
 			var styled = false
 			if field.has("styled") {
@@ -206,7 +208,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			return NativeCell(
 				id: try field["id"].string(), name: try field["name"].string(), initial: initial,
-				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled)
+				storageKey: field.has("storage") ? try field["storage"].object(["key"])["key"].string() : nil, styled: styled,
+				row: field.has("row") ? try field["row"].string() : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()
@@ -456,6 +459,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
+			}
+		}
+		for cell in cells {
+			if let row = cell.row, !repeats.contains(row) {
+				throw PayloadError(path: "payload.cells", reason: "\(cell.id) is state of rows of \(row), which is not a list")
 			}
 		}
 		for event in events {

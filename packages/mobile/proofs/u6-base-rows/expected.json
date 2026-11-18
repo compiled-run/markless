@@ -1,0 +1,31 @@
+{
+	"rung": 106,
+	"name": "@markless/ui base.button in @for rows: each row's own pressed state, its callback, a remove handler per row, and @empty",
+	"steps": [
+		{
+			"visible": ["Tasks", "Milk", "Bread", "Remove Milk", "Remove Bread", "Done 0"],
+			"absent": ["No tasks", "Eggs"],
+			"order": ["Milk", "Bread"]
+		},
+		{ "do": { "tap": "Milk" }, "visible": ["Done 1"], "absent": ["Done 0"] },
+		{ "do": { "tap": "Bread" }, "visible": ["Done 2"], "absent": ["Done 1"] },
+		{
+			"do": { "tap": "Milk" },
+			"visible": ["Milk", "Remove Milk", "Done 1"],
+			"absent": ["Done 2"]
+		},
+		{
+			"do": { "tap": "Remove Milk" },
+			"visible": ["Bread", "Done 1"],
+			"absent": ["Milk", "Remove Milk", "No tasks"]
+		},
+		{ "do": { "tap": "Bread" }, "visible": ["Bread", "Done 0"], "absent": ["Done 1"] },
+		{ "do": { "tap": "Remove Bread" }, "visible": ["No tasks", "Done 0"], "absent": ["Bread"] },
+		{
+			"do": { "tap": "Add eggs" },
+			"visible": ["Eggs", "Remove Eggs", "Done 0"],
+			"absent": ["No tasks"]
+		},
+		{ "do": { "tap": "Eggs" }, "visible": ["Eggs", "Done 1"], "absent": ["Done 0"] }
+	]
+}
