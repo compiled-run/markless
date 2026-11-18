@@ -200,6 +200,8 @@ export function componentEdgeGraphRoutes(
 			: {
 					name: prop.name,
 					kind: prop.kind === 'serializable' ? 'compiler-known-constant' : prop.kind,
+					// A child that hands this prop to an event as is cancels with it during the dispatch.
+					...(prop.kind === 'callback' && prop.syncPolicy ? { syncPolicy: prop.syncPolicy } : {}),
 				},
 	);
 	if (!hasProjection || routes.some((route) => route.name === 'children')) return routes;

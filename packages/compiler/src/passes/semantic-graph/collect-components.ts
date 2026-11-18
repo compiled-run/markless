@@ -342,21 +342,22 @@ function componentPropBindings(
 				? hasSyncEventPolicyCandidate(callback) ||
 					Boolean(firstDetachedSyncPolicyReference(callback))
 				: false;
-			if (
-				hasSyncPolicyCandidate &&
-				!syncPolicy &&
-				spreadForwardsProp(name, link, state, childComponentName)
-			) {
-				state.graph.diagnostics.push(
-					unextractableSyncPolicyDiagnostic(name, callback, [callback], state),
-				);
-			}
 			const strayCancel = syncPolicy ? uncoveredSyncPolicyCall(callback, state) : null;
-			if (strayCancel && spreadForwardsProp(name, link, state, childComponentName)) {
-				state.graph.diagnostics.push(
-					secondSyncPolicyCancelDiagnostic(name, strayCancel, state),
-				);
-			}
+			const misplacedCancel =
+				hasSyncPolicyCandidate && !syncPolicy
+					? unextractableSyncPolicyDiagnostic(name, callback, [callback], state)
+					: strayCancel
+						? secondSyncPolicyCancelDiagnostic(name, strayCancel, state)
+						: null;
+			if (misplacedCancel && spreadForwardsProp(name, link, state, childComponentName))
+				state.graph.diagnostics.push(misplacedCancel);
+			else if (misplacedCancel)
+				state.relayCancelRefusals.push({
+					childComponentName: link?.childComponentName || childComponentName,
+					...(link?.importSource ? { importSource: link.importSource } : {}),
+					propName: name,
+					diagnostic: misplacedCancel,
+				});
 
 			const factory = factoryCall
 				? factoryHandlerSource(factoryCall, parameterNodes.length, state, name)

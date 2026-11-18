@@ -851,6 +851,23 @@ export function marklessCsrChildReadIsStatic(
 	return binding.kind !== undefined && binding.kind !== 'graph-reference';
 }
 
+/** A child's event whose handler is its own prop takes the cancel the parent passed in that prop, or relays it on when the parent passed its own prop. */
+export function marklessRelayedPolicy<T extends { readonly relayedProp?: unknown; readonly syncPolicy?: unknown }>(
+	event: T,
+	graphProps: ComposeGraphProps,
+): T {
+	const { relayedProp, ...rest } = event;
+	const route = graphProps?.find((prop) => prop.name === relayedProp);
+	if (!route) return (relayedProp ? rest : event) as T;
+	if (route.kind === 'callback')
+		return (route.syncPolicy && !event.syncPolicy ? { ...rest, syncPolicy: route.syncPolicy } : rest) as T;
+	const passedOn =
+		route.graphNodeId && (route.path?.length ?? 0) <= +(route.graphNodeId === 'prop:props')
+			? marklessCompositionPropName(route.graphNodeId, route.path ?? [])
+			: null;
+	return (passedOn ? { ...rest, relayedProp: passedOn } : rest) as T;
+}
+
 function marklessCompositionPropName(
 	graphNodeId: string,
 	path: ReadonlyArray<string>,

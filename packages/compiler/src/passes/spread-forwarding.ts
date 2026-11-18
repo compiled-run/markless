@@ -1,7 +1,6 @@
 import type { ProtocolViewPayload } from '@markless/serializer';
 import { isEventAttribute, normalizeEventName } from '../ast/events.ts';
 import type {
-	ModuleGraphInterfaceArtifact,
 	ModuleGraphInterfaceSpreadHost,
 	PlannedSymbol,
 	ProtocolViewPayloadInput,
@@ -117,35 +116,6 @@ export function forwardedSpreadViewRecords(input: ProtocolViewPayloadInput): {
 			});
 	}
 
-	// A child's `onSubmit={props.onSave}` runs the consumer's handler, so the consumer's cancel is that element's.
-	for (const { hostNodeId, edge, host } of childHostsByEdge(
-		input,
-		(child) => child?.relayHosts,
-	)) {
-		const prop = edge.props.find((candidate) => candidate.name === host.propName);
-		if (prop?.kind !== 'callback' || !prop.syncPolicy) continue;
-		events.push({
-			hostNodeId,
-			eventName: host.eventName,
-			symbolIds: [],
-			syncPolicy: prop.syncPolicy,
-			componentEdgeId: edge.id,
-		});
-		if (
-			!locators.some(
-				(locator) =>
-					locator.hostNodeId === hostNodeId && locator.componentEdgeId === edge.id,
-			)
-		)
-			locators.push({
-				hostNodeId,
-				strategy: 'dom-order',
-				index: 0,
-				tagName: '*',
-				componentEdgeId: edge.id,
-			});
-	}
-
 	return { locators, events, domUpdates, elementHandles };
 }
 
@@ -234,21 +204,6 @@ function spreadHostsByEdge(input: ForwardedSpreadInput): ReadonlyArray<{
 	readonly edge: SemanticComponentEdge;
 	readonly spread: ModuleGraphInterfaceSpreadHost;
 }> {
-	return childHostsByEdge(input, (child) => child?.spreadHosts).map(
-		({ hostNodeId, edge, host }) => ({ hostNodeId, edge, spread: host }),
-	);
-}
-
-type ChildInterface = ModuleGraphInterfaceArtifact['render']['components'][number] | undefined;
-
-function childHostsByEdge<H extends { readonly hostNodeId: string }>(
-	input: ForwardedSpreadInput,
-	hostsOf: (child: ChildInterface) => ReadonlyArray<H> | undefined,
-): ReadonlyArray<{
-	readonly hostNodeId: string;
-	readonly edge: SemanticComponentEdge;
-	readonly host: H;
-}> {
 	const semanticGraph = input.semanticGraph;
 	if (!semanticGraph) return [];
 	return semanticGraph.components.flatMap((component) => {
@@ -257,20 +212,25 @@ function childHostsByEdge<H extends { readonly hostNodeId: string }>(
 			(edge) => edge.parentComponentName === component.name,
 		);
 		return edges.flatMap((edge, index) =>
-			(hostsOf(childInterface(input, edge)) ?? []).map((host) => ({
-				hostNodeId: `c${index}:${host.hostNodeId}`,
+			childSpreadHosts(input, edge).map((spread) => ({
+				hostNodeId: `c${index}:${spread.hostNodeId}`,
 				edge,
-				host,
+				spread,
 			})),
 		);
 	});
 }
 
-function childInterface(input: ForwardedSpreadInput, edge: SemanticComponentEdge): ChildInterface {
+function childSpreadHosts(
+	input: ForwardedSpreadInput,
+	edge: SemanticComponentEdge,
+): ReadonlyArray<ModuleGraphInterfaceSpreadHost> {
 	const moduleInterface = edge.importSource
 		? input.source?.importedModuleInterfaces?.[edge.importSource]
 		: input.semanticGraph?.moduleGraphInterface;
-	return moduleInterface?.render.components.find(
-		(component) => component.componentName === edge.childComponentName,
+	return (
+		moduleInterface?.render.components.find(
+			(component) => component.componentName === edge.childComponentName,
+		)?.spreadHosts ?? []
 	);
 }
