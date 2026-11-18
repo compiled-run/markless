@@ -697,6 +697,7 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
 	paintSides(view, style.sides)
+	paintDashed(view, style.dashedBorder)
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }
 		return
@@ -729,6 +730,78 @@ private func paintSides(_ view: UIView, _ sides: [ResolvedStyle.Side]?) {
 		layer.frame = rect
 		layer.backgroundColor = uiColor(side.color).cgColor
 		view.layer.addSublayer(layer)
+	}
+}
+
+/// A dashed or dotted border, drawn from Dragon's operations as Dragon's own UIKit paint draws them (dragonDrawBorderOps).
+@MainActor
+private func paintDashed(_ view: UIView, _ border: ResolvedStyle.DashedBorder?) {
+	let name = "markless-border-ops"
+	view.layer.sublayers?.filter { $0.name == name }.forEach { $0.removeFromSuperlayer() }
+	guard let border else { return }
+	let layer = DashedBorderLayer(border)
+	layer.name = name
+	layer.frame = view.bounds
+	layer.contentsScale = view.traitCollection.displayScale
+	view.layer.addSublayer(layer)
+	layer.setNeedsDisplay()
+}
+
+private final class DashedBorderLayer: CALayer {
+	private var border: ResolvedStyle.DashedBorder?
+	init(_ border: ResolvedStyle.DashedBorder) {
+		self.border = border
+		super.init()
+	}
+	override init(layer: Any) {
+		border = (layer as? DashedBorderLayer)?.border
+		super.init(layer: layer)
+	}
+	required init?(coder: NSCoder) { fatalError("not built from a coder") }
+
+	override func draw(in ctx: CGContext) {
+		guard let border else { return }
+		ctx.saveGState()
+		ctx.scaleBy(x: 1 / border.scale, y: 1 / border.scale)
+		ctx.translateBy(x: border.ops.originX, y: border.ops.originY)
+		for o in border.ops.ops {
+			let pts = o.points
+			switch o.op {
+			case "begin-layer":
+				ctx.saveGState()
+				ctx.setAlpha(o.alpha)
+				ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+			case "end-layer":
+				ctx.endTransparencyLayer()
+				ctx.restoreGState()
+			case "save": ctx.saveGState()
+			case "restore": ctx.restoreGState()
+			case "clip":
+				ctx.setShouldAntialias(o.antialias)
+				ctx.addPath(polygon(pts))
+				ctx.clip()
+				ctx.setShouldAntialias(true)
+			default:
+				let c = border.colors[o.side]
+				ctx.setFillColor(UIColor(red: c.r / 255, green: c.g / 255, blue: c.b / 255, alpha: o.alpha).cgColor)
+				ctx.setShouldAntialias(o.antialias)
+				if o.op == "fill" {
+					ctx.addPath(polygon(pts))
+					ctx.fillPath()
+				} else {
+					ctx.fillEllipse(in: CGRect(x: pts[0] - pts[2], y: pts[1] - pts[2], width: 2 * pts[2], height: 2 * pts[2]))
+				}
+				ctx.setShouldAntialias(true)
+			}
+		}
+		ctx.restoreGState()
+	}
+
+	private func polygon(_ pts: [Double]) -> CGPath {
+		let path = CGMutablePath()
+		path.addLines(between: stride(from: 0, to: pts.count - 1, by: 2).map { CGPoint(x: pts[$0], y: pts[$0 + 1]) })
+		path.closeSubpath()
+		return path
 	}
 }
 
