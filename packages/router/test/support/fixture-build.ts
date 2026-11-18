@@ -49,23 +49,45 @@ const heldByThisFile = async (): Promise<boolean> => {
 	return false;
 };
 
+// Waiters take slots in the order they asked: a file that builds again and again would otherwise win every slot it frees.
+const queueDir = `${slotsDir}-queue`;
+let tickets = 0;
+
+async function liveTickets(): Promise<string[]> {
+	const live: string[] = [];
+	for (const ticket of (await readdir(queueDir).catch(() => [])).sort()) {
+		const holder = Number(ticket.split('-')[1]);
+		if (holder && !alive(holder)) await rm(join(queueDir, ticket), { force: true });
+		else live.push(ticket);
+	}
+	return live;
+}
+
 async function acquireSlot(held = ''): Promise<string> {
 	await mkdir(slotsDir, { recursive: true });
-	for (;;) {
-		for (let index = 0; index < BUILD_SLOTS; index++) {
-			const slot = join(slotsDir, String(index));
-			try {
-				await mkdir(slot);
-				await writeFile(join(slot, 'pid'), String(process.pid));
-				if (held) await writeFile(join(slot, 'held'), held);
-				return slot;
-			} catch {
-				// A worker killed mid-build leaves its slot behind.
-				const holder = Number(await readFile(join(slot, 'pid'), 'utf8').catch(() => ''));
-				if (holder && !alive(holder)) await rm(slot, { recursive: true, force: true });
-			}
+	await mkdir(queueDir, { recursive: true });
+	const ticket = `${String(Date.now()).padStart(16, '0')}-${process.pid}-${String(tickets++).padStart(8, '0')}`;
+	await writeFile(join(queueDir, ticket), '');
+	try {
+		for (;;) {
+			if ((await liveTickets()).indexOf(ticket) < BUILD_SLOTS)
+				for (let index = 0; index < BUILD_SLOTS; index++) {
+					const slot = join(slotsDir, String(index));
+					try {
+						await mkdir(slot);
+						await writeFile(join(slot, 'pid'), String(process.pid));
+						if (held) await writeFile(join(slot, 'held'), held);
+						return slot;
+					} catch {
+						// A worker killed mid-build leaves its slot behind.
+						const holder = Number(await readFile(join(slot, 'pid'), 'utf8').catch(() => ''));
+						if (holder && !alive(holder)) await rm(slot, { recursive: true, force: true });
+					}
+				}
+			await new Promise((settle) => setTimeout(settle, 50));
 		}
-		await new Promise((settle) => setTimeout(settle, 50));
+	} finally {
+		await rm(join(queueDir, ticket), { force: true });
 	}
 }
 
