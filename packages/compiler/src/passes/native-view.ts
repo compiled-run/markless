@@ -2203,6 +2203,21 @@ export function createNativeViewPayload(
 					);
 				}
 				const left = exprOf(expression.left, what, scope);
+				// As in JavaScript, a left side known when the app is built either decides `&&`, `||` or `??` (the right side never
+				// runs) or hands the whole value to the right side.
+				if (left && expression.kind === 'logical') {
+					const known = buildTime(left);
+					if (known) {
+						const value = known.value;
+						const decided =
+							expression.operator === '&&'
+								? !value
+								: expression.operator === '||'
+									? Boolean(value)
+									: value !== null && value !== undefined;
+						return decided ? left : exprOf(expression.right, what, scope);
+					}
+				}
 				const right = exprOf(expression.right, what, scope);
 				if (!left || !right) return null;
 				// Strict equality tells undefined from null on the web; a native value does not, so a cell first holding the other one is refused.

@@ -280,8 +280,9 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointerout event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:4/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:5/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test uses a call to `panel.contains`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `focusEdge`, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `focusEdge`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `dismissChain`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `event.stopPropagation`, which needs a script engine"
 		]
 	},
 	"menubar": {
@@ -301,7 +302,8 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the contextmenu event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test uses a call to `surface.contains`, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.isTrusted`, which a tap on a phone does not have",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `event.detail`, which a tap on a phone does not have"
 		]
 	},
 	"modal": {
@@ -325,8 +327,7 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:2/h3 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <a> component-edge:3/h5 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `window.clearTimeout`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `directionTo` uses the `&` operator, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `window.clearTimeout`, which needs a script engine"
 		]
 	},
 	"numberbox": {
@@ -443,12 +444,10 @@
 		]
 	},
 	"table": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focusin handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the function `isReachable` uses a call to `row.hasAttribute`, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:0/component-edge:0/event:1@component-edge:2/h1 keeps an element as a value, which a native host has no use for yet"
+			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <table> component-edge:0/component-edge:0/h0 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
 	"tabs": {
