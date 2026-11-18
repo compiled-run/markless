@@ -31,6 +31,7 @@ import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.Rgba
 import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.SystemFace
 import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import java.io.File
@@ -272,6 +273,30 @@ private fun textLines(fixtures: File) {
 	refusesLines("lines on an element", text.replace("\"text\": null,", "\"text\": null, \"lines\": [],"), "only a framed text node has lines")
 }
 
+private fun systemFonts(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val roboto = """{ "file": "Roboto-Regular.ttf", "index": 0, "axes": { "ital": 0, "wdth": 100, "wght": 700 }, "sha256": "9ca9" }"""
+	fun withFaces(faces: String) = text.replaceFirst("\n \"fonts\": [", "\n \"systemFonts\": $faces,\n \"fonts\": [")
+	val good = withFaces("""[{ "id": "system:system-ui:700", "ios": { "face": { "kind": "system", "weight": 0.4, "design": "default" } }, "android": $roboto }]""")
+	check("the fixture gains system fonts", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes the system fonts", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	check("a system face keeps its file, index and axes", decoded.getOrNull()?.systemFaces == mapOf("system:system-ui:700" to SystemFace("Roboto-Regular.ttf", 0, mapOf("ital" to 0.0, "wdth" to 100.0, "wght" to 700.0)))) { "${decoded.getOrNull()?.systemFaces}" }
+	check("an export without system fonts has none", StyleExport.decode(text.toByteArray()).systemFaces.isEmpty()) { "" }
+	fun refuses(name: String, faces: String, fragment: String) {
+		val err = try { StyleExport.decode(withFaces(faces).toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refuses("system fonts that are not a list", "{}", "systemFonts must be an array")
+	refuses("a system face without an Android face", """[{ "id": "system:serif:400", "ios": {} }]""", "has no android face")
+	refuses("a system face id that is not one", """[{ "id": "sha256:ab", "android": $roboto }]""", "not a system face id")
+	refuses("a system face listed twice", """[{ "id": "system:serif:400", "android": $roboto }, { "id": "system:serif:400", "android": $roboto }]""", "twice")
+	refuses("a path for a file", """[{ "id": "system:serif:400", "android": { "file": "../etc/x.ttf", "index": 0, "axes": {}, "sha256": "a" } }]""", "not a file name")
+	refuses("an unknown field", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": {}, "sha256": "a", "weight": 4 } }]""", "unknown field")
+	refuses("a fractional face index", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0.5, "axes": {}, "sha256": "a" } }]""", "not a face index")
+	refuses("an axis tag that is not four letters", """[{ "id": "system:serif:400", "android": { "file": "a.ttf", "index": 0, "axes": { "weight": 4 }, "sha256": "a" } }]""", "four-letter axis tag")
+}
+
 private fun ops() {
 	val payload = """{"version":"markless.native-view/0","component":"C","cells":[{"id":"n","name":"n","initial":0,"storage":{"key":"visits"}},{"id":"s","name":"s","initial":"a"}],"nodes":[{"kind":"element","id":"h0","element":"div","parent":null,"attributes":{"class":"x mk-1"}},{"kind":"text","id":"h0:text0","parent":"h0","parts":[{"cell":"n"},{"text":"/"},{"expr":{"template":["<",{"cell":"s"},">"]}}]},{"kind":"element","id":"h1","element":"button","parent":"h0"},{"kind":"element","id":"h2","element":"button","parent":"h0"}],"events":[{"host":"h1","event":"activate","handler":"t"},{"host":"h2","event":"activate","handler":"same"}],"handlers":[{"id":"t","ops":[{"op":"assign","cell":"n","value":{"binary":"+","left":{"unary":"+","value":{"cell":"n"}},"right":{"literal":1}}},{"op":"assign","cell":"s","value":{"binary":"+","left":{"cell":"s"},"right":{"cell":"n"}}}]},{"id":"same","ops":[{"op":"assign","cell":"s","value":{"cell":"s"}}]}]}"""
 	val decoded = Payload.decode(payload.toByteArray())
@@ -503,6 +528,7 @@ fun main(args: Array<String>) {
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	systemFonts(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)

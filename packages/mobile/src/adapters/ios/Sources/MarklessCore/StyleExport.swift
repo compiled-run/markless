@@ -55,6 +55,29 @@ public struct BorderOps: Equatable, Sendable {
 	public let ops: [Op]
 }
 
+/// A system face of the export (`system:<role>:<weight>`): the platform's own font, rebuilt as Dragon measured it at build time.
+public enum SystemFace: Sendable, Equatable {
+	/// `UIFont.systemFont(ofSize:weight:)` at this `UIFont.Weight` value, in the system design named `design` (`default`, `serif`, `monospaced`).
+	case system(weight: Double, design: String)
+	/// `CTFontCreateWithName` by PostScript name.
+	case named(postScriptName: String)
+}
+
+/// Consecutive glyphs of a text line in one face at one size (device px); each x is a pen origin in device px from the node's frame.
+public struct GlyphRun: Sendable, Equatable {
+	public let face: String
+	public let size: Double
+	public let glyphs: [UInt16]
+	public let xs: [Double]
+}
+
+/// One line of a text node as Dragon laid it out: its line box top and baseline in device px from the node's frame, and its runs.
+public struct TextLine: Sendable, Equatable {
+	public let top: Double
+	public let baseline: Double
+	public let runs: [GlyphRun]
+}
+
 public struct StyleNode: Sendable {
 	public let id: String
 	public let parent: String?
@@ -67,6 +90,8 @@ public struct StyleNode: Sendable {
 	public let borderOps: BorderOps?
 	/// Only on a scroll container: its offset range in device px.
 	public let scrollRange: ScrollOffsetRange?
+	/// Only on a framed text node: its lines as Dragon laid them out, glyph for glyph.
+	public let lines: [TextLine]?
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -140,11 +165,13 @@ public struct StyleExport: Sendable {
 	public let pageScrollUndecided: String?
 	/// Each system sheet's content, laid out as its own document at every resting height (app style files only).
 	public var sheets: [SheetStyle] = []
+	/// Each system face the export names, by id: the platform font this host draws it with.
+	public var systemFaces: [String: SystemFace] = [:]
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings"])
+		let fields = try root.object(required: ["schema", "units", "fonts", "targets"], optional: ["compiler", "component", "source", "warnings", "systemFonts"])
 		let schema = try fields["schema"].string()
 		guard dragonStyleExportSchemas.contains(schema) else {
 			throw PayloadError(path: "style.schema", reason: "unsupported schema \"\(schema)\", this host reads \(dragonStyleExportSchemas)")
@@ -163,15 +190,18 @@ public struct StyleExport: Sendable {
 				}
 			}
 		}
-		return try decodeTarget(
+		var style = try decodeTarget(
 			try fields["targets"].field(target), perState: perState, fonts: try decodeFonts(fields["fonts"]), backend: backend,
 			pageScrollUndecided: pageScrollUndecided)
+		if fields.has("systemFonts") { style.systemFaces = try decodeSystemFonts(fields["systemFonts"], target: target) }
+		return style
 	}
 
 	/// Reads an app's `markless.native-app-style/0` for one target: each styled route's styles, by route pattern.
 	public static func decodeApp(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> [String: StyleExport] {
 		let root = try Reader(JSONValue.parse(data), at: "style")
-		let fields = try root.object(["version", "units", "warnings", "fonts", "targets"])
+		let fields = try root.object(required: ["version", "units", "warnings", "fonts", "targets"], optional: ["systemFonts"])
+		let systemFaces = fields.has("systemFonts") ? try decodeSystemFonts(fields["systemFonts"], target: target) : [:]
 		let version = try fields["version"].string()
 		guard version == nativeAppStyleVersion else {
 			throw PayloadError(path: "style.version", reason: "unsupported version \"\(version)\", this host reads \(nativeAppStyleVersion)")
@@ -214,6 +244,7 @@ public struct StyleExport: Sendable {
 			_ = (try f["component"].string(), try f["compiler"].string())
 			guard routes[pattern] == nil else { throw route.fail("route \(pattern) is listed twice") }
 			var style = try expanded(route, f, try raw(targetFields, "viewport"))
+			style.systemFaces = systemFaces
 			if f.has("sheets") {
 				style.sheets = try f["sheets"].array().map { sheet in
 					let s = try sheet.object(["node", "heights"])
@@ -229,6 +260,57 @@ public struct StyleExport: Sendable {
 			routes[pattern] = style
 		}
 		return routes
+	}
+
+	/// `systemFonts`: each system face with this target's face; an entry without this target, or a face of an unknown kind, is an error.
+	private static func decodeSystemFonts(_ reader: Reader, target: String) throws -> [String: SystemFace] {
+		var out: [String: SystemFace] = [:]
+		for entry in try reader.array() {
+			let f = try entry.object(required: ["id"], optional: ["ios", "android"])
+			let id = try f["id"].string()
+			guard id.hasPrefix("system:") else { throw entry.fail("\(id) is not a system face id") }
+			guard out[id] == nil else { throw entry.fail("\(id) is listed twice") }
+			guard f.has(target) else { throw entry.fail("\(id) has no \(target) face") }
+			let face = try f[target].object(["face"])["face"]
+			switch try face.field("kind").string() {
+			case "system":
+				let s = try face.object(["kind", "weight", "design"])
+				let weight = try s["weight"].number()
+				guard weight >= -1, weight <= 1 else { throw face.fail("weight \(weight) is not a UIFont.Weight value") }
+				let design = try s["design"].string()
+				guard ["default", "serif", "monospaced"].contains(design) else { throw face.fail("unknown system design \"\(design)\"") }
+				out[id] = .system(weight: weight, design: design)
+			case "name":
+				let n = try face.object(["kind", "postScriptName"])
+				let name = try n["postScriptName"].string()
+				guard !name.isEmpty else { throw face.fail("an empty PostScript name") }
+				out[id] = .named(postScriptName: name)
+			case let kind:
+				throw face.fail("unknown system face kind \"\(kind)\"")
+			}
+		}
+		return out
+	}
+
+	private static func decodeLines(_ reader: Reader) throws -> [TextLine] {
+		try reader.array().map { line in
+			let l = try line.object(["top", "baseline", "runs"])
+			let runs = try l["runs"].array().map { run in
+				let r = try run.object(["face", "size", "glyphs", "xs"])
+				let size = try r["size"].number()
+				guard size > 0 else { throw run.fail("\(size) is not a positive size") }
+				let glyphs = try r["glyphs"].array().map { g -> UInt16 in
+					let v = try g.number()
+					guard v >= 0, v <= 65535, v == v.rounded() else { throw g.fail("\(v) is not a glyph id") }
+					return UInt16(v)
+				}
+				let xs = try r["xs"].array().map { try $0.number() }
+				guard !glyphs.isEmpty else { throw run.fail("a run needs at least one glyph") }
+				guard xs.count == glyphs.count else { throw run.fail("a run needs one x per glyph") }
+				return GlyphRun(face: try r["face"].string(), size: size, glyphs: glyphs, xs: xs)
+			}
+			return TextLine(top: try l["top"].number(), baseline: try l["baseline"].number(), runs: runs)
+		}
 	}
 
 	private static func decodeFonts(_ reader: Reader) throws -> [(id: String, file: String)] {
@@ -365,12 +447,14 @@ public struct StyleExport: Sendable {
 			return (try w["top"].number(), try w["right"].number(), try w["bottom"].number(), try w["left"].number())
 		}()
 		let textReader = try field["text"]
+		let lines = field.has("lines") ? try decodeLines(try field["lines"]) : nil
+		if lines != nil, !isText || frame == nil || textReader.isNull { throw node.fail("only a framed text node with a text has lines") }
 		return StyleNode(
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
 			writes: try field["writes"].array().map(decodeWrite),
 			borderOps: field.has("borderOps") ? try decodeBorderOps(try field["borderOps"]) : nil,
-			scrollRange: field.has("scrollRange") ? try decodeRange(try field["scrollRange"]) : nil)
+			scrollRange: field.has("scrollRange") ? try decodeRange(try field["scrollRange"]) : nil, lines: lines)
 	}
 
 	private static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {

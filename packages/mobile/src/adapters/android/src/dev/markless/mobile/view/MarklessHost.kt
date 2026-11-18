@@ -84,6 +84,33 @@ class AssetFonts(private val context: Context) : FontSource {
 }
 
 /**
+ * The system faces a style export names, each `/system/fonts/<file>` at the axes Dragon measured it at, drawn by the platform's
+ * own font; any other id goes to [bundled].
+ */
+class SystemFonts(private val faces: Map<String, dev.markless.mobile.style.SystemFace>, private val bundled: FontSource) : FontSource {
+	private val fonts = HashMap<String, android.graphics.fonts.Font>()
+	private val typefaces = HashMap<String, Typeface>()
+
+	override fun font(id: String): android.graphics.fonts.Font {
+		val face = faces[id] ?: return bundled.font(id)
+		return fonts.getOrPut(id) {
+			val file = java.io.File("/system/fonts", face.file)
+			try {
+				android.graphics.fonts.Font.Builder(file).setTtcIndex(face.index)
+					.setFontVariationSettings(face.axes.entries.joinToString(", ") { "'${it.key}' ${it.value}" }).build()
+			} catch (e: java.io.IOException) {
+				throw MarklessHostError("system face $id: ${file.path} could not be read (${e.message})")
+			}
+		}
+	}
+
+	override fun typeface(id: String): Typeface {
+		if (id !in faces) return bundled.typeface(id)
+		return typefaces.getOrPut(id) { Typeface.CustomFallbackBuilder(android.graphics.fonts.FontFamily.Builder(font(id)).build()).build() }
+	}
+}
+
+/**
  * Builds the retained views for one payload and keeps them current. After [root] is built, views change only through
  * journal entries from the [runtime]. Pass the Dragon style export to place and paint the views; without it children stack.
  */
@@ -92,7 +119,7 @@ class MarklessHost(
 	val payload: Payload,
 	/** This page's styles: a page's own export, or its route's styles from an app style file. */
 	val style: StyleExport?,
-	private val fonts: FontSource = AssetFonts(context),
+	bundledFonts: FontSource = AssetFonts(context),
 	store: Store = PreferencesStore(context),
 	/** The route params the page opens with. */
 	params: Map<String, String> = emptyMap(),
@@ -114,6 +141,7 @@ class MarklessHost(
 		preferredLanguages: List<String> = LocaleList.getDefault().let { list -> (0 until list.size()).map { list[it].toLanguageTag() } },
 	) : this(context, Payload.decode(payloadBytes), styleExportBytes?.let { StyleExport.decode(it) }, fonts, store, params, device, preferredLanguages)
 
+	private val fonts: FontSource = if (style?.systemFaces.isNullOrEmpty()) bundledFonts else SystemFonts(style!!.systemFaces, bundledFonts)
 	val runtime = Runtime(payload, store, params, preferredLanguages, now)
 	private val order = payload.nodes.withIndex().associate { it.value.id to it.index }
 	private val events = payload.events.groupBy { it.host }
@@ -1067,7 +1095,8 @@ class MarklessHost(
 		val color = s.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb ?: drawn?.color ?: view.currentTextColor
 		val glyphs = drawn ?: GlyphLines(fonts).also { glyphLines[view] = it; view.overlay.add(it) }
 		val frame = s.frame!!
-		glyphs.setBounds(0, 0, Math.ceil(inView.first + frame.width).toInt(), Math.ceil(inView.second + frame.height).toInt())
+		// One device px of slack on every side, so a glyph whose ink passes its advance is not cut at the frame's edge.
+		glyphs.setBounds(-1, -1, Math.ceil(inView.first + frame.width).toInt() + 1, Math.ceil(inView.second + frame.height).toInt() + 1)
 		glyphs.set(lines, inView.first, inView.second, color)
 		view.setTextColor(Color.TRANSPARENT)
 	}

@@ -9,6 +9,9 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
+	/// A text node's lines as Dragon laid them out, in points from its frame, and the text they draw.
+	public var lines: [TextLine]?
+	public var linesText: String?
 	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
 	public var dashedBorder: DashedBorder?
 	/// Overflow other than visible: the children are clipped to the box (Dragon clips them to the padding box; without borders the same).
@@ -24,7 +27,7 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
+			&& a.textColor == b.textColor && a.lines == b.lines && a.linesText == b.linesText && a.sides == b.sides && a.dashedBorder == b.dashedBorder && a.scroll == b.scroll
 			&& a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 			&& a.paintOrder?.bucket == b.paintOrder?.bucket && a.paintOrder?.rank == b.paintOrder?.rank
 	}
@@ -80,6 +83,8 @@ public struct StyleLayout: Sendable {
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
+	/// Each system face the export names, by id.
+	public let systemFaces: [String: SystemFace]
 	public let bands: StyleBands?
 	/// Each assignment's document height in points: how far the laid-out content reaches down.
 	public let extents: [Double]
@@ -177,7 +182,7 @@ extension StyleExport {
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
 			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
-			dpr: dpr, fontFiles: fonts, bands: bands,
+			dpr: dpr, fontFiles: fonts, systemFaces: systemFaces, bands: bands,
 			extents: assignments.map { assignment in
 				let byId = Dictionary(uniqueKeysWithValues: assignment.nodes.map { ($0.id, $0) })
 				func top(_ id: String?) -> Double {
@@ -271,6 +276,10 @@ extension StyleExport {
 		var bounce = (x: true, y: true)
 		var clips = false
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
+		style.lines = node.lines?.map { line in
+			TextLine(top: line.top / dpr, baseline: line.baseline / dpr, runs: line.runs.map { GlyphRun(face: $0.face, size: $0.size / dpr, glyphs: $0.glyphs, xs: $0.xs.map { $0 / dpr }) })
+		}
+		style.linesText = node.lines == nil ? nil : node.text
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
 		for write in writes {

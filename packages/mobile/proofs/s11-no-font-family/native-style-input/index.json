@@ -1,0 +1,62 @@
+{
+	"version": "markless.native-style-input/0",
+	"component": "Notes",
+	"nodes": [
+		{
+			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "notes mk-105srqn"
+			}
+		},
+		{
+			"kind": "element",
+			"id": "h2",
+			"element": "h1",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-105srqn"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h2:text0",
+			"parent": "h2",
+			"text": "Field notes"
+		},
+		{
+			"kind": "element",
+			"id": "h3",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-105srqn"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h3:text0",
+			"parent": "h3",
+			"text": "No font-family anywhere: the browser's default serif, on the web and on the phone"
+		},
+		{
+			"kind": "element",
+			"id": "h4",
+			"element": "p",
+			"parent": "h0",
+			"attributes": {
+				"class": "mk-105srqn"
+			}
+		},
+		{
+			"kind": "text",
+			"id": "h4:text0",
+			"parent": "h4",
+			"text": "Waffles, quays and fjords"
+		}
+	],
+	"css": "body {\n\tmargin: 0;\n}\n\n.notes.mk-105srqn {\n\t\t\t\tpadding: 24px;\n\t\t\t}",
+	"states": []
+}

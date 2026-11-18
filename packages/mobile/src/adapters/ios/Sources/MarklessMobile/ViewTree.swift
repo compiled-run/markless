@@ -1,5 +1,6 @@
 #if canImport(UIKit)
 import AVFoundation
+import CoreText
 import MarklessCore
 import UIKit
 import UIKit.UIGestureRecognizerSubclass
@@ -170,6 +171,8 @@ final class ViewTree {
 	private let runtime: NativeRuntime
 	private let layout: StyleLayout?
 	private let faces: [String: UIFontDescriptor]
+	/// The system faces the page's and its sheets' styles name.
+	private let systemFaces: [String: SystemFace]
 	private let onAction: (NativeAction) -> Void
 	/// The view of a device object (a camera's preview), made by the page's device.
 	private let objectView: (_ object: String, _ device: String) throws -> UIView
@@ -241,6 +244,7 @@ final class ViewTree {
 		self.objectView = objectView
 		self.layout = layout
 		self.faces = faces
+		systemFaces = sheetLayouts.values.joined().reduce(layout?.systemFaces ?? [:]) { $0.merging($1.layout.systemFaces) { a, _ in a } }
 		self.onAction = onAction
 		keyboard = KeyboardDismisser(page)
 		assignment = layout?.start ?? 0
@@ -459,6 +463,7 @@ final class ViewTree {
 				}
 				guard let label = labels[node] else { throw HostError("journal names text node \(node), which is not shown") }
 				label.text = value
+				drawLines(label)
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
 			case let .checked(node, checked):
 				if elements[node] is AbsentField { continue }
@@ -642,6 +647,7 @@ final class ViewTree {
 	/// Paints a view and puts it at its frame; inside a scroll container, frames count from the scroll view's padding box.
 	private func place(_ id: String, _ view: UIView, _ style: ResolvedStyle) throws {
 		try paint(view, style, faces: faces)
+		if let label = view as? UILabel { drawLines(label, style) }
 		if let host = view.superview as? ContainerScrollView { view.frame.origin = CGPoint(x: view.frame.minX - host.inset.left, y: view.frame.minY - host.inset.top) }
 		guard let scroll = scrollViews[id] else {
 			if style.scroll != nil { throw HostError("\(id) became a scroll container after it was built") }
@@ -649,6 +655,35 @@ final class ViewTree {
 		}
 		guard let s = style.scroll else { throw HostError("\(id) stopped being a scroll container after it was built") }
 		scroll.configure(s, in: view.bounds.size, cornerRadius: style.cornerRadius)
+	}
+
+	/// Draws Dragon's lines over a label in a system face while its text is the one Dragon laid out; otherwise the label draws its own.
+	private func drawLines(_ label: UILabel, _ given: ResolvedStyle? = nil) {
+		let drawn = label.layer.sublayers?.first { $0 is GlyphLinesLayer } as? GlyphLinesLayer
+		guard let id = label.accessibilityIdentifier, let style = given ?? self.style(of: id), let lines = style.lines,
+			style.linesText == label.text, lines.allSatisfy({ $0.runs.allSatisfy { systemFaces[$0.face] != nil } })
+		else {
+			if let drawn {
+				drawn.removeFromSuperlayer()
+				label.textColor = drawn.textColor
+			}
+			return
+		}
+		let layer = drawn ?? GlyphLinesLayer()
+		if drawn == nil {
+			layer.textColor = label.textColor
+			label.layer.addSublayer(layer)
+		}
+		if let color = style.textColor { layer.textColor = uiColor(color) }
+		// One device px of slack on every side, so a glyph whose ink passes its advance is not cut at the frame's edge.
+		let scale = label.traitCollection.displayScale > 0 ? label.traitCollection.displayScale : UIScreen.main.scale
+		layer.slack = 1 / scale
+		layer.frame = label.bounds.insetBy(dx: -layer.slack, dy: -layer.slack)
+		layer.contentsScale = scale
+		layer.lines = lines
+		layer.faces = systemFaces
+		layer.setNeedsDisplay()
+		label.textColor = .clear
 	}
 
 	private func style(of id: String) -> ResolvedStyle? {
@@ -1489,6 +1524,45 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 		label.font = UIFont(descriptor: face, size: font.size)
 	}
 	if let color = style.textColor { label.textColor = uiColor(color) }
+}
+
+/// A text node's lines drawn glyph for glyph at Dragon's positions in the platform's own font (`CTFontDrawGlyphs`).
+final class GlyphLinesLayer: CALayer {
+	var lines: [TextLine] = []
+	var faces: [String: SystemFace] = [:]
+	var textColor: UIColor = .black
+	/// How far the layer reaches past the label on every side, in points.
+	var slack: CGFloat = 0
+
+	override func draw(in ctx: CGContext) {
+		ctx.saveGState()
+		ctx.textMatrix = .identity
+		ctx.translateBy(x: 0, y: bounds.height)
+		ctx.scaleBy(x: 1, y: -1)
+		ctx.setFillColor(textColor.cgColor)
+		for line in lines {
+			for run in line.runs {
+				guard let face = faces[run.face] else { continue }
+				let font = systemFont(face, size: run.size)
+				let glyphs = run.glyphs.map { CGGlyph($0) }
+				let positions = run.xs.map { CGPoint(x: $0 + slack, y: bounds.height - (line.baseline + slack)) }
+				CTFontDrawGlyphs(font, glyphs, positions, glyphs.count, ctx)
+			}
+		}
+		ctx.restoreGState()
+	}
+}
+
+/// A system face at a size in points, built as Dragon's build-time helper built it.
+func systemFont(_ face: SystemFace, size: Double) -> CTFont {
+	switch face {
+	case let .system(weight, design):
+		let base = UIFont.systemFont(ofSize: size, weight: UIFont.Weight(rawValue: weight))
+		guard design != "default", let d = base.fontDescriptor.withDesign(design == "serif" ? .serif : .monospaced) else { return base as CTFont }
+		return UIFont(descriptor: d, size: size) as CTFont
+	case let .named(name):
+		return CTFontCreateWithName(name as CFString, size, nil)
+	}
 }
 
 private func uiColor(_ color: RGBA) -> UIColor {

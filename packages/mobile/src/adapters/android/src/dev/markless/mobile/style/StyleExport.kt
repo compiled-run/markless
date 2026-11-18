@@ -104,10 +104,13 @@ data class Bands(val atoms: List<BandAtom>, val bands: List<List<Boolean>>) {
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
+/** A system face of a style export (`system:<role>:<weight>`): a file of `/system/fonts` at the fonts.xml instance Dragon measured. */
+data class SystemFace(val file: String, val index: Int, val axes: Map<String, Double>)
+
 /** A system sheet's content at one resting height: its own document, laid out in the sheet's content area. */
 data class SheetHeight(val snapPoint: Double, val style: StyleExport)
 
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap()) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val bands: Bands? = null, val pageScrollUndecided: String? = null, val sheets: Map<String, List<SheetHeight>> = emptyMap(), val systemFaces: Map<String, SystemFace> = emptyMap()) {
 
 	/** The index of [BAND_KEY] among [states], or -1 for an export without @media. */
 	val bandState: Int = states.indexOfFirst { it.key == BAND_KEY }
@@ -187,7 +190,33 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
 				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
 			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
-			return program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }
+			return program(t, target, dpr, width, height, undecided) { w, what -> writes(w, what) }.copy(systemFaces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap())
+		}
+
+		/** `systemFonts`: each system face with this target's file, face index and axes; an entry without this target is an error. */
+		private fun systemFaces(v: Json, target: String): Map<String, SystemFace> {
+			val out = LinkedHashMap<String, SystemFace>()
+			for ((n, e) in v.arr("systemFonts").withIndex()) {
+				val what = "systemFonts[$n]"
+				val o = e.obj(what)
+				o.only(setOf("id", "ios", "android"), what)
+				val id = o.field("id", what).str("$what.id")
+				if (!id.startsWith("system:")) throw MarklessDecodeError("$what.id \"$id\" is not a system face id")
+				if (id in out) throw MarklessDecodeError("$what lists $id twice")
+				val f = (o[target] ?: throw MarklessDecodeError("$what ($id) has no $target face")).obj("$what.$target")
+				f.only(setOf("file", "index", "axes", "sha256"), "$what.$target")
+				val file = f.field("file", what).str("$what.$target.file")
+				if (file.isEmpty() || file.contains('/') || file.startsWith(".")) throw MarklessDecodeError("$what.$target.file \"$file\" is not a file name in /system/fonts")
+				val index = f.field("index", what).num("$what.$target.index")
+				if (index < 0 || index != Math.floor(index)) throw MarklessDecodeError("$what.$target.index is $index, not a face index")
+				f.field("sha256", what).str("$what.$target.sha256")
+				val axes = f.field("axes", what).obj("$what.$target.axes").mapValues { (tag, x) ->
+					if (tag.length != 4) throw MarklessDecodeError("$what.$target.axes names \"$tag\", not a four-letter axis tag")
+					x.num("$what.$target.axes.$tag")
+				}
+				out[id] = SystemFace(file, index.toInt(), axes)
+			}
+			return out
 		}
 
 		/** One target's states, assignments and next table; [writesOf] reads a node's `writes` field. */
@@ -241,7 +270,8 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 		 */
 		fun decodeApp(bytes: ByteArray, target: String = "android"): Map<String, StyleExport> {
 			val root = Json.parse(bytes).obj("app style")
-			root.only(setOf("version", "units", "warnings", "fonts", "targets"), "app style")
+			root.only(setOf("version", "units", "warnings", "fonts", "systemFonts", "targets"), "app style")
+			val faces = root["systemFonts"]?.let { systemFaces(it, target) } ?: emptyMap()
 			val version = root.field("version", "app style").str("version")
 			if (version != APP_STYLE_VERSION) throw MarklessDecodeError("unknown app style version \"$version\" (this host reads $APP_STYLE_VERSION)")
 			val t = root.field("targets", "app style").obj("targets").field(target, "targets").obj("targets.$target")
@@ -280,7 +310,7 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 						SheetHeight(ho.field("snapPoint", at).num("$at.snapPoint"), program(ho, at, dpr, hp.field("width", at).num("width"), hp.field("height", at).num("height"), null, listed))
 					}.also { if (it.isEmpty() || it.map { h -> h.snapPoint }.distinct().size != it.size) throw MarklessDecodeError("$where needs one layout per resting height") }
 				}
-				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets)
+				routes[pattern] = program(o, "routes[$n] ($pattern)", dpr, width, height, null, listed).copy(sheets = sheets, systemFaces = faces)
 				val missing = routes.getValue(pattern).assignments.indexOfFirst { it.canvas == null }
 				if (missing >= 0) throw MarklessDecodeError("routes[$n] ($pattern).assignments[$missing] has no canvas")
 			}

@@ -1,0 +1,17 @@
+{
+	"rung": "S10",
+	"name": "System fonts: system-ui headings and sans-serif, serif and monospace paragraphs, each measured at build time from the phone's own font (San Francisco, Helvetica, Times New Roman and Courier on iOS; Roboto, Noto Serif and Droid Sans Mono on Android) and drawn by it, nothing bundled",
+	"steps": [
+		{
+			"visible": [
+				"Harbour tides",
+				"Drawn in the phone's own font",
+				"Sans-serif: waffles, quays and fjords along the harbour wall",
+				"Serif: the quick brown fox jumps over the lazy dog",
+				"Bold serif: AVATAR Type office",
+				"Monospace: tide table 0412"
+			],
+			"title": "Generics"
+		}
+	]
+}
