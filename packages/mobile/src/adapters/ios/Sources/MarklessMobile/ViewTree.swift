@@ -675,6 +675,16 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 	view.layer.borderWidth = style.borderWidth
 	view.layer.borderColor = style.borderColor.map(uiColor)?.cgColor
 	view.layer.cornerRadius = style.cornerRadius
+	view.clipsToBounds = style.clipsChildren
+	// A layer mask clips the box and its subviews without touching their accessibility, as Chrome keeps clipped text exposed.
+	if let r = style.clipRect {
+		let mask = view.layer.mask ?? CALayer()
+		mask.backgroundColor = UIColor.black.cgColor
+		mask.frame = CGRect(x: r.x, y: r.y, width: r.width, height: r.height)
+		view.layer.mask = mask
+	} else {
+		view.layer.mask = nil
+	}
 	paintSides(view, style.sides)
 	guard let label = view as? UILabel else {
 		if style.font != nil || style.textColor != nil { throw HostError("\(view.accessibilityIdentifier ?? "a box") has text styles but is not text") }

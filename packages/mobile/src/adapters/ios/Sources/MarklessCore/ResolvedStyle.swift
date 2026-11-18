@@ -9,11 +9,15 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
+	/// Overflow other than visible: the children are clipped to the box (Dragon clips them to the padding box; without borders the same).
+	public var clipsChildren = false
+	/// clip-path: inset(): the rect in points, relative to the box, the box and everything in it are clipped to; empty when nothing shows.
+	public var clipRect: Frame?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.sides == b.sides
+			&& a.textColor == b.textColor && a.sides == b.sides && a.clipsChildren == b.clipsChildren && a.clipRect == b.clipRect
 	}
 
 	public struct Side: Equatable, Sendable {
@@ -139,6 +143,7 @@ extension StyleExport {
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
+		var reHosted: String?
 		for write in writes {
 			switch write {
 			case let .backgroundColor(color): style.background = color
@@ -153,10 +158,26 @@ extension StyleExport {
 			case let .font(family, size): style.font = (family, size)
 			case let .textColor(color): style.textColor = color
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
+			case .paddingBoxClip: style.clipsChildren = true
+			case let .clipPathInset(edges):
+				guard let frame = style.frame else { throw styleError("\(node.id): clip-path on a box with no frame") }
+				let edge = { (k: Int, size: Double) in edges[k].percent ? edges[k].value / 100 * size : edges[k].value }
+				let l = edge(3, frame.width), t = edge(0, frame.height)
+				let r = frame.width - edge(1, frame.width), b = frame.height - edge(2, frame.height)
+				style.clipRect = r <= l || b <= t ? Frame(x: 0, y: 0, width: 0, height: 0) : Frame(x: l, y: t, width: r - l, height: b - t)
+			case .clipText: break
+			case let .paintOrder(host): reHosted = host
 			}
+		}
+		// Re-hosting a box into another stacking context's order is not built here; a box that paints nothing has no order to keep.
+		if let host = reHosted, !(style.clipRect.map { $0.width == 0 || $0.height == 0 } ?? false) {
+			throw styleError("\(node.id): painting in \(host)'s stacking order (a positioned or z-index box) is not implemented on iOS")
 		}
 		if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]
+			if style.clipsChildren, all.contains(where: { $0 != 0 }) {
+				throw styleError("\(node.id): overflow clipping on a box with borders (to its padding box) is not implemented on iOS")
+			}
 			if all.contains(where: { $0 != 0 }) {
 				guard borderStyles.count == 4, borderStyles.allSatisfy({ ["solid", "none", "hidden"].contains($0) }), borderColors.count == 4 else {
 					throw styleError("\(node.id): border styles \(borderStyles) are not implemented on iOS, only solid sides")

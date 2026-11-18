@@ -1,0 +1,8 @@
+{
+	"rung": 118,
+	"name": "@markless/ui base.visuallyhidden styled through Dragon: its inline style hides its text from sight, not from the page",
+	"steps": [
+		{ "visible": ["Hidden text", "Shown above", "Taps 0", "Tap"] },
+		{ "do": { "tap": "Tap" }, "visible": ["Taps 1"], "absent": ["Taps 0"] }
+	]
+}

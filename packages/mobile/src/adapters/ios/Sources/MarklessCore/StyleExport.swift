@@ -24,6 +24,14 @@ public enum StyleWrite: Sendable {
 	case font(family: String, size: Double)
 	case textColor(RGBA)
 	case syntheticBold
+	/// Overflow other than visible: the children are clipped to the padding box.
+	case paddingBoxClip
+	/// clip-path: inset(): the box and everything in it are clipped to its border box inset by each edge (top, right, bottom, left).
+	case clipPathInset([(value: Double, percent: Bool)])
+	/// The text a clip-path leaves exposed to the screen reader; a clip does not change accessibility, so nothing to apply.
+	case clipText
+	/// The box paints in another stacking context's order (Dragon's re-hosting); `host` is that context's node.
+	case paintOrder(host: String)
 }
 
 public struct StyleNode: Sendable {
@@ -322,6 +330,31 @@ public struct StyleExport: Sendable {
 			_ = try f["keys"].array().map { try $0.number() }
 			_ = try f["values"].array().map { try $0.number() }
 			return .syntheticBold
+		case "padding-box-clip":
+			try expectKey(try write.object(["kind", "key"]), "dragonClip.frame")
+			return .paddingBoxClip
+		case "clip-path-inset":
+			let f = try write.object(["kind", "edges", "key"])
+			try expectKey(f, "dragonClipPath.frame")
+			let edges = try sides(f["edges"]).map { edge in
+				let e = try edge.object(["value", "unit"])
+				let unit = try e["unit"].string()
+				guard unit == "px" || unit == "%" else { throw PayloadError(path: edge.path + ".unit", reason: "clip-path inset unit \(unit) is not px or %") }
+				return (value: try e["value"].number(), percent: unit == "%")
+			}
+			return .clipPathInset(edges)
+		case "clip-text":
+			let f = try write.object(["kind", "texts", "key"])
+			try expectKey(f, "dragonClipText.exposed")
+			_ = try f["texts"].array().map { try $0.string() }
+			return .clipText
+		case "paint-order":
+			let f = try write.object(["kind", "host", "bucket", "rank", "index", "key"])
+			try expectKey(f, "dragonStacking.order")
+			_ = try f["bucket"].number()
+			_ = try f["rank"].number()
+			_ = try f["index"].number()
+			return .paintOrder(host: try f["host"].string())
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}
