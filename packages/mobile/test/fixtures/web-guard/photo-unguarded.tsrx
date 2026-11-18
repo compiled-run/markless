@@ -1,12 +1,12 @@
 import { state } from '@markless/core';
 import { camera } from '@markless/device';
-import { native } from '@markless/ui';
+import { base } from '@markless/ui';
 
 export default function App() @{
 	const cam = camera();
 	let photo = state('');
 	<main>
-		<native.camera el={cam} />
+		<base.camera el={cam} />
 		<button
 			onClick={async () => {
 				photo = (await cam.takePhoto()).url;

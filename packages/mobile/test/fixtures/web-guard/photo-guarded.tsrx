@@ -1,12 +1,12 @@
 import { state } from '@markless/core';
 import { camera, platform } from '@markless/device';
-import { native } from '@markless/ui';
+import { base } from '@markless/ui';
 
 function Shooter() @{
 	const cam = camera();
 	let photo = state('');
 	<section>
-		<native.camera el={cam} />
+		<base.camera el={cam} />
 		<button
 			onClick={async () => {
 				photo = (await cam.takePhoto()).url;

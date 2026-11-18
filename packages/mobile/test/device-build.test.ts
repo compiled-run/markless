@@ -166,7 +166,7 @@ export default function App() @{
 		);
 	});
 
-	it('lowers <native.camera> and its alias <base.camera> to the same camera element', async () => {
+	it('lowers <native.camera>, ready for the native namespace, and <base.camera> to the same camera element', async () => {
 		const shooter = (namespace: string) => `import { camera } from '@markless/device';
 import { ${namespace} } from '@markless/ui';
 export default function App() @{

@@ -1,6 +1,6 @@
 import { state } from '@markless/core';
 import { camera, platform } from '@markless/device';
-import { native } from '@markless/ui';
+import { base } from '@markless/ui';
 
 function Shooter() @{
 	const cam = camera();
@@ -10,7 +10,7 @@ function Shooter() @{
 	<section>
 		<p>Access {camera.access}</p>
 		@if (showing) {
-			<native.camera el={cam} />
+			<base.camera el={cam} />
 		}
 		<button onClick={() => (showing = !showing)}>{showing ? 'Hide preview' : 'Show preview'}</button>
 		<p>{cam.ready ? 'Camera ready' : 'Camera starting'}</p>

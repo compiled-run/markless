@@ -1604,18 +1604,6 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"hooks": []
 		}
 	],
-	"native": [
-		{
-			"part": "camera",
-			"role": "",
-			"element": "div",
-			"ariaRole": "",
-			"hidden": false,
-			"hooks": [
-				"ui-camera"
-			]
-		}
-	],
 	"navbar": [
 		{
 			"part": "root",
