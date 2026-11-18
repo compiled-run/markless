@@ -133,7 +133,11 @@ export async function compileNativeComponent(input: {
 	const analyze = async (file: string, visiting: Set<string>): Promise<SemanticGraphArtifact> => {
 		const known = interfaces.get(file) ?? graphs.get(file);
 		if (known) return known;
-		const module = read.get(file)!;
+		const given = read.get(file)!;
+		// A JSON module is its value as the default export, which is what an import of one gives on the web.
+		const module = given.filename.endsWith('.json')
+			? { filename: `${given.filename}.ts`, source: `export default ${given.source.trim()};\n` }
+			: given;
 		const importedModuleInterfaces: Record<string, ModuleGraphInterfaceArtifact> = {};
 		const plain = await buildSemanticGraph({ ...module, ...targetFacts });
 		visiting.add(file);

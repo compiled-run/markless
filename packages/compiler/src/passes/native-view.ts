@@ -1474,6 +1474,8 @@ export function createNativeViewPayload(
 			entry.statements.add(index);
 			const statement = factsOf(entry.module)!.statements[index]!;
 			const at = where(entry.module);
+			// A CommonJS module is refused as a whole; its `require` and `exports` say nothing more.
+			if (factsOf(entry.module)!.commonjs) return;
 			for (const use of statement.dropped)
 				refuseScript(`${at} uses \`${use.name}\` (a component or framework state) outside a component, which a phone's script cannot run`, use.span);
 			for (const use of statement.framework)
