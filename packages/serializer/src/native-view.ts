@@ -108,9 +108,11 @@ export type NativeExpr =
 	/**
 	 * What the event that runs the handler carries: an `input` handler's field text after the edit
 	 * (`event.currentTarget.value`); a `dismiss` handler's `event.detail.reason` and `event.detail.pressTarget` (an element,
-	 * or null for Escape); a pointer handler's `event.target` (an element) and `event.button` (0, a touch).
+	 * or null for Escape); a pointer handler's fields, as a phone's browser reports a touch (`NativePointerField`).
 	 */
-	| { readonly event: 'value' | 'reason' | 'pressTarget' | 'target' | 'button' }
+	| { readonly event: 'value' | 'reason' | 'pressTarget' | NativePointerField }
+	/** Whether the element `node` has captured the pointer `pointer` (`node.hasPointerCapture(pointer)`). */
+	| { readonly captures: NativeExpr; readonly pointer: NativeExpr }
 	/**
 	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
 	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
@@ -446,8 +448,44 @@ export type NativeEventName =
 	| 'submit'
 	| 'idle'
 	| 'visible'
+	| NativePointerEventName;
+
+/**
+ * The pointer events a touch raises, in a phone browser's order (Safari on iOS, Chrome on Android): `pointerover`, then
+ * `pointerenter` on each element from the outermost to the one touched, `pointerdown`; `pointermove` while it moves;
+ * `pointerup`, or `pointercancel` when the platform takes the touch for a scroll; then `pointerout` and `pointerleave` on
+ * each element from the innermost out. The touched element captures the pointer until it lifts, so `pointermove` and
+ * `pointerup` reach it wherever the finger goes, unless a handler captures it elsewhere or releases it. Hover lasts only
+ * while the finger is down.
+ */
+export type NativePointerEventName =
 	| 'pointerdown'
-	| 'pointerup';
+	| 'pointermove'
+	| 'pointerup'
+	| 'pointercancel'
+	| 'pointerover'
+	| 'pointerout'
+	| 'pointerenter'
+	| 'pointerleave';
+
+/**
+ * What a pointer handler reads off its event. `target`, `currentTarget` and `relatedTarget` are elements (`relatedTarget`
+ * is null, as a touch has no element it came from); `clientX` and `clientY` are the touch's place in points (iOS) or dp
+ * (Android) from the screen's top left, which a browser's CSS pixels match; `pointerType` is "touch"; `timeStamp` is in
+ * milliseconds since the screen appeared.
+ */
+export type NativePointerField =
+	| 'target'
+	| 'currentTarget'
+	| 'relatedTarget'
+	| 'button'
+	| 'buttons'
+	| 'clientX'
+	| 'clientY'
+	| 'pointerId'
+	| 'pointerType'
+	| 'isPrimary'
+	| 'timeStamp';
 
 /** Why the overlay behaviour reported a dismissal; the vocabulary of `OverlayGestureReason` in `@markless/web`. */
 export type NativeDismissReason = 'escape' | 'outside-press';
@@ -496,6 +534,17 @@ export type NativeOp =
 	 * unless `preventScroll` (`focus({ preventScroll: true })`). `node` is an element fixed at build time, or an expression
 	 * evaluated when the op runs (modal's "back to the trigger or the opener"); one that gives null or the body does nothing.
 	 */
+	/**
+	 * `node.setPointerCapture(pointer)`, or with `release` `node.releasePointerCapture(pointer)`: the runtime sends that touch's
+	 * later pointer events to `node` wherever the finger goes, or again to the element under it. A pointer that is not down,
+	 * or (to release) not captured by `node`, changes nothing.
+	 */
+	| {
+			readonly op: 'capture';
+			readonly node: string | NativeExpr;
+			readonly pointer: NativeExpr;
+			readonly release?: true;
+	  }
 	| {
 			readonly op: 'command';
 			readonly node: string | NativeExpr;

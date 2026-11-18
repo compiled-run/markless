@@ -6,6 +6,7 @@ import type {
 	NativeScriptBindings,
 	NativeNode,
 	NativeOp,
+	NativePointerEventName,
 	NativeTextPart,
 	NativeValue,
 	NativeViewPayload,
@@ -48,8 +49,20 @@ export type NativeAction =
 	 * not sent: the runtime reports it from `pointerdown`, as the web's overlay behaviour does.
 	 */
 	| { readonly event: 'dismiss'; readonly host: string; readonly reason: 'escape' }
-	/** A touch going down or up on the element `host` (the innermost element under it). */
-	| { readonly event: 'pointerdown' | 'pointerup'; readonly host: string }
+	/**
+	 * A touch going down, moving, lifting, or taken by the platform for a scroll (`pointercancel`), with `host` the innermost
+	 * element under it. `pointerId` names the touch (the host numbers touches from 1, as a phone browser does), `x` and `y`
+	 * are its place in points or dp from the screen's top left, `time` the milliseconds since the screen appeared. The
+	 * runtime raises the browser's pointer events from these (`NativePointerEventName`).
+	 */
+	| {
+			readonly event: NativeTouch;
+			readonly host: string;
+			readonly pointerId?: number;
+			readonly x?: number;
+			readonly y?: number;
+			readonly time?: number;
+	  }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
 	| { readonly event: 'cancel'; readonly host: string }
 	/** The keyboard's return key in a single-line text field. */
@@ -72,13 +85,26 @@ type Compute = (fn: string, bindings: NativeScriptBindings, scope: NativeScope) 
 
 type Value = NativeValue;
 
+/** What a host reports of a touch. */
+export type NativeTouch = 'pointerdown' | 'pointermove' | 'pointerup' | 'pointercancel';
+const TOUCHES: ReadonlySet<string> = new Set<NativeTouch>(['pointerdown', 'pointermove', 'pointerup', 'pointercancel']);
+
 /** What the event running a handler carries, by the field a `{ event }` expression names. */
 export type NativeEventFields = {
 	readonly value?: string;
 	readonly reason?: string;
 	readonly pressTarget?: string | null;
 	readonly target?: string;
+	readonly currentTarget?: string;
+	readonly relatedTarget?: string | null;
 	readonly button?: number;
+	readonly buttons?: number;
+	readonly clientX?: number;
+	readonly clientY?: number;
+	readonly pointerId?: number;
+	readonly pointerType?: string;
+	readonly isPrimary?: boolean;
+	readonly timeStamp?: number;
 };
 
 /** The element facts an expression reads: focus, each overlay's focus origin, and the element tree. */
@@ -87,6 +113,8 @@ export type NativeElements = {
 	readonly focusOrigin: (overlay: string) => string | null;
 	readonly isElement: (id: string) => boolean;
 	readonly contains: (within: string, node: string) => boolean;
+	/** Whether `node` has captured the touch `pointer`. */
+	readonly captures: (node: string, pointer: number) => boolean;
 };
 
 /** What names mean inside a list row or an arrow function: the row items by repeat id, the function's parameters. */
@@ -198,6 +226,11 @@ export function evaluateNativeExpr(
 	if ('isElement' in expr) {
 		const value = evaluate(expr.isElement);
 		return typeof value === 'string' && dom().isElement(value);
+	}
+	if ('captures' in expr) {
+		const node = evaluate(expr.captures);
+		const pointer = evaluate(expr.pointer);
+		return typeof node === 'string' && typeof pointer === 'number' && dom().captures(node, pointer);
 	}
 	if ('contains' in expr) {
 		const within = evaluate(expr.contains);
@@ -595,6 +628,8 @@ export function createNativeRuntime(
 	let focused: string | null = null;
 	let stack: string[] = [];
 	const origins = new Map<string, string>();
+	/** Each touch that is down: the element it is captured to (null after a release), the one under it, and whether it was first. */
+	const touches = new Map<number, { capture: string | null; over: string; readonly primary: boolean }>();
 	/** A row's copy (`<node>@<key>`) sits where its node does in the tree. */
 	const nodeOf = (id: string) => (id.includes('@') ? id.slice(0, id.indexOf('@')) : id);
 	const elements: NativeElements = {
@@ -607,6 +642,7 @@ export function createNativeRuntime(
 				if (at === nodeOf(within)) return true;
 			return false;
 		},
+		captures: (node, pointer) => touches.get(pointer)?.capture === node,
 	};
 	const evaluate = (
 		expr: NativeExpr,
@@ -898,7 +934,7 @@ export function createNativeRuntime(
 		stack.push(overlay);
 		origins.set(overlay, NATIVE_DOCUMENT_BODY);
 	}
-	const handlerOf = (host: string, name: NativeAction['event']) =>
+	const handlerOf = (host: string, name: NativeAction['event'] | NativePointerEventName) =>
 		payload.events.find((candidate) => candidate.host === host && candidate.event === name);
 	/** The scope a shown instance's handlers run in (its row's), or undefined when it is not shown. */
 	const scopeOf = (id: string): NativeScope | undefined =>
@@ -1030,34 +1066,116 @@ export function createNativeRuntime(
 					dismiss ? run(handlers.get(dismiss.handler) ?? [], fields, base) : [],
 				);
 			}
-			if (action.event === 'pointerdown' || action.event === 'pointerup') {
-				const press = action.event;
-				const scope = scopeOf(action.host);
-				if (!scope) throw new Error(`${action.host} is not shown`);
+			if (TOUCHES.has(action.event) && 'host' in action) {
+				const touch = action as Extract<NativeAction, { readonly event: NativeTouch }>;
+				const scope = scopeOf(touch.host);
+				if (!scope) throw new Error(`${touch.host} is not shown`);
+				const pointerId = touch.pointerId ?? 1;
+				const down = touches.get(pointerId);
+				if (touch.event === 'pointerdown' ? down : !down)
+					throw new Error(`touch ${pointerId} is ${down ? 'already' : 'not'} down`);
 				return change(undefined, undefined, () => {
 					const calls: NativeJournalEntry[] = [];
-					// The behaviour's document listener hears the press first: the topmost overlay it landed outside is told.
-					const top = stack.at(-1);
-					const dismiss =
-						top !== undefined && press === 'pointerdown' && !elements.contains(top, action.host)
-							? handlerOf(top, 'dismiss')
-							: undefined;
+					const state =
+						down ??
+						{
+							capture: touch.host,
+							over: touch.host,
+							primary: [...touches.values()].every((other) => !other.primary),
+						};
+					if (!down) touches.set(pointerId, state);
+					const at = { x: touch.x ?? 0, y: touch.y ?? 0 };
+					/** The elements from `id` out to the root, innermost first. */
+					const chain = (id: string): string[] => {
+						const out: string[] = [];
+						for (let node: string | null | undefined = nodeOf(id); node; node = nodesById.get(node)?.parent)
+							out.push(node === nodeOf(id) ? id : node);
+						return out;
+					};
+					const fieldsOf = (
+						type: NativePointerEventName,
+						target: string,
+						currentTarget: string,
+						relatedTarget: string | null,
+					): NativeEventFields => {
+						const lifted = type === 'pointerup' || type === 'pointercancel' || type === 'pointerout' || type === 'pointerleave';
+						const cancelled = touch.event === 'pointercancel';
+						return {
+							target,
+							currentTarget,
+							relatedTarget,
+							// Safari's values, which the Pointer Events spec gives; Chrome on Android reports 0 for over, enter, out and leave.
+							button: type === 'pointerdown' || type === 'pointerup' ? 0 : -1,
+							buttons: lifted ? 0 : 1,
+							clientX: cancelled ? 0 : at.x,
+							clientY: cancelled ? 0 : at.y,
+							pointerId,
+							pointerType: 'touch',
+							isPrimary: state.primary,
+							timeStamp: touch.time ?? 0,
+						};
+					};
 					const runs: { readonly handler: string; readonly fields: NativeEventFields }[] = [];
-					if (dismiss)
-						runs.push({
-							handler: dismiss.handler,
-							fields: { reason: 'outside-press', pressTarget: action.host },
-						});
-					for (let at: string | null | undefined = nodeOf(action.host); at; at = nodesById.get(at)?.parent) {
-						const own = handlerOf(at, press);
-						if (own) runs.push({ handler: own.handler, fields: { target: action.host, button: 0 } });
+					const raise = (type: NativePointerEventName, target: string, related: string | null = null) => {
+						for (const node of chain(target)) {
+							const own = handlerOf(nodeOf(node), type);
+							if (own) runs.push({ handler: own.handler, fields: fieldsOf(type, target, node, related) });
+						}
+					};
+					/** `pointerenter` on each element `target` is in that `from` is not, outermost first; `pointerleave` the other way. */
+					const crossing = (type: 'pointerenter' | 'pointerleave', target: string, from: string | null, related: string | null) => {
+						const outside = new Set(from === null ? [] : chain(from));
+						const nodes = chain(target).filter((node) => !outside.has(node));
+						for (const node of type === 'pointerenter' ? nodes.reverse() : nodes) {
+							const own = handlerOf(nodeOf(node), type);
+							if (own) runs.push({ handler: own.handler, fields: fieldsOf(type, node, node, related) });
+						}
+					};
+					const flush = (): NativeJournalEntry[] | undefined => {
+						for (const step of runs.splice(0)) {
+							const out = run(handlers.get(step.handler) ?? [], step.fields, scope);
+							if (out[0]?.op === 'navigate') return out;
+							calls.push(...out);
+						}
+						return undefined;
+					};
+					if (touch.event === 'pointerdown') {
+						raise('pointerover', touch.host);
+						crossing('pointerenter', touch.host, null, null);
+						// The behaviour's document listener hears the press: the topmost overlay it landed outside is told.
+						const top = stack.at(-1);
+						const dismiss =
+							top !== undefined && !elements.contains(top, touch.host) ? handlerOf(top, 'dismiss') : undefined;
+						if (dismiss)
+							runs.push({ handler: dismiss.handler, fields: { reason: 'outside-press', pressTarget: touch.host } });
+						raise('pointerdown', touch.host);
+						return flush() ?? calls;
 					}
-					for (const step of runs) {
-						const out = run(handlers.get(step.handler) ?? [], step.fields, scope);
-						if (out[0]?.op === 'navigate') return out;
-						calls.push(...out);
+					// Before the next event the pointer counts as over its capturing element (or, released, the one under it):
+					// a change raises the boundary events from the old one to the new, as the browsers do.
+					const target = state.capture ?? touch.host;
+					if (target !== state.over) {
+						const from = state.over;
+						raise('pointerout', from, target);
+						crossing('pointerleave', from, target, target);
+						raise('pointerover', target, from);
+						crossing('pointerenter', target, from, from);
+						state.over = target;
 					}
-					return calls;
+					if (touch.event === 'pointermove') {
+						raise('pointermove', target);
+						return flush() ?? calls;
+					}
+					raise(touch.event, target);
+					const early = flush();
+					if (early) {
+						touches.delete(pointerId);
+						return early;
+					}
+					touches.delete(pointerId);
+					raise('pointerout', target);
+					crossing('pointerleave', target, null, null);
+					return flush() ?? calls;
 				});
 			}
 			if (action.event === 'idle' || action.event === 'visible') {
@@ -1156,6 +1274,15 @@ export function createNativeRuntime(
 						...(op.replace ? { replace: true as const } : {}),
 					},
 				];
+			}
+			if (op.op === 'capture') {
+				const node = typeof op.node === 'string' ? op.node : evaluate(op.node, eventValue, scope);
+				const pointer = evaluate(op.pointer, eventValue, scope);
+				const touch = typeof pointer === 'number' ? touches.get(pointer) : undefined;
+				if (typeof node !== 'string' || !touch) continue;
+				if (!op.release) touch.capture = node;
+				else if (touch.capture === node) touch.capture = null;
+				continue;
 			}
 			if (op.op === 'command') {
 				let node = op.node;

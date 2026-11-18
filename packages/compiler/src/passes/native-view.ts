@@ -31,6 +31,7 @@ import {
 	NATIVE_VIEW_VERSION,
 	type NativeFieldKind,
 	type NativeForm,
+	type NativePointerEventName,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
 } from '@markless/serializer/native-view';
@@ -170,15 +171,46 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 	[PROTOCOL_VISIBLE_EVENT_NAME]: 'visible',
 	[DISMISS_EVENT]: 'dismiss',
 	pointerdown: 'pointerdown',
+	pointermove: 'pointermove',
 	pointerup: 'pointerup',
+	pointercancel: 'pointercancel',
+	pointerover: 'pointerover',
+	pointerout: 'pointerout',
+	pointerenter: 'pointerenter',
+	pointerleave: 'pointerleave',
 };
+
+const CAPTURE_METHODS: ReadonlySet<string> = new Set(['setPointerCapture', 'releasePointerCapture']);
+
+const POINTER_EVENTS: ReadonlySet<string> = new Set<NativePointerEventName>([
+	'pointerdown',
+	'pointermove',
+	'pointerup',
+	'pointercancel',
+	'pointerover',
+	'pointerout',
+	'pointerenter',
+	'pointerleave',
+]);
 
 /** The fields a dismiss or pointer event carries, by how a handler reads them off its event parameter. */
 const EVENT_FIELDS: Readonly<
 	Record<'dismiss' | 'pointer', Readonly<Record<string, Extract<NativeExpr, { event: string }>['event']>>>
 > = {
 	dismiss: { 'detail.reason': 'reason', 'detail.pressTarget': 'pressTarget' },
-	pointer: { target: 'target', button: 'button' },
+	pointer: {
+		target: 'target',
+		currentTarget: 'currentTarget',
+		relatedTarget: 'relatedTarget',
+		button: 'button',
+		buttons: 'buttons',
+		clientX: 'clientX',
+		clientY: 'clientY',
+		pointerId: 'pointerId',
+		pointerType: 'pointerType',
+		isPrimary: 'isPrimary',
+		timeStamp: 'timeStamp',
+	},
 };
 
 /** `event.detail.reason` as `detail.reason` when `expression` is a member path of the read `event`. */
@@ -2131,6 +2163,29 @@ export function createNativeViewPayload(
 		};
 	};
 
+	/** `setPointerCapture(pointer)` or `releasePointerCapture(pointer)` on an element value. */
+	const captureOn = (
+		node: NativeExpr,
+		pointer: SemanticExpression,
+		method: string,
+		optional: boolean,
+		what: string,
+		scope: Scope,
+	): NativeOp[] => {
+		if ('literal' in node && node.literal === null && optional) return [];
+		const id = exprOf(pointer, what, scope);
+		if (!id) return [];
+		const element = elementOf(node);
+		return [
+			{
+				op: 'capture',
+				node: element ?? node,
+				pointer: id,
+				...(method === 'releasePointerCapture' ? { release: true as const } : {}),
+			},
+		];
+	};
+
 	/** `contains`, `getAttribute` and `hasAttribute` on an element known when the app is built. */
 	const elementMethod = (
 		element: string,
@@ -2140,6 +2195,10 @@ export function createNativeViewPayload(
 		scope: Scope,
 	): NativeExpr | null => {
 		const [first, ...more] = args;
+		if (method === 'hasPointerCapture' && first && more.length === 0) {
+			const pointer = exprOf(first, what, scope);
+			return pointer && { captures: elementValue(element), pointer };
+		}
 		if (method === 'contains' && first && more.length === 0) {
 			const other = exprOf(first, what, scope);
 			if (!other) return null;
@@ -2906,6 +2965,15 @@ export function createNativeViewPayload(
 					) {
 						const node = exprOf(expression.arguments[0], what, scope);
 						return node && { contains: holder, node };
+					}
+					if (
+						element === undefined &&
+						holder &&
+						expression.method === 'hasPointerCapture' &&
+						expression.arguments.length === 1
+					) {
+						const pointer = exprOf(expression.arguments[0], what, scope);
+						return pointer && { captures: holder, pointer };
 					}
 					if (element === undefined) {
 						if (holder === null && expression.object.kind === 'new') return null;
@@ -4296,8 +4364,7 @@ export function createNativeViewPayload(
 		const submitting =
 			event.eventName === 'submit' && pressed ? { submitting: pressed.currentTarget } : {};
 		const semantic = SEMANTIC_EVENTS[event.eventName];
-		const carried =
-			semantic === 'dismiss' || semantic === 'pointerdown' || semantic === 'pointerup';
+		const carried = semantic === 'dismiss' || POINTER_EVENTS.has(semantic ?? '');
 		const inner: Scope =
 			parameter === undefined
 				? { ...running, ...submitting }
@@ -5092,6 +5159,10 @@ export function createNativeViewPayload(
 		if (statement.kind === 'await' || statement.kind === 'try') return [];
 		if (statement.kind === 'method-call') {
 			const command = statement.method;
+			if (CAPTURE_METHODS.has(command) && (statement.arguments ?? []).length === 1) {
+				const node = exprOf(statement.object, what, scope);
+				return node ? captureOn(node, statement.arguments![0]!, command, statement.optional === true, what, scope) : [];
+			}
 			if ((command !== 'focus' && command !== 'scrollIntoView') || (statement.arguments ?? []).length > 0) {
 				refuse(`${what} calls \`.${command}()\` on a value, which needs a script engine`, span);
 				return [];
@@ -5165,6 +5236,18 @@ export function createNativeViewPayload(
 							)?.fields.get(receiver[0]!);
 						})()
 					: undefined;
+			const onAnElement =
+				receiverField?.kind === 'handle' ||
+				(scope.carried?.name === statement.name && receiver.length > 0) ||
+				(receiver.length === 0 && (scope.args.has(statement.name) || !scope.objects.has(statement.name)));
+			if (command && CAPTURE_METHODS.has(command) && (statement.arguments ?? []).length === 1 && onAnElement) {
+				const holder = receiver.reduce<SemanticExpression>(
+					(object, property) => ({ kind: 'member', object, property }),
+					{ kind: 'read', name: statement.name },
+				);
+				const node = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
+				return node ? captureOn(node, statement.arguments![0]!, command, statement.optional === true, what, scope) : [];
+			}
 			const onElement =
 				(command === 'focus' || command === 'scrollIntoView') &&
 				(receiverField?.kind === 'handle' ||
