@@ -39,7 +39,7 @@ rm -rf "$selection_dir"
 if [ $status -ne 0 ]; then
 	echo ""
 	echo "pre-commit: CI fast jobs failed (see above)."
-	echo "Re-run with: pnpm ci:local --fast   (MARKLESS_HOOK_ALL=1 makes the hook run every unit test)"
+	echo "Re-run with: pnpm ci:local --affected   (MARKLESS_HOOK_ALL=1 makes the hook run every unit test)"
 	exit $status
 fi
 

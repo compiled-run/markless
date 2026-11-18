@@ -12,13 +12,14 @@ The process below answers each one.
 
 ## 1. `pnpm ci:local`: run exactly what CI runs
 
-For a write task only `--fast` runs locally; heavier jobs run on the pull request (section 3).
+For a write task only `--affected` runs locally; the full unit suite and heavier jobs run on the pull request (section 3).
 
 `scripts/ci/local.mjs` reads `.github/workflows/ci.yml` at run time and runs each job's `run:` steps. Nothing is copied from the YAML by hand, so a step added to the workflow is picked up automatically. The only thing the script owns is a small table saying, for each job with checks, whether it belongs to the fast set, the full set, or runs only in CI. A new job without an entry makes the script exit with an error that names it, so the table cannot fall behind silently.
 
 ```sh
 pnpm ci:local --list      # every job and step in ci.yml, and what runs locally
-pnpm ci:local             # fast mode (same as --fast)
+pnpm ci:local --affected  # fast jobs, unit tests narrowed to what the diff from origin/main can reach
+pnpm ci:local             # fast mode (same as --fast): every unit test (debugging a CI failure)
 pnpm ci:local --full      # every job this machine can run (debugging only: the PR's CI run is the receipt)
 pnpm ci:local --job browser --job boxes-router   # just these jobs
 pnpm ci:local --clean     # same, in a throwaway worktree of HEAD
@@ -102,7 +103,7 @@ When to use it: before pushing anything that touches the HMR/dev server, native 
 
 Heavy verification runs on GitHub Actions, not on this Mac. The org's plan runs 60 jobs at once; this Mac runs about three heavy commands before everything on it slows down, and the load itself made tests flaky.
 
-1. **Locally, every write task:** `pnpm run typecheck` and `pnpm ci:local --fast` (agent files, typecheck, unit). The pre-commit hook runs the fast jobs on every commit too.
+1. **Locally, every write task:** `pnpm run typecheck` and `pnpm ci:local --affected`. That runs the fast jobs (agent files, lint, both typechecks) in full and the unit tests the yuku module graph selects for the diff from the merge base with `origin/main`, counting commits, staged and unstaged edits and untracked files. A config, lockfile, workspace-manifest or unclassified change still selects every unit test. The pre-commit hook runs the same selection for the staged change on every commit. The whole unit suite runs in the PR's `unit` job; run `pnpm ci:local --fast` locally only to debug a failure there. Three whole-suite runs at once held an 18-core Mac at a load of 36 to 54 (2026-11-18), which is why the local run is narrowed. `VITEST_MAX_WORKERS=<n>` caps the workers of any local unit run; vitest reads it over the config's `maxWorkers`.
 2. **On GitHub, through the pull request:** everything heavier. That means browser, the `boxes-*` lanes, build-scale, perf-guards, the benchmark, demo and website boxes, and the migrate checks. Push the branch, open the PR, and let CI run.
 3. **The receipt is the PR's green CI run** on the exact commit: its run URL, or the commit's check summary. No task is reported done before that run is green. "Green on N local runs" in prose is not a receipt.
 4. **Local heavy runs are for debugging one specific failure:** `pnpm ci:local --job <id>`, or the single test file. They do not replace the PR run.

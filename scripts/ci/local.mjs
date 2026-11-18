@@ -2,7 +2,7 @@
 // Runs a workflow's check steps locally; commands come from the YAML, only per-job local policy lives here.
 
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -18,6 +18,10 @@ const USAGE = `usage: node scripts/ci/local.mjs [--list] [--fast | --full] [--jo
 
   --list            print every job and step the workflow defines, and what runs locally
   --fast            run the fast jobs (default)
+  --affected        the fast jobs, with the unit job narrowed to the tests the yuku module graph
+                    selects for the diff from the merge base with --base (default origin/main);
+                    a config, lockfile, workspace manifest or unclassified change runs every unit test
+  --base <ref>      the ref --affected diffs against
   --full            run every job that can run on this machine; for debugging, since heavy
                     jobs are verified by the pull request's CI run (docs/ci-process.md)
   --job <id>        run only this job (repeatable); overrides --fast/--full
@@ -108,6 +112,8 @@ const parseArgs = (argv) => {
 		bail: false,
 		dryRun: false,
 		unitSelection: null,
+		affected: false,
+		base: 'origin/main',
 	};
 	for (let index = 0; index < argv.length; index += 1) {
 		const arg = argv[index];
@@ -123,6 +129,10 @@ const parseArgs = (argv) => {
 		else if (arg === '--keep-going') options.bail = false;
 		else if (arg === '--dry-run') options.dryRun = true;
 		else if (arg === '--unit-selection') options.unitSelection = argv[++index];
+		else if (arg === '--affected') {
+			options.affected = true;
+			options.mode = 'fast';
+		} else if (arg === '--base') options.base = argv[++index];
 		else if (arg === '--help' || arg === '-h') {
 			console.log(USAGE);
 			process.exit(0);
@@ -537,10 +547,24 @@ const runLinux = (options) => {
 	return results.some((result) => result.status === 'failed') ? 1 : 0;
 };
 
+// A failed selection leaves the file empty, which readUnitSelection turns into every unit test.
+const affectedSelection = (base) => {
+	const path = join(mkdtempSync(join(tmpdir(), 'markless-affected-')), 'selection.json');
+	const result = spawnSync(
+		process.execPath,
+		[resolve(repoRoot, 'scripts/ci/affected.mjs'), '--base', base, '--json'],
+		{ cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 },
+	);
+	writeFileSync(path, result.status === 0 ? result.stdout : '');
+	return path;
+};
+
 const argv = process.argv.slice(2);
 const options = parseArgs(argv);
 if (options.linux) process.exit(runLinux(options));
 if (options.clean) process.exit(runClean(argv));
+if (options.affected && !options.unitSelection && !options.list && !options.dryRun)
+	options.unitSelection = affectedSelection(options.base);
 const workflow = readWorkflow(options.workflow);
 if (options.list) {
 	printList(workflow);

@@ -13,11 +13,13 @@ const NODE_PROJECT = 'node';
 const SHADOW_LOG =
 	process.env.MARKLESS_AFFECTED_SHADOW_LOG ?? join(homedir(), '.markless/affected-shadow.jsonl');
 
-const USAGE = `usage: node scripts/ci/affected.mjs (--staged | --files <path>...) [--print | --json]
+const USAGE = `usage: node scripts/ci/affected.mjs (--staged | --base [<ref>] | --files <path>...) [--print | --json]
        node scripts/ci/affected.mjs --shadow-log <selection.json> [--unit-report <vitest.json>] [--unit-scope selected|all]
        node scripts/ci/affected.mjs --history <count> [--rev <ref>] [--durations <vitest.json>] [--durations-root <dir>]
 
   --staged          select for the staged change (git diff --cached)
+  --base [<ref>]    select for everything since the merge base with <ref> (default origin/main):
+                    commits, staged and unstaged edits, and untracked files
   --files <path>... select for these repo-relative paths
   --print           print the selected ${NODE_PROJECT}-project test files, or "ALL: <reason>"
   --json            print the selection as JSON (default)
@@ -263,6 +265,16 @@ if (flag('--history')) {
 
 let changed;
 if (flag('--staged')) changed = lines(git('diff', '--cached', '--name-only', '--no-renames'));
+else if (flag('--base')) {
+	const ref = value('--base')?.startsWith('--') ? undefined : value('--base');
+	const mergeBase = git('merge-base', ref ?? 'origin/main', 'HEAD').trim();
+	changed = [
+		...new Set([
+			...lines(git('diff', '--name-only', '--no-renames', mergeBase)),
+			...lines(git('ls-files', '--others', '--exclude-standard')),
+		]),
+	].sort();
+}
 else if (flag('--files')) {
 	const start = argv.indexOf('--files') + 1;
 	changed = [];
