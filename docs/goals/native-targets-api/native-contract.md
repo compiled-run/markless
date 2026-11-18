@@ -298,6 +298,9 @@ after a `swipe` step, Maestro now waits for animations to end (`waitForAnimation
 dark switch caught iOS's cross-fade (sheet colour `#6e6c68`, then `#494743`, on the way to `#1d1b16`), and Android's shot
 after the pull was taken before the sheet settled. S3 and Y3's flows change with them.
 
+Device receipt: `receipts/2026-11-18-sheet-styled-content-verdict.txt` (the whole phone ladder, 39 rungs, one run per
+platform: "proof passed on iOS and Android"), with the per-platform reports beside it.
+
 ### Payload (a component's look stored once)
 
 Bytes of compact JSON, per rung, from `style-size.json`. "Separate" is Dragon's export for the page and for each sheet
