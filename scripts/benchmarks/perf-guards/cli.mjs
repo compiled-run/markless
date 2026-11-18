@@ -12,7 +12,14 @@ import {
 } from '../anchor-ledger.mjs';
 import { applyBaseline } from './baseline.mjs';
 import { BUDGETS } from './config.mjs';
-import { evaluate, formatReport, isLean, LOAD_PLATFORM, routeKey } from './evaluate.mjs';
+import {
+	evaluate,
+	formatReport,
+	isLean,
+	LOAD_PLATFORM,
+	playgroundKey,
+	routeKey,
+} from './evaluate.mjs';
 import { measure } from './measure.mjs';
 
 export const LAST_MEASUREMENT = join(tmpdir(), 'markless-perf-guards', 'last-measurement.json');
@@ -104,16 +111,24 @@ export function accept(
 		for (const [site, siteResult] of Object.entries(measurement.sites))
 			for (const [route, result] of Object.entries(siteResult.routes)) {
 				const key = routeKey(site, route);
-				if (!result.load || !pick(key)) continue;
+				const playground = playgroundKey(key);
+				if (!result.load || !(pick(key) || pick(playground))) continue;
 				next.loadWeight ??= {};
 				const platform = measurement.platform ?? LOAD_PLATFORM;
 				const anchors = (next.loadWeight[platform] ??= {});
-				const value = {
-					executedChars: result.load.executedChars,
-					jsGzipBytes: result.load.jsGzipBytes,
-				};
-				log('load', `${key} (${platform})`, anchors[key], value);
-				anchors[key] = value;
+				if (pick(key)) {
+					const value = {
+						executedChars: result.load.executedChars,
+						jsGzipBytes: result.load.jsGzipBytes,
+					};
+					log('load', `${key} (${platform})`, anchors[key], value);
+					anchors[key] = value;
+					matched++;
+				}
+				if (!result.load.playground) continue;
+				const prefetched = { jsGzipBytes: result.load.playground.jsGzipBytes };
+				log('load', `${playground} (${platform})`, anchors[playground], prefetched);
+				anchors[playground] = prefetched;
 				matched++;
 			}
 	for (const [, siteResult] of Object.entries(measurement.sites)) {

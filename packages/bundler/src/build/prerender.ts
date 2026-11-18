@@ -16,15 +16,26 @@ import type { ProtocolStatePayload, ProtocolViewPayload } from '@markless/serial
 export type BuiltPrerenderRecords = {
 	readonly state: ProtocolStatePayload;
 	readonly view: ProtocolViewPayload;
+	/** A @try rendered once per keyed row: each row's boundary id, mapped to the boundary it was rendered from. */
+	readonly boundarySites?: Readonly<Record<string, string>>;
 };
 
 export async function deriveBuiltPrerenderRecords(input: {
 	readonly entry: string;
 	readonly serverPlugin: Plugin;
 }): Promise<BuiltPrerenderRecords> {
-	return withBuiltPrerenderPage(input, async (page) =>
-		prepareSsrResumeRecords(await evaluateBuiltPageClosure(page)),
-	);
+	return withBuiltPrerenderPage(input, async (page) => {
+		const output = await evaluateBuiltPageClosure(page);
+		const boundarySites = Object.fromEntries(
+			(output.structure?.anchors ?? []).flatMap((anchor) =>
+				anchor.kind === 'async' && anchor.site && anchor.site !== anchor.id
+					? [[anchor.id, anchor.site]]
+					: [],
+			),
+		);
+		const records = await prepareSsrResumeRecords(output);
+		return Object.keys(boundarySites).length > 0 ? { ...records, boundarySites } : records;
+	});
 }
 
 export async function emitPrerenderedPage(input: {

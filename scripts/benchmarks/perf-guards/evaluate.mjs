@@ -7,6 +7,9 @@ const acceptHint = (guard, subject) =>
 	`If this cost is intended, accept it with a one-line reason: ${ACCEPT} ${guard} "${subject}" --reason "<why>"`;
 
 export const routeKey = (site, route) => `${site} ${route}`;
+/** The G16 subject for what a page's <Code> playground prefetches at load, judged apart from the page's own code. */
+export const PLAYGROUND = 'playground';
+export const playgroundKey = (subject) => `${subject} ${PLAYGROUND}`;
 export const isLean = (path) => path !== 'full-resume';
 
 /** Compares one measurement with the anchors; returns failures (block) and notes (informational). */
@@ -32,12 +35,16 @@ export function evaluate(measurement, anchors) {
 			checkFirstUse(subject, result.controls, fail, note);
 			if (result.waste) checkWaste(subject, result.waste, note);
 			if (result.payPerUse) checkPayPerUse(subject, result.payPerUse, fail, note);
+			const platform = measurement.platform ?? LOAD_PLATFORM;
+			const loadAnchors = anchors.loadWeight?.[platform];
 			if (result.load)
-				checkLoadWeight(
-					subject,
-					result.load,
-					measurement.platform ?? LOAD_PLATFORM,
-					anchors.loadWeight?.[measurement.platform ?? LOAD_PLATFORM]?.[subject],
+				checkLoadWeight(subject, result.load, platform, loadAnchors?.[subject], fail, note);
+			if (result.load?.playground)
+				checkPlaygroundLoad(
+					playgroundKey(subject),
+					result.load.playground,
+					platform,
+					loadAnchors?.[playgroundKey(subject)],
 					fail,
 					note,
 				);
@@ -116,6 +123,26 @@ function checkLoadWeight(subject, load, platform, anchor, fail, note) {
 		'G16',
 		`${line}; anchor ${anchor.executedChars} chars run, ${anchor.jsGzipBytes} B gzip downloaded${anchor.reference ? ` (${referenceLine(anchor.reference)})` : ''}`,
 	);
+}
+
+// Prefetched, not run: only its download is weighed, with room for the compiler and runtime changes it carries.
+function checkPlaygroundLoad(subject, load, platform, anchor, fail, note) {
+	const line = `${subject} (${platform}): prefetches ${load.jsGzipBytes} B gzip in ${load.files.length} JS files at load for the <Code> playground`;
+	if (!anchor) {
+		fail('G16', `${line}, with no anchor for this platform. ${acceptHint('load', subject)}`);
+		return;
+	}
+	const grew = load.jsGzipBytes - anchor.jsGzipBytes;
+	const against = anchor.reference ? referenceLine(anchor.reference) : `its anchor ${anchor.jsGzipBytes}`;
+	if (grew > BUDGETS.loadPlaygroundGrowthBytes) {
+		fail(
+			'G16',
+			`${line}: +${grew} B gzip more than ${against} (allowed ${BUDGETS.loadPlaygroundGrowthBytes} B shared by changes since). ${acceptHint('load', subject)}`,
+			subject,
+		);
+		return;
+	}
+	note('G16', `${line}; ${signed(grew)} B against ${against}`);
 }
 
 const signed = (value) => `${value >= 0 ? '+' : ''}${value}`;

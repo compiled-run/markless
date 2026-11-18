@@ -1,8 +1,15 @@
-import { asNodes, childNodes, type AnyNode } from '../../ast/nodes.ts';
+import { asNodes, childNodes, walkNode, type AnyNode } from '../../ast/nodes.ts';
 import { expressionSource, sourceSpan } from '../../ast/source.ts';
 import {
+	graphBindingMap,
+	resolveGraphPath,
+	semanticAliasMap,
+} from '../../artifact-helpers/graph-paths.ts';
+import {
+	arrowReadSources,
 	type CompositeReadOptions,
 	collectCompositeTemplateExpression,
+	freeReadSources,
 	mintTemplateExpressionComputed,
 	pureCompositeReadSources,
 	type GraphReadSource,
@@ -10,7 +17,10 @@ import {
 import { readsShadowingRowItem } from './collect-repeat.ts';
 import { ifChainOf, isElseIfLink } from './if-chain.ts';
 import { propTestOf } from './prop-test.ts';
-import { stateWriteInTemplateDiagnostic } from './diagnostics.ts';
+import {
+	stateWriteInTemplateDiagnostic,
+	templateExpressionUnsupportedDiagnostic,
+} from './diagnostics.ts';
 import type { WalkState } from './types.ts';
 import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
 
@@ -27,11 +37,15 @@ import { NATIVE_FACTS, nativeCollectors } from './native-facts-flag.ts';
  * A condition over PROPS alone mints too, unlike an attribute or an edge prop: a
  * parent can pass a live graph reference, and with no minted node the site had an
  * empty wake set, so the served payload dropped the branch and the child's arm
- * never re-decided when the parent's cell moved.
+ * never re-decided when the parent's cell moved. That holds for a condition reading
+ * into an object or array prop (`opened.includes(post.id)`) too: the derive reads
+ * through the parent's routes, not the child's scalar-only prop cell.
  */
 const BRANCH_CONDITION_READ_OPTIONS: CompositeReadOptions = {
 	unaryOperators: true,
 	methodCalls: true,
+	readsIntoProps: true,
+	arrowArguments: true,
 };
 
 /**
@@ -61,9 +75,48 @@ function branchTest(
 		state,
 		BRANCH_CONDITION_READ_OPTIONS,
 	);
-	return composite
-		? { testSource, testComputedGraphNodeId: composite.graphNodeId }
-		: { testSource };
+	if (composite) return { testSource, testComputedGraphNodeId: composite.graphNodeId };
+	refuseUnreadableFunctionCondition([test], state);
+	return { testSource };
+}
+
+// A function the condition passes whose body hides its reads would leave a condition over state that never updates.
+function refuseUnreadableFunctionCondition(tests: ReadonlyArray<AnyNode>, state: WalkState): void {
+	// A row of a keyed @for decides its own branches when it renders, as text in a row does.
+	if (state.currentKeyedRepeatScopeIds.length > 0) return;
+	for (const test of tests) {
+		const functions: AnyNode[] = [];
+		walkNode(test, (node) => {
+			if (node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression')
+				functions.push(node);
+		});
+		const unreadable = functions.find(
+			(node) =>
+				!functions.some(
+					(outer) => outer !== node && outer.start! <= node.start! && node.end! <= outer.end!,
+				) &&
+				(node.type === 'FunctionExpression' ||
+					arrowReadSources(node, state, BRANCH_CONDITION_READ_OPTIONS) === null),
+		);
+		if (!unreadable || !readsGraphValue(test, state)) continue;
+		state.graph.diagnostics.push(
+			templateExpressionUnsupportedDiagnostic({
+				target: 'This branch condition',
+				source: expressionSource(test, state.source),
+				node: unreadable,
+				filename: state.filename,
+			}),
+		);
+	}
+}
+
+function readsGraphValue(test: AnyNode, state: WalkState): boolean {
+	const bindings = graphBindingMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName ?? undefined);
+	const aliases = semanticAliasMap(state.graph, state.currentSharedDefinitionId, state.currentComponentName ?? undefined);
+	return freeReadSources(test, state, true).some((source) => {
+		const kind = resolveGraphPath(source, bindings, aliases)?.binding.kind;
+		return kind === 'state' || kind === 'computed' || kind === 'prop';
+	});
 }
 
 // A branch in a row of a repeat inside the same @try belongs to the row, which flips it per row.
@@ -245,11 +298,25 @@ function armIndexTest(
 	const readSources: GraphReadSource[] = [];
 	for (const read of reads) {
 		const sources = pureCompositeReadSources(read, state, BRANCH_CONDITION_READ_OPTIONS);
-		if (!sources) return {};
+		if (!sources) {
+			refuseUnreadableFunctionCondition(reads, state);
+			return {};
+		}
 		readSources.push(...sources);
 	}
-	const minted = mintTemplateExpressionComputed(`() => ${indexSource}`, readSources, state);
-	return minted ? { testComputedGraphNodeId: minted.graphNodeId } : {};
+	const minted = mintTemplateExpressionComputed(
+		`() => ${indexSource}`,
+		readSources,
+		state,
+		undefined,
+		false,
+		undefined,
+		false,
+		BRANCH_CONDITION_READ_OPTIONS.readsIntoProps,
+	);
+	if (minted) return { testComputedGraphNodeId: minted.graphNodeId };
+	refuseUnreadableFunctionCondition(reads, state);
+	return {};
 }
 
 function switchArmTests(node: AnyNode): ReadonlyArray<unknown> | null {

@@ -1,7 +1,9 @@
 import type {
 	BoundSymbolResolverRow,
 	RenderDataArtifact,
+	SemanticBranchSite,
 	SemanticComponentEdge,
+	SemanticGraphBinding,
 	SymbolResolverPlan,
 	TriggerGroupArtifact,
 } from '@markless/compiler';
@@ -74,16 +76,15 @@ export function emitPrerenderTriggerGroupModule(input: {
 	});
 	// Keep routes exhaustive while demand-loading only their symbols.
 	// This group's resolver holds only its own bound rows.
-	const routes = (input.symbolRoutes ?? []).map((route) =>
-		route.boundSymbols
-			? {
-					...route,
-					boundSymbols: Object.fromEntries(
-						Object.entries(route.boundSymbols).filter(([, rowId]) => ids.has(rowId)),
-					),
-				}
-			: route,
-	);
+	const ownRows = (rows: Readonly<Record<string, string>>) =>
+		Object.fromEntries(Object.entries(rows).filter(([, rowId]) => ids.has(rowId)));
+	const routes = (input.symbolRoutes ?? []).map((route) => ({
+		...route,
+		...(route.boundSymbols ? { boundSymbols: ownRows(route.boundSymbols) } : {}),
+		...('forwardedSymbols' in route && route.forwardedSymbols
+			? { forwardedSymbols: ownRows(route.forwardedSymbols) }
+			: {}),
+	}));
 	if (routes.length > 0) {
 		source = source.replaceAll('loadSymbol(', 'marklessLoadLocalSymbol(');
 		source +=
@@ -123,14 +124,24 @@ export function emitPrerenderTriggerGroupModule(input: {
 	].join('\n');
 }
 
-export function emitPrerenderBoundaryRendererModule(renderDataId: string): string {
+export function emitPrerenderBoundaryRendererModule(
+	renderDataId: string,
+	rowBoundarySites?: Readonly<Record<string, string>>,
+): string {
 	return [
 		`import { marklessPrerenderData } from ${JSON.stringify(renderDataId)};`,
 		"import { renderPrerenderBoundary } from '@markless/web/fns/prerender-resume';",
 		// Keyed by graph: two trigger groups can re-settle one boundary at once.
 		'const marklessPreparedBoundaryArms = new WeakMap();',
 		'export async function prepareBoundaryArm(boundaryId, status, graph, loadSymbol) {',
-		'\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol);',
+		...(rowBoundarySites
+			? [
+					`\tconst site = ${JSON.stringify(rowBoundarySites)}[boundaryId];`,
+					'\tconst rendered = await (site ? renderPrerenderBoundary(marklessPrerenderData, site, status, graph, loadSymbol, boundaryId) : renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol));',
+				]
+			: [
+					'\tconst rendered = await renderPrerenderBoundary(marklessPrerenderData, boundaryId, status, graph, loadSymbol);',
+				]),
 		'\tif (!marklessPreparedBoundaryArms.has(graph)) marklessPreparedBoundaryArms.set(graph, new Map());',
 		'\tmarklessPreparedBoundaryArms.get(graph).set(`${boundaryId}:${status}`, rendered);',
 		'}',
@@ -143,6 +154,43 @@ export function emitPrerenderBoundaryRendererModule(renderDataId: string): strin
 		'\treturn rendered;',
 		'}',
 	].join('\n');
+}
+
+/** The keyed-row @try boundaries this module's own view renders, each mapped to the boundary it was rendered from. */
+export function prerenderRowBoundarySites(
+	completeView: ProtocolViewPayload,
+	boundarySites: Readonly<Record<string, string>> | undefined,
+): Readonly<Record<string, string>> | undefined {
+	if (!boundarySites) return undefined;
+	const own = new Set(completeView.asyncBoundaries.map((boundary) => boundary.id));
+	const sites = Object.entries(boundarySites).filter(([, site]) => own.has(site));
+	return sites.length > 0 ? Object.fromEntries(sites) : undefined;
+}
+
+// Each row's served boundary takes the compiler's record for its site, under the row's id and anchors.
+function withRowBoundaries(
+	completeView: ProtocolViewPayload,
+	servedView: ProtocolViewPayload,
+	rowBoundarySites: Readonly<Record<string, string>> | undefined,
+): ProtocolViewPayload {
+	if (!rowBoundarySites) return completeView;
+	const rows = new Map<string, Array<ProtocolViewPayload['asyncBoundaries'][number]>>();
+	for (const served of servedView.asyncBoundaries) {
+		const site = rowBoundarySites[served.id];
+		if (site) rows.set(site, [...(rows.get(site) ?? []), served]);
+	}
+	return {
+		...completeView,
+		asyncBoundaries: completeView.asyncBoundaries.flatMap(
+			(boundary) =>
+				rows.get(boundary.id)?.map((served) => ({
+					...boundary,
+					id: served.id,
+					startAnchor: served.startAnchor,
+					endAnchor: served.endAnchor,
+				})) ?? [boundary],
+		),
+	};
 }
 
 function symbolRouteImportSource(importSource: string): string {
@@ -160,15 +208,24 @@ export function planPrerenderTriggerGroups(input: {
 	readonly symbolResolver: SymbolResolverPlan;
 	readonly boundRows: ReadonlyArray<BoundSymbolResolverRow>;
 	readonly componentEdges?: ReadonlyArray<SemanticComponentEdge>;
+	readonly graphBindings?: ReadonlyArray<Pick<SemanticGraphBinding, 'id' | 'componentName'>>;
+	readonly branchSites?: ReadonlyArray<Pick<SemanticBranchSite, 'id' | 'componentName'>>;
 	readonly renderData?: RenderDataArtifact;
+	readonly boundarySites?: Readonly<Record<string, string>>;
 }): PrerenderTriggerGroup[] {
 	const symbols = new Map(input.symbolResolver.symbols.map((symbol) => [symbol.id, symbol]));
 	const bounds = new Map(input.boundRows.map((row) => [row.id, row]));
-	const completeView = input.completeView ?? input.view;
+	const compilerView = input.completeView ?? input.view;
+	const compilerBoundaries = new Map(
+		compilerView.asyncBoundaries.map((boundary) => [boundary.id, boundary]),
+	);
+	const rowBoundarySites = prerenderRowBoundarySites(compilerView, input.boundarySites);
+	const completeView = withRowBoundaries(compilerView, input.view, rowBoundarySites);
 	const completeBoundaries = new Map(
 		completeView.asyncBoundaries.map((boundary) => [boundary.id, boundary]),
 	);
 	const selfWakeBoundaries = unsettledAsyncBoundaryIndexes(input.state, input.view);
+	const servedBoundaryIds = new Set(input.view.asyncBoundaries.map((boundary) => boundary.id));
 	// One route shape for the three sources: self-wake, view events, branch-arm events.
 	const routes: ReadonlyArray<{
 		readonly event: ProtocolEventRecord;
@@ -248,12 +305,22 @@ export function planPrerenderTriggerGroups(input: {
 			const escalatedHostNodeIds = new Set<string>();
 			for (const boundaryIndex of selfWakeBoundaries ?? []) {
 				const servedBoundary = input.view.asyncBoundaries[boundaryIndex]!;
-				selected.boundaries.add(boundaryIndex);
+				// Indexes into the view this route closes over, which is not the served one.
+				const closureIndex = closureView.asyncBoundaries.findIndex(
+					(boundary) => boundary.id === servedBoundary.id,
+				);
+				selected.boundaries.add(closureIndex === -1 ? boundaryIndex : closureIndex);
 				collectSettledBoundaryClosure(
 					input,
 					completeBoundaries.get(servedBoundary.id) ?? servedBoundary,
 					graphNodeIds,
 					symbolIds,
+				);
+				collectEnclosingRowLists(
+					input.renderData,
+					completeView,
+					rowBoundarySites?.[servedBoundary.id] ?? servedBoundary.id,
+					graphNodeIds,
 				);
 			}
 			closureView.behaviors.forEach((behavior, index) => {
@@ -327,6 +394,8 @@ export function planPrerenderTriggerGroups(input: {
 					if (runnerSymbolId) symbolIds.add(runnerSymbolId);
 				}
 				selectViewSubscribers(closureView, graphNodeIds, symbolIds, selected);
+				for (const index of selected.repeats)
+					collectRowComponentSymbols(input, closureView.keyedRepeats![index]!, symbols, symbolIds);
 				const escalatedBranchIds = new Set<string>();
 				for (const index of selected.branches) {
 					const record = closureView.branches?.[index];
@@ -338,6 +407,16 @@ export function planPrerenderTriggerGroups(input: {
 						completeBoundaries.get(served.id) ?? served,
 					))
 						collectEscalatedArmBranchIds(arm, escalatedBranchIds);
+					// A @try inside this one's arm is wired by this group when the arm lands.
+					for (const nestedId of nestedBoundaryIds(
+						input.renderData,
+						rowBoundarySites?.[served.id] ?? served.id,
+					)) {
+						const nested = compilerBoundaries.get(nestedId);
+						if (!nested) continue;
+						collectSettledBoundaryClosure(input, nested, graphNodeIds, symbolIds);
+						collectSettledArmHostRecordClosure(compilerView, nested, graphNodeIds, symbolIds);
+					}
 				}
 				for (const branchId of escalatedBranchIds)
 					collectEscalatedBranchClosure(
@@ -423,8 +502,12 @@ export function planPrerenderTriggerGroups(input: {
 				// here and commits both through the ordinary arm machinery. An adopting
 				// gesture group takes the same complete record set: the served one
 				// describes @pending, which is not what its wake will find in the DOM.
+				// A @try the served page did not draw, such as one inside another's unsettled arm, is wired by the arm that draws it.
 				asyncBoundaries: closureView.asyncBoundaries
-					.filter((boundary) => selectedBoundaryIds.has(boundary.id))
+					.filter(
+						(boundary) =>
+							selectedBoundaryIds.has(boundary.id) && servedBoundaryIds.has(boundary.id),
+					)
 					.map((boundary) =>
 						adoptedBoundaryIds.has(boundary.id)
 							? (completeBoundaries.get(boundary.id) ?? boundary)
@@ -476,6 +559,54 @@ export function planPrerenderTriggerGroups(input: {
 	return groups.map(({ adoptsSettledArm, ...group }) =>
 		adoptsSettledArm && armRendererModuleId ? { ...group, armRendererModuleId } : group,
 	);
+}
+
+// A component row this group builds runs its components' code: what they bind under the repeat, and every symbol they own.
+function collectRowComponentSymbols(
+	input: Parameters<typeof planPrerenderTriggerGroups>[0],
+	repeat: NonNullable<ProtocolViewPayload['keyedRepeats']>[number],
+	symbols: ReadonlyMap<string, SymbolResolverPlan['symbols'][number]>,
+	symbolIds: Set<string>,
+): void {
+	if (!repeat.rowComponent) return;
+	for (const row of input.boundRows)
+		if (row.ancestry.some((step) => step.keyedRepeatScopeIds.includes(repeat.id)))
+			symbolIds.add(row.id);
+	const edges = input.componentEdges ?? [];
+	const components = new Set(
+		edges
+			.filter((edge) => !edge.importSource && edge.keyedRepeatScopeIds.includes(repeat.id))
+			.map((edge) => edge.childComponentName),
+	);
+	for (const name of components)
+		for (const edge of edges)
+			if (!edge.importSource && edge.parentComponentName === name)
+				components.add(edge.childComponentName);
+	const hostOwners = new Map(
+		(input.renderData?.chunks ?? []).flatMap((chunk) =>
+			chunk.hosts.map((host) => [host.hostNodeId, chunk.componentName] as const),
+		),
+	);
+	const graphOwners = new Map(
+		(input.graphBindings ?? []).map((binding) => [binding.id, binding.componentName]),
+	);
+	const branchOwners = new Map((input.branchSites ?? []).map((site) => [site.id, site.componentName]));
+	const edgeOwners = new Map(edges.map((edge) => [edge.id, edge.parentComponentName]));
+	for (const symbol of symbols.values()) {
+		const owner =
+			'hostNodeId' in symbol
+				? hostOwners.get(symbol.hostNodeId)
+				: symbol.kind === 'callback-prop'
+					? edgeOwners.get(symbol.componentEdgeId)
+					: symbol.kind === 'branch-update'
+						? branchOwners.get(symbol.branchSiteId)
+						: symbol.kind === 'shared-seed'
+							? symbol.componentName
+							: 'graphNodeId' in symbol
+								? graphOwners.get(symbol.graphNodeId)
+								: undefined;
+		if (owner !== undefined && components.has(owner)) symbolIds.add(symbol.id);
+	}
 }
 
 // Graph cells a settled arm reads: its own records, page records bound to its hosts, and props it forwards to children inside it.
@@ -605,6 +736,70 @@ function collectEscalatedArmBranchIds(
 				branchIds,
 			);
 	}
+}
+
+// A @try inside keyed rows settles by rendering those rows again, so it reads the lists they come from.
+function collectEnclosingRowLists(
+	renderData: RenderDataArtifact | undefined,
+	view: ProtocolViewPayload,
+	boundaryId: string,
+	graphNodeIds: Set<string>,
+): void {
+	if (!renderData) return;
+	const parents = new Map<string, { readonly chunkId: string; readonly repeatId?: string }>();
+	let holder: string | undefined;
+	for (const chunk of renderData.chunks)
+		for (const slot of chunk.slots) {
+			if (slot.kind === 'async' && slot.boundaryId === boundaryId) holder = chunk.id;
+			for (const id of ownedChunkIds(slot))
+				parents.set(id, {
+					chunkId: chunk.id,
+					...(slot.kind === 'repeat' && id === slot.rowTemplateId && { repeatId: slot.repeatId }),
+				});
+		}
+	for (let at = holder && parents.get(holder); at; at = parents.get(at.chunkId)) {
+		const repeat = at.repeatId && view.keyedRepeats?.find((record) => record.id === at!.repeatId);
+		if (repeat && repeat.collectionGraphNodeId) graphNodeIds.add(repeat.collectionGraphNodeId);
+	}
+}
+
+// The @try blocks drawn inside a @try's arms, at any depth of this module's markup.
+function nestedBoundaryIds(renderData: RenderDataArtifact | undefined, boundaryId: string): string[] {
+	if (!renderData) return [];
+	const chunks = new Map(renderData.chunks.map((chunk) => [chunk.id, chunk]));
+	const outer = renderData.chunks
+		.flatMap((chunk) => chunk.slots)
+		.find((slot) => slot.kind === 'async' && slot.boundaryId === boundaryId);
+	if (!outer) return [];
+	const found: string[] = [];
+	const walked = new Set<string>();
+	const walk = (chunkId: string) => {
+		if (walked.has(chunkId)) return;
+		walked.add(chunkId);
+		for (const slot of chunks.get(chunkId)?.slots ?? []) {
+			if (slot.kind === 'async') found.push(slot.boundaryId);
+			for (const id of ownedChunkIds(slot)) walk(id);
+		}
+	};
+	for (const id of ownedChunkIds(outer)) walk(id);
+	return found;
+}
+
+// The chunks a slot draws in this module, excluding a child component's own template.
+function ownedChunkIds(slot: RenderDataArtifact['chunks'][number]['slots'][number]): string[] {
+	const ids =
+		slot.kind === 'repeat'
+			? [slot.rowTemplateId, slot.emptyTemplateId]
+			: slot.kind === 'branch'
+				? slot.armTemplateIds
+				: slot.kind === 'async'
+					? Object.values(slot.armTemplateIds)
+					: slot.kind === 'dynamic-host'
+						? [slot.childChunkId]
+						: slot.kind === 'child-component'
+							? [slot.projectionChunkId]
+							: [];
+	return ids.filter((id): id is string => !!id);
 }
 
 // An escalated flip runs the arm's components, naming their symbols through this group's resolver.

@@ -320,6 +320,24 @@ export function memberTagUnresolvedDiagnostic(input: {
 	});
 }
 
+export function componentPropTagDiagnostic(input: {
+	readonly tagName: string;
+	readonly componentName: string;
+	readonly propName: string;
+	readonly node: AnyNode;
+	readonly filename: string;
+}): SemanticGraphDiagnostic {
+	return semanticGraphDiagnostic({
+		code: 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+		title: 'A component passed as a prop is rendered as a tag',
+		message: `\`<${input.tagName} />\` in \`${input.componentName}\` renders the prop \`${input.propName}\`, and a component passed as a prop value cannot be rendered as a tag.`,
+		why: 'The compiler links every child component to the module it comes from at build time. A component that arrives as a prop value is only known when the page renders, so the build has no code to render it with.',
+		span: sourceSpan(input.node, input.filename),
+		suggestion: `Import the component in \`${input.componentName}\` and render it there, or have the caller place it inside \`<${input.componentName}>\` as children and render \`{children}\` instead of \`<${input.tagName} />\`.`,
+		docsUrl: 'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+	});
+}
+
 // The module behind a member tag is linked, and it does not serve the part the
 // tag names. Emitting the tag anyway would compile to a named read off a module
 // that publishes no such export, which surfaces as a bundler MISSING_EXPORT or a
@@ -813,7 +831,7 @@ export function asyncPostAwaitDependentReadDiagnostic(
 }
 
 export function asyncBoundaryRequiredDiagnostic(
-	read: SemanticTemplateRead,
+	read: Pick<SemanticTemplateRead, 'source' | 'sourceSpan'>,
 	binding: SemanticGraphBinding,
 ): SemanticGraphDiagnostic {
 	const computedLabel = binding.async === true ? 'async computed' : 'async-capable computed';

@@ -1,0 +1,361 @@
+{
+	"changes": [
+		{
+			"surface": "build-scale",
+			"path": [
+				"budgets",
+				"clientModules",
+				"value"
+			],
+			"delta": 1,
+			"reason": "the range journal's one shared loader is its own module, so a pass can wait on it before its commits land",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"darwin-arm64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 148,
+			"reason": "the range journal's one shared loader (web/dom-journal-load) ships at load so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-journal-load"
+			],
+			"set": 774,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"runtime/graph"
+			],
+			"delta": 242,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/dom-journal-direct"
+			],
+			"delta": -131,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/render-csr"
+			],
+			"delta": -27,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": -114,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime-start"
+			],
+			"delta": 49,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 115,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-journal-load"
+			],
+			"set": 774,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"runtime/graph"
+			],
+			"delta": 242,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/dom-journal-direct"
+			],
+			"delta": -131,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/render-csr"
+			],
+			"delta": -27,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": -114,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime-start"
+			],
+			"delta": 49,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 104,
+			"reason": "the range journal's one shared loader, which a resumed page's pass waits on before its commits land so an @if and the @for beside it paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/dom-journal-load"
+			],
+			"set": 786,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"runtime/graph"
+			],
+			"delta": 242,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/dom-journal-direct"
+			],
+			"delta": -131,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/payload-resume"
+			],
+			"delta": -48,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/render-csr"
+			],
+			"delta": -27,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": -114,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime-start"
+			],
+			"delta": 49,
+			"reason": "the range journal's one shared loader (web/dom-journal-load), which the resume journal listener names so a pass waits on it before its commits land; an @if and the @for beside it now paint in one task",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 187,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 159,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": 8,
+			"reason": "an awaited write that closes an @if and fills its @for ships the late-close path in the runtime docs and bench pages load; measured on CI runs 44138750553 vs 44135479139",
+			"date": "2026-11-17"
+		}
+	]
+}

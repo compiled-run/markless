@@ -8,7 +8,7 @@ export type Board = {
 	readonly items: ReadonlyArray<Row>;
 };
 
-type Waiting = { readonly request: string; readonly answer: () => void };
+type Waiting = { readonly request: string; readonly answer: (refused?: true) => void };
 
 type Server = {
 	log: string[];
@@ -47,23 +47,28 @@ export const saveRequest = (subject: string) => `POST /grid/save ${subject}`;
 export const failRequest = (subject: string) => `POST /grid/fail ${subject}`;
 
 /** Answers the oldest waiting request named `request`; the caller polls until one is waiting. */
-export function release(request: string): boolean {
+export function release(request: string, refused?: true): boolean {
 	const found = server.waiting.find((each) => each.request === request);
 	if (!found) return false;
 	server.waiting.splice(server.waiting.indexOf(found), 1);
-	found.answer();
+	found.answer(refused);
 	return true;
 }
+
+/** Answers the oldest waiting request named `request` with a failure. */
+export const refuse = (request: string) => release(request, true);
 
 export const waitingRequests = () => server.waiting.map((each) => each.request);
 
 const json = (body: unknown, status = 200) =>
 	new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
-function held(request: string): Promise<void> {
+function held(request: string): Promise<true | undefined> {
 	server.log.push(request);
 	return new Promise((answer) => server.waiting.push({ request, answer }));
 }
+
+const BROKEN = 'The board broke';
 
 async function answer(url: URL, method: string, body: string): Promise<Response> {
 	if (method === 'GET' && url.pathname === '/grid/detail') {
@@ -74,7 +79,7 @@ async function answer(url: URL, method: string, body: string): Promise<Response>
 	if (method === 'GET') {
 		const subject = url.searchParams.get('subject') ?? '';
 		const round = Number(url.searchParams.get('round'));
-		await held(`GET ${url.pathname}${url.search}`);
+		if (await held(`GET ${url.pathname}${url.search}`)) return json({ error: BROKEN }, 500);
 		return json(boardFor(subject, round, server.saved.get(subject)));
 	}
 	if (url.pathname === '/grid/fail') {
@@ -108,7 +113,14 @@ export async function loadBoard(subject: string, round: number): Promise<Board> 
 		return boardFor(subject, round);
 	}
 	const response = await fetch(`/grid/board?subject=${subject}&round=${round}`);
+	if (!response.ok) throw new Error(((await response.json()) as { error: string }).error);
 	return (await response.json()) as Board;
+}
+
+/** A board the server render fails to load; in the browser it loads unless the test refuses it. */
+export async function loadFragileBoard(subject: string, round: number): Promise<Board> {
+	if (typeof window === 'undefined') throw new Error(BROKEN);
+	return loadBoard(subject, round);
 }
 
 export async function saveRow(subject: string): Promise<void> {

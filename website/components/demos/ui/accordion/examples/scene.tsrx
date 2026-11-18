@@ -39,6 +39,7 @@ export default function AccordionScene({ scenario }: { readonly scenario: Scenar
       read = [...read, value];
      }
     }}>
+     // markless-allow MARKLESS_KEYED_REPEAT_ROW_MINT_UNSUPPORTED: the rows are the story's fixed sections; none is added after load
      @for (const entry of visibleEntries; key entry.value) {
       <accordion.item class="entry" value={entry.value} disabled={entry.locked}>
        <accordion.itemlabel class="entry-heading"><accordion.itemtrigger class="entry-trigger" data-example-trigger data-culprit-trigger={entry.value === 'culprit'}>

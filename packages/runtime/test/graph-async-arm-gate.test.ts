@@ -119,6 +119,114 @@ test('a reload waiting on a re-asked value stops waiting once its arm closes', a
 	expect(runs[1]!.signal.aborted).toBe(true);
 });
 
+// The run loads its code first, then checks it still should run, then reads its inputs, as a resumed runner does.
+// The flush is held so the write's pass, which decides the arm, has not run when the code arrives.
+function loadingGraph(cell: { readonly graphNodeId: string; readonly value: unknown }, path: string[] = []) {
+	const bodies: unknown[] = [];
+	const answers: Array<(value: unknown) => void> = [];
+	let loaded!: () => void;
+	const code = new Promise<void>((resolve) => (loaded = resolve));
+	const graph = createRuntimeGraph({
+		cells: [cell],
+		asyncComputed: [
+			{
+				graphNodeId: 'c0:computed:item',
+				dependencies: [{ graphNodeId: cell.graphNodeId, path }],
+				key: (read: (id: string, path?: string[]) => unknown) => read(cell.graphNodeId, path),
+				run: async ({ signal, read }: { signal: AbortSignal; read: (id: string, path?: string[]) => unknown }) => {
+					await code;
+					if (signal.aborted) throw signal.reason;
+					if (graph.armShown!('c0:computed:item') === false) throw new DOMException('Arm closed', 'AbortError');
+					bodies.push(read(cell.graphNodeId, path));
+					return new Promise((resolve) => answers.push(resolve));
+				},
+			},
+		],
+		async: createAsyncComputedPlane,
+		held: createHeldInputsPlane,
+	} as never);
+	let shows = true;
+	graph.subscribe({ id: 'branch-test', graphNodeId: cell.graphNodeId, run: (value) => void (shows = value !== null) });
+	graph.gateArms!((graphNodeId) => (graphNodeId.startsWith('c0:') ? shows : undefined));
+	return { graph, bodies, answers, loaded };
+}
+
+test('a write that closes the arm while its value loads its code leaves that run nothing to read', async () => {
+	const { graph, bodies, loaded } = loadingGraph({ graphNodeId: 'state:open', value: 1 });
+	graph.read('c0:computed:item');
+	const release = graph.holdFlush!();
+	graph.write({ graphNodeId: 'state:open', value: null });
+	loaded();
+	await turn();
+	expect(bodies).toEqual([]);
+	release();
+	await graph.flush();
+	await turn();
+	expect(bodies).toEqual([]);
+});
+
+test('a write that keeps the arm open while its value loads its code runs it once, on the written value', async () => {
+	const { graph, bodies, answers, loaded } = loadingGraph({ graphNodeId: 'state:open', value: 1 });
+	graph.read('c0:computed:item');
+	const release = graph.holdFlush!();
+	graph.write({ graphNodeId: 'state:open', value: 2 });
+	loaded();
+	await turn();
+	release();
+	await graph.flush();
+	await turn();
+	expect(bodies).toEqual([2]);
+	answers[0]!({ name: 'two' });
+	await turn();
+	expect(graph.read('c0:computed:item', ['name'])).toBe('two');
+});
+
+test('a write that moves an input but not the key still lands the value it ends in flight', async () => {
+	const { graph, bodies, answers, loaded } = loadingGraph({ graphNodeId: 'state:filter', value: { a: 1 } }, ['a']);
+	graph.read('c0:computed:item');
+	const release = graph.holdFlush!();
+	graph.write({ graphNodeId: 'state:filter', value: { a: 1, b: 2 } });
+	loaded();
+	await turn();
+	release();
+	await graph.flush();
+	await turn();
+	expect(bodies).toEqual([1]);
+	answers[0]!({ name: 'one' });
+	await turn();
+	expect(graph.read('c0:computed:item', ['status'])).toBe('fulfilled');
+	expect(graph.read('c0:computed:item', ['name'])).toBe('one');
+});
+
+// The arm renders its value in the pass that opened it, while a later write is still waiting for that pass to flip it.
+test('a value first read while a write that closes its arm waits on the pass never runs with the closing value', async () => {
+	const { graph, runs } = gatedGraph();
+	const release = graph.holdFlush!();
+	graph.write({ graphNodeId: 'state:open', value: null });
+	expect(graph.read('c0:computed:item', ['status'])).not.toBe('fulfilled');
+	graph.read('computed:outside');
+	expect(runs.map((run) => run.key)).toEqual([null]);
+	release();
+	await graph.flush();
+	await turn();
+	expect(runs.map((run) => run.key)).toEqual([null]);
+});
+
+test('a value first read while a write that keeps its arm open waits on the pass runs once that pass has decided the arm', async () => {
+	const { graph, runs } = gatedGraph();
+	const release = graph.holdFlush!();
+	graph.write({ graphNodeId: 'state:open', value: 2 });
+	graph.read('c0:computed:item');
+	expect(runs).toEqual([]);
+	release();
+	await graph.flush();
+	await turn();
+	expect(runs.map((run) => run.key)).toEqual([2]);
+	runs[0]!.resolve({ name: 'two' });
+	await turn();
+	expect(graph.read('c0:computed:item', ['name'])).toBe('two');
+});
+
 test('a dropped value never moves to another phase', () => {
 	expect(() => assertAsyncNodeMove(NODE_DROPPED, NODE_RUNNING)).toThrow();
 	expect(() => assertAsyncNodeMove(NODE_DROPPED, NODE_SETTLED)).toThrow();

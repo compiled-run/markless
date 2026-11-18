@@ -348,7 +348,7 @@ type PropAliasOwner = {
 	readonly propPath: ReadonlyArray<string>;
 };
 
-function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
+export function sourceBindingId(span: { readonly start: number; readonly end: number }): string {
 	return `binding:${span.start}:${span.end}`;
 }
 

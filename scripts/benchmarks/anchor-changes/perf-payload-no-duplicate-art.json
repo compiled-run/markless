@@ -1,0 +1,178 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-computed"
+			],
+			"delta": 60,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-sync-demand"
+			],
+			"delta": 394,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-computed"
+			],
+			"delta": 60,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-sync-demand"
+			],
+			"delta": 394,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": -1,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 2,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-sync-demand"
+			],
+			"delta": 394,
+			"reason": "resume derives a module-constant computed at its first read, so the page no longer carries imported art",
+			"date": "2026-11-16"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 47,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 47,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 47,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 67,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": -10,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 67,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs / playground",
+				"jsGzipBytes"
+			],
+			"delta": 141,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state playground",
+				"jsGzipBytes"
+			],
+			"delta": -30,
+			"reason": "resume derives a module-constant computed at its first read, so pages stop carrying imported art; the demand module gains the first-read path (measured on CI run 44276264904 at 09649e012 against main 69fa705bc run 44253578749)",
+			"date": "2026-11-18"
+		}
+	]
+}

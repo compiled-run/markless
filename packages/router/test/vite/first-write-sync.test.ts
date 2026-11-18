@@ -40,8 +40,10 @@ afterAll(async () => {
 type Seen = { readonly dealt: number[]; readonly snapshots: string[] };
 
 // What each of three presses saw: the rows right after its write, and a view transition's "after" snapshot.
-async function seenAfterWrites(origin: string, path: string, rows: string): Promise<Seen> {
+async function seenAfterWrites(origin: string, path: string, rows: string, cpuSlowdown = 1): Promise<Seen> {
 	const page = await browser!.newPage();
+	if (cpuSlowdown > 1)
+		await (await page.context().newCDPSession(page)).send('Emulation.setCPUThrottlingRate', { rate: cpuSlowdown });
 	const errors: string[] = [];
 	page.on('pageerror', (error) => errors.push(error.message));
 	await page.addInitScript(() => {
@@ -87,6 +89,11 @@ const pages: ReadonlyArray<{ readonly path: string; readonly rows: string; reado
 		rows: 'ol > li',
 		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
 	},
+	{
+		path: '/wide',
+		rows: 'ol > li',
+		seen: { dealt: [4, 5, 6], snapshots: ['4 4 cards false', '5 5 cards false', '6 6 cards true'] },
+	},
 ];
 
 describe('production build', () => {
@@ -103,5 +110,11 @@ describe('production build', () => {
 	for (const { path, rows, seen } of pages)
 		test(`${path}: every write, the first included, has reached the page when the handler returns`, async () => {
 			expect(await seenAfterWrites(server!.origin, path, rows)).toEqual(seen);
+		});
+
+	// A slow CPU presses before the page has evaluated the packs it warms after load.
+	for (const { path, rows, seen } of pages)
+		test(`${path}: on a slow CPU, the first write has still reached the page when the handler returns`, async () => {
+			expect(await seenAfterWrites(server!.origin, path, rows, 30)).toEqual(seen);
 		});
 });

@@ -18,7 +18,6 @@ test('an arm opened and closed in a row whose key changes many times keeps live 
 	for (let key = 1; key <= 8; key++) {
 		await expect.poll(() => document.querySelector(`[data-row="${key}"] [data-open]`)).not.toBeNull();
 		click(`[data-row="${key}"] [data-open]`);
-		// A row-placed owner's arm reads `undefined` today (a separate defect); only the settled @try matters here.
 		await expect.poll(() => document.querySelector(`[data-row="${key}"] [data-loaded]`)?.textContent).toMatch(/^loaded /);
 		for (const path of paths()) seen.add(path);
 		expect(paths().length).toBeGreaterThan(0);
@@ -31,8 +30,8 @@ test('an arm opened and closed in a row whose key changes many times keeps live 
 	expect(paths().length).toBeLessThanOrEqual(2);
 });
 
-// Known defect, not the live routes': its file binds the arm's reads only along the chain from the component there that places it, so placed from another file they read `undefined`.
-test.fails('an arm opened in a row-placed owner reads the prop it was handed in its async value', async () => {
+// PropArmOwner is also placed in its own file; placed from here, its arm's reads bind along the chain that starts at it.
+test('an arm opened in a row-placed owner reads the prop it was handed in its async value', async () => {
 	await render(RowArmPage);
 	click('[data-row="1"] [data-open]');
 	await expect.poll(() => document.querySelector('[data-row="1"] [data-loaded]')?.textContent).toMatch(/^loaded /);

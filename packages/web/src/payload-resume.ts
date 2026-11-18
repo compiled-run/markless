@@ -11,7 +11,8 @@ import {
 import type { decodePayloadScripts } from '../../serializer/src/protocol-client.ts';
 import type { DecodedPayloadScripts } from '../../serializer/src/protocol-client-storage.ts';
 import { createRuntimeGraphFromResumePayload } from './payload-graph-construct.ts';
-import { applyDirectJournalEntries, isDirectJournalEntry } from './dom-journal-direct.ts';
+import { applyDirectJournalEntries } from './dom-journal-direct.ts';
+import { isDirectJournalEntry, loadRangeJournal } from './dom-journal-load.ts';
 import {
 	CONTAINER_RETIRE_PROPERTY,
 	type RetirableContainer,
@@ -135,7 +136,6 @@ async function startPayloadResume(
 }
 
 type SymbolLoader = ResumePayloadScriptsInput['loadSymbol'];
-let journal: typeof import('./dom-journal.ts') | undefined;
 type LoadedSymbol = ReturnType<SymbolLoader>;
 
 // An evaluated symbol module never changes, and a repeat import() of it still costs a task.
@@ -214,7 +214,7 @@ async function startDecodedResume(
 				applyDirectJournalEntries(entries, (locator) => runtime?.getElement(locator));
 				return;
 			}
-			const { applyDomJournalEntries } = (journal ??= await import('./dom-journal.ts'));
+			const { applyDomJournalEntries } = await loadRangeJournal();
 			applyDomJournalEntries(entries, {
 				resolveTarget(locator) {
 					const rangeAnchor = /^(branch|async-boundary):(.+?):(start|end)$/.exec(

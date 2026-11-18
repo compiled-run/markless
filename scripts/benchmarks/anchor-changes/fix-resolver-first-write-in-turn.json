@@ -1,0 +1,74 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-csr", "web/resume-sync-computed"],
+			"delta": 239,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["modules", "@fixtures/vite-plus", "web/resume-sync-computed"],
+			"delta": 239,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": ["walls", "@fixtures/vite-plus", "maxEmittedRuntimeGzipBytes", "measured"],
+			"delta": 1,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["runtimeModules", "web/resume-sync-computed"],
+			"delta": 239,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /", "jsGzipBytes"],
+			"delta": 24,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /records", "jsGzipBytes"],
+			"delta": 24,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "bench /settings", "jsGzipBytes"],
+			"delta": 24,
+			"reason": "a sync derive waits for the roster reader only when it reads an element binding, so a first press before pack warm-up derives in turn",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /", "jsGzipBytes"],
+			"delta": 248,
+			"reason": "a component with more than 8 symbols reads its packed resolver in the caller's task: each resolver and its source module import the resident read (about 17 B gzip per such component)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /concepts/state", "jsGzipBytes"],
+			"delta": 237,
+			"reason": "a component with more than 8 symbols reads its packed resolver in the caller's task: each resolver and its source module import the resident read (about 17 B gzip per such component)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": ["loadWeight", "linux-x64", "docs /ui/accordion", "jsGzipBytes"],
+			"delta": 340,
+			"reason": "a component with more than 8 symbols reads its packed resolver in the caller's task: each resolver and its source module import the resident read (about 17 B gzip per such component)",
+			"date": "2026-11-17"
+		}
+	]
+}

@@ -59,6 +59,8 @@ Deploy with `npx wrangler deploy --config .output/server/wrangler.json`. Cloudfl
 - Pages that aren't prerendered render in the Worker and stream, so `@pending` content still shows first.
 - Name the Worker with `name` in a `wrangler.json` next to `vite.config.ts`.
 
+A page or endpoint the Worker renders stays in Cloudflare's edge cache for as long as the `s-maxage` in its `Cache-Control` says, the way an ISR rule keeps it on Vercel. Each URL gets its own entry, and a new deploy starts fresh. Requests with a cookie or an `Authorization` header skip the cache, and so do answers that set a cookie or vary on anything but encoding.
+
 ## Memory isn't shared between servers
 
 A host runs many copies of your server, called *instances*, and each has its own memory. Put sessions and carts in a database or a key-value store. For one copy per instance, such as a database pool, put it on `globalThis`:

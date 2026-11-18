@@ -11,7 +11,8 @@ import {
 } from '@markless/serializer/protocol';
 import type { DomJournalEntry } from '@markless/runtime';
 import type { RuntimeGraph } from '@markless/runtime';
-import { applyDirectJournalEntries, isDirectJournalEntry } from './dom-journal-direct.ts';
+import { applyDirectJournalEntries } from './dom-journal-direct.ts';
+import { isDirectJournalEntry, loadRangeJournal } from './dom-journal-load.ts';
 import type { CsrRenderContainer, CsrRenderOptions, CsrRenderOutput } from './render.ts';
 import { marklessInstanceScopedLoadSymbol } from './fns/instance-scope.ts';
 import {
@@ -33,9 +34,6 @@ import {
 	marklessNoteArrivingControlEdits,
 } from './control-edit-hold.ts';
 import type { MarklessIdleHost } from './fns/idle-trigger.ts';
-
-// Even an evaluated module's import() costs a task.
-let journal: typeof import('./dom-journal.ts') | undefined;
 
 declare const __MARKLESS_DEV_ENABLED__: boolean;
 
@@ -656,7 +654,7 @@ async function applyDefaultCsrDomJournal(
 	disposed: () => boolean,
 ): Promise<void> {
 	// Loaded before any entry applies, so a text and the branch beside it land in one task.
-	if (!entries.every(isDirectJournalEntry)) journal ??= await import('./dom-journal.ts');
+	const journal = entries.every(isDirectJournalEntry) ? undefined : await loadRangeJournal();
 	if (disposed()) return;
 	const deferred = applyDirectJournalEntries(entries, (locator) => runtime.getElement(locator));
 	if (deferred.length === 0) return;

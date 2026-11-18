@@ -143,9 +143,9 @@
 		}
 	},
 	"anchors": {
-		"calibrationS": 1.374,
-		"cpuS": 3525.6,
-		"peakRssMb": 4035,
+		"calibrationS": 1.267,
+		"cpuS": 3043.2,
+		"peakRssMb": 4068,
 		"models": {
 			"AMD EPYC 7763 64-Core Processor": 1.045,
 			"AMD EPYC 9V45 96-Core Processor": 0.89,
@@ -157,22 +157,32 @@
 		},
 		"shards": {
 			"1/3": {
-				"cpuS": 1006.6,
-				"peakRssMb": 3762
+				"cpuS": 975.3,
+				"peakRssMb": 3963
 			},
 			"2/3": {
-				"cpuS": 1367,
-				"peakRssMb": 3984
+				"cpuS": 938.3,
+				"peakRssMb": 4068
 			},
 			"3/3": {
-				"cpuS": 1152,
-				"peakRssMb": 4035
+				"cpuS": 1129.6,
+				"peakRssMb": 3849
 			}
 		},
 		"runs": [
-			"44251003560"
+			"43644444611",
+			"43645710927",
+			"43645711888",
+			"43649460585",
+			"43653762906",
+			"43808674640",
+			"43884980407",
+			"43915343602",
+			"43934576030",
+			"43947900042",
+			"43959681371"
 		],
-		"sha": "839b3e7a039be38c3ab0b6cc620017c8b1f75c93"
+		"sha": "710c44d481f4c34da616029fe7aa61c8cf9192d1"
 	},
 	"history": [
 		{
@@ -387,29 +397,23 @@
 				"peakRssMb": 4171
 			},
 			"to": {
-				"cpuS": 3585.5,
-				"peakRssMb": 4414
+				"cpuS": 3043.2,
+				"peakRssMb": 4068
 			},
 			"runs": [
-				"44085378060"
+				"43644444611",
+				"43645710927",
+				"43645711888",
+				"43649460585",
+				"43653762906",
+				"43808674640",
+				"43884980407",
+				"43915343602",
+				"43934576030",
+				"43947900042",
+				"43959681371"
 			],
-			"reason": "the native ladder's web check (packages/mobile/test/ladder-web.test.ts) builds a router app per rung and drives it in Chromium, the web reference each native rung needs; 15 rungs now, measured in CI run 44085378060 at +369.6 CPU-s total"
-		},
-		{
-			"date": "2026-11-18",
-			"change": "anchors",
-			"from": {
-				"cpuS": 3585.5,
-				"peakRssMb": 4414
-			},
-			"to": {
-				"cpuS": 3525.6,
-				"peakRssMb": 4035
-			},
-			"runs": [
-				"44251003560"
-			],
-			"reason": "largest shard peak RSS measured twice on this branch's CI (run 44251003560, attempts 1 and 2): 4048 MB and 4035 MB against the 4414 MB anchor (-8.3%, -8.6%; margin 7.9%); CPU -2.8% and -2.0%, inside noise. The memory anchor is lowered, not raised."
+			"reason": "re-anchored from main's 11 green runs since #721 (d96d14cc2 to 710c44d48, 33 shard measurements on 7 CPU models): largest-shard peak RSS read -6.5% to +1.6% against the 4171 MB anchor (PR #739 failed at -8.0% as stale), because shard 2's peak moved: in 22 of 26 green shard-2 measurements before #721 it was migration-defects' fixture build beside kept-late-handler 15-20 s in (~4171 MB), and in all 16 since #721 (whose grid build now takes the one build slot) it is render-order-sweep beside ssr-imported-rows-fixture, shard 2 median 4171 to 4068 MB; CPU at the anchors' speed read +3.6% (median, -2.5% to +7.8%) as 26 node test files were added since d61244a69, inside the 11.8% band; the ±7.9% RSS margin stays, same-tree repeats spread 0-4.3% (710c44d48 4100/3927 MB, 581eacb79 4169/4169, #739 3836/3998)"
 		}
 	],
 	"models": {

@@ -310,14 +310,11 @@ test(`a component row added right after load or once the page is idle fetches no
 			if (idle === 'reached') await drainIdle(page);
 			await page.locator('[data-add-shelf]').click();
 			await expect.poll(() => page.locator('section[data-shelf]').count()).toBe(3);
-			// On the records path an added component row renders empty, on main too: a separate defect.
-			if (path === 'served') {
-				await expect.poll(() => titles(page, 2), { timeout: 10_000 }).toEqual(['Dune', 'Emma']);
-				await page.locator('section[data-shelf="2"] [data-toggle]').click();
-				await expect
-					.poll(() => page.locator('section[data-shelf="2"] [data-detail]').textContent())
-					.toBe('Filter: e');
-			}
+			await expect.poll(() => titles(page, 2), { timeout: 10_000 }).toEqual(['Dune', 'Emma']);
+			await page.locator('section[data-shelf="2"] [data-toggle]').click();
+			await expect
+				.poll(() => page.locator('section[data-shelf="2"] [data-detail]').textContent())
+				.toBe('Filter: e');
 			await page.waitForLoadState('networkidle');
 			expect({ path, idle, errors, afterLoad }).toEqual({ path, idle, errors: [], afterLoad: [] });
 			await page.close();

@@ -3328,7 +3328,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless build tooling error from @markless/bundler.',
 		printed: [
-			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalized>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalizedId>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		],
 		structured: false,
 		sources: [
@@ -3432,6 +3432,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description: 'A Markless build tooling error from @markless/bundler.',
 		printed: [
 			'MARKLESS_CLIENT_BUILD_PROCESS: the client build failed in its own process (<exit>); its error is printed above. Set MARKLESS_CLIENT_BUILD_PROCESS=0 to build every environment in one process.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_CLIENT_BUILD_STALLED',
+		title: 'The browser build stopped making progress',
+		area: 'build',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For <idleSeconds> s it used no CPU, had no compile or chunk job on a build worker and waited on no request, socket or process<value>, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.',
 		],
 		structured: false,
 		sources: [
@@ -4002,6 +4023,33 @@ export const errorEntries: readonly ErrorEntry[] = [
 		why: 'A child reads a prop through the graph node the parent named. An expression with no node behind it can only be seeded once, from whatever the value happened to be at render - so the child would show a stale value forever and nothing would say so.',
 		suggestion:
 			'Pass a value the compiler can follow: a plain read (`group.value`), or an expression built only from reads, operators and method calls on those reads (`group.value.includes(item.value)`). If the value needs a function of your own, put that function inside a `computed()` and pass the computed.',
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/semantic-graph/diagnostics.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
+		code: 'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+		title: 'A component passed as a prop is rendered as a tag',
+		area: 'components',
+		packageName: '@markless/compiler',
+		stage: 'compile',
+		severity: 'error',
+		description: 'A component passed as a prop is rendered as a tag: a Markless build error.',
+		printed: [
+			'MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED: `<<tagName> />` in `<componentName>` renders the prop `<propName>`, and a component passed as a prop value cannot be rendered as a tag.',
+			'The compiler links every child component to the module it comes from at build time. A component that arrives as a prop value is only known when the page renders, so the build has no code to render it with.',
+			'Import the component in `<componentName>` and render it there, or have the caller place it inside `<<componentName>>` as children and render `{children}` instead of `<<tagName> />`.',
+			'https://markless.dev/errors/MARKLESS_COMPONENT_PROP_TAG_UNSUPPORTED',
+		],
+		structured: true,
+		why: 'The compiler links every child component to the module it comes from at build time. A component that arrives as a prop value is only known when the page renders, so the build has no code to render it with.',
+		suggestion:
+			'Import the component in `<componentName>` and render it there, or have the caller place it inside `<<componentName>>` as children and render `{children}` instead of `<<tagName> />`.',
 		sources: [
 			{
 				id: 'f0',
@@ -10817,6 +10865,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED',
+		title: 'document.tsrx reads shared()',
+		area: 'router',
+		packageName: '@markless/router',
+		stage: 'runtime',
+		severity: 'error',
+		description: 'A Markless runtime error from @markless/router.',
+		printed: [
+			"MARKLESS_ROUTER_DOCUMENT_SHARED_UNSUPPORTED: the document reads shared() <names>, but the router serves only the document's HTML and never wires it in the browser, so it would keep showing the starting value after a write. Read the value in a component the page renders, and set the class or attribute on an element there.",
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/router/src/vite/runtime/create-server-entry.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/router/src/vite/runtime/create-server-entry.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_ROUTER_DOCUMENT_STORAGE_UNSUPPORTED',
 		title: 'document.tsrx uses storage()',
 		area: 'router',
@@ -15395,17 +15464,17 @@ export const errorEntries: readonly ErrorEntry[] = [
 		code: 'MARKLESS_SYMBOL_UNKNOWN',
 		title: 'A piece of code is unknown',
 		area: 'internal',
-		packageName: '@markless/compiler',
-		stage: 'build',
+		packageName: '@markless/web',
+		stage: 'runtime',
 		severity: 'error',
-		description: 'A Markless build tooling error from @markless/compiler.',
+		description: 'A Markless runtime error from @markless/web.',
 		printed: [],
 		structured: false,
 		sources: [
 			{
 				id: 'f0',
-				file: 'packages/compiler/src/passes/symbol-resolver-module.ts',
-				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/symbol-resolver-module.ts',
+				file: 'packages/web/src/fns/symbol-unknown.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/web/src/fns/symbol-unknown.ts',
 			},
 		],
 		moreSources: 0,

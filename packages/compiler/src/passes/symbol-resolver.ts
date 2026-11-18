@@ -33,6 +33,7 @@ import {
 	componentEdgeHostSegment,
 	componentEdgeInstancePath,
 	componentEdgeInstanceSegment,
+	componentEdgePathsEndingAt,
 } from '../component-edge-instance.ts';
 import { asNodes, getIdentifierName, walkNode, type AnyNode } from '../ast/nodes.ts';
 import { parseJavaScriptModule } from '../js-ast.ts';
@@ -471,7 +472,11 @@ export function captureSlotFoldsToConstant(slot: {
 export function planBoundSymbolResolver(
 	input: BoundSymbolResolverInput,
 ): BoundSymbolResolverArtifact {
-	const pathsByTerminalEdge = componentEdgePaths(input.semanticGraph.componentEdges);
+	const pathsByTerminalEdge = new Map(
+		input.semanticGraph.componentEdges.map(
+			(edge) => [edge.id, componentEdgePathsEndingAt(edge, input.semanticGraph)] as const,
+		),
+	);
 	const rows: BoundSymbolResolverRow[] = [];
 
 	for (const symbol of input.captureAnalysis.extractedSymbols) {
@@ -633,28 +638,6 @@ function qualifiedRoute(
 		: rest;
 }
 
-function componentEdgePaths(edges: SymbolResolverInput['semanticGraph']['componentEdges']) {
-	const incomingByComponent = new Map<string, typeof edges>();
-	for (const edge of edges) {
-		const incoming = incomingByComponent.get(edge.childComponentName) ?? [];
-		incomingByComponent.set(edge.childComponentName, [...incoming, edge]);
-	}
-	const result = new Map<string, Array<Array<(typeof edges)[number]>>>();
-	const visit = (
-		edge: (typeof edges)[number],
-		seen: ReadonlySet<string>,
-	): Array<Array<(typeof edges)[number]>> => {
-		if (seen.has(edge.id)) return [];
-		const nextSeen = new Set(seen).add(edge.id);
-		const parents = (incomingByComponent.get(edge.parentComponentName) ?? []).filter(
-			(parent) => !nextSeen.has(parent.id),
-		);
-		if (parents.length === 0) return [[edge]];
-		return parents.flatMap((parent) => visit(parent, nextSeen).map((path) => [...path, edge]));
-	};
-	for (const edge of edges) result.set(edge.id, visit(edge, new Set()));
-	return result;
-}
 
 // A row inside a keyed repeat is one instance per rendered row, and only the dispatching record's host id names the row.
 function boundRowPieces(

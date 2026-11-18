@@ -17,6 +17,8 @@ import { readExecutionDemandAsset } from '../src/build/execution-demand.ts';
 import { UNSHIPPED_HOOK_REASON } from '../src/build/execution-sizes.ts';
 import { verifyGeneratedSymbolTableRoutes } from '../src/build/symbol-table.ts';
 import { moduleIdFor } from '../src/module-id.ts';
+import { RESIDENT_LOAD_MODULE } from '../src/rebound-symbol-route.ts';
+import { marklessWhenLoaded } from '@markless/web/fns/resident-load';
 import {
 	callBuildStart,
 	callGenerateBundle,
@@ -119,8 +121,25 @@ describe('TSRX Rolldown plugin structure', () => {
 		).toMatchObject({
 			preserveEntrySignatures: 'strict',
 		});
-		expect(callOptions(marklessServer(), {})).toEqual({});
+		expect(callOptions(marklessServer(), {})).toEqual({
+			experimental: { attachDebugInfo: 'none' },
+		});
 		expect(callOptions(marklessLib(), {})).toEqual({});
+		const warn = vi.fn();
+		expect(
+			callOptions(marklessServer(), { experimental: { attachDebugInfo: 'simple' } }, { warn }),
+		).toEqual({ experimental: { attachDebugInfo: 'none' } });
+		expect(warn).toHaveBeenCalledWith(expect.stringContaining('attachDebugInfo'));
+		const routeBuild = marklessClient();
+		(routeBuild as { api: { declareRouteModules(isRoute: () => boolean): void } }).api.declareRouteModules(
+			() => true,
+		);
+		expect(callOptions(routeBuild, {})).toMatchObject({
+			experimental: {
+				attachDebugInfo: 'none',
+				chunkOptimization: { mergeCommonChunks: true, avoidRedundantChunkLoads: false },
+			},
+		});
 	});
 
 	test('transformTsrxModule produces virtual payload, resolver, and symbol modules', async () => {
@@ -710,7 +729,7 @@ let active = state(true);
 			'const marklessSymbolResolverModule = () => import("virtual:markless:resolver:',
 		);
 		expect(result.code).toContain(
-			'return marklessSymbolResolverModule().then((mod) => mod.loadSymbol(symbolId));',
+			'return marklessSymbolResolverWhenLoaded(marklessSymbolResolverModule(), (mod) => mod.loadSymbol(symbolId));',
 		);
 	});
 
@@ -1899,7 +1918,11 @@ export function App() @{
 		)!;
 		const childHandlerUrl = `data:text/javascript,${encodeURIComponent(childHandlerModule.source)}`;
 		const resolverUrl = `data:text/javascript,${encodeURIComponent(
-			resolver.source.split(childHandlerModule.id).join(childHandlerUrl),
+			resolver.source
+				.split(childHandlerModule.id)
+				.join(childHandlerUrl)
+				.split(RESIDENT_LOAD_MODULE)
+				.join(`data:text/javascript,${encodeURIComponent(`export ${marklessWhenLoaded}`)}`),
 		)}`;
 		const loadedResolver = (await import(resolverUrl)) as {
 			loadSymbol(id: string): Promise<(context: unknown) => unknown>;

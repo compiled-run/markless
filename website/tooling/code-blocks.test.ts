@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -108,6 +108,9 @@ export default function Card() @{
 \`\`\`
 </Code>
 `;
+
+// The first highlight stands up shiki and the quick-info TypeScript program, seconds on a cold runner.
+beforeAll(() => codePane({ name: 'Warm.tsrx', code: 'export default function Warm() {}' }), 60_000);
 
 describe('several .tsrx files in one block', () => {
 	it('runs the first .tsrx fence when no entry is named', () => {

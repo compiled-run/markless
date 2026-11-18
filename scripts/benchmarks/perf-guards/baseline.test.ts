@@ -7,6 +7,7 @@ import {
 	buildBaseline,
 	chooseReference,
 	ledgerHistory,
+	measuredDownload,
 	rebaseLoadAnchors,
 } from './baseline.mjs';
 import { BUDGETS } from './config.mjs';
@@ -192,6 +193,64 @@ describe('G16 downloads against a CI baseline', () => {
 		) as { loadWeight: Record<string, Record<string, Load>> };
 		expect(anchors.loadWeight[PLATFORM][PAGE].executedChars).toBe(25_000);
 		expect(anchors.loadWeight[PLATFORM][PAGE].jsGzipBytes).toBe(1052);
+	});
+});
+
+describe("splitting the playground's prefetch out of a page's download", () => {
+	const PLAYGROUND = `${PAGE} playground`;
+	// Before the split, CI measured docs / at 1,450,000 B with the playground's prefetch in it.
+	const total = 1_450_000;
+	const own = 150_000;
+	const prefetch = 1_300_000;
+	const split = (pageBytes: number, playgroundBytes: number) => {
+		const m = measurement(pageBytes);
+		Object.assign(m.sites.docs.routes['/'].load, {
+			playground: { jsGzipBytes: playgroundBytes, files: [] },
+		});
+		return m;
+	};
+	const headLoad = {
+		[PLATFORM]: {
+			[PAGE]: { executedChars: 25_000, jsGzipBytes: 1000 - (total - own) },
+			[PLAYGROUND]: { jsGzipBytes: prefetch },
+		},
+	};
+	const verdictOf = (m: ReturnType<typeof split>) => {
+		const history = {
+			head: { sha: 'head', load: headLoad, marked: new Set([`${PLATFORM} ${PAGE}`, `${PLATFORM} ${PLAYGROUND}`]) },
+			chain: [
+				{
+					sha: 'm',
+					load: anchorsWith({ executedChars: 25_000, jsGzipBytes: 1000 }).loadWeight,
+					marked: new Set([`${PLATFORM} ${PAGE}`]),
+				},
+			],
+		};
+		const baseline = buildBaseline({
+			history,
+			platform: PLATFORM,
+			measurementAt: () => ({ ...measurement(total), run: 1 }),
+		});
+		const anchors = rebaseLoadAnchors({ loadWeight: headLoad }, baseline);
+		return {
+			baseline,
+			failures: evaluate(m, anchors).failures.filter((finding) => finding.guard === 'G16'),
+		};
+	};
+
+	test('measuredDownload reads the page and its playground as two figures', () => {
+		const m = split(own, prefetch);
+		expect(measuredDownload(m, PAGE)).toBe(own);
+		expect(measuredDownload(m, PLAYGROUND)).toBe(prefetch);
+		expect(measuredDownload(measurement(total), PLAYGROUND)).toBeUndefined();
+	});
+
+	test("the switch-over record moves the page's limit onto its own code, and the playground keeps its anchor", () => {
+		const { baseline, failures } = verdictOf(split(own + ALLOWED, prefetch));
+		expect(failures).toEqual([]);
+		expect(baseline.subjects[PAGE].measured).toBe(total);
+		expect(baseline.fallbacks).toHaveProperty([PLAYGROUND]);
+		expect(verdictOf(split(own + ALLOWED + 1, prefetch)).failures).toHaveLength(1);
 	});
 });
 
