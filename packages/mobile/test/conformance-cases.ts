@@ -345,6 +345,15 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'typed-target',
+		fixture: 'test/fixtures/TypedTarget.tsrx',
+		actions: [
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'ada' },
+			{ event: 'input', host: 'component-edge:0/h1', value: 'bo' },
+		],
+	},
+	{
 		name: 'commands',
 		fixture: 'test/fixtures/Commands.tsrx',
 		actions: [

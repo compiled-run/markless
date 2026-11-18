@@ -344,8 +344,7 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `currencyScale` uses a TryStatement, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the focus event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the input handler's call to `numberbox.type` reads `event`, which is not state of this component"
+			"MARKLESS_NATIVE_UNSUPPORTED: the blur event has no native meaning yet"
 		]
 	},
 	"otp": {
@@ -488,8 +487,7 @@
 	"textbox": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the input handler's call to `textbox.type` reads `event`, which is not state of this component"
+			"MARKLESS_NATIVE_ELEMENT: the <textarea> element has no native view yet"
 		]
 	},
 	"timebox": {

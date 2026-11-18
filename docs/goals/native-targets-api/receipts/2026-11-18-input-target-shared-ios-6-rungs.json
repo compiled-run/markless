@@ -1,0 +1,48 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "ios",
+	"rungs": [
+		{
+			"name": "u23-textbox",
+			"failure": {
+				"step": 0,
+				"action": "launch",
+				"role": "flow",
+				"command": "assertConditionCommand",
+				"message": "Assertion is false: \"Name\" is visible"
+			},
+			"installSeconds": 3.524181791999996,
+			"flowSeconds": 31.466255042000004
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.2817282500000001,
+			"flowSeconds": 27.66444729099999
+		},
+		{
+			"name": "f1-fields",
+			"failure": null,
+			"installSeconds": 0.36173616600001696,
+			"flowSeconds": 38.166690125000024
+		},
+		{
+			"name": "f2-return-key",
+			"failure": null,
+			"installSeconds": 0.33447262499999486,
+			"flowSeconds": 51.479448999999995
+		},
+		{
+			"name": "f4-required",
+			"failure": null,
+			"installSeconds": 0.3448540000000503,
+			"flowSeconds": 31.46317599999998
+		},
+		{
+			"name": "f6-disabled",
+			"failure": null,
+			"installSeconds": 0.2879992499999935,
+			"flowSeconds": 28.33082716600003
+		}
+	]
+}

@@ -1,0 +1,12 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "u23-textbox",
+			"failure": null,
+			"installSeconds": 5.3472615,
+			"flowSeconds": 17.281543875000004
+		}
+	]
+}

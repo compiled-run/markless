@@ -335,6 +335,39 @@ export function Page() @{
 		]);
 	});
 
+	it("reads an input event's target as the field typed into, whose value is the typed text, only in that handler", async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	if (!control) return '';
+	return control.value;
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<input aria-label="Name" onInput={(event) => (said = textOf(event.target))} />
+		<p>{said}</p>
+	</main>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.handlers).toEqual([
+			{ id: 'handler:event:0', ops: [{ op: 'assign', cell: 'state:said', value: { event: 'value' } }] },
+		]);
+		const elsewhere = await nativeView(`import { state } from '@markless/core';
+function textOf(from: EventTarget | null): string {
+	const control = from as HTMLInputElement | null;
+	return control ? control.value : '';
+}
+export function Page() @{
+	let said = state('');
+	<main>
+		<button onClick={(event) => (said = textOf(event.target))}>Read</button>
+		<p>{said}</p>
+	</main>
+}`);
+		expect(elsewhere.payload).toBeNull();
+	});
+
 	it('lowers the children a caller passes where the component renders {children}, in the caller scope', async () => {
 		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
 function Card({ title, children }) @{
