@@ -1,5 +1,5 @@
 import { computed } from '@markless/core';
-import { location } from '@markless/device';
+import { location, platform } from '@markless/device';
 
 function Here() @{
 	const here = computed(async () => location.current());
@@ -18,7 +18,7 @@ function Here() @{
 export default function App() @{
 	<main>
 		<h1>Location</h1>
-		@if (location.supported) {
+		@if (!platform.web) {
 			<Here />
 		} @else {
 			<p>Location is not available here</p>

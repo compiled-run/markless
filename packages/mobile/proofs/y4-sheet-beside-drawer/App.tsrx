@@ -1,5 +1,5 @@
 import { state } from '@markless/core';
-import { native } from '@markless/device';
+import { native, platform } from '@markless/device';
 import { drawer } from '@markless/ui';
 
 export default function App() @{
@@ -33,22 +33,26 @@ export default function App() @{
 			</drawer.backdrop>
 		</drawer.root>
 		<button onClick={() => (systemOpen = true)}>Open the system sheet</button>
-		<native.sheet
-			open={systemOpen}
-			onChange={(open) => {
-				systemOpen = open;
-				last = 'the system sheet';
-			}}
-		>
-			<h2>Drawn by the platform</h2>
-			<button
-				onClick={() => {
-					systemOpen = false;
+		@if (!platform.web) {
+			<native.sheet
+				open={systemOpen}
+				onChange={(open) => {
+					systemOpen = open;
 					last = 'the system sheet';
 				}}
 			>
-				Close the system sheet
-			</button>
-		</native.sheet>
+				<h2>Drawn by the platform</h2>
+				<button
+					onClick={() => {
+						systemOpen = false;
+						last = 'the system sheet';
+					}}
+				>
+					Close the system sheet
+				</button>
+			</native.sheet>
+		} @else {
+			<p>On the web, only the drawer</p>
+		}
 	</main>
 }

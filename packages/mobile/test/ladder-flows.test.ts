@@ -32,6 +32,10 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		'D2',
 		'D3',
 		'D4',
+		'D4b',
+		'D5',
+		'D6',
+		'D7',
 		'P1',
 		101,
 		102,
@@ -51,14 +55,23 @@ test.each(rungFolders())('%s: flow.yaml is the flow its expected.json describes'
 	);
 	const [header, commands] = committed;
 	expect(header).toEqual({ appId: '${APP_ID}', name: folder });
-	// A rung that places the device sets its location first; the launch always clears the app's state.
+	// Before the launch only the device's place and a cold Settings app are set; the launch always clears the app's state.
 	const launch = commands.findIndex(
 		(command: unknown) =>
 			typeof command === 'object' && command !== null && 'launchApp' in command,
 	);
-	expect(commands.slice(0, launch).every((command: object) => 'setLocation' in command)).toBe(
-		true,
-	);
+	const coldSettings = {
+		runFlow: { when: { platform: 'iOS' }, commands: [{ stopApp: 'com.apple.Preferences' }] },
+	};
+	expect(
+		commands
+			.slice(0, launch)
+			.every(
+				(command: object) =>
+					'setLocation' in command ||
+					JSON.stringify(command) === JSON.stringify(coldSettings),
+			),
+	).toBe(true);
 	expect(commands[launch]).toMatchObject({ launchApp: { clearState: true } });
 });
 

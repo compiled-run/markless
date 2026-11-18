@@ -383,7 +383,8 @@
 		"objects": [
 			{
 				"id": "object:component-edge:1/cam",
-				"device": "camera"
+				"device": "camera",
+				"owner": "component-edge:1/h0"
 			}
 		]
 	},

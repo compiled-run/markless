@@ -32,6 +32,8 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	/// Run a device call now (on `object` when it names one); with `result`, settle that task cell with what it gives; with
 	/// `resume`, answer with `resume(_:value:)` once the call settles.
 	case call(call: String, object: String?, arguments: [NativeValue], result: String?, resume: String?)
+	/// The device object's owner left the screen: the host stops it and forgets it.
+	case release(object: String)
 
 	public var json: JSONValue {
 		switch self {
@@ -57,6 +59,7 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			if let result { fields.append(("result", .string(result))) }
 			if let resume { fields.append(("resume", .string(resume))) }
 			return .object(fields)
+		case let .release(object): return .object([("op", .string("release")), ("object", .string(object))])
 		}
 	}
 }
@@ -328,6 +331,24 @@ public final class NativeRuntime {
 		return try change(host: nil) { try self.run(then.ops, in: scope) }
 	}
 
+	/// That call failed: the rest of the handler does not run, and the nearest `@catch` cell takes `{ name, message }`.
+	public func reject(_ continuation: String, name: String, message: String) throws -> [NativeJournalEntry] {
+		guard let then = continuations[continuation] else { throw RuntimeError(reason: "no continuation \(continuation)") }
+		guard let cell = then.catch else { return [] }
+		return try change(host: nil) {
+			self.values[cell] = .object([("name", .string(name)), ("message", .string(message))])
+			return []
+		}
+	}
+
+	/// Device objects whose owner is shown.
+	public func liveObjects() throws -> [String] {
+		try payload.objects.compactMap { object in
+			guard let owner = nodesById[object.owner] else { throw RuntimeError(reason: "\(object.id) is owned by unknown node \(object.owner)") }
+			return try isShown(owner.arm) ? object.id : nil
+		}
+	}
+
 	/// Runs ops in order: writes cells and collects the calls (a continuation's id rides on its call); stops at a navigation.
 	private func run(_ ops: [NativeOp], in scope: NativeScope) throws -> [NativeJournalEntry] {
 		var calls: [NativeJournalEntry] = []
@@ -375,7 +396,7 @@ public final class NativeRuntime {
 	}
 
 	/// Runs `apply` (cell writes, returning the calls it made or a navigation) and returns the journal: styled cells,
-	/// then every shown node whose output changed in document order, then the calls.
+	/// then every shown node whose output changed in document order, then released device objects, then the calls.
 	private func change(host: String?, _ apply: () throws -> [NativeJournalEntry]) throws -> [NativeJournalEntry] {
 		let keyed = { (list: [(node: String, name: String, value: String?)]) in
 			Dictionary(list.map { ("\($0.node)\u{0}\($0.name)", $0.value) }, uniquingKeysWith: { $1 })
@@ -388,6 +409,7 @@ public final class NativeRuntime {
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		let beforeSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
+		let ownedBefore = Set(try liveObjects())
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
@@ -427,6 +449,10 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries + calls
+		let owned = Set(try liveObjects())
+		let releases = payload.objects.compactMap { object -> NativeJournalEntry? in
+			ownedBefore.contains(object.id) && !owned.contains(object.id) ? .release(object: object.id) : nil
+		}
+		return styles + entries + releases + calls
 	}
 }

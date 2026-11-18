@@ -109,6 +109,13 @@ class MarklessHost(
 
 	/** Set when another page replaces this one: device answers that arrive later change nothing. */
 	var released = false
+		private set
+
+	/** Another page replaces this one: its device objects end, and device answers that arrive later change nothing. */
+	fun release() {
+		released = true
+		for (o in payload.objects) device?.release(o.id)
+	}
 
 	private fun needDevice(): NativeDevice = device ?: throw MarklessHostError("the payload names device features and this host was given no device")
 
@@ -122,8 +129,13 @@ class MarklessHost(
 					is DeviceOutcome.Error -> runtime.settleError(cell, outcome.name, outcome.message)
 				})
 			}
-			// An awaited call from a handler: the rest of the handler runs with the answer; a refusal ends it.
-			continuation != null -> { outcome -> if (!released && outcome is DeviceOutcome.Value) apply(runtime.resume(continuation, outcome.value)) }
+			// An awaited call from a handler: the rest of the handler runs with the answer; a failure goes to its `@catch`.
+			continuation != null -> { outcome ->
+				if (!released) apply(when (outcome) {
+					is DeviceOutcome.Value -> runtime.resume(continuation, outcome.value)
+					is DeviceOutcome.Error -> runtime.reject(continuation, outcome.name, outcome.message)
+				})
+			}
 			else -> null
 		}
 		needDevice().call(call.node, call.obj, call.arguments, settle)
@@ -173,6 +185,7 @@ class MarklessHost(
 				}
 				is JournalEntry.Sheet -> (sheets[entry.node] ?: throw MarklessHostError("journal names \"${entry.node}\", which is not a sheet")).let { if (entry.open) it.open() else it.close() }
 				is JournalEntry.Call -> runCall(entry)
+				is JournalEntry.Release -> needDevice().release(entry.node)
 				is JournalEntry.Rows -> {
 					if (runtime.node(entry.node) !is Node.Repeat) throw MarklessHostError("journal names \"${entry.node}\", which is not a list")
 					rebuild()
@@ -288,6 +301,10 @@ class MarklessHost(
 				needDevice().view(obj, device).also { named(it, inst.id) }
 			}
 			"img" -> SizedImage(context).also { named(it, inst.id) }
+			"audio" -> AudioButton(context).apply {
+				visibility = View.GONE
+				named(this, inst.id)
+			}
 			"input" -> EditText(context).apply {
 				isSingleLine = true
 				includeFontPadding = false
@@ -337,9 +354,13 @@ class MarklessHost(
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
 		when (name) {
-			"aria-label" -> view.contentDescription = value
+			"aria-label" -> if (view is AudioButton) view.label(value) else view.contentDescription = value
 			"alt" -> if (view is SizedImage) view.contentDescription = value
-			"src" -> (view as? SizedImage)?.show(value)
+			"src" -> when (view) {
+				is SizedImage -> view.show(value)
+				is AudioButton -> view.source(value)
+			}
+			"controls" -> if (view is AudioButton) view.visibility = if (value == null) View.GONE else View.VISIBLE
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }

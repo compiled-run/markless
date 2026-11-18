@@ -21,6 +21,12 @@ export type NativeAction =
 	| { readonly event: 'settle'; readonly cell: string; readonly value: Value }
 	/** A device call made from a handler answered: its continuation runs with the answer. */
 	| { readonly event: 'resume'; readonly continuation: string; readonly value: Value }
+	/** That call failed: the rest of the handler does not run, and the nearest `@catch` around it takes the error. */
+	| {
+			readonly event: 'reject';
+			readonly continuation: string;
+			readonly error: { readonly name: string; readonly message: string };
+	  }
 	| {
 			readonly event: 'settle';
 			readonly cell: string;
@@ -228,7 +234,10 @@ export function createNativeRuntime(
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
 	/** Every `after` of every call op, by id: what runs when a host resumes it. */
-	const continuations = new Map<string, NonNullable<Extract<NativeOp, { op: 'call' }>['after']>>();
+	const continuations = new Map<
+		string,
+		NonNullable<Extract<NativeOp, { op: 'call' }>['after']>
+	>();
 	const collectThen = (ops: ReadonlyArray<NativeOp>): void => {
 		for (const op of ops)
 			if (op.op === 'call' && op.after) {
@@ -262,6 +271,14 @@ export function createNativeRuntime(
 		const branch = branches.get(node.arm.branch);
 		return !!branch && shown(branch) && armOf(branch) === node.arm.index;
 	};
+	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
+	/** Device objects whose owning component is shown. */
+	const liveObjects = (): string[] =>
+		(payload.objects ?? []).flatMap((object) => {
+			const owner = nodesById.get(object.owner);
+			if (!owner) throw new Error(`${object.id} is owned by unknown node ${object.owner}`);
+			return shown(owner) ? [object.id] : [];
+		});
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
@@ -372,8 +389,22 @@ export function createNativeRuntime(
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
 				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
-				const scope: NativeScope = { ...base, locals: new Map([...base.locals, [continuation.as, action.value]]) };
+				const scope: NativeScope = {
+					...base,
+					locals: new Map([...base.locals, [continuation.as, action.value]]),
+				};
 				return change(undefined, undefined, () => run(continuation.ops, undefined, scope));
+			}
+			if (action.event === 'reject') {
+				const continuation = continuations.get(action.continuation);
+				if (!continuation) throw new Error(`no continuation ${action.continuation}`);
+				const cell = continuation.catch;
+				// With no @catch around the handler, a failed call ends it and changes nothing.
+				if (cell === undefined) return [];
+				return change(undefined, undefined, () => {
+					values.set(cell, { name: action.error.name, message: action.error.message });
+					return [];
+				});
 			}
 			if (action.event === 'device' || action.event === 'settle') {
 				const cell = payload.cells.find((candidate) => candidate.id === action.cell);
@@ -397,7 +428,9 @@ export function createNativeRuntime(
 			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
-			return change(action.host, eventValue, () => run(handlers.get(event.handler) ?? [], eventValue, base));
+			return change(action.host, eventValue, () =>
+				run(handlers.get(event.handler) ?? [], eventValue, base),
+			);
 		},
 		tasks: () =>
 			payload.cells.flatMap((cell) =>
@@ -417,16 +450,23 @@ export function createNativeRuntime(
 	};
 
 	/** Runs ops in order: writes cells, collects the calls (a continuation's id rides on its call), stops at a navigation. */
-	function run(ops: ReadonlyArray<NativeOp>, eventValue: string | undefined, scope: NativeScope): NativeJournalEntry[] {
+	function run(
+		ops: ReadonlyArray<NativeOp>,
+		eventValue: string | undefined,
+		scope: NativeScope,
+	): NativeJournalEntry[] {
 		const calls: NativeJournalEntry[] = [];
 		for (const op of ops) {
-			if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
+			if (op.op === 'navigate')
+				return [{ op: 'navigate', route: op.route, params: op.params }];
 			if (op.op === 'call') {
 				calls.push({
 					op: 'call',
 					call: op.call,
 					...(op.object !== undefined ? { object: op.object } : {}),
-					arguments: op.arguments.map((argument) => evaluate(argument, eventValue, scope)),
+					arguments: op.arguments.map((argument) =>
+						evaluate(argument, eventValue, scope),
+					),
 					...(op.result !== undefined ? { result: op.result } : {}),
 					...(op.after ? { resume: op.after.id } : {}),
 				});
@@ -460,6 +500,7 @@ export function createNativeRuntime(
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const beforeSheets = new Map(sheets());
+			const ownedBefore = new Set(liveObjects());
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
 			const afterTexts = new Map(texts());
@@ -537,7 +578,13 @@ export function createNativeRuntime(
 					}),
 				);
 			});
-			return [...styles, ...nodes, ...calls];
+			const owned = new Set(liveObjects());
+			const releases = (payload.objects ?? []).flatMap((object): NativeJournalEntry[] =>
+				ownedBefore.has(object.id) && !owned.has(object.id)
+					? [{ op: 'release', object: object.id }]
+					: [],
+			);
+			return [...styles, ...nodes, ...releases, ...calls];
 		}
 	}
 }

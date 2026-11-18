@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: d6-sharesheet
+---
+- launchApp:
+    clearState: true
+- assertVisible: Share
+- assertVisible: Share link
+- assertVisible: Closed 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: none"
+- tapOn: Share link
+- assertVisible:
+    text: Markless proof|markless\.dev
+- assertVisible:
+    text: Markless proof|markless\.dev
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          point: 50%,25%
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- assertNotVisible: Closed 0
+- assertVisible: Share link
+- assertVisible: Closed 1
+- assertNotVisible: Closed 0
+- assertVisible:
+    id: markless-device-calls
+    text: "calls: sharesheet\\.open"

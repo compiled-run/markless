@@ -63,6 +63,20 @@ func reproducesConformanceVector(file: URL) throws {
 		if case let .object(stepFields) = step,
 			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
 			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
+			eventName == "reject",
+			case let .string(continuation)? = actionFields.first(where: { $0.0 == "continuation" })?.1,
+			case let .object(errorFields)? = actionFields.first(where: { $0.0 == "error" })?.1,
+			case let .string(name)? = errorFields.first(where: { $0.0 == "name" })?.1,
+			case let .string(message)? = errorFields.first(where: { $0.0 == "message" })?.1,
+			let expected = stepFields.first(where: { $0.0 == "journal" })?.1
+		{
+			let journal = try runtime.reject(continuation, name: name, message: message)
+			#expect(Array(JSONValue.array(journal.map(\.json)).jsonText.utf8) == Array(expected.jsonText.utf8), "\(file.lastPathComponent) reject \(continuation)")
+			continue
+		}
+		if case let .object(stepFields) = step,
+			case let .object(actionFields)? = stepFields.first(where: { $0.0 == "action" })?.1,
+			case let .string(eventName)? = actionFields.first(where: { $0.0 == "event" })?.1,
 			eventName == "device" || eventName == "settle",
 			case let .string(cell)? = actionFields.first(where: { $0.0 == "cell" })?.1,
 			let expected = stepFields.first(where: { $0.0 == "journal" })?.1

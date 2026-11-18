@@ -136,7 +136,6 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		...(input.nativeFacts ? { nativeFacts: input.nativeFacts } : {}),
 		...(input.target ? { target: input.target } : {}),
 		...(input.deviceTargetFacts ? { deviceTargetFacts: input.deviceTargetFacts } : {}),
-		...(input.deviceWebAnswers === 'platform-only' ? { platformGuardsOnly: true } : {}),
 	});
 	state.walk = walk;
 	collectMemberTagTargets(statements, state);
@@ -241,11 +240,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		submitAriaDisabled: state.authoredSubmitAriaDisabled,
 	});
 	if (state.target === 'web')
-		graph.webDeviceEdits = state.deviceTarget?.collectWebDeviceAbsence(
-			ast as never,
-			state as never,
-			input.deviceWebAnswers ?? 'build-error',
-		);
+		graph.webDeviceEdits = state.deviceTarget?.collectWebDeviceAbsence(ast as never, state as never);
 	graph.markup = collectSemanticMarkup({
 		ast,
 		source: input.source,

@@ -165,8 +165,6 @@ export type WalkState = {
 	readonly foldedIfs: Map<AnyNode, number | null>;
 	/** The target-constant analysis when this build passed it; absent in the browser's in-page compiler. */
 	readonly deviceTarget: DeviceTargetFacts | null;
-	/** Candidate (c): on the web only a `platform` check rules a device use out; `supported` does not fold. */
-	readonly platformGuardsOnly: boolean;
 	/** `{expr}` containers whose value the target's constants decide, as the text they render. */
 	readonly foldedTexts: Map<AnyNode, string>;
 	/** Props the host provides only while rendering on the server, by component export. */
@@ -340,7 +338,6 @@ export function createWalkState(input: {
 	readonly nativeFacts?: NativeFactCollectors;
 	readonly target?: BuildTarget;
 	readonly deviceTargetFacts?: DeviceTargetFacts;
-	readonly platformGuardsOnly?: boolean;
 	/** Overridable so a test can observe when analysis is requested. */
 	readonly analyzeSemantics?: (source: string, filename: string) => ModuleSemantics;
 }): WalkState {
@@ -362,7 +359,6 @@ export function createWalkState(input: {
 		target: input.target ?? 'web',
 		foldedIfs: new Map(),
 		deviceTarget: input.deviceTargetFacts ?? null,
-		platformGuardsOnly: input.platformGuardsOnly === true,
 		foldedTexts: new Map(),
 		hostIds: new WeakMap<object, string>(),
 		hostParents: new Map(),

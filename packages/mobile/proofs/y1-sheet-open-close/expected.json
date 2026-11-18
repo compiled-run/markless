@@ -1,29 +1,58 @@
 {
 	"rung": 101,
 	"name": "A system sheet opens from a button and closes by the platform's swipe and back",
-	"webStopped": "a page that opens <native.sheet> from its own state does not start the overlay runtime its linked module needs, so Escape and an outside press never report dismiss and the page behind is not made inert",
 	"steps": [
 		{
 			"visible": ["Shop", "Show filters", "Closed by the platform: 0"],
 			"absent": ["Filters", "Done"]
 		},
-		{ "do": { "tap": "Show filters" }, "visible": ["Filters", "Pull down to close", "Done"] },
 		{
-			"do": { "dismiss": "swipe" },
+			"do": {
+				"tap": "Show filters"
+			},
+			"visible": ["Filters", "Pull down to close", "Done"]
+		},
+		{
+			"do": {
+				"dismissSheet": "swipe"
+			},
 			"visible": ["Show filters", "Closed by the platform: 1"],
 			"absent": ["Filters", "Done", "Closed by the platform: 0"]
 		},
-		{ "do": { "tap": "Show filters" }, "visible": ["Filters", "Done"] },
 		{
-			"do": { "dismiss": "back" },
+			"do": {
+				"tap": "Show filters"
+			},
+			"visible": ["Filters", "Done"]
+		},
+		{
+			"do": {
+				"dismissSheet": "back"
+			},
 			"visible": ["Show filters", "Closed by the platform: 2"],
 			"absent": ["Filters", "Done", "Closed by the platform: 1"]
 		},
-		{ "do": { "tap": "Show filters" }, "visible": ["Filters", "Done"] },
 		{
-			"do": { "tap": "Done" },
+			"do": {
+				"tap": "Show filters"
+			},
+			"visible": ["Filters", "Done"]
+		},
+		{
+			"do": {
+				"tap": "Done"
+			},
 			"visible": ["Show filters", "Closed by the platform: 2"],
 			"absent": ["Filters", "Done"]
 		}
-	]
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Shop", "Show filters", "On the web, filters open in a drawer"],
+				"absent": ["Filters", "Done"]
+			}
+		],
+		"absentFromOutput": ["Pull down to close", "@markless/device"]
+	}
 }

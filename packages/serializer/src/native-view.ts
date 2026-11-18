@@ -1,4 +1,9 @@
-import { DEVICE_MODULE, type NativeDeviceCall, type NativeDeviceValue } from './native-device.ts';
+import {
+	DEVICE_MODULE,
+	type NativeDeviceCall,
+	type NativeDeviceObject,
+	type NativeDeviceValue,
+} from './native-device.ts';
 
 // The target-neutral view a native host builds retained views from: no HTML, no DOM positions, no script.
 export const NATIVE_VIEW_VERSION = 'markless.native-view/0';
@@ -142,7 +147,7 @@ export type NativeNode = NativePlace &
 				/**
 				 * The platform's own sheet (`<native.sheet>`): its content is the nodes whose parent is this id, built at mount
 				 * and kept; the host presents them in its system sheet while `open` is truthy (iOS `UISheetPresentationController`,
-				 * Android Material `BottomSheetDialog`, web a modal panel on the overlay layer).
+				 * Android Material `BottomSheetDialog`; absent on the web).
 				 */
 				readonly kind: 'sheet';
 				readonly id: string;
@@ -176,9 +181,15 @@ export type NativeOp =
 			readonly result?: string;
 			/**
 			 * What the handler does once the call answers: `ops` run with the answer read as `{ local: as }`. The host
-			 * answers the journal entry's `resume` with a `resume` action.
+			 * answers the journal entry's `resume` with a `resume` action, or a `reject` action when the call fails;
+			 * `catch` is the cell of the nearest `@catch` around the handler's element, which then takes the error.
 			 */
-			readonly after?: { readonly id: string; readonly as: string; readonly ops: ReadonlyArray<NativeOp> };
+			readonly after?: {
+				readonly id: string;
+				readonly as: string;
+				readonly ops: ReadonlyArray<NativeOp>;
+				readonly catch?: string;
+			};
 	  }
 	/** Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. */
 	| {
@@ -224,8 +235,15 @@ export type NativeViewPayload = {
 		readonly id: string;
 		readonly ops: ReadonlyArray<NativeOp>;
 	}>;
-	/** Device objects the page's components make; each lives while the page does, its picture while its element is shown. */
-	readonly objects?: ReadonlyArray<{ readonly id: string; readonly device: 'camera' }>;
+	/**
+	 * Device objects the page's components make. Each lives while `owner`, the first node of the component instance that
+	 * made it, is shown (a `release` entry ends it); a camera's picture runs while its element is shown.
+	 */
+	readonly objects?: ReadonlyArray<{
+		readonly id: string;
+		readonly device: NativeDeviceObject;
+		readonly owner: string;
+	}>;
 };
 
 /** One change a host applies to its retained views after a handler runs. */
@@ -264,9 +282,11 @@ export type NativeJournalEntry =
 			readonly object?: string;
 			readonly arguments: ReadonlyArray<NativeValue>;
 			readonly result?: string;
-			/** Answer with a `resume` action naming this continuation once the call settles. */
+			/** Answer with a `resume` action naming this continuation once the call settles, or `reject` when it fails. */
 			readonly resume?: string;
 	  }
+	/** The component that made this device object is no longer shown: the host stops it and lets the device go. */
+	| { readonly op: 'release'; readonly object: string }
 	/** Leave this page: the host builds the page at `route` from scratch with `params` (its own state starts over). */
 	| {
 			readonly op: 'navigate';

@@ -23,6 +23,7 @@ import {
 	DEVICE_VALUES,
 	type NativeDeviceCall,
 	type NativeDeviceFeature,
+	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from '@markless/serializer/native-device';
 import type {
@@ -77,6 +78,7 @@ const PORTABLE_ELEMENTS = new Set([
 	'input',
 	'a',
 	'img',
+	'audio',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
@@ -159,14 +161,23 @@ type Scope = {
 	/** Callback parameters the caller fixes at build time, such as a sheet's `onChange` reading `false` on dismiss. */
 	readonly bound?: ReadonlyMap<string, NativeExpr>;
 	/** This instance's device objects by local name (`cam`), each with its payload id. */
-	readonly objects: ReadonlyMap<string, { readonly id: string; readonly device: 'camera' }>;
+	readonly objects: ReadonlyMap<
+		string,
+		{ readonly id: string; readonly device: NativeDeviceObject }
+	>;
+	/** The nearest `@catch` around this markup: a handler's failed awaited device call writes its error there. */
+	readonly catches?: HandlerCatch;
 	/** Inside a `@try` arm: the boundary, whose task cells its reads collect, and the name `@catch` binds its error to. */
 	readonly boundary?: {
 		readonly tasks: Set<string>;
 		readonly errorName?: string;
 		readonly arm: 'try' | 'pending' | 'catch';
+		readonly catches: HandlerCatch;
 	};
 };
+
+/** A `@try`'s `@catch` as handlers inside its `@try` arm reach it: the cell made the first time one needs it. */
+type HandlerCatch = { readonly cell: () => string; readonly used: () => boolean };
 
 /** Calls every host implements with exact JavaScript meaning (`NativeBuiltin`). */
 const BUILTINS = new Set<string>([
@@ -182,8 +193,21 @@ const BUILTINS = new Set<string>([
 
 /** Methods with JavaScript meaning that return a new value; `reverse` mutates, so only a fresh array may take it. */
 const METHODS = new Set<string>([
-	'filter', 'map', 'findIndex', 'some', 'every', 'includes', 'indexOf', 'join', 'concat', 'slice',
-	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
+	'filter',
+	'map',
+	'findIndex',
+	'some',
+	'every',
+	'includes',
+	'indexOf',
+	'join',
+	'concat',
+	'slice',
+	'reverse',
+	'toReversed',
+	'toUpperCase',
+	'toLowerCase',
+	'trim',
 ]);
 
 const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
@@ -247,7 +271,9 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 		}, new Map<string, Map<string, SemanticGraphArtifact['graphBindings'][number]>>()),
 		boundaries: new Map(graph.asyncBoundaries.map((boundary) => [boundary.id, boundary])),
 		imports: new Map(
-			graph.moduleImports.filter((entry) => !entry.typeOnly).map((entry) => [entry.localName, entry]),
+			graph.moduleImports
+				.filter((entry) => !entry.typeOnly)
+				.map((entry) => [entry.localName, entry]),
 		),
 	};
 }
@@ -289,7 +315,12 @@ export function createNativeViewPayload(
 
 	const cells: NativeViewPayload['cells'][number][] = [];
 	/** A component instance's cells: its own state, named by its prefix, plus its module's top-level state, shared. */
-	const instanceCells = (module: ModuleFacts, component: string, prefix: string, shared: boolean) => {
+	const instanceCells = (
+		module: ModuleFacts,
+		component: string,
+		prefix: string,
+		shared: boolean,
+	) => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
 		for (const binding of module.graph.graphBindings) {
@@ -301,7 +332,9 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (!moduleLevel && prefix !== '' && binding.storage) {
-				refuse(`storage \`${binding.name}\` declared inside the child component ${component}`);
+				refuse(
+					`storage \`${binding.name}\` declared inside the child component ${component}`,
+				);
 				continue;
 			}
 			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
@@ -416,29 +449,63 @@ export function createNativeViewPayload(
 		scope.boundary.tasks.add(id);
 		return { member: { cell: id }, property: 'value' };
 	};
-	const objects: NonNullable<NativeViewPayload['objects']>[number][] = [];
-	/** A component instance's device objects (`const cam = camera()`), each one per instance. */
-	const instanceObjects = (module: ModuleFacts, component: string, prefix: string) =>
-		new Map(
+	const objects: { id: string; device: NativeDeviceObject; owner: string }[] = [];
+	/** A component instance's device objects (`const cam = camera()`), each one per instance; `own` names their owner node. */
+	const instanceObjects = (module: ModuleFacts, component: string, prefix: string) => {
+		const made: { id: string; device: NativeDeviceObject; owner: string }[] = [];
+		const byName = new Map(
 			(module.graph.deviceObjects ?? []).flatMap((fact) => {
-				if (fact.componentName !== component || !Object.hasOwn(DEVICE_OBJECTS, fact.device)) return [];
-				const object = { id: `object:${prefix}${fact.name}`, device: fact.device as 'camera' };
-				if (!objects.some((known) => known.id === object.id)) objects.push(object);
+				if (fact.componentName !== component || !Object.hasOwn(DEVICE_OBJECTS, fact.device))
+					return [];
+				const object = {
+					id: `object:${prefix}${fact.name}`,
+					device: fact.device as NativeDeviceObject,
+					owner: '',
+				};
+				if (!objects.some((known) => known.id === object.id)) {
+					objects.push(object);
+					made.push(object);
+				}
 				features.add(DEVICE_OBJECTS[object.device].feature);
 				return [[fact.name, object] as const];
 			}),
 		);
+		return {
+			byName,
+			/** The instance's first node owns its objects: they live while it is shown. */
+			own: (firstNode: number) => {
+				const owner = nodes[firstNode];
+				if (made.length > 0 && !owner)
+					refuse(`<${component}> makes a device object and renders nothing`);
+				for (const object of made) object.owner = owner?.id ?? '';
+			},
+		};
+	};
 	/** A device object's field (`cam.ready`) as its device cell. */
-	const objectFieldCell = (local: string, object: { id: string; device: 'camera' }, field: string, what: string): string | null => {
+	const objectFieldCell = (
+		local: string,
+		object: { id: string; device: NativeDeviceObject },
+		field: string,
+		what: string,
+	): string | null => {
 		const name = `${object.device}.${field}`;
 		if (!isDeviceValue(name) || !('object' in DEVICE_VALUES[name]))
-			return refuse(`${what} reads \`${local}.${field}\`, which a ${object.device} has no native field for yet`);
+			return refuse(
+				`${what} reads \`${local}.${field}\`, which a ${object.device} has no native field for yet`,
+			);
 		const id = `${object.id}:${field}`;
 		if (!cells.some((cell) => cell.id === id))
-			cells.push({ id, name: `${local}.${field}`, initial: DEVICE_VALUES[name].initial, device: name, object: object.id });
+			cells.push({
+				id,
+				name: `${local}.${field}`,
+				initial: DEVICE_VALUES[name].initial,
+				device: name,
+				object: object.id,
+			});
 		return id;
 	};
-	(TOP as { objects: Scope['objects'] }).objects = instanceObjects(rootModule, root.componentName, '');
+	const rootObjects = instanceObjects(rootModule, root.componentName, '');
+	(TOP as { objects: Scope['objects'] }).objects = rootObjects.byName;
 	const isDeviceValue = (name: string): name is NativeDeviceValue =>
 		Object.hasOwn(DEVICE_VALUES, name);
 	const isDeviceCall = (name: string): name is NativeDeviceCall =>
@@ -460,17 +527,36 @@ export function createNativeViewPayload(
 				if (bound) return bound;
 				if (scope.locals.has(expression.name)) return { local: expression.name };
 				if (scope.objects.has(expression.name))
-					return refuse(`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`);
+					return refuse(
+						`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`,
+					);
 				if (
 					scope.boundary?.arm === 'catch' &&
 					expression.name === scope.boundary.errorName
 				) {
 					const [task] = scope.boundary.tasks;
-					return task
+					const handlerError = scope.boundary.catches.used()
+						? scope.boundary.catches.cell()
+						: undefined;
+					const taskError: NativeExpr | undefined = task
 						? { member: { cell: task }, property: 'error' }
-						: refuse(
-								`${what} reads the @catch error of a @try that reads no device value`,
-							);
+						: undefined;
+					if (handlerError && taskError)
+						return {
+							if: {
+								binary: '!==',
+								left: { cell: handlerError },
+								right: { literal: null },
+							},
+							whenTrue: { cell: handlerError },
+							whenFalse: taskError,
+						};
+					return handlerError
+						? { cell: handlerError }
+						: (taskError ??
+								refuse(
+									`${what} reads the @catch error of a @try that reads no device value`,
+								));
 				}
 				if (importsDevice(expression.name, scope))
 					return refuse(
@@ -478,20 +564,33 @@ export function createNativeViewPayload(
 					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
-				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(expression.name) ?? '');
+				const prop = scope.props.get(
+					scope.module.propNames.get(scope.component)?.get(expression.name) ?? '',
+				);
 				if (prop?.kind === 'value') return prop.expr;
-				if (prop) return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
+				if (prop)
+					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
 				const computed =
 					scope.module.computeds.get(scope.component)?.get(expression.name) ??
 					scope.module.computeds.get('')?.get(expression.name);
 				if (computed?.kind === 'computed' && computed.async)
 					return asyncRead(computed, what, scope);
 				if (computed) {
-					if (!computed.nativeExpression) return refuse(`${what} reads the computed \`${expression.name}\`, whose body needs a script engine`);
-					if (inlining.has(computed.id)) return refuse(`${what} reads the computed \`${expression.name}\` inside itself`);
+					if (!computed.nativeExpression)
+						return refuse(
+							`${what} reads the computed \`${expression.name}\`, whose body needs a script engine`,
+						);
+					if (inlining.has(computed.id))
+						return refuse(
+							`${what} reads the computed \`${expression.name}\` inside itself`,
+						);
 					inlining.add(computed.id);
 					try {
-						return exprOf(computed.nativeExpression, `the computed \`${expression.name}\``, scope);
+						return exprOf(
+							computed.nativeExpression,
+							`the computed \`${expression.name}\``,
+							scope,
+						);
 					} finally {
 						inlining.delete(computed.id);
 					}
@@ -543,8 +642,17 @@ export function createNativeViewPayload(
 					holder.object.name === scope.event
 				)
 					return { event: 'value' };
-				if (holder.kind === 'read' && !scope.locals.has(holder.name) && scope.objects.has(holder.name)) {
-					const cell = objectFieldCell(holder.name, scope.objects.get(holder.name)!, expression.property, what);
+				if (
+					holder.kind === 'read' &&
+					!scope.locals.has(holder.name) &&
+					scope.objects.has(holder.name)
+				) {
+					const cell = objectFieldCell(
+						holder.name,
+						scope.objects.get(holder.name)!,
+						expression.property,
+						what,
+					);
 					return cell === null ? null : { cell };
 				}
 				if (holder.kind === 'read') {
@@ -601,18 +709,28 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
-				if (!METHODS.has(expression.method)) return refuse(`${what} calls \`.${expression.method}()\``);
+				if (!METHODS.has(expression.method))
+					return refuse(`${what} calls \`.${expression.method}()\``);
 				if (expression.method === 'reverse' && expression.object.kind !== 'array')
-					return refuse(`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`);
+					return refuse(
+						`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`,
+					);
 				const target = exprOf(expression.object, what, scope);
 				const args = expression.arguments.map((argument) => {
 					if (argument.kind !== 'lambda') return exprOf(argument, what, scope);
-					const inner: Scope = { ...scope, locals: new Set([...scope.locals, ...argument.parameters]) };
+					const inner: Scope = {
+						...scope,
+						locals: new Set([...scope.locals, ...argument.parameters]),
+					};
 					const lambdaBody = exprOf(argument.body, what, inner);
 					return lambdaBody && { lambda: argument.parameters, body: lambdaBody };
 				});
 				return target && args.every((argument) => argument !== null)
-					? { method: expression.method as NativeMethod, target, arguments: args as NativeExpr[] }
+					? {
+							method: expression.method as NativeMethod,
+							target,
+							arguments: args as NativeExpr[],
+						}
 					: null;
 			}
 			case 'lambda':
@@ -707,7 +825,12 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (slot.kind === 'repeat') {
-				items.push({ kind: 'repeat', id: slot.repeatId, row: slot.rowTemplateId, path: slot.coordinate.path });
+				items.push({
+					kind: 'repeat',
+					id: slot.repeatId,
+					row: slot.rowTemplateId,
+					path: slot.coordinate.path,
+				});
 				if (slot.emptyTemplateId) refuse('@empty');
 				continue;
 			}
@@ -739,7 +862,12 @@ export function createNativeViewPayload(
 			}
 			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
 				const expr = exprOf(slot.nativeExpression, 'a text expression', scope);
-				if (expr) items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
+				if (expr)
+					items.push({
+						kind: 'part',
+						part: 'cell' in expr ? { cell: expr.cell } : { expr },
+						path: slot.coordinate.path,
+					});
 				continue;
 			}
 			if (slot.residue.kind === 'repeat-item') {
@@ -760,11 +888,20 @@ export function createNativeViewPayload(
 				const [name, ...rest] = path;
 				const prop = name === undefined ? undefined : scope.props.get(name);
 				if (prop?.kind !== 'value') {
-					refuse(`a text binding that reads the prop \`${name ?? ''}\` this instance was not given as a value`);
+					refuse(
+						`a text binding that reads the prop \`${name ?? ''}\` this instance was not given as a value`,
+					);
 					continue;
 				}
-				const expr = rest.reduce<NativeExpr>((object, property) => ({ member: object, property }), prop.expr);
-				items.push({ kind: 'part', part: 'cell' in expr ? { cell: expr.cell } : { expr }, path: slot.coordinate.path });
+				const expr = rest.reduce<NativeExpr>(
+					(object, property) => ({ member: object, property }),
+					prop.expr,
+				);
+				items.push({
+					kind: 'part',
+					part: 'cell' in expr ? { cell: expr.cell } : { expr },
+					path: slot.coordinate.path,
+				});
 				continue;
 			}
 			if (path.length > 1 || (path.length === 1 && path[0] !== 'length')) {
@@ -836,11 +973,17 @@ export function createNativeViewPayload(
 					if (scope.module === rootModule) loweredEvents.add(event.id);
 					const semantic = SEMANTIC_EVENTS[event.eventName];
 					if (!semantic) {
-						refuse(`the ${event.eventName} event has no native meaning yet`, event.handlerSpan);
+						refuse(
+							`the ${event.eventName} event has no native meaning yet`,
+							event.handlerSpan,
+						);
 						continue;
 					}
 					if (place.row) {
-						refuse(`the ${event.eventName} handler inside a @for row`, event.handlerSpan);
+						refuse(
+							`the ${event.eventName} handler inside a @for row`,
+							event.handlerSpan,
+						);
 						continue;
 					}
 					const handler = `handler:${scope.prefix}${event.id}`;
@@ -863,13 +1006,17 @@ export function createNativeViewPayload(
 			if (item.kind === 'child') {
 				close();
 				const edge = scope.module.edgesById.get(item.edge);
-				const imported = edge ? scope.module.imports.get(edge.childComponentName) : undefined;
+				const imported = edge
+					? scope.module.imports.get(edge.childComponentName)
+					: undefined;
 				const importedModule =
 					imported?.importedName && options.importedModules?.[imported.source]
 						? importedFacts(imported.source, options.importedModules[imported.source]!)
 						: undefined;
 				const childModule = importedModule ?? scope.module;
-				const childComponent = importedModule ? imported!.importedName! : (edge?.childComponentName ?? '');
+				const childComponent = importedModule
+					? imported!.importedName!
+					: (edge?.childComponentName ?? '');
 				const template = importedModule
 					? importedModule.chunks.get(`template:${childComponent}`)
 					: scope.module.chunks.get(item.template);
@@ -891,27 +1038,52 @@ export function createNativeViewPayload(
 				if (deviceElement) {
 					const el = edge.props.find((prop) => prop.name === 'el');
 					const named = el && 'nativeExpression' in el ? el.nativeExpression : undefined;
-					const object = named?.kind === 'read' ? scope.objects.get(named.name) : undefined;
-					if (!object || object.device !== deviceElement.device || edge.props.some((prop) => prop.name !== 'el')) {
-						refuse(`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`);
+					const object =
+						named?.kind === 'read' ? scope.objects.get(named.name) : undefined;
+					if (
+						!object ||
+						object.device !== deviceElement.device ||
+						edge.props.some((prop) => prop.name !== 'el')
+					) {
+						refuse(
+							`<${edge.childComponentName}> needs el={…} naming a ${deviceElement.device} the component made, and no other props`,
+						);
 						continue;
 					}
-					nodes.push({ kind: 'element', id: scope.prefix + edge.id, element: deviceElement.element, object: object.id, parent, ...place });
+					nodes.push({
+						kind: 'element',
+						id: scope.prefix + edge.id,
+						element: deviceElement.element,
+						object: object.id,
+						parent,
+						...place,
+					});
 					continue;
 				}
 				if (isRouterLink(scope, edge.childComponentName)) {
 					const href = edge.props.find((prop) => prop.name === 'href');
 					const params = edge.props.find((prop) => prop.name === 'params');
 					const paramValues =
-						params?.kind === 'opaque' ? params.buildTimeValue?.value : params?.kind === 'serializable' ? params.value : {};
-					const projection = item.projection ? scope.module.chunks.get(item.projection) : undefined;
+						params?.kind === 'opaque'
+							? params.buildTimeValue?.value
+							: params?.kind === 'serializable'
+								? params.value
+								: {};
+					const projection = item.projection
+						? scope.module.chunks.get(item.projection)
+						: undefined;
 					if (
 						href?.kind !== 'serializable' ||
 						typeof href.value !== 'string' ||
 						!paramValues ||
 						typeof paramValues !== 'object' ||
 						Object.values(paramValues).some((value) => typeof value !== 'string') ||
-						edge.props.some((prop) => prop.name !== 'href' && prop.name !== 'params' && prop.name !== 'children') ||
+						edge.props.some(
+							(prop) =>
+								prop.name !== 'href' &&
+								prop.name !== 'params' &&
+								prop.name !== 'children',
+						) ||
 						(item.projection && !projection)
 					) {
 						refuse('a <Link> whose href and params are not fixed at build time');
@@ -924,7 +1096,13 @@ export function createNativeViewPayload(
 					events.push({ host: id, event: 'activate', handler });
 					handlers.push({
 						id: handler,
-						ops: [{ op: 'navigate', route: href.value, params: paramValues as Record<string, string> }],
+						ops: [
+							{
+								op: 'navigate',
+								route: href.value,
+								params: paramValues as Record<string, string>,
+							},
+						],
 					});
 					continue;
 				}
@@ -932,7 +1110,9 @@ export function createNativeViewPayload(
 					refuse(`<${edge.childComponentName}>, a component from another module`);
 					continue;
 				}
-				const projected = item.projection ? scope.module.chunks.get(item.projection) : undefined;
+				const projected = item.projection
+					? scope.module.chunks.get(item.projection)
+					: undefined;
 				if (item.projection && !projected) {
 					refuse(`children passed to <${edge.childComponentName}> that have no markup`);
 					continue;
@@ -942,26 +1122,49 @@ export function createNativeViewPayload(
 				);
 				for (const prop of edge.props) {
 					if (prop.kind === 'callback') {
-						props.set(prop.name, { kind: 'callback', statements: prop.nativeStatements, scope });
+						props.set(prop.name, {
+							kind: 'callback',
+							statements: prop.nativeStatements,
+							scope,
+						});
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
-						props.set(prop.name, { kind: 'value', expr: { literal: prop.value as NativeScalar } });
-					} else if (prop.kind === 'graph-reference' && scope.cells.byBinding.has(prop.graphNodeId) && prop.path.length === 0) {
-						props.set(prop.name, { kind: 'value', expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! } });
+						props.set(prop.name, {
+							kind: 'value',
+							expr: { literal: prop.value as NativeScalar },
+						});
+					} else if (
+						prop.kind === 'graph-reference' &&
+						scope.cells.byBinding.has(prop.graphNodeId) &&
+						prop.path.length === 0
+					) {
+						props.set(prop.name, {
+							kind: 'value',
+							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
+						});
 					} else {
 						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`);
 					}
 				}
 				const childPrefix = `${scope.prefix}${edge.id}/`;
+				const childObjects = instanceObjects(childModule, childComponent, childPrefix);
+				const first = nodes.length;
 				lowerChunk(template, parent, place, {
 					module: childModule,
 					component: childComponent,
-					cells: instanceCells(childModule, childComponent, childPrefix, childModule === rootModule),
+					cells: instanceCells(
+						childModule,
+						childComponent,
+						childPrefix,
+						childModule === rootModule,
+					),
 					prefix: childPrefix,
 					locals: new Set(),
 					items: new Map(),
 					props,
-					objects: instanceObjects(childModule, childComponent, childPrefix),
+					objects: childObjects.byName,
+					...(scope.catches ? { catches: scope.catches } : {}),
 				});
+				childObjects.own(first);
 				continue;
 			}
 			if (item.kind === 'repeat') {
@@ -972,13 +1175,33 @@ export function createNativeViewPayload(
 					refuse('@for inside an @if arm or another @for');
 					continue;
 				}
-				if (!repeat || !rowChunk || repeat.collectionGraphNodeId === undefined || !scope.cells.byBinding.has(repeat.collectionGraphNodeId) || (repeat.collectionPath?.length ?? 0) > 0 || !repeat.keyPath) {
-					refuse('a @for over something other than a state list keyed by a path of its item');
+				if (
+					!repeat ||
+					!rowChunk ||
+					repeat.collectionGraphNodeId === undefined ||
+					!scope.cells.byBinding.has(repeat.collectionGraphNodeId) ||
+					(repeat.collectionPath?.length ?? 0) > 0 ||
+					!repeat.keyPath
+				) {
+					refuse(
+						'a @for over something other than a state list keyed by a path of its item',
+					);
 					continue;
 				}
 				const repeatId = scope.prefix + item.id;
-				nodes.push({ kind: 'repeat', id: repeatId, parent, list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! }, key: repeat.keyPath });
-				lowerChunk(rowChunk, parent, { row: repeatId }, { ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) });
+				nodes.push({
+					kind: 'repeat',
+					id: repeatId,
+					parent,
+					list: { cell: scope.cells.byBinding.get(repeat.collectionGraphNodeId)! },
+					key: repeat.keyPath,
+				});
+				lowerChunk(
+					rowChunk,
+					parent,
+					{ row: repeatId },
+					{ ...scope, items: new Map([...scope.items, [repeat.itemName, repeatId]]) },
+				);
 				continue;
 			}
 			if (item.kind === 'boundary') {
@@ -995,6 +1218,21 @@ export function createNativeViewPayload(
 				const branchId = scope.prefix + item.id;
 				const at = nodes.length;
 				const tasks = new Set<string>();
+				const catchCell = `${branchId}:catch`;
+				let caught = false;
+				const catches: HandlerCatch = {
+					cell: () => {
+						if (!caught)
+							cells.push({
+								id: catchCell,
+								name: boundary?.errorName ?? 'error',
+								initial: null,
+							});
+						caught = true;
+						return catchCell;
+					},
+					used: () => caught,
+				};
 				(['try', 'pending', 'catch'] as const).forEach((arm, index) => {
 					const armId = item.arms[arm];
 					// No @pending shows nothing while the value is on its way.
@@ -1007,29 +1245,51 @@ export function createNativeViewPayload(
 						{ arm: { branch: branchId, index } },
 						{
 							...scope,
+							...(arm === 'try' ? { catches } : {}),
 							boundary: {
 								tasks,
 								arm,
+								catches,
 								...(boundary?.errorName ? { errorName: boundary.errorName } : {}),
 							},
 						},
 					);
 				});
-				if (tasks.size !== 1) {
-					refuse(`a @try that waits on ${tasks.size} device values; one is supported`);
+				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
+					refuse(
+						tasks.size > 1
+							? `a @try that waits on ${tasks.size} device values; one is supported`
+							: 'a @try that neither reads a device value nor holds a handler that awaits a device call',
+					);
 					continue;
 				}
 				const [task] = tasks;
-				const state = (value: string): NativeExpr => ({
-					binary: '===',
-					left: { member: { cell: task! }, property: 'state' },
-					right: { literal: value },
-				});
+				// A handler's error shows the @catch arm whatever the value is doing.
+				const noHandlerError = (test: NativeExpr): NativeExpr =>
+					caught
+						? {
+								logical: '&&',
+								left: {
+									binary: '===',
+									left: { cell: catchCell },
+									right: { literal: null },
+								},
+								right: test,
+							}
+						: test;
+				const state = (value: string): NativeExpr =>
+					task === undefined
+						? { literal: value === 'value' }
+						: {
+								binary: '===',
+								left: { member: { cell: task }, property: 'state' },
+								right: { literal: value },
+							};
 				nodes.splice(at, 0, {
 					kind: 'branch',
 					id: branchId,
 					parent,
-					tests: [state('value'), state('pending'), null],
+					tests: [noHandlerError(state('value')), noHandlerError(state('pending')), null],
 					arms: 3,
 				});
 				continue;
@@ -1048,7 +1308,9 @@ export function createNativeViewPayload(
 				const plain = site.kind === 'if' && site.armIndexSource === undefined;
 				const test = plain ? exprOf(site.testExpression, 'the @if test', scope) : undefined;
 				const recorded = site.armTestExpressions?.map((expression) =>
-					expression === null ? null : exprOf(expression, `the @${site.kind} test`, scope),
+					expression === null
+						? null
+						: exprOf(expression, `the @${site.kind} test`, scope),
 				);
 				// A chain with no @else still has an empty last arm; showing it when nothing matches shows nothing.
 				const tests =
@@ -1058,8 +1320,10 @@ export function createNativeViewPayload(
 							? [...recorded, null]
 							: recorded;
 				if (plain ? !test : !tests || tests.length !== item.arms.length) {
-					if (!plain && !tests) refuse(`a @${site.kind} whose arm tests the compiler did not record`);
-					if (tests && tests.length !== item.arms.length) refuse(`a @${site.kind} with an empty arm`);
+					if (!plain && !tests)
+						refuse(`a @${site.kind} whose arm tests the compiler did not record`);
+					if (tests && tests.length !== item.arms.length)
+						refuse(`a @${site.kind} with an empty arm`);
 					continue;
 				}
 				const branchId = scope.prefix + item.id;
@@ -1073,7 +1337,8 @@ export function createNativeViewPayload(
 				});
 				item.arms.forEach((armId, index) => {
 					const armChunk = scope.module.chunks.get(armId);
-					if (armChunk) lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
+					if (armChunk)
+						lowerChunk(armChunk, parent, { arm: { branch: branchId, index } }, scope);
 					else refuse(`arm ${armId} has no markup`);
 				});
 				continue;
@@ -1248,7 +1513,11 @@ export function createNativeViewPayload(
 	function splitAwait(
 		expression: SemanticExpression,
 		as: string,
-	): { readonly call: Extract<SemanticExpression, { kind: 'call' }> | null; readonly rest: SemanticExpression; readonly count: number } {
+	): {
+		readonly call: Extract<SemanticExpression, { kind: 'call' }> | null;
+		readonly rest: SemanticExpression;
+		readonly count: number;
+	} {
 		let call: Extract<SemanticExpression, { kind: 'call' }> | null = null;
 		let count = 0;
 		const walk = (node: SemanticExpression): SemanticExpression => {
@@ -1262,11 +1531,23 @@ export function createNativeViewPayload(
 				copy[key] = Array.isArray(value)
 					? value.map((item) =>
 							Array.isArray(item)
-								? item.map((inner) => (inner && typeof inner === 'object' && 'kind' in inner ? walk(inner as SemanticExpression) : inner))
+								? item.map((inner) =>
+										inner && typeof inner === 'object' && 'kind' in inner
+											? walk(inner as SemanticExpression)
+											: inner,
+									)
 								: item && typeof item === 'object' && 'kind' in item
 									? walk(item as SemanticExpression)
-									: item && typeof item === 'object' && 'value' in item && typeof (item as { value: unknown }).value === 'object'
-										? { ...item, value: walk((item as { value: SemanticExpression }).value) }
+									: item &&
+										  typeof item === 'object' &&
+										  'value' in item &&
+										  typeof (item as { value: unknown }).value === 'object'
+										? {
+												...item,
+												value: walk(
+													(item as { value: SemanticExpression }).value,
+												),
+											}
 										: item,
 						)
 					: value && typeof value === 'object' && 'kind' in value
@@ -1286,14 +1567,21 @@ export function createNativeViewPayload(
 		span: SourceSpan | undefined,
 	): { readonly call: NativeDeviceCall; readonly object?: string } | null {
 		const [local, method, ...more] = value.calleePath;
-		const object = local !== undefined && !scope.locals.has(local) ? scope.objects.get(local) : undefined;
-		const device = object && method !== undefined && more.length === 0 ? `${object.device}.${method}` : deviceName(value.calleePath, scope);
+		const object =
+			local !== undefined && !scope.locals.has(local) ? scope.objects.get(local) : undefined;
+		const device =
+			object && method !== undefined && more.length === 0
+				? `${object.device}.${method}`
+				: deviceName(value.calleePath, scope);
 		if (device === undefined) {
 			refuse(`${what} uses a call to \`${value.callee}\`, which needs a script engine`, span);
 			return null;
 		}
-		if (!isDeviceCall(device) || ('object' in DEVICE_CALLS[device]) !== (object !== undefined)) {
-			refuse(`${what} calls \`${device}\`, which ${DEVICE_MODULE} has no native call for yet`, span);
+		if (!isDeviceCall(device) || 'object' in DEVICE_CALLS[device] !== (object !== undefined)) {
+			refuse(
+				`${what} calls \`${device}\`, which ${DEVICE_MODULE} has no native call for yet`,
+				span,
+			);
 			return null;
 		}
 		features.add(DEVICE_CALLS[device].feature);
@@ -1319,7 +1607,10 @@ export function createNativeViewPayload(
 						: null;
 			if (awaited && awaited.count > 0) {
 				if (awaited.count > 1 || !awaited.call) {
-					refuse(`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : 'something other than a call'}`, span);
+					refuse(
+						`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : 'something other than a call'}`,
+						span,
+					);
 					return ops;
 				}
 				const target = deviceCallOf(awaited.call, scope, what, span);
@@ -1328,16 +1619,25 @@ export function createNativeViewPayload(
 				const id = `${continuations.base}:after:${continuations.next++}`;
 				const inner: Scope = { ...scope, locals: new Set([...scope.locals, as]) };
 				const remaining: SemanticHandlerStatement[] = [
-					...(statement.kind === 'effect' ? [] : [{ ...statement, value: awaited.rest } as SemanticHandlerStatement]),
+					...(statement.kind === 'effect'
+						? []
+						: [{ ...statement, value: awaited.rest } as SemanticHandlerStatement]),
 					...statements.slice(index + 1),
 				];
-				const args = awaited.call.arguments.map((argument) => exprOf(argument, what, scope));
+				const args = awaited.call.arguments.map((argument) =>
+					exprOf(argument, what, scope),
+				);
 				if (!args.every((argument) => argument !== null)) return ops;
 				ops.push({
 					op: 'call',
 					...target,
 					arguments: args as NativeExpr[],
-					after: { id, as, ops: statementOps(remaining, inner, what, span, depth, continuations) },
+					after: {
+						id,
+						as,
+						ops: statementOps(remaining, inner, what, span, depth, continuations),
+						...(scope.catches ? { catch: scope.catches.cell() } : {}),
+					},
 				});
 				return ops;
 			}
@@ -1357,7 +1657,10 @@ export function createNativeViewPayload(
 		{
 			if (statement.kind === 'effect') {
 				if (statement.value.kind !== 'call') {
-					refuse(`${what} uses ${statement.value.kind === 'await' ? 'an `await` of something other than a call' : 'an expression statement'}, which needs a script engine`, span);
+					refuse(
+						`${what} uses ${statement.value.kind === 'await' ? 'an `await` of something other than a call' : 'an expression statement'}, which needs a script engine`,
+						span,
+					);
 					return [];
 				}
 				const value = statement.value;
@@ -1369,10 +1672,15 @@ export function createNativeViewPayload(
 					: [];
 			}
 			if (statement.kind === 'assign-field') {
-				const object = !scope.locals.has(statement.target) ? scope.objects.get(statement.target) : undefined;
+				const object = !scope.locals.has(statement.target)
+					? scope.objects.get(statement.target)
+					: undefined;
 				const field = `${object?.device}.${statement.field}`;
 				if (!object || !isDeviceValue(field) || !('writable' in DEVICE_VALUES[field])) {
-					refuse(`${what} writes \`${statement.target}.${statement.field}\`, which is not a setting of a device object`, span);
+					refuse(
+						`${what} writes \`${statement.target}.${statement.field}\`, which is not a setting of a device object`,
+						span,
+					);
 					return [];
 				}
 				const cell = objectFieldCell(statement.target, object, statement.field, what);
@@ -1380,7 +1688,12 @@ export function createNativeViewPayload(
 				return cell && value
 					? [
 							{ op: 'assign', cell, value },
-							{ op: 'call', call: field as NativeDeviceCall, object: object.id, arguments: [{ cell }] },
+							{
+								op: 'call',
+								call: field as NativeDeviceCall,
+								object: object.id,
+								arguments: [{ cell }],
+							},
 						]
 					: [];
 			}
@@ -1389,16 +1702,31 @@ export function createNativeViewPayload(
 				return [];
 			}
 			if (statement.kind === 'invoke') {
-				const prop = scope.props.get(scope.module.propNames.get(scope.component)?.get(statement.name) ?? '');
+				const prop = scope.props.get(
+					scope.module.propNames.get(scope.component)?.get(statement.name) ?? '',
+				);
 				if (prop?.kind !== 'callback' || !prop.statements || depth > 8) {
-					refuse(`${what} uses a call to \`${statement.name}\`, which needs a script engine`, span);
+					refuse(
+						`${what} uses a call to \`${statement.name}\`, which needs a script engine`,
+						span,
+					);
 					return [];
 				}
-				return statementOps(prop.statements, prop.scope, what, span, depth + 1, continuations);
+				return statementOps(
+					prop.statements,
+					prop.scope,
+					what,
+					span,
+					depth + 1,
+					continuations,
+				);
 			}
 			const cell = cellOf(statement.target, scope);
 			if (!cell) {
-				refuse(`${what} assigns \`${statement.target}\`, which is not state of this component`, span);
+				refuse(
+					`${what} assigns \`${statement.target}\`, which is not state of this component`,
+					span,
+				);
 				return [];
 			}
 			const value = exprOf(statement.value, what, scope);
@@ -1407,10 +1735,12 @@ export function createNativeViewPayload(
 	}
 
 	lowerChunk(rootChunk, null, {}, TOP);
+	rootObjects.own(0);
 	if (graph.markup.chunks.some((chunk) => chunk.kind !== 'template' && !lowered.has(chunk.id)))
 		refuse('markup outside the root template, its @if arms and its @for rows');
 	for (const event of graph.events)
-		if (!loweredEvents.has(event.id)) refuse(`the ${event.eventName} handler on an element this build does not show`);
+		if (!loweredEvents.has(event.id))
+			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
 	const styledCells = new Set<string>();
 	const collectCells = (expr: NativeExpr): void => {
@@ -1432,7 +1762,9 @@ export function createNativeViewPayload(
 	return done({
 		version: NATIVE_VIEW_VERSION,
 		component: root.componentName,
-		...(options.route ? { route: { pattern: options.route.pattern, params: options.route.params } } : {}),
+		...(options.route
+			? { route: { pattern: options.route.pattern, params: options.route.params } }
+			: {}),
 		cells: cells.map((cell) =>
 			styledCells.has(cell.id) ? { ...cell, styled: true as const } : cell,
 		),

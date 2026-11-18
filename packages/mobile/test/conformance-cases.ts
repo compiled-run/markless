@@ -149,6 +149,76 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		],
 	},
 	{
+		name: 'handler-catch',
+		fixture: 'proofs/d4b-photo-refused/App.tsrx',
+		device: { usage: { camera: 'Takes the photo you ask for.' } },
+		actions: [
+			{ event: 'device', cell: 'device:camera.access', value: 'denied' },
+			{ event: 'activate', host: 'component-edge:1/h3' },
+			{
+				event: 'reject',
+				continuation: 'handler:component-edge:1/event:0:after:0',
+				error: { name: 'NotAllowedError', message: 'The camera was refused' },
+			},
+		],
+	},
+	{
+		name: 'recorder',
+		fixture: 'proofs/d5-recorder/App.tsrx',
+		device: { usage: { microphone: 'Records the clip you ask for.' } },
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'device', cell: 'device:recorder.access', value: 'denied' },
+			{ event: 'device', cell: 'object:component-edge:0/rec:active', value: false },
+			{ event: 'device', cell: 'device:recorder.access', value: 'granted' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'device', cell: 'object:component-edge:0/rec:seconds', value: 8 },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{
+				event: 'device',
+				cell: 'object:component-edge:0/rec:clip',
+				value: 'file:///clip.m4a',
+			},
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'device', cell: 'object:component-edge:0/rec:active', value: false },
+			{ event: 'activate', host: 'h9' },
+		],
+	},
+	{
+		name: 'sharesheet',
+		fixture: 'proofs/d6-sharesheet/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{
+				event: 'resume',
+				continuation: 'handler:component-edge:0/event:0:after:0',
+				value: null,
+			},
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{
+				event: 'reject',
+				continuation: 'handler:component-edge:0/event:0:after:0',
+				error: { name: 'Error', message: 'The share sheet failed' },
+			},
+		],
+	},
+	{
+		name: 'settings',
+		fixture: 'proofs/d7-settings/App.tsrx',
+		device: { usage: { location: 'Shows where you are.' } },
+		actions: [
+			{ event: 'device', cell: 'device:location.access', value: 'denied' },
+			{
+				event: 'settle',
+				cell: 'component-edge:0/task:computed:here',
+				error: { name: 'NotAllowedError', message: 'Location was refused' },
+			},
+			{ event: 'activate', host: 'component-edge:0/h4' },
+			{ event: 'device', cell: 'device:location.access', value: 'granted' },
+		],
+	},
+	{
 		name: 'sheet',
 		fixture: 'proofs/y2-sheet-pick/App.tsrx',
 		actions: [

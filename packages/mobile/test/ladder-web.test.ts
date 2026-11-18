@@ -112,9 +112,6 @@ async function act(page: Page, step: LadderStep) {
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
 	else if ('wait' in action) await page.clock.runFor(action.wait);
-	// The browser's close request for the top dialog, the web's swipe and back alike.
-	else if ('dismiss' in action) await page.keyboard.press('Escape');
-	else if ('scrollTo' in action) await shown(page, action.scrollTo).scrollIntoViewIfNeeded();
 }
 
 // Every expectation of a step read at one moment, so a screen the action has not reached yet cannot pass.
@@ -175,8 +172,8 @@ describe.each(rungFolders())('%s', (folder) => {
 		for (const cleanup of cleanups.splice(0).reverse()) await cleanup();
 	}, 60_000);
 
-	(rung.webStopped ? test.fails : test)(
-		`${rung.name}: the web build shows every step's expected texts${rung.webStopped ? ` (stopped: ${rung.webStopped})` : ''}`,
+	test(
+		`${rung.name}: the web build shows every step's expected texts`,
 		{ timeout: 60_000 },
 		async () => {
 			const context = await browser.newContext();
