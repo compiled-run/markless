@@ -534,9 +534,12 @@ function namesNestedTemplateLocal(expression: AnyNode, state: WalkState): boolea
 	const symbolId = resolvedSymbolAt(semantic, root.start);
 	const declared =
 		symbolId === null ? undefined : semantic.bindings[symbolId]!.declarations[0]?.start;
-	return (
-		declared !== undefined &&
-		nestedTemplateScopes(state).some((scope) => declared >= scope.start && declared < scope.end)
+	return declared !== undefined && declaredInNestedTemplate(declared, state);
+}
+
+export function declaredInNestedTemplate(declared: number, state: WalkState): boolean {
+	return nestedTemplateScopes(state).some(
+		(scope) => declared >= scope.start && declared < scope.end,
 	);
 }
 

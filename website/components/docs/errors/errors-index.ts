@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 319,
+	total: 321,
 	guided: 51,
 	groups: [
 		{
@@ -386,6 +386,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'one element() handle per idref attribute markless_element_handle_idref_composite one element() handle per idref attribute: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_STATE_SHARED_OBJECT',
+					title: 'One object at two state paths',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'one object at two state paths markless_state_shared_object one object at two state paths: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_STATE_REPEAT_ROW_SCOPE_UNSUPPORTED',
@@ -1194,6 +1202,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'compile error',
 					guided: false,
 					words: 'the markup reads a name it cannot see markless_template_read_undeclared template read is not declared in render scope: a markless build error.',
+				},
+				{
+					code: 'MARKLESS_TEMPLATE_READS_STATE_COPY',
+					title: 'The page shows a copy of state taken once',
+					chip: 'error',
+					kind: 'compile error',
+					guided: false,
+					words: 'the page shows a copy of state taken once markless_template_reads_state_copy the page shows a copy of state taken once: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_BRANCH_ARM_RENDERS_IN_BROWSER',
