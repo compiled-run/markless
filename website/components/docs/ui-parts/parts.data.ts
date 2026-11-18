@@ -1594,6 +1594,20 @@ export const parts: Readonly<Record<string, readonly PartFacts[]>> = {
 			"hooks": []
 		}
 	],
+	"native": [
+		{
+			"part": "sheet",
+			"role": "",
+			"element": "div",
+			"ariaRole": "",
+			"hidden": false,
+			"hooks": [
+				"ui-backdrop",
+				"ui-content",
+				"ui-open"
+			]
+		}
+	],
 	"navbar": [
 		{
 			"part": "root",
