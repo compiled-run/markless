@@ -18,6 +18,7 @@ type Shard = {
 	peakRssMb: number;
 	calibrationS?: number;
 	cpuModel?: string;
+	run?: string;
 	attempt?: number;
 	exitCode?: number;
 	platform?: string;
@@ -72,6 +73,12 @@ const anchored = {
 	},
 	history: [],
 };
+
+const correction = (models: { factors?: object; calibrationS?: object; elasticity?: object }) => ({
+	factors: models.factors ?? {},
+	calibrationS: models.calibrationS ?? {},
+	elasticity: models.elasticity ?? {},
+});
 
 const run = (...args: string[]) => {
 	const result = spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
@@ -147,8 +154,8 @@ describe('check', () => {
 		const budget = {
 			...anchored,
 			models,
-			anchors: { ...anchored.anchors, models: models.factors },
-			margin: { ...anchored.margin, models: models.factors },
+			anchors: { ...anchored.anchors, models: correction(models) },
+			margin: { ...anchored.margin, models: correction(models) },
 		};
 		const result = check(budget, [
 			{ shard: '1/2', cpuS: 120, cpuModel: 'fast at calibration', peakRssMb: 2000 },
@@ -160,13 +167,35 @@ describe('check', () => {
 		expect(result.status).toBe(0);
 	});
 
+	test("a calibration swing counts only as far as its model's suite follows it", () => {
+		const models = {
+			factors: { 'test cpu': 1 },
+			calibrationS: { 'test cpu': 1 },
+			elasticity: { 'test cpu': 0.5 },
+		};
+		const budget = {
+			...anchored,
+			models,
+			anchors: { ...anchored.anchors, models: correction(models) },
+			margin: { ...anchored.margin, models: correction(models) },
+		};
+		// Calibration 0.6561 reads 34% fast, but the suite ran 19% faster: dividing by it whole reads +7.8%.
+		const result = check(budget, [
+			{ shard: '1/2', cpuS: 81, calibrationS: 0.6561, peakRssMb: 2000 },
+			{ shard: '2/2', cpuS: 200, peakRssMb: 1500 },
+		]);
+		expect(result.output).toContain("total CPU at the anchors' speed: 300 CPU-s");
+		expect(result.output).toContain('counted as 0.81');
+		expect(result.status).toBe(0);
+	});
+
 	test('a shard on a CPU model with no factor gets the band measured without factors, and a warning', () => {
 		const models = { unknownMargin: 0.2, factors: { 'test cpu': 1 } };
 		const budget = {
 			...anchored,
 			models,
-			anchors: { ...anchored.anchors, models: models.factors },
-			margin: { ...anchored.margin, models: models.factors },
+			anchors: { ...anchored.anchors, models: correction(models) },
+			margin: { ...anchored.margin, models: correction(models) },
 		};
 		const shards = (cpuModel: string) => [
 			{ shard: '1/2', cpuS: 100, peakRssMb: 2000 },
@@ -192,10 +221,10 @@ describe('check', () => {
 		]);
 		expect(result.status).toBe(1);
 		expect(result.output).toContain(
-			'stale anchor: the CPU-model factors changed after the anchors were accepted',
+			'stale anchor: the CPU-model correction changed after the anchors were accepted',
 		);
 		expect(result.output).toContain(
-			'stale margin: the CPU-model factors changed after the margin was derived',
+			'stale margin: the CPU-model correction changed after the margin was derived',
 		);
 	});
 
@@ -341,15 +370,45 @@ describe('models', () => {
 		expect(run('accept', '--budget', path, ...args, '--reason', 'anchors').status).toBe(0);
 		expect(run('margin', '--budget', path, ...args, '--reason', 'margin').status).toBe(0);
 		const budget = JSON.parse(readFileSync(path, 'utf8'));
-		expect(budget.anchors.models).toEqual(budget.models.factors);
-		expect(budget.margin.models).toEqual(budget.models.factors);
+		expect(budget.anchors.models).toEqual(correction(budget.models));
+		expect(budget.margin.models).toEqual(correction(budget.models));
+	});
+
+	test("fits how far each model's suite follows a calibration swing", () => {
+		// 12 runs; on model A the suite moves by the square root of the calibration's swing, on B by all of it.
+		const swings = [0.8, 1.25, 0.9, 1.1, 1, 0.85, 1.2, 0.95, 1.05, 1.15, 0.88, 1.12];
+		const swung = swings.map((k, index) => {
+			const k2 = swings[(index + 5) % swings.length];
+			const at = (
+				shard: string,
+				cpuModel: string,
+				work: number,
+				swing: number,
+				elastic: number,
+			) => ({
+				...sample(shard, cpuModel, work * swing ** elastic),
+				calibrationS: (cpuModel === 'B' ? 1.2 : 1) * swing,
+				run: String(100 + index),
+			});
+			return [
+				at('1/2', 'A', 100, k, 0.5),
+				at('2/2', 'B', 242, k2, 1),
+				at('1/2', 'B', 121, k2, 1),
+				at('2/2', 'A', 200, k, 0.5),
+			];
+		});
+		const path = budgetFile(anchored);
+		const args = swung.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		expect(run('models', '--budget', path, ...args, '--reason', 'swings').status).toBe(0);
+		const { models } = JSON.parse(readFileSync(path, 'utf8'));
+		expect(models.elasticity.A).toBeCloseTo(0.5, 1);
+		expect(models.elasticity.B).toBeCloseTo(1, 1);
+		expect(models.calibrationS).toEqual({ A: 1.025, B: 1.23 });
 	});
 
 	test('a model with too few samples gets no factor, and one model alone fits nothing', () => {
 		const path = budgetFile(anchored);
-		const few = runs
-			.slice(0, 2)
-			.flatMap((shards) => ['--from', measurementsDir(shards)]);
+		const few = runs.slice(0, 2).flatMap((shards) => ['--from', measurementsDir(shards)]);
 		const result = run('models', '--budget', path, ...few, '--reason', 'too few');
 		expect(result.status).toBe(2);
 		expect(result.output).toContain('at least two CPU models with 5 samples each');
@@ -405,7 +464,11 @@ describe('peak attribution', () => {
 				mb: 800,
 				parts: { 'node fixture-build-child.ts': 600, 'node forks.js': 200 },
 			},
-			{ file: expect.stringContaining('no test file'), mb: 300, parts: { 'node vitest.mjs': 300 } },
+			{
+				file: expect.stringContaining('no test file'),
+				mb: 300,
+				parts: { 'node vitest.mjs': 300 },
+			},
 		]);
 	});
 
@@ -437,8 +500,8 @@ describe('peak attribution', () => {
 				'/repo/node_modules/vitest/dist/workers/forks.js',
 			]),
 		).toBe('node forks.js');
-		expect(processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}'])).toBe(
-			'node fixture-build-child.ts',
-		);
+		expect(
+			processLabel(['/usr/bin/node', '/repo/test/support/fixture-build-child.ts', '{}']),
+		).toBe('node fixture-build-child.ts');
 	});
 });

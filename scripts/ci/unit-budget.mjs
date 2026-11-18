@@ -32,7 +32,8 @@ const USAGE = `usage: node scripts/ci/unit-budget.mjs measure -- <command...>
            noise band: above it is over budget, below it is a stale anchor
   accept   takes new anchors from CI artifacts (the median per shard over every attempt of the runs)
   margin   derives the noise band from repeated CI measurements of one test set
-  models   derives each CPU model's factor: how far the calibration misjudges its speed on the unit suite`;
+  models   derives each CPU model's correction: how far the calibration misjudges its speed on the unit
+           suite, and how much of a calibration swing on that model the suite's CPU-s follow`;
 
 const flags = (args, name) => {
 	const values = [];
@@ -138,7 +139,9 @@ export function processLabel(args) {
 
 const labelOf = ({ pid }) => {
 	try {
-		return processLabel(readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean));
+		return processLabel(
+			readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0').filter(Boolean),
+		);
 	} catch {
 		return 'exited';
 	}
@@ -209,14 +212,12 @@ export function describePeak(measurement, limit = 8) {
 	if (!at) return `  shard ${measurement.shard}: no per-file attribution at its peak`;
 	return [
 		`  shard ${measurement.shard} at its peak (${measurement.peakRssMb} MB, ${at.atS} s in):`,
-		...at.groups
-			.slice(0, limit)
-			.map(
-				(group) =>
-					`    ${group.mb} MB  ${group.file}  (${Object.entries(group.parts)
-						.map(([kind, mb]) => `${kind} ${mb}`)
-						.join(', ')})`,
-			),
+		...at.groups.slice(0, limit).map(
+			(group) =>
+				`    ${group.mb} MB  ${group.file}  (${Object.entries(group.parts)
+					.map(([kind, mb]) => `${kind} ${mb}`)
+					.join(', ')})`,
+		),
 	].join('\n');
 }
 
@@ -297,11 +298,7 @@ async function measure(command) {
 		singleCalibrationS: calibration.singleS,
 		wrapperCpuS: round((own.user + own.system) / 1e6, 2),
 		atPeak: peakAt,
-		filePeaksMb: Object.fromEntries(
-			[...filePeaks]
-				.sort(([, a], [, b]) => b - a)
-				.slice(0, 25),
-		),
+		filePeaksMb: Object.fromEntries([...filePeaks].sort(([, a], [, b]) => b - a).slice(0, 25)),
 	};
 	rmSync(filesDir, { recursive: true, force: true });
 	mkdirSync(dirname(out), { recursive: true });
@@ -363,10 +360,30 @@ const shardList = (shards) => [...shards].sort().join(', ');
 // The calibration ranks CPU models differently from the unit suite, so each recorded model carries a factor.
 const modelFactor = (budget, m) => budget.models?.factors?.[m.cpuModel] ?? 1;
 
-/** A shard's CPU-seconds divided by its runner's calibration and its CPU model's factor. */
-export const workOf = (budget, m) => m.cpuS / m.calibrationS / modelFactor(budget, m);
+/**
+ * The calibration a shard is divided by: its own, pulled toward its CPU model's median calibration by
+ * the share of a calibration swing the unit suite does not follow on that model (elasticity 1 keeps it).
+ */
+export function effectiveCalibration(budget, m) {
+	const typical = budget.models?.calibrationS?.[m.cpuModel];
+	const elasticity = budget.models?.elasticity?.[m.cpuModel];
+	if (!(typical > 0) || typeof elasticity !== 'number') return m.calibrationS;
+	return typical * (m.calibrationS / typical) ** elasticity;
+}
 
-const sameFactors = (a, b) => JSON.stringify(a ?? {}) === JSON.stringify(b ?? {});
+/** A shard's CPU-seconds divided by its effective calibration and its CPU model's factor. */
+export const workOf = (budget, m) =>
+	m.cpuS / effectiveCalibration(budget, m) / modelFactor(budget, m);
+
+/** What anchors and margins were computed with; changing any of it invalidates them. */
+const correctionOf = (budget) => ({
+	factors: budget.models?.factors ?? {},
+	calibrationS: budget.models?.calibrationS ?? {},
+	elasticity: budget.models?.elasticity ?? {},
+});
+
+const sameCorrection = (recorded, budget) =>
+	JSON.stringify(correctionOf({ models: recorded })) === JSON.stringify(correctionOf(budget));
 
 /** The verdict for one run's shards against the budget file. */
 export function evaluate(budget, measurements) {
@@ -383,13 +400,13 @@ export function evaluate(budget, measurements) {
 		failures.push(
 			`stale anchor: the anchors cover shards [${shardList(Object.keys(budget.anchors.shards))}] but this run measured [${shardList(measured)}]; re-anchor from this run`,
 		);
-	if (budget.anchors && !sameFactors(budget.anchors.models, budget.models?.factors))
+	if (budget.anchors && !sameCorrection(budget.anchors.models, budget))
 		failures.push(
-			'stale anchor: the CPU-model factors changed after the anchors were accepted; re-anchor with `unit-budget.mjs accept`',
+			'stale anchor: the CPU-model correction changed after the anchors were accepted; re-anchor with `unit-budget.mjs accept`',
 		);
-	if (budget.margin && !sameFactors(budget.margin.models, budget.models?.factors))
+	if (budget.margin && !sameCorrection(budget.margin.models, budget))
 		failures.push(
-			'stale margin: the CPU-model factors changed after the margin was derived; re-derive it with `unit-budget.mjs margin`',
+			'stale margin: the CPU-model correction changed after the margin was derived; re-derive it with `unit-budget.mjs margin`',
 		);
 	const speed = budget.anchors?.calibrationS ?? 1;
 	const scaled = (m) => workOf(budget, m) * speed;
@@ -397,7 +414,7 @@ export function evaluate(budget, measurements) {
 	const peakRssMb = Math.max(0, ...[...latest.values()].map((m) => m.peakRssMb));
 	for (const [shard, m] of [...latest].sort(([a], [b]) => a.localeCompare(b)))
 		lines.push(
-			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s, ${budget.models?.factors?.[m.cpuModel] ? `model factor ${modelFactor(budget, m)}` : 'no factor recorded for this CPU model'}), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
+			`  shard ${shard}: ${m.cpuS} CPU-s on ${m.cpuModel} (calibration ${m.calibrationS} CPU-s, ${budget.models?.factors?.[m.cpuModel] ? `counted as ${round(effectiveCalibration(budget, m), 3)}, model factor ${modelFactor(budget, m)}` : 'no factor recorded for this CPU model'}), ${round(scaled(m))} CPU-s at the anchors' speed, peak RSS ${m.peakRssMb} MB, ${m.wallS} s wall${budget.anchors?.shards?.[shard] ? ` (anchor ${budget.anchors.shards[shard].cpuS} CPU-s, ${budget.anchors.shards[shard].peakRssMb} MB)` : ''}`,
 		);
 	if (budget.margin && budget.anchors) {
 		const band = (name, value, anchor, margin, unit) => {
@@ -426,7 +443,9 @@ export function evaluate(budget, measurements) {
 						(sum, shard) =>
 							sum +
 							anchorOf(shard) *
-								(unknown.some(([s]) => s === shard) ? unknownMargin : budget.margin.cpu),
+								(unknown.some(([s]) => s === shard)
+									? unknownMargin
+									: budget.margin.cpu),
 						0,
 					) / budget.anchors.cpuS,
 					3,
@@ -509,7 +528,10 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 			perShard.set(shard, list);
 		}
 	}
-	const speed = median([...perShard.values()].flat().map((m) => m.calibrationS));
+	const speed = round(
+		median([...perShard.values()].flat().map((m) => effectiveCalibration(budget, m))),
+		3,
+	);
 	const shards = Object.fromEntries(
 		[...perShard]
 			.sort(([a], [b]) => a.localeCompare(b))
@@ -525,7 +547,7 @@ export function acceptAnchors(budget, runs, reason, date = today()) {
 		calibrationS: speed,
 		cpuS: round(Object.values(shards).reduce((sum, s) => sum + s.cpuS, 0)),
 		peakRssMb: Math.max(...Object.values(shards).map((s) => s.peakRssMb)),
-		models: budget.models?.factors ?? {},
+		models: correctionOf(budget),
 		shards,
 		runs: runs.map((r) => r.source),
 		sha: runs.at(-1).measurements[0]?.sha ?? null,
@@ -589,7 +611,7 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 	const margin = {
 		cpu: spread('work'),
 		rss: spread('peakRssMb'),
-		models: budget.models?.factors ?? {},
+		models: correctionOf(budget),
 		samples: Object.fromEntries([...perShard].sort(([a], [b]) => a.localeCompare(b))),
 	};
 	return {
@@ -609,13 +631,38 @@ export function deriveMargin(budget, runs, reason, date = today(), minimumSample
 	};
 }
 
+// Least squares, not a robust slope: the rare slow host whose tests slow down with its calibration is the signal.
+const slope = (points) => {
+	const mx = points.reduce((sum, [x]) => sum + x, 0) / points.length;
+	const my = points.reduce((sum, [, y]) => sum + y, 0) / points.length;
+	let sxy = 0;
+	let sxx = 0;
+	for (const [x, y] of points) {
+		sxy += (x - mx) * (y - my);
+		sxx += (x - mx) ** 2;
+	}
+	return sxx > 0 ? sxy / sxx : 1;
+};
+
 /**
- * Each CPU model's factor: the median, over its samples, of a sample's work (CPU-s over calibration CPU-s)
- * against its shard's median, refined as the shard medians move. Samples of different commits pool per
- * shard: runners are assigned at random, so test changes between them spread over every model alike.
- * Normalised so the factors' geometric mean is 1; a model with fewer than `minimumSamples` gets none.
+ * Each CPU model's correction, fitted against the median work of the same shard in the `neighbours` nearest
+ * runs on each side, so the suite's own growth over the fitted runs does not read as runner speed.
+ * - calibrationS: the model's median calibration.
+ * - elasticity: how far the suite's CPU-s follow a calibration swing on that model (log-log slope, 0 to 1);
+ *   a fast calibration round on an otherwise ordinary host must not scale the whole shard. A model with
+ *   fewer than `minimumElasticitySamples` keeps its own calibration whole.
+ * - factors: how far the calibration misjudges the model's speed on the suite, normalised to a geometric
+ *   mean of 1. A model with fewer than `minimumSamples` gets none.
  */
-export function deriveModels(budget, runs, reason, date = today(), minimumSamples = 5) {
+export function deriveModels(
+	budget,
+	runs,
+	reason,
+	date = today(),
+	minimumSamples = 5,
+	minimumElasticitySamples = 20,
+	neighbours = 8,
+) {
 	if (!reason?.trim())
 		throw new Error('models needs --reason "<one line: what the samples are>"');
 	const samples = [];
@@ -628,24 +675,54 @@ export function deriveModels(budget, runs, reason, date = today(), minimumSample
 	const counts = new Map();
 	for (const m of samples) counts.set(m.cpuModel, (counts.get(m.cpuModel) ?? 0) + 1);
 	const fitted = samples.filter((m) => counts.get(m.cpuModel) >= minimumSamples);
-	if (new Set(fitted.map((m) => m.cpuModel)).size < 2)
+	const names = [...new Set(fitted.map((m) => m.cpuModel))].sort((a, b) => a.localeCompare(b));
+	if (names.length < 2)
 		throw new Error(
 			`factors need at least two CPU models with ${minimumSamples} samples each; got ${JSON.stringify(Object.fromEntries(counts))}`,
 		);
+	const ofModel = new Map(names.map((name) => [name, fitted.filter((m) => m.cpuModel === name)]));
+	const typical = new Map(
+		names.map((name) => [name, round(median(ofModel.get(name).map((m) => m.calibrationS)), 3)]),
+	);
+	const elastic = names.filter((name) => ofModel.get(name).length >= minimumElasticitySamples);
+	const elasticity = new Map();
 	const factors = new Map();
-	const work = (m) => m.cpuS / m.calibrationS / (factors.get(m.cpuModel) ?? 1);
+	const correction = () => ({
+		models: {
+			factors: Object.fromEntries(factors),
+			calibrationS: Object.fromEntries(elastic.map((name) => [name, typical.get(name)])),
+			elasticity: Object.fromEntries(elasticity),
+		},
+	});
+	const byShard = new Map();
+	for (const m of [...fitted].sort(
+		(a, b) => Number(a.run) - Number(b.run) || a.attempt - b.attempt,
+	))
+		byShard.set(m.shard, [...(byShard.get(m.shard) ?? []), m]);
 	for (let pass = 0; pass < 8; pass += 1) {
-		const shardMedian = new Map();
-		for (const shard of new Set(fitted.map((m) => m.shard)))
-			shardMedian.set(shard, median(fitted.filter((m) => m.shard === shard).map(work)));
-		const ratios = new Map();
-		for (const m of fitted) {
-			const list = ratios.get(m.cpuModel) ?? [];
-			list.push(work(m) / shardMedian.get(m.shard));
-			ratios.set(m.cpuModel, list);
+		const current = correction();
+		const reference = new Map();
+		for (const list of byShard.values())
+			list.forEach((m, index) => {
+				const near = list.filter((other, at) => Math.abs(at - index) <= neighbours);
+				reference.set(m, median(near.map((n) => workOf(current, n))));
+			});
+		for (const name of elastic) {
+			const points = ofModel
+				.get(name)
+				.map((m) => [
+					Math.log(m.calibrationS / typical.get(name)),
+					Math.log(m.cpuS / reference.get(m)),
+				]);
+			elasticity.set(name, round(Math.min(1, Math.max(0, slope(points))), 2));
 		}
-		for (const [model, list] of ratios)
-			factors.set(model, (factors.get(model) ?? 1) * median(list));
+		const next = correction();
+		for (const name of names)
+			factors.set(
+				name,
+				(factors.get(name) ?? 1) *
+					median(ofModel.get(name).map((m) => workOf(next, m) / reference.get(m))),
+			);
 	}
 	const mean = Math.exp(
 		[...factors.values()].reduce((sum, f) => sum + Math.log(f), 0) / factors.size,
@@ -653,13 +730,11 @@ export function deriveModels(budget, runs, reason, date = today(), minimumSample
 	const models = {
 		unknownMargin: budget.models?.unknownMargin ?? budget.margin?.cpu ?? null,
 		factors: Object.fromEntries(
-			[...factors]
-				.sort(([a], [b]) => a.localeCompare(b))
-				.map(([model, f]) => [model, Math.round((f / mean) * 1000) / 1000]),
+			names.map((name) => [name, round(factors.get(name) / mean, 3)]),
 		),
-		samples: Object.fromEntries(
-			[...counts].sort(([a], [b]) => a.localeCompare(b)),
-		),
+		calibrationS: Object.fromEntries(elastic.map((name) => [name, typical.get(name)])),
+		elasticity: Object.fromEntries(elastic.map((name) => [name, elasticity.get(name)])),
+		samples: Object.fromEntries([...counts].sort(([a], [b]) => a.localeCompare(b))),
 	};
 	const sources = [...new Set(samples.map((m) => m.run).filter(Boolean))];
 	return {
@@ -670,8 +745,8 @@ export function deriveModels(budget, runs, reason, date = today(), minimumSample
 			{
 				date,
 				change: 'models',
-				from: budget.models?.factors ?? null,
-				to: models.factors,
+				from: budget.models ? correctionOf(budget) : null,
+				to: correctionOf({ models }),
 				runs: sources,
 				reason: reason.trim(),
 			},
@@ -697,7 +772,9 @@ async function main(argv) {
 		const result = evaluate(budget, measurements);
 		console.log(result.report);
 		for (const warning of result.warnings) console.log(`::warning::${warning}`);
-		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) => a.localeCompare(b)))
+		for (const [, m] of [...latestPerShard(measurements)].sort(([a], [b]) =>
+			a.localeCompare(b),
+		))
 			console.log(describePeak(m));
 		if (!result.failures.length) {
 			console.log('unit budget: within the noise band of its anchors');
