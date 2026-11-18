@@ -1,9 +1,9 @@
 # Native integration: conformance report, 2026-11-17
 
-Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet
-and headless-UI branches together. On it, 42 of 45 buildable rungs pass on the iPhone simulator and 45 of 45 on the
-Android emulator: the full run gave 44, and its one failure (the return from Settings, broken only by combining the branches)
-is fixed and proven since; the 3 iOS failures are the system sheet, also broken on its own branch today.
+Branch `cw/native-integration` (draft PR #820, base `cw/native-targets`) holds today's navigation, styles, device, sheet,
+headless-UI, scrolling, forms, element and value branches together. Latest full run (round two, below): 77 of 81 buildable
+rungs pass on the iPhone simulator and 80 of 81 on the Android emulator. Rung 17 failed on both and is fixed and proven since;
+the 3 iOS failures are the system sheet (Y1 to Y3), fixed on #822, which is not merged yet. The table below is round one's.
 
 | Area | Rungs | iOS | Android | What is missing |
 |---|---|---|---|---|
@@ -238,6 +238,48 @@ holds every hook (the browser compiler gets no-op hooks), or a separate native w
 shared analyzer). The two records are left as they are until then; with them removed, G16 would fail by those 606 B.
 `base.camera` (the device's `@markless/ui` part, 559 B rendered) also ships in the worker's UI sources; not compiler code.
 
+## Round two (2026-11-18): scrolling, forms, real elements, real values
+
+Merged, each with a merge commit on this branch: `cw/native-scroll` (#821, `235daa389`), `cw/native-forms` (#823,
+`5d41b7b99`), `cw/real-elements` (#826, `f0bc4dcc9`), `cw/real-values` (#825, `753a0ddc7`). Each was green except the docs
+size check. Not merged: `cw/sheet-styled-content` (#822, its CI is still red: the iOS host did not compile on one head, a unit
+shard fails on the latest) and `cw/ui-overlay` (#819, see "Left out").
+
+**Ladder, one run over every rung that builds** (81 folders; `11-async` and `y4-sheet-beside-drawer` are refused by name, as
+before): iOS 77 of 81, Android 80 of 81. Dragon from my Dragon worktree, which now also merges dragoncss#593 (the scroll
+branch's Dragon side). Receipts: `receipts/2026-11-18-integration-round2-{ios,android}-81-rungs.json` and `-verdict.txt`.
+
+| Failed | Phones | Why | Now |
+|---|---|---|---|
+| 17-into-view | iOS and Android | Only together. Neither host routed an element command (`scrollIntoView()`, `focus()`) to the scroll branch's Chrome-style alignment; they scrolled the least distance, so the target ended at the bottom. #821 proved rung 17 only on a local merge with #816 whose wiring was not pushed. | Fixed (`65f70b4a1`): `scrollIntoView()` aligns to the start, `focus()` brings the element into view unless `preventScroll`, a blocked submit's field scrolls as `focus()` does. Rerun of 16, 17, F1 to F7 and U11 to U14: all 13 pass on both phones (`receipts/2026-11-18-integration-round2-*-focus-scroll-13-rungs.json`). |
+| Y1, Y2, Y3 | iOS | The iOS system sheet does not present (fixed on #822, not merged yet). | Waits for #822. |
+
+All other rungs pass on both phones, the new ones included: 12 to 16 (scrolling), F1 to F7 (forms), R101 to R115 (elements)
+and R131 to R138 (values). Reference ladder and web ladder: pass (`vitest`, 453 files, 4,036 tests).
+Conformance vectors: reference, Swift (31 tests) and Kotlin (632 checks) reproduce every file. PR CI on `65f70b4a1`: green,
+including perf-guards and the iOS job (its first try timed out starting Maestro's iOS driver on the runner, before any
+rung ran; the rerun passed).
+
+**Docs page size (G16).** Passes: 1,709,267 B gzip at load against the anchor 1,709,376 B, so 705 B over `main` (606 B
+before this round; the 99 B are analyzer hook call sites, not native modules). The compile-worker test still finds no
+native-only module in the docs' compiler.
+
+### Decisions in this round (all reversible)
+
+| What | Kept | Left | Why |
+|---|---|---|---|
+| Runtime shape for forms (TS, Swift, Kotlin) | the device branch's `run` and `change` | forms' `step` with an inner `run` | Forms' `submit`, `tick` and `after` ops, the `timer` event, edited-field tracking, checks and busy marks moved into the kept shape. Timer and invalid entries are journalled in op order, as the reference runtime does. |
+| `await` in a handler | a device call: a continuation; anything else: forms' timer `after` | device's refusal of other awaits | Both readings fit one statement kind (`await`). |
+| `new` in the analyzer | `new Date(...)` stays the call real-values answers by name | — | Both branches handled `new`; real-values' case came first and hid forms' `new FormData`, `new Error`, `new Promise`. Now `new Date` is a call and every other `new` is forms' node. |
+| Exports for native refusals (#826) | `@markless/compiler/native` | the main `@markless/compiler` entry | A main-entry export would put native code back in the docs' compiler. |
+| Module constants (#825) | collected by the injected native collectors, like module functions | collected in the shared analyzer | Same reason: the main entry gains no native-only code. |
+| Allowed elements | real-elements' `NATIVE_ELEMENTS`, with `form` added | forms' `PORTABLE_ELEMENTS` | One list; `form` is the forms branch's entry in it. |
+| Keyboard steps in the ladder (#821) | `keepKeyboard` | `keyboard: 'stays'` | Same meaning; one spelling. Swipes take `up` or `{ from, to, until }`. |
+| Dragon data-only compile (dragoncss#593 with #590) | appearance bands on both compiles | bands only on the full compile | Markless uses the data-only compile; without bands, dark mode would lose its styles. |
+| iOS svg drawing (#826) | `viewBox` converted to `CGFloat` before it scales the bounds | `CGFloat / Double` | CI's Xcode 16.4 rejects the mixed division (`ambiguous use of operator '/'`); local Swift accepted it. |
+| Style sizes S1 to S5 | as the harness wrote them (+102 B per page) | — | Dragon #593 adds the page's scroll range to every export. |
+| Proof screenshots | the branches' own | this run's 1,000+ changed images | As in round one: results are in the receipts. |
+
 ## 7. Contact sheet
 
 `docs/goals/native-targets-api/contact-sheet/index.html`: every rung at its launch screen, web (Chromium at 402×778, 3×) beside
@@ -293,4 +335,13 @@ UI rows. Every resolution below is in a merge commit on `cw/native-integration`;
 
 - `cw/native-handlers` (#807): 19 conflicting files (`native-view.ts`, `expression-tree.ts`, `artifacts.ts`, both hosts'
   runtimes and payload decoders, the harness). Study branch; not merged.
-- Pending, not included: `cw/ui-overlay`, `cw/native-scroll`, `cw/sheet-styled-content`.
+- `cw/sheet-styled-content` (#822): not merged; its CI is red (see round two). Y1 to Y3 on iOS wait for it.
+- `cw/ui-overlay` (#819): not merged, although its CI is green. It branched before #816 and implements the same things
+  differently: it calls any named helper as `call` and inlines it, where #816 (on this branch) has `apply` plus the collected
+  module functions that #825 extends; it whitelists `METHODS`, where #816 lowers method calls as `invoke`. Its element values,
+  `contains`, `activeElement`, `instanceof`, pointer events and the overlay stack would have to be rebuilt on #816's shapes
+  across the analyzer, three runtimes and both hosts (about 130 conflicting hunks), which is a port, not a merge.
+  **Overlay owner:** rebase `cw/ui-overlay` onto `cw/native-integration` (or #816). Also, its size record
+  (`scripts/benchmarks/anchor-changes/cw-ui-overlay.json`) accepts +611 B on the docs pages for the compile worker; with
+  the native entry, that growth should not be needed, so that entry should go when it is rebased (its web runtime
+  entries, +144 B for the overlay install fix, are a real web change).
