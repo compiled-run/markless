@@ -199,6 +199,45 @@ from the list and `u1-base` added to it, those four tests (two rungs, two target
 **Left as they are:** perf-guards G16 stays failing (+217 B gzip on the docs page, only together); its size record is not
 accepted. The iOS sheet failure (Y1 to Y3) is being investigated on `cw/sheet-styled-content`; nothing here changed for it.
 
+## Native code in the docs' in-browser compiler (2026-11-18)
+
+The docs page downloads the playground's compile worker at load, which bundles the compiler. Read from Rolldown's own
+module graph of that worker (built with the site's swaps; `website/tooling/compile-worker-graph.ts`), six native-only modules
+were in it: `compiler/src/passes/semantic-graph/expression-tree.ts`, `compiler/src/passes/native-view.ts`,
+`compiler/src/passes/semantic-graph/device-target.ts` (all three through `export`s in the compiler's main entry,
+`compiler/src/index.ts`), `compiler/src/passes/semantic-graph/web-device-edits.ts` (imported by `compile-module.ts`), and
+behind them `serializer/src/native-view.ts` and `serializer/src/native-device.ts`.
+
+Fixed at the source:
+- Native builds get their own entry, `@markless/compiler/native` (`NATIVE_FACT_COLLECTORS`, `DEVICE_TARGET_FACTS`,
+  `createNativeViewPayload` and the native diagnostics). The main entry no longer exports them; `@markless/mobile` and the
+  bundler's build plugin (`rolldown.ts`, never in the worker) import the native entry. These exports exist only on the native
+  branches, so `main`'s public API does not change.
+- `applyWebDeviceEdits` and the device-object write test are part of the injected device analysis; module functions, a
+  computed's tree, `@if`/`@switch` arm tests and callback parameter names are built by the injected native collectors.
+- Static texts and attributes in markup chunks are recorded only for native builds, so web compiles neither collect nor strip
+  them (`render-data` is back to `main`'s code).
+- Test: `website/tooling/compile-worker-graph.test.ts` (website tooling job) fails when the compiler's main entry reaches the
+  native entry's modules, or the compile worker's graph reaches a native-only module (what the native entry's modules load
+  that the main entry does not, and the `@markless/mobile` package). Checked both ways by putting the leak back (a re-export in
+  the main entry; an import of the native entry from bundler code): it fails each time.
+- Web output: byte-identical to `main` at `710c44d48` for all 3,419 shared `.tsrx` files, again.
+
+| Figure | Before | After | `main` |
+|---|---|---|---|
+| Compile worker, built locally (raw / gzip -9) | 3,626,958 / 1,045,540 B | 3,625,686 / 1,045,113 B | 3,622,034 / 1,043,908 B |
+| CI G16, docs `/` (gzip at load, 68 files) | 1,709,593 B (failed) | 1,709,168 B (passes) | 1,708,562 B |
+
+`main`'s docs figure is its anchor without the two records the native branches accepted for this cost
+(`scripts/benchmarks/anchor-changes/cw-native-targets.json` +584 B, `cw-device-slice.json` +230 B; CI's anchor 1,709,376 B
+includes them). So the docs page is still **606 B gzip over `main`**: what remains is no native module but the analyzer's hook
+call sites (about two dozen one-line `state.nativeFacts?.…` and `state.deviceTarget?.…` calls and the option plumbing that
+carries them, about 5 KB minified before this change and 3.6 KB after), which every web compile runs and finds empty.
+Removing those too needs a choice the owner should make: either a `browser` export condition on one compiler module that
+holds every hook (the browser compiler gets no-op hooks), or a separate native walk over the analysis (the hooks leave the
+shared analyzer). The two records are left as they are until then; with them removed, G16 would fail by those 606 B.
+`base.camera` (the device's `@markless/ui` part, 559 B rendered) also ships in the worker's UI sources; not compiler code.
+
 ## 7. Contact sheet
 
 `docs/goals/native-targets-api/contact-sheet/index.html`: every rung at its launch screen, web (Chromium at 402×778, 3×) beside
