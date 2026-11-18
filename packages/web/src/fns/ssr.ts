@@ -112,6 +112,7 @@ type SsrBoundaryRecord = SsrAnchoredRecord & {
 	readonly runnerGraphNodeId?: string | null;
 	readonly updateSymbolId?: string;
 	readonly asyncReads?: ReadonlyArray<SsrAsyncReadRecord>;
+	readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>;
 	readonly armRecords?: SsrArmRecordSet | ReadonlyArray<SsrArmRecordSet>;
 	readonly composedInstancePath?: string;
 	readonly composedGraphProps?: ReadonlyArray<ProtocolComposedGraphProp>;
@@ -1751,6 +1752,12 @@ export function marklessSsrAppendChildView(context: {
 						childGraphNodeId(read),
 						sources.map(childGraphNodeId),
 					]),
+				),
+			}),
+			// A literal prop never changes, so a read of one has nothing to re-render for.
+			...(boundary.rerenderReads && {
+				rerenderReads: boundary.rerenderReads.flatMap(
+					(read) => marklessSsrRemapChildGraph(read, context.child.graphProps, childInstancePath) ?? [],
 				),
 			}),
 			asyncReads: marklessSsrRemapChildReads(

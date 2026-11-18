@@ -155,6 +155,7 @@ export function createProtocolViewPayload(
 				),
 				updateSymbolId: boundaryUpdateSymbols(input).get(boundary.id),
 				...rerendersOnRefreshField(input, boundary.id, keyedRepeats),
+				...rowArmRerenderReadsField(input, boundary.id, boundary.asyncReads),
 				...(catchTargets.has(boundary.id) && { catchesHandlers: true as const }),
 				startAnchor: {
 					...boundary.startAnchor,
@@ -753,6 +754,43 @@ function rerendersOnRefreshField(
 		(read) => read.armScopeBoundaryId === boundaryId,
 	);
 	return stale || armText ? { rerendersOnRefresh: true } : {};
+}
+
+// A row holding a @try has no row template, so the arm's own text is re-rendered when what it reads is written.
+function rowArmRerenderReadsField(
+	input: ProtocolViewPayloadInput,
+	boundaryId: string,
+	asyncReads: ReadonlyArray<{ readonly graphNodeId: string }>,
+): { readonly rerenderReads?: ReadonlyArray<{ readonly graphNodeId: string; readonly path: ReadonlyArray<string> }> } {
+	const data = renderDataOf(input);
+	const tryChunkId = data.boundaries.find((boundary) => boundary.boundaryId === boundaryId)
+		?.armChunkIds.try;
+	const graph = input.semanticGraph;
+	const enclosing = tryChunkId
+		? data.repeats.filter((repeat) => chunkIdsForChunkTree(input, repeat.rowChunkId).includes(tryChunkId))
+		: [];
+	if (!tryChunkId || !graph || enclosing.length === 0) return {};
+	const rowNames = new Set(
+		enclosing.flatMap((repeat) =>
+			rowBoundNames(graph.keyedRepeats.find((candidate) => candidate.id === repeat.repeatId)),
+		),
+	);
+	const settledBy = new Set(asyncReads.map((read) => read.graphNodeId));
+	const reads = new Map<string, { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }>();
+	const add = (read: { readonly graphNodeId: string; readonly path: ReadonlyArray<string> }) => {
+		if (!settledBy.has(read.graphNodeId)) reads.set(`${read.graphNodeId}:${read.path.join('.')}`, read);
+	};
+	for (const chunkId of chunkIdsForChunkTree(input, tryChunkId, new Set(), false)) {
+		const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+		for (const slot of chunk?.slots ?? []) {
+			const value =
+				mintableSlotValue(slot) ??
+				(chunk?.componentName ? expressionSlotValue(slot, graph, chunk.componentName, rowNames) : null);
+			if (value && 'graphNodeId' in value) add({ graphNodeId: value.graphNodeId, path: value.graphPath });
+			else if (value && 'reads' in value) for (const read of value.reads ?? []) add(read);
+		}
+	}
+	return reads.size > 0 ? { rerenderReads: [...reads.values()] } : {};
 }
 
 // A nested record's own parent renders once per enclosing row, so it names the outermost
@@ -1466,18 +1504,28 @@ function armScopedBranchHostIds(
 	);
 }
 
-function hostIdsForChunkTree(
+function hostIdsForChunkTree(input: ProtocolViewPayloadInput, chunkId: string): ReadonlyArray<string> {
+	const chunks = renderDataOf(input).chunks;
+	return chunkIdsForChunkTree(input, chunkId).flatMap(
+		(id) => chunks.find((candidate) => candidate.id === id)?.hosts.map((host) => host.hostNodeId) ?? [],
+	);
+}
+
+// `nested` false stops at the lists and @try blocks inside, which keep their own records.
+function chunkIdsForChunkTree(
 	input: ProtocolViewPayloadInput,
 	chunkId: string,
 	seen = new Set<string>(),
+	nested = true,
 ): ReadonlyArray<string> {
 	if (seen.has(chunkId)) return [];
 	seen.add(chunkId);
-	const data = renderDataOf(input);
-	const chunk = data.chunks.find((candidate) => candidate.id === chunkId);
+	const chunk = renderDataOf(input).chunks.find((candidate) => candidate.id === chunkId);
 	if (!chunk) return [];
 	const childChunkIds = chunk.slots.flatMap((slot) => {
 		if (slot.kind === 'branch') return slot.armTemplateIds;
+		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
+		if (!nested) return [];
 		if (slot.kind === 'repeat')
 			return [slot.rowTemplateId, ...(slot.emptyTemplateId ? [slot.emptyTemplateId] : [])];
 		if (slot.kind === 'async')
@@ -1486,13 +1534,9 @@ function hostIdsForChunkTree(
 				...(slot.armTemplateIds.pending ? [slot.armTemplateIds.pending] : []),
 				...(slot.armTemplateIds.catch ? [slot.armTemplateIds.catch] : []),
 			];
-		if (slot.kind === 'dynamic-host') return [slot.childChunkId];
 		return [];
 	});
-	return [
-		...chunk.hosts.map((host) => host.hostNodeId),
-		...childChunkIds.flatMap((childChunkId) => hostIdsForChunkTree(input, childChunkId, seen)),
-	];
+	return [chunkId, ...childChunkIds.flatMap((id) => chunkIdsForChunkTree(input, id, seen, nested))];
 }
 
 function armScopedBranchRecords(

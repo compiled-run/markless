@@ -119,6 +119,7 @@ function materializeAsyncBoundaryLocators(
 			initiallyServedArm: boundary.initiallyServedArm,
 			updateSymbolId: boundary.updateSymbolId,
 			...(boundary.rerendersOnRefresh && { rerendersOnRefresh: true }),
+			...(boundary.rerenderReads && { rerenderReads: boundary.rerenderReads }),
 			...(boundary.catchesHandlers && { catchesHandlers: true }),
 			startAnchor,
 			endAnchor,

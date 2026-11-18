@@ -3,8 +3,9 @@ import { installMarklessComposedArmRecords } from '../../../web/src/fns/instance
 import { cleanup, render, renderServerHTML, renderSSR, renderStream } from '../../src/index.ts';
 import BesideChildPage from './beside-child-page.tsrx';
 import ChildInlineRowsPage from './child-inline-page.tsrx';
+import ChildMarkPage from './child-mark-page.tsrx';
 import { forgetRequests } from './gate.ts';
-import { counts, own, refreshStreamed, settleInline } from './rows.ts';
+import { appendStreamed, counts, own, refreshStreamed, settleInline } from './rows.ts';
 
 // A built page that composes children re-spells a composed @try's arm records by the instance its id names, as here.
 beforeAll(() => installMarklessComposedArmRecords());
@@ -54,10 +55,60 @@ test("streamed: inline row @try blocks beside a composed child each show their o
 	await refreshStreamed(appends, renderServerHTML(shell).container);
 });
 
-// Known gap: the compiler files text inside a row's @try arm as a page record with no locator, and gives that arm no records, so no row finds its element.
-test.fails("text a keyed row's @try arm reads follows a write", async () => {
+// Text a row's @try arm reads from page state follows a write in every row.
+const seen = () => [...document.querySelectorAll('[data-seen]')].map((cell) => cell.textContent);
+async function bump() {
+	document.querySelector<HTMLElement>('[data-bump]')!.click();
+	await expect.poll(seen).toEqual(['1', '1']);
+}
+
+test("CSR: text a keyed row's @try arm reads follows a write", async () => {
 	await render(BesideChildPage);
 	await settleInline(0);
-	document.querySelector<HTMLElement>('[data-bump]')!.click();
-	await expect.poll(() => [...document.querySelectorAll('[data-seen]')].map((cell) => cell.textContent)).toEqual(['1', '1']);
+	await bump();
+});
+
+test("SSR: text a keyed row's @try arm reads follows a write", async () => {
+	await renderSSR(BesideChildPage);
+	expect(seen()).toEqual(['0', '0']);
+	await bump();
+});
+
+test("streamed: text a keyed row's @try arm reads follows a write", async () => {
+	const { shell, appends } = await renderStream(BesideChildPage);
+	const { container } = renderServerHTML(shell);
+	for (const chunk of appends) appendStreamed(container, chunk);
+	await expect.poll(seen).toEqual(['0', '0']);
+	await bump();
+});
+
+// A child's own rows: text reading the row and the child's own state follows a write to that state.
+const marks = () => [...document.querySelectorAll('[data-mark]')].map((cell) => cell.textContent);
+async function tickThenRefresh() {
+	document.querySelector<HTMLElement>('[data-tick]')!.click();
+	await expect.poll(marks).toEqual(['Pen +3', 'Ink +3']);
+	document.querySelector<HTMLElement>('[data-again]')!.click();
+	await settleInline(1);
+	document.querySelector<HTMLElement>('[data-tick]')!.click();
+	await expect.poll(marks).toEqual(['Nib +6', 'Cap +6']);
+}
+
+test("CSR: text a child's row @try arm reads from the child's state follows a write", async () => {
+	await render(ChildMarkPage);
+	await settleInline(0);
+	await tickThenRefresh();
+});
+
+test("SSR: text a child's row @try arm reads from the child's state follows a write", async () => {
+	await renderSSR(ChildMarkPage);
+	expect(marks()).toEqual(['Pen +0', 'Ink +0']);
+	await tickThenRefresh();
+});
+
+test("streamed: text a child's row @try arm reads from the child's state follows a write", async () => {
+	const { shell, appends } = await renderStream(ChildMarkPage);
+	const { container } = renderServerHTML(shell);
+	for (const chunk of appends) appendStreamed(container, chunk);
+	await expect.poll(marks).toEqual(['Pen +0', 'Ink +0']);
+	await tickThenRefresh();
 });

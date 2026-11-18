@@ -481,7 +481,16 @@ function renderArmAppend(
 			(cell) => !shellGraphNodeIds.has(cell.graphNodeId) || cell.graphNodeId === caughtError,
 		),
 	);
-	const armGraphNodeIds = armDependencyClosure(output, arm.graphNodeId);
+	const nested = boundariesInside(view, boundary);
+	// A @try inside the arm served settled shows values the shell sent pending, so they ride this patch too.
+	const armGraphNodeIds = new Set(
+		[
+			arm.graphNodeId,
+			...nested.flatMap((inner) =>
+				inner.initiallyServedArm === ASYNC_BOUNDARY_ARM.pending ? [] : inner.asyncReads.map((read) => read.graphNodeId),
+			),
+		].flatMap((id) => [...armDependencyClosure(output, id)]),
+	);
 	const computedById = new Map(
 		(output.state?.computed ?? [])
 			.filter(
@@ -495,7 +504,6 @@ function renderArmAppend(
 		'markless/state',
 		{ cells, computed: serializeRuntimeAsyncSnapshots([...computedById.values()]) },
 	);
-	const nested = boundariesInside(view, boundary);
 	const armEvents = withPaintedBlockEvents(
 		armRecords,
 		nested,
