@@ -159,7 +159,6 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 			state.filename,
 		);
 	}
-	if (state.nativeFacts) graph.scriptModule = state.nativeFacts.scriptModule(state.semantic() as never, input.filename);
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {
@@ -271,7 +270,6 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		hostIds: state.hostIds,
 		nestedLocalSource: (expression) => inlineNestedTemplateLocals(expression, state),
 		nativeFacts: state.nativeFacts,
-		...(state.nativeFacts ? { semantic: state.semantic } : {}),
 		foldedIfs: state.foldedIfs,
 		foldedTexts: state.foldedTexts,
 		absentComponents,

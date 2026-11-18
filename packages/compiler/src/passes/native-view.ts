@@ -62,6 +62,7 @@ import type {
 } from '../artifacts.ts';
 import { compileDrawing, type DrawingElement } from './native-drawing.ts';
 import { nativeScriptOf, type NativeScriptModuleInput } from './native-script.ts';
+import { scriptFactsOf, type ScriptFacts } from './semantic-graph/script-facts.ts';
 
 export const NATIVE_UNSUPPORTED_CODE = 'MARKLESS_NATIVE_UNSUPPORTED';
 
@@ -656,6 +657,8 @@ export type NativeViewOptions = {
 	 * `never`: data only.
 	 */
 	readonly scriptHandlers?: 'fallback' | 'all' | 'never';
+	/** A module's source as the build read it, by filename: where a native build finds a value's own JavaScript. */
+	readonly readSource?: (filename: string) => string | undefined;
 };
 
 /** One module's facts, indexed for lowering its templates. */
@@ -1591,6 +1594,22 @@ export function createNativeViewPayload(
 	const isDeviceCall = (name: string): name is NativeDeviceCall =>
 		Object.hasOwn(DEVICE_CALLS, name);
 	const scriptMode = options.scriptHandlers ?? 'fallback';
+	const factsByFile = new Map<string, ScriptFacts | undefined>();
+	/** A module's script facts, from its source as the build read it; none when the build was given no source. */
+	const scriptFacts = (module: ModuleFacts): ScriptFacts | undefined => {
+		const file = module.graph.filename;
+		if (!factsByFile.has(file)) {
+			const source = options.readSource?.(file);
+			factsByFile.set(file, source === undefined ? undefined : scriptFactsOf(source, file));
+		}
+		return factsByFile.get(file);
+	};
+	const readScript = (module: ModuleFacts, span: SourceSpan | undefined) =>
+		span && scriptFacts(module)?.value(span);
+	const listScript = (module: ModuleFacts, rowHost: string | undefined) => {
+		const span = rowHost && module.graph.hostNodes.find((host) => host.id === rowHost)?.sourceSpan;
+		return span ? scriptFacts(module)?.forList(span) : undefined;
+	};
 	/** Script functions by where they are written; each payload numbers its own. */
 	const scriptFunctions = new Map<string, { readonly id: string; readonly module: ModuleFacts; readonly fact: SemanticScriptFunction }>();
 	const scriptServices = new Set<NativeScriptService>();
@@ -1701,13 +1720,15 @@ export function createNativeViewPayload(
 	 */
 	function renderValue(
 		expression: SemanticExpression | undefined,
-		script: SemanticScriptFunction | undefined,
+		scriptOf: () => SemanticScriptFunction | undefined,
 		what: string,
 		scope: Scope,
 	): NativeExpr | null {
-		if (scriptMode === 'never' || !script) return exprOf(expression, what, scope);
+		if (scriptMode === 'never') return exprOf(expression, what, scope);
 		const data = attempt(() => exprOf(expression, what, scope));
 		if (!data.failed) return data.value;
+		const script = scriptOf();
+		if (!script) return data.value;
 		data.rollBack();
 		// The web renders the clock and random numbers once; a host evaluates a script value again whenever the page changes.
 		const unsteady = script.globals.filter((global) => !global.typeofOnly && RENDER_UNSTEADY.has(global.property ?? global.name));
@@ -1730,7 +1751,7 @@ export function createNativeViewPayload(
 		what: string,
 	): NativeExpr | null {
 		return keepingFunctions(() => {
-		const fact = computed.nativeScript;
+		const fact = scriptFacts(scope.module)?.computed(computed.componentName, computed.name);
 		if (!fact || scriptMode === 'never')
 			return refuse(`${what} reads the computed \`${computed.name}\`, whose body needs a script engine`);
 		const label = `the computed \`${computed.name}\``;
@@ -1757,7 +1778,7 @@ export function createNativeViewPayload(
 		const included = new Map<ModuleFacts, Included>();
 		const order: Included[] = [];
 		const where = (module: ModuleFacts) => module.graph.filename;
-		const factsOf = (module: ModuleFacts) => module.graph.scriptModule;
+		const factsOf = (module: ModuleFacts) => scriptFacts(module)?.module();
 		const enter = (module: ModuleFacts): Included | undefined => {
 			const known = included.get(module);
 			if (known) return known;
@@ -2354,7 +2375,7 @@ export function createNativeViewPayload(
 						const data = attempt(() =>
 							exprOf(computed.nativeExpression, `the computed \`${expression.name}\``, { ...scope, live: true }),
 						);
-						if (!data.failed || scriptMode === 'never' || !computed.nativeScript) return data.value;
+						if (!data.failed || scriptMode === 'never') return data.value;
 						data.rollBack();
 						return scriptComputed(computed, scope, what);
 					} finally {
@@ -2886,7 +2907,7 @@ export function createNativeViewPayload(
 				return value ? [{ property: 'value' as const, value }] : [];
 			}
 			if (target.kind === 'attribute') {
-				const value = renderValue(read.expression, read.script, `the \`${target.name}\` attribute`, scope);
+				const value = renderValue(read.expression, () => readScript(scope.module, read.sourceSpan), `the \`${target.name}\` attribute`, scope);
 				return value ? [{ attribute: target.name, value }] : [];
 			}
 			if (
@@ -2924,7 +2945,7 @@ export function createNativeViewPayload(
 		if (cell) return { cell };
 		const read = scope.module.computedReads.get(graphNodeId);
 		const expr = read
-			? renderValue(read.expression, read.script, 'a text expression', readScope(read, scope))
+			? renderValue(read.expression, () => readScript(scope.module, read.sourceSpan), 'a text expression', readScope(read, scope))
 			: refuse('a text binding that is not state');
 		return expr && { expr };
 	};
@@ -3015,7 +3036,7 @@ export function createNativeViewPayload(
 				continue;
 			}
 			if (slot.nativeExpression && slot.residue.kind !== 'element-handle-id') {
-				const lowered = renderValue(slot.nativeExpression, slot.nativeScript, 'a text expression', {
+				const lowered = renderValue(slot.nativeExpression, () => readScript(scope.module, slot.nativeSpan), 'a text expression', {
 					...scope,
 					live: slot.residue.kind === 'graph-read',
 					...(slot.nativeSpan ? { span: slot.nativeSpan } : {}),
@@ -3590,7 +3611,7 @@ export function createNativeViewPayload(
 					continue;
 				}
 				const list = repeat?.collectionExpression
-					? renderValue(repeat.collectionExpression, repeat.collectionScript, 'the @for list', {
+					? renderValue(repeat.collectionExpression, () => listScript(scope.module, repeat.rowHostNodeId), 'the @for list', {
 							...scope,
 							live: repeat.collectionGraphNodeId !== undefined,
 						})
@@ -3915,7 +3936,7 @@ export function createNativeViewPayload(
 		handler: string,
 		pressed?: NonNullable<Scope['pressed']>,
 	): NativeOp[] {
-		if (scriptMode === 'never' || !event.handlerScript || DATA_ONLY_EVENTS.has(event.eventName))
+		if (scriptMode === 'never' || !event.handlerSpan || DATA_ONLY_EVENTS.has(event.eventName) || !scriptFacts(scope.module))
 			return dataHandlerOps(event, scope, handler, pressed);
 		if (scriptMode === 'all') {
 			const scripted = attempt(() => scriptOp(event, scope));
@@ -3979,8 +4000,9 @@ export function createNativeViewPayload(
 	}
 
 	function scriptOpOf(event: SemanticEvent, scope: Scope): NativeOp | null {
-		const fact = event.handlerScript!;
+		const fact = event.handlerSpan && scriptFacts(scope.module)?.handler(event.handlerSpan);
 		const what = `the ${event.eventName} handler`;
+		if (!fact) return refuseScript(`${what} has no source the build read, so it cannot run as JavaScript`, event.handlerSpan);
 		let readsMissing = false;
 		for (const read of fact.event ?? []) {
 			const known = NATIVE_SCRIPT_EVENT_MEMBERS.some((members) =>

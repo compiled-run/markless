@@ -259,17 +259,7 @@ export function collectKeyedRepeat(node: AnyNode, state: WalkState): number | nu
 		...(indexName ? { indexName } : {}),
 		collectionSource,
 		...(state.nativeFacts
-			? {
-					collectionExpression: state.nativeFacts.expression(collectionNode as never),
-					...(() => {
-						const collectionScript = state.nativeFacts.scriptValue(
-							collectionNode as never,
-							state.semantic() as never,
-							state.filename,
-						);
-						return collectionScript ? { collectionScript } : {};
-					})(),
-				}
+			? { collectionExpression: state.nativeFacts.expression(collectionNode as never) }
 			: {}),
 		...(collection
 			? {

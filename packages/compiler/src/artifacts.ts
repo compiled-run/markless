@@ -116,12 +116,6 @@ export type NativeFactCollectors = {
 		node: never,
 		isFrameworkCall: (node: never, api: 'state') => boolean,
 	) => SemanticComponentNativeFacts;
-	/** A handler's or computed's own JavaScript for a phone's script engine; `semantic` is the module's scope analysis. */
-	readonly scriptFunction: (node: never, semantic: never, filename: string) => SemanticScriptFunction | undefined;
-	/** A value a template reads, as a script whose function gives it, for when it is not data. */
-	readonly scriptValue: (node: never, semantic: never, filename: string) => SemanticScriptFunction | undefined;
-	/** The module's own top-level code as a script module (components and framework state left out). */
-	readonly scriptModule: (semantic: never, filename: string) => SemanticScriptModule;
 };
 
 /** A name a script reads that no declaration in its module gives (`setTimeout`, `document`). */
@@ -484,8 +478,6 @@ export type SemanticGraphBinding = {
 	readonly dependencies?: ReadonlyArray<SemanticGraphDependency>;
 	/** A sync computed's body as a tree, for native builds only (`nativeFacts`). */
 	readonly nativeExpression?: SemanticExpression;
-	/** A computed's function as JavaScript for a phone's script engine, for native builds only. */
-	readonly nativeScript?: SemanticScriptFunction;
 	readonly functionSource?: string;
 	// A synthetic computed spelling one run of text: inside @try it waits on its async inputs, not on itself.
 	readonly joinsText?: true;
@@ -1003,8 +995,6 @@ export type SemanticKeyedRepeat = {
 	readonly collectionPath: ReadonlyArray<string>;
 	/** The collection as a tree (native builds only). */
 	readonly collectionExpression?: SemanticExpression;
-	/** The collection as JavaScript for a phone's script engine (native builds only). */
-	readonly collectionScript?: SemanticScriptFunction;
 	readonly keySource: string;
 	// Empty means the item ITSELF is the key (`key row`), which a list of scalars
 	// is; `indexKey` is what says a row has no data identity at all.
@@ -1133,8 +1123,6 @@ export type SemanticEvent = {
 	readonly handlerParameters: ReadonlyArray<string>;
 	/** The inline handler's body as statements, for hosts that run handlers as data; absent for a named or relayed handler. */
 	readonly handlerStatements?: ReadonlyArray<SemanticHandlerStatement>;
-	/** The handler as JavaScript for a phone's script engine, for native builds only. */
-	readonly handlerScript?: SemanticScriptFunction;
 	readonly hasSyncPolicyCandidate: boolean;
 	readonly syncPolicy?: SemanticSyncPolicy;
 	/** A submit event whose form has a submit control with an author-written aria-disabled, which a submitting form then leaves alone. */
@@ -1569,8 +1557,6 @@ export type SemanticTemplateRead = {
 	readonly source: string;
 	/** The read's value as a tree (for a conditional class, its test). */
 	readonly expression?: SemanticExpression;
-	/** The same value as JavaScript for a phone's script engine (native builds only). */
-	readonly script?: SemanticScriptFunction;
 	readonly sourceSpan?: SourceSpan;
 	readonly hostNodeId: string;
 	readonly target: SemanticTemplateBindingTarget;
@@ -1856,8 +1842,6 @@ export type SemanticMarkupSlot = SemanticMarkupLocatedSlot &
 				readonly nativeExpression?: SemanticExpression;
 				/** Where the interpolation is written, for native builds only. */
 				readonly nativeSpan?: SourceSpan;
-				/** The interpolation as JavaScript for a phone's script engine, for native builds only. */
-				readonly nativeScript?: SemanticScriptFunction;
 		  }
 		| {
 				readonly kind: 'attribute';
@@ -2021,8 +2005,6 @@ export type SemanticGraphArtifact = {
 	readonly moduleFunctions?: ReadonlyArray<SemanticModuleFunction>;
 	/** Top-level `const` values, for native builds only (`nativeFacts`). */
 	readonly moduleConstants?: ReadonlyArray<SemanticModuleConstant>;
-	/** The module's top-level code for a phone's script engine, for native builds only. */
-	readonly scriptModule?: SemanticScriptModule;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;

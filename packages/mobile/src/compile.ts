@@ -191,6 +191,7 @@ export async function compileNativeComponent(input: {
 					}
 				: {}),
 			modules: { graphs, resolve },
+			readSource: (file: string) => (file === input.filename ? input.source : read.get(file)?.source),
 			...(input.scriptHandlers ? { scriptHandlers: input.scriptHandlers } : {}),
 			...(input.manifest
 				? {

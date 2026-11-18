@@ -59,7 +59,6 @@ export type MutableSemanticGraphArtifact = {
 	moduleId: string;
 	moduleFunctions?: SemanticModuleFunction[];
 	moduleConstants?: SemanticModuleConstant[];
-	scriptModule?: import('../../artifacts.ts').SemanticScriptModule;
 	components: SemanticComponent[];
 	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];

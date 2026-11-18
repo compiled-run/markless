@@ -7,7 +7,10 @@ const analyze = (filename: string, source: string) =>
 	buildSemanticGraph({ filename, source, nativeFacts: NATIVE_FACT_COLLECTORS });
 
 const nativeView = async (source: string, options: NativeViewOptions = {}) =>
-	createNativeViewPayload(await analyze('src/App.tsrx', source), options);
+	createNativeViewPayload(await analyze('src/App.tsrx', source), {
+		readSource: (file) => (file === 'src/App.tsrx' ? source : undefined),
+		...options,
+	});
 
 /** The build with other modules: `files` by name, resolved from `./name`. */
 const withModules = async (source: string, files: Record<string, string>) => {

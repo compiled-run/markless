@@ -2411,19 +2411,18 @@ function eventHandlerExpression(
 function expressionField(
 	expression: AnyNode | undefined,
 	state: WalkState,
-): Pick<SemanticTemplateRead, 'expression' | 'script'> {
-	if (!expression || !state.nativeFacts) return {};
-	const script = state.nativeFacts.scriptValue(expression as never, state.semantic() as never, state.filename);
-	return { expression: state.nativeFacts.expression(expression as never), ...(script ? { script } : {}) };
+): Pick<SemanticTemplateRead, 'expression'> {
+	return expression && state.nativeFacts
+		? { expression: state.nativeFacts.expression(expression as never) }
+		: {};
 }
 
 function handlerStatementsField(
 	node: AnyNode | undefined,
 	state: WalkState,
-): Pick<SemanticEvent, 'handlerStatements' | 'handlerScript'> {
+): Pick<SemanticEvent, 'handlerStatements'> {
 	const handlerStatements = node && state.nativeFacts?.handlerStatements(node as never);
-	const handlerScript = node && state.nativeFacts?.scriptFunction(node as never, state.semantic() as never, state.filename);
-	return { ...(handlerStatements ? { handlerStatements } : {}), ...(handlerScript ? { handlerScript } : {}) };
+	return handlerStatements ? { handlerStatements } : {};
 }
 
 function handlerParameterNames(node: AnyNode): string[] {

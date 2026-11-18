@@ -14,7 +14,7 @@ const nativeView = async (source: string, options: NativeViewOptions = {}) =>
 			source,
 			nativeFacts: NATIVE_FACT_COLLECTORS,
 		}),
-		options,
+		{ readSource: (file) => (file === 'src/App.tsrx' ? source : undefined), ...options },
 	);
 /** The data vocabulary alone, as before handlers could fall back to JavaScript. */
 const dataOnly: NativeViewOptions = { scriptHandlers: 'never' };

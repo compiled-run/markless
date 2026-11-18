@@ -8,7 +8,7 @@ import type {
 	SemanticScriptStatement,
 	SourceSpan,
 } from '../../artifacts.ts';
-import type { ModuleSemantics } from './shared-ast.ts';
+import { moduleSemantics, type ModuleSemantics } from './shared-ast.ts';
 
 // Script facts read yuku's scope analysis only: what each name resolves to decides how the emitted JavaScript reaches it.
 
@@ -587,3 +587,65 @@ export function scriptModuleOf(semantic: ModuleSemantics, filename: string): Sem
 /** A value a template reads (a text run, an attribute, a `@for` list) as a script that gives it. */
 export const scriptValueOf = (node: AnyNode, semantic: ModuleSemantics, filename: string) =>
 	scriptFunctionOf(node, semantic, filename, true);
+
+/** The outermost node written exactly over `span`. */
+function nodeOver(semantic: ModuleSemantics, span: { readonly start: number; readonly end: number }): AnyNode | undefined {
+	const at = semantic.nodeAt(span.start);
+	let found: AnyNode | undefined;
+	if (!at) return undefined;
+	for (const node of semantic.ancestors(at) as Iterable<AnyNode>) {
+		if (node.start === span.start && node.end === span.end && node.type !== 'JSXExpressionContainer') found = node;
+		if ((node.start as number) < span.start || (node.end as number) > span.end) break;
+	}
+	return found;
+}
+
+/**
+ * A native build's script facts for one module, from the module's own analysis: what the native pass asks for, found
+ * by the places the semantic graph records. The web build never loads this.
+ */
+export function scriptFactsOf(source: string, filename: string) {
+	const semantic = moduleSemantics(source, filename);
+	let module: SemanticScriptModule | undefined;
+	return {
+		/** A handler written at `span`: an inline function, or the name of one. */
+		handler: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			return node && scriptFunctionOf(node, semantic, filename);
+		},
+		/** A value the template reads, written at `span`. */
+		value: (span: SourceSpan): SemanticScriptFunction | undefined => {
+			const node = nodeOver(semantic, span);
+			return node && scriptFunctionOf(node, semantic, filename, true);
+		},
+		/** The list a `@for` iterates, found from where its row element is written. */
+		forList: (rowSpan: SourceSpan): SemanticScriptFunction | undefined => {
+			const at = semantic.nodeAt(rowSpan.start);
+			if (!at) return undefined;
+			for (const node of semantic.ancestors(at) as Iterable<AnyNode>)
+				if (node.type === 'JSXForExpression') return scriptFunctionOf(node.right as AnyNode, semantic, filename, true);
+			return undefined;
+		},
+		/** The function of `computed(...)` bound to `name` in `component` (module level when there is none). */
+		computed: (component: string | undefined, name: string): SemanticScriptFunction | undefined => {
+			for (const binding of semantic.bindings) {
+				if (binding.name !== name) continue;
+				const declaring = declaringNode(semantic, binding);
+				if (declaring?.type !== 'VariableDeclarator' || !isFrameworkCall(semantic, declaring.init as AnyNode)) continue;
+				let owner: string | undefined;
+				for (const node of semantic.ancestors(declaring as never) as Iterable<AnyNode>)
+					if (isComponent(node)) {
+						owner = String((node.id as AnyNode | undefined)?.name);
+						break;
+					}
+				if ((owner ?? '') !== (component ?? '')) continue;
+				const [fn] = ((declaring.init as AnyNode).arguments as AnyNode[] | undefined) ?? [];
+				return fn && scriptFunctionOf(fn, semantic, filename);
+			}
+			return undefined;
+		},
+		module: (): SemanticScriptModule => (module ??= scriptModuleOf(semantic, filename)),
+	};
+}
+
+export type ScriptFacts = ReturnType<typeof scriptFactsOf>;
