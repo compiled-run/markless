@@ -15,7 +15,8 @@ rendering stays native.
   use; a script's timers are `timer` entries (`script:<n>`) the view tree schedules like a data timer. A screen whose payload has a script warms the engine once its first frame is up and the main run loop is
   idle; the Info.plist boolean `MarklessEngineWarm` set to false turns that off (the proof harness does this when
   `MARKLESS_PROOF_ENGINE_WARM=0`). The log also carries `engine start <ms> ms` and `first script entry <ms> ms (engine
-  cold|warm)`.
+  cold|warm)`, and once per launch `first frame <ms> ms (process start), <ms> ms (first controller created)`, taken
+  after the run-loop turn that committed the first screen's views.
 
 ## Embedding
 
