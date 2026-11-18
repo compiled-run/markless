@@ -761,6 +761,15 @@ const isScalar = (value: unknown): value is NativeScalar | null =>
 	(typeof value === 'number' && Number.isFinite(value));
 
 /** Every cell an expression reads. */
+/** Whether an expression reads a row's item. */
+function readsItem(expr: NativeExpr): boolean {
+	if (!expr || typeof expr !== 'object') return false;
+	if ('item' in expr) return true;
+	return Object.values(expr).some((child) =>
+		Array.isArray(child) ? child.some((one) => readsItem(Array.isArray(one) ? one[1] : one)) : readsItem(child as NativeExpr),
+	);
+}
+
 /** Whether an expression reads a row's item and nothing that changes after the row is built (no event, local or route). */
 function readsItemOnly(expr: NativeExpr): boolean {
 	let item = false;
@@ -3454,6 +3463,7 @@ export function createNativeViewPayload(
 				const childPrefix = `${scope.prefix}${edge.id}/`;
 				const childObjects = instanceObjects(target.module, target.component, childPrefix);
 				const first = nodes.length;
+				const cellsBefore = cells.length;
 				const childScope = enterComponent(
 					target.module,
 					target.component,
@@ -3470,6 +3480,16 @@ export function createNativeViewPayload(
 					...(scope.catches ? { catches: scope.catches } : {}),
 				});
 				childObjects.own(first);
+				// The web builds a part in a row again when a value the row passes it changes; its state then starts over.
+				const passed = [
+					...[...props.values()].flatMap((prop) => (prop.kind === 'value' ? [prop.expr] : [])),
+					...rest.map(([, expr]) => expr),
+				].filter(readsItem);
+				if (place.row && passed.length > 0)
+					for (let index = cellsBefore; index < cells.length; index++) {
+						const cell = cells[index]!;
+						if (cell.row) cells[index] = { ...cell, rebuiltBy: [...(cell.rebuiltBy ?? []), ...passed] };
+					}
 				continue;
 			}
 			if (item.kind === 'repeat') {

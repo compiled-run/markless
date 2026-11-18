@@ -247,6 +247,24 @@ public final class NativeRuntime {
 		return value
 	}
 
+	/// For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON.
+	private func rowSignatures() throws -> [String: String] {
+		var signatures: [String: String] = [:]
+		for cell in payload.cells {
+			guard let row = cell.row, let rebuiltBy = cell.rebuiltBy, let list = nodesById[row], try isShown(list.arm) else { continue }
+			for (key, item) in try rows(of: row) {
+				let scope = NativeScope(items: [row: item], keys: [row: key])
+				signatures["\(cell.id)@\(key)"] = try rebuiltBy.map { try evaluate($0, in: scope).jsonText }.joined(separator: ",")
+			}
+		}
+		return signatures
+	}
+
+	/// As on the web, a part a row passes a changed value to is built again: that row's state starts over.
+	private func resetChangedRows(_ before: [String: String]) throws {
+		for (slot, now) in try rowSignatures() where before[slot].map({ $0 != now }) ?? false { values.removeValue(forKey: slot) }
+	}
+
 	/// A row's state with a `first` takes it once, from the row's item, when the row is built.
 	private func seedRows() throws {
 		for cell in payload.cells {
@@ -786,6 +804,7 @@ public final class NativeRuntime {
 		let dialogsBefore = dialogs
 		let beforeSheets = Dictionary(uniqueKeysWithValues: try sheets().map { ($0.node, $0.open) })
 		let ownedBefore = Set(try liveObjects())
+		let signaturesBefore = try rowSignatures()
 		let calls = try apply()
 		if case .navigate? = calls.first { return calls }
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
@@ -794,6 +813,7 @@ public final class NativeRuntime {
 			guard let at = slot.firstIndex(of: "@"), let list = rowOfCell[String(slot[..<at])] else { continue }
 			if !kept.contains("\(list)\u{0}\(slot[slot.index(after: at)...])") { values.removeValue(forKey: slot) }
 		}
+		try resetChangedRows(signaturesBefore)
 		try seedRows()
 		try forgetHidden()
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })

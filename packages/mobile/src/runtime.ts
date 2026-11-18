@@ -403,6 +403,27 @@ export function createNativeRuntime(
 			scope: { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) },
 		}));
 	};
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	const rowSignatures = () => {
+		const signatures = new Map<string, string>();
+		for (const cell of payload.cells) {
+			if (!cell.row || !cell.rebuiltBy) continue;
+			const repeat = repeats.get(cell.row);
+			if (!repeat || !shown(repeat)) continue;
+			for (const { key, item } of rowsOf(repeat)) {
+				const scope = { ...base, items: new Map([[repeat.id, item]]), keys: new Map([[repeat.id, key]]) };
+				signatures.set(`${cell.id}@${key}`, JSON.stringify(cell.rebuiltBy.map((expr) => evaluate(expr, undefined, scope))));
+			}
+		}
+		return signatures;
+	};
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	const resetChangedRows = (before: Map<string, string>) => {
+		for (const [slot, now] of rowSignatures()) {
+			const was = before.get(slot);
+			if (was !== undefined && was !== now) values.delete(slot);
+		}
+	};
 	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
 	const seedRows = () => {
 		for (const cell of payload.cells) {
@@ -919,6 +940,7 @@ export function createNativeRuntime(
 			const dialogsBefore = new Map(dialogs);
 			const beforeSheets = new Map(sheets());
 			const ownedBefore = new Set(liveObjects());
+			const itemsBefore = rowSignatures();
 			const calls = apply();
 			if (calls[0]?.op === 'navigate') return calls;
 			// A row that left takes its state with it; a later row with the same key starts from the first values.
@@ -928,6 +950,7 @@ export function createNativeRuntime(
 				const list = at < 0 ? undefined : rowOfCell.get(slot.slice(0, at));
 				if (list !== undefined && !kept.has(`${list}\0${slot.slice(at + 1)}`)) values.delete(slot);
 			}
+			resetChangedRows(itemsBefore);
 			seedRows();
 			forgetHidden();
 			const afterTexts = new Map(texts());

@@ -516,6 +516,11 @@ export type NativeViewPayload = {
 		 */
 		readonly first?: NativeExpr;
 		/**
+		 * On a row's state: the values the row passes to the part that owns it, read from the row's item. As on the web, when
+		 * one changes the part is built again: the row's state starts over from its first values.
+		 */
+		readonly rebuiltBy?: ReadonlyArray<NativeExpr>;
+		/**
 		 * The clock when the screen opened, in milliseconds since 1970 (UTC): the host writes it at mount, before the first
 		 * build, as a page's render reads the clock when it is served; `initial` is never shown.
 		 */

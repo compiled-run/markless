@@ -30,5 +30,6 @@ export default function RowSeed() @{
 		}
 		<button onClick={() => (items = [...items, { id: 'c', name: 'Cherry' }])}>Add</button>
 		<button onClick={() => (items = items.filter((one) => one.id !== 'a'))}>Drop</button>
+		<button onClick={() => (items = items.map((one) => ({ id: one.id, name: one.id === 'b' ? 'Blueberry' : one.name })))}>Rename</button>
 	</main>
 }

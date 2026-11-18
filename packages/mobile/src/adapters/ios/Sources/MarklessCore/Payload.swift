@@ -346,6 +346,8 @@ public struct NativeCell: Equatable, Sendable {
 	public var clock = false
 	/// On a row's state: its first value as an expression of the row's item, taken once when the row is built.
 	public var first: NativeExpr? = nil
+	/// On a row's state: the values the row passes to the part that owns it; when one changes the row's state starts over.
+	public var rebuiltBy: [NativeExpr]? = nil
 }
 
 public struct NativeEvent: Equatable, Sendable {
@@ -393,7 +395,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
 		}
 		let cells = try fields["cells"].array().map { cell in
-			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock", "first"])
+			let field = try cell.object(required: ["id", "name", "initial"], optional: ["storage", "styled", "device", "task", "object", "row", "clock", "first", "rebuiltBy"])
 			if field.has("clock"), try !field["clock"].bool() {
 				throw PayloadError(path: try field["clock"].path, reason: "clock is only ever true")
 			}
@@ -414,7 +416,8 @@ public struct NativeViewPayload: Equatable, Sendable {
 				}() : nil,
 				row: field.has("row") ? try field["row"].string() : nil,
 				clock: field.has("clock"),
-				first: field.has("first") ? try decodeExpr(try field["first"]) : nil)
+				first: field.has("first") ? try decodeExpr(try field["first"]) : nil,
+				rebuiltBy: field.has("rebuiltBy") ? try field["rebuiltBy"].array().map(decodeExpr) : nil)
 		}
 		let nodes = try fields["nodes"].array().map { node -> NativeNode in
 			let kind = try node.field("kind").string()

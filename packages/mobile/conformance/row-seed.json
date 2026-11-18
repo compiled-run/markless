@@ -28,13 +28,29 @@
 						"item": "repeat:0"
 					},
 					"property": "name"
-				}
+				},
+				"rebuiltBy": [
+					{
+						"member": {
+							"item": "repeat:0"
+						},
+						"property": "name"
+					}
+				]
 			},
 			{
 				"id": "component-edge:0/shared:src/row-seed.tsrx#tagState/state:tag.taps",
 				"name": "tag.taps",
 				"initial": 0,
-				"row": "repeat:0"
+				"row": "repeat:0",
+				"rebuiltBy": [
+					{
+						"member": {
+							"item": "repeat:0"
+						},
+						"property": "name"
+					}
+				]
 			}
 		],
 		"nodes": [
@@ -114,6 +130,22 @@
 						"text": "Drop"
 					}
 				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h1"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Rename"
+					}
+				]
 			}
 		],
 		"events": [
@@ -131,6 +163,11 @@
 				"host": "h3",
 				"event": "activate",
 				"handler": "handler:event:2"
+			},
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:3"
 			}
 		],
 		"handlers": [
@@ -221,6 +258,65 @@
 						}
 					}
 				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:items",
+						"value": {
+							"method": "map",
+							"target": {
+								"cell": "state:items"
+							},
+							"arguments": [
+								{
+									"lambda": ["one"],
+									"body": {
+										"object": [
+											[
+												"id",
+												{
+													"member": {
+														"local": "one"
+													},
+													"property": "id"
+												}
+											],
+											[
+												"name",
+												{
+													"if": {
+														"binary": "===",
+														"left": {
+															"member": {
+																"local": "one"
+															},
+															"property": "id"
+														},
+														"right": {
+															"literal": "b"
+														}
+													},
+													"whenTrue": {
+														"literal": "Blueberry"
+													},
+													"whenFalse": {
+														"member": {
+															"local": "one"
+														},
+														"property": "name"
+													}
+												}
+											]
+										]
+									}
+								}
+							]
+						}
+					}
+				]
 			}
 		]
 	},
@@ -228,7 +324,8 @@
 		["component-edge:0/h0:text0@a", "Apple 0"],
 		["component-edge:0/h0:text0@b", "Berry 0"],
 		["h2:text0", "Add"],
-		["h3:text0", "Drop"]
+		["h3:text0", "Drop"],
+		["h4:text0", "Rename"]
 	],
 	"initialRows": [["repeat:0", ["a", "b"]]],
 	"steps": [
@@ -294,6 +391,32 @@
 					"op": "text",
 					"node": "component-edge:0/h0:text0@b",
 					"value": "Berry 1"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0@b",
+					"value": "Blueberry 0"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0/h0@c"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "component-edge:0/h0:text0@c",
+					"value": "Cherry 2"
 				}
 			]
 		}

@@ -190,6 +190,27 @@ class Runtime(
 		return initial
 	}
 
+	/** For each row's state that has `rebuiltBy`, by slot (`<cell>@<key>`): those values now, as JSON. */
+	private fun rowSignatures(): Map<String, String> {
+		val signatures = HashMap<String, String>()
+		for (cell in payload.cells) {
+			val row = cell.row ?: continue
+			val rebuiltBy = cell.rebuiltBy ?: continue
+			val list = byId[row] as? Node.Repeat ?: continue
+			if (!isShown(list)) continue
+			for (r in rowsOf(list)) {
+				val scope = Scope(items = mapOf(row to r.item), keys = mapOf(row to r.key))
+				signatures["${cell.id}@${r.key}"] = rebuiltBy.joinToString(",") { jsonValue(evaluate(it, scope)) }
+			}
+		}
+		return signatures
+	}
+
+	/** As on the web, a part a row passes a changed value to is built again: that row's state starts over. */
+	private fun resetChangedRows(before: Map<String, String>) {
+		for ((slot, now) in rowSignatures()) if (before[slot]?.let { it != now } == true) values.remove(slot)
+	}
+
 	/** A row's state with a `first` takes it once, from the row's item, when the row is built. */
 	private fun seedRows() {
 		for (cell in payload.cells) {
@@ -620,6 +641,7 @@ class Runtime(
 		val dialogsBefore = HashMap(dialogs)
 		val beforeSheets = sheets().toMap()
 		val ownedBefore = liveObjects()
+		val signaturesBefore = rowSignatures()
 		val calls = apply()
 		if (calls.firstOrNull() is JournalEntry.Navigate) return calls
 		// A row that left takes its state with it; a later row with the same key starts from the first values.
@@ -628,6 +650,7 @@ class Runtime(
 			val list = rowOfCell[slot.substringBefore('@')]
 			list != null && '@' in slot && "$list\u0000${slot.substringAfter('@')}" !in kept
 		}
+		resetChangedRows(signaturesBefore)
 		seedRows()
 		forgetHidden()
 		val afterTexts = texts().toMap()
