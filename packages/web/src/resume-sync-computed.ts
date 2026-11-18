@@ -249,6 +249,8 @@ const onReadGraphs = new WeakMap<RuntimeGraph, OnReadGraph>();
 export async function refreshWhenShown(
 	input: RefreshInput,
 	batches: ReadonlyArray<NonNullable<RefreshInput['records']>>,
+	// Nothing wrote it: every value the page does not carry, this one included, derives at its first read.
+	unwritten?: true,
 ): Promise<void> {
 	const { graph } = input;
 	let state = onReadGraphs.get(graph);
@@ -322,6 +324,8 @@ export async function refreshWhenShown(
 		const id = node.record.graphNodeId;
 		// A read while the derive settles still answers the held value; the next one derives.
 		if (node.pending) return graph.pullBeforeRead!(id, () => pull(node));
+		// A derive the page already loaded answers this read.
+		if (!node.derive) void prepare(node);
 		const derived = node.derive && deriveSyncComputedNow(at(node.record), node.derive);
 		if (derived === true) node.stale = false;
 		else if (derived) {
@@ -390,5 +394,6 @@ export async function refreshWhenShown(
 	))
 		markStale(record.graphNodeId);
 	markStale(input.computed.graphNodeId);
-	if (shown(input.computed.graphNodeId)) await refresh(nodes.get(input.computed.graphNodeId)!);
+	if (!unwritten && shown(input.computed.graphNodeId))
+		await refresh(nodes.get(input.computed.graphNodeId)!);
 }
