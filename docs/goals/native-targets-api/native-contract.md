@@ -8,10 +8,10 @@ to follow; the name `native` is the naming test's (`cw/device-api-ab`, `naming/r
 
 ## The two choices
 
-| You want | Write | Who draws the frame | Same on every platform? |
-|---|---|---|---|
-| Your own control: your frame, your motion, your look | `modal`, `drawer` from `@markless/ui`, or a plain `<dialog>` | You (the headless family's markup and your CSS) | Yes |
-| The platform's own sheet | `<native.sheet>` from `@markless/device` | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`; nothing on the web | No: each phone's real sheet, and absent on the web |
+| You want                                             | Write                                                        | Who draws the frame                                                                                         | Same on every platform?                            |
+| ---------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| Your own control: your frame, your motion, your look | `modal`, `drawer` from `@markless/ui`, or a plain `<dialog>` | You (the headless family's markup and your CSS)                                                             | Yes                                                |
+| The platform's own sheet                             | `<native.sheet>` from `@markless/device`                     | The platform: iOS `UISheetPresentationController`, Android Material `BottomSheetDialog`; nothing on the web | No: each phone's real sheet, and absent on the web |
 
 One sentence for an author: **use `drawer` when the sheet must look and move the way your design says on every platform;
 use `native.sheet` when it should be the sheet people already know on their phone, with the platform's drag, heights,
@@ -53,21 +53,21 @@ export default function Checkout() @{
   always with `false`. It does not run when the page itself writes `open = false`. It is the same
   word and shape as `drawer`'s and `modal`'s `onChange`; the difference is that a sheet has no trigger part, so opening is
   always the page's own write.
-- **The content is ordinary Markless markup**, styled by the author's CSS (through Dragon on phones). **The frame is not
-  styleable**: corner radius, grabber, dimming colour, the sheet's background and its motion are the platform's. There is
-  no `class` or `style` on `<native.sheet>`; an author who needs to style the frame wants `drawer`.
+- **The content is ordinary Markless markup**, styled by the author's CSS (through Dragon on phones; "Styled content",
+  below). **The frame is not styleable**: corner radius, grabber, dimming colour and its motion are the platform's. There
+  is no `class` or `style` on `<native.sheet>`; an author who needs to style the frame wants `drawer`.
 
 ## Options
 
 Kept to what both phones have. Each must be fixed at build time in this draft (state-driven options are refused by name).
 
-| Option | Default | Meaning | iOS | Android |
-|---|---|---|---|---|
-| `open` | `false` | Shows the sheet while true | present / dismiss | `show()` / `dismiss()` |
-| `onChange` | none | The platform closed it | `presentationControllerDidDismiss` | `setOnCancelListener` |
-| `snapPoints` | `[1]` | Resting heights, as fractions of the screen's height: one value, or two with the larger `1` | detents: `1` is `.large()`, `0.5` is `.medium()`, any other a custom detent | `1` alone: expanded, skip collapsed; `[x, 1]`: `halfExpandedRatio = x`, starts half expanded |
-| `dismissible` | `true` | The person can close it the platform's way | `isModalInPresentation = !dismissible` | `setCancelable(dismissible)` (back, outside tap, swipe) |
-| `modal` | `true` | The page behind is dimmed and cannot be reached | `largestUndimmedDetentIdentifier` unset; when `false`, set to the largest detent | `BottomSheetDialog` when true; a standard bottom sheet in the page when false (not built yet, refused on phones) |
+| Option        | Default | Meaning                                                                                     | iOS                                                                              | Android                                                                                                          |
+| ------------- | ------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `open`        | `false` | Shows the sheet while true                                                                  | present / dismiss                                                                | `show()` / `dismiss()`                                                                                           |
+| `onChange`    | none    | The platform closed it                                                                      | `presentationControllerDidDismiss`                                               | `setOnCancelListener`                                                                                            |
+| `snapPoints`  | `[1]`   | Resting heights, as fractions of the screen's height: one value, or two with the larger `1` | detents: `1` is `.large()`, `0.5` is `.medium()`, any other a custom detent      | `1` alone: expanded, skip collapsed; `[x, 1]`: `halfExpandedRatio = x`, starts half expanded                     |
+| `dismissible` | `true`  | The person can close it the platform's way                                                  | `isModalInPresentation = !dismissible`                                           | `setCancelable(dismissible)` (back, outside tap, swipe)                                                          |
+| `modal`       | `true`  | The page behind is dimmed and cannot be reached                                             | `largestUndimmedDetentIdentifier` unset; when `false`, set to the largest detent | `BottomSheetDialog` when true; a standard bottom sheet in the page when false (not built yet, refused on phones) |
 
 `snapPoints` and `modal` are `drawer`'s words for the same ideas (drawer measures fractions of its own size; a system
 sheet's are of the screen, because that is what both platforms take). `dismissible` has no headless counterpart: `modal`'s
@@ -79,14 +79,14 @@ height (with `fitToContents` off); an iOS custom detent below full has no Androi
 
 ## What each platform does
 
-| | iOS (UIKit) | Android (Views) |
-|---|---|---|
-| What is presented | A `UIViewController` holding the content's views in a `UIScrollView`, presented with `.pageSheet` | `com.google.android.material.bottomsheet.BottomSheetDialog` holding the content's views in a `NestedScrollView` |
-| Grabber / drag handle | `prefersGrabberVisible = true` when there are two heights | the Material 3 drag handle view when there are two heights |
-| Drag between heights, swipe to close | the system's | `BottomSheetBehavior`'s |
-| Back | no back for a sheet on iOS (VoiceOver's escape gesture is the system's close request) | the system back gesture or button (predictive back from Material) |
-| Keyboard | the sheet rises above the keyboard (system) | `adjustResize` on the dialog window; Material insets |
-| Library | none (UIKit) | Material Components for Android (`com.google.android.material:material`), see the receipt below for what it adds to the app |
+|                                      | iOS (UIKit)                                                                                       | Android (Views)                                                                                                             |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| What is presented                    | A `UIViewController` holding the content's views in a `UIScrollView`, presented with `.pageSheet` | `com.google.android.material.bottomsheet.BottomSheetDialog` holding the content's views in a `NestedScrollView`             |
+| Grabber / drag handle                | `prefersGrabberVisible = true` when there are two heights                                         | the Material 3 drag handle view when there are two heights                                                                  |
+| Drag between heights, swipe to close | the system's                                                                                      | `BottomSheetBehavior`'s                                                                                                     |
+| Back                                 | no back for a sheet on iOS (VoiceOver's escape gesture is the system's close request)             | the system back gesture or button (predictive back from Material)                                                           |
+| Keyboard                             | the sheet rises above the keyboard (system)                                                       | `adjustResize` on the dialog window; Material insets                                                                        |
+| Library                              | none (UIKit)                                                                                      | Material Components for Android (`com.google.android.material:material`), see the receipt below for what it adds to the app |
 
 ## The payload (`markless.native-view/0`, additive)
 
@@ -156,8 +156,6 @@ Traced: the idle chunk is imported by runtime chunks the page preloads; not trac
   full-screen fallback in iPhone landscape.
 - **Non-modal on Android** needs the sheet in the page's own layout (a `CoordinatorLayout`), not a dialog; refused on
   phones until built.
-- **Styling content inside the sheet through Dragon**: Dragon lays out one page box tree; the sheet's content is a second
-  root, the same open question as `<dialog>` on `cw/native-ui`.
 
 ## Rungs (2026-11-17)
 
@@ -168,18 +166,18 @@ through a mirror host); **iOS** and **Android** are the rung's Maestro flow on t
 receipt: `receipts/2026-11-17-native-sheet-y1-y3.txt` (one harness run, both platforms: "all 3 rung(s) passed on iOS and
 Android"). Screenshots: `packages/mobile/proofs/y<n>-*/screenshots/{ios,android}/`.
 
-| Rung | What | Web | Reference | iOS | Android |
-|---|---|---|---|---|---|
-| Y1 `y1-sheet-open-close` | open from a button; close by swipe, by back, and by the page's own button; a counter of platform closes on the page | absent, fallback shown | pass | **pass** | **pass** |
-| Y2 `y2-sheet-pick` | a list and a text input inside; the pick lands on the page; keyboard up (`keepKeyboard`) while typing | absent, fallback shown | pass | **pass** | **pass** |
-| Y3 `y3-sheet-heights` | `snapPoints={[0.5, 1]}`: opens at half, pulled to full, 70 items scrolled to the last | absent, fallback shown | pass | **pass** | **pass** |
-| Y4 `y4-sheet-beside-drawer` | the same page with the headless `drawer` | the drawer opens and closes; the sheet absent | **refused by name** (`<drawer.root>, a component from another module`) | not run | not run |
-| Y5 confirmation | report only, below | | | | |
+| Rung                        | What                                                                                                                | Web                                           | Reference                                                              | iOS      | Android  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- | -------- | -------- |
+| Y1 `y1-sheet-open-close`    | open from a button; close by swipe, by back, and by the page's own button; a counter of platform closes on the page | absent, fallback shown                        | pass                                                                   | **pass** | **pass** |
+| Y2 `y2-sheet-pick`          | a list and a text input inside; the pick lands on the page; keyboard up (`keepKeyboard`) while typing               | absent, fallback shown                        | pass                                                                   | **pass** | **pass** |
+| Y3 `y3-sheet-heights`       | `snapPoints={[0.5, 1]}`: opens at half, pulled to full, 70 items scrolled to the last                               | absent, fallback shown                        | pass                                                                   | **pass** | **pass** |
+| Y4 `y4-sheet-beside-drawer` | the same page with the headless `drawer`                                                                            | the drawer opens and closes; the sheet absent | **refused by name** (`<drawer.root>, a component from another module`) | not run  | not run  |
+| Y5 confirmation             | report only, below                                                                                                  |                                               |                                                                        |          |          |
 
 What each rung needed and what is real:
 
 - **Y1.** Payload: the `sheet` node, `dismiss` action, `sheet` journal entry. Real on both phones: the system sheet,
-  its pull-down, Android's back *gesture* (a left-edge swipe; gesture navigation is the AVD's default). iOS has no back
+  its pull-down, Android's back _gesture_ (a left-edge swipe; gesture navigation is the AVD's default). iOS has no back
   for a sheet, so its "back" step is the pull-down again; VoiceOver's escape gesture (the iOS close request) is not
   driven, Maestro cannot perform it. Test doubles: one iOS unit test calls `presentationControllerDidDismiss` directly,
   Android's in-app conformance calls the cancel path directly; neither is in the device column.
@@ -209,6 +207,129 @@ providers are not registered; nothing here needed them). iOS needs no library (U
 **iOS 27 look.** The half-height sheet floats inset from the screen edges and the page behind dims rather than shrinks:
 the system's current look, which a `drawer` author would have to imitate by hand.
 
+## Styled content (branch `cw/sheet-styled-content`, Dragon `cw/sheet-styled-content`)
+
+Base: `cw/system-sheet` merged with `cw/native-app-styles` (#809, which carries `cw/native-nav`): page styles through
+Dragon, dark-mode bands, `ui-*` state styles and the app style file are #809's (`styles-contract.md`). This section adds
+the sheet's content to them.
+
+**The rule.** An author's CSS reaches markup inside `<native.sheet>` as it would reach the same markup rendered as a page
+the size of the sheet's content area: the stylesheets the app and page import, then every shown component's scoped CSS
+(one CSS text, the page's). The content is a document of its own: its top-level elements are the body's children, so
+`%`, `vh`, `vw` and `min-height: 100vh` measure the sheet's content area, not the screen. The page's elements are not
+its ancestors: a selector such as `main .city` does not match inside the sheet, and nothing is inherited from the page's
+elements, because on phones the sheet is its own window. The area outside the document's boxes is the web canvas, white
+in either colour scheme, as on a styled page (#809); the frame around it (grabber or drag handle, corners, dimming,
+motion) is the platform's.
+
+**How it reaches the phone.** For every styled page, Markless hands Dragon the page without its sheets, then each
+sheet's content once per resting height (`nativeStyleInputs`, `packages/mobile/src/style-input.ts`), sized by the
+content area measured for that height on each phone (`SHEET_AREAS`, `packages/mobile/src/sheet-areas.ts`). A sheet's
+input lists only the styled cells its content reads. The app style file (`markless.native-app-style/0`, additive) gains
+`routes[].sheets: [{ node, heights: [{ snapPoint, viewport, readiness, states, initial, next, bands?, assignments }] }]`,
+whose nodes index the same `writes` table as the page's. The hosts lay the content out at the height the sheet rests at,
+switch to the other height's layout when the person drags it there (iOS
+`sheetPresentationControllerDidChangeSelectedDetentIdentifier`, Android `BottomSheetCallback` at
+`STATE_HALF_EXPANDED` / `STATE_EXPANDED`), and apply `state` entries and the dark-mode band to the page and every sheet
+height that has that state.
+
+**The content areas, measured** (Maestro and `uiautomator` view hierarchies, and each host's own size check):
+
+| Resting height | iOS, iPhone 17, iOS 27.2                                                                         | Android, Pixel 7, API 36                                         |
+| -------------- | ------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| 1              | 402 x 778 pt (the scroll view of the `.pageSheet`)                                               | 1080 x 2075 px, 411.43 x 790.48 dp; laid out at 411 x 790        |
+| 0.5            | 402 x 435.7 pt, drawn scaled to 386 pt wide and inset 8 pt from each edge; laid out at 402 x 435 | 1080 x 975 px visible, 411.43 x 371.43 dp; laid out at 411 x 371 |
+
+Laid out in whole CSS px, as Dragon's page viewports are (Chrome, the reference, takes no other size). A first iOS
+measurement read the half-height sheet's accessibility frame (386 x 418, after the scale) and laid the content out 4%
+too small; the host's size check named the real size and the table was corrected. Each host logs once when a sheet shows
+its content in a size more than 1 pt / dp from its layout (a phone other than these).
+
+**What Dragon needed.** One field: `viewports: { ios: { width, height }, android: { width, height } }` on a Markless style
+input, positive whole CSS px, laid out there and recorded as the export's `viewport` (Dragon
+`packages/parity/src/markless-style-input.ts`, test `markless-style-viewports.test.ts`); and `markless:style-compare
+--screenshots <dir>`, which saves Chrome's rendering of each assignment, the reference read beside the phone
+screenshots. Everything else (flex, `gap`, `calc()`, `vh`, `margin-top: auto`, `@media (prefers-color-scheme)`,
+`[ui-*]`) compiled as it does for a page.
+
+**Refused by name.**
+
+- A styled sheet resting at a height not measured on both phones (`snapPoints` other than `0.5` and `1`): "a styled system
+  sheet rests at 0.3, but its content is laid out only at the heights measured on both phones (0.5 and 1)". An unstyled
+  sheet still takes any fraction (Y3's rule).
+- A styled sheet in a one-screen rung (`App.tsrx`): its layout travels only in the app style file, so it needs an app
+  (`pages/`).
+- A styled page whose app style has no styles for one of its sheets (both hosts, by the sheet's id).
+- Inherited from #809 and unchanged inside the sheet: `:active`, `:disabled` and the `disabled` attribute, a link's
+  default underline, `html`/`body` backgrounds, `@media` features other than `prefers-color-scheme`, `@if` arms and
+  `@for` rows in styled markup.
+
+**Not covered.** A height change UIKit makes by itself (the sheet growing to full height when the keyboard rises) may not
+reach the delegate, and the content would keep the half-height layout; not driven by any rung. While the person drags,
+the content keeps the layout of the height it last rested at.
+
+### Rungs Z1-Z5
+
+Columns as above. **Web**: the app built by the router in Chromium (`ladder-web.test.ts`): the sheet is absent, the
+author's `@else` arm shows, the sheet's text is in no built file, and page screenshots at each phone's size go to
+`screenshots/web-{ios,android}/`. **Chrome reference**: Dragon's frames against Chrome's boxes for the page and for each
+sheet height, at the export's viewport (`native-style-compare/*.json`, gate 1 device px), with Chrome's rendering in
+`screenshots/chrome/<input>/`. **iOS** and **Android**: the rung's Maestro flow on simulator `markless-sheet-st` and AVD
+`markless_sheet_st`, screenshots in `screenshots/{ios,android}/`.
+
+| Rung                           | What                                                                                                                                                                       | Web                                    | Reference runtime | Chrome reference (boxes outside 1 device px) | iOS      | Android  |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------- | -------------------------------------------- | -------- | -------- |
+| Z1 `z1-sheet-scoped-styles`    | the page's scoped `<style>` on a heading and buttons inside the sheet; a pick lands on the page                                                                            | absent, fallback shown                 | pass              | page 0 of 14, sheet 0 of 18                  | **pass** | **pass** |
+| Z2 `z2-sheet-shared-component` | `lib/Tag.tsrx` with its own scoped style, once on the page and twice in the sheet                                                                                          | absent, fallback shown                 | pass              | page 0 of 18, sheet 0 of 18                  | **pass** | **pass** |
+| Z3 `z3-sheet-size`             | `snapPoints={[0.5, 1]}`: a two-column grid (`calc(50% - 4px)`, `gap`) and a footer pinned by `min-height: 100vh` and `margin-top: auto`, opened at half and pulled to full | absent, fallback shown                 | pass              | page 0 of 14, half 0 of 28, full 0 of 28     | **pass** | **pass** |
+| Z4 `z4-sheet-dark-mode`        | `@media (prefers-color-scheme: dark)`: opened in dark, switched to light and back while open                                                                               | absent, fallback shown (dark emulated) | pass              | page 0 of 28, sheet 0 of 28 (both bands)     | **pass** | **pass** |
+| Z5 `z5-sheet-state-style`      | `.toggle[ui-active]` on a button inside the sheet, following a cell                                                                                                        | absent, fallback shown                 | pass              | page 0 of 28, sheet 0 of 20 (both values)    | **pass** | **pass** |
+
+How each was judged. Texts decide pass or fail on every column. The looks (colours, borders, radii, positions) were read
+side by side: phone screenshots against Chrome's rendering of the same document at the same size. Z3 at half height
+shows the footer at the bottom of the half-height sheet and, after the pull, at the bottom of the full-height one (iOS
+`01-tap-after.png`, `02-swipe-after.png`, the same on Android); the grid's columns fill the sheet's width. Z4's
+screenshot after opening in dark shows `#1d1b16` behind light text and a gold border; after the switch to light, while
+open, `#fdfcf9` and the slate text. Z5's toggle turns teal with white text when on. The one visible difference from
+Chrome is #809's: Dragon draws `sans-serif` as its pinned Inter, which Chrome's reference here also uses.
+
+Two flow changes made the screenshots records rather than snapshots of an animation: after an `appearance` step and
+after a `swipe` step, Maestro now waits for animations to end (`waitForAnimationToEnd`); before that, the shot after a
+dark switch caught iOS's cross-fade (sheet colour `#6e6c68`, then `#494743`, on the way to `#1d1b16`), and Android's shot
+after the pull was taken before the sheet settled. S3 and Y3's flows change with them.
+
+### Payload (a component's look stored once)
+
+Bytes of compact JSON, per rung, from `style-size.json`. "Separate" is Dragon's export for the page and for each sheet
+height; "app file" is the one style file shipped.
+
+| Rung | Separate                                      | App file | Write lists / node references (each phone) |
+| ---- | --------------------------------------------- | -------- | ------------------------------------------ |
+| Z1   | page 10,812; sheet 14,148; 24,960             | 20,019   | 11 / 16                                    |
+| Z2   | page 13,781; sheet 13,340; 27,121             | 16,896   | 7 / 18                                     |
+| Z3   | page 10,763; half 20,525; full 20,527; 51,815 | 26,758   | 10 / 35                                    |
+| Z4   | page 20,402; sheet 19,964; 40,366             | 28,332   | 15 / 28                                    |
+| Z5   | page 20,028; sheet 15,375; 35,403             | 21,601   | 8 / 24                                     |
+
+Z2: the Tag's box and text on the page and both Tags in the sheet name the same two write lists (indexes 3 and 4 on
+each phone), 1,151 bytes on iOS and 1,168 on Android, carried once instead of three times. Frames stay per document:
+Dragon lays a component out where it sits. Z3's two heights share every write list; only frames differ. A page with no
+sheet, or an unstyled sheet, carries nothing new: no `sheets` field, no extra Dragon input.
+
+### Found on the way (the merge of #809 into the sheet branch)
+
+- **iOS:** a tap that opened a sheet presented nothing: the controller set the sheet's presenter only after a device
+  answer. It is now set when the page is built.
+- **Android:** with #809's screen stack beside the sheet branch's `singleTask` shell, every pushed screen reused the first
+  (S3 failed on Android at "Open settings"). The shell is back to the standard launch mode, and the test build's device
+  links (`markless-proof://device/...`) go to a `DeviceLinkActivity` that sets the value on the screen on top and
+  finishes; D1 and N4 pass with it.
+- **Android, D7:** with the standard launch mode, Settings opened by `settings.open` stayed on top when the person came
+  back to the app, because it had opened inside the app's own task (`singleTask` used to clear it). It now opens in its
+  own task (`FLAG_ACTIVITY_NEW_TASK`), as an app's link to Settings does; D7 passes again.
+- **Android JVM conformance:** six app-style refusal checks had always failed silently (their text edits did not match
+  the re-formatted fixture); the edits are now whitespace-tolerant and all pass.
+
 ## Y5: a confirmation
 
 Platform guidance: Material keeps confirmations in a centered basic dialog ("urgent information, details, or actions");
@@ -221,19 +342,20 @@ are drawn entirely by the system from a title, a message and labelled buttons. S
    with `modal`, `cw/native-ui` u4b).
 2. **`native.alert`**, the platform's own alert: text-only parts, the system draws everything.
 
-   ```tsrx
-   <native.alert open={confirming} onChange={(open) => (confirming = open)}>
-   	<native.title>Delete this address?</native.title>
-   	<native.message>You cannot undo this.</native.message>
-   	<native.action cancel>Cancel</native.action>
-   	<native.action destructive onClick={() => (addresses = addresses.filter((a) => a.id !== chosen))}>Delete</native.action>
-   </native.alert>
-   ```
+    ```tsrx
+    <native.alert open={confirming} onChange={(open) => (confirming = open)}>
+    	<native.title>Delete this address?</native.title>
+    	<native.message>You cannot undo this.</native.message>
+    	<native.action cancel>Cancel</native.action>
+    	<native.action destructive onClick={() => (addresses = addresses.filter((a) => a.id !== chosen))}>Delete</native.action>
+    </native.alert>
+    ```
 
-   iOS `UIAlertController(.alert)` (actions with `.cancel` / `.destructive` styles), Android
-   `MaterialAlertDialogBuilder`; absent on the web like every `native.*` element, where the author's guarded `@else` uses
-   `modal alert` or `<dialog role="alertdialog">`. Each action's `onClick` is a
-   handler like any other (data); children other than these parts with text would be refused.
+    iOS `UIAlertController(.alert)` (actions with `.cancel` / `.destructive` styles), Android
+    `MaterialAlertDialogBuilder`; absent on the web like every `native.*` element, where the author's guarded `@else` uses
+    `modal alert` or `<dialog role="alertdialog">`. Each action's `onClick` is a
+    handler like any other (data); children other than these parts with text would be refused.
+
 3. **A call** (`await confirm({ title, actions })` in `@markless/device`): the result arrives by `await`, which a phone
    cannot run as data today (handlers that await are refused); rejected for that reason.
 
