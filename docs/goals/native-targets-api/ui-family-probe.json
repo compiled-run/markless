@@ -53,7 +53,8 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointermove event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the pointerup event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the wheel event has no native meaning yet",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler reads `slideEls`, which is not state of this component",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `slideEngine` uses a call to `engines.get`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `slideValues` reads `slideValue`, which is not state of this component",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `window.clearInterval`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `window.matchMedia`, which needs a script engine"
 		]
@@ -223,9 +224,11 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the drop event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.id` from a value that follows state; pass a fixed value or leave the prop out",
 			"MARKLESS_NATIVE_UNSUPPORTED: FileUploadItem while rendering sets `item.name` from a value that follows state; pass a fixed value or leave the prop out",
-			"MARKLESS_NATIVE_UNSUPPORTED: the change handler's `if` test reads `fieldEl`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler's `if` test reads `fieldEl`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet"
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `storeFor` uses a call to `stores.get`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `openPicker`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the change handler on the <input> component-edge:2/h4: a text field raises it when it loses focus, which a native build has no lowering for yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:2/event:5 keeps an element as a value, which a native host has no use for yet",
+			"MARKLESS_NATIVE_UNSUPPORTED: handler:component-edge:7/event:4 keeps an element as a value, which a native host has no use for yet"
 		]
 	},
 	"gridlist": {
@@ -523,7 +526,9 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the focus handler on <div> component-edge:4/h2 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: a @for keyed by its index; a native list keys each row by its item",
 			"MARKLESS_NATIVE_UNSUPPORTED: the input handler's `if` test reads `event`, which is not state of this component",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler reads `surfaceEl`, which is not state of this component"
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `asValueText` uses a call to `text.replace`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `surfaceText` uses a call to `doc.createRange`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the function `placedTokens` uses a call to `(value).sort`, which needs a script engine"
 		]
 	},
 	"toolbar": {
@@ -554,7 +559,9 @@
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <div> component-edge:6/component-edge:0/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
 			"MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the computed `labelCount` reads `tour.itemEls` as a value outside a handler",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler reads `itemEls`, which is not state of this component"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `releaseTarget`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `focusIntoCard`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a call to `focusBackToTarget`, which needs a script engine"
 		]
 	},
 	"tree": {

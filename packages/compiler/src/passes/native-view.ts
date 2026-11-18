@@ -329,6 +329,8 @@ type Scope = {
 	/** Props the caller passed that the component does not declare: written where it spreads `{...rest}`. */
 	readonly rest?: ReadonlyArray<readonly [string, NativeExpr]>;
 	/** This instance's device objects by local name (`cam`), each with its payload id. */
+	/** In a `shared()` factory's methods: the handles it declares (`const fieldEl = element()`), read by their own names. */
+	readonly handles?: ReadonlyMap<string, { readonly key: string; readonly plural: boolean }>;
 	readonly deviceObjects: ReadonlyMap<
 		string,
 		{ readonly id: string; readonly device: NativeDeviceObject }
@@ -850,6 +852,7 @@ function foldConstant(
 		const value = fold(expr.value);
 		if (!value) return undefined;
 		const v = value.value as number;
+		if (expr.unary === 'typeof') return { value: typeof value.value };
 		return { value: expr.unary === '!' ? !v : expr.unary === '-' ? -v : +v };
 	}
 	if ('binary' in expr) {
@@ -1258,9 +1261,17 @@ export function createNativeViewPayload(
 					});
 			}
 		}
+		const handles = new Map(
+			owner.graph.graphBindings.flatMap((binding) =>
+				binding.sharedDefinitionId === definition.id && binding.kind === 'element'
+					? [[binding.name, { key: `${prefix}${binding.id}`, plural: binding.plural === true }] as const]
+					: [],
+			),
+		);
 		instance.scope = {
 			module: owner,
 			component: '',
+			handles,
 			cells: { byName, byBinding },
 			prefix,
 			locals: new Set(),
@@ -1688,6 +1699,9 @@ export function createNativeViewPayload(
 		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
 		const bound = boundHandles.get(key) ?? [];
 		const byId = nodeById();
+		// An element in an @if arm is bound only while its arm shows, which the app knows only while it runs.
+		if (bound.some((id) => byId.get(id)?.arm))
+			return refuse(`${what}, a handle bound inside an @if arm`);
 		if (bound.some((id) => byId.get(id)?.row)) {
 			// In the run of a tap on one row, the row's copy is the only one that holds what was tapped.
 			const rows = new Set(bound.map((id) => byId.get(id)?.row));
@@ -2226,6 +2240,9 @@ export function createNativeViewPayload(
 						`${what} reads \`${expression.name}\``,
 					);
 				}
+				const factoryHandle = scope.locals.has(expression.name) ? undefined : scope.handles?.get(expression.name);
+				if (factoryHandle)
+					return handleValue(factoryHandle.key, factoryHandle.plural, `${what} reads \`${expression.name}\``);
 				if (scope.objects.has(expression.name))
 					return refuse(
 						`${what} reads \`${expression.name}\` whole; a native build reads its fields`,
@@ -2308,6 +2325,10 @@ export function createNativeViewPayload(
 			}
 			case 'conditional': {
 				const test = exprOf(expression.test, what, scope);
+				// A test known when the app is built picks its branch; the other never runs, as in JavaScript.
+				const decided = test ? buildTime(test) : undefined;
+				if (decided)
+					return exprOf(decided.value ? expression.consequent : expression.alternate, what, scope);
 				const whenTrue = exprOf(expression.consequent, what, scope);
 				const whenFalse = exprOf(expression.alternate, what, scope);
 				return test && whenTrue && whenFalse ? { if: test, whenTrue, whenFalse } : null;
