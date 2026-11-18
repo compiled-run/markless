@@ -214,6 +214,9 @@ function startWrangler(config: string): Promise<string> {
 			'127.0.0.1',
 			'--port',
 			'0',
+			// wrangler probes 9229 upward for a free inspector port and binds it later, so two at once can pick the same one.
+			'--inspector-port',
+			'0',
 			'--show-interactive-dev-session=false',
 		],
 		{
