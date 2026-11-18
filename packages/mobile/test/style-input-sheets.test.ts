@@ -24,7 +24,7 @@ test("a page's style inputs: the page without its sheet, then the sheet's conten
 			android: SHEET_AREAS.android[entry.snapPoint as 0.5 | 1],
 		});
 		const top = entry.input.nodes.find((node) => node.id === content[0]!.id)!;
-		expect(top.kind === 'element' && top.parent).toBeNull();
+		expect(top.kind === 'element' && top.parent).toBe(sheet.parent);
 		expect(entry.input.css).toBe(route!.input.css);
 	}
 });
@@ -62,4 +62,20 @@ export default function App() @{
 	expect(() => nativeStyleInputs(build.payload!, build.styles)).toThrow(
 		'a styled system sheet rests at 0.3, but its content is laid out only at the heights measured on both phones (0.5 and 1)',
 	);
+});
+
+test("a sheet's markup ancestors come along without boxes, for selectors and inherited values", async () => {
+	const build = await compileRungApp(proof('z6-sheet-page-selectors'), 'ios');
+	const page = build.payload!.routes[0]!.page;
+	const sheet = page.nodes.find((node) => node.kind === 'sheet')!;
+	const chain: string[] = [];
+	for (let at = sheet.parent; at !== null; at = page.nodes.find((node) => node.id === at)!.parent)
+		chain.unshift(at);
+	const input = build.styleInputs[0]!.sheets[0]!.input;
+	const boxless = input.nodes.flatMap((node) =>
+		node.kind === 'element' && node.boxless ? [node.id] : [],
+	);
+	expect(boxless).toEqual(chain);
+	expect(boxless.length).toBeGreaterThan(1);
+	expect(build.styleInputs[0]!.input.nodes.some((node) => 'boxless' in node)).toBe(false);
 });

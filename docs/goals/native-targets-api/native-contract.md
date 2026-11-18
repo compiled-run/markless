@@ -49,17 +49,18 @@ export default function Checkout() @{
   guarded markup and everything it alone uses, and refuses an unguarded use with `MARKLESS_DEVICE_WEB_ABSENT`, whose
   message teaches the fix:
 
-  ```text
-  `<native.sheet>` does not exist on the web: everything under `native.*` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with `drawer` from @markless/ui:
+    ```text
+    `<native.sheet>` does not exist on the web: everything under `native.*` is drawn by iOS or Android. Guard it in the component that renders it, and draw the web's version with `drawer` from @markless/ui:
 
-  	@if (!platform.web) {
-  		<native.sheet …>…</native.sheet>
-  	} @else {
-  		<drawer.root …>…</drawer.root>
-  	}
+    	@if (!platform.web) {
+    		<native.sheet …>…</native.sheet>
+    	} @else {
+    		<drawer.root …>…</drawer.root>
+    	}
 
-  `platform` comes from @markless/device. `modal` or a plain `<dialog>` also work for the web.
-  ```
+    `platform` comes from @markless/device. `modal` or a plain `<dialog>` also work for the web.
+    ```
+
 - **`onChange(open)`** runs when the platform closes the sheet (a swipe, the back gesture, a tap on the dimmed page),
   always with `false`. It does not run when the page itself writes `open = false`. It is the same
   word and shape as `drawer`'s and `modal`'s `onChange`; the difference is that a sheet has no trigger part, so opening is
@@ -225,19 +226,22 @@ Base: `cw/system-sheet` merged with `cw/native-app-styles` (#809, which carries 
 Dragon, dark-mode bands, `ui-*` state styles and the app style file are #809's (`styles-contract.md`). This section adds
 the sheet's content to them.
 
-**The rule.** An author's CSS reaches markup inside `<native.sheet>` as it would reach the same markup rendered as a page
-the size of the sheet's content area: the stylesheets the app and page import, then every shown component's scoped CSS
-(one CSS text, the page's). The content is a document of its own: its top-level elements are the body's children, so
-`%`, `vh`, `vw` and `min-height: 100vh` measure the sheet's content area, not the screen. The page's elements are not
-its ancestors: a selector such as `main .city` does not match inside the sheet, and nothing is inherited from the page's
-elements, because on phones the sheet is its own window. The area outside the document's boxes is the web canvas, white
-in either colour scheme, as on a styled page (#809); the frame around it (grabber or drag handle, corners, dimming,
-motion) is the platform's.
+**The rule.** An author's CSS reaches markup inside `<native.sheet>` as it reaches the same markup on the web: the
+stylesheets the app and page import, then every shown component's scoped CSS (one CSS text, the page's). The content is
+written as a child in the page's markup, so, as with a `<dialog>` on the web, selectors that go through its ancestors match
+(`.panel .pick`), and it inherits from them (`color`, `font-size`, ...), while its layout is the sheet's own: its
+top-level elements sit in the sheet's content area, so `%`, `vh`, `vw` and `min-height: 100vh` measure the sheet, and
+the ancestors' own boxes (padding, borders, backgrounds, flex) take no part in it (owner decision, 2026-11-18). The area
+outside the document's boxes is the canvas, as on a styled page (#809): white unless the author opts in to a dark scheme
+with `color-scheme`, as a browser's canvas does (owner decision, 2026-11-18); that opt-in is refused by Dragon today
+("Found on the way"). The frame around it (grabber or drag handle, corners, dimming, motion) is the platform's.
 
 **How it reaches the phone.** For every styled page, Markless hands Dragon the page without its sheets, then each
 sheet's content once per resting height (`nativeStyleInputs`, `packages/mobile/src/style-input.ts`), sized by the
 content area measured for that height on each phone (`SHEET_AREAS`, `packages/mobile/src/sheet-areas.ts`). A sheet's
-input lists only the styled cells its content reads. The app style file (`markless.native-app-style/0`, additive) gains
+input lists only the styled cells its content and its ancestors read. Its markup ancestors (the page's elements from
+the root down to the sheet's parent) travel with it as boxless elements (`boxless: true`): Dragon keeps them for
+selectors and inheritance and gives them `display: contents`, so they have no box and no node in the export. The app style file (`markless.native-app-style/0`, additive) gains
 `routes[].sheets: [{ node, heights: [{ snapPoint, viewport, readiness, states, initial, next, bands?, assignments }] }]`,
 whose nodes index the same `writes` table as the page's. The hosts lay the content out at the height the sheet rests at,
 switch to the other height's layout when the person drags it there (iOS
@@ -257,7 +261,7 @@ measurement read the half-height sheet's accessibility frame (386 x 418, after t
 too small; the host's size check named the real size and the table was corrected. Each host logs once when a sheet shows
 its content in a size more than 1 pt / dp from its layout (a phone other than these).
 
-**What Dragon needed.** One field: `viewports: { ios: { width, height }, android: { width, height } }` on a Markless style
+**What Dragon needed.** Two input fields. First, `viewports: { ios: { width, height }, android: { width, height } }` on a Markless style
 input, positive whole CSS px, laid out there and recorded as the export's `viewport` (Dragon
 `packages/parity/src/markless-style-input.ts`, test `markless-style-viewports.test.ts`); and `markless:style-compare
 --screenshots <dir>`, which saves Chrome's rendering of each assignment, the reference read beside the phone
@@ -289,13 +293,14 @@ sheet height, at the export's viewport (`native-style-compare/*.json`, gate 1 de
 `screenshots/chrome/<input>/`. **iOS** and **Android**: the rung's Maestro flow on simulator `markless-sheet-st` and AVD
 `markless_sheet_st`, screenshots in `screenshots/{ios,android}/`.
 
-| Rung                           | What                                                                                                                                                                       | Web                                    | Reference runtime | Chrome reference (boxes outside 1 device px) | iOS      | Android  |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------- | -------------------------------------------- | -------- | -------- |
-| Z1 `z1-sheet-scoped-styles`    | the page's scoped `<style>` on a heading and buttons inside the sheet; a pick lands on the page                                                                            | absent, fallback shown                 | pass              | page 0 of 14, sheet 0 of 18                  | **pass** | **pass** |
-| Z2 `z2-sheet-shared-component` | `lib/Tag.tsrx` with its own scoped style, once on the page and twice in the sheet                                                                                          | absent, fallback shown                 | pass              | page 0 of 18, sheet 0 of 18                  | **pass** | **pass** |
-| Z3 `z3-sheet-size`             | `snapPoints={[0.5, 1]}`: a two-column grid (`calc(50% - 4px)`, `gap`) and a footer pinned by `min-height: 100vh` and `margin-top: auto`, opened at half and pulled to full | absent, fallback shown                 | pass              | page 0 of 14, half 0 of 28, full 0 of 28     | **pass** | **pass** |
-| Z4 `z4-sheet-dark-mode`        | `@media (prefers-color-scheme: dark)`: opened in dark, switched to light and back while open                                                                               | absent, fallback shown (dark emulated) | pass              | page 0 of 28, sheet 0 of 28 (both bands)     | **pass** | **pass** |
-| Z5 `z5-sheet-state-style`      | `.toggle[ui-active]` on a button inside the sheet, following a cell                                                                                                        | absent, fallback shown                 | pass              | page 0 of 28, sheet 0 of 20 (both values)    | **pass** | **pass** |
+| Rung                           | What                                                                                                                                                                                                                                      | Web                                    | Reference runtime | Chrome reference (boxes outside 1 device px) | iOS      | Android  |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | ----------------- | -------------------------------------------- | -------- | -------- |
+| Z1 `z1-sheet-scoped-styles`    | the page's scoped `<style>` on a heading and buttons inside the sheet; a pick lands on the page                                                                                                                                           | absent, fallback shown                 | pass              | page 0 of 14, sheet 0 of 18                  | **pass** | **pass** |
+| Z2 `z2-sheet-shared-component` | `lib/Tag.tsrx` with its own scoped style, once on the page and twice in the sheet                                                                                                                                                         | absent, fallback shown                 | pass              | page 0 of 18, sheet 0 of 18                  | **pass** | **pass** |
+| Z3 `z3-sheet-size`             | `snapPoints={[0.5, 1]}`: a two-column grid (`calc(50% - 4px)`, `gap`) and a footer pinned by `min-height: 100vh` and `margin-top: auto`, opened at half and pulled to full                                                                | absent, fallback shown                 | pass              | page 0 of 14, half 0 of 28, full 0 of 28     | **pass** | **pass** |
+| Z4 `z4-sheet-dark-mode`        | `@media (prefers-color-scheme: dark)`: opened in dark, switched to light and back while open                                                                                                                                              | absent, fallback shown (dark emulated) | pass              | page 0 of 28, sheet 0 of 28 (both bands)     | **pass** | **pass** |
+| Z5 `z5-sheet-state-style`      | `.toggle[ui-active]` on a button inside the sheet, following a cell                                                                                                                                                                       | absent, fallback shown                 | pass              | page 0 of 28, sheet 0 of 20 (both values)    | **pass** | **pass** |
+| Z6 `z6-sheet-page-selectors`   | the sheet inside `<section class="panel">` inside `<main class="page">`: the content inherits the page's colour and font size, and `.panel .pick` styles a paragraph inside the sheet; the page's padding, border and background stay out | absent, fallback shown                 | pass              | page 0 of 16, sheet 0 of 18                  | **pass** | **pass** |
 
 How each was judged. Texts decide pass or fail on every column. The looks (colours, borders, radii, positions) were read
 side by side: phone screenshots against Chrome's rendering of the same document at the same size. Z3 at half height
@@ -310,7 +315,8 @@ after a `swipe` step, Maestro now waits for animations to end (`waitForAnimation
 dark switch caught iOS's cross-fade (sheet colour `#6e6c68`, then `#494743`, on the way to `#1d1b16`), and Android's shot
 after the pull was taken before the sheet settled. S3 and Y3's flows change with them.
 
-Device receipt: `receipts/2026-11-18-sheet-styled-content-verdict.txt` (the whole phone ladder, 39 rungs, one run per
+Device receipts: Z6 and the iOS presenter fix in `receipts/2026-11-18-sheet-z6-and-ios-presenter-verdict.txt`
+(Z1-Z6, Y1-Y3, both phones); the rest in `receipts/2026-11-18-sheet-styled-content-verdict.txt` (the whole phone ladder, 39 rungs, one run per
 platform: "proof passed on iOS and Android"), with the per-platform reports beside it.
 
 ### Payload (a component's look stored once)
@@ -325,6 +331,7 @@ height; "app file" is the one style file shipped.
 | Z3   | page 10,763; half 20,525; full 20,527; 51,815 | 26,758   | 10 / 35                                    |
 | Z4   | page 20,402; sheet 19,964; 40,366             | 28,332   | 15 / 28                                    |
 | Z5   | page 20,028; sheet 15,375; 35,403             | 21,601   | 8 / 24                                     |
+| Z6   | page 12,756; sheet 12,587; 25,343             | 19,081   | 10 / 17                                    |
 
 Z2: the Tag's box and text on the page and both Tags in the sheet name the same two write lists (indexes 3 and 4 on
 each phone), 1,151 bytes on iOS and 1,168 on Android, carried once instead of three times. Frames stay per document:
@@ -333,8 +340,16 @@ sheet, or an unstyled sheet, carries nothing new: no `sheets` field, no extra Dr
 
 ### Found on the way (the merge of #809 into the sheet branch)
 
-- **iOS:** a tap that opened a sheet presented nothing: the controller set the sheet's presenter only after a device
-  answer. It is now set when the page is built.
+- **iOS: the system sheet did not present on tap, on `cw/system-sheet` itself** (reported by the integration run on
+  mini-1, #820; reproduced here on 2026-11-18 on a clean checkout of `cw/system-sheet` at `deee0dc85`: Y1 to Y3 fail 0 of 3 at
+  the tap, on simulator `markless-sheet-st`, iPhone 17, iOS 27.2, Xcode 27.2 27B52). A code defect, not the machine:
+  the receipt for Y1 to Y3 was taken on `9b927e6f0`, where `buildPage()` gave the view tree its presenter; the merge of
+  `cw/device-slice` (`0315c68d5`) moved that line into the path that applies a device call's answer, so a tap that opens
+  a sheet had no presenter and the sheet waited for a window it already had. This branch sets the presenter when the
+  page is built. The UIKit test that covers it already existed and fails without the fix
+  (`aSystemSheetKeepsItsContentOffThePageAndPresentsAPageSheet`: "the sheet did not present" on `deee0dc85`, passes on
+  this branch); it runs only under `xcodebuild test` on a simulator, which no CI job and no harness step runs, so the
+  regression went unseen. With the fix, Y1 to Y3 and Z1 to Z6 pass on iOS.
 - **Android:** with #809's screen stack beside the sheet branch's `singleTask` shell, every pushed screen reused the first
   (S3 failed on Android at "Open settings"). The shell is back to the standard launch mode, and the test build's device
   links (`markless-proof://device/...`) go to a `DeviceLinkActivity` that sets the value on the screen on top and
@@ -342,6 +357,15 @@ sheet, or an unstyled sheet, carries nothing new: no `sheets` field, no extra Dr
 - **Android, D7:** with the standard launch mode, Settings opened by `settings.open` stayed on top when the person came
   back to the app, because it had opened inside the app's own task (`singleTask` used to clear it). It now opens in its
   own task (`FLAG_ACTIVITY_NEW_TASK`), as an app's link to Settings does; D7 passes again.
+- **Host test fixtures:** a formatter run on this branch rewrote six existing host fixtures that two iOS style-export
+  tests edit as text; those tests failed under `swift test` and `xcodebuild test`. The fixtures are restored byte for byte.
+- **Not fixed, Dragon:** `color-scheme` that names dark on the root (or on an element whose `color` is initial) is refused
+  (`DRAGON_UNSUPPORTED_VALUE`, "which Dragon does not draw yet"): Dragon models no dark Canvas and CanvasText. So a
+  styled page or sheet that opts in to a dark canvas is refused by name rather than drawn white.
+- **Harness, fixed:** it created a missing simulator on the newest iOS runtime by version, and with
+  `iOS-27-2-iPhone19-4` installed beside `iOS-27-2` (both 27.2) it could pick the device-specific one, which refuses an
+  iPhone 17 (`Incompatible device`, mini-1). It now picks the newest runtime whose `supportedDeviceTypes` names the device
+  type it creates (`simulatorRuntime`, test `harness-simulator-runtime.test.ts`). An existing simulator is reused as before.
 - **Android JVM conformance:** six app-style refusal checks had always failed silently (their text edits did not match
   the re-formatted fixture); the edits are now whitespace-tolerant and all pass.
 

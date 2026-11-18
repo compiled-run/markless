@@ -4,9 +4,19 @@
 	"nodes": [
 		{
 			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "page mk-oa2wx4"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
 			"id": "h3",
 			"element": "div",
-			"parent": null,
+			"parent": "h0",
 			"attributes": {
 				"class": "note mk-oa2wx4"
 			}

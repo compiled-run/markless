@@ -29,6 +29,8 @@ export type NativeStyleInput = {
 				readonly attributesByState?: Readonly<
 					Record<string, ReadonlyArray<NativeStyleByState>>
 				>;
+				/** A markup ancestor of a sheet's content: there for its selectors and inheritance, with no box of its own. */
+				readonly boxless?: true;
 				readonly arm?: NativeArmPlace;
 		  }
 		| {
@@ -96,6 +98,10 @@ export function nativeStyleInputs(
 	const sheets = payload.nodes.flatMap((sheet) => {
 		if (sheet.kind !== 'sheet') return [];
 		const content = payload.nodes.filter((node) => rootOf.get(node.id) === sheet.id);
+		// The content is written as a child in the page's markup: its ancestors match selectors and pass inherited values.
+		const ancestors: PayloadNode[] = [];
+		for (let at = sheet.parent; at !== null; at = byId.get(at)?.parent ?? null)
+			ancestors.unshift(byId.get(at)!);
 		const unmeasured = sheet.snapPoints.filter((point) => !isMeasuredSnapPoint(point));
 		if (unmeasured.length > 0)
 			throw new Error(
@@ -107,11 +113,24 @@ export function nativeStyleInputs(
 					.join(' and ')})`,
 			);
 		const read = cellsOf(
-			content.flatMap((node) => (node.kind === 'element' ? (node.bindings ?? []) : [])),
+			[...ancestors, ...content].flatMap((node) =>
+				node.kind === 'element' ? (node.bindings ?? []) : [],
+			),
 			new Set(),
 		);
 		return sheet.snapPoints.map((snapPoint) => {
-			const input = nativeStyleInput(payload, styles, stylesheets, content, sheet.id, read);
+			const input = nativeStyleInput(
+				payload,
+				styles,
+				stylesheets,
+				[...ancestors, ...content],
+				{
+					id: sheet.id,
+					parent: sheet.parent,
+					boxless: new Set(ancestors.map((node) => node.id)),
+				},
+				read,
+			);
 			return {
 				node: sheet.id,
 				snapPoint,
@@ -135,7 +154,11 @@ export function nativeStyleInput(
 	styles: NativeBuild['styles'],
 	stylesheets: ReadonlyArray<NativeStylesheet> = [],
 	nodes: ReadonlyArray<PayloadNode> = payload.nodes,
-	root: string | null = null,
+	sheet?: {
+		readonly id: string;
+		readonly parent: string | null;
+		readonly boxless: ReadonlySet<string>;
+	},
 	cells?: ReadonlySet<string>,
 ): NativeStyleInput {
 	const initial = new Map(createNativeRuntime(payload).texts());
@@ -183,7 +206,7 @@ export function nativeStyleInput(
 					{
 						kind: 'text',
 						id: node.id,
-						parent: node.parent,
+						parent: sheet && node.parent === sheet.id ? sheet.parent! : node.parent,
 						text: initial.get(node.id) ?? unshownText(node.parts),
 						...place,
 					},
@@ -223,10 +246,11 @@ export function nativeStyleInput(
 					kind: 'element',
 					id: node.id,
 					element: node.element,
-					parent: node.parent === root ? null : node.parent,
+					parent: sheet && node.parent === sheet.id ? sheet.parent : node.parent,
 					attributes: node.attributes ?? {},
 					...(classByState ? { classByState } : {}),
 					...(styleAttributes.length > 0 ? { attributesByState } : {}),
+					...(sheet?.boxless.has(node.id) ? { boxless: true as const } : {}),
 					...place,
 				},
 			];

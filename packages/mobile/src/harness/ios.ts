@@ -1,6 +1,7 @@
 import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
+import { simulatorRuntime, type SimctlRuntime } from './simulator-runtime.ts';
 import { PROOF_APP_ID, PROOF_APP_NAME, PROOF_URL_SCHEME } from './proof-app.ts';
 import type { DeviceManifest } from '../permissions.ts';
 import type { ProofAssets } from './rung.ts';
@@ -21,7 +22,7 @@ type SimctlDevice = {
 
 const simctl = async (...args: string[]) => (await exec('xcrun', ['simctl', ...args])).stdout;
 
-/** Finds the simulator called `name` (creating it on the newest iOS runtime when missing) and boots it unless it already runs. */
+/** Finds the simulator called `name` (creating it on the newest iOS runtime that runs its device type when missing) and boots it unless it already runs. */
 export async function bootSimulator(name: string): Promise<BootedSimulator> {
 	const listed = JSON.parse(await simctl('list', 'devices', '--json')) as {
 		devices: Record<string, ReadonlyArray<SimctlDevice>>;
@@ -30,27 +31,16 @@ export async function bootSimulator(name: string): Promise<BootedSimulator> {
 		.flat()
 		.find((candidate) => candidate.name === name && candidate.isAvailable);
 	if (!device) {
-		const runtimes = (
-			JSON.parse(await simctl('list', 'runtimes', '--json')) as {
-				runtimes: ReadonlyArray<{
-					identifier: string;
-					platform: string;
-					isAvailable: boolean;
-					version: string;
-				}>;
-			}
-		).runtimes
-			.filter((runtime) => runtime.platform === 'iOS' && runtime.isAvailable)
-			.sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
-		if (runtimes.length === 0) throw new Error('no iOS simulator runtime is installed');
-		const udid = (
-			await simctl(
-				'create',
-				name,
-				process.env.MARKLESS_PROOF_IOS_DEVICE_TYPE ?? 'iPhone 17',
-				runtimes[0]!.identifier,
-			)
-		).trim();
+		const deviceType = process.env.MARKLESS_PROOF_IOS_DEVICE_TYPE ?? 'iPhone 17';
+		const runtime = simulatorRuntime(
+			(
+				JSON.parse(await simctl('list', 'runtimes', '--json')) as {
+					runtimes: SimctlRuntime[];
+				}
+			).runtimes,
+			deviceType,
+		);
+		const udid = (await simctl('create', name, deviceType, runtime)).trim();
 		device = { udid, name, state: 'Shutdown', isAvailable: true };
 	}
 	const bootedHere = device.state !== 'Booted';

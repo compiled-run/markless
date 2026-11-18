@@ -1,0 +1,23 @@
+{
+	"rung": "Z6",
+	"name": "Selectors and inherited values from the page reach the content of a system sheet, written as a child in its markup",
+	"steps": [
+		{
+			"visible": ["Spices", "Pick a spice"],
+			"absent": ["Saffron", "Coloured by the page"]
+		},
+		{
+			"do": { "tap": "Pick a spice" },
+			"visible": ["Saffron", "Coloured by the page"]
+		}
+	],
+	"web": {
+		"steps": [
+			{
+				"visible": ["Spices", "Pick a spice", "On the web, the spices open in a drawer"],
+				"absent": ["Saffron", "Coloured by the page"]
+			}
+		],
+		"absentFromOutput": ["Coloured by the page", "@markless/device"]
+	}
+}

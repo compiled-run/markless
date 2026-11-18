@@ -4,9 +4,19 @@
 	"nodes": [
 		{
 			"kind": "element",
+			"id": "h0",
+			"element": "main",
+			"parent": null,
+			"attributes": {
+				"class": "shelf mk-1cmrpqe"
+			},
+			"boxless": true
+		},
+		{
+			"kind": "element",
 			"id": "h3",
 			"element": "div",
-			"parent": null,
+			"parent": "h0",
 			"attributes": {
 				"class": "detail mk-1cmrpqe"
 			}
