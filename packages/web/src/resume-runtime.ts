@@ -283,6 +283,7 @@ export function createResumeRuntime(
 					storeContainerSubscription,
 					storeHostSubscription,
 					addBehaviorRecords: behaviors?.addBehaviorRecords ?? (() => {}),
+					activateBehaviors: (id: string) => behaviorRuntime?.activateBehaviors(id, { flush: false }),
 					commitArm: commitBoundaryArm,
 					prepareArmCommit: prepareBoundaryArmCommit,
 					registerServedArmRecords: registerServedBranchArmRecords,

@@ -1,5 +1,6 @@
 import { afterEach, expect, onTestFinished, test } from 'vitest';
 import { cleanup, render, renderSSR } from '../src/index.ts';
+import NestedElse from './try-arm-component-if/nested-else.tsrx';
 import NestedInline from './try-arm-component-if/nested-inline.tsrx';
 import Page from './try-arm-component-if/page.tsrx';
 import PanelPage from './try-arm-component-if/panel-page.tsrx';
@@ -66,8 +67,7 @@ test('client: an @if/@else in a component an @else opens inside an async @try fl
 	await showThenWarn(container);
 });
 
-// The served @try arm carries a record for the inner @if although its closed outer @if rendered no anchors for it, so resume throws.
-test.fails('served: a page @if nested in a closed @if inside an async @try resumes and opens', async () => {
+function rejections(): unknown[] {
 	const errors: unknown[] = [];
 	const onRejection = (event: PromiseRejectionEvent) => {
 		errors.push(event.reason);
@@ -75,11 +75,61 @@ test.fails('served: a page @if nested in a closed @if inside an async @try resum
 	};
 	window.addEventListener('unhandledrejection', onRejection);
 	onTestFinished(() => window.removeEventListener('unhandledrejection', onRejection));
-	const { container } = await renderSSR(NestedInline);
+	return errors;
+}
+
+async function openThenTouch(container: Element) {
 	container.querySelector<HTMLButtonElement>('[data-open]')?.click();
-	await expect.poll(() => container.querySelector('[data-touch]'), { timeout: 500 }).not.toBeNull();
+	await expect.poll(() => container.querySelector('[data-touch]')).not.toBeNull();
+	expect(container.querySelector('[data-required]')).toBeNull();
 	container.querySelector<HTMLButtonElement>('[data-touch]')?.click();
-	await expect.poll(() => container.querySelector('[data-required]'), { timeout: 500 }).not.toBeNull();
+	await expect.poll(() => container.querySelector('[data-required]')?.textContent).toBe('Required');
+}
+
+async function expandThenToggle(container: Element) {
+	const text = (selector: string) => container.querySelector(selector)?.textContent ?? null;
+	await expect.poll(() => text('[data-summary]')).toBe('Summary');
+	container.querySelector<HTMLButtonElement>('[data-expand]')?.click();
+	await expect.poll(() => text('[data-total]')).toBe('7');
+	expect(text('[data-off]')).toBe('Off');
+	expect(text('[data-on]')).toBeNull();
+
+	container.querySelector<HTMLButtonElement>('[data-detail]')!.click();
+	await expect.poll(() => text('[data-on]')).toBe('On');
+	expect(text('[data-off]')).toBeNull();
+	expect(text('[data-early]')).toBe('Early');
+
+	container.querySelector<HTMLButtonElement>('[data-detail]')!.click();
+	await expect.poll(() => text('[data-off]')).toBe('Off');
+	expect(text('[data-on]')).toBeNull();
+	expect(text('[data-early]')).toBeNull();
+}
+
+test('served: a page @if nested in a closed @if inside an async @try resumes and opens', async () => {
+	const errors = rejections();
+	const { container } = await renderSSR(NestedInline);
+	await openThenTouch(container);
+	expect(errors).toEqual([]);
+});
+
+test('client: a page @if nested in a closed @if inside an async @try opens and follows its state', async () => {
+	const errors = rejections();
+	const { container } = await render(NestedInline);
+	await openThenTouch(container);
+	expect(errors).toEqual([]);
+});
+
+test('served: an @if/@else nested in the @else of an unopened @if inside an async @try resumes and flips', async () => {
+	const errors = rejections();
+	const { container } = await renderSSR(NestedElse);
+	await expandThenToggle(container);
+	expect(errors).toEqual([]);
+});
+
+test('client: an @if/@else nested in the @else of an unopened @if inside an async @try flips', async () => {
+	const errors = rejections();
+	const { container } = await render(NestedElse);
+	await expandThenToggle(container);
 	expect(errors).toEqual([]);
 });
 

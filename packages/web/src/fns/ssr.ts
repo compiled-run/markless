@@ -1186,14 +1186,21 @@ function marklessSsrComposedView(
 	const renderedBoundaries = asyncBoundaries.filter((boundary) =>
 		renderedBoundaryIds.has(idPrefix + boundary.id),
 	);
+	// An arm's @if nested in a closed @if drew no anchors, so it has nothing to resume until a flip renders it.
+	const renderedArmBranchIds = new Set(
+		structure.anchors.filter((anchor) => anchor.kind === 'arm-branch').map((anchor) => anchor.id),
+	);
 	const boundariesWithComposedBranches = renderedBoundaries.map((boundary) => {
+		if (!Array.isArray(boundary.armRecords)) return boundary;
 		const composed = boundaryArmBranches.get(boundary.id);
-		if (!composed?.size || !Array.isArray(boundary.armRecords)) return boundary;
 		return {
 			...boundary,
-			armRecords: boundary.armRecords.map((arm, index) => {
-				const armBranches = composed.get(index);
-				return armBranches ? { ...arm, branches: [...(arm.branches ?? []), ...armBranches] } : arm;
+			armRecords: boundary.armRecords.map((arm: SsrArmRecordSet, index) => {
+				const own = arm.branches?.filter((branch) => renderedArmBranchIds.has(idPrefix + branch.id));
+				const armBranches = composed?.get(index);
+				return own === undefined && !armBranches
+					? arm
+					: { ...arm, branches: [...(own ?? []), ...(armBranches ?? [])] };
 			}),
 		};
 	});

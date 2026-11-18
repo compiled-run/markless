@@ -1,0 +1,198 @@
+{
+	"changes": [
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/fns/ssr"
+			],
+			"delta": 278,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-branches"
+			],
+			"delta": 166,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-csr",
+				"web/resume-runtime"
+			],
+			"delta": 89,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-csr",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 31,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/fns/ssr"
+			],
+			"delta": 278,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-branches"
+			],
+			"delta": 166,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"modules",
+				"@fixtures/vite-plus",
+				"web/resume-runtime"
+			],
+			"delta": 89,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxRuntimeChunkGzipBytes",
+				"measured"
+			],
+			"delta": 3,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "fixture-runtime",
+			"path": [
+				"walls",
+				"@fixtures/vite-plus",
+				"maxEmittedRuntimeGzipBytes",
+				"measured"
+			],
+			"delta": 51,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record (+275 B resume-branches, +162 B resume-runtime rendered, measured)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-branches"
+			],
+			"delta": 166,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"runtimeModules",
+				"web/resume-runtime"
+			],
+			"delta": 89,
+			"reason": "a flip of an @if inside an @try arm that re-renders the page wires the arm's own events, text and behaviors from the branch record, and the served arm drops records for branches it never drew (measured in CI)",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /",
+				"jsGzipBytes"
+			],
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /records",
+				"jsGzipBytes"
+			],
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"bench /settings",
+				"jsGzipBytes"
+			],
+			"delta": 33,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /concepts/state",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		},
+		{
+			"surface": "perf-guards",
+			"path": [
+				"loadWeight",
+				"linux-x64",
+				"docs /ui/accordion",
+				"jsGzipBytes"
+			],
+			"delta": 50,
+			"reason": "a page's @if nested in a closed @if inside an async @try follows its state: the runtime docs pages load carries the nested-arm path; measured on CI runs 44197753109 vs 44193974219",
+			"date": "2026-11-17"
+		}
+	]
+}

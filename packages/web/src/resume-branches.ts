@@ -191,7 +191,13 @@ function createBranchRegistration(
 					html,
 				};
 				const commit = await input.prepareArmCommit(branch, armUpdate);
-				return () => commit().then(() => wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats));
+				return () =>
+					commit().then(async () => {
+						// A @try arm's own markup records ride the branch, not the re-render.
+						if (branch.armBoundaryId)
+							for (const id of materializeBranchArmRecords(input, branch, update.arm)) await input.activateBehaviors(id);
+						return wireArmLists(input, branch, update.arm, armUpdate.armRecords?.keyedRepeats);
+					});
 			}
 			const fragment = input.renderBranchHtml
 				? input.renderBranchHtml(
