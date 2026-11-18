@@ -91,6 +91,9 @@ final class ViewTree {
 		if let layout { root.heightAnchor.constraint(equalToConstant: layout.viewport.height).isActive = true }
 	}
 
+	/// The colour behind the page in the current assignment: the export's canvas, else the web canvas's white.
+	var canvas: UIColor? { layout.map { $0.canvases[assignment].map(uiColor) ?? .white } }
+
 	/// The journal applier: the only code that changes a retained view after the first build.
 	func apply(_ journal: [NativeJournalEntry]) throws {
 		for entry in journal {

@@ -2,6 +2,7 @@ package dev.markless.mobile.view
 
 import android.content.Context
 import android.content.res.Configuration
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -34,7 +35,7 @@ import kotlin.math.roundToInt
 
 class MarklessHostError(message: String) : RuntimeException(message)
 
-private fun isDark(configuration: Configuration): Boolean =
+internal fun isDark(configuration: Configuration): Boolean =
 	configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
 
 /** Looks up a font face by the id a style export names it with (`sha256:<hex>` of the font file). */
@@ -155,6 +156,12 @@ class MarklessHost(
 		onJournal?.invoke(journal)
 	}
 
+	/** The colour behind the page in the current assignment (the export's canvas, else the web canvas's white); null unstyled. */
+	val canvasColor: Int? get() = style?.let { it.assignments[assignment].canvas?.argb ?: Color.WHITE }
+
+	/** Called with [canvasColor] whenever the assignment changes. */
+	var onCanvas: ((Int) -> Unit)? = null
+
 	/** The device's appearance changed: move to the @media band it selects, as a cell's `state` entry moves to its assignment. */
 	fun configurationChanged(configuration: Configuration) {
 		val st = style ?: return
@@ -167,6 +174,7 @@ class MarklessHost(
 	}
 
 	private fun repaint(st: StyleExport) {
+		canvasColor?.let { onCanvas?.invoke(it) }
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) place(inst, views.getValue(inst.id), st)
 		root.requestLayout()
 	}

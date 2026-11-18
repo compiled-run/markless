@@ -89,7 +89,7 @@ public struct StyleExport: Sendable {
 	public let states: [StyleState]
 	public let initial: Int
 	/// Every reachable combination of states, each a complete node list, with each state's value in it.
-	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
+	public let assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?)]
 	/// `next[a][s][v]`: the assignment reached from `a` by setting state `s` to its `v`-th value; -1 when unreachable.
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
@@ -136,14 +136,14 @@ public struct StyleExport: Sendable {
 			let pattern = try f["pattern"].string()
 			_ = (try f["component"].string(), try f["compiler"].string())
 			let assignments: [JSONValue] = try f["assignments"].array().map { assignment in
-				let a = try assignment.object(["values", "nodes"])
+				let a = try assignment.object(["values", "nodes", "canvas"])
 				let nodes: [JSONValue] = try a["nodes"].array().map { node in
 					guard case let .object(entries) = node.value else { throw node.fail("expected an object") }
 					let index = Int(try node.field("writes").number())
 					guard writes.indices.contains(index) else { throw node.fail("writes \(index) is not in the target's writes") }
 					return .object(entries.map { $0.0 == "writes" ? ("writes", writes[index]) : $0 })
 				}
-				return .object([("values", try a["values"].value), ("nodes", .array(nodes))])
+				return .object([("values", try a["values"].value), ("nodes", .array(nodes)), ("canvas", try a["canvas"].value)])
 			}
 			let raw = { (fields: Fields, key: String) throws -> (String, JSONValue) in (key, try fields[key].value) }
 			var page: [(String, JSONValue)] = [
@@ -195,7 +195,7 @@ public struct StyleExport: Sendable {
 		}
 		var states: [StyleState] = []
 		var initial = 0
-		var assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
+		var assignments: [(values: [String: NativeValue], nodes: [StyleNode], canvas: RGBA?)]
 		var next: [[[Int]]] = [[]]
 		if perState {
 			states = try targetFields["states"].array().map { state in
@@ -203,12 +203,14 @@ public struct StyleExport: Sendable {
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
 			assignments = try targetFields["assignments"].array().map { assignment in
-				let f = try assignment.object(["values", "nodes"])
+				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas"])
 				let valuesReader = try f["values"]
 				var values: [String: NativeValue] = [:]
 				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
 				guard Set(values.keys) == Set(states.map(\.key)) else { throw PayloadError(path: valuesReader.path, reason: "an assignment's values must name every state") }
-				return (values, try checkedNodes(try f["nodes"]))
+				let canvas = f.has("canvas") ? try decodeColor(try f["canvas"]) : nil
+				if let canvas, canvas.alpha != 255 { throw PayloadError(path: assignment.path + ".canvas", reason: "the canvas is not opaque") }
+				return (values, try checkedNodes(try f["nodes"]), canvas)
 			}
 			initial = Int(try targetFields["initial"].number())
 			next = try targetFields["next"].array().map { row in try row.array().map { column in try column.array().map { Int(try $0.number()) } } }
@@ -221,7 +223,7 @@ public struct StyleExport: Sendable {
 				throw PayloadError(path: chosen.path, reason: "the next table and initial do not match the assignments and states")
 			}
 		} else {
-			assignments = [([:], try checkedNodes(try targetFields["nodes"]))]
+			assignments = [([:], try checkedNodes(try targetFields["nodes"]), nil)]
 		}
 		var bands: StyleBands?
 		if targetFields.has("bands") {

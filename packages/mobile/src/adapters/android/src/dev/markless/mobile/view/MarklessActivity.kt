@@ -3,11 +3,18 @@ package dev.markless.mobile.view
 import android.app.Activity
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
+import android.os.Build
 import android.os.Bundle
+import android.text.SpannableString
+import android.text.Spanned
+import android.text.style.ForegroundColorSpan
+import android.view.ContextThemeWrapper
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
+import android.view.WindowInsetsController
 import android.widget.FrameLayout
 import dev.markless.mobile.core.AppPayload
 import dev.markless.mobile.core.Payload
@@ -49,8 +56,10 @@ abstract class MarklessActivity : Activity() {
 			open(launchParams(bytes))
 			return
 		}
-		setTheme(android.R.style.Theme_Material_Light)
+		isApp = true
+		setTheme(APP_THEME)
 		super.onCreate(savedInstanceState)
+		followAppearance(resources.configuration)
 		val path = route() ?: "/"
 		val stack = app.backStack(path)
 		if (!intent.hasExtra(DEPTH) && stack.size > 1) {
@@ -76,6 +85,7 @@ abstract class MarklessActivity : Activity() {
 
 	override fun onConfigurationChanged(newConfig: Configuration) {
 		super.onConfigurationChanged(newConfig)
+		if (isApp) followAppearance(newConfig)
 		if (::host.isInitialized) host.configurationChanged(newConfig)
 	}
 
@@ -83,6 +93,43 @@ abstract class MarklessActivity : Activity() {
 		if (item.itemId != android.R.id.home) return super.onOptionsItemSelected(item)
 		finish()
 		return true
+	}
+
+	/** An app payload's screen, which has an action bar; a single page has none. */
+	private var isApp = false
+
+	/** The text colour of the action bar in the current appearance; null outside an app. */
+	private var barText: Int? = null
+
+	/**
+	 * The action bar and status bar icons follow the appearance as iOS's bar does. The activity handles uiMode itself (a rebuild
+	 * would lose the page's state), so the theme's bar colours are read again from the new configuration and set by hand.
+	 */
+	private fun followAppearance(configuration: Configuration) {
+		val themed = ContextThemeWrapper(createConfigurationContext(configuration), APP_THEME)
+		val colors = themed.obtainStyledAttributes(intArrayOf(android.R.attr.colorPrimary, android.R.attr.textColorPrimary))
+		val bar = colors.getColor(0, 0)
+		val text = colors.getColor(1, 0)
+		colors.recycle()
+		barText = text
+		actionBar?.setBackgroundDrawable(ColorDrawable(bar))
+		actionBar?.setHomeAsUpIndicator(themed.obtainStyledAttributes(intArrayOf(android.R.attr.homeAsUpIndicator)).let { a ->
+			a.getDrawable(0)?.mutate()?.apply { setTint(text) }.also { a.recycle() }
+		})
+		title = title
+		val light = !isDark(configuration)
+		if (Build.VERSION.SDK_INT >= 30) window.insetsController?.setSystemBarsAppearance(
+			if (light) WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS else 0,
+			WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS,
+		)
+	}
+
+	override fun onTitleChanged(title: CharSequence?, color: Int) {
+		val text = barText
+		if (title == null || text == null) return super.onTitleChanged(title, color)
+		val tinted = SpannableString(title.toString())
+		tinted.setSpan(ForegroundColorSpan(text), 0, tinted.length, Spanned.SPAN_INCLUSIVE_INCLUSIVE)
+		super.onTitleChanged(tinted, color)
 	}
 
 	private fun screen(path: String, depth: Int) = Intent(this, javaClass).putExtra(ROUTE, path).putExtra(DEPTH, depth)
@@ -116,6 +163,8 @@ abstract class MarklessActivity : Activity() {
 			insets
 		}
 		viewport.addView(host.root, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+		host.canvasColor?.let(viewport::setBackgroundColor)
+		host.onCanvas = viewport::setBackgroundColor
 		setContentView(viewport)
 		if (host.style != null) viewport.post { android.util.Log.i(MarklessHost.TAG, "frames max gap ${host.frameDeviation()} device px") }
 	}
@@ -123,6 +172,8 @@ abstract class MarklessActivity : Activity() {
 	fun contentRoot(): View = host.root
 
 	companion object {
+		/** The system's own theme, light or dark with the device. */
+		private val APP_THEME = if (Build.VERSION.SDK_INT >= 29) android.R.style.Theme_DeviceDefault_DayNight else android.R.style.Theme_Material_Light
 		const val ROUTE = "route"
 		const val DEPTH = "markless.depth"
 	}

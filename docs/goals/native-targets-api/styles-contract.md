@@ -102,6 +102,7 @@ payload (`markless/style.json` in the proof shells).
 					"assignments": [
 						{
 							"values": { "state:on": false, "@env#band": 0 },
+							"canvas": { "r": 255, "g": 255, "b": 255, "alpha": 255 },
 							"nodes": [
 								{
 									"id": "h0",
@@ -127,6 +128,10 @@ payload (`markless/style.json` in the proof shells).
 - Every page's export must agree on schema, units, targets and, per target, backend, viewport and dpr; otherwise the build
   fails naming the page.
 - A route absent from `routes` has no styles (its screen is laid out as an unstyled page is).
+- Every assignment has `canvas`: the colour Chrome paints behind the page (css-backgrounds-3 §2.11.2: `html`'s
+  background, else `body`'s, else white), from Dragon's export of that assignment, so a dark band has its own. A page
+  export without it is refused by name; a `body` background under an `html` background, and a translucent canvas, are
+  refused by Dragon (the hosts draw no `html` or `body` box).
 - A node's `writes` is an index into its target's `writes`. Expanding every index gives back Dragon's per-page export
   exactly; a host may decode a route into the per-page `StyleExport` it already applies.
 
@@ -138,6 +143,14 @@ payload (`markless/style.json` in the proof shells).
   the system appearance (iOS `traitCollection.userInterfaceStyle`, Android `Configuration.uiMode` night bits); the keyword
   `any` holds always. An atom of any other feature is a host error (not built; see section 6). The starting assignment
   matches the cells' values at mount and the band of the appearance at mount.
+- **Canvas:** the screen behind the page is the current assignment's `canvas`, repainted when the assignment changes; it
+  reaches under the status bar and the navigation or action bar, as the page background does in a browser. iOS: the
+  controller's view. Android: the full-screen container the page sits in (its padding keeps the page clear of the bars).
+  An unstyled screen keeps the system background.
+- **System bars:** iOS's navigation bar follows the appearance. Android's activity uses the system's own day-night theme
+  (`Theme.DeviceDefault.DayNight`); because it handles `uiMode` itself, it reads the bar's colours from the new
+  configuration's theme and sets them by hand (bar background, title, Up arrow, light or dark status and navigation bar
+  icons).
 - **Appearance changes:** every screen on the stack follows the appearance, including screens below the top. iOS: each
   `MarklessViewController` registers for `UITraitUserInterfaceStyle` changes and re-evaluates the band whenever its
   traits change (UIKit updates a covered controller's traits before it appears again). Android: the activity declares
@@ -158,6 +171,7 @@ It changes only how the screen looks, so no text witnesses it; the screenshots d
 | S2  | A component with scoped styles (`lib/Tag.tsrx`) used on both pages, three times                                                                       | passing                                                                          | passing          | **passing** | **passing** | 36 boxes, none outside 1 device px                                                     |
 | S3  | A class and a `ui-*` attribute that follow a cell; a dark-mode variant on a pushed screen, switched while it is in the back stack, then back to light | passing, with Back measured as different (the page's state starts over, `onWeb`) | passing          | **passing** | **passing** | 122 boxes over every assignment (light and dark, on and off), none outside 1 device px |
 | S4  | A stylesheet imported by the document: `:root` tokens, element and class rules shared by both pages                                                   | passing                                                                          | passing          | **passing** | **passing** | 36 boxes, none outside 1 device px                                                     |
+| S5  | A page background on `body` with a dark-mode variant: it fills the screen under the bars on a pushed screen and on the one below it                   | passing                                                                          | passing          | S5_IOS      | S5_ANDROID  | 56 boxes over both pages, light and dark, none outside 1 device px                     |
 
 How each column is judged. The texts and titles of every step are checked by Maestro on the phones and by Playwright on
 the web (numbers decide pass or fail). Dragon's frames are compared with Chrome's boxes by Dragon's
@@ -167,8 +181,9 @@ the web (numbers decide pass or fail). Dragon's frames are compared with Chrome'
 written by the web column with `MARKLESS_LADDER_SCREENSHOTS=1`) were read side by side. That reading is evidence, not a
 gate. It shows the same colours, borders, radii and layout. The one visible difference is the typeface: Dragon draws
 `sans-serif` as its pinned Inter, while the browser uses the system face (an open owner decision since rung 2). The
-system bars are the platform's: iOS's navigation bar follows dark mode, Android's action bar stays light (its theme is
-fixed light).
+system bars are the platform's: iOS's navigation bar follows dark mode; since S5 Android's action bar does too (before it, it stayed light, its theme
+fixed light). Since S5 the page background reaches the screen: before it a styled iOS page sat on white and an Android
+one on the light theme's window grey (#FAFAFA), whatever `body` said.
 
 ### Payload (S2: style data carried once)
 
@@ -208,14 +223,31 @@ layout, not the component's look. Sizes per run: `proofs/s<n>-*/style-size.json`
 - **A link's default look.** With its `href`, a link is underlined by Chrome's user-agent sheet, and Dragon refuses that
   underline on both targets (`DRAGON_UNSUPPORTED_VALUE ... text-decoration (underline ...) that ios does not draw`).
   The rungs style their links with `text-decoration: none`; an unstyled `<Link>` in a styled page is refused by name.
-- **`html`/`body` backgrounds.** Dragon lays out its own `html` and `body`; the hosts paint only payload nodes, so a
-  background set on `body` would not reach the phone. Not used by the rungs; a styled iOS page sits on a white canvas, as
-  the web document does in either colour scheme.
+- **`html`/`body` backgrounds.** Closed by S5 (section 6b): Dragon's export gives each assignment its canvas colour and the
+  hosts paint it behind the page and the bars.
 
 Host gaps found and closed on the way (both platforms): solid border sides that differ (`border-left: 6px solid`) were
 refused ("only four solid sides"); now drawn as one rectangle per side on square boxes (rounded boxes with differing
 sides stay refused). On iOS 26 and later a styled page's root reaches the screen edge, and its keyboard-dismiss pan took
 the content swipe-back from UIKit; it now waits for both back gestures to fail.
+
+## 6b. The style gaps a styled app still hit (branch `cw/native-style-gaps`)
+
+Status 2026-11-17. Each gap with what Dragon needed, what the hosts needed, and what is still refused, by name. "Refused"
+means the build stops naming Dragon's reason; nothing is dropped silently.
+
+| Gap                                                 | Web     | iOS         | Android     | Where it stands                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| --------------------------------------------------- | ------- | ----------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| G5 page background on `body` or `html`              | passing | S5_IOS      | S5_ANDROID  | **Built** (rung S5). Dragon: `canvas` per assignment in the Markless export, from its own `html`/`body` background writes. Hosts: paint it behind the page and under the bars, per assignment, so it follows the dark band on every screen of the stack; Android's action bar and bar icons follow the appearance. Still refused: a `body` background under an `html` one, a translucent canvas.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| G1 pressed (`:active`) on a button and a link       | passing | refused     | refused     | **Not built: needs a decision.** Measured through `markless:style-export` on S5's page with one rule added: on a `<button>`, `:active needs Dragon hit testing through the form control h9, which is not built yet (FORM-a)`; with any rounded box on the page, even one the rule does not select, `:active needs Dragon hit testing through border-top-left-radius on …, which is not built yet (package SELD-R2b)`; on a square link, block or inline, the compile passes and the entry point stops with `the output has interaction states (:hover, :active, :focus), which this entry point does not emit yet`. Past those, Dragon's rulings make the hit test and the interaction runtime its own translated code on the device (decisions "Hit testing", R12 to R14); the Markless hosts run no Dragon code, only the JSON export, so there is nothing for a touch to look up. |
+| G3 `:focus-visible` on an input                     | passing | refused     | refused     | **Not built.** `<input> h9 of type text is not supported: only type=range is laid out; other inputs wait for the FORM-b package`, and its user-agent `border-style: inset` has no fixture; focus needs the same on-device interaction runtime as G1.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| G2 `:disabled` and the `disabled` attribute         | passing | refused     | refused     | **Not built: needs a Dragon ruling.** `:disabled` is refused with no package named ("a later package models as runtime state"); the `disabled` attribute is refused because Chrome's user-agent styles for it are not captured (no `button[disabled]` row in Dragon's UA data). An unstyled `<button>` is refused on its own (`appearance: auto and no author background or border is painted by the platform theme …, which waits for the FORM-b package`), and a styled one needs `font-family: inherit`, since Chrome's control font (Arial) is not pinned. The working path stays Dragon's own fix: a `ui-disabled` attribute bound to a cell, styled by the author (S3's mechanism).                                                                                                                                                                                            |
+| G4 system font for `sans-serif`, `system-ui`, unset | passing | not changed | not changed | **Not built: conflicts with Dragon rulings.** Dragon lays out and positions every glyph from the bundled font file's own tables at build time ("Pinned generic fonts", "Native glyph advances", "Dragon positions every glyph"); San Francisco cannot be bundled, and a host drawing the system face inside frames laid out for Inter would clip or misplace text. Today `font-family: system-ui` is refused on both targets (`has no layout mapping`); phones draw `sans-serif` as Inter.                                                                                                                                                                                                                                                                                                                                                                                           |
+| G6 an unstyled link reads as a link                 | passing | refused     | refused     | **Partly.** Chrome's link colour (`rgb(0, 0, 238)`) reaches the phone when the author removes the underline (`text-decoration: none`, as S1 to S5 do). The default underline is refused: with a real face Dragon needs skip-ink (TDEC-d covers Ahem only) and draws no decoration inside a state program (TDEC-b). So the unstyled default is refused, not approximated.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| G7 a width `@media` variant, portrait and landscape | passing | refused     | refused     | **Not built: needs a decision.** The export's frames are laid out for one device size; Dragon's ruling resolves size-dependent values with its layout engine on the device ("Native viewports"), which the hosts do not run. The hosts refuse a `width` or `orientation` atom by name.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+
+G1, G3 and G7 hinge on one question: whether the Markless hosts carry Dragon's generated on-device code (its layout engine,
+hit test and interaction runtime) rather than only the JSON export.
 
 ## 7. Receipts
 

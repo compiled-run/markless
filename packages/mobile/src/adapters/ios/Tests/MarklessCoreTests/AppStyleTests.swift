@@ -51,3 +51,35 @@ private func settings() throws -> (StyleExport, NativeViewPayload) {
 	let bands = StyleBands(atoms: [StyleAtom(feature: "width", comparisons: 1, keyword: "none")], bands: [[false], [true]])
 	#expect(throws: PayloadError.self) { try bands.band(dark: false) }
 }
+
+// The S5 rung's app style: body's background, light and dark, is each assignment's canvas.
+@Test func eachAssignmentCarriesTheCanvasOfItsBand() throws {
+	let styles = try StyleExport.decodeApp(try fixture("s5-page-canvas.native-app-style"))
+	let paper = RGBA(r: 244, g: 239, b: 230, alpha: 255)
+	let night = RGBA(r: 29, g: 27, b: 22, alpha: 255)
+	for pattern in ["/", "/notes"] {
+		let style = try #require(styles[pattern])
+		#expect(style.assignments.count == 2)
+		for assignment in style.assignments {
+			let dark = try #require(assignment.values[StyleBands.state]).strictlyEquals(.number(1))
+			#expect(assignment.canvas == (dark ? night : paper))
+		}
+	}
+}
+
+@Test func refusesATranslucentCanvas() throws {
+	var root = try #require(try JSONSerialization.jsonObject(with: try fixture("s5-page-canvas.native-app-style")) as? [String: Any])
+	var targets = try #require(root["targets"] as? [String: Any])
+	var ios = try #require(targets["ios"] as? [String: Any])
+	var routes = try #require(ios["routes"] as? [[String: Any]])
+	var assignments = try #require(routes[0]["assignments"] as? [[String: Any]])
+	var canvas = try #require(assignments[0]["canvas"] as? [String: Any])
+	canvas["alpha"] = 128
+	assignments[0]["canvas"] = canvas
+	routes[0]["assignments"] = assignments
+	ios["routes"] = routes
+	targets["ios"] = ios
+	root["targets"] = targets
+	let changed = try JSONSerialization.data(withJSONObject: root)
+	#expect { try StyleExport.decodeApp(changed) } throws: { ($0 as? PayloadError)?.reason == "the canvas is not opaque" }
+}

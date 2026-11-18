@@ -27,6 +27,7 @@ const page = (component: string, background: number): DragonStyleExport => ({
 			assignments: [
 				{
 					values: {},
+					canvas: { r: 18, g: 52, b: 86, alpha: 255 },
 					nodes: [
 						{
 							id: 'h0',
@@ -59,6 +60,10 @@ test('a component styled alike on two pages carries its writes once; each page k
 	expect(tagIndex(0)).toBe(tagIndex(1));
 	expect(ios.writes[tagIndex(0)]).toEqual(tag);
 	expect(ios.routes.map((route) => route.pattern)).toEqual(['/', '/basil']);
+	expect(ios.routes.map((route) => route.assignments[0]!.canvas)).toEqual([
+		{ r: 18, g: 52, b: 86, alpha: 255 },
+		{ r: 18, g: 52, b: 86, alpha: 255 },
+	]);
 	expect(style.fonts).toEqual([{ id: 'sha256:aa', file: 'vendor/fonts/a.ttf' }]);
 	const size = nativeAppStyleSize(pages, style);
 	expect(size.targets.ios).toEqual({ writeLists: 3, writeListReferences: 4 });
@@ -77,4 +82,17 @@ test('pages laid out for different devices are refused by name', () => {
 			{ pattern: '/basil', exported: moved },
 		]),
 	).toThrow('/basil: the ios export was laid out for another device');
+});
+
+test('an export without a canvas colour is refused by name', () => {
+	const other = page('Basil', 2);
+	const [assignment] = other.targets.ios!.assignments;
+	const { canvas: _canvas, ...bare } = assignment!;
+	const without = {
+		...other,
+		targets: { ios: { ...other.targets.ios!, assignments: [bare] } },
+	} as unknown as DragonStyleExport;
+	expect(() => nativeAppStyle([{ pattern: '/basil', exported: without }])).toThrow(
+		"/basil: the ios export's assignment 0 has no canvas",
+	);
 });
