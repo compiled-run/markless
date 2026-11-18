@@ -3328,7 +3328,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		severity: 'error',
 		description: 'A Markless build tooling error from @markless/bundler.',
 		printed: [
-			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalized>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
+			'MARKLESS_CHILD_SYMBOL_MISSING: Linked child <missingSymbolSource> does not provide requested symbol module <normalizedId>. Rebuild the child with the current Markless compiler and clear any stale build cache.',
 		],
 		structured: false,
 		sources: [
