@@ -554,6 +554,7 @@ function renderRowChunk(
 			},
 			idPrefix: scope.ownerIdPrefix,
 			projectionSegment: definition.rowHosts?.segment,
+			rowSegment: () => scope.rowSegment,
 			attributeName: definition.attributeName,
 			rootContext: { item: input.item, index: input.rowIndex, key: input.rowKey },
 			read: scope.readRow,
@@ -582,9 +583,13 @@ function renderRowChunk(
 						: [],
 				),
 			);
+			// The owner's @try records, named by the row each one renders in.
 			const composition = marklessSsrComposeView(
 				rendered.structure,
-				emptyRowView() as unknown as SsrComposableView,
+				{
+					...emptyRowView(),
+					asyncBoundaries: definition.view.asyncBoundaries,
+				} as unknown as SsrComposableView,
 				scope.projected,
 				asyncSnapshots,
 				scope.ownerIdPrefix,
