@@ -1,6 +1,7 @@
 package dev.markless.mobile.view
 
 import android.content.Context
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import dev.markless.mobile.core.Json
 import dev.markless.mobile.core.JournalEntry
@@ -16,7 +17,7 @@ import dev.markless.mobile.core.str
 object DeviceConformance {
 	fun run(context: Context, vectorBytes: ByteArray): List<String> {
 		val vector = Json.parse(vectorBytes).obj("vector")
-		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap())
+		val host = MarklessHost(context, canonical(vector.field("payload", "vector")).toByteArray(), store = dev.markless.mobile.core.MemoryStore(), params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap(), preferredLanguages = vector["preferredLanguages"]?.arr("preferredLanguages")?.map { it.str("preferredLanguages[]") } ?: listOf("en"))
 		val failures = ArrayList<String>()
 		fun shownTexts(): String = host.runtime.texts().joinToString(",", "[", "]") { (id, _) -> "[${jsonString(id)},${jsonString(if (host.hasView(id)) host.textView(id).text.toString() else "<no view>")}]" }
 		fun structure(where: String) {
@@ -42,19 +43,30 @@ object DeviceConformance {
 			val shown = (host.view(node.str("node")) as EditText).text.toString()
 			if (shown != value.str("value")) failures.add("initial: ${node.str("node")} field shows \"$shown\", expected \"${value.str("value")}\"")
 		}
+		fun checks(where: String) {
+			for ((node, checked) in host.runtime.checks()) {
+				val box = host.view(node) as? android.widget.CompoundButton ?: continue
+				if (box.isChecked != checked) failures.add("$where: $node shows checked=${box.isChecked}, the runtime holds $checked")
+			}
+		}
+		checks("initial")
 		val journal = ArrayList<JournalEntry>()
 		host.onJournal = { journal.addAll(it) }
 		host.onNavigate = { }
+		// Timers fire when a step says so, not on the clock.
+		host.scheduleTimer = { _, _ -> }
 		for ((n, step) in vector.field("steps", "vector").arr("steps").withIndex()) {
 			val s = step.obj("steps[$n]")
 			val action = s.field("action", "step").obj("action")
-			val target = host.view(action.field("host", "action").str("host"))
+			val target by lazy { host.view(action.field("host", "action").str("host")) }
 			journal.clear()
 			when (val event = action.field("event", "action").str("event")) {
 				"activate" -> if (!target.performClick()) failures.add("steps[$n]: the view took no click")
 				"cancel" -> host.apply(host.runtime.dispatch(action.field("host", "action").str("host"), dev.markless.mobile.core.EventName.Cancel))
 				"input" -> (target as? EditText ?: throw MarklessHostError("steps[$n] types into a view that is not an input")).setText(action.field("value", "action").str("value"))
 				"dismiss" -> host.closedByPlatform(action.field("host", "action").str("host"))
+				"enter" -> (target as? EditText ?: throw MarklessHostError("steps[$n] presses return in a view that is not an input")).onEditorAction(EditorInfo.IME_ACTION_GO)
+				"timer" -> host.apply(host.runtime.timer(action.field("timer", "action").str("timer")))
 				else -> throw MarklessHostError("steps[$n] has an action this check cannot perform: $event")
 			}
 			val actual = journal.joinToString(",", "[", "]") { it.toJson() }
@@ -67,8 +79,9 @@ object DeviceConformance {
 			}
 			val runtimeTexts = host.runtime.texts().joinToString(",", "[", "]") { (id, t) -> "[${jsonString(id)},${jsonString(t)}]" }
 			if (shownTexts() != runtimeTexts) failures.add("steps[$n]: views show ${shownTexts()}, the runtime shows $runtimeTexts")
-			if (journal.none { it is JournalEntry.Navigate }) structure("steps[$n]")
+			if (journal.none { it is JournalEntry.Navigate }) { structure("steps[$n]"); checks("steps[$n]") }
 		}
+		host.dismissMessage()
 		return failures
 	}
 
@@ -79,6 +92,7 @@ object DeviceConformance {
 			"aria-label" -> if (view.contentDescription?.toString() != value) "$node contentDescription is ${view.contentDescription}, expected $value" else null
 			"disabled" -> if (view.isEnabled != (value == null)) "$node isEnabled is ${view.isEnabled} with disabled=$value" else null
 			"aria-pressed", "aria-selected" -> if (view.isSelected != (value == "true")) "$node isSelected is ${view.isSelected} with $name=$value" else null
+			"aria-disabled" -> view.createAccessibilityNodeInfo().isEnabled.let { if (view.isEnabled && it == (value == "true")) "$node reads enabled=$it to accessibility with aria-disabled=$value" else null }
 			else -> null
 		}
 	}

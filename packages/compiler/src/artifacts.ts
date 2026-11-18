@@ -1289,6 +1289,12 @@ export type SemanticFunctionStatement =
 	| { readonly kind: 'set'; readonly name: string; readonly value: SemanticExpression }
 	/** `name.push(value)` on a local array. */
 	| { readonly kind: 'push'; readonly name: string; readonly value: SemanticExpression }
+	/** `callee(...)` by a bare name, for its effect: `setTimeout(...)`, or a promise executor's `resolve(value)`. */
+	| {
+			readonly kind: 'call';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	| {
 			readonly kind: 'if';
 			readonly test: SemanticExpression;
@@ -1317,7 +1323,11 @@ export type SemanticFunctionStatement =
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+' | 'typeof'; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'unary';
+			readonly operator: '!' | '-' | '+' | 'typeof';
+			readonly value: SemanticExpression;
+	  }
 	| {
 			readonly kind: 'binary';
 			readonly operator:
@@ -1350,11 +1360,22 @@ export type SemanticExpression =
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
 	/** `object[index]` with an index that is not a literal. */
-	| { readonly kind: 'index'; readonly object: SemanticExpression; readonly index: SemanticExpression }
-	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	| {
+			readonly kind: 'index';
+			readonly object: SemanticExpression;
+			readonly index: SemanticExpression;
+	  }
+	| {
+			readonly kind: 'call';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	/** A call to a function by its bare name that is not a builtin: a module-level function, this module's or an imported one. */
-	| { readonly kind: 'apply'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
-	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'apply';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	| {
 			readonly kind: 'array';
 			readonly items: ReadonlyArray<{
@@ -1366,7 +1387,6 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
-	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';
@@ -1375,9 +1395,32 @@ export type SemanticExpression =
 			readonly arguments: ReadonlyArray<SemanticExpression>;
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
-	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
+	| {
+			readonly kind: 'lambda';
+			readonly parameters: ReadonlyArray<string>;
+			readonly body: SemanticExpression;
+	  }
+	/** `new Callee(...)` by a bare name (`new FormData(form)`, `new Promise(...)`, `new Error(message)`). */
+	| {
+			readonly kind: 'new';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
+	/** `await value`. */
+	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	/** A function passed to `new` or to a call by bare name, with its statements (an expression body returns it). */
+	| {
+			readonly kind: 'function';
+			readonly parameters: ReadonlyArray<string>;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
 	/** A computed body's `const name = value`: `name` reads `value` inside `body`. */
-	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression; readonly body: SemanticExpression }
+	| {
+			readonly kind: 'let';
+			readonly name: string;
+			readonly value: SemanticExpression;
+			readonly body: SemanticExpression;
+	  }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
@@ -1411,8 +1454,16 @@ export type SemanticHandlerStatement =
 	| { readonly kind: 'return' }
 	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
 	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
-	/** An awaited expression whose value is not kept (`await sharesheet.open(...)`). */
-	| { readonly kind: 'effect'; readonly value: SemanticExpression }
+	/** `await value;` as a statement. */
+	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	/** `try { body } catch (name) { handler } finally { finalizer }`; `name` is absent for `catch {` or no catch. */
+	| {
+			readonly kind: 'try';
+			readonly body: ReadonlyArray<SemanticHandlerStatement>;
+			readonly catchName?: string;
+			readonly handler?: ReadonlyArray<SemanticHandlerStatement>;
+			readonly finalizer: ReadonlyArray<SemanticHandlerStatement>;
+	  }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {

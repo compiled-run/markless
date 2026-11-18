@@ -1,0 +1,50 @@
+appId: ${APP_ID}
+name: f5-async
+---
+- launchApp:
+      clearState: true
+- assertVisible: Username
+- assertVisible: Save
+- assertVisible: Nothing saved
+- tapOn: Name
+- eraseText
+- inputText: ada
+- hideKeyboard
+- assertVisible: ada
+- assertVisible: Nothing saved
+- assertVisible: ada
+- tapOn: Save
+- assertNotVisible: Nothing saved
+- assertVisible: Saving
+- assertNotVisible: Nothing saved
+- assertVisible:
+      text: Save
+      enabled: false
+- extendedWaitUntil:
+      visible: Saved ada
+      timeout: 18000
+- assertNotVisible: Saving
+- assertVisible: Saved ada
+- assertVisible: Save
+- assertNotVisible: Saving
+- tapOn: Name
+- eraseText
+- inputText: admin
+- hideKeyboard
+- assertVisible: admin
+- assertVisible: Saved ada
+- assertVisible: admin
+- tapOn: Save
+- assertNotVisible: Saved ada
+- assertVisible: Saving
+- assertNotVisible: Saved ada
+- assertVisible:
+      text: Save
+      enabled: false
+- extendedWaitUntil:
+      visible: The name admin is taken
+      timeout: 18000
+- assertNotVisible: Saving
+- assertVisible: The name admin is taken
+- assertVisible: Save
+- assertNotVisible: Saving

@@ -101,7 +101,15 @@ export type NativeExpr =
 	| { readonly route: 'params' }
 	| { readonly call: NativeBuiltin; readonly arguments: ReadonlyArray<NativeExpr> }
 	/** In an `input` handler: the field's text after the edit (`event.currentTarget.value`). */
-	| { readonly event: 'value' };
+	| { readonly event: 'value' }
+	/**
+	 * `new FormData(form)`: the form's entry list as the web builds it, `[name, value]` pairs in tree order. A field is left
+	 * out when it is disabled or has no name, a checkbox when it is not checked; a checkbox's value is its `value` attribute
+	 * or "on", a text field's its text now, a hidden input's its `value` attribute.
+	 */
+	| { readonly formData: string }
+	/** A checkbox's or radio button's checkedness now: what its `checked` binding last set, or a person's tick since. */
+	| { readonly checked: string };
 
 export type NativeTextPart =
 	| { readonly text: string }
@@ -129,7 +137,7 @@ export type NativeNode = NativePlace &
 				/** Attributes that follow state, written as the web writes them (absent, bare or a string), and an input's `value`. */
 				readonly bindings?: ReadonlyArray<
 					| { readonly attribute: string; readonly value: NativeExpr }
-					| { readonly property: 'value'; readonly value: NativeExpr }
+					| { readonly property: NativeProperty; readonly value: NativeExpr }
 				>;
 		  }
 		| {
@@ -179,8 +187,14 @@ export type NativeNode = NativePlace &
 		  }
 	);
 
-/** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel';
+/** A field's state a binding sets as a DOM property: a text field's text, a checkbox's checkedness and its mixed look. */
+export type NativeProperty = 'value' | 'checked' | 'indeterminate';
+
+/**
+ * Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click).
+ * `enter` is the keyboard's return key in a single-line text field. `submit` is a form's, raised only by a `submit` op.
+ */
+export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel' | 'enter' | 'submit';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -226,6 +240,30 @@ export type NativeOp =
 	 * unless `preventScroll` (`focus({ preventScroll: true })`).
 	 */
 	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	/**
+	 * Submits `form` as the web does when `submitter` is pressed, or the return key submits it with no submit button (null):
+	 * nothing when the submitter is disabled; then, unless the form has `novalidate` or the submitter `formnovalidate`,
+	 * the first field that is required and empty (or unchecked) stops it with an `invalid` entry; then a submission that
+	 * carries the same entries from the same submitter as one still running is dropped; then the form's `submit` handler
+	 * runs. While a run it starts waits on an `after`, the form has `aria-busy="true"` and the submitter
+	 * `aria-disabled="true"` (unless an author wrote `aria-disabled` on a submit button of the form).
+	 */
+	| { readonly op: 'submit'; readonly form: string; readonly submitter: string | null }
+	/**
+	 * What follows an `await` of a timer the build can see: after `ms`, `ops` run with each `capture` name read as a
+	 * `{ local }` holding the value it had when this op ran. The host schedules it from a `timer` journal entry.
+	 */
+	| {
+			readonly op: 'after';
+			readonly ms: NativeExpr;
+			readonly capture: ReadonlyArray<readonly [string, NativeExpr]>;
+			readonly ops: ReadonlyArray<NativeOp>;
+	  }
+	/**
+	 * A press on a checkbox or radio button, before its handlers run: a checkbox flips its checkedness, a radio button is
+	 * checked and every other radio button of its group (same `name`, same form or none) unchecked.
+	 */
+	| { readonly op: 'tick'; readonly node: string }
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
@@ -298,6 +336,13 @@ export type NativeViewPayload = {
 	}>;
 	/** The page's `<title>`, as text parts: what the system navigation bar shows for this screen. */
 	readonly title?: ReadonlyArray<NativeTextPart>;
+	/** Forms a `submit` op can submit; absent when there are none. */
+	readonly forms?: ReadonlyArray<NativeForm>;
+	/**
+	 * What the web says when a required field has no value, by the language its browser shows its own text in (Chromium's
+	 * wording); the host picks the device's language. Present with `forms`.
+	 */
+	readonly valueMissing?: Readonly<Record<string, NativeValueMissing>>;
 };
 
 export const NATIVE_APP_VERSION = 'markless.native-app/0';
@@ -312,13 +357,69 @@ export type NativeAppPayload = {
 	}>;
 };
 
+export type NativeValueMissing = {
+	readonly text: string;
+	readonly checkbox: string;
+	readonly radio: string;
+};
+
+/** A form's submittable fields and submit buttons, each in tree order. */
+export type NativeForm = {
+	readonly node: string;
+	readonly fields: ReadonlyArray<{ readonly node: string; readonly kind: NativeFieldKind }>;
+	readonly submitters: ReadonlyArray<string>;
+	/** The form's `novalidate`: no field is checked before it submits. */
+	readonly noValidate?: true;
+	/** An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them. */
+	readonly authoredAriaDisabled?: true;
+};
+
+/** A text field (`<input>` of type text, search or tel), a checkbox, a radio button, or a hidden input. */
+export type NativeFieldKind = 'text' | 'checkbox' | 'radio' | 'hidden';
+
+export { NATIVE_VALUE_MISSING_BY_LOCALE } from './native-validation-messages.ts';
+
+/**
+ * The language a browser on a device with these preferred languages shows its own text in, among `available`: the first
+ * preference that matches exactly, then without its script (`zh-Hant-TW` as `zh-TW`), then by language alone; else `en`.
+ */
+export function nativeLocale(
+	preferred: ReadonlyArray<string>,
+	available: ReadonlyArray<string>,
+): string {
+	const byLower = new Map(available.map((locale) => [locale.toLowerCase(), locale]));
+	for (const wanted of preferred) {
+		const parts = wanted.replaceAll('_', '-').toLowerCase().split('-');
+		const language = parts[0]!;
+		const region = parts.slice(1).find((part) => part.length !== 4);
+		for (const candidate of [
+			parts.join('-'),
+			region ? `${language}-${region}` : language,
+			language,
+		]) {
+			const found = byLower.get(candidate);
+			if (found) return found;
+		}
+	}
+	return 'en';
+}
+
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
 	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
-	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	| {
+			readonly op: 'command';
+			readonly node: string;
+			readonly command: NativeCommand;
+			readonly preventScroll?: true;
+	  }
 	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
 	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
+	/** A submit stopped: the host moves focus to `node` as `focus()` would and shows `message` until the next action. */
+	| { readonly op: 'invalid'; readonly node: string; readonly message: string }
+	/** Run the `after` op `timer` names in `ms` milliseconds, by dispatching a `timer` action for it. */
+	| { readonly op: 'timer'; readonly timer: string; readonly ms: number }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -332,6 +433,13 @@ export type NativeJournalEntry =
 			readonly node: string;
 			readonly name: 'value';
 			readonly value: string;
+	  }
+	/** A checkbox's or radio button's checkedness changed: by a tick, by its `checked` binding, or by another radio's tick. */
+	| {
+			readonly op: 'property';
+			readonly node: string;
+			readonly name: 'checked';
+			readonly value: boolean;
 	  }
 	/** A styled cell's new value: the host moves to Dragon's next style assignment (`next[a][s][v]`) and applies it. */
 	| { readonly op: 'state'; readonly cell: string; readonly value: NativeValue }

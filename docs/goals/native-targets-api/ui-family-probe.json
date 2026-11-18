@@ -34,11 +34,11 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `dayLabel` uses a call to `dayFormat.format`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `isIsoDate` uses a call to `isoPattern.test`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `normaliseIso` uses a destructuring declaration, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.focused uses a NewExpression, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: the computed `isToday` uses a NewExpression, which needs a script engine",
-			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.month uses a NewExpression, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.focused uses `new Date`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: the computed `isToday` uses `new Date`, which needs a script engine",
+			"MARKLESS_NATIVE_UNSUPPORTED: calendarState.month uses `new Date`, which needs a script engine",
 			"MARKLESS_NATIVE_UNSUPPORTED: the @if test reads the callback `children` as a value",
-			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses a NewExpression, which needs a script engine"
+			"MARKLESS_NATIVE_UNSUPPORTED: the click handler uses `new Date`, which needs a script engine"
 		]
 	},
 	"carousel": {
@@ -61,9 +61,8 @@
 		]
 	},
 	"checkbox": {
-		"payload": false,
+		"payload": true,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: a property binding (`checked`)",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:6/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out"
 		]
 	},
@@ -72,7 +71,6 @@
 		"diagnostics": [
 			"MARKLESS_NATIVE_UNSUPPORTED: the `checked` prop of <CheckboxRoot>",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `disabled` prop of <CheckboxRoot>",
-			"MARKLESS_NATIVE_UNSUPPORTED: a property binding (`checked`)",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `name` prop of <CheckboxRoot>",
 			"MARKLESS_NATIVE_UNSUPPORTED: the `value` prop of <CheckboxRoot>",
 			"MARKLESS_NATIVE_KEYBOARD_ONLY: the keydown handler on <button> component-edge:7/component-edge:7/h1 runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out",
@@ -510,9 +508,7 @@
 	},
 	"popover": {
 		"payload": false,
-		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet"
-		]
+		"diagnostics": ["MARKLESS_NATIVE_UNSUPPORTED: the dismiss event has no native meaning yet"]
 	},
 	"progress": {
 		"payload": false,
@@ -534,7 +530,6 @@
 	"radio-group": {
 		"payload": false,
 		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: a property binding (`checked`)",
 			"MARKLESS_NATIVE_UNSUPPORTED: the change event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the focus event has no native meaning yet",
 			"MARKLESS_NATIVE_UNSUPPORTED: the keydown event has no native meaning yet",
@@ -663,7 +658,6 @@
 			"MARKLESS_NATIVE_UNSUPPORTED: the <th> element",
 			"MARKLESS_NATIVE_UNSUPPORTED: the <tr> element",
 			"MARKLESS_NATIVE_UNSUPPORTED: the <td> element",
-			"MARKLESS_NATIVE_UNSUPPORTED: a property binding (`checked`)",
 			"MARKLESS_NATIVE_UNSUPPORTED: <table.itemstate>, a component from another module",
 			"MARKLESS_NATIVE_UNSUPPORTED: markup outside the root template, its @if arms and its @for rows",
 			"MARKLESS_NATIVE_UNSUPPORTED: the function `isReachable` uses a call to `row.hasAttribute`, which needs a script engine",
@@ -817,10 +811,8 @@
 		]
 	},
 	"toggle": {
-		"payload": false,
-		"diagnostics": [
-			"MARKLESS_NATIVE_UNSUPPORTED: a property binding (`checked`)"
-		]
+		"payload": true,
+		"diagnostics": []
 	},
 	"tokenbox": {
 		"payload": false,

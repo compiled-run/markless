@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+name: f4-required
+---
+- launchApp:
+    clearState: true
+- assertVisible: Membership
+- assertVisible: Agree to the rules
+- assertVisible: You have not agreed
+- assertVisible: Not joined
+- tapOn: Join
+- assertVisible: Please fill out this field\.
+- assertVisible: Not joined
+- assertVisible: Please fill out this field\.
+- tapOn: Email
+- eraseText
+- inputText: ada@example.com
+- hideKeyboard
+- assertVisible: ada@example\.com
+- assertVisible: Not joined
+- assertVisible: ada@example\.com
+- tapOn: Join
+- assertVisible: Please check this box if you want to proceed\.
+- assertVisible: Not joined
+- assertNotVisible: You agreed
+- assertVisible: Please check this box if you want to proceed\.
+- tapOn: Agree to the rules
+- assertVisible: You agreed
+- assertVisible: You agreed
+- assertVisible: Not joined
+- assertNotVisible: You have not agreed
+- tapOn: Join
+- assertNotVisible: Not joined
+- assertVisible: Joined as ada@example\.com, rules on
+- assertNotVisible: Not joined

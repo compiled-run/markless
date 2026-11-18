@@ -10,6 +10,8 @@ export type NativeConformance = {
 	readonly payload: NativeViewPayload;
 	/** Present for a page: the route params it opens with. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** Present when the device's preferred languages matter (the web's messages); otherwise `['en']`. */
+	readonly preferredLanguages?: ReadonlyArray<string>;
 	readonly initial: ReadonlyArray<readonly [node: string, text: string]>;
 	/** Present when the payload binds attributes: `[node, name, value]`, value null when absent. */
 	readonly initialAttributes?: ReadonlyArray<
@@ -21,6 +23,8 @@ export type NativeConformance = {
 	>;
 	/** Present when the payload has lists: `[repeat, keys]`. */
 	readonly initialRows?: ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
+	/** Present when the payload has checkboxes or radio buttons: `[node, checked]`. */
+	readonly initialChecks?: ReadonlyArray<readonly [node: string, checked: boolean]>;
 	/** Present when the payload has branches: `[branch, arm]`, arm null when none is shown. */
 	readonly initialArms?: ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Present when the payload has system sheets: `[sheet, open]`. */
@@ -37,8 +41,9 @@ export function nativeConformance(
 	payload: NativeViewPayload,
 	actions: ReadonlyArray<NativeAction>,
 	params?: Readonly<Record<string, string>>,
+	preferredLanguages?: ReadonlyArray<string>,
 ): NativeConformance {
-	const runtime = createNativeRuntime(payload, new Map(), params);
+	const runtime = createNativeRuntime(payload, new Map(), params, preferredLanguages);
 	const initial = runtime.texts();
 	const initialAttributes = runtime.attributes();
 	const initialArms = runtime.arms();
@@ -46,10 +51,12 @@ export function nativeConformance(
 	const initialRows = runtime.rows();
 	const initialSheets = runtime.sheets();
 	const tasks = runtime.tasks();
+	const initialChecks = runtime.checks();
 	return {
 		version: NATIVE_CONFORMANCE_VERSION,
 		payload,
 		...(params ? { params } : {}),
+		...(preferredLanguages ? { preferredLanguages } : {}),
 		initial,
 		...(initialAttributes.length > 0 ? { initialAttributes } : {}),
 		...(initialProperties.length > 0 ? { initialProperties } : {}),
@@ -57,6 +64,7 @@ export function nativeConformance(
 		...(initialRows.length > 0 ? { initialRows } : {}),
 		...(initialSheets.length > 0 ? { initialSheets } : {}),
 		...(tasks.length > 0 ? { tasks } : {}),
+		...(initialChecks.length > 0 ? { initialChecks } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
 	};
 }

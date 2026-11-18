@@ -40,7 +40,7 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 			widest = maxOf(widest, child.measuredWidth)
 		}
 		val w = if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.EXACTLY) MeasureSpec.getSize(widthMeasureSpec) else widest + paddingLeft + paddingRight
-		setMeasuredDimension(w, resolveSize(height, heightMeasureSpec))
+		setMeasuredDimension(maxOf(w, minimumWidth), resolveSize(maxOf(height, minimumHeight), heightMeasureSpec))
 	}
 
 	override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {

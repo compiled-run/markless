@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: f1-fields
+---
+- launchApp:
+    clearState: true
+- assertVisible: Sign up
+- assertVisible: Send
+- assertVisible: Nothing sent
+- assertVisible: ""
+- assertVisible: Lovelace
+- tapOn: First name
+- eraseText
+- inputText: Ada
+- hideKeyboard
+- assertVisible: Ada
+- assertVisible: Nothing sent
+- assertVisible: Ada
+- assertVisible: Lovelace
+- tapOn: Send
+- assertNotVisible: Nothing sent
+- assertVisible: Sent Ada Lovelace, nickname false
+- assertNotVisible: Nothing sent
+- tapOn: Last name
+- eraseText
+- inputText: Byron
+- hideKeyboard
+- assertVisible: Ada
+- assertVisible: Byron
+- assertVisible: Sent Ada Lovelace, nickname false
+- assertVisible: Ada
+- assertVisible: Byron
+- tapOn: Send
+- assertNotVisible: Sent Ada Lovelace, nickname false
+- assertVisible: Sent Ada Byron, nickname false
+- assertNotVisible: Sent Ada Lovelace, nickname false

@@ -1,0 +1,53 @@
+{
+	"rung": 53,
+	"name": "@markless/ui toggle and checkbox field parts in a form: checked ones send their name and value, unchecked ones nothing",
+	"steps": [
+		{
+			"visible": [
+				"Preferences",
+				"Wi-Fi",
+				"Bluetooth",
+				"Save",
+				"Wi-Fi is off",
+				"Bluetooth is on",
+				"Nothing saved"
+			],
+			"absent": ["Accepted"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Wi-Fi null, Bluetooth on, terms null"],
+			"absent": ["Nothing saved", "Accepted"]
+		},
+		{
+			"do": {
+				"tap": "Accept terms"
+			},
+			"visible": ["Accepted", "Wi-Fi null, Bluetooth on, terms null"],
+			"absent": ["Wi-Fi is on"]
+		},
+		{
+			"do": {
+				"tap": "Wi-Fi"
+			},
+			"visible": ["Wi-Fi is on"],
+			"absent": ["Wi-Fi is off", "Bluetooth is off"]
+		},
+		{
+			"do": {
+				"tap": "Bluetooth"
+			},
+			"visible": ["Bluetooth is off"],
+			"absent": ["Bluetooth is on", "Wi-Fi yes, Bluetooth null, terms on"]
+		},
+		{
+			"do": {
+				"tap": "Save"
+			},
+			"visible": ["Wi-Fi yes, Bluetooth null, terms on"],
+			"absent": ["Wi-Fi null, Bluetooth on, terms null"]
+		}
+	]
+}

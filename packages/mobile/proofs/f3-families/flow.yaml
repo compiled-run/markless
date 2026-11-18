@@ -1,0 +1,37 @@
+appId: ${APP_ID}
+name: f3-families
+---
+- launchApp:
+    clearState: true
+- assertVisible: Preferences
+- assertVisible: Wi-Fi
+- assertVisible: Bluetooth
+- assertVisible: Save
+- assertVisible: Wi-Fi is off
+- assertVisible: Bluetooth is on
+- assertVisible: Nothing saved
+- assertNotVisible: Accepted
+- tapOn: Save
+- assertNotVisible: Nothing saved
+- assertVisible: Wi-Fi null, Bluetooth on, terms null
+- assertNotVisible: Nothing saved
+- assertNotVisible: Accepted
+- tapOn: Accept terms
+- assertVisible: Accepted
+- assertVisible: Accepted
+- assertVisible: Wi-Fi null, Bluetooth on, terms null
+- assertNotVisible: Wi-Fi is on
+- tapOn: Wi-Fi
+- assertVisible: Wi-Fi is on
+- assertVisible: Wi-Fi is on
+- assertNotVisible: Wi-Fi is off
+- assertNotVisible: Bluetooth is off
+- tapOn: Bluetooth
+- assertVisible: Bluetooth is off
+- assertVisible: Bluetooth is off
+- assertNotVisible: Bluetooth is on
+- assertNotVisible: Wi-Fi yes, Bluetooth null, terms on
+- tapOn: Save
+- assertVisible: Wi-Fi yes, Bluetooth null, terms on
+- assertVisible: Wi-Fi yes, Bluetooth null, terms on
+- assertNotVisible: Wi-Fi null, Bluetooth on, terms null

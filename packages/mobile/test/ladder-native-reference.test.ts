@@ -308,6 +308,8 @@ function walk(
 		for (const [node, , value] of runtime.properties()) properties.set(node, value);
 		sheetOpen.clear();
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
+		checks.clear();
+		for (const [node, checked] of runtime.checks()) checks.set(node, checked);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
 	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
@@ -415,7 +417,27 @@ function walk(
 		const node = shownTexts().find(([id, shown]) => shown === text && !hiddenWithin(id))?.[0];
 		return node ? parentOf(node) : undefined;
 	};
-	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number) {
+	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const staticValue = (id: string) => {
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
+			? (node.attributes?.['value'] ?? '')
+			: undefined;
+	};
+	const typed = new Map<string, string>();
+	const checks = new Map(runtime.checks());
+	const attributeNow = (id: string, name: string) => {
+		const bound = attributes.get(`${id}\0${name}`);
+		if (bound !== undefined) return bound;
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' ? (node.attributes?.[name] ?? null) : null;
+	};
+	const fieldText = (id: string) => typed.get(id) ?? properties.get(id) ?? staticValue(id);
+	// Timers the journal set, on a clock that only `wait` moves; a host shows a blocked submit's message until the next action.
+	let now = 0;
+	let timers: { readonly timer: string; readonly due: number }[] = [];
+	let invalid: string | undefined;
+	function apply(dispatched: ReadonlyArray<NativeJournalEntry>, index: number, at = now) {
 		const answered: Array<() => ReadonlyArray<NativeJournalEntry>> = [];
 		for (const entry of dispatched) {
 			if (entry.op === 'call') {
@@ -490,11 +512,18 @@ function walk(
 						payload.cells.some((cell) => cell.object === object && cell.device === name)
 					)
 						answered.push(() => setObject(object, name, value));
-			} else if (entry.op === 'text') texts.set(entry.node, entry.value);
+			} else if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'invalid') invalid = entry.message;
+			else if (entry.op === 'text') texts.set(entry.node, entry.value);
 			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-			else if (entry.op === 'property') properties.set(entry.node, entry.value);
+			else if (entry.op === 'property' && entry.name === 'checked')
+				checks.set(entry.node, entry.value);
+			else if (entry.op === 'property') {
+				properties.set(entry.node, entry.value);
+				typed.delete(entry.node);
+			}
 			else if (entry.op === 'navigate') {
 				// One page per rung: a navigation opens this page again with the link's params.
 				expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
@@ -563,6 +592,7 @@ function walk(
 	startTasks();
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
+		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			if (action.permissions?.location === 'unset') permission = 'unknown';
 			// Android remembers a refusal across a revoke: access stays denied, and the system still asks again.
@@ -577,6 +607,7 @@ function walk(
 			// The test build's call label starts over with the app.
 			calls = [];
 			runtime = start();
+			typed.clear();
 			mount();
 			startTasks();
 		} else if (action && 'device' in action) {
@@ -598,9 +629,18 @@ function walk(
 				else apply(setObject(object, 'recorder.active', false), index);
 		} else if (action && 'wait' in action) {
 			for (const [object, seconds] of recording) {
-				const now = seconds + Math.floor(action.wait / 1000);
-				recording.set(object, now);
-				apply(setObject(object, 'recorder.seconds', now), index);
+				const elapsed = seconds + Math.floor(action.wait / 1000);
+				recording.set(object, elapsed);
+				apply(setObject(object, 'recorder.seconds', elapsed), index);
+			}
+			now += action.wait;
+			for (
+				let next = timers.sort((x, y) => x.due - y.due)[0];
+				next && next.due <= now;
+				next = timers.sort((x, y) => x.due - y.due)[0]
+			) {
+				timers = timers.filter((timer) => timer !== next);
+				apply(runtime.dispatch({ event: 'timer', timer: next.timer }), index, next.due);
 			}
 		} else if (action && 'dismiss' in action) {
 			if (sheet === undefined) throw new Error(`step ${index}: no share sheet is open`);
@@ -626,7 +666,7 @@ function walk(
 			openSheet(index);
 			if (!shownTexts().some(([, text]) => text === action.scrollTo))
 				throw new Error(`step ${index}: "${action.scrollTo}" is not in the open sheet`);
-		} else if (action && !('tap' in action) && !('type' in action) && !('dismissSheet' in action))
+		} else if (action && !('tap' in action) && !('type' in action) && !('submit' in action) && !('dismissSheet' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action && 'dismissSheet' in action) {
 			const sheet = openSheet(index);
@@ -636,32 +676,50 @@ function walk(
 			sheetOpen.set(sheet, false);
 			apply(runtime.dispatch({ event: 'dismiss', host: sheet }), index);
 		} else if (action) {
-			const name = 'tap' in action ? action.tap : action.type.field;
+			const name =
+				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
 			const host = elementReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
-			if (attributes.get(`${host}\0disabled`) != null)
+			if (attributeNow(host, 'disabled') != null)
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
-			if ('type' in action) properties.set(host, action.type.text);
+			if ('type' in action) {
+				if (properties.has(host)) properties.set(host, action.type.text);
+				else typed.set(host, action.type.text);
+			}
 			// A touch reaches the nearest element around it that handles a press, as on a phone.
 			let pressed: string | null | undefined = host;
-			while (pressed && !payload.events.some((event) => event.host === pressed && event.event === 'activate'))
+			while (
+				pressed &&
+				!payload.events.some(
+					(event) => event.host === pressed && event.event === 'activate',
+				)
+			)
 				pressed = nodeOf.get(pressed)?.parent;
+			// The return key in a field that submits nothing only puts the keyboard away.
+			const returns = payload.events.some(
+				(event) => event.host === host && event.event === 'enter',
+			);
 			const dispatched =
 				'tap' in action
 					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
-					: runtime.dispatch({ event: 'input', host, value: action.type.text });
+					: 'type' in action
+						? runtime.dispatch({ event: 'input', host, value: action.type.text })
+						: returns
+							? runtime.dispatch({ event: 'enter', host })
+							: [];
 			apply(dispatched, index);
 		}
 		check(index, step);
 	}
 	function check(index: number, step: LadderStep) {
+		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
 			const host = elementReading(field);
-			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
+			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		if (step.calls) expect(calls, `step ${index}: the device calls made`).toEqual(step.calls);
 		if (step.microphone)
@@ -692,10 +750,13 @@ function walk(
 		);
 		if (step.order)
 			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
+		// `aria-disabled` reports a control as unavailable, as Maestro and Playwright read it, though a press still reaches it.
 		for (const text of step.disabled ?? []) {
 			const host = elementReading(text);
 			expect(
-				host && attributes.get(`${host}\0disabled`),
+				host &&
+					(attributeNow(host, 'disabled') ??
+						(attributeNow(host, 'aria-disabled') === 'true' ? '' : null)),
 				`step ${index}: "${text}" is disabled`,
 			).not.toBeNull();
 		}
@@ -706,6 +767,10 @@ function walk(
 			new Map(runtime.attributes().map(([node, name, value]) => [`${node}\0${name}`, value])),
 			`step ${index}: the journal left an attribute stale`,
 		).toEqual(attributes);
+		expect(
+			new Map(runtime.checks()),
+			`step ${index}: the journal left a checkbox stale`,
+		).toEqual(checks);
 		expect(
 			new Map(runtime.properties().map(([node, , value]) => [node, value])),
 			`step ${index}: the journal left a field stale`,

@@ -32,6 +32,8 @@ export type LadderAction =
 				readonly until?: string;
 			};
 	  }
+	/** The keyboard's return key in the text field with this accessible name. */
+	| { readonly submit: string }
 	/** Scroll until this text is on screen. */
 	| { readonly scrollTo: string }
 	| {
@@ -124,6 +126,11 @@ export type LadderStep = {
 	readonly microphone?: 'on' | 'off';
 	/** Texts on screen on one platform only: a `platform` check shows a different arm on each. */
 	readonly visibleOn?: Readonly<Partial<Record<'ios' | 'android' | 'web', readonly string[]>>>;
+	/**
+	 * The validation message shown for the field a blocked submit focused: on the web the browser's bubble, read as the
+	 * focused field's `validationMessage`; on a phone the host's message, on screen.
+	 */
+	readonly invalid?: string;
 };
 
 /** Each system prompt's title, as a Maestro text pattern matching iOS's and Android's wording. */
@@ -178,7 +185,7 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[uy]\d+)-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[fuy]\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
 		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
@@ -242,6 +249,8 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 		...(step.camera && step.camera !== previous.camera && { camera: step.camera }),
 		...(step.microphone &&
 			step.microphone !== previous.microphone && { microphone: step.microphone }),
+		...(step.invalid !== undefined &&
+			step.invalid !== previous.invalid && { invalid: step.invalid }),
 	};
 }
 
@@ -254,7 +263,8 @@ export const witnessCount = (witness: LadderStep): number =>
 	(witness.calls ? 1 : 0) +
 	(witness.camera ? 1 : 0) +
 	(witness.microphone ? 1 : 0) +
-	(witness.title === undefined ? 0 : 1);
+	(witness.title === undefined ? 0 : 1) +
+	(witness.invalid !== undefined ? 1 : 0);
 
 const assertions = (step: LadderStep): unknown[] =>
 	step.prompt
@@ -302,6 +312,7 @@ const screenAssertions = (step: LadderStep): unknown[] => [
 	...(step.microphone
 		? [{ assertVisible: { id: MICROPHONE_STATE_ID, text: `microphone ${step.microphone}` } }]
 		: []),
+	...(step.invalid !== undefined ? [{ assertVisible: selector(step.invalid) }] : []),
 ];
 
 const onPlatform = (platform: 'iOS' | 'Android', commands: unknown[]) => ({
@@ -326,6 +337,7 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ inputText: action.type.text },
 			...(action.type.keepKeyboard ? [] : ['hideKeyboard']),
 		];
+	if ('submit' in action) return [{ tapOn: selector(action.submit) }, { pressKey: 'Enter' }];
 	if ('relaunch' in action)
 		return [
 			'stopApp',

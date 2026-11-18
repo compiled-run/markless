@@ -8,6 +8,7 @@ import type {
 	NativeValue,
 	NativeViewPayload,
 } from '@markless/serializer';
+import { nativeLocale } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 
 /** A host-side action: what a person does to a retained view. */
@@ -35,7 +36,11 @@ export type NativeAction =
 	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
 	| { readonly event: 'dismiss'; readonly host: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
-	| { readonly event: 'cancel'; readonly host: string };
+	| { readonly event: 'cancel'; readonly host: string }
+	/** The keyboard's return key in a single-line text field. */
+	| { readonly event: 'enter'; readonly host: string }
+	/** A `timer` journal entry's time has come: its `after` op's ops run. */
+	| { readonly event: 'timer'; readonly timer: string };
 
 type Value = NativeValue;
 
@@ -47,6 +52,10 @@ export type NativeScope = {
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** A form's entries now, for `{ formData }`. */
+	readonly formData?: (form: string) => Value;
+	/** A checkbox's or radio button's checkedness now, for `{ checked }`. */
+	readonly checked?: (node: string) => boolean;
 };
 
 const EMPTY_SCOPE: NativeScope = { items: new Map(), locals: new Map() };
@@ -68,6 +77,8 @@ export type NativeRuntime = {
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Every system sheet and whether its `open` is truthy. */
 	readonly sheets: () => ReadonlyArray<readonly [node: string, open: boolean]>;
+	/** Every shown checkbox's and radio button's checkedness. */
+	readonly checks: () => ReadonlyArray<readonly [node: string, checked: boolean]>;
 	/** Runs the handler bound to the action (or writes the device or task cell it names) and returns the journal. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
 	/** The page's `<title>` text, null when it has none. */
@@ -136,6 +147,8 @@ export function evaluateNativeExpr(
 									(name, i) => [name, values[i] ?? null] as const,
 								),
 							]),
+							...(scope.formData ? { formData: scope.formData } : {}),
+							...(scope.checked ? { checked: scope.checked } : {}),
 						})
 				: evaluate(argument),
 		);
@@ -152,10 +165,22 @@ export function evaluateNativeExpr(
 		const list = evaluate(expr.of);
 		if (!Array.isArray(list)) throw new Error('an index into a value that is not an array');
 		const at = evaluate(expr.at);
-		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length ? list[at]! : null;
+		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length
+			? list[at]!
+			: null;
 	}
 	if ('cell' in expr) return read(expr.cell, scope);
 	if ('literal' in expr) return expr.literal;
+	if ('checked' in expr) {
+		if (!scope.checked)
+			throw new Error(`the checkedness of ${expr.checked} read outside a runtime`);
+		return scope.checked(expr.checked);
+	}
+	if ('formData' in expr) {
+		if (!scope.formData)
+			throw new Error(`the entries of ${expr.formData} read outside a runtime`);
+		return scope.formData(expr.formData);
+	}
 	if ('event' in expr) {
 		if (eventValue === undefined)
 			throw new Error('the event value read outside an input handler');
@@ -211,11 +236,22 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
-		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
+		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
+			return value.length;
 		const index = Number(expr.property);
-		if (Array.isArray(value) && Number.isInteger(index) && index >= 0 && String(index) === expr.property)
+		if (
+			Array.isArray(value) &&
+			Number.isInteger(index) &&
+			index >= 0 &&
+			String(index) === expr.property
+		)
 			return value[index] ?? null;
-		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
+		if (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.hasOwn(value, expr.property)
+		)
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
@@ -229,8 +265,15 @@ export function createNativeRuntime(
 	store: Map<string, Value> = new Map(),
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
+	/** The device's preferred languages, most preferred first: the web's messages are shown in the first one it has. */
+	preferredLanguages: ReadonlyArray<string> = ['en'],
 ): NativeRuntime {
-	const base: NativeScope = { ...EMPTY_SCOPE, params };
+	const base: NativeScope = {
+		...EMPTY_SCOPE,
+		params,
+		formData: (form) => entriesOf(form),
+		checked: (node) => checkedOf(node),
+	};
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
@@ -381,11 +424,142 @@ export function createNativeRuntime(
 	const attributes = () =>
 		bound('attribute', (name, value) => marklessAttributeValue(name, value));
 	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')) as (readonly [
-			string,
-			'value',
-			string,
-		])[];
+		bound('property', (_name, value) => String(value ?? '')).filter(
+			([, name]) => name === 'value',
+		) as (readonly [string, 'value', string])[];
+
+	// Forms: what each text field holds, which submissions are still running, and the marks they set.
+	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
+	/** A field's text a person typed since its `value` binding last changed it. */
+	const edited = new Map<string, string>();
+	type Submission = {
+		readonly sent: string;
+		readonly submitter: string | null;
+		readonly marks: boolean;
+		pending: number;
+	};
+	const running = new Map<string, Submission[]>();
+	const timers = new Map<
+		string,
+		{
+			readonly ops: ReadonlyArray<NativeOp>;
+			readonly locals: ReadonlyMap<string, Value>;
+			readonly submission?: Submission;
+		}
+	>();
+	let timerCount = 0;
+	const elementOf = (id: string) => {
+		const node = nodesById.get(id);
+		if (node?.kind !== 'element') throw new Error(`${id} is not an element`);
+		return node;
+	};
+	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
+	const attributeNow = (id: string, name: string): string | null => {
+		const node = elementOf(id);
+		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
+		return binding
+			? marklessAttributeValue(name, evaluate(binding.value))
+			: (node.attributes?.[name] ?? null);
+	};
+	const propertyBinding = (id: string, name: string) =>
+		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	const textOf = (id: string): string => {
+		if (edited.has(id)) return edited.get(id)!;
+		const binding = propertyBinding(id, 'value');
+		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
+	};
+	const ticked = payload.nodes.flatMap((node) =>
+		node.kind === 'element' &&
+		node.element === 'input' &&
+		!node.row &&
+		(node.attributes?.['type'] === 'checkbox' || node.attributes?.['type'] === 'radio')
+			? [node]
+			: [],
+	);
+	const checkedBinding = (id: string) => {
+		const binding = propertyBinding(id, 'checked');
+		return binding ? Boolean(evaluate(binding.value)) : undefined;
+	};
+	/** Each checkbox's and radio button's checkedness: its `checked` binding sets it, as does a person's tick. */
+	const checkedness = new Map(
+		ticked.map(
+			(node) =>
+				[
+					node.id,
+					checkedBinding(node.id) ?? node.attributes?.['checked'] !== undefined,
+				] as const,
+		),
+	);
+	const checkedOf = (id: string): boolean => {
+		if (!checkedness.has(id)) throw new Error(`${id} is not a checkbox or radio button`);
+		return checkedness.get(id)!;
+	};
+	const formOf = (id: string) =>
+		(payload.forms ?? []).find((form) => form.fields.some((field) => field.node === id))
+			?.node ?? null;
+	/** The radio buttons of `id`'s group: the same `name`, in the same form or in none. */
+	const groupOf = (id: string) => {
+		const name = attributeNow(id, 'name');
+		const form = formOf(id);
+		return ticked.filter(
+			(node) =>
+				node.id === id ||
+				(node.attributes?.['type'] === 'radio' &&
+					!!name &&
+					attributeNow(node.id, 'name') === name &&
+					formOf(node.id) === form),
+		);
+	};
+	const messages = payload.valueMissing ?? {};
+	const missing = messages[nativeLocale(preferredLanguages, Object.keys(messages))];
+	function entriesOf(id: string): Value {
+		const form = forms.get(id);
+		if (!form) throw new Error(`${id} is not a form`);
+		return form.fields.flatMap(({ node, kind }): Value[] => {
+			const name = attributeNow(node, 'name');
+			if (!shown(elementOf(node)) || attributeNow(node, 'disabled') !== null || !name)
+				return [];
+			if (kind === 'checkbox' || kind === 'radio')
+				return checkedOf(node) ? [[name, attributeNow(node, 'value') ?? 'on']] : [];
+			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
+		});
+	}
+	/** The first field that stops a submit, with what the web says about it, or undefined when none does. */
+	const firstInvalid = (id: string, submitter: string | null) => {
+		const form = forms.get(id)!;
+		if (
+			form.noValidate ||
+			(submitter !== null && attributeNow(submitter, 'formnovalidate') !== null)
+		)
+			return undefined;
+		return form.fields.find(({ node, kind }) => {
+			if (kind === 'hidden' || !shown(elementOf(node))) return false;
+			if (attributeNow(node, 'disabled') !== null) return false;
+			// A radio button is missing its value when any button of its group is required and none is checked.
+			const required =
+				kind === 'radio'
+					? groupOf(node).some((member) => attributeNow(member.id, 'required') !== null)
+					: attributeNow(node, 'required') !== null;
+			if (!required) return false;
+			if (kind === 'radio') return groupOf(node).every((member) => !checkedOf(member.id));
+			return kind === 'text' ? textOf(node) === '' : !checkedOf(node);
+		});
+	};
+	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
+	const marks = () => {
+		const now = new Map<string, string | null>();
+		for (const form of payload.forms ?? []) {
+			const runs = running.get(form.node) ?? [];
+			now.set(`${form.node}\0aria-busy`, runs.length > 0 ? 'true' : null);
+			if (form.authoredAriaDisabled) continue;
+			for (const submitter of form.submitters)
+				now.set(
+					`${submitter}\0aria-disabled`,
+					runs.some((run) => run.marks && run.submitter === submitter) ? 'true' : null,
+				);
+		}
+		return now;
+	};
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
@@ -407,13 +581,21 @@ export function createNativeRuntime(
 
 	return {
 		texts,
-		attributes,
+		attributes: () => [
+			...attributes(),
+			...[...marks()].map(([key, value]) => {
+				const [node, name] = key.split('\0') as [string, string];
+				return [node, name, value] as const;
+			}),
+		],
 		properties,
 		arms,
 		dialogs: () => [...dialogs],
 		rows,
 		title,
 		sheets,
+		checks: () =>
+			ticked.flatMap((node) => (shown(node) ? [[node.id, checkedOf(node.id)] as const] : [])),
 		dispatch(action) {
 			if (action.event === 'resume') {
 				const continuation = continuations.get(action.continuation);
@@ -463,6 +645,19 @@ export function createNativeRuntime(
 					return cancel ? run(handlers.get(cancel.handler) ?? [], undefined, base) : [];
 				});
 			}
+			if (action.event === 'timer') {
+				const timer = timers.get(action.timer);
+				if (!timer) throw new Error(`no timer ${action.timer} is set`);
+				timers.delete(action.timer);
+				return change(undefined, undefined, () => {
+					const out = run(timer.ops, undefined, { ...base, locals: timer.locals }, timer.submission);
+					if (timer.submission) {
+						timer.submission.pending--;
+						settled(timer.submission);
+					}
+					return out;
+				});
+			}
 			// A row's copy (`<node>@<key>`) runs its node's handler in that row; node ids never hold `@`.
 			const at = action.host.indexOf('@');
 			const host = at < 0 ? action.host : action.host.slice(0, at);
@@ -502,9 +697,32 @@ export function createNativeRuntime(
 		ops: ReadonlyArray<NativeOp>,
 		eventValue: string | undefined,
 		scope: NativeScope,
+		submission?: Submission,
 	): NativeJournalEntry[] {
 		const calls: NativeJournalEntry[] = [];
 		for (const op of ops) {
+			if (op.op === 'submit') {
+				const taken = submit(op, scope, calls);
+				if (taken[0]?.op === 'navigate') return taken;
+				calls.push(...taken);
+				continue;
+			}
+			if (op.op === 'tick') {
+				const group = elementOf(op.node).attributes?.['type'] === 'radio' ? groupOf(op.node) : [];
+				if (group.length === 0) checkedness.set(op.node, !checkedOf(op.node));
+				else for (const member of group) checkedness.set(member.id, member.id === op.node);
+				continue;
+			}
+			if (op.op === 'after') {
+				const ms = evaluate(op.ms, eventValue, scope);
+				const locals = new Map(scope.locals);
+				for (const [name, value] of op.capture) locals.set(name, evaluate(value, eventValue, scope));
+				const id = `timer:${timerCount++}`;
+				timers.set(id, { ops: op.ops, locals, ...(submission ? { submission } : {}) });
+				if (submission) submission.pending++;
+				calls.push({ op: 'timer', timer: id, ms: typeof ms === 'number' && ms > 0 ? ms : 0 });
+				continue;
+			}
 			if (op.op === 'navigate') {
 				const params = Object.fromEntries(
 					Object.entries(op.params).map(([name, value]) => [
@@ -540,6 +758,7 @@ export function createNativeRuntime(
 					evaluate(op.test, eventValue, scope) ? op.whenTrue : op.whenFalse,
 					eventValue,
 					scope,
+					submission,
 				);
 				if (taken[0]?.op === 'navigate') return taken;
 				calls.push(...taken);
@@ -566,6 +785,55 @@ export function createNativeRuntime(
 		return calls;
 	}
 
+	/** A submission whose handler and timers have all run is no longer running. */
+	function settled(submission: Submission | undefined) {
+		if (!submission || submission.pending > 0) return;
+		for (const [form, runs] of running) {
+			const left = runs.filter((run) => run !== submission);
+			if (left.length > 0) running.set(form, left);
+			else running.delete(form);
+		}
+	}
+
+	/**
+	 * A `submit` op as the web runs it: nothing for a disabled submitter, an `invalid` entry for the first field missing its
+	 * value, nothing for the same entries from the same button as a submission still running, else the form's handler.
+	 */
+	function submit(
+		op: Extract<NativeOp, { op: 'submit' }>,
+		scope: NativeScope,
+		calls: NativeJournalEntry[],
+	): NativeJournalEntry[] {
+		const form = forms.get(op.form);
+		if (!form) throw new Error(`${op.form} is not a form`);
+		if (op.submitter !== null && attributeNow(op.submitter, 'disabled') !== null) return [];
+		const invalid = firstInvalid(op.form, op.submitter);
+		if (invalid) {
+			if (!missing) throw new Error(`the payload has no message for a ${invalid.kind} missing its value`);
+			calls.push({
+				op: 'invalid',
+				node: invalid.node,
+				message: missing[invalid.kind as 'text' | 'checkbox' | 'radio'],
+			});
+			return [];
+		}
+		const sent = JSON.stringify(entriesOf(op.form));
+		const runs = running.get(op.form) ?? [];
+		if (runs.some((run) => run.sent === sent && run.submitter === op.submitter)) return [];
+		const handler = payload.events.find((candidate) => candidate.host === op.form && candidate.event === 'submit');
+		if (!handler) throw new Error(`${op.form} has no submit handler`);
+		const submission: Submission = {
+			sent,
+			submitter: op.submitter,
+			marks: op.submitter !== null && !form.authoredAriaDisabled,
+			pending: 0,
+		};
+		running.set(op.form, [...runs, submission]);
+		const out = run(handlers.get(handler.handler) ?? [], undefined, { ...base, locals: scope.locals }, submission);
+		settled(submission);
+		return out;
+	}
+
 	/**
 	 * Runs `apply` (which writes cells and returns the calls it made, or a navigation that ends the page) and returns the
 	 * journal: styled cells first, then every shown node whose output changed, in document order, then the calls.
@@ -579,10 +847,17 @@ export function createNativeRuntime(
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
+			const beforeMarks = marks();
+			const checkedBefore = new Map(checkedness);
+			const bindingsBefore = new Map(
+				ticked.map((node) => [node.id, checkedBinding(node.id)] as const),
+			);
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined && host !== undefined)
+			if (eventValue !== undefined && host !== undefined) {
 				beforeProperties.set(`${host}\0value`, eventValue);
+				edited.set(host, eventValue);
+			}
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const beforeTitle = title();
@@ -632,7 +907,9 @@ export function createNativeRuntime(
 				const ids = instances(node).map((instance) => instance.id);
 				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
 				const dialog: NativeJournalEntry[] =
-					opened !== undefined && opened !== dialogsBefore.get(node.id) ? [{ op: 'dialog', node: node.id, open: opened }] : [];
+					opened !== undefined && opened !== dialogsBefore.get(node.id)
+						? [{ op: 'dialog', node: node.id, open: opened }]
+						: [];
 				if (node.kind === 'text') {
 					return ids.flatMap((id): NativeJournalEntry[] => {
 						const before = beforeTexts.get(id);
@@ -642,39 +919,66 @@ export function createNativeRuntime(
 							: [];
 					});
 				}
-				return dialog.concat(ids.flatMap((id) =>
-					(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
-						const name = 'attribute' in binding ? binding.attribute : binding.property;
-						const key = `${id}\0${name}`;
-						const [before, after] =
-							'attribute' in binding
-								? [beforeAttributes, afterAttributes]
-								: [beforeProperties, afterProperties];
-						if (
-							!before.has(key) ||
-							!after.has(key) ||
-							before.get(key) === after.get(key)
-						)
-							return [];
-						return 'attribute' in binding
-							? [
-									{
-										op: 'attribute',
-										node: id,
-										name,
-										value: afterAttributes.get(key)!,
-									},
-								]
-							: [
-									{
-										op: 'property',
-										node: id,
-										name: 'value',
-										value: afterProperties.get(key)!,
-									},
-								];
-					}),
-				));
+				return dialog.concat(
+					ids.flatMap((id) =>
+						(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
+							const name =
+								'attribute' in binding ? binding.attribute : binding.property;
+							const key = `${id}\0${name}`;
+							const [before, after] =
+								'attribute' in binding
+									? [beforeAttributes, afterAttributes]
+									: [beforeProperties, afterProperties];
+							if (
+								!before.has(key) ||
+								!after.has(key) ||
+								before.get(key) === after.get(key)
+							)
+								return [];
+							return 'attribute' in binding
+								? [
+										{
+											op: 'attribute',
+											node: id,
+											name,
+											value: afterAttributes.get(key)!,
+										},
+									]
+								: [
+										{
+											op: 'property',
+											node: id,
+											name: 'value',
+											value: afterProperties.get(key)!,
+										},
+									];
+						}),
+					),
+				);
+			});
+			// A `checked` binding whose value changed sets the checkedness, as the web's property write does.
+			for (const node of ticked) {
+				const bound = checkedBinding(node.id);
+				if (bound !== undefined && bound !== bindingsBefore.get(node.id))
+					checkedness.set(node.id, bound);
+			}
+			const checks = ticked.flatMap((node): NativeJournalEntry[] =>
+				shown(node) && checkedBefore.get(node.id) !== checkedness.get(node.id)
+					? [
+							{
+								op: 'property',
+								node: node.id,
+								name: 'checked',
+								value: checkedness.get(node.id)!,
+							},
+						]
+					: [],
+			);
+			const afterMarks = marks();
+			const marked = [...afterMarks].flatMap(([key, value]): NativeJournalEntry[] => {
+				if (beforeMarks.get(key) === value) return [];
+				const [node, name] = key.split('\0') as [string, string];
+				return [{ op: 'attribute', node, name, value }];
 			});
 			const owned = new Set(liveObjects());
 			const releases = (payload.objects ?? []).flatMap((object): NativeJournalEntry[] =>
@@ -683,9 +987,13 @@ export function createNativeRuntime(
 					: [],
 			);
 			const afterTitle = title();
+			// A field whose binding wrote it shows that value now, not what was typed before.
+			for (const entry of nodes) if (entry.op === 'property') edited.delete(entry.node);
 			return [
 				...styles,
 				...nodes,
+				...checks,
+				...marked,
 				...(afterTitle !== beforeTitle && afterTitle !== null
 					? [{ op: 'title' as const, value: afterTitle }]
 					: []),

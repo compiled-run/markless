@@ -10,6 +10,8 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 	readonly params?: Readonly<Record<string, string>>;
 	/** The app config's usage text, for a component that uses a device feature that asks. */
 	readonly device?: DeviceAppConfig;
+	/** The device's preferred languages, when the vector shows a message in one. */
+	readonly preferredLanguages?: ReadonlyArray<string>;
 	readonly actions: ReadonlyArray<NativeAction>;
 }> = [
 	{
@@ -268,6 +270,56 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h8' },
 			{ event: 'activate', host: 'h8' },
 			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'forms',
+		fixture: 'test/fixtures/Forms.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h11' },
+			{ event: 'input', host: 'h2', value: '' },
+			{ event: 'activate', host: 'h9' },
+			{ event: 'activate', host: 'h10' },
+			{ event: 'input', host: 'h2', value: 'Grace' },
+			{ event: 'input', host: 'h3', value: 'Cy' },
+			{ event: 'enter', host: 'h2' },
+			{ event: 'enter', host: 'h15' },
+			{ event: 'input', host: 'h20', value: 'Lu' },
+			{ event: 'activate', host: 'h21' },
+			{ event: 'activate', host: 'h21' },
+			{ event: 'input', host: 'h20', value: '' },
+			{ event: 'enter', host: 'h20' },
+			{ event: 'timer', timer: 'timer:0' },
+			{ event: 'timer', timer: 'timer:1' },
+			{ event: 'activate', host: 'h24' },
+			{ event: 'timer', timer: 'timer:2' },
+		],
+	},
+	{
+		name: 'form-return',
+		fixture: 'test/fixtures/FormReturn.tsrx',
+		actions: [
+			{ event: 'input', host: 'h2', value: 'hi' },
+			{ event: 'enter', host: 'h2' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'enter', host: 'h2' },
+		],
+	},
+	{
+		name: 'ticks',
+		fixture: 'test/fixtures/Ticks.tsrx',
+		preferredLanguages: ['fr-CA', 'en'],
+		actions: [
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h3' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h7' },
 		],
 	},
 	{
