@@ -38,7 +38,13 @@ sealed interface StyleWrite {
 	data class TextColor(val color: Rgba) : StyleWrite
 }
 
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
+/** One drawing operation of a dashed or dotted border, in device px; [side] names the side whose colour it takes (-1: none). */
+data class BorderOp(val op: String, val side: Int, val alpha: Double, val antialias: Boolean, val points: List<Double>)
+
+/** A dashed or dotted border as Dragon's own native paint draws it, the snapped border box at the origin (relative to the node's frame). */
+data class BorderOps(val originX: Double, val originY: Double, val ops: List<BorderOp>)
+
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val borderOps: BorderOps? = null)
 
 /** One reachable combination of style states: every node's frame and writes, complete, and the canvas behind the page (null: white). */
 data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val canvas: Rgba? = null) {
@@ -222,7 +228,34 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val kind = o.field("kind", what).str("$what.kind")
 			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
-			return StyledNode(id, parent, kind, frame, bw, writesOf(o.field("writes", what), id))
+			return StyledNode(id, parent, kind, frame, bw, writesOf(o.field("writes", what), id), o["borderOps"]?.let { borderOps(it, "$what.borderOps") })
+		}
+
+		private fun borderOps(v: Json, what: String): BorderOps {
+			val o = v.obj(what)
+			o.only(setOf("origin", "size", "widths", "ops"), what)
+			val origin = o.field("origin", what).obj("$what.origin")
+			o.field("size", what).obj("$what.size")
+			if (o.field("widths", what).arr("$what.widths").size != 4) throw MarklessDecodeError("$what.widths is not four sides")
+			val ops = o.field("ops", what).arr("$what.ops").mapIndexed { n, x ->
+				val at = "$what.ops[$n]"
+				val f = x.obj(at)
+				f.only(setOf("op", "side", "alpha", "antialias", "points"), at)
+				val op = f.field("op", at).str("$at.op")
+				val side = f.field("side", at).num("$at.side").toInt()
+				val points = f.field("points", at).arr("$at.points").map { it.num("$at.points[]") }
+				val shaped = when (op) {
+					"begin-layer", "end-layer", "save", "restore" -> points.isEmpty()
+					"clip" -> points.size >= 6 && points.size % 2 == 0
+					"fill" -> points.size >= 6 && points.size % 2 == 0 && side in 0..3
+					"dot" -> points.size == 3 && side in 0..3
+					else -> throw MarklessDecodeError("$at is an unknown border operation \"$op\"")
+				}
+				if (!shaped) throw MarklessDecodeError("$at ($op) has the wrong points or side")
+				val antialias = f.field("antialias", at).let { if (it is Json.Bool) it.value else throw MarklessDecodeError("$at.antialias is not true or false") }
+				BorderOp(op, side, f.field("alpha", at).num("$at.alpha"), antialias, points)
+			}
+			return BorderOps(origin.field("x", what).num("$what.origin.x"), origin.field("y", what).num("$what.origin.y"), ops)
 		}
 
 		private fun scalar(v: Json, what: String): JsValue = when (v) {

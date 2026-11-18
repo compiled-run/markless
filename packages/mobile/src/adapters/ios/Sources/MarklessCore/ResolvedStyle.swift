@@ -9,11 +9,19 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var sides: [Side]?
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
+	/// A dashed or dotted border: Dragon's operations, the four side colours and the device scale they are drawn at.
+	public var dashedBorder: DashedBorder?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor && a.sides == b.sides
+			&& a.textColor == b.textColor && a.sides == b.sides && a.dashedBorder == b.dashedBorder
+	}
+
+	public struct DashedBorder: Equatable, Sendable {
+		public let ops: BorderOps
+		public let colors: [RGBA]
+		public let scale: Double
 	}
 
 	public struct Side: Equatable, Sendable {
@@ -155,7 +163,12 @@ extension StyleExport {
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
 			}
 		}
-		if let widths = node.borderWidths {
+		if let ops = node.borderOps {
+			guard borderColors.count == 4, style.cornerRadius == 0 else {
+				throw styleError("\(node.id): a dashed or dotted border needs four side colours and square corners")
+			}
+			style.dashedBorder = ResolvedStyle.DashedBorder(ops: ops, colors: borderColors, scale: dpr)
+		} else if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]
 			if all.contains(where: { $0 != 0 }) {
 				guard borderStyles.count == 4, borderStyles.allSatisfy({ ["solid", "none", "hidden"].contains($0) }), borderColors.count == 4 else {

@@ -26,6 +26,21 @@ public enum StyleWrite: Sendable {
 	case syntheticBold
 }
 
+/// A dashed or dotted border as Dragon's own native paint draws it (its port of Blink's side painter): operations in device px,
+/// with the box's snapped border box at `origin` (relative to the node's frame); `side` names the side whose colour an operation takes.
+public struct BorderOps: Equatable, Sendable {
+	public struct Op: Equatable, Sendable {
+		public let op: String
+		public let side: Int
+		public let alpha: Double
+		public let antialias: Bool
+		public let points: [Double]
+	}
+	public let originX: Double
+	public let originY: Double
+	public let ops: [Op]
+}
+
 public struct StyleNode: Sendable {
 	public let id: String
 	public let parent: String?
@@ -35,6 +50,7 @@ public struct StyleNode: Sendable {
 	public let frame: Frame?
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
 	public let writes: [StyleWrite]
+	public let borderOps: BorderOps?
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -249,7 +265,7 @@ public struct StyleExport: Sendable {
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"])
+		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
@@ -274,7 +290,32 @@ public struct StyleExport: Sendable {
 		return StyleNode(
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
-			writes: try field["writes"].array().map(decodeWrite))
+			writes: try field["writes"].array().map(decodeWrite),
+			borderOps: field.has("borderOps") ? try decodeBorderOps(try field["borderOps"]) : nil)
+	}
+
+	private static func decodeBorderOps(_ reader: Reader) throws -> BorderOps {
+		let f = try reader.object(["origin", "size", "widths", "ops"])
+		let origin = try f["origin"].object(["x", "y"])
+		_ = try f["size"].object(["width", "height"])
+		guard try f["widths"].array().count == 4 else { throw PayloadError(path: reader.path + ".widths", reason: "expected four sides") }
+		let ops = try f["ops"].array().map { op -> BorderOps.Op in
+			let o = try op.object(["op", "side", "alpha", "antialias", "points"])
+			let kind = try o["op"].string()
+			let points = try o["points"].array().map { try $0.number() }
+			let side = Int(try o["side"].number())
+			let shaped: Bool
+			switch kind {
+			case "begin-layer", "end-layer", "save", "restore": shaped = points.isEmpty
+			case "clip": shaped = points.count >= 6 && points.count % 2 == 0
+			case "fill": shaped = points.count >= 6 && points.count % 2 == 0 && (0...3).contains(side)
+			case "dot": shaped = points.count == 3 && (0...3).contains(side)
+			default: throw PayloadError(path: op.path, reason: "unknown border operation \(kind)")
+			}
+			guard shaped else { throw PayloadError(path: op.path, reason: "\(kind) has the wrong points or side") }
+			return BorderOps.Op(op: kind, side: side, alpha: try o["alpha"].number(), antialias: try o["antialias"].bool(), points: points)
+		}
+		return BorderOps(originX: try origin["x"].number(), originY: try origin["y"].number(), ops: ops)
 	}
 
 	private static func decodeWrite(_ write: Reader) throws -> StyleWrite {
