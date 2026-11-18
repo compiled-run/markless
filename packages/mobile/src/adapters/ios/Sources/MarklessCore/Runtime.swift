@@ -1,14 +1,25 @@
 /// What a person does to a retained view.
 public struct NativeAction: Equatable, Sendable {
 	public let event: NativeEventName
+	/// The element acted on; "" for a `timer`.
 	public let host: String
 	/// For `input`: the field's whole text after the edit.
 	public let value: String?
+	/// For `timer`: the journalled timer whose time has come.
+	public let timer: String?
 
 	public init(event: NativeEventName, host: String, value: String? = nil) {
 		self.event = event
 		self.host = host
 		self.value = value
+		timer = nil
+	}
+
+	public init(event: NativeEventName, timer: String) {
+		self.event = event
+		host = ""
+		value = nil
+		self.timer = timer
 	}
 }
 
@@ -31,6 +42,10 @@ public enum NativeJournalEntry: Equatable, Sendable {
 	case dialog(node: String, open: Bool)
 	/// A `command` op the handler ran, after every other entry, in order.
 	case command(node: String, command: String, preventScroll: Bool)
+	/// A submit stopped: focus moves to `node` as `focus()` would and `message` shows until the next action.
+	case invalid(node: String, message: String)
+	/// Dispatch a `timer` action for `timer` in `ms` milliseconds.
+	case timer(timer: String, ms: Double)
 
 	public var json: JSONValue {
 		switch self {
@@ -51,6 +66,10 @@ public enum NativeJournalEntry: Equatable, Sendable {
 			return .object([("op", .string("dialog")), ("node", .string(node)), ("open", .bool(open))])
 		case let .command(node, command, preventScroll):
 			return .object([("op", .string("command")), ("node", .string(node)), ("command", .string(command))] + (preventScroll ? [("preventScroll", .bool(true))] : []))
+		case let .invalid(node, message):
+			return .object([("op", .string("invalid")), ("node", .string(node)), ("message", .string(message))])
+		case let .timer(timer, ms):
+			return .object([("op", .string("timer")), ("timer", .string(timer)), ("ms", .number(ms))])
 		}
 	}
 }
@@ -86,6 +105,25 @@ public struct NativeInstance {
 	public let scope: NativeScope
 }
 
+/// One run of a form's submit handler, kept while an `after` it started is pending.
+private final class Submission {
+	let sent: [[String]]
+	let submitter: String?
+	let marks: Bool
+	var pending = 0
+
+	init(sent: [[String]], submitter: String?, marks: Bool) {
+		self.sent = sent
+		self.submitter = submitter
+		self.marks = marks
+	}
+}
+
+private struct Context {
+	let locals: [String: NativeValue]
+	let submission: Submission?
+}
+
 /// The payload's state and op interpreter, matching `packages/mobile/src/runtime.ts` exactly.
 public final class NativeRuntime {
 	public let payload: NativeViewPayload
@@ -96,6 +134,12 @@ public final class NativeRuntime {
 	private let nodesById: [String: NativeNode]
 	private let params: [NativeRouteParam]
 	private var eventValue: String?
+	private let forms: [String: NativeForm]
+	/// A field's text a person typed since its `value` binding last changed it.
+	private var edited: [String: String] = [:]
+	private var running: [String: [Submission]] = [:]
+	private var timers: [String: (ops: [NativeOp], context: Context)] = [:]
+	private var timerCount = 0
 	/// Each `<dialog>`'s top-layer state; every dialog mounts closed.
 	public private(set) var dialogs: [String: Bool]
 
@@ -110,6 +154,7 @@ public final class NativeRuntime {
 		storageKeys = Dictionary(uniqueKeysWithValues: payload.cells.compactMap { cell in cell.storageKey.map { (cell.id, $0) } })
 		handlers = Dictionary(uniqueKeysWithValues: payload.handlers.map { ($0.id, $0.ops) })
 		nodesById = Dictionary(uniqueKeysWithValues: payload.nodes.map { ($0.id, $0) })
+		forms = Dictionary(payload.forms.map { ($0.node, $0) }, uniquingKeysWith: { first, _ in first })
 		dialogs = Dictionary(uniqueKeysWithValues: payload.nodes.compactMap { node in
 			if case let .element(element, _, _) = node.kind, element == "dialog" { return (node.id, false) }
 			return nil
@@ -158,6 +203,7 @@ public final class NativeRuntime {
 			}
 			return try callMethod(method, on: targetValue, args)
 		case .routeParams: return .object(params.map { (key: $0.name, value: .string($0.value)) })
+		case let .formData(form): return .array(try entries(of: form).map { .array($0.map(NativeValue.string)) })
 		case .eventValue:
 			guard let eventValue else { throw RuntimeError(reason: "the event value read outside an input handler") }
 			return .string(eventValue)
@@ -274,14 +320,95 @@ public final class NativeRuntime {
 		}
 	}
 
-	/// Every shown element instance's bound attributes as written: nil absent, "" bare.
+	/// Every shown element's bound attributes as written (nil absent, "" bare), then each form's marks.
 	public func attributes() throws -> [(node: String, name: String, value: String?)] {
+		try boundAttributes() + marks().map { ($0.node, $0.name, $0.value) }
+	}
+
+	private func boundAttributes() throws -> [(node: String, name: String, value: String?)] {
 		try bound(properties: false).map { ($0.node, $0.name, marklessAttributeValue($0.name, $0.value)) }
 	}
 
 	/// Every shown input's bound `value`, as `String(value)` with null reading "".
 	public func properties() throws -> [(node: String, name: String, value: String)] {
-		try bound(properties: true).map { ($0.node, $0.name, $0.value == .null ? "" : $0.value.text) }
+		try bound(properties: true).filter { $0.name == "value" }.map { ($0.node, $0.name, $0.value == .null ? "" : $0.value.text) }
+	}
+
+	private func element(_ id: String) throws -> (node: NativeNode, attributes: [String: String], bindings: [NativeBinding]) {
+		guard let node = nodesById[id], case let .element(_, attributes, bindings) = node.kind else { throw RuntimeError(reason: "\(id) is not an element") }
+		return (node, attributes, bindings)
+	}
+
+	/// An attribute as the web has it now: a binding's value as written, else the attribute the element was built with.
+	private func attributeNow(_ id: String, _ name: String) throws -> String? {
+		let found = try element(id)
+		if let binding = found.bindings.first(where: { !$0.isProperty && $0.name == name }) {
+			return marklessAttributeValue(name, try evaluate(binding.value))
+		}
+		return found.attributes[name]
+	}
+
+	private func propertyBinding(_ id: String, _ name: String) throws -> NativeBinding? {
+		try element(id).bindings.first { $0.isProperty && $0.name == name }
+	}
+
+	private func textOf(field id: String) throws -> String {
+		if let typed = edited[id] { return typed }
+		if let binding = try propertyBinding(id, "value") { return textOf(try evaluate(binding.value)) }
+		return try attributeNow(id, "value") ?? ""
+	}
+
+	private func isChecked(_ id: String) throws -> Bool {
+		if let binding = try propertyBinding(id, "checked") { return try evaluate(binding.value).isTruthy }
+		return try attributeNow(id, "checked") != nil
+	}
+
+	private func isShownField(_ id: String) throws -> Bool { try isShown(try element(id).node.arm) }
+
+	/// A form's entry list as the web builds it: `[name, value]` pairs in tree order.
+	public func entries(of id: String) throws -> [[String]] {
+		guard let form = forms[id] else { throw RuntimeError(reason: "\(id) is not a form") }
+		return try form.fields.compactMap { field -> [String]? in
+			guard try isShownField(field.node), try attributeNow(field.node, "disabled") == nil,
+				let name = try attributeNow(field.node, "name"), !name.isEmpty
+			else { return nil }
+			switch field.kind {
+			case .checkbox: return try isChecked(field.node) ? [name, try attributeNow(field.node, "value") ?? "on"] : nil
+			case .hidden: return [name, try attributeNow(field.node, "value") ?? ""]
+			case .text: return [name, try textOf(field: field.node)]
+			}
+		}
+	}
+
+	/// The first field that stops a submit, or nil when none does.
+	private func firstInvalid(_ form: NativeForm, submitter: String?) throws -> NativeForm.Field? {
+		if form.noValidate { return nil }
+		if let submitter, try attributeNow(submitter, "formnovalidate") != nil { return nil }
+		return try form.fields.first { field in
+			guard field.kind != .hidden, try isShownField(field.node) else { return false }
+			guard try attributeNow(field.node, "disabled") == nil, try attributeNow(field.node, "required") != nil else { return false }
+			return field.kind == .text ? try textOf(field: field.node) == "" : !(try isChecked(field.node))
+		}
+	}
+
+	/// `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one.
+	private func marks() -> [(node: String, name: String, value: String?)] {
+		payload.forms.flatMap { form -> [(node: String, name: String, value: String?)] in
+			let runs = running[form.node] ?? []
+			let busy = (node: form.node, name: "aria-busy", value: runs.isEmpty ? nil : Optional("true"))
+			if form.authoredAriaDisabled { return [busy] }
+			return [busy] + form.submitters.map { submitter in
+				(submitter, "aria-disabled", runs.contains { $0.marks && $0.submitter == submitter } ? "true" : nil)
+			}
+		}
+	}
+
+	private func settle(_ submission: Submission?) {
+		guard let submission, submission.pending == 0 else { return }
+		for (form, runs) in running {
+			let left = runs.filter { $0 !== submission }
+			running[form] = left.isEmpty ? nil : left
+		}
 	}
 
 	/// Every shown branch's chosen arm.
@@ -302,8 +429,14 @@ public final class NativeRuntime {
 
 	/// Runs the handler bound to the action and returns the journal the host applies.
 	public func dispatch(_ action: NativeAction) throws -> [NativeJournalEntry] {
-		let bound = payload.events.first(where: { $0.host == action.host && $0.event == action.event })
-		if action.event == .cancel {
+		let bound = action.event == .timer ? nil : payload.events.first(where: { $0.host == action.host && $0.event == action.event })
+		var timer: (ops: [NativeOp], context: Context)?
+		if action.event == .timer {
+			guard let id = action.timer, let found = timers.removeValue(forKey: id) else {
+				throw RuntimeError(reason: "no timer \(action.timer ?? "") is set")
+			}
+			timer = found
+		} else if action.event == .cancel {
 			guard dialogs[action.host] == true else { throw RuntimeError(reason: "\(action.host) is not an open dialog") }
 		} else if bound == nil {
 			throw RuntimeError(reason: "no \(action.event.rawValue) handler on \(action.host)")
@@ -317,34 +450,79 @@ public final class NativeRuntime {
 		}
 		let cellsBefore = values
 		let beforeTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
-		let beforeAttributes = keyed(try attributes())
+		let beforeAttributes = keyed(try boundAttributes())
+		let beforeMarks = keyed(marks())
 		var beforeProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		if let eventValue { beforeProperties["\(action.host)\u{0}value"] = eventValue }
+		if action.event == .input { edited[action.host] = action.value ?? "" }
 		let beforeArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let beforeRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
 		var commands: [NativeJournalEntry] = []
-		func run(_ ops: [NativeOp]) throws -> NativeJournalEntry? {
+		var later: [NativeJournalEntry] = []
+		func submit(_ formId: String, _ submitter: String?, _ context: Context) throws -> NativeJournalEntry? {
+			guard let form = forms[formId] else { throw RuntimeError(reason: "\(formId) is not a form") }
+			if let submitter, try attributeNow(submitter, "disabled") != nil { return nil }
+			if let invalid = try firstInvalid(form, submitter: submitter) {
+				later.append(.invalid(node: invalid.node, message: invalid.missing))
+				return nil
+			}
+			let sent = try self.entries(of: formId)
+			let runs = running[formId] ?? []
+			// The same entries from the same button as a submission still running: the web drops it before any handler hears it.
+			if runs.contains(where: { $0.sent == sent && $0.submitter == submitter }) { return nil }
+			guard let handler = payload.events.first(where: { $0.host == formId && $0.event == .submit }) else {
+				throw RuntimeError(reason: "\(formId) has no submit handler")
+			}
+			let submission = Submission(sent: sent, submitter: submitter, marks: submitter != nil && !form.authoredAriaDisabled)
+			running[formId] = runs + [submission]
+			let navigated = try run(handlers[handler.handler] ?? [], Context(locals: context.locals, submission: submission))
+			settle(submission)
+			return navigated
+		}
+		func run(_ ops: [NativeOp], _ context: Context) throws -> NativeJournalEntry? {
+			let scope = NativeScope(locals: context.locals)
 			for op in ops {
 				switch op {
 				case let .navigate(route, params): return .navigate(route: route, params: params)
 				case let .assign(cell, expr):
-					let value = try evaluate(expr)
+					let value = try evaluate(expr, in: scope)
 					values[cell] = value
 					if let key = storageKeys[cell] { store.write(key, value) }
 				case let .when(test, then, otherwise):
-					if let taken = try run(try evaluate(test).isTruthy ? then : otherwise) { return taken }
+					if let taken = try run(try evaluate(test, in: scope).isTruthy ? then : otherwise, context) { return taken }
 				case let .dialog(node, open):
 					guard dialogs[node] != nil else { throw RuntimeError(reason: "\(node) is not a dialog") }
 					dialogs[node] = open
 				case let .command(node, command, preventScroll):
 					commands.append(.command(node: node, command: command, preventScroll: preventScroll))
+				case let .submit(form, submitter):
+					if let taken = try submit(form, submitter, context) { return taken }
+				case let .after(msExpr, capture, ops):
+					let ms = try evaluate(msExpr, in: scope)
+					var locals = context.locals
+					for captured in capture { locals[captured.name] = try evaluate(captured.value, in: scope) }
+					let id = "timer:\(timerCount)"
+					timerCount += 1
+					timers[id] = (ops, Context(locals: locals, submission: context.submission))
+					context.submission?.pending += 1
+					let wait: Double = if case let .number(number) = ms, number > 0 { number } else { 0 }
+					later.append(.timer(timer: id, ms: wait))
 				}
 			}
 			return nil
 		}
-		if let bound, let navigated = try run(handlers[bound.handler] ?? []) { return [navigated] }
+		if let timer {
+			let taken = try run(timer.ops, timer.context)
+			if let submission = timer.context.submission {
+				submission.pending -= 1
+				settle(submission)
+			}
+			if let taken { return [taken] }
+		} else if let bound, let navigated = try run(handlers[bound.handler] ?? [], Context(locals: [:], submission: nil)) {
+			return [navigated]
+		}
 		let afterTexts = Dictionary(try texts().map { ($0.node, $0.text) }, uniquingKeysWith: { $1 })
-		let afterAttributes = keyed(try attributes())
+		let afterAttributes = keyed(try boundAttributes())
 		let afterProperties = keyed(try properties().map { ($0.node, $0.name, Optional($0.value)) })
 		let afterArms = Dictionary(uniqueKeysWithValues: try arms().map { ($0.node, $0.index) })
 		let afterRows = Dictionary(uniqueKeysWithValues: try rows().map { ($0.node, $0.keys) })
@@ -377,6 +555,13 @@ public final class NativeRuntime {
 				}
 			}
 		}
-		return styles + entries + commands
+		let afterMarks = marks()
+		let marked = afterMarks.compactMap { mark -> NativeJournalEntry? in
+			guard beforeMarks["\(mark.node)\u{0}\(mark.name)"] != mark.value else { return nil }
+			return .attribute(node: mark.node, name: mark.name, value: mark.value)
+		}
+		// A field whose binding wrote it shows that value now, not what was typed before.
+		for case let .property(node, _, _) in entries { edited[node] = nil }
+		return styles + entries + marked + commands + later
 	}
 }

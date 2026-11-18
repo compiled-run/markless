@@ -1,0 +1,35 @@
+{
+	"rung": 55,
+	"name": "An async submit: the form is busy and its button unavailable until the awaited work succeeds or fails",
+	"steps": [
+		{ "visible": ["Username", "Save", "Nothing saved"] },
+		{
+			"do": { "type": { "field": "Name", "text": "ada" } },
+			"visible": ["Nothing saved"],
+			"fields": { "Name": "ada" }
+		},
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Saving"],
+			"absent": ["Nothing saved"],
+			"disabled": ["Save"]
+		},
+		{ "do": { "wait": 8000 }, "visible": ["Saved ada", "Save"], "absent": ["Saving"] },
+		{
+			"do": { "type": { "field": "Name", "text": "admin" } },
+			"visible": ["Saved ada"],
+			"fields": { "Name": "admin" }
+		},
+		{
+			"do": { "tap": "Save" },
+			"visible": ["Saving"],
+			"absent": ["Saved ada"],
+			"disabled": ["Save"]
+		},
+		{
+			"do": { "wait": 8000 },
+			"visible": ["The name admin is taken", "Save"],
+			"absent": ["Saving"]
+		}
+	]
+}

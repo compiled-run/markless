@@ -192,7 +192,10 @@ export type SemanticComponentPropBinding =
 			/** A callback's body as statements, collected for native builds only (`nativeFacts`). */
 			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
 			// `@catch (error, reset)` reset names a callback prop's own source calls, with the boundary each resets.
-			readonly catchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+			readonly catchResets?: ReadonlyArray<{
+				readonly name: string;
+				readonly boundaryId: string;
+			}>;
 			// An async callback's rejection renders in this boundary's `@catch`, as for an event handler.
 			readonly catchBoundaryId?: string;
 			readonly returnsPromise?: true;
@@ -975,7 +978,10 @@ export type SemanticEvent = {
 	// Body-local definitions spliced into `handlerSource`; their reads are the handler's too.
 	readonly handlerDefinitionSpans?: ReadonlyArray<SourceSpan>;
 	// `@catch (error, reset)` reset names the handler calls, with the boundary each resets.
-	readonly handlerCatchResets?: ReadonlyArray<{ readonly name: string; readonly boundaryId: string }>;
+	readonly handlerCatchResets?: ReadonlyArray<{
+		readonly name: string;
+		readonly boundaryId: string;
+	}>;
 	// An async handler's rejection renders in this boundary's `@catch`: the nearest one whose @try arm holds the element.
 	readonly handlerCatchBoundaryId?: string;
 	/** The handler can hand back a promise: it is async, or it returns a value that may be one. */
@@ -1230,6 +1236,12 @@ export type SemanticFunctionStatement =
 	| { readonly kind: 'set'; readonly name: string; readonly value: SemanticExpression }
 	/** `name.push(value)` on a local array. */
 	| { readonly kind: 'push'; readonly name: string; readonly value: SemanticExpression }
+	/** `callee(...)` by a bare name, for its effect: `setTimeout(...)`, or a promise executor's `resolve(value)`. */
+	| {
+			readonly kind: 'call';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	| {
 			readonly kind: 'if';
 			readonly test: SemanticExpression;
@@ -1258,10 +1270,25 @@ export type SemanticFunctionStatement =
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+' | 'typeof'; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'unary';
+			readonly operator: '!' | '-' | '+' | 'typeof';
+			readonly value: SemanticExpression;
+	  }
 	| {
 			readonly kind: 'binary';
-			readonly operator: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
+			readonly operator:
+				| '+'
+				| '-'
+				| '*'
+				| '/'
+				| '%'
+				| '==='
+				| '!=='
+				| '<'
+				| '<='
+				| '>'
+				| '>=';
 			readonly left: SemanticExpression;
 			readonly right: SemanticExpression;
 	  }
@@ -1280,15 +1307,33 @@ export type SemanticExpression =
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
 	/** `object[index]` with an index that is not a literal. */
-	| { readonly kind: 'index'; readonly object: SemanticExpression; readonly index: SemanticExpression }
-	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	| {
+			readonly kind: 'index';
+			readonly object: SemanticExpression;
+			readonly index: SemanticExpression;
+	  }
+	| {
+			readonly kind: 'call';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	/** A call to a function by its bare name that is not a builtin: a module-level function, this module's or an imported one. */
-	| { readonly kind: 'apply'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	| {
+			readonly kind: 'apply';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
 	| {
 			readonly kind: 'array';
-			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
+			readonly items: ReadonlyArray<{
+				readonly spread: boolean;
+				readonly value: SemanticExpression;
+			}>;
 	  }
-	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
+	| {
+			readonly kind: 'object';
+			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
+	  }
 	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';
@@ -1297,9 +1342,32 @@ export type SemanticExpression =
 			readonly arguments: ReadonlyArray<SemanticExpression>;
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
-	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
+	| {
+			readonly kind: 'lambda';
+			readonly parameters: ReadonlyArray<string>;
+			readonly body: SemanticExpression;
+	  }
+	/** `new Callee(...)` by a bare name (`new FormData(form)`, `new Promise(...)`, `new Error(message)`). */
+	| {
+			readonly kind: 'new';
+			readonly callee: string;
+			readonly arguments: ReadonlyArray<SemanticExpression>;
+	  }
+	/** `await value`. */
+	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	/** A function passed to `new` or to a call by bare name, with its statements (an expression body returns it). */
+	| {
+			readonly kind: 'function';
+			readonly parameters: ReadonlyArray<string>;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
 	/** A computed body's `const name = value`: `name` reads `value` inside `body`. */
-	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression; readonly body: SemanticExpression }
+	| {
+			readonly kind: 'let';
+			readonly name: string;
+			readonly value: SemanticExpression;
+			readonly body: SemanticExpression;
+	  }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
@@ -1333,6 +1401,16 @@ export type SemanticHandlerStatement =
 	| { readonly kind: 'return' }
 	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
 	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
+	/** `await value;` as a statement. */
+	| { readonly kind: 'await'; readonly value: SemanticExpression }
+	/** `try { body } catch (name) { handler } finally { finalizer }`; `name` is absent for `catch {` or no catch. */
+	| {
+			readonly kind: 'try';
+			readonly body: ReadonlyArray<SemanticHandlerStatement>;
+			readonly catchName?: string;
+			readonly handler?: ReadonlyArray<SemanticHandlerStatement>;
+			readonly finalizer: ReadonlyArray<SemanticHandlerStatement>;
+	  }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 export type SemanticTemplateRead = {
@@ -1363,7 +1441,10 @@ export type SemanticTemplateRead = {
 	// The innermost keyed @for whose row holds this read; the row mint decides whether it stays live.
 	readonly keyedRepeatId?: string;
 	// The async values a row expression reads beside its row item, which its @try waits on.
-	readonly asyncGateReads?: ReadonlyArray<{ readonly source: string; readonly graphNodeId: string }>;
+	readonly asyncGateReads?: ReadonlyArray<{
+		readonly source: string;
+		readonly graphNodeId: string;
+	}>;
 	// The component body this read was authored in, for the same reason the branch
 	// site carries one: `{w.label}` in two components is two reads of two different
 	// instances, and without the component they lower to a single node (defect 46).
@@ -2581,7 +2662,11 @@ export type CaptureSlot = {
 };
 
 /** A file, line and column (both from 1), for naming code another module's compile cannot see. */
-export type SourcePosition = { readonly filename: string; readonly line: number; readonly column: number };
+export type SourcePosition = {
+	readonly filename: string;
+	readonly line: number;
+	readonly column: number;
+};
 
 export type ExtractedCaptureSymbol = {
 	readonly symbolId: string;

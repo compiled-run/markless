@@ -1,10 +1,11 @@
 #if canImport(UIKit)
 import MarklessCore
 import UIKit
+import UIKit.UIGestureRecognizerSubclass
 
 private let headings: Set<String> = ["h1", "h2", "h3", "h4", "h5", "h6"]
 private let unimplementedElements: Set<String> = [
-	"audio", "canvas", "details", "embed", "form", "iframe", "img", "object", "option",
+	"audio", "canvas", "details", "embed", "iframe", "img", "object", "option",
 	"picture", "select", "summary", "svg", "textarea", "video",
 ]
 
@@ -43,6 +44,9 @@ final class ViewTree {
 	private var dialogIds = Set<String>()
 	/// The open dialog's top layer and the place in the page its view returns to.
 	private var topLayer: (layer: TopLayerView, home: UIView, index: Int)?
+	/// What a stopped submit says, shown until the person's next action.
+	private var message: UILabel?
+	private var touches: TouchWatcher?
 
 	init(
 		runtime: NativeRuntime, layout: StyleLayout?, faces: [String: UIFontDescriptor], onAction: @escaping (NativeAction) -> Void
@@ -92,6 +96,54 @@ final class ViewTree {
 			root.trailingAnchor.constraint(equalTo: guide.trailingAnchor),
 		])
 		if let layout { root.heightAnchor.constraint(equalToConstant: layout.viewport.height).isActive = true }
+		let watcher = TouchWatcher { [weak self] in self?.dismissMessage() }
+		screen.addGestureRecognizer(watcher)
+		touches = watcher
+	}
+
+	func unmount() {
+		dismissMessage()
+		if let touches { touches.view?.removeGestureRecognizer(touches) }
+		touches = nil
+		root.removeFromSuperview()
+	}
+
+	func dismissMessage() {
+		message?.removeFromSuperview()
+		message = nil
+	}
+
+	/// A stopped submit's message, pinned under the top of the page (or of the open dialog's top layer) and announced.
+	private func show(_ text: String) {
+		dismissMessage()
+		guard let host = topLayer?.layer ?? root.superview else { return }
+		let label = UILabel()
+		label.text = text
+		label.numberOfLines = 0
+		label.textAlignment = .center
+		label.textColor = .white
+		label.backgroundColor = UIColor(white: 0.15, alpha: 0.92)
+		label.layer.cornerRadius = 8
+		label.layer.masksToBounds = true
+		label.isAccessibilityElement = true
+		label.translatesAutoresizingMaskIntoConstraints = false
+		host.addSubview(label)
+		let guide = host.safeAreaLayoutGuide
+		NSLayoutConstraint.activate([
+			label.topAnchor.constraint(equalTo: guide.topAnchor, constant: 8),
+			label.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
+			label.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, constant: -32),
+			label.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+		])
+		message = label
+		UIAccessibility.post(notification: .announcement, argument: text)
+	}
+
+	/// Brings a view into sight; only a scrolling ancestor can.
+	private func reveal(_ view: UIView) {
+		var ancestor = view.superview
+		while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
+		if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
 	}
 
 	/// The journal applier: the only code that changes a retained view after the first build.
@@ -103,6 +155,7 @@ final class ViewTree {
 				label.text = value
 				if let button = contexts[node]?.button { refreshLabel(of: button) }
 			case let .property(node, _, value):
+				if elements[node] is AbsentField { continue }
 				guard let field = elements[node] as? UITextField else { throw HostError("journal names input \(node), which is not a shown field") }
 				field.text = value
 			case let .attribute(node, name, value):
@@ -116,17 +169,28 @@ final class ViewTree {
 			case let .command(node, command, preventScroll):
 				guard let view = elements[node] else { throw HostError("journal names element \(node), which is not shown") }
 				root.layoutIfNeeded()
-				// As on the web, focus brings the element into view unless told not to; only a scrolling ancestor can.
-				if command == "scrollIntoView" || !preventScroll {
-					var ancestor = view.superview
-					while let candidate = ancestor, !(candidate is UIScrollView) { ancestor = candidate.superview }
-					if let scroll = ancestor as? UIScrollView { scroll.scrollRectToVisible(view.convert(view.bounds, to: scroll), animated: false) }
-				}
+				// As on the web, focus brings the element into view unless told not to.
+				if command == "scrollIntoView" || !preventScroll { reveal(view) }
 				if command == "scrollIntoView" {
 				} else if view is UITextField {
 					view.becomeFirstResponder()
 				} else {
 					UIAccessibility.post(notification: .layoutChanged, argument: view)
+				}
+			case let .invalid(node, text):
+				guard let view = elements[node] else { throw HostError("journal names field \(node), which is not shown") }
+				if let field = view as? UITextField {
+					root.layoutIfNeeded()
+					reveal(field)
+					field.becomeFirstResponder()
+				}
+				show(text)
+			case let .timer(timer, ms):
+				Task { @MainActor [weak self] in
+					try? await Task.sleep(for: .milliseconds(ms))
+					// A page left since (or never mounted) has no runtime holding this timer any more.
+					guard let self, self.root.superview != nil else { return }
+					self.onAction(NativeAction(event: .timer, timer: timer))
 				}
 			case let .state(cell, value):
 				guard let layout else { continue }
@@ -291,10 +355,16 @@ final class ViewTree {
 					control.isAccessibilityElement = true
 					control.accessibilityTraits = element == "a" ? .link : .button
 					view = control
+				} else if element == "input", ["checkbox", "hidden"].contains(staticAttributes["type"]) {
+					view = AbsentField()
 				} else if element == "input" {
 					if context.button != nil { throw HostError("<input> \(id) is inside a button") }
 					let field = UITextField()
-					field.addAction(UIAction { [weak field] _ in field?.resignFirstResponder() }, for: .editingDidEndOnExit)
+					field.addAction(UIAction { [weak self, weak field] _ in
+						self?.dismissMessage()
+						field?.resignFirstResponder()
+					}, for: .editingDidEndOnExit)
+					field.addAction(UIAction { [weak self] _ in self?.dismissMessage() }, for: .editingChanged)
 					if layout == nil {
 						field.borderStyle = .roundedRect
 						field.widthAnchor.constraint(equalToConstant: 240).isActive = true
@@ -387,6 +457,7 @@ final class ViewTree {
 	private func wire(_ bound: [NativeEvent], on view: UIView, element: String, id: String, inRow: Bool) throws {
 		let onAction = onAction
 		for event in bound {
+			if event.event == .submit { continue }
 			if inRow { throw HostError("a \(event.event.rawValue) handler on a list row (\(id)) has no iOS host support yet") }
 			switch (event.event, view) {
 			case let (.activate, control as UIButton):
@@ -399,6 +470,8 @@ final class ViewTree {
 				field.addAction(
 					UIAction { [weak field] _ in onAction(NativeAction(event: .input, host: id, value: field?.text ?? "")) },
 					for: .editingChanged)
+			case let (.enter, field as UITextField):
+				field.addAction(UIAction { _ in onAction(NativeAction(event: .enter, host: id)) }, for: .editingDidEndOnExit)
 			default:
 				throw HostError("\(event.event.rawValue) on <\(element)> \(id) has no iOS control event yet")
 			}
@@ -431,12 +504,20 @@ final class ViewTree {
 	/// Static and bound attributes as platform state; `class` reaches views only through the style export.
 	private func applyAttributes(_ id: String, _ view: UIView) {
 		let current = attributes[id] ?? [:]
+		if view is AbsentField { return }
 		if let button = view as? UIButton {
 			button.isEnabled = current["disabled"] == nil
-			if button.isEnabled { button.accessibilityTraits.remove(.notEnabled) } else { button.accessibilityTraits.insert(.notEnabled) }
 			refreshLabel(of: button)
 		} else {
 			view.accessibilityLabel = current["aria-label"]
+		}
+		if let field = view as? UITextField { field.isEnabled = current["disabled"] == nil }
+		// aria-disabled only reads as dimmed: a press still reaches the button, as on the web.
+		let disabled = (view is UIButton || view is UITextField) && current["disabled"] != nil
+		if disabled || current["aria-disabled"] == "true" {
+			view.accessibilityTraits.insert(.notEnabled)
+		} else {
+			view.accessibilityTraits.remove(.notEnabled)
 		}
 		if current["role"] == "switch" {
 			if #available(iOS 17.0, *) { view.accessibilityTraits.insert(.toggleButton) }
@@ -532,6 +613,7 @@ final class KeyboardDismisser: NSObject {
 
 @MainActor
 private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFontDescriptor]) throws {
+	if view is AbsentField { return }
 	// Dragon gives an element it does not render (`display: none`, `[hidden]`) no frame.
 	guard let frame = style.frame else {
 		view.isHidden = true
@@ -556,6 +638,36 @@ private func paint(_ view: UIView, _ style: ResolvedStyle, faces: [String: UIFon
 
 private func uiColor(_ color: RGBA) -> UIColor {
 	UIColor(red: color.r / 255, green: color.g / 255, blue: color.b / 255, alpha: color.alpha / 255)
+}
+
+/// A checkbox or hidden `<input>`: the form reads its state, the screen shows nothing for it.
+private final class AbsentField: UIView {
+	override init(frame: CGRect) {
+		super.init(frame: frame)
+		isHidden = true
+		isUserInteractionEnabled = false
+		isAccessibilityElement = false
+		accessibilityElementsHidden = true
+	}
+
+	@available(*, unavailable)
+	required init?(coder: NSCoder) { fatalError("an absent field is built by the view factory") }
+}
+
+/// Reports the start of every touch on the screen, then steps aside so no other gesture or control is held up.
+private final class TouchWatcher: UIGestureRecognizer {
+	private let began: () -> Void
+	init(_ began: @escaping () -> Void) {
+		self.began = began
+		super.init(target: nil, action: nil)
+		cancelsTouchesInView = false
+		delaysTouchesEnded = false
+	}
+
+	override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+		began()
+		state = .failed
+	}
 }
 
 /// A tap that presses an element which is not a button.

@@ -13,14 +13,16 @@ import {
 
 test('the ladder has one proof folder per rung, in rung order', () => {
 	expect(rungFolders().map((folder) => readRung(folder).rung)).toEqual([
-		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11, 101, 102, 103, 104, 105, 111, 112, 113, 114,
+		1, 2, 3, 4, 5, 5.5, 6, 7, 7.5, 7.75, 7.875, 8, 9, 10, 11, 51, 52, 53, 54, 55, 56, 101, 102,
+		103, 104, 105, 111, 112, 113, 114,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);
 });
 
 test.each(rungFolders())('%s: flow.yaml is the flow its expected.json describes', (folder) => {
-	const documents = (source: string) => parseAllDocuments(source).map((document) => document.toJS());
+	const documents = (source: string) =>
+		parseAllDocuments(source).map((document) => document.toJS());
 	const committed = documents(readFileSync(join(proofsDir, folder, 'flow.yaml'), 'utf8'));
 	expect(committed, 'run `node packages/mobile/proofs/write-flows.ts`').toEqual(
 		documents(renderFlow(folder, readRung(folder))),

@@ -96,78 +96,134 @@ function walk(
 		const node = [...texts].find(([, shown]) => shown === text)?.[0];
 		return node ? (nodeOf.get(node)?.parent ?? undefined) : undefined;
 	};
+	// A field's text: what its `value` binding or attribute gave it, then what was typed or the journal wrote.
+	const staticValue = (id: string) => {
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' && node.element === 'input' && !properties.has(id)
+			? (node.attributes?.['value'] ?? '')
+			: undefined;
+	};
+	const typed = new Map<string, string>();
+	const attributeNow = (id: string, name: string) => {
+		const bound = attributes.get(`${id}\0${name}`);
+		if (bound !== undefined) return bound;
+		const node = nodeOf.get(id);
+		return node?.kind === 'element' ? (node.attributes?.[name] ?? null) : null;
+	};
+	const fieldText = (id: string) => typed.get(id) ?? properties.get(id) ?? staticValue(id);
+	// Timers the journal set, on a clock that only `wait` moves; a host shows a blocked submit's message until the next action.
+	let now = 0;
+	let timers: { readonly timer: string; readonly due: number }[] = [];
+	let invalid: string | undefined;
+	const apply = (index: number, dispatched: ReturnType<typeof runtime.dispatch>, at: number) => {
+		for (const entry of dispatched) {
+			if (entry.op === 'timer') timers.push({ timer: entry.timer, due: at + entry.ms });
+			else if (entry.op === 'invalid') invalid = entry.message;
+			else if (entry.op === 'text') texts.set(entry.node, entry.value);
+			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
+			else if (entry.op === 'attribute')
+				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
+			else if (entry.op === 'property') {
+				properties.set(entry.node, entry.value);
+				typed.delete(entry.node);
+			} else if (entry.op === 'navigate') {
+				// One page per rung: a navigation opens this page again with the link's params.
+				expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
+				runtime = createNativeRuntime(payload, store, entry.params);
+				mount();
+			} else if (entry.op === 'rows') {
+				const rowNodes = payload.nodes
+					.filter((node) => node.row === entry.node)
+					.map((node) => node.id);
+				const instanceOf = (id: string) => {
+					const at = id.indexOf('@');
+					return at < 0 ? null : { node: id.slice(0, at), key: id.slice(at + 1) };
+				};
+				const kept = new Map<string, string>();
+				for (const [id, text] of texts) {
+					const instance = instanceOf(id);
+					if (!instance || !rowNodes.includes(instance.node)) continue;
+					texts.delete(id);
+					if (entry.keys.includes(instance.key)) kept.set(id, text);
+				}
+				const fresh = new Map(runtime.texts());
+				for (const key of entry.keys)
+					for (const node of rowNodes) {
+						const id = `${node}@${key}`;
+						const text = kept.get(id) ?? fresh.get(id);
+						if (text !== undefined) texts.set(id, text);
+					}
+			} else if (entry.op === 'arm') {
+				chosen.set(entry.node, entry.index);
+				for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
+				for (const key of attributes.keys())
+					if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
+				for (const [id, text] of runtime.texts())
+					if (inArm(id, entry.node)) texts.set(id, text);
+				for (const [node, name, value] of runtime.attributes())
+					if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
+			}
+		}
+	};
 	for (const [index, step] of steps.entries()) {
 		const action = step.do;
+		if (action) invalid = undefined;
 		if (action && 'relaunch' in action) {
 			runtime = createNativeRuntime(payload, store, params);
+			typed.clear();
 			mount();
-		} else if (action && !('tap' in action) && !('type' in action))
-			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
-		else if (action) {
-			const name = 'tap' in action ? action.tap : action.type.field;
+		} else if (action && 'wait' in action) {
+			now += action.wait;
+			for (
+				let next = timers.sort((a, b) => a.due - b.due)[0];
+				next && next.due <= now;
+				next = timers.sort((a, b) => a.due - b.due)[0]
+			) {
+				timers = timers.filter((timer) => timer !== next);
+				apply(index, runtime.dispatch({ event: 'timer', timer: next.timer }), next.due);
+			}
+		} else if (action) {
+			const name =
+				'tap' in action ? action.tap : 'type' in action ? action.type.field : action.submit;
 			const host = elementReading(name);
 			if (!host)
 				throw new Error(
 					`step ${index}: nothing reads "${name}" to ${'tap' in action ? 'tap' : 'type into'}`,
 				);
-			if (attributes.get(`${host}\0disabled`) != null)
+			if (attributeNow(host, 'disabled') != null)
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
-			if ('type' in action) properties.set(host, action.type.text);
+			if ('type' in action) {
+				if (properties.has(host)) properties.set(host, action.type.text);
+				else typed.set(host, action.type.text);
+			}
 			// A touch reaches the nearest element around it that handles a press, as on a phone.
 			let pressed: string | null | undefined = host;
-			while (pressed && !payload.events.some((event) => event.host === pressed && event.event === 'activate'))
+			while (
+				pressed &&
+				!payload.events.some(
+					(event) => event.host === pressed && event.event === 'activate',
+				)
+			)
 				pressed = nodeOf.get(pressed)?.parent;
+			// The return key in a field that submits nothing only puts the keyboard away.
+			const returns = payload.events.some(
+				(event) => event.host === host && event.event === 'enter',
+			);
 			const dispatched =
 				'tap' in action
 					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
-					: runtime.dispatch({ event: 'input', host, value: action.type.text });
-			for (const entry of dispatched) {
-				if (entry.op === 'text') texts.set(entry.node, entry.value);
-				else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
-				else if (entry.op === 'attribute')
-					attributes.set(`${entry.node}\0${entry.name}`, entry.value);
-				else if (entry.op === 'property') properties.set(entry.node, entry.value);
-				else if (entry.op === 'navigate') {
-					// One page per rung: a navigation opens this page again with the link's params.
-					expect(entry.route, `step ${index}: the link's route`).toBe(payload.route?.pattern);
-					runtime = createNativeRuntime(payload, store, entry.params);
-					mount();
-				} else if (entry.op === 'rows') {
-					const rowNodes = payload.nodes.filter((node) => node.row === entry.node).map((node) => node.id);
-					const instanceOf = (id: string) => {
-						const at = id.indexOf('@');
-						return at < 0 ? null : { node: id.slice(0, at), key: id.slice(at + 1) };
-					};
-					const kept = new Map<string, string>();
-					for (const [id, text] of texts) {
-						const instance = instanceOf(id);
-						if (!instance || !rowNodes.includes(instance.node)) continue;
-						texts.delete(id);
-						if (entry.keys.includes(instance.key)) kept.set(id, text);
-					}
-					const fresh = new Map(runtime.texts());
-					for (const key of entry.keys)
-						for (const node of rowNodes) {
-							const id = `${node}@${key}`;
-							const text = kept.get(id) ?? fresh.get(id);
-							if (text !== undefined) texts.set(id, text);
-						}
-				} else if (entry.op === 'arm') {
-					chosen.set(entry.node, entry.index);
-					for (const id of texts.keys()) if (inArm(id, entry.node)) texts.delete(id);
-					for (const key of attributes.keys())
-						if (inArm(key.split('\0')[0]!, entry.node)) attributes.delete(key);
-					for (const [id, text] of runtime.texts())
-						if (inArm(id, entry.node)) texts.set(id, text);
-					for (const [node, name, value] of runtime.attributes())
-						if (inArm(node, entry.node)) attributes.set(`${node}\0${name}`, value);
-				}
-			}
+					: 'type' in action
+						? runtime.dispatch({ event: 'input', host, value: action.type.text })
+						: returns
+							? runtime.dispatch({ event: 'enter', host })
+							: [];
+			apply(index, dispatched, now);
 		}
+		expect(invalid, `step ${index}: the message of a blocked submit`).toBe(step.invalid);
 		for (const [field, value] of Object.entries(step.fields ?? {})) {
 			const host = elementReading(field);
-			expect(host && properties.get(host), `step ${index}: the field "${field}"`).toBe(value);
+			expect(host && fieldText(host), `step ${index}: the field "${field}"`).toBe(value);
 		}
 		const shown = [
 			...[...texts].filter(([id]) => !hiddenWithin(id)).map(([, text]) => text),
@@ -179,10 +235,13 @@ function walk(
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
 		if (step.order)
 			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
+		// `aria-disabled` reports a control as unavailable, as Maestro and Playwright read it, though a press still reaches it.
 		for (const text of step.disabled ?? []) {
 			const host = elementReading(text);
 			expect(
-				host && attributes.get(`${host}\0disabled`),
+				host &&
+					(attributeNow(host, 'disabled') ??
+						(attributeNow(host, 'aria-disabled') === 'true' ? '' : null)),
 				`step ${index}: "${text}" is disabled`,
 			).not.toBeNull();
 		}

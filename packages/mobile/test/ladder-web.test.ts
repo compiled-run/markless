@@ -85,17 +85,20 @@ async function act(page: Page, step: LadderStep) {
 		// a button named by its own text comes first, over a region its heading also names.
 		const button = page.getByRole('button', { name: action.tap, exact: true });
 		const named = page.getByLabel(action.tap, { exact: true });
-		await ((await button.count()) === 1
-			? button
-			: (await named.count()) === 1
-				? named
-				: shown(page, action.tap)
+		await (
+			(await button.count()) === 1
+				? button
+				: (await named.count()) === 1
+					? named
+					: shown(page, action.tap)
 		).click();
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
-	} else if ('relaunch' in action) await page.reload();
+	} else if ('submit' in action)
+		await page.getByRole('textbox', { name: action.submit, exact: true }).press('Enter');
+	else if ('relaunch' in action) await page.reload();
 	else await page.clock.runFor(action.wait);
 }
 
@@ -113,6 +116,16 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	for (const [name, value] of Object.entries(step.fields ?? {})) {
 		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
+	}
+	if (step.invalid !== undefined) {
+		const message = await page.evaluate(() => {
+			const focused = document.activeElement;
+			return focused instanceof HTMLInputElement && !focused.validity.valid
+				? focused.validationMessage
+				: null;
+		});
+		if (message !== step.invalid)
+			failed.push(`the focused field's validation message is ${JSON.stringify(message)}`);
 	}
 	if (step.order) {
 		const tops: number[] = [];

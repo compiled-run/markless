@@ -16,7 +16,11 @@ export type NativeAction =
 	/** The field's whole text after an edit. */
 	| { readonly event: 'input'; readonly host: string; readonly value: string }
 	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
-	| { readonly event: 'cancel'; readonly host: string };
+	| { readonly event: 'cancel'; readonly host: string }
+	/** The keyboard's return key in a single-line text field. */
+	| { readonly event: 'enter'; readonly host: string }
+	/** A `timer` journal entry's time has come: its `after` op's ops run. */
+	| { readonly event: 'timer'; readonly timer: string };
 
 type Value = NativeValue;
 
@@ -26,6 +30,8 @@ export type NativeScope = {
 	readonly locals: ReadonlyMap<string, Value>;
 	/** The page's route params. */
 	readonly params?: Readonly<Record<string, string>>;
+	/** A form's entries now, for `{ formData }`. */
+	readonly formData?: (form: string) => Value;
 };
 
 const EMPTY_SCOPE: NativeScope = { items: new Map(), locals: new Map() };
@@ -76,11 +82,13 @@ export function evaluateNativeExpr(
 		return { ...scope.params };
 	}
 	if ('item' in expr) {
-		if (!scope.items.has(expr.item)) throw new Error(`the row item of ${expr.item} read outside its row`);
+		if (!scope.items.has(expr.item))
+			throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
 	}
 	if ('local' in expr) {
-		if (!scope.locals.has(expr.local)) throw new Error(`the parameter ${expr.local} read outside its function`);
+		if (!scope.locals.has(expr.local))
+			throw new Error(`the parameter ${expr.local} read outside its function`);
 		return scope.locals.get(expr.local)!;
 	}
 	if ('array' in expr)
@@ -90,7 +98,8 @@ export function evaluateNativeExpr(
 			if (!Array.isArray(value)) throw new Error('a spread of a value that is not an array');
 			return value;
 		});
-	if ('object' in expr) return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
+	if ('object' in expr)
+		return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
 	if ('lambda' in expr) throw new Error('a function value outside a method call');
 	if ('method' in expr) {
 		const target = evaluate(expr.target);
@@ -100,14 +109,22 @@ export function evaluateNativeExpr(
 						evaluateNativeExpr(argument.body, read, eventValue, {
 							items: scope.items,
 							...(scope.params ? { params: scope.params } : {}),
-							locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
+							locals: new Map([
+								...scope.locals,
+								...argument.lambda.map(
+									(name, i) => [name, values[i] ?? null] as const,
+								),
+							]),
+							...(scope.formData ? { formData: scope.formData } : {}),
 						})
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
 		if ((typeof target !== 'string' && !Array.isArray(target)) || typeof method !== 'function')
 			throw new Error(`.${expr.method}() of a ${target === null ? 'null' : typeof target}`);
-		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as Value | undefined;
+		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as
+			| Value
+			| undefined;
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
@@ -115,10 +132,17 @@ export function evaluateNativeExpr(
 		const list = evaluate(expr.of);
 		if (!Array.isArray(list)) throw new Error('an index into a value that is not an array');
 		const at = evaluate(expr.at);
-		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length ? list[at]! : null;
+		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length
+			? list[at]!
+			: null;
 	}
 	if ('cell' in expr) return read(expr.cell);
 	if ('literal' in expr) return expr.literal;
+	if ('formData' in expr) {
+		if (!scope.formData)
+			throw new Error(`the entries of ${expr.formData} read outside a runtime`);
+		return scope.formData(expr.formData);
+	}
 	if ('event' in expr) {
 		if (eventValue === undefined)
 			throw new Error('the event value read outside an input handler');
@@ -174,11 +198,22 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
-		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
+		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
+			return value.length;
 		const index = Number(expr.property);
-		if (Array.isArray(value) && Number.isInteger(index) && index >= 0 && String(index) === expr.property)
+		if (
+			Array.isArray(value) &&
+			Number.isInteger(index) &&
+			index >= 0 &&
+			String(index) === expr.property
+		)
 			return value[index] ?? null;
-		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
+		if (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.hasOwn(value, expr.property)
+		)
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
@@ -193,15 +228,19 @@ export function createNativeRuntime(
 	/** The route params the page opened with. */
 	params: Readonly<Record<string, string>> = {},
 ): NativeRuntime {
-	const base: NativeScope = { ...EMPTY_SCOPE, params };
+	const base: NativeScope = { ...EMPTY_SCOPE, params, formData: (form) => entriesOf(form) };
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
-			cell.storage && store.has(cell.storage.key) ? store.get(cell.storage.key)! : cell.initial,
+			cell.storage && store.has(cell.storage.key)
+				? store.get(cell.storage.key)!
+				: cell.initial,
 		]),
 	);
 	const storageKeys = new Map(
-		payload.cells.flatMap((cell) => (cell.storage ? [[cell.id, cell.storage.key] as const] : [])),
+		payload.cells.flatMap((cell) =>
+			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
+		),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
 	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
@@ -238,11 +277,17 @@ export function createNativeRuntime(
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
-		if (!Array.isArray(list)) throw new Error(`${repeat.id} lists a value that is not an array`);
+		if (!Array.isArray(list))
+			throw new Error(`${repeat.id} lists a value that is not an array`);
 		return list.map((item) => {
 			let key: Value = item;
 			for (const step of repeat.key) {
-				if (key === null || typeof key !== 'object' || Array.isArray(key) || !Object.hasOwn(key, step))
+				if (
+					key === null ||
+					typeof key !== 'object' ||
+					Array.isArray(key) ||
+					!Object.hasOwn(key, step)
+				)
 					throw new Error(`${repeat.id}: a row has no key at ${repeat.key.join('.')}`);
 				key = (key as Record<string, Value>)[step]!;
 			}
@@ -250,7 +295,9 @@ export function createNativeRuntime(
 		});
 	};
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
-	const instances = (node: NativeNode): { readonly id: string; readonly scope: NativeScope }[] => {
+	const instances = (
+		node: NativeNode,
+	): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!shown(node)) return [];
 		if (!node.row) return [{ id: node.id, scope: base }];
 		const repeat = repeats.get(node.row);
@@ -265,7 +312,11 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue('cell' in part ? read(part.cell) : evaluate(part.expr, undefined, scope)),
+					: formatNativeValue(
+							'cell' in part
+								? read(part.cell)
+								: evaluate(part.expr, undefined, scope),
+						),
 			)
 			.join('');
 
@@ -284,15 +335,113 @@ export function createNativeRuntime(
 				? instances(node).flatMap(({ id, scope }) =>
 						(node.bindings ?? []).flatMap((binding) => {
 							if (!(kind in binding)) return [];
-							const name = 'attribute' in binding ? binding.attribute : binding.property;
-							return [[id, name, write(name, evaluate(binding.value, undefined, scope))] as const];
+							const name =
+								'attribute' in binding ? binding.attribute : binding.property;
+							return [
+								[
+									id,
+									name,
+									write(name, evaluate(binding.value, undefined, scope)),
+								] as const,
+							];
 						}),
 					)
 				: [],
 		);
-	const attributes = () => bound('attribute', (name, value) => marklessAttributeValue(name, value));
+	const attributes = () =>
+		bound('attribute', (name, value) => marklessAttributeValue(name, value));
 	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')) as (readonly [string, 'value', string])[];
+		bound('property', (_name, value) => String(value ?? '')).filter(
+			([, name]) => name === 'value',
+		) as (readonly [string, 'value', string])[];
+
+	// Forms: what each text field holds, which submissions are still running, and the marks they set.
+	const nodesById = new Map(payload.nodes.map((node) => [node.id, node]));
+	const forms = new Map((payload.forms ?? []).map((form) => [form.node, form]));
+	/** A field's text a person typed since its `value` binding last changed it. */
+	const edited = new Map<string, string>();
+	type Submission = {
+		readonly sent: string;
+		readonly submitter: string | null;
+		readonly marks: boolean;
+		pending: number;
+	};
+	const running = new Map<string, Submission[]>();
+	const timers = new Map<
+		string,
+		{
+			readonly ops: ReadonlyArray<NativeOp>;
+			readonly locals: ReadonlyMap<string, Value>;
+			readonly submission?: Submission;
+		}
+	>();
+	let timerCount = 0;
+	const elementOf = (id: string) => {
+		const node = nodesById.get(id);
+		if (node?.kind !== 'element') throw new Error(`${id} is not an element`);
+		return node;
+	};
+	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
+	const attributeNow = (id: string, name: string): string | null => {
+		const node = elementOf(id);
+		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
+		return binding
+			? marklessAttributeValue(name, evaluate(binding.value))
+			: (node.attributes?.[name] ?? null);
+	};
+	const propertyBinding = (id: string, name: string) =>
+		elementOf(id).bindings?.find((one) => 'property' in one && one.property === name);
+	const textOf = (id: string): string => {
+		if (edited.has(id)) return edited.get(id)!;
+		const binding = propertyBinding(id, 'value');
+		return binding ? String(evaluate(binding.value) ?? '') : (attributeNow(id, 'value') ?? '');
+	};
+	const checkedOf = (id: string): boolean => {
+		const binding = propertyBinding(id, 'checked');
+		return binding ? Boolean(evaluate(binding.value)) : attributeNow(id, 'checked') !== null;
+	};
+	function entriesOf(id: string): Value {
+		const form = forms.get(id);
+		if (!form) throw new Error(`${id} is not a form`);
+		return form.fields.flatMap(({ node, kind }): Value[] => {
+			const name = attributeNow(node, 'name');
+			if (!shown(elementOf(node)) || attributeNow(node, 'disabled') !== null || !name)
+				return [];
+			if (kind === 'checkbox')
+				return checkedOf(node) ? [[name, attributeNow(node, 'value') ?? 'on']] : [];
+			return [[name, kind === 'hidden' ? (attributeNow(node, 'value') ?? '') : textOf(node)]];
+		});
+	}
+	/** The first field that stops a submit, with what the web says about it, or undefined when none does. */
+	const firstInvalid = (id: string, submitter: string | null) => {
+		const form = forms.get(id)!;
+		if (
+			form.noValidate ||
+			(submitter !== null && attributeNow(submitter, 'formnovalidate') !== null)
+		)
+			return undefined;
+		return form.fields.find(({ node, kind }) => {
+			if (kind === 'hidden' || !shown(elementOf(node))) return false;
+			if (attributeNow(node, 'disabled') !== null || attributeNow(node, 'required') === null)
+				return false;
+			return kind === 'text' ? textOf(node) === '' : !checkedOf(node);
+		});
+	};
+	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
+	const marks = () => {
+		const now = new Map<string, string | null>();
+		for (const form of payload.forms ?? []) {
+			const runs = running.get(form.node) ?? [];
+			now.set(`${form.node}\0aria-busy`, runs.length > 0 ? 'true' : null);
+			if (form.authoredAriaDisabled) continue;
+			for (const submitter of form.submitters)
+				now.set(
+					`${submitter}\0aria-disabled`,
+					runs.some((run) => run.marks && run.submitter === submitter) ? 'true' : null,
+				);
+		}
+		return now;
+	};
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
@@ -303,20 +452,37 @@ export function createNativeRuntime(
 				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
 				: [],
 		);
-	const keyed = <T,>(list: ReadonlyArray<readonly [string, string, T]>) =>
+	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
 
 	return {
 		texts,
-		attributes,
+		attributes: () => [
+			...attributes(),
+			...[...marks()].map(([key, value]) => {
+				const [node, name] = key.split('\0') as [string, string];
+				return [node, name, value] as const;
+			}),
+		],
 		properties,
 		arms,
 		dialogs: () => [...dialogs],
 		rows,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
-			if (action.event === 'cancel') {
-				if (dialogs.get(action.host) !== true) throw new Error(`${action.host} is not an open dialog`);
+			const event =
+				action.event === 'timer'
+					? undefined
+					: payload.events.find(
+							(candidate) =>
+								candidate.host === action.host && candidate.event === action.event,
+						);
+			const timer = action.event === 'timer' ? timers.get(action.timer) : undefined;
+			if (action.event === 'timer') {
+				if (!timer) throw new Error(`no timer ${action.timer} is set`);
+				timers.delete(action.timer);
+			} else if (action.event === 'cancel') {
+				if (dialogs.get(action.host) !== true)
+					throw new Error(`${action.host} is not an open dialog`);
 			} else if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const dialogsBefore = new Map(dialogs);
 			if (action.event === 'cancel') dialogs.set(action.host, false);
@@ -324,16 +490,78 @@ export function createNativeRuntime(
 			const cellsBefore = new Map(values);
 			const beforeTexts = new Map(texts());
 			const beforeAttributes = keyed(attributes());
+			const beforeMarks = marks();
 			// The edited field already shows what was typed, so its own value counts as already written.
 			const beforeProperties = keyed(properties());
-			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
+			if (action.event === 'input') {
+				beforeProperties.set(`${action.host}\0value`, action.value);
+				edited.set(action.host, action.value);
+			}
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const commands: NativeJournalEntry[] = [];
-			const run = (ops: ReadonlyArray<NativeOp>): NativeJournalEntry | undefined => {
+			const later: NativeJournalEntry[] = [];
+			type Context = {
+				readonly locals: ReadonlyMap<string, Value>;
+				readonly submission?: Submission;
+			};
+			const settled = (submission: Submission | undefined) => {
+				if (!submission || submission.pending > 0) return;
+				for (const [form, runs] of running) {
+					const left = runs.filter((run) => run !== submission);
+					if (left.length > 0) running.set(form, left);
+					else running.delete(form);
+				}
+			};
+			const submit = (
+				op: Extract<NativeOp, { op: 'submit' }>,
+				context: Context,
+			): NativeJournalEntry | undefined => {
+				const form = forms.get(op.form);
+				if (!form) throw new Error(`${op.form} is not a form`);
+				if (op.submitter !== null && attributeNow(op.submitter, 'disabled') !== null)
+					return undefined;
+				const invalid = firstInvalid(op.form, op.submitter);
+				if (invalid) {
+					later.push({ op: 'invalid', node: invalid.node, message: invalid.missing });
+					return undefined;
+				}
+				const sent = JSON.stringify(entriesOf(op.form));
+				const runs = running.get(op.form) ?? [];
+				// The same entries from the same button as a submission still running: the web drops it before any handler hears it.
+				if (runs.some((run) => run.sent === sent && run.submitter === op.submitter))
+					return undefined;
+				const handler = payload.events.find(
+					(candidate) => candidate.host === op.form && candidate.event === 'submit',
+				);
+				if (!handler) throw new Error(`${op.form} has no submit handler`);
+				const submission: Submission = {
+					sent,
+					submitter: op.submitter,
+					marks: op.submitter !== null && !form.authoredAriaDisabled,
+					pending: 0,
+				};
+				running.set(op.form, [...runs, submission]);
+				const navigated = run(handlers.get(handler.handler) ?? [], {
+					locals: context.locals,
+					submission,
+				});
+				settled(submission);
+				return navigated;
+			};
+			const run = (
+				ops: ReadonlyArray<NativeOp>,
+				context: Context,
+			): NativeJournalEntry | undefined => {
+				const scope: NativeScope = { ...base, locals: context.locals };
 				for (const op of ops) {
 					if (op.op === 'command') {
-						commands.push({ op: 'command', node: op.node, command: op.command, ...(op.preventScroll ? { preventScroll: true as const } : {}) });
+						commands.push({
+							op: 'command',
+							node: op.node,
+							command: op.command,
+							...(op.preventScroll ? { preventScroll: true as const } : {}),
+						});
 						continue;
 					}
 					if (op.op === 'navigate')
@@ -345,19 +573,59 @@ export function createNativeRuntime(
 					}
 					if (op.op === 'if') {
 						const taken = run(
-							evaluate(op.test, eventValue) ? op.whenTrue : op.whenFalse,
+							evaluate(op.test, eventValue, scope) ? op.whenTrue : op.whenFalse,
+							context,
 						);
 						if (taken) return taken;
 						continue;
 					}
-					const value = evaluate(op.value, eventValue);
+					if (op.op === 'submit') {
+						const taken = submit(op, context);
+						if (taken) return taken;
+						continue;
+					}
+					if (op.op === 'after') {
+						const ms = evaluate(op.ms, eventValue, scope);
+						const locals = new Map(context.locals);
+						for (const [name, value] of op.capture)
+							locals.set(name, evaluate(value, eventValue, scope));
+						const id = `timer:${timerCount++}`;
+						timers.set(id, {
+							ops: op.ops,
+							locals,
+							...(context.submission ? { submission: context.submission } : {}),
+						});
+						if (context.submission) context.submission.pending++;
+						later.push({
+							op: 'timer',
+							timer: id,
+							ms: typeof ms === 'number' && ms > 0 ? ms : 0,
+						});
+						continue;
+					}
+					const value = evaluate(op.value, eventValue, scope);
 					values.set(op.cell, value);
 					const key = storageKeys.get(op.cell);
 					if (key !== undefined) store.set(key, value);
 				}
 				return undefined;
 			};
-			const navigated = event ? run(handlers.get(event.handler) ?? []) : undefined;
+			const navigated = timer
+				? (() => {
+						const taken = run(timer.ops, {
+							locals: timer.locals,
+							...(timer.submission ? { submission: timer.submission } : {}),
+						});
+						if (timer.submission) {
+							timer.submission.pending--;
+							settled(timer.submission);
+						}
+						return taken;
+					})()
+				: event
+					? run(handlers.get(event.handler) ?? [], { locals: new Map() })
+					: undefined;
+
 			if (navigated) return [navigated];
 			const afterTexts = new Map(texts());
 			const afterAttributes = keyed(attributes());
@@ -379,14 +647,18 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'branch') {
-					return beforeArms.has(node.id) && afterArms.has(node.id) && beforeArms.get(node.id) !== afterArms.get(node.id)
+					return beforeArms.has(node.id) &&
+						afterArms.has(node.id) &&
+						beforeArms.get(node.id) !== afterArms.get(node.id)
 						? [{ op: 'arm', node: node.id, index: afterArms.get(node.id)! }]
 						: [];
 				}
 				const ids = instances(node).map((instance) => instance.id);
 				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
 				const dialog: NativeJournalEntry[] =
-					opened !== undefined && opened !== dialogsBefore.get(node.id) ? [{ op: 'dialog', node: node.id, open: opened }] : [];
+					opened !== undefined && opened !== dialogsBefore.get(node.id)
+						? [{ op: 'dialog', node: node.id, open: opened }]
+						: [];
 				if (node.kind === 'text') {
 					return ids.flatMap((id): NativeJournalEntry[] => {
 						const before = beforeTexts.get(id);
@@ -396,20 +668,52 @@ export function createNativeRuntime(
 							: [];
 					});
 				}
-				return dialog.concat(ids.flatMap((id) =>
-					(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
-						const name = 'attribute' in binding ? binding.attribute : binding.property;
-						const key = `${id}\0${name}`;
-						const [before, after] =
-							'attribute' in binding ? [beforeAttributes, afterAttributes] : [beforeProperties, afterProperties];
-						if (!before.has(key) || !after.has(key) || before.get(key) === after.get(key)) return [];
-						return 'attribute' in binding
-							? [{ op: 'attribute', node: id, name, value: afterAttributes.get(key)! }]
-							: [{ op: 'property', node: id, name: 'value', value: afterProperties.get(key)! }];
-					}),
-				));
+				return dialog.concat(
+					ids.flatMap((id) =>
+						(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
+							const name =
+								'attribute' in binding ? binding.attribute : binding.property;
+							const key = `${id}\0${name}`;
+							const [before, after] =
+								'attribute' in binding
+									? [beforeAttributes, afterAttributes]
+									: [beforeProperties, afterProperties];
+							if (
+								!before.has(key) ||
+								!after.has(key) ||
+								before.get(key) === after.get(key)
+							)
+								return [];
+							return 'attribute' in binding
+								? [
+										{
+											op: 'attribute',
+											node: id,
+											name,
+											value: afterAttributes.get(key)!,
+										},
+									]
+								: [
+										{
+											op: 'property',
+											node: id,
+											name: 'value',
+											value: afterProperties.get(key)!,
+										},
+									];
+						}),
+					),
+				);
 			});
-			return [...styles, ...nodes, ...commands];
+			const afterMarks = marks();
+			const marked = [...afterMarks].flatMap(([key, value]): NativeJournalEntry[] => {
+				if (beforeMarks.get(key) === value) return [];
+				const [node, name] = key.split('\0') as [string, string];
+				return [{ op: 'attribute', node, name, value }];
+			});
+			// A field whose binding wrote it shows that value now, not what was typed before.
+			for (const entry of nodes) if (entry.op === 'property') edited.delete(entry.node);
+			return [...styles, ...nodes, ...marked, ...commands, ...later];
 		},
 	};
 }

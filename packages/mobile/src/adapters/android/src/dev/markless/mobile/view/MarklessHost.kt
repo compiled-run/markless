@@ -11,12 +11,17 @@ import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.inputmethod.EditorInfo
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Button
@@ -76,6 +81,7 @@ class MarklessHost(
 	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
 	private val attrs = HashMap<String, HashMap<String, String>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
+	private var enterPressedAt = Long.MIN_VALUE / 2
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
 		it.assignments.map { a -> absoluteOrigins(a.nodes) }
@@ -90,6 +96,19 @@ class MarklessHost(
 
 	/** Called with each journal after it is applied. */
 	var onJournal: ((List<JournalEntry>) -> Unit)? = null
+
+	private val timers = Handler(Looper.getMainLooper())
+
+	/** Runs a `timer` entry's action after its delay; by default on the main looper, applying its journal. */
+	var scheduleTimer: (timer: String, ms: Double) -> Unit = { timer, ms ->
+		if (ms.isFinite()) timers.postDelayed({ apply(runtime.timer(timer)) }, ms.toLong())
+	}
+
+	/** Inputs with no visible view (a checkbox or hidden input): GONE and outside the accessibility tree. */
+	private val inert = HashSet<String>()
+
+	/** The layer showing an `invalid` entry's message until the next action. */
+	private var message: View? = null
 
 	val root: View
 
@@ -113,11 +132,12 @@ class MarklessHost(
 
 	/** The journal applier: the only code that changes a retained view after the first build. */
 	fun apply(journal: List<JournalEntry>) {
+		dismissMessage()
 		for (entry in journal) {
 			when (entry) {
 				is JournalEntry.Text -> textView(entry.node).text = entry.value
 				is JournalEntry.Attribute -> attribute(entry.node, entry.name, entry.value)
-				is JournalEntry.Property -> {
+				is JournalEntry.Property -> if (entry.node !in inert) {
 					val field = view(entry.node) as? EditText ?: throw MarklessHostError("journal sets the value of \"${entry.node}\", which is not an input")
 					if (field.text.toString() != entry.value) { field.setText(entry.value); field.setSelection(entry.value.length) }
 				}
@@ -132,7 +152,10 @@ class MarklessHost(
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
 				}
+				is JournalEntry.Invalid -> invalid(entry.node, entry.message)
+				is JournalEntry.Timer -> scheduleTimer(entry.node, entry.ms)
 				is JournalEntry.Navigate -> {
+					timers.removeCallbacksAndMessages(null)
 					Log.i(TAG, "journal ${entry.toJson()}")
 					onJournal?.invoke(journal)
 					(onNavigate ?: throw MarklessHostError("navigate to ${entry.node} with no page builder")).invoke(entry.node, entry.params)
@@ -165,6 +188,7 @@ class MarklessHost(
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
 			textViews.remove(inst.id)
+			inert.remove(inst.id)
 			if (inst.node is Node.Text && view is Button) continue
 			expanded.remove(view)
 			(view.parent as? ViewGroup)?.let { p ->
@@ -234,6 +258,8 @@ class MarklessHost(
 					info.isChecked = current["aria-checked"] == "true"
 				}
 				current["aria-describedby"]?.let { info.hintText = textOf(it) }
+				// As on the web, an aria-disabled control still takes presses; only assistive technology hears it as disabled.
+				if (current["aria-disabled"] == "true") info.isEnabled = false
 				if (link) info.extras.putCharSequence("AccessibilityNodeInfo.roleDescription", "link")
 				val state = expanded[host] ?: return
 				if (Build.VERSION.SDK_INT >= 36) info.expandedState = if (state) AccessibilityNodeInfo.EXPANDED_STATE_FULL else AccessibilityNodeInfo.EXPANDED_STATE_COLLAPSED
@@ -246,8 +272,15 @@ class MarklessHost(
 		if (node.row != null && events[node.id].orEmpty().isNotEmpty()) throw MarklessHostError("\"${node.id}\" handles events inside a list row; native-view/0 has no row handlers")
 		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
 		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
-		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
-			"box-button" -> MarklessBox(context).apply { isClickable = true; isFocusable = true; named(this, inst.id, control = true) }
+		val unseen = node.element == "input" && node.attributes["type"] in UNSEEN_INPUTS
+		if (unseen) inert.add(inst.id)
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else if (unseen) "unseen" else node.element) {
+			"unseen" -> View(context)
+			"box-button" -> MarklessBox(context).apply {
+				isClickable = true; isFocusable = true; named(this, inst.id, control = true)
+				// The stacking layout gives a control the platform's 48 dp touch target, so one with no text yet can be pressed.
+				if (style == null) { minimumWidth = (48 * dpr).roundToInt(); minimumHeight = (48 * dpr).roundToInt() }
+			}
 			"button" -> Button(context).apply {
 				background = null
 				minWidth = 0; minHeight = 0; minimumWidth = 0; minimumHeight = 0
@@ -262,15 +295,38 @@ class MarklessHost(
 				isSingleLine = true
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
+				addTextChangedListener(object : TextWatcher {
+					override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+					override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+					override fun afterTextChanged(s: Editable) = dismissMessage()
+				})
+				if (events[node.id].orEmpty().any { it.event == EventName.Enter }) imeOptions = EditorInfo.IME_ACTION_GO
 				named(this, inst.id)
 			}
 			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a") }
 		}
 		views[inst.id] = view
-		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
+		if (!unseen) for (b in node.bindings) if (b.property && b.name == "value") (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
+		// A field's `value` attribute is its text until something sets it, as on the web.
+		if (view is EditText && node.bindings.none { it.property && it.name == "value" }) node.attributes["value"]?.let { view.setText(it) }
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(e.host, EventName.Activate)) }
-			EventName.Cancel -> {}
+			EventName.Cancel, EventName.Submit -> {}
+			// The keyboard's action key arrives as its action id; a hardware Enter as IME_NULL with the key down, then up.
+			EventName.Enter -> (view as? EditText ?: throw MarklessHostError("enter event on \"${node.id}\", which is not an input")).setOnEditorActionListener { _, actionId, key ->
+				val now = android.os.SystemClock.uptimeMillis()
+				when {
+					key != null && key.keyCode != KeyEvent.KEYCODE_ENTER -> false
+					key != null -> {
+						if (key.action == KeyEvent.ACTION_DOWN) { enterPressedAt = now; apply(runtime.dispatch(e.host, EventName.Enter)) }
+						true
+					}
+					actionId == EditorInfo.IME_NULL -> false
+					// One press can arrive as the Enter key and then again as the keyboard's action: it submits once.
+					now - enterPressedAt < 500 -> true
+					else -> { apply(runtime.dispatch(e.host, EventName.Enter)); true }
+				}
+			}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -286,6 +342,10 @@ class MarklessHost(
 		if (node.element == "dialog") view.visibility = View.GONE
 		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
+		if (unseen) {
+			view.visibility = View.GONE
+			view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+		}
 		return view
 	}
 
@@ -310,6 +370,7 @@ class MarklessHost(
 		val view = view(id)
 		val current = attrs.getOrPut(id) { HashMap() }
 		if (value == null) current.remove(name) else current[name] = value
+		if (id in inert && (name == "aria-hidden" || name == "hidden")) return
 		when (name) {
 			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
 			"for" -> if (value != null) {
@@ -335,6 +396,41 @@ class MarklessHost(
 			view.requestFocus()
 			(context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(view, 0)
 		} else view.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+	}
+
+	/** A stopped submit: focus moves to the field as `focus()` would, and the message shows at the top of the page until the next action. */
+	private fun invalid(id: String, text: String) {
+		if (id !in inert) command(view(id), "focus", false)
+		val activity = context as? Activity ?: throw MarklessHostError("an invalid field's message needs an Activity to show over")
+		val content = activity.findViewById<ViewGroup>(android.R.id.content)
+		val pad = (12 * dpr).roundToInt()
+		val label = TextView(context).apply {
+			this.text = text
+			setTextColor(0xFFFFFFFF.toInt())
+			setBackgroundColor(0xE6202124.toInt())
+			setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+			setPadding(pad, pad, pad, pad)
+		}
+		val layer = FrameLayout(context).apply {
+			setOnApplyWindowInsetsListener { v, insets ->
+				v.setPadding(0, insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout()).top, 0, 0)
+				insets
+			}
+			// Watches for a press anywhere without taking it, so the press still reaches the page beneath.
+			setOnTouchListener { _, event -> if (event.actionMasked == MotionEvent.ACTION_DOWN) post { dismissMessage() }; false }
+			addView(label, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP))
+		}
+		content.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+		layer.requestApplyInsets()
+		message = layer
+		label.announceForAccessibility(text)
+	}
+
+	/** Takes down an `invalid` message, if one shows. */
+	fun dismissMessage() {
+		val layer = message ?: return
+		message = null
+		(layer.parent as? ViewGroup)?.removeView(layer)
 	}
 
 	/** The open dialog's top layer, its view's place in the page to return it to, and the back callback that cancels it. */
@@ -412,6 +508,10 @@ class MarklessHost(
 		val absolute = absolutes[assignment]
 		val frame = s.frame
 		val origin = absolute[s.id]
+		if (inst.id in inert) {
+			view.visibility = View.GONE
+			return
+		}
 		// Dragon gives an element it does not render (`display: none`, `[hidden]`), and everything inside it, no frame.
 		if (frame == null || origin == null) {
 			view.visibility = View.GONE
@@ -519,5 +619,6 @@ class MarklessHost(
 	companion object {
 		const val TAG = "MarklessHost"
 		private val HEADINGS = setOf("h1", "h2", "h3", "h4", "h5", "h6")
+		private val UNSEEN_INPUTS = setOf("checkbox", "hidden")
 	}
 }

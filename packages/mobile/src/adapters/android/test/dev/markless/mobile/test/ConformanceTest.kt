@@ -67,9 +67,11 @@ private fun runVector(file: File) {
 		val s = step.obj("steps[$n]")
 		val action = field(s, "action", "steps[$n]").obj("action")
 		val event = field(action, "event", "action").str("event")
-		val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
-		val value = action["value"]?.str("action.value")
-		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value).joinToString(",", "[", "]") { it.toJson() }
+		val journal = if (event == "timer") runtime.timer(field(action, "timer", "action").str("timer")) else {
+			val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
+			runtime.dispatch(field(action, "host", "action").str("host"), name, action["value"]?.str("action.value"))
+		}
+		val actual = journal.joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
 	}

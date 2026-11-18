@@ -45,6 +45,16 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"command\",\"node\":${jsonString(node)},\"command\":${jsonString(command)}${if (preventScroll) ",\"preventScroll\":true" else ""}}"
 	}
 
+	/** A submit stopped at the field [node]: focus moves there and [message] shows until the next action. */
+	data class Invalid(override val node: String, val message: String) : JournalEntry {
+		override fun toJson() = "{\"op\":\"invalid\",\"node\":${jsonString(node)},\"message\":${jsonString(message)}}"
+	}
+
+	/** Dispatch a `timer` action for the timer [node] in [ms] milliseconds. */
+	data class Timer(override val node: String, val ms: Double) : JournalEntry {
+		override fun toJson() = "{\"op\":\"timer\",\"timer\":${jsonString(node)},\"ms\":${jsonValue(JsValue.Num(ms))}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -102,6 +112,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		return when (e) {
 			Expr.RouteParams -> JsValue.Obj(params.entries.associateTo(LinkedHashMap()) { it.key to JsValue.Str(it.value) })
 			Expr.EventValue -> JsValue.Str(eventValue ?: throw MarklessRuntimeError("the event value read outside an input handler"))
+			is Expr.FormData -> entriesOf(e.form)
 			is Expr.CellRef -> value(e.cell)
 			is Expr.Literal -> e.value
 			is Expr.Item -> scope.items[e.repeat] ?: throw MarklessRuntimeError("the row item of ${e.repeat} read outside its row")
@@ -206,16 +217,85 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	fun texts(): List<Pair<String, String>> = payload.nodes.filterIsInstance<Node.Text>().flatMap { t -> instances(t).map { it.id to text(t, it.scope) } }
 
 	private fun bound(property: Boolean): List<Triple<String, String, Any?>> = payload.nodes.filterIsInstance<Node.Element>().flatMap { e ->
-		instances(e).flatMap { inst -> e.bindings.filter { it.property == property }.map { b -> Triple(inst.id, b.name, if (property) property(b, inst.scope) else attribute(b, inst.scope)) } }
+		instances(e).flatMap { inst -> e.bindings.filter { it.property == property && (!property || it.name == "value") }.map { b -> Triple(inst.id, b.name, if (property) property(b, inst.scope) else attribute(b, inst.scope)) } }
 	}
 
-	/** Every shown element's bound attributes as written. */
 	@Suppress("UNCHECKED_CAST")
-	fun attributes(): List<Triple<String, String, String?>> = bound(false) as List<Triple<String, String, String?>>
+	private fun boundAttributes(): List<Triple<String, String, String?>> = bound(false) as List<Triple<String, String, String?>>
+
+	/** Every shown element's bound attributes as written, then each form's busy and sending marks. */
+	fun attributes(): List<Triple<String, String, String?>> = boundAttributes() + marks().map { (key, v) -> Triple(key.first, key.second, v) }
 
 	/** Every shown input's bound `value`. */
 	@Suppress("UNCHECKED_CAST")
 	fun properties(): List<Triple<String, String, String>> = bound(true) as List<Triple<String, String, String>>
+
+	private val forms = payload.forms.associateBy { it.node }
+	/** A field's text a person typed since its `value` binding last wrote it. */
+	private val edited = HashMap<String, String>()
+
+	private class Submission(val sent: String, val submitter: String?, val marks: Boolean) {
+		var pending = 0
+	}
+
+	private class Pending(val ops: List<Op>, val locals: Map<String, JsValue>, val submission: Submission?)
+
+	private val running = LinkedHashMap<String, List<Submission>>()
+	private val timers = HashMap<String, Pending>()
+	private var timerCount = 0
+
+	private fun elementOf(id: String): Node.Element = byId[id] as? Node.Element ?: throw MarklessRuntimeError("\"$id\" is not an element")
+
+	/** An attribute as the web has it now: a binding's value as written, else the attribute the element was built with. */
+	fun attributeNow(id: String, name: String): String? {
+		val e = elementOf(id)
+		val binding = e.bindings.firstOrNull { !it.property && it.name == name }
+		return if (binding != null) attribute(binding) else e.attributes[name]
+	}
+
+	private fun propertyBinding(id: String, name: String) = elementOf(id).bindings.firstOrNull { it.property && it.name == name }
+
+	/** A text field's text: what was typed since its binding last wrote it, else its `value` binding, else its `value` attribute. */
+	fun textOf(id: String): String = edited[id] ?: propertyBinding(id, "value")?.let(::property) ?: attributeNow(id, "value") ?: ""
+
+	fun checkedOf(id: String): Boolean = propertyBinding(id, "checked")?.let { Js.truthy(evaluate(it.value)) } ?: (attributeNow(id, "checked") != null)
+
+	private fun entriesOf(id: String): JsValue {
+		val form = forms[id] ?: throw MarklessRuntimeError("\"$id\" is not a form")
+		val out = ArrayList<JsValue>()
+		for ((node, kind) in form.fields) {
+			val name = attributeNow(node, "name")
+			if (!isShown(elementOf(node)) || attributeNow(node, "disabled") != null || name.isNullOrEmpty()) continue
+			val value = when (kind) {
+				FieldKind.Checkbox -> if (checkedOf(node)) attributeNow(node, "value") ?: "on" else continue
+				FieldKind.Hidden -> attributeNow(node, "value") ?: ""
+				FieldKind.Text -> textOf(node)
+			}
+			out.add(JsValue.Arr(mutableListOf(JsValue.Str(name), JsValue.Str(value))))
+		}
+		return JsValue.Arr(out)
+	}
+
+	/** The first field that stops a submit, or null when none does. */
+	private fun firstInvalid(form: Form, submitter: String?): Field? {
+		if (form.noValidate || (submitter != null && attributeNow(submitter, "formnovalidate") != null)) return null
+		return form.fields.firstOrNull { (node, kind) ->
+			kind != FieldKind.Hidden && isShown(elementOf(node)) && attributeNow(node, "disabled") == null && attributeNow(node, "required") != null &&
+				if (kind == FieldKind.Text) textOf(node) == "" else !checkedOf(node)
+		}
+	}
+
+	/** `aria-busy` on a form while a submission of it runs, `aria-disabled` on the button that sent a marking one. */
+	private fun marks(): LinkedHashMap<Pair<String, String>, String?> {
+		val now = LinkedHashMap<Pair<String, String>, String?>()
+		for (form in payload.forms) {
+			val runs = running[form.node].orEmpty()
+			now[form.node to "aria-busy"] = if (runs.isNotEmpty()) "true" else null
+			if (form.authoredAriaDisabled) continue
+			for (submitter in form.submitters) now[submitter to "aria-disabled"] = if (runs.any { it.marks && it.submitter == submitter }) "true" else null
+		}
+		return now
+	}
 
 	/** Every shown branch's chosen arm. */
 	fun arms(): List<Pair<String, Int?>> = payload.nodes.filterIsInstance<Node.Branch>().filter { isShown(it) }.map { it.id to armOf(it) }
@@ -242,42 +322,78 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
 		} else if (handlerId == null) throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlerId?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
+		return step(host, event, value) { run -> handler?.let { run(it.ops, emptyMap(), null) } }
+	}
+
+	/** Runs the ops of the `after` that the `timer` entry [timer] scheduled, with the values it captured. */
+	fun timer(timer: String): List<JournalEntry> {
+		val pending = timers.remove(timer) ?: throw MarklessRuntimeError("no timer $timer is set")
+		return step(null, null, null) { run ->
+			val taken = run(pending.ops, pending.locals, pending.submission)
+			pending.submission?.let { it.pending--; settled(it) }
+			taken
+		}
+	}
+
+	private fun settled(submission: Submission?) {
+		if (submission == null || submission.pending > 0) return
+		for ((form, runs) in running.entries.toList()) {
+			val left = runs.filter { it !== submission }
+			if (left.isNotEmpty()) running[form] = left else running.remove(form)
+		}
+	}
+
+	private fun step(host: String?, event: EventName?, value: String?, body: ((List<Op>, Map<String, JsValue>, Submission?) -> JournalEntry.Navigate?) -> JournalEntry.Navigate?): List<JournalEntry> {
 		val dialogsBefore = HashMap(dialogs)
-		if (event == EventName.Cancel) dialogs[host] = false
+		if (event == EventName.Cancel) dialogs[host!!] = false
 		val cellsBefore = HashMap(values)
 		val beforeTexts = texts().toMap()
-		val beforeAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
+		val beforeAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
+		val beforeMarks = marks()
 		val beforeProperties = properties().associate { (n, a, v) -> (n to a) to v }.toMutableMap()
 		// The edited field already shows what was typed, so its own value counts as written.
-		if (value != null) beforeProperties[host to "value"] = value
+		if (value != null) beforeProperties[host!! to "value"] = value
+		if (event == EventName.Input) edited[host!!] = value!!
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		eventValue = value
 		val commands = ArrayList<JournalEntry>()
-		fun run(ops: List<Op>): JournalEntry.Navigate? {
+		val later = ArrayList<JournalEntry>()
+		fun run(ops: List<Op>, locals: Map<String, JsValue>, submission: Submission?): JournalEntry.Navigate? {
+			val scope = Scope(locals = locals)
 			for (op in ops) when (op) {
 				is Op.Navigate -> return JournalEntry.Navigate(op.route, op.params)
 				is Op.Assign -> {
-					val v = evaluate(op.value)
+					val v = evaluate(op.value, scope)
 					values[op.cell] = v
 					storageKeys[op.cell]?.let { store.set(it, v) }
 				}
-				is Op.If -> run(if (Js.truthy(evaluate(op.test))) op.then else op.otherwise)?.let { return it }
+				is Op.If -> run(if (Js.truthy(evaluate(op.test, scope))) op.then else op.otherwise, locals, submission)?.let { return it }
 				is Op.Dialog -> {
 					if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
 					dialogs[op.node] = op.open
 				}
 				is Op.Command -> commands.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
+				is Op.Submit -> submit(op, locals, later, ::run)?.let { return it }
+				is Op.After -> {
+					val ms = evaluate(op.ms, scope)
+					val captured = LinkedHashMap(locals)
+					for ((name, x) in op.capture) captured[name] = evaluate(x, scope)
+					val id = "timer:${timerCount++}"
+					timers[id] = Pending(op.ops, captured, submission)
+					submission?.let { it.pending++ }
+					later.add(JournalEntry.Timer(id, if (ms is JsValue.Num && ms.value > 0) ms.value else 0.0))
+				}
 			}
 			return null
 		}
 		try {
-			handler?.let { h -> run(h.ops)?.let { return listOf(it) } }
+			body(::run)?.let { return listOf(it) }
 		} finally {
 			eventValue = null
 		}
 		val afterTexts = texts().toMap()
-		val afterAttributes = attributes().associate { (n, a, v) -> (n to a) to v }
+		val afterAttributes = boundAttributes().associate { (n, a, v) -> (n to a) to v }
 		val afterProperties = properties().associate { (n, a, v) -> (n to a) to v }
 		val afterArms = arms().toMap()
 		val afterRows = rows().toMap()
@@ -303,7 +419,27 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				}
 			}
 		}
+		for ((key, v) in marks()) if (beforeMarks[key] != v) journal.add(JournalEntry.Attribute(key.first, key.second, v))
+		// A field whose binding wrote it shows that value now, not what was typed before.
+		for (entry in journal) if (entry is JournalEntry.Property) edited.remove(entry.node)
 		journal.addAll(commands)
+		journal.addAll(later)
 		return journal
+	}
+
+	private fun submit(op: Op.Submit, locals: Map<String, JsValue>, later: MutableList<JournalEntry>, run: (List<Op>, Map<String, JsValue>, Submission?) -> JournalEntry.Navigate?): JournalEntry.Navigate? {
+		val form = forms[op.form] ?: throw MarklessRuntimeError("\"${op.form}\" is not a form")
+		if (op.submitter != null && attributeNow(op.submitter, "disabled") != null) return null
+		firstInvalid(form, op.submitter)?.let { later.add(JournalEntry.Invalid(it.node, it.missing)); return null }
+		val sent = jsonValue(entriesOf(op.form))
+		val runs = running[op.form].orEmpty()
+		// The same entries from the same button as a submission still running: the web drops it before any handler hears it.
+		if (runs.any { it.sent == sent && it.submitter == op.submitter }) return null
+		val handler = handlerFor(op.form, EventName.Submit) ?: throw MarklessRuntimeError("\"${op.form}\" has no submit handler")
+		val submission = Submission(sent, op.submitter, op.submitter != null && !form.authoredAriaDisabled)
+		running[op.form] = runs + submission
+		val navigated = run(handlers[handler]?.ops.orEmpty(), locals, submission)
+		settled(submission)
+		return navigated
 	}
 }

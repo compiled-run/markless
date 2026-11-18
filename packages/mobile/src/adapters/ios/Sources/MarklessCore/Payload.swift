@@ -38,11 +38,13 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case eventValue
 	/// The page's route params, an object of strings.
 	case routeParams
+	/// `new FormData(form)`: the form's entries as `[name, value]` string pairs, in tree order.
+	case formData(String)
 
 	var cells: [String] {
 		switch self {
 		case let .cell(cell): return [cell]
-		case .literal, .eventValue, .local, .item, .routeParams: return []
+		case .literal, .eventValue, .local, .item, .routeParams, .formData: return []
 		case let .unary(_, inner), let .member(inner, _), let .lambda(_, inner): return inner.cells
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
@@ -83,7 +85,7 @@ public struct NativeArmPlace: Equatable, Hashable, Sendable {
 }
 
 public struct NativeBinding: Equatable, Sendable {
-	/// The attribute's name, or `value` for the input property.
+	/// The attribute's name, or the property (`value`, `checked` or `indeterminate`).
 	public let name: String
 	public let isProperty: Bool
 	public let value: NativeExpr
@@ -116,6 +118,12 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
 	case cancel
+	/// The keyboard's return key in a single-line text field.
+	case enter
+	/// A form's, run only by a `submit` op.
+	case submit
+	/// A `timer` journal entry's time has come.
+	case timer
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -129,6 +137,36 @@ public enum NativeOp: Equatable, Sendable {
 	case dialog(node: String, open: Bool)
 	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes.
 	case command(node: String, command: String, preventScroll: Bool)
+	/// Submits `form` as if `submitter` were pressed (nil: the return key with no submit button).
+	case submit(form: String, submitter: String?)
+	/// After `ms`, `ops` run with each captured name read as a local holding its value when this op ran.
+	indirect case after(ms: NativeExpr, capture: [NativeCapture], ops: [NativeOp])
+}
+
+public struct NativeCapture: Equatable, Sendable {
+	public let name: String
+	public let value: NativeExpr
+}
+
+public enum NativeFieldKind: String, Sendable {
+	case text, checkbox, hidden
+}
+
+/// A form's submittable fields and submit buttons, each in tree order.
+public struct NativeForm: Equatable, Sendable {
+	public struct Field: Equatable, Sendable {
+		public let node: String
+		public let kind: NativeFieldKind
+		/// What the web says when this field is required and has no value.
+		public let missing: String
+	}
+
+	public let node: String
+	public let fields: [Field]
+	public let submitters: [String]
+	public let noValidate: Bool
+	/// An author wrote `aria-disabled` on one of its submit buttons, so a running submission marks none of them.
+	public let authoredAriaDisabled: Bool
 }
 
 public struct NativeRouteParam: Equatable, Sendable {
@@ -188,6 +226,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 	public let nodes: [NativeNode]
 	public let events: [NativeEvent]
 	public let handlers: [NativeHandler]
+	public let forms: [NativeForm]
 
 	public static func decode(_ data: Data) throws -> NativeViewPayload {
 		try decode(JSONValue.parse(data))
@@ -195,7 +234,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 
 	public static func decode(_ json: JSONValue) throws -> NativeViewPayload {
 		let root = try Reader(json, at: "payload")
-		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route"])
+		let fields = try root.object(required: ["version", "component", "cells", "nodes", "events", "handlers"], optional: ["route", "forms"])
 		let version = try fields["version"].string()
 		guard version == nativeViewVersion else {
 			throw PayloadError(path: "payload.version", reason: "unsupported version \"\(version)\", this host reads \(nativeViewVersion)")
@@ -227,7 +266,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 					if try binding.keys().contains("property") {
 						let b = try binding.object(["property", "value"])
 						let property = try b["property"].string()
-						guard property == "value" else { throw PayloadError(path: binding.path, reason: "unknown property \"\(property)\"") }
+						guard ["value", "checked", "indeterminate"].contains(property) else { throw PayloadError(path: binding.path, reason: "unknown property \"\(property)\"") }
 						return NativeBinding(name: property, isProperty: true, value: try decodeExpr(try b["value"]))
 					}
 					let b = try binding.object(["attribute", "value"])
@@ -311,6 +350,17 @@ public struct NativeViewPayload: Equatable, Sendable {
 					}
 					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
 					return .command(node: try opField["node"].string(), command: command, preventScroll: preventScroll)
+				case "submit":
+					let opField = try op.object(["op", "form", "submitter"])
+					return .submit(form: try opField["form"].string(), submitter: try opField["submitter"].optionalString())
+				case "after":
+					let opField = try op.object(["op", "ms", "capture", "ops"])
+					let capture = try opField["capture"].array().map { pair -> NativeCapture in
+						let items = try pair.array()
+						guard items.count == 2 else { throw PayloadError(path: pair.path, reason: "a capture is [name, expression]") }
+						return NativeCapture(name: try items[0].string(), value: try decodeExpr(items[1]))
+					}
+					return .after(ms: try decodeExpr(try opField["ms"]), capture: capture, ops: try opField["ops"].array().map(decodeOp))
 				case "if":
 					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
 					return .when(
@@ -324,12 +374,32 @@ public struct NativeViewPayload: Equatable, Sendable {
 			let ops = try field["ops"].array().map(decodeOp)
 			return NativeHandler(id: try field["id"].string(), ops: ops)
 		}
+		let forms: [NativeForm] = fields.has("forms") ? try fields["forms"].array().map { form in
+			let field = try form.object(required: ["node", "fields", "submitters"], optional: ["noValidate", "authoredAriaDisabled"])
+			let flag = { (key: String) throws -> Bool in
+				guard field.has(key) else { return false }
+				guard try field[key].bool() else { throw PayloadError(path: try field[key].path, reason: "\(key) is only ever true") }
+				return true
+			}
+			return NativeForm(
+				node: try field["node"].string(),
+				fields: try field["fields"].array().map { entry in
+					let f = try entry.object(["node", "kind", "missing"])
+					let kind = try f["kind"].string()
+					guard let fieldKind = NativeFieldKind(rawValue: kind) else {
+						throw PayloadError(path: try f["kind"].path, reason: "unknown field kind \"\(kind)\"")
+					}
+					return NativeForm.Field(node: try f["node"].string(), kind: fieldKind, missing: try f["missing"].string())
+				},
+				submitters: try field["submitters"].array().map { try $0.string() },
+				noValidate: try flag("noValidate"), authoredAriaDisabled: try flag("authoredAriaDisabled"))
+		} : []
 		let route: NativeRoute? = fields.has("route") ? try {
 			let r = try fields["route"].object(["pattern", "params"])
 			return NativeRoute(pattern: try r["pattern"].string(), params: try r["params"].array().map { try $0.string() })
 		}() : nil
 		let payload = NativeViewPayload(
-			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers)
+			component: try fields["component"].string(), route: route, cells: cells, nodes: nodes, events: events, handlers: handlers, forms: forms)
 		try payload.check()
 		return payload
 	}
@@ -408,6 +478,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard name == "params" else { throw PayloadError(path: reader.path + ".route", reason: "unknown route read \"\(name)\"") }
 			return .routeParams
 		case ["item"]: return .item(try field("item").string())
+		case ["formData"]: return .formData(try field("formData").string())
 		case ["arguments", "call"]:
 			let name = try field("call").string()
 			guard let builtin = NativeBuiltin(rawValue: name) else { throw PayloadError(path: reader.path + ".call", reason: "unknown call \"\(name)\"") }
@@ -470,6 +541,11 @@ public struct NativeViewPayload: Equatable, Sendable {
 			}
 			for case let .assign(cell, value) in handler.ops where !cellIds.contains(cell) || !value.cells.allSatisfy(cellIds.contains) {
 				throw PayloadError(path: "payload.handlers", reason: "\(handler.id) names an unknown cell")
+			}
+		}
+		for form in forms {
+			for node in [form.node] + form.fields.map(\.node) + form.submitters where !elements.contains(node) {
+				throw PayloadError(path: "payload.forms", reason: "form \(form.node) names unknown element \(node)")
 			}
 		}
 		for event in events {

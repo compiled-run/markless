@@ -79,6 +79,7 @@ public final class MarklessViewController: UIViewController {
 
 	/// Runs the handler for an action and applies its journal, exactly as a tap does.
 	public func perform(_ action: NativeAction) {
+		tree?.dismissMessage()
 		do {
 			let journal = try runtime.dispatch(action)
 			if case let .navigate(route, params)? = journal.last {
@@ -95,7 +96,7 @@ public final class MarklessViewController: UIViewController {
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
-		tree?.root.removeFromSuperview()
+		tree?.unmount()
 		try buildPage()
 		if isViewLoaded { tree?.mount(in: view) }
 	}

@@ -13,7 +13,16 @@ const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
 /** Calls with exact JavaScript meaning that a native host implements; any other call needs a script engine. */
-const BUILTINS = new Set(['String', 'Number', 'Boolean', 'Math.abs', 'Math.floor', 'Math.max', 'Math.min', 'Math.round']);
+const BUILTINS = new Set([
+	'String',
+	'Number',
+	'Boolean',
+	'Math.abs',
+	'Math.floor',
+	'Math.max',
+	'Math.min',
+	'Math.round',
+]);
 
 const lambdaOf = (node: AnyNode): SemanticExpression => {
 	const parameters = asNodes(node.params);
@@ -21,10 +30,47 @@ const lambdaOf = (node: AnyNode): SemanticExpression => {
 		return unsupported('a function with a pattern or async parameters');
 	const body = node.body as AnyNode | undefined;
 	if (!body || body.type === 'BlockStatement') return unsupported('a function with a block body');
-	return { kind: 'lambda', parameters: parameters.map((parameter) => String(parameter.name)), body: expressionTreeOf(body) };
+	return {
+		kind: 'lambda',
+		parameters: parameters.map((parameter) => String(parameter.name)),
+		body: expressionTreeOf(body),
+	};
 };
 
 const unsupported = (construct: string): SemanticExpression => ({ kind: 'unsupported', construct });
+
+/** A function passed to `new` or a bare-name call (a promise executor, a timer callback) with its statements. */
+function functionValueOf(node: AnyNode): SemanticExpression {
+	const parameters = asNodes(node.params);
+	if (
+		node.async ||
+		node.generator ||
+		parameters.some((parameter) => parameter.type !== 'Identifier')
+	)
+		return unsupported('a function with a pattern, async or generator parameters');
+	const body = node.body as AnyNode | undefined;
+	return {
+		kind: 'function',
+		parameters: parameters.map((parameter) => String(parameter.name)),
+		body:
+			body?.type === 'BlockStatement'
+				? functionStatementsOf(body)
+				: body?.type === 'CallExpression' &&
+					  (body.callee as AnyNode | undefined)?.type === 'Identifier'
+					? functionStatementsOf({
+							type: 'ExpressionStatement',
+							expression: body,
+						} as AnyNode)
+					: [{ kind: 'return', value: expressionTreeOf(body) }],
+	};
+}
+
+const isFunctionNode = (node: AnyNode) =>
+	node.type === 'ArrowFunctionExpression' || node.type === 'FunctionExpression';
+const callArgumentsOf = (node: AnyNode) =>
+	asNodes(node.arguments).map((argument) =>
+		isFunctionNode(argument) ? functionValueOf(argument) : expressionTreeOf(argument),
+	);
 
 function calleeName(node: AnyNode | undefined): string | null {
 	if (node?.type === 'Identifier' && typeof node.name === 'string') return node.name;
@@ -50,7 +96,9 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			return expressionTreeOf(node.expression as AnyNode | undefined);
 		case 'Identifier':
 			if (node.name === 'undefined') return { kind: 'literal', value: null };
-			return typeof node.name === 'string' ? { kind: 'read', name: node.name } : unsupported('a name');
+			return typeof node.name === 'string'
+				? { kind: 'read', name: node.name }
+				: unsupported('a name');
 		case 'Literal':
 			return typeof node.value === 'string' ||
 				typeof node.value === 'boolean' ||
@@ -73,13 +121,20 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		}
 		case 'UnaryExpression':
 			return typeof node.operator === 'string' && UNARY.has(node.operator)
-				? { kind: 'unary', operator: node.operator as '!' | '-' | '+' | 'typeof', value: expressionTreeOf(node.argument as AnyNode) }
+				? {
+						kind: 'unary',
+						operator: node.operator as '!' | '-' | '+' | 'typeof',
+						value: expressionTreeOf(node.argument as AnyNode),
+					}
 				: unsupported(`the \`${String(node.operator)}\` operator`);
 		case 'BinaryExpression':
 			return typeof node.operator === 'string' && BINARY.has(node.operator)
 				? {
 						kind: 'binary',
-						operator: node.operator as Extract<SemanticExpression, { kind: 'binary' }>['operator'],
+						operator: node.operator as Extract<
+							SemanticExpression,
+							{ kind: 'binary' }
+						>['operator'],
 						left: expressionTreeOf(node.left as AnyNode),
 						right: expressionTreeOf(node.right as AnyNode),
 					}
@@ -103,38 +158,72 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		case 'MemberExpression': {
 			const key = node.property as AnyNode | undefined;
 			const property = node.computed
-				? key?.type === 'Literal' && typeof key.value === 'number' && Number.isInteger(key.value) && key.value >= 0
+				? key?.type === 'Literal' &&
+					typeof key.value === 'number' &&
+					Number.isInteger(key.value) &&
+					key.value >= 0
 					? String(key.value)
 					: undefined
 				: key?.name;
 			if (typeof property === 'string')
-				return { kind: 'member', object: expressionTreeOf(node.object as AnyNode), property };
+				return {
+					kind: 'member',
+					object: expressionTreeOf(node.object as AnyNode),
+					property,
+				};
 			return node.computed && key && key.type !== 'Literal'
-				? { kind: 'index', object: expressionTreeOf(node.object as AnyNode), index: expressionTreeOf(key) }
+				? {
+						kind: 'index',
+						object: expressionTreeOf(node.object as AnyNode),
+						index: expressionTreeOf(key),
+					}
 				: unsupported('a computed member read');
 		}
 		case 'CallExpression': {
 			const callee = node.callee as AnyNode | undefined;
-			const method = callee?.type === 'MemberExpression' && !callee.computed ? (callee.property as AnyNode | undefined)?.name : undefined;
+			const method =
+				callee?.type === 'MemberExpression' && !callee.computed
+					? (callee.property as AnyNode | undefined)?.name
+					: undefined;
 			if (typeof method === 'string' && !BUILTINS.has(calleeName(callee) ?? '')) {
 				return {
 					kind: 'method',
 					method,
 					object: expressionTreeOf(callee!.object as AnyNode),
 					arguments: asNodes(node.arguments).map((argument) =>
-						argument.type === 'ArrowFunctionExpression' ? lambdaOf(argument) : expressionTreeOf(argument),
+						argument.type === 'ArrowFunctionExpression'
+							? lambdaOf(argument)
+							: expressionTreeOf(argument),
 					),
 				};
 			}
 			const name = calleeName(callee);
 			if (name && BUILTINS.has(name))
-				return { kind: 'call', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) };
-			if (callee?.type === 'Identifier' && name && !asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement'))
-				return { kind: 'apply', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) };
+				return {
+					kind: 'call',
+					callee: name,
+					arguments: asNodes(node.arguments).map(expressionTreeOf),
+				};
+			if (
+				callee?.type === 'Identifier' &&
+				name &&
+				!asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement')
+			)
+				return { kind: 'apply', callee: name, arguments: callArgumentsOf(node) };
 			return unsupported(`a call to \`${name ?? 'a computed function'}\``);
 		}
 		case 'AwaitExpression':
-			return unsupported('`await`');
+			return { kind: 'await', value: expressionTreeOf(node.argument as AnyNode | undefined) };
+		case 'NewExpression': {
+			const callee = node.callee as AnyNode | undefined;
+			if (
+				callee?.type !== 'Identifier' ||
+				typeof callee.name !== 'string' ||
+				asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement')
+			)
+				return unsupported('a `new` of something other than a name');
+			return { kind: 'new', callee: callee.name, arguments: callArgumentsOf(node) };
+		}
 		case 'ArrowFunctionExpression':
 		case 'FunctionExpression':
 			return unsupported('a function value');
@@ -151,8 +240,18 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 			const entries: (readonly [string, SemanticExpression])[] = [];
 			for (const property of asNodes(node.properties)) {
 				const key = property.key as AnyNode | undefined;
-				const name = key?.type === 'Identifier' ? key.name : key?.type === 'Literal' ? key.value : undefined;
-				if (property.type !== 'Property' || property.computed || property.kind !== 'init' || typeof name !== 'string')
+				const name =
+					key?.type === 'Identifier'
+						? key.name
+						: key?.type === 'Literal'
+							? key.value
+							: undefined;
+				if (
+					property.type !== 'Property' ||
+					property.computed ||
+					property.kind !== 'init' ||
+					typeof name !== 'string'
+				)
 					return unsupported('an object with a spread, computed key or method');
 				entries.push([name, expressionTreeOf(property.value as AnyNode)]);
 			}
@@ -165,7 +264,10 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 
 /** Whether a member chain has a `?.` link: `a?.b()` calls nothing when `a` is absent. */
 function optionalChain(node: AnyNode | undefined): boolean {
-	return node?.type === 'MemberExpression' && (node.optional === true || optionalChain(node.object as AnyNode | undefined));
+	return (
+		node?.type === 'MemberExpression' &&
+		(node.optional === true || optionalChain(node.object as AnyNode | undefined))
+	);
 }
 
 /** `a.b.c` as its root name and member path, or null for anything else. */
@@ -211,6 +313,11 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 		return { kind: 'unsupported', construct: 'a statement other than an expression' };
 	if (expression.type === 'ParenthesizedExpression' || expression.type === 'ChainExpression')
 		return statementOf((expression.expression as AnyNode | undefined) ?? null);
+	if (expression.type === 'AwaitExpression')
+		return {
+			kind: 'await',
+			value: expressionTreeOf(expression.argument as AnyNode | undefined),
+		};
 	if (expression.type === 'CallExpression') {
 		const callee = memberPath(expression.callee as AnyNode | undefined);
 		if (callee && !BUILTINS.has([callee.name, ...callee.path].join('.'))) {
@@ -220,7 +327,8 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 				name: callee.name,
 				...(callee.path.length > 0 ? { path: callee.path } : {}),
 				...(args.length > 0 ? { arguments: args } : {}),
-				...(expression.optional === true || optionalChain(expression.callee as AnyNode | undefined)
+				...(expression.optional === true ||
+				optionalChain(expression.callee as AnyNode | undefined)
 					? { optional: true as const }
 					: {}),
 			};
@@ -263,7 +371,10 @@ const statementOf = (expression: AnyNode | null): SemanticHandlerStatement => {
 			: { kind: 'unsupported', construct: `the \`${operator}\` assignment` };
 	}
 	const tree = expressionTreeOf(expression);
-	return { kind: 'unsupported', construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement' };
+	return {
+		kind: 'unsupported',
+		construct: tree.kind === 'unsupported' ? tree.construct : 'an expression statement',
+	};
 };
 
 /** `const a = x` and `const { a, b: c } = x` as names and values, or the construct no native build binds. */
@@ -301,12 +412,20 @@ function constBindingsOf(
 const declaresDirectly = (block: AnyNode): AnyNode | undefined =>
 	asNodes(block.body).find((statement) => statement.type === 'VariableDeclaration');
 
-function blockStatementsOf(statement: AnyNode | undefined, inList = false): SemanticHandlerStatement[] {
+function blockStatementsOf(
+	statement: AnyNode | undefined,
+	inList = false,
+): SemanticHandlerStatement[] {
 	if (!statement) return [];
 	if (statement.type === 'BlockStatement') {
 		const declaration = inList ? declaresDirectly(statement) : undefined;
 		if (declaration)
-			return [{ kind: 'unsupported', construct: `a \`${String(declaration.kind)}\` inside a bare block` }];
+			return [
+				{
+					kind: 'unsupported',
+					construct: `a \`${String(declaration.kind)}\` inside a bare block`,
+				},
+			];
 		return asNodes(statement.body).flatMap((inner) => blockStatementsOf(inner, true));
 	}
 	if (statement.type === 'EmptyStatement') return [];
@@ -331,6 +450,23 @@ function blockStatementsOf(statement: AnyNode | undefined, inList = false): Sema
 				whenFalse: blockStatementsOf((statement.alternate as AnyNode | null) ?? undefined),
 			},
 		];
+	if (statement.type === 'TryStatement') {
+		const clause = statement.handler as AnyNode | null | undefined;
+		const param = clause?.param as AnyNode | null | undefined;
+		if (param && (param.type !== 'Identifier' || typeof param.name !== 'string'))
+			return [{ kind: 'unsupported', construct: 'a `catch` with a destructured error' }];
+		const blockOf = (block: AnyNode | null | undefined) =>
+			asNodes(block?.body).flatMap((inner) => blockStatementsOf(inner, true));
+		return [
+			{
+				kind: 'try',
+				body: blockOf(statement.block as AnyNode),
+				...(param ? { catchName: String(param.name) } : {}),
+				...(clause ? { handler: blockOf(clause.body as AnyNode) } : {}),
+				finalizer: blockOf(statement.finalizer as AnyNode | null),
+			},
+		];
+	}
 	return [{ kind: 'unsupported', construct: `a ${String(statement.type)}` }];
 }
 
@@ -348,7 +484,9 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 		case 'logical':
 			return readsName(tree.left, name) || readsName(tree.right, name);
 		case 'conditional':
-			return [tree.test, tree.consequent, tree.alternate].some((part) => readsName(part, name));
+			return [tree.test, tree.consequent, tree.alternate].some((part) =>
+				readsName(part, name),
+			);
 		case 'template':
 			return tree.parts.some((part) => typeof part !== 'string' && readsName(part, name));
 		case 'member':
@@ -357,9 +495,17 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 			return readsName(tree.object, name) || readsName(tree.index, name);
 		case 'call':
 		case 'apply':
+		case 'new':
 			return tree.arguments.some((argument) => readsName(argument, name));
+		case 'await':
+			return readsName(tree.value, name);
+		case 'function':
+			return !tree.parameters.includes(name);
 		case 'method':
-			return readsName(tree.object, name) || tree.arguments.some((argument) => readsName(argument, name));
+			return (
+				readsName(tree.object, name) ||
+				tree.arguments.some((argument) => readsName(argument, name))
+			);
 		case 'array':
 			return tree.items.some((item) => readsName(item.value, name));
 		case 'object':
@@ -367,7 +513,9 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 		case 'lambda':
 			return !tree.parameters.includes(name) && readsName(tree.body, name);
 		case 'let':
-			return readsName(tree.value, name) || (tree.name !== name && readsName(tree.body, name));
+			return (
+				readsName(tree.value, name) || (tree.name !== name && readsName(tree.body, name))
+			);
 	}
 }
 
@@ -375,16 +523,26 @@ function readsName(tree: SemanticExpression, name: string): boolean {
  * A computed's statements as one tree, `after` being what the statements following their block give: `const` is a
  * `let`, `if` a conditional, `return` its value and falling off the end `undefined`.
  */
-function returnChainOf(statements: ReadonlyArray<AnyNode>, after: SemanticExpression): SemanticExpression {
+function returnChainOf(
+	statements: ReadonlyArray<AnyNode>,
+	after: SemanticExpression,
+): SemanticExpression {
 	const [first, ...rest] = statements;
 	if (!first) return after;
 	const branch = (node: AnyNode | null | undefined, otherwise: SemanticExpression) =>
-		!node ? otherwise : returnChainOf(node.type === 'BlockStatement' ? asNodes(node.body) : [node], otherwise);
+		!node
+			? otherwise
+			: returnChainOf(
+					node.type === 'BlockStatement' ? asNodes(node.body) : [node],
+					otherwise,
+				);
 	switch (first.type) {
 		case 'EmptyStatement':
 			return returnChainOf(rest, after);
 		case 'ReturnStatement':
-			return first.argument ? expressionTreeOf(first.argument as AnyNode) : { kind: 'literal', value: null };
+			return first.argument
+				? expressionTreeOf(first.argument as AnyNode)
+				: { kind: 'literal', value: null };
 		case 'BlockStatement':
 			return branch(first, returnChainOf(rest, after));
 		case 'IfStatement': {
@@ -419,10 +577,19 @@ export function computedBodyOf(node: AnyNode): SemanticExpression {
 /** `for (let i = 0; i < list.length; i++)` (or `i += 1`, `++i`) as its index name and list. */
 function countedLoopOf(statement: AnyNode): { name: string; over: SemanticExpression } | undefined {
 	const init = statement.init as AnyNode | null | undefined;
-	const [declarator, ...more] = init?.type === 'VariableDeclaration' && init.kind === 'let' ? asNodes(init.declarations) : [];
+	const [declarator, ...more] =
+		init?.type === 'VariableDeclaration' && init.kind === 'let'
+			? asNodes(init.declarations)
+			: [];
 	const id = declarator?.id as AnyNode | undefined;
 	const start = declarator?.init as AnyNode | undefined;
-	if (more.length > 0 || id?.type !== 'Identifier' || typeof id.name !== 'string' || start?.type !== 'Literal' || start.value !== 0)
+	if (
+		more.length > 0 ||
+		id?.type !== 'Identifier' ||
+		typeof id.name !== 'string' ||
+		start?.type !== 'Literal' ||
+		start.value !== 0
+	)
 		return undefined;
 	const name = id.name;
 	const isName = (node: AnyNode | undefined) => node?.type === 'Identifier' && node.name === name;
@@ -440,7 +607,9 @@ function countedLoopOf(statement: AnyNode): { name: string; over: SemanticExpres
 	const update = statement.update as AnyNode | null | undefined;
 	const step = update?.right as AnyNode | undefined;
 	const steps =
-		(update?.type === 'UpdateExpression' && update.operator === '++' && isName(update.argument as AnyNode)) ||
+		(update?.type === 'UpdateExpression' &&
+			update.operator === '++' &&
+			isName(update.argument as AnyNode)) ||
 		(update?.type === 'AssignmentExpression' &&
 			update.operator === '+=' &&
 			isName(update.left as AnyNode) &&
@@ -452,14 +621,23 @@ function countedLoopOf(statement: AnyNode): { name: string; over: SemanticExpres
 /** A module function's statements as a native build evaluates them; anything else names its construct. */
 function functionStatementsOf(statement: AnyNode | null | undefined): SemanticFunctionStatement[] {
 	if (!statement) return [];
-	const unsupportedStatement = (construct: string): SemanticFunctionStatement[] => [{ kind: 'unsupported', construct }];
+	const unsupportedStatement = (construct: string): SemanticFunctionStatement[] => [
+		{ kind: 'unsupported', construct },
+	];
 	switch (statement.type) {
 		case 'BlockStatement':
 			return asNodes(statement.body).flatMap(functionStatementsOf);
 		case 'EmptyStatement':
 			return [];
 		case 'ReturnStatement':
-			return [{ kind: 'return', value: statement.argument ? expressionTreeOf(statement.argument as AnyNode) : { kind: 'literal', value: null } }];
+			return [
+				{
+					kind: 'return',
+					value: statement.argument
+						? expressionTreeOf(statement.argument as AnyNode)
+						: { kind: 'literal', value: null },
+				},
+			];
 		case 'IfStatement':
 			return [
 				{
@@ -470,19 +648,35 @@ function functionStatementsOf(statement: AnyNode | null | undefined): SemanticFu
 				},
 			];
 		case 'VariableDeclaration': {
-			if (statement.kind !== 'const' && statement.kind !== 'let') return unsupportedStatement(`a \`${String(statement.kind)}\` declaration`);
-			return asNodes(statement.declarations).flatMap((declarator): SemanticFunctionStatement[] => {
-				const id = declarator.id as AnyNode | undefined;
-				if (id?.type !== 'Identifier' || typeof id.name !== 'string') return unsupportedStatement('a destructuring declaration');
-				const init = declarator.init as AnyNode | null | undefined;
-				return [{ kind: 'let', name: id.name, value: init ? expressionTreeOf(init) : { kind: 'literal', value: null } }];
-			});
+			if (statement.kind !== 'const' && statement.kind !== 'let')
+				return unsupportedStatement(`a \`${String(statement.kind)}\` declaration`);
+			return asNodes(statement.declarations).flatMap(
+				(declarator): SemanticFunctionStatement[] => {
+					const id = declarator.id as AnyNode | undefined;
+					if (id?.type !== 'Identifier' || typeof id.name !== 'string')
+						return unsupportedStatement('a destructuring declaration');
+					const init = declarator.init as AnyNode | null | undefined;
+					return [
+						{
+							kind: 'let',
+							name: id.name,
+							value: init ? expressionTreeOf(init) : { kind: 'literal', value: null },
+						},
+					];
+				},
+			);
 		}
 		case 'ForOfStatement': {
 			const left = statement.left as AnyNode | undefined;
-			const [declarator, ...more] = left?.type === 'VariableDeclaration' ? asNodes(left.declarations) : [];
+			const [declarator, ...more] =
+				left?.type === 'VariableDeclaration' ? asNodes(left.declarations) : [];
 			const id = declarator?.id as AnyNode | undefined;
-			if (statement.await || more.length > 0 || id?.type !== 'Identifier' || typeof id.name !== 'string')
+			if (
+				statement.await ||
+				more.length > 0 ||
+				id?.type !== 'Identifier' ||
+				typeof id.name !== 'string'
+			)
 				return unsupportedStatement('a `for...of` loop that does not declare one name');
 			return [
 				{
@@ -496,22 +690,51 @@ function functionStatementsOf(statement: AnyNode | null | undefined): SemanticFu
 		case 'ForStatement': {
 			const counted = countedLoopOf(statement);
 			return counted
-				? [{ kind: 'count', ...counted, body: functionStatementsOf(statement.body as AnyNode) }]
-				: unsupportedStatement('a `for` loop other than over an array\'s indices');
+				? [
+						{
+							kind: 'count',
+							...counted,
+							body: functionStatementsOf(statement.body as AnyNode),
+						},
+					]
+				: unsupportedStatement("a `for` loop other than over an array's indices");
 		}
 		case 'ExpressionStatement': {
 			const expression = statement.expression as AnyNode | undefined;
-			if (expression?.type === 'AssignmentExpression' || expression?.type === 'UpdateExpression') {
+			if (
+				expression?.type === 'AssignmentExpression' ||
+				expression?.type === 'UpdateExpression'
+			) {
 				const write = statementOf(expression);
 				return write.kind === 'assign' && !write.path
 					? [{ kind: 'set', name: write.target, value: write.value }]
 					: unsupportedStatement('a write to something other than a local');
 			}
-			const callee = expression?.type === 'CallExpression' ? memberPath(expression.callee as AnyNode | undefined) : null;
+			const callee =
+				expression?.type === 'CallExpression'
+					? memberPath(expression.callee as AnyNode | undefined)
+					: null;
 			const [value, ...rest] = asNodes(expression?.arguments);
-			if (callee?.path.length === 1 && callee.path[0] === 'push' && value && rest.length === 0 && value.type !== 'SpreadElement')
+			if (
+				callee?.path.length === 1 &&
+				callee.path[0] === 'push' &&
+				value &&
+				rest.length === 0 &&
+				value.type !== 'SpreadElement'
+			)
 				return [{ kind: 'push', name: callee.name, value: expressionTreeOf(value) }];
-			return unsupportedStatement('an expression statement other than a write to a local or `push`');
+			if (
+				callee?.path.length === 0 &&
+				!asNodes(expression?.arguments).some(
+					(argument) => argument.type === 'SpreadElement',
+				)
+			)
+				return [
+					{ kind: 'call', callee: callee.name, arguments: callArgumentsOf(expression!) },
+				];
+			return unsupportedStatement(
+				'an expression statement other than a write to a local or `push`',
+			);
 		}
 		default:
 			return unsupportedStatement(`a ${String(statement.type)}`);
@@ -519,13 +742,27 @@ function functionStatementsOf(statement: AnyNode | null | undefined): SemanticFu
 }
 
 /** A module-level function's parameters and statements; a defaulted parameter starts the body as `let p = p ?? default`. */
-export function functionBodyOf(node: AnyNode): { parameters: string[]; statements: SemanticFunctionStatement[] } {
+export function functionBodyOf(node: AnyNode): {
+	parameters: string[];
+	statements: SemanticFunctionStatement[];
+} {
 	const parameters: string[] = [];
 	const defaults: SemanticFunctionStatement[] = [];
 	for (const parameter of asNodes(node.params)) {
-		const target = parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode | undefined) : parameter;
+		const target =
+			parameter.type === 'AssignmentPattern'
+				? (parameter.left as AnyNode | undefined)
+				: parameter;
 		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
-			return { parameters, statements: [{ kind: 'unsupported', construct: 'a function with a pattern or rest parameter' }] };
+			return {
+				parameters,
+				statements: [
+					{
+						kind: 'unsupported',
+						construct: 'a function with a pattern or rest parameter',
+					},
+				],
+			};
 		parameters.push(target.name);
 		if (parameter.type === 'AssignmentPattern')
 			defaults.push({
@@ -541,12 +778,17 @@ export function functionBodyOf(node: AnyNode): { parameters: string[]; statement
 	}
 	const body = node.body as AnyNode | undefined;
 	if (node.async || node.generator)
-		return { parameters, statements: [{ kind: 'unsupported', construct: 'an async or generator function' }] };
+		return {
+			parameters,
+			statements: [{ kind: 'unsupported', construct: 'an async or generator function' }],
+		};
 	return {
 		parameters,
 		statements: [
 			...defaults,
-			...(body?.type === 'BlockStatement' ? functionStatementsOf(body) : [{ kind: 'return' as const, value: expressionTreeOf(body) }]),
+			...(body?.type === 'BlockStatement'
+				? functionStatementsOf(body)
+				: [{ kind: 'return' as const, value: expressionTreeOf(body) }]),
 		],
 	};
 }
@@ -557,7 +799,6 @@ export function handlerStatementsOf(
 ): ReadonlyArray<SemanticHandlerStatement> | undefined {
 	if (!node || (node.type !== 'ArrowFunctionExpression' && node.type !== 'FunctionExpression'))
 		return undefined;
-	if (node.async) return [{ kind: 'unsupported', construct: 'an async handler' }];
 	// A parameter's default applies when no value (undefined, which native values spell null) is passed.
 	const defaults = asNodes(node.params).flatMap((parameter): SemanticHandlerStatement[] => {
 		const name = (parameter.left as AnyNode | undefined)?.name;
@@ -577,7 +818,12 @@ export function handlerStatementsOf(
 			: [];
 	});
 	const body = node.body as AnyNode | undefined;
-	return [...defaults, ...(body?.type === 'BlockStatement' ? blockStatementsOf(body) : [statementOf(body ?? null)])];
+	return [
+		...defaults,
+		...(body?.type === 'BlockStatement'
+			? blockStatementsOf(body)
+			: [statementOf(body ?? null)]),
+	];
 }
 
 /** A component's prop defaults, rest spread, `state()` initializers and the writes its body makes while rendering. */
