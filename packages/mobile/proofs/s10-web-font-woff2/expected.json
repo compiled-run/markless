@@ -1,0 +1,14 @@
+{
+	"rung": "S10",
+	"name": "An author web font shipped as WOFF2 (Lato, regular and bold .woff2) behind a family the app does not provide ('Nowhere Sans', 'Harbour Lato'): the missing family is skipped and the text is drawn in Lato on the web, iOS and Android",
+	"steps": [
+		{
+			"visible": [
+				"Tide almanac",
+				"Lato from WOFF2, regular weight",
+				"Waffles, quays and fjords"
+			],
+			"title": "Almanac"
+		}
+	]
+}
