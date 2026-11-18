@@ -59,8 +59,14 @@ data class BorderOp(val op: String, val side: Int, val alpha: Double, val antial
 /** A dashed or dotted border as Dragon's own native paint draws it, the snapped border box at the origin (relative to the node's frame). */
 data class BorderOps(val originX: Double, val originY: Double, val ops: List<BorderOp>)
 
-/** [scrollRange], device px, only on a scroll container. */
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null)
+/** Consecutive glyphs of a text line in one face at one instance size in device px; [xs] are pen origins in device px from the node's frame. */
+data class GlyphRun(val face: String, val size: Double, val glyphs: List<Int>, val xs: List<Double>)
+
+/** One line of a text node as Dragon shaped and placed it; [top] and [baseline] in device px from the node's frame. */
+data class TextLine(val top: Double, val baseline: Double, val runs: List<GlyphRun>)
+
+/** [scrollRange], device px, only on a scroll container; [lines], only on a framed text node, the glyphs Dragon draws for its [text]. */
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null, val borderOps: BorderOps? = null, val lines: List<TextLine>? = null, val text: String? = null)
 
 /**
  * One reachable combination of style states: every node's frame and writes, complete, the canvas behind the page (null: white),
@@ -294,7 +300,33 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val writes = writesOf(o.field("writes", what), id)
 			val scroll = o["scrollRange"]?.let { range(it, "$what.scrollRange") }
 			if ((scroll != null) != writes.any { it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("$what: a scroll range comes with a scroll-container write, and only then")
-			return StyledNode(id, parent, kind, frame, bw, writes, scroll, o["borderOps"]?.let { borderOps(it, "$what.borderOps") })
+			val lines = o["lines"]?.let { textLines(it, "$what.lines") }
+			if (lines != null && (kind != "text" || frame == null)) throw MarklessDecodeError("$what: only a framed text node has lines")
+			val text = o["text"]?.takeIf { it != Json.Null }?.str("$what.text")
+			if (lines != null && text == null) throw MarklessDecodeError("$what has lines but no text")
+			return StyledNode(id, parent, kind, frame, bw, writes, scroll, o["borderOps"]?.let { borderOps(it, "$what.borderOps") }, lines, text)
+		}
+
+		private fun textLines(v: Json, what: String): List<TextLine> = v.arr(what).mapIndexed { n, x ->
+			val at = "$what[$n]"
+			val l = x.obj(at)
+			l.only(setOf("top", "baseline", "runs"), at)
+			val runs = l.field("runs", at).arr("$at.runs").mapIndexed { k, r ->
+				val where = "$at.runs[$k]"
+				val o = r.obj(where)
+				o.only(setOf("face", "size", "glyphs", "xs"), where)
+				val size = o.field("size", where).num("$where.size")
+				if (!(size > 0) || size.isInfinite()) throw MarklessDecodeError("$where.size is $size, not a positive size")
+				val glyphs = o.field("glyphs", where).arr("$where.glyphs").map {
+					val g = it.num("$where.glyphs[]")
+					if (g != Math.floor(g) || g < 0 || g > 65535) throw MarklessDecodeError("$where.glyphs holds $g, not a glyph id")
+					g.toInt()
+				}
+				val xs = o.field("xs", where).arr("$where.xs").map { it.num("$where.xs[]").also { x -> if (x.isNaN() || x.isInfinite()) throw MarklessDecodeError("$where.xs holds $x") } }
+				if (glyphs.isEmpty() || xs.size != glyphs.size) throw MarklessDecodeError("$where needs one x per glyph and at least one glyph")
+				GlyphRun(o.field("face", where).str("$where.face"), size, glyphs, xs)
+			}
+			TextLine(l.field("top", at).num("$at.top"), l.field("baseline", at).num("$at.baseline"), runs)
 		}
 
 		private fun borderOps(v: Json, what: String): BorderOps {
