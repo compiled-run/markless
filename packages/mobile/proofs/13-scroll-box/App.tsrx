@@ -1,4 +1,7 @@
+import { state } from '@markless/core';
+
 export default function App() @{
+	let taps = state(0);
 	<main class="page">
 		<style>
 			.page {
@@ -19,6 +22,17 @@ export default function App() @{
 				padding: 0 12px;
 				height: 44px;
 				font-size: 18px;
+			}
+			.tap {
+				display: block;
+				margin-top: 12px;
+				padding: 12px 20px;
+				border: 2px solid #1d1b16;
+				border-radius: 12px;
+				background: #ffd166;
+				font-family: inherit;
+				font-size: 18px;
+				color: #1d1b16;
 			}
 			.tail {
 				margin: 0;
@@ -79,5 +93,6 @@ export default function App() @{
 		<p class="tail">Page row 18</p>
 		<p class="tail">Page row 19</p>
 		<p class="tail">Page row 20</p>
+		<button class="tap" onClick={() => taps++}>Tapped {taps}</button>
 	</main>
 }

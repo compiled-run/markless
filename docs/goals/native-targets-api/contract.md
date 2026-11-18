@@ -454,7 +454,7 @@ compares Dragon's build-time layout with Chrome, not the device's pixels.
   Android `ScrollView` padded by the system bars with `clipToPadding = false`. Content starts inside the safe area and
   scrolls under the bars, as a phone browser's page does. Its bottom follows the keyboard (`keyboardLayoutGuide`; Android
   IME insets). Unstyled pages size it from native layout. Styled pages use Dragon's `pageScroll`, the viewport's offset range in
-  device px per assignment. When Dragon leaves that range undecided (a form control on the page), a page taller than
+  device px per assignment. When Dragon leaves that range undecided (a range control, or a control that scrolls; block buttons are decided since dragoncss#593's second commit), a page taller than
   the screen is a host error that quotes Dragon's `DRAGON_PAGE_SCROLL_UNDECIDED` reason.
 - **A box with `overflow-x`/`overflow-y` `auto` or `scroll`** has a `scroll-container` write and a `scrollRange`. The host puts
   a scroll view over its padding box and hosts the children there, at their frames less the border:

@@ -5,8 +5,10 @@ name: 13-scroll-box
       clearState: true
 - assertVisible: Scroll box
 - assertVisible: Box row 1
+- assertNotVisible: Tapped 1
 - assertNotVisible: Box row 30
 - assertNotVisible: Page row 20
+- assertNotVisible: Tapped 0
 - repeat:
       times: 80
       while:
@@ -22,7 +24,7 @@ name: 13-scroll-box
 - repeat:
       times: 80
       while:
-          notVisible: Page row 20
+          notVisible: Tapped 0
       commands:
           - swipe:
                 start: 50%, 90%
@@ -30,4 +32,9 @@ name: 13-scroll-box
 - assertVisible: Page row 20
 - assertNotVisible: Scroll box
 - assertVisible: Page row 20
+- assertVisible: Tapped 0
 - assertNotVisible: Scroll box
+- tapOn: Tapped 0
+- assertNotVisible: Tapped 0
+- assertVisible: Tapped 1
+- assertNotVisible: Tapped 0

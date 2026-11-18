@@ -1,10 +1,11 @@
 {
 	"rung": 13,
-	"name": "A fixed-height box with overflow-y auto scrolls inside a page that also scrolls",
+	"name": "A fixed-height box with overflow-y auto scrolls inside a page that also scrolls, and a styled button at the page's end is pressed",
 	"steps": [
 		{
 			"visible": ["Scroll box", "Box row 1"],
-			"offScreen": ["Box row 30", "Page row 20"]
+			"offScreen": ["Box row 30", "Page row 20", "Tapped 0"],
+			"absent": ["Tapped 1"]
 		},
 		{
 			"do": {
@@ -22,11 +23,18 @@
 				"swipe": {
 					"from": [50, 90],
 					"to": [50, 40],
-					"until": "Page row 20"
+					"until": "Tapped 0"
 				}
 			},
-			"visible": ["Page row 20"],
+			"visible": ["Page row 20", "Tapped 0"],
 			"offScreen": ["Scroll box"]
+		},
+		{
+			"do": {
+				"tap": "Tapped 0"
+			},
+			"visible": ["Tapped 1"],
+			"absent": ["Tapped 0"]
 		}
 	]
 }
