@@ -19,7 +19,7 @@ name: j4-timers-fetch
 - assertNotVisible: 'Ticking: done'
 - extendedWaitUntil:
       visible: 'Ticks: 3'
-      timeout: 11000
+      timeout: 16000
 - assertVisible: 'Ticking: done'
 - assertVisible: 'Ticks: 3'
 - assertVisible: 'Ticking: done'

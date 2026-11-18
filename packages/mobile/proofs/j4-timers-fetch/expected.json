@@ -22,7 +22,7 @@
 		},
 		{
 			"do": {
-				"wait": 1000
+				"wait": 6000
 			},
 			"visible": ["Ticks: 3", "Ticking: done"],
 			"absent": ["Ticks: 4"]

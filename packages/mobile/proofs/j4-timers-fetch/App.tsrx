@@ -32,7 +32,7 @@ export default function App() @{
 						clearInterval(id);
 						ticking = 'done';
 					}
-				}, 200);
+				}, 1500);
 			}}
 		>
 			Tick
