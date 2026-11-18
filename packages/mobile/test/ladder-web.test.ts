@@ -58,17 +58,49 @@ beforeAll(async () => {
 
 afterAll(() => browser.close(), 60_000);
 
+/**
+ * The one-screen rungs of the script ladder share one build, each its own page at `/<folder>`: they bring no route,
+ * document, styles or output checks of their own, so one app per rung would only repeat the same build.
+ */
+const SHARED = (folder: string, rung: LadderRung): boolean =>
+	/^j\d+-/.test(folder) &&
+	!existsSync(join(proofsDir, folder, 'pages')) &&
+	rung.route === undefined &&
+	rung.start === undefined &&
+	rung.web === undefined;
+const sharedCleanups: Array<() => Promise<void> | void> = [];
+let shared: Promise<{ origin: string; root: string }> | undefined;
+const serveShared = () =>
+	(shared ??= (async () => {
+		const folders = allRungFolders().filter((folder) => SHARED(folder, readRung(folder)));
+		return serveRung(folders.join('+'), undefined, sharedCleanups, async (root) => {
+			for (const folder of folders) {
+				await mkdir(join(root, 'pages'), { recursive: true });
+				await copyFile(
+					join(proofsDir, folder, 'App.tsrx'),
+					join(root, 'pages', `${folder}.tsrx`),
+				);
+			}
+		});
+	})());
+afterAll(async () => {
+	for (const cleanup of sharedCleanups.splice(0).reverse()) await cleanup();
+}, 60_000);
+
 async function serveRung(
 	folder: string,
-	rung: LadderRung,
+	rung: LadderRung | undefined,
+	owned = cleanups,
+	placePages?: (root: string) => Promise<void>,
 ): Promise<{ origin: string; root: string }> {
-	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder}-`));
-	cleanups.push(() => rm(root, { recursive: true, force: true }));
+	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder.slice(0, 40)}-`));
+	owned.push(() => rm(root, { recursive: true, force: true }));
+	if (placePages) await placePages(root);
 	// A navigation rung is an app of several routes: its pages/ folder is the app's.
-	if (existsSync(join(proofsDir, folder, 'pages'))) {
+	else if (existsSync(join(proofsDir, folder, 'pages'))) {
 		await cp(join(proofsDir, folder, 'pages'), join(root, 'pages'), { recursive: true });
 	} else {
-		const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
+		const page = join(root, 'pages', `${rung?.route ?? 'index'}.tsrx`);
 		await mkdir(dirname(page), { recursive: true });
 		await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
 	}
@@ -108,7 +140,7 @@ async function serveRung(
 	const server = await startBuiltServer(join(root, '.output/server/index.mjs'), {
 		env: { PATH: process.env.PATH, HOST: '127.0.0.1' },
 	});
-	cleanups.push(() => server.close());
+	owned.push(() => server.close());
 	return { origin: server.origin, root };
 }
 
@@ -280,8 +312,10 @@ describe.each(allRungFolders())('%s', (folder) => {
 	let origin = '';
 
 	let built = '';
+	const sharing = SHARED(folder, rung);
+	const start = sharing ? `/${folder}` : (rung.start ?? '/');
 	beforeAll(async () => {
-		({ origin, root: built } = await serveRung(folder, rung));
+		({ origin, root: built } = sharing ? await serveShared() : await serveRung(folder, rung));
 		if (rung.server === 'echo') {
 			const echo = await startEchoServer();
 			cleanups.push(() => echo.close());
@@ -324,7 +358,7 @@ describe.each(allRungFolders())('%s', (folder) => {
 				if (message.type() === 'error') errors.push(message.text());
 			});
 			if (rung.steps.some((step) => step.do && 'wait' in step.do)) await page.clock.install();
-			await page.goto(`${origin}${rung.start ?? '/'}`);
+			await page.goto(`${origin}${start}`);
 			if (rung.steps.some((step) => step.do && 'wait' in step.do))
 				await page.clock.pauseAt(Date.now() + 60_000);
 			for (const [index, authored] of (rung.web?.steps ?? rung.steps).entries()) {
