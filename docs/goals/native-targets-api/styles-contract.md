@@ -278,13 +278,17 @@ AVD `markless_dragon_bugs`, Pixel 7, API 36; Dragon `cw/dragon-bugs` at `65fd307
 u11 to u15, u17 to u20), 21 of 21 on each, "proof passed on iOS and Android" (`receipts/2026-11-18-dragon-bugs-*`). An
 earlier run at `446b88bfe` (20 rungs, before u19) also passed on both.
 
-Found on the way:
+Round two (2026-11-18, owner rulings):
 
-- **Android button labels.** The u17 "Tap" button draws "Ta" on Android: Dragon gives the label 82.5 device px, the host's
-  `Button` gets 83, and Android measures the word a hair wider and wraps the last letter out of view. Not fixed here.
-- **The dark-mode page base.** Chrome 145 under an emulated dark preference paints a page with no background over
-  rgb(18, 18, 18), whatever its `color-scheme`; the hosts paint white there (S5's decision). Open for the owner; see
-  `deferred-styles.md`.
+| Item | Change | Rung | iOS | Android |
+| --- | --- | --- | --- | --- |
+| Dark mode opt-in | `color-scheme` on the root decides the used scheme per band (Dragon `canvas: 'host'`); dark takes Chrome's dark canvas (18, 18, 18) and dark UA colours; no opt-in stays white (owner; Safari agrees, Chrome paints 18, 18, 18) | S7, S8 | pass | pass |
+| Android label wraps | A button's label pads from its outward-rounded edges (u17 "Tap", rung 02 "Count 0"); every styled text draws Dragon's glyph lines (`lines` in the export) with `Canvas.drawGlyphs`, since Android shapes word by word and loses Inter's contextual comma before a space (S2 "Basil, in stock") | u17, 02, S2 | pass | pass |
+| Author web font | The style input carries each `@font-face` url's file (compiler fact `fontFaceSources`); Dragon measures with it; the harness ships it; TTF and OTF (TrueType outlines) work, WOFF/WOFF2 refused by name | S9 | pass | pass |
+| Scroll, forms, real elements | Base `cw/native-integration` merged; Dragon `cw/native-scroll` (#593) merged | all | pass | pass |
+
+Receipt: `receipts/2026-11-18-dragon-bugs-round2-*`, 25 rungs per platform (02, S1 to S9, the u rungs).
+
 - Pressed, `:focus-visible`, width `@media` and the system font are not built; what each would take is in
   `deferred-styles.md`.
 
