@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: u14-gridlist
+---
+- launchApp:
+      clearState: true
+- assertVisible: Files
+- assertVisible: Recent
+- assertVisible: README\.md
+- assertVisible: LICENSE
+- assertVisible: NOTES\.md
+- assertVisible: Picked nothing
+- assertNotVisible: Picked readme
+- assertNotVisible: Picked license
+- tapOn: LICENSE
+- assertVisible: Picked license
+- assertNotVisible: Picked nothing
+- assertVisible: Picked license
+- assertNotVisible: Picked nothing
+- assertNotVisible: Picked readme
+- tapOn: README\.md
+- assertVisible: Picked readme
+- assertNotVisible: Picked license
+- assertVisible: Picked readme
+- assertNotVisible: Picked nothing
+- assertNotVisible: Picked license
+- tapOn: README\.md
+- assertVisible: Picked nothing
+- assertNotVisible: Picked readme
+- assertVisible: Picked nothing
+- assertNotVisible: Picked readme
+- assertNotVisible: Picked license

@@ -14,7 +14,7 @@ import {
 	createNativeRuntime,
 	type NativeRuntime,
 } from '../src/index.ts';
-import { compileRungApp, readAppConfig, readRelativeModule } from '../src/harness/rung.ts';
+import { compileRungApp, readAppConfig, readWorkspaceModule } from '../src/harness/rung.ts';
 import {
 	looksOnly,
 	navRungFolders,
@@ -29,6 +29,7 @@ import {
 // The native column before any device: each rung's payload, run by the reference runtime, must show what the
 // web build shows; a rung the compiler cannot lower yet must be refused by name, never emitted half right.
 const NATIVE_UNSUPPORTED = 'MARKLESS_NATIVE_UNSUPPORTED';
+const NATIVE_KEYBOARD_ONLY = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 
 // A mirror host: it keeps what a device shows and changes it only through journal entries, as the hosts must.
 function mirror(
@@ -307,6 +308,8 @@ function walk(
 		for (const [node, open] of runtime.sheets()) sheetOpen.set(node, open);
 	};
 	const nodeOf = new Map(payload.nodes.map((node) => [node.id, node]));
+	// A closed <dialog> shows nothing (the UA's dialog:not([open]) rule); the journal opens and closes it.
+	const openDialogs = new Map(runtime.dialogs());
 	const chosen = new Map(runtime.arms());
 	// What the platform's sheets show: changed only by `sheet` entries and by the platform closing one.
 	const sheetOpen = new Map(runtime.sheets());
@@ -335,22 +338,52 @@ function walk(
 		if (!node?.arm) return false;
 		return node.arm.branch === branch || inArm(node.arm.branch, branch);
 	};
+	// An element carrying `hidden`, bound or static, hides everything inside it, as the web's `[hidden]` rule does.
+	const hiddenWithin = (id: string): boolean => {
+		const at = id.indexOf('@');
+		const suffix = at < 0 ? '' : id.slice(at);
+		const node = nodeOf.get(at < 0 ? id : id.slice(0, at));
+		if (!node) return false;
+		if (node.kind === 'element') {
+			if (openDialogs.get(id) === false) return true;
+			const bound = attributes.get(`${id}\0hidden`);
+			if ((bound !== undefined ? bound : (node.attributes?.['hidden'] ?? null)) !== null)
+				return true;
+		}
+		return (
+			node.parent !== null &&
+			hiddenWithin(`${node.parent}${nodeOf.get(node.parent)?.row ? suffix : ''}`)
+		);
+	};
 	// What a flow can see or tap: shown text, and each shown element's accessible name (aria-label, bound or static).
 	const labels = () =>
 		payload.nodes.flatMap((node) => {
 			if (node.kind !== 'element') return [];
-			const bound = attributes.get(`${node.id}\0aria-label`);
+			const attribute = (name: string) => {
+				const bound = attributes.get(`${node.id}\0${name}`);
+				return bound !== undefined ? bound : (node.attributes?.[name] ?? null);
+			};
 			// A host shows an <audio controls> with a clip as one control named for what it does next.
 			if (node.element === 'audio')
 				return shownNode(node.id) && attributes.get(`${node.id}\0src`) != null
 					? [[node.id, playing ? 'Pause' : 'Play'] as const]
 					: [];
+			// aria-labelledby names an element by the text of the elements it lists, as the hosts read it.
+			const labelledBy = attribute('aria-labelledby');
 			const label =
-				bound !== undefined
-					? bound
-					: (node.attributes?.['aria-label'] ??
-						(node.element === 'img' ? node.attributes?.alt : undefined) ??
-						null);
+				attribute('aria-label') ??
+				(node.element === 'img' ? (node.attributes?.alt ?? null) : null) ??
+				(labelledBy === null
+					? null
+					: labelledBy
+							.split(' ')
+							.map((id) =>
+								[...texts]
+									.filter(([text]) => nodeOf.get(text)?.parent === id)
+									.map(([, shown]) => shown)
+									.join(' '),
+							)
+							.join(' '));
 			return label !== null && shownNode(node.id) ? [[node.id, label] as const] : [];
 		});
 	const elementReading = (text: string) => {
@@ -435,6 +468,7 @@ function walk(
 					)
 						answered.push(() => setObject(object, name, value));
 			} else if (entry.op === 'text') texts.set(entry.node, entry.value);
+			else if (entry.op === 'dialog') openDialogs.set(entry.node, entry.open);
 			else if (entry.op === 'attribute')
 				attributes.set(`${entry.node}\0${entry.name}`, entry.value);
 			else if (entry.op === 'property') properties.set(entry.node, entry.value);
@@ -578,9 +612,13 @@ function walk(
 				throw new Error(`step ${index}: "${name}" is disabled`);
 			// Typing shows the text in the field at once; the input event then runs the handler.
 			if ('type' in action) properties.set(host, action.type.text);
+			// A touch reaches the nearest element around it that handles a press, as on a phone.
+			let pressed: string | null | undefined = host;
+			while (pressed && !payload.events.some((event) => event.host === pressed && event.event === 'activate'))
+				pressed = nodeOf.get(pressed)?.parent;
 			const dispatched =
 				'tap' in action
-					? runtime.dispatch({ event: 'activate', host })
+					? runtime.dispatch({ event: 'activate', host: pressed ?? host })
 					: runtime.dispatch({ event: 'input', host, value: action.type.text });
 			apply(dispatched, index);
 		}
@@ -605,7 +643,14 @@ function walk(
 				);
 			expect(running ? 'on' : 'off', `step ${index}: the camera session`).toBe(step.camera);
 		}
-		const shown = [...shownTexts().map(([, text]) => text), ...labels().map(([, label]) => label)];
+		const shown = [
+			...shownTexts()
+				.filter(([id]) => !hiddenWithin(id))
+				.map(([, text]) => text),
+			...labels()
+				.filter(([id]) => !hiddenWithin(id))
+				.map(([, label]) => label),
+		];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
 		if (step.order)
@@ -649,7 +694,7 @@ test.each(
 			filename,
 			source: readFileSync(filename, 'utf8'),
 			...(page ? { page } : {}),
-			readModule: readRelativeModule,
+			readModule: readWorkspaceModule,
 			...readAppConfig(join(proofsDir, folder)),
 			target,
 		});
@@ -659,9 +704,16 @@ test.each(
 				typeof rung.rung,
 				`${folder} is refused: ${build.diagnostics.map((d) => d.message).join('; ')}`,
 			).toBe('number');
-			expect(build.diagnostics.length).toBeGreaterThan(0);
-			expect(build.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
-				build.diagnostics.map(() => NATIVE_UNSUPPORTED),
+			// Every refusal is named; a keyboard-only handler left out is a warning beside them, never the reason.
+			expect(build.diagnostics.some((diagnostic) => diagnostic.severity === 'error')).toBe(true);
+			expect(
+				build.diagnostics.map((diagnostic) => [diagnostic.severity, diagnostic.code]),
+			).toEqual(
+				build.diagnostics.map((diagnostic) =>
+					diagnostic.severity === 'error'
+						? ['error', NATIVE_UNSUPPORTED]
+						: ['warning', NATIVE_KEYBOARD_ONLY],
+				),
 			);
 			return;
 		}

@@ -88,9 +88,17 @@ export type SemanticDeviceObject = {
 /** The collectors a native build passes to the analysis; their nodes are the parser's ESTree nodes. */
 export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
+	/** A computed's block body (its statements) as one tree. */
+	readonly computedBody: (node: never) => SemanticExpression;
+	/** A module-level function's parameters and body as one tree. */
+	readonly functionBody: (node: never) => SemanticModuleFunction['native'];
 	readonly handlerStatements: (
 		node: never,
 	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
+	readonly component: (
+		node: never,
+		isFrameworkCall: (node: never, api: 'state') => boolean,
+	) => SemanticComponentNativeFacts;
 };
 
 export type ElementOnlyAttribute = {
@@ -162,6 +170,20 @@ export type SemanticComponent = {
 	readonly name: string;
 	/** How this module exports the component: `default`, the export name, or absent. */
 	readonly exportName?: string;
+	/** Native builds only (`nativeFacts`). */
+	readonly native?: SemanticComponentNativeFacts;
+};
+
+/** What a native build lowers from a component's own body, collected only when `nativeFacts` is passed. */
+export type SemanticComponentNativeFacts = {
+	/** Destructured prop defaults (`open = false`) as trees, by local name. */
+	readonly propDefaults: Readonly<Record<string, SemanticExpression>>;
+	/** The local name of a `...rest` prop spread, when the component takes one. */
+	readonly restProp?: string;
+	/** Each `state(initial)` the body declares, its initializer as a tree, by local name. */
+	readonly stateInitializers: Readonly<Record<string, SemanticExpression>>;
+	/** Statements the body runs while it renders (`collapsible.open = open`), in order. */
+	readonly renderStatements: ReadonlyArray<SemanticHandlerStatement>;
 };
 
 // An authored prop binding is identified by its declaration span, not by the
@@ -742,6 +764,9 @@ export type SemanticSharedReturnProperty =
 			readonly name: string;
 			readonly source: string;
 			readonly sourceSpan?: SourceSpan;
+			/** The method's body as statements and its parameter names, for native builds only (`nativeFacts`). */
+			readonly nativeStatements?: ReadonlyArray<SemanticHandlerStatement>;
+			readonly parameters?: ReadonlyArray<string>;
 	  }
 	| {
 			// A function-typed placeholder on the returned object: a slot the widget
@@ -1227,15 +1252,55 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/** A top-level `function` of a module: what a native build inlines where an expression calls it. */
+export type SemanticModuleFunction = {
+	readonly name: string;
+	/** The names other modules import it by (`export function`, `export { name as alias }`). */
+	readonly exportNames: ReadonlyArray<string>;
+	readonly native: {
+		readonly parameters: ReadonlyArray<string>;
+		/** Its body; a defaulted parameter `p = d` starts it as `let p = p ?? d`. */
+		readonly statements: ReadonlyArray<SemanticFunctionStatement>;
+	};
+};
+
+/** One statement of a module function's body, as a native build evaluates it where the function is called. */
+export type SemanticFunctionStatement =
+	/** `const name = value` or `let name = value` (`let name;` is `undefined`). */
+	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression }
+	/** `name = value`, `name += value`, `name++`: a write to a local of the function. */
+	| { readonly kind: 'set'; readonly name: string; readonly value: SemanticExpression }
+	/** `name.push(value)` on a local array. */
+	| { readonly kind: 'push'; readonly name: string; readonly value: SemanticExpression }
+	| {
+			readonly kind: 'if';
+			readonly test: SemanticExpression;
+			readonly whenTrue: ReadonlyArray<SemanticFunctionStatement>;
+			readonly whenFalse: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `for (const name of list)`. */
+	| {
+			readonly kind: 'each';
+			readonly name: string;
+			readonly list: SemanticExpression;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `for (let name = 0; name < over.length; name++)`: a loop over an array's indices. */
+	| {
+			readonly kind: 'count';
+			readonly name: string;
+			readonly over: SemanticExpression;
+			readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	  }
+	/** `return value` (`return;` is `undefined`). */
+	| { readonly kind: 'return'; readonly value: SemanticExpression }
+	| { readonly kind: 'unsupported'; readonly construct: string };
+
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| {
-			readonly kind: 'unary';
-			readonly operator: '!' | '-' | '+';
-			readonly value: SemanticExpression;
-	  }
+	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+' | 'typeof'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'binary';
 			readonly operator:
@@ -1267,14 +1332,11 @@ export type SemanticExpression =
 	  }
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
-	/** A call to a named function (`String`, `haptics.tap`); the consumer decides which callees it can run. */
-	| {
-			readonly kind: 'call';
-			readonly callee: string;
-			/** The callee's names in order: `['haptics', 'tap']`; the first is a binding of this module. */
-			readonly calleePath: ReadonlyArray<string>;
-			readonly arguments: ReadonlyArray<SemanticExpression>;
-	  }
+	/** `object[index]` with an index that is not a literal. */
+	| { readonly kind: 'index'; readonly object: SemanticExpression; readonly index: SemanticExpression }
+	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	/** A call to a function by its bare name that is not a builtin: a module-level function, this module's or an imported one. */
+	| { readonly kind: 'apply'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
 	| { readonly kind: 'await'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'array';
@@ -1287,7 +1349,8 @@ export type SemanticExpression =
 			readonly kind: 'object';
 			readonly entries: ReadonlyArray<readonly [string, SemanticExpression]>;
 	  }
-	/** A method of an array or string value, called with JavaScript's meaning. */
+	| { readonly kind: 'object'; readonly entries: ReadonlyArray<readonly [string, SemanticExpression]> }
+	/** A method called on a value: an array's or string's (with JavaScript's meaning), or an element's, which a native build resolves itself. */
 	| {
 			readonly kind: 'method';
 			readonly method: string;
@@ -1295,26 +1358,43 @@ export type SemanticExpression =
 			readonly arguments: ReadonlyArray<SemanticExpression>;
 	  }
 	/** An arrow function passed to a method: its parameters read as names inside `body`. */
-	| {
-			readonly kind: 'lambda';
-			readonly parameters: ReadonlyArray<string>;
-			readonly body: SemanticExpression;
-	  }
+	| { readonly kind: 'lambda'; readonly parameters: ReadonlyArray<string>; readonly body: SemanticExpression }
+	/** A computed body's `const name = value`: `name` reads `value` inside `body`. */
+	| { readonly kind: 'let'; readonly name: string; readonly value: SemanticExpression; readonly body: SemanticExpression }
 	/** Outside the tree: names what would need a script engine. */
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
 /** One statement of a handler body: an assignment to a name (`x++` and `x += 1` arrive desugared), or what is not one. */
 export type SemanticHandlerStatement =
-	| { readonly kind: 'assign'; readonly target: string; readonly value: SemanticExpression }
-	/** `name(...)`: calls a function by name, such as a callback prop or an import; `arguments` only when it has some. */
+	/** `target = value`, or `target.a.b = value` when `path` is set. */
+	| {
+			readonly kind: 'assign';
+			readonly target: string;
+			readonly path?: ReadonlyArray<string>;
+			readonly value: SemanticExpression;
+	  }
+	/**
+	 * `name(...)`, or `name.a.b(...)` when `path` is set: calls a function the component received (a callback prop) or a
+	 * method of a shared instance. `optional` is `?.(`: an absent function is not called.
+	 */
 	| {
 			readonly kind: 'invoke';
 			readonly name: string;
+			readonly path?: ReadonlyArray<string>;
 			readonly arguments?: ReadonlyArray<SemanticExpression>;
+			readonly optional?: true;
 	  }
-	/** `name.field = value`: a write to a field of an object the component holds (`cam.facing = 'front'`). */
-	| { readonly kind: 'assign-field'; readonly target: string; readonly field: string; readonly value: SemanticExpression }
-	/** Any other call or awaited call whose value is not kept (`haptics.tap()`, `await save()`). */
+	| {
+			readonly kind: 'if';
+			readonly test: SemanticExpression;
+			readonly whenTrue: ReadonlyArray<SemanticHandlerStatement>;
+			readonly whenFalse: ReadonlyArray<SemanticHandlerStatement>;
+	  }
+	/** `return;` with no value: the rest of the body does not run. */
+	| { readonly kind: 'return' }
+	/** `const name = value`: the statements after it in its block read `name` as the value it had here. */
+	| { readonly kind: 'const'; readonly name: string; readonly value: SemanticExpression }
+	/** An awaited expression whose value is not kept (`await sharesheet.open(...)`). */
 	| { readonly kind: 'effect'; readonly value: SemanticExpression }
 	| { readonly kind: 'unsupported'; readonly construct: string };
 
@@ -1359,6 +1439,8 @@ export type SemanticTemplateRead = {
 export type SemanticElementHandleBinding = {
 	readonly hostNodeId: string;
 	readonly handleName: string;
+	/** The handle expression as a tree (`collapsible.triggerEl`), for native builds only (`nativeFacts`). */
+	readonly nativeHandle?: SemanticExpression;
 	readonly componentName?: string;
 	readonly sourceSpan?: SourceSpan;
 	readonly keyedRepeatScopeIds: ReadonlyArray<string>;
@@ -1760,6 +1842,8 @@ export type SemanticGraphArtifact = {
 	readonly elementRosterCounts?: ReadonlyArray<SemanticElementRosterCount>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
+	/** The module's top-level functions that are not components, for native builds only (`nativeFacts`). */
+	readonly moduleFunctions?: ReadonlyArray<SemanticModuleFunction>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;

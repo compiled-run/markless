@@ -40,6 +40,8 @@ sealed interface Expr {
 	data class Template(val parts: List<Any>) : Expr
 	/** `length` of a string or array, or an own property of an object. */
 	data class Member(val value: Expr, val property: String) : Expr
+	/** An array's element at an index computed while the app runs; null when it is not an integer inside the array. */
+	data class At(val index: Expr, val list: Expr) : Expr
 	/** Each item, spread when [spread] (its value must be an array). */
 	data class ArrayLit(val items: List<Pair<Boolean, Expr>>) : Expr
 	data class ObjectLit(val entries: List<Pair<String, Expr>>) : Expr
@@ -87,7 +89,7 @@ sealed interface Node {
 	}
 }
 
-enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss") }
+enum class EventName(val wire: String) { Activate("activate"), Input("input"), Dismiss("dismiss"), Cancel("cancel") }
 
 sealed interface Op {
 	/** The cell takes the expression's value, evaluated before the write. */
@@ -97,6 +99,12 @@ sealed interface Op {
 	/** A device call (`haptics.tap`); with [result], the call settles that task cell. */
 	/** A device call on [obj] when it names one; [result] settles a task cell; [after] runs once the host resumes it. */
 	data class Call(val call: String, val arguments: List<Expr>, val result: String?, val obj: String? = null, val after: Continuation? = null) : Op
+	/** Runs [then] when [test] is truthy, else [otherwise]; the test is evaluated once, before either. */
+	data class If(val test: Expr, val then: List<Op>, val otherwise: List<Op>) : Op
+	/** `showModal()` ([open] true) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out. */
+	data class Dialog(val node: String, val open: Boolean) : Op
+	/** `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes. */
+	data class Command(val node: String, val command: String, val preventScroll: Boolean) : Op
 }
 
 /** A device call a task cell starts at mount. */
@@ -211,6 +219,7 @@ data class Payload(
 			is Expr.If -> cellsOf(e.test) + cellsOf(e.whenTrue) + cellsOf(e.whenFalse)
 			is Expr.Template -> e.parts.filterIsInstance<Expr>().flatMap(::cellsOf)
 			is Expr.Member -> cellsOf(e.value)
+			is Expr.At -> cellsOf(e.index) + cellsOf(e.list)
 			is Expr.ArrayLit -> e.items.flatMap { cellsOf(it.second) }
 			is Expr.ObjectLit -> e.entries.flatMap { cellsOf(it.second) }
 			is Expr.Method -> cellsOf(e.target) + e.arguments.flatMap(::cellsOf)
@@ -220,7 +229,7 @@ data class Payload(
 			Expr.EventValue -> emptyList()
 		}
 
-		private val UNARY = setOf("!", "-", "+")
+		private val UNARY = setOf("!", "-", "+", "typeof")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")
@@ -246,6 +255,7 @@ data class Payload(
 					o.only(setOf("template"), what)
 					Expr.Template(o.field("template", what).arr("$what.template").mapIndexed { n, p -> if (p is Json.Str) p.value else expr(p, "$what.template[$n]") })
 				}
+				o.containsKey("at") -> { o.only(setOf("at", "of"), what); Expr.At(sub("at"), sub("of")) }
 				o.containsKey("member") -> { o.only(setOf("member", "property"), what); Expr.Member(sub("member"), o.field("property", what).str("$what.property")) }
 				o.containsKey("array") -> {
 					o.only(setOf("array"), what)
@@ -417,6 +427,27 @@ data class Payload(
 					Continuation(t.field("id", what).str("$what.after.id"), t.field("as", what).str("$what.after.as"), t.field("ops", what).arr("$what.after.ops").mapIndexed { n, inner -> op(inner, "$what.after.ops[$n]", cells) }, catch)
 				}
 				return Op.Call(o.field("call", what).str("$what.call"), args, result, o["object"]?.str("$what.object"), after)
+			}
+			if (name == "dialog") {
+				o.only(setOf("op", "node", "method"), what)
+				val method = o.field("method", what).str("$what.method")
+				if (method != "showModal" && method != "close") throw MarklessDecodeError("$what has unknown dialog method \"$method\"")
+				return Op.Dialog(o.field("node", what).str("$what.node"), method == "showModal")
+			}
+			if (name == "command") {
+				o.only(setOf("op", "node", "command", "preventScroll"), what)
+				val command = o.field("command", what).str("$what.command")
+				if (command != "focus" && command != "scrollIntoView") throw MarklessDecodeError("$what has unknown command \"$command\"")
+				val preventScroll = if (o.containsKey("preventScroll")) ((o.field("preventScroll", what) as? Json.Bool ?: throw MarklessDecodeError("$what.preventScroll must be a boolean")).value) else false
+				return Op.Command(o.field("node", what).str("$what.node"), command, preventScroll)
+			}
+			if (name == "if") {
+				o.only(setOf("op", "test", "whenTrue", "whenFalse"), what)
+				val test = expr(o.field("test", what), "$what.test")
+				for (c in cellsOf(test)) if (c !in cells) throw MarklessDecodeError("$what reads unknown cell \"$c\"")
+				val then = o.field("whenTrue", what).arr("$what.whenTrue").mapIndexed { n, inner -> op(inner, "$what.whenTrue[$n]", cells) }
+				val otherwise = o.field("whenFalse", what).arr("$what.whenFalse").mapIndexed { n, inner -> op(inner, "$what.whenFalse[$n]", cells) }
+				return Op.If(test, then, otherwise)
 			}
 			if (name != "assign") throw MarklessDecodeError("$what has unknown op \"$name\"")
 			o.only(setOf("op", "cell", "value"), what)

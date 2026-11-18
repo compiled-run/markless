@@ -1,8 +1,13 @@
 package dev.markless.mobile.view
 
+import android.app.Activity
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.Color
+import android.view.WindowInsets
+import android.widget.FrameLayout
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
@@ -87,6 +92,8 @@ class MarklessHost(
 	private var assignment = style?.start(payload.cells.filter { it.styled }.map { it.id }, runtime::value, isDark(context.resources.configuration)) ?: 0
 	private val expanded = HashMap<View, Boolean?>()
 	private val sheets = LinkedHashMap<String, SystemSheet>()
+	/** Each view's current attributes, for the relations and roles the accessibility delegate reports. */
+	private val attrs = HashMap<String, HashMap<String, String>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
@@ -124,6 +131,7 @@ class MarklessHost(
 		for ((id, open) in runtime.sheets()) if (open) root.post { sheets.getValue(id).open() }
 		for (cell in payload.cells) cell.device?.let { name -> needDevice().watch(name, cell.obj) { if (!released) apply(runtime.device(cell.id, it)) } }
 		for (call in runtime.tasks()) runCall(call)
+		refreshRelations()
 	}
 
 	/** Set when another page replaces this one: device answers that arrive later change nothing. */
@@ -191,6 +199,8 @@ class MarklessHost(
 					assignment = st.next(assignment, st.stateFor(entry.node), entry.value)
 					repaint(st)
 				}
+				is JournalEntry.Dialog -> dialog(entry.node, entry.open)
+				is JournalEntry.Command -> command(view(entry.node), entry.command, entry.preventScroll)
 				is JournalEntry.Arm -> {
 					if (runtime.node(entry.node) !is Node.Branch) throw MarklessHostError("journal names \"${entry.node}\", which is not a branch")
 					rebuild()
@@ -212,6 +222,7 @@ class MarklessHost(
 			}
 			Log.i(TAG, "journal ${entry.toJson()}")
 		}
+		refreshRelations()
 		onJournal?.invoke(journal)
 	}
 
@@ -316,6 +327,13 @@ class MarklessHost(
 				super.onInitializeAccessibilityNodeInfo(host, info)
 				info.viewIdResourceName = id
 				if (control) info.className = Button::class.java.name
+				val current = attrs[id].orEmpty()
+				if (current["role"] == "switch") {
+					info.className = "android.widget.Switch"
+					info.isCheckable = true
+					info.isChecked = current["aria-checked"] == "true"
+				}
+				current["aria-describedby"]?.let { info.hintText = textOf(it) }
 				if (link) info.extras.putCharSequence("AccessibilityNodeInfo.roleDescription", "link")
 				val state = expanded[host] ?: return
 				if (Build.VERSION.SDK_INT >= 36) info.expandedState = if (state) AccessibilityNodeInfo.EXPANDED_STATE_FULL else AccessibilityNodeInfo.EXPANDED_STATE_COLLAPSED
@@ -326,7 +344,10 @@ class MarklessHost(
 
 	private fun element(node: Node.Element, inst: Instance): View {
 		if (node.row != null && events[node.id].orEmpty().any { it.event == EventName.Input }) throw MarklessHostError("\"${node.id}\" handles input inside a list row, which this host does not implement")
-		val view = when (node.element) {
+		// A Button holds one text run; a button with an element inside (a switch's thumb) is a box that reads as a Button.
+		val holdsElements = payload.nodes.any { it.parent == node.id && it is Node.Element }
+		val view = when (if (node.element == "button" && holdsElements) "box-button" else node.element) {
+			"box-button" -> MarklessBox(context).apply { isClickable = true; isFocusable = true; named(this, inst.id, control = true) }
 			"button" -> Button(context).apply {
 				background = null
 				minWidth = 0; minHeight = 0; minimumWidth = 0; minimumHeight = 0
@@ -360,6 +381,7 @@ class MarklessHost(
 		for (e in events[node.id].orEmpty()) when (e.event) {
 			EventName.Activate -> view.setOnClickListener { apply(runtime.dispatch(inst.id, EventName.Activate)) }
 			EventName.Dismiss -> throw MarklessHostError("dismiss event on \"${node.id}\", which is not a sheet")
+			EventName.Cancel -> {}
 			EventName.Input -> (view as? EditText ?: throw MarklessHostError("input event on \"${node.id}\", which is not an input")).addTextChangedListener(object : TextWatcher {
 				override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
 				override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -371,6 +393,8 @@ class MarklessHost(
 				}
 			})
 		}
+		// A dialog shows nothing until showModal() puts it in the top layer (the UA's dialog:not([open]) { display: none }).
+		if (node.element == "dialog") view.visibility = View.GONE
 		for ((name, value) in node.attributes) if (name != "class") attribute(inst.id, name, value)
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		return view
@@ -395,7 +419,14 @@ class MarklessHost(
 	/** Attributes per the contract's Android mapping; `class` reaches views only through Dragon's style states, and any other attribute is ignored. */
 	private fun attribute(id: String, name: String, value: String?) {
 		val view = view(id)
+		val current = attrs.getOrPut(id) { HashMap() }
+		if (value == null) current.remove(name) else current[name] = value
 		when (name) {
+			// A label names its control, so TalkBack reads it there and not a second time on the label; a press on it activates the control.
+			"for" -> if (value != null) {
+				view.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+				view.setOnClickListener { views[value]?.performClick() }
+			}
 			"aria-label" -> if (view is AudioButton) view.label(value) else view.contentDescription = value
 			"alt" -> if (view is SizedImage) view.contentDescription = value
 			"src" -> when (view) {
@@ -406,6 +437,87 @@ class MarklessHost(
 			"disabled" -> view.isEnabled = value == null
 			"aria-pressed", "aria-selected" -> view.isSelected = value == "true"
 			"aria-expanded" -> expanded[view] = when (value) { "true" -> true; "false" -> false; else -> null }
+			"aria-hidden" -> view.importantForAccessibility = if (value == "true") View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+			// With a style export Dragon decides visibility (a hidden element has no frame); the stacking layout reads `hidden`.
+			"hidden" -> if (style == null) view.visibility = if (value != null) View.GONE else View.VISIBLE
+		}
+	}
+
+	/** `focus()`: a text field takes the keyboard, anything else TalkBack's cursor; `scrollIntoView()`: its scrolling ancestors bring it on screen. */
+	private fun command(view: View, command: String, preventScroll: Boolean) {
+		// As on the web, focus brings the element into view unless told not to.
+		if (command == "scrollIntoView" || !preventScroll) view.requestRectangleOnScreen(android.graphics.Rect(0, 0, view.width, view.height), true)
+		if (command == "scrollIntoView") return
+		if (view is EditText) {
+			view.requestFocus()
+			(context.getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).showSoftInput(view, 0)
+		} else view.performAccessibilityAction(AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null)
+	}
+
+	/** The open dialog's top layer, its view's place in the page to return it to, and the back callback that cancels it. */
+	private var topLayer: Triple<FrameLayout, Pair<ViewGroup, Int>, OnBackInvokedCallback>? = null
+
+	/**
+	 * The top layer: a full-screen layer above the page and the bars, holding the dialog's own view (styled by its CSS,
+	 * not a system sheet). The page behind is hidden from TalkBack, and the back gesture closes the dialog as a cancel.
+	 */
+	private fun dialog(id: String, open: Boolean) {
+		val view = view(id)
+		val activity = context as? Activity ?: throw MarklessHostError("a dialog needs an Activity for its top layer")
+		val content = activity.findViewById<ViewGroup>(android.R.id.content)
+		if (open) {
+			if (topLayer != null) throw MarklessHostError("a second dialog over \"$id\" has no top layer yet")
+			val parent = view.parent as ViewGroup
+			val index = parent.indexOfChild(view)
+			parent.removeView(view)
+			val layer = FrameLayout(context).apply {
+				// Chrome's ::backdrop default, rgba(0, 0, 0, 0.1); a press on it is the page's, so it is consumed here.
+				setBackgroundColor(0x1A000000)
+				isClickable = true
+				setOnApplyWindowInsetsListener { v, insets ->
+					val bars = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.displayCutout() or WindowInsets.Type.ime())
+					v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+					insets
+				}
+			}
+			view.visibility = View.VISIBLE
+			view.setBackgroundColor(0xFFFFFFFF.toInt())
+			val pad = (16 * dpr).roundToInt()
+			view.setPadding(pad, pad, pad, pad)
+			// Centred, as the web centres a modal dialog (dialog:modal { inset: 0; margin: auto }) on every platform.
+			layer.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+			content.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+			for (i in 0 until content.childCount) content.getChildAt(i).takeIf { it !== layer }?.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+			val back = OnBackInvokedCallback { apply(runtime.dispatch(id, EventName.Cancel)) }
+			activity.onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT, back)
+			topLayer = Triple(layer, parent to index, back)
+			layer.requestApplyInsets()
+		} else {
+			val (layer, place, back) = topLayer ?: return
+			activity.onBackInvokedDispatcher.unregisterOnBackInvokedCallback(back)
+			layer.removeView(view)
+			content.removeView(layer)
+			for (i in 0 until content.childCount) content.getChildAt(i).importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+			view.visibility = View.GONE
+			place.first.addView(view, minOf(place.second, place.first.childCount))
+			topLayer = null
+		}
+	}
+
+	/** The text the elements named by a space-separated id list show, in view order. */
+	private fun textOf(ids: String): String = ids.split(' ').mapNotNull { views[it] }.joinToString(" ") { textWithin(it) }
+
+	private fun textWithin(view: View): String = when (view) {
+		is TextView -> view.text.toString()
+		is ViewGroup -> (0 until view.childCount).map { textWithin(view.getChildAt(it)) }.filter { it.isNotEmpty() }.joinToString(" ")
+		else -> ""
+	}
+
+	/** `aria-labelledby` as the content description, kept current after every journal. */
+	private fun refreshRelations() {
+		for ((id, current) in attrs) {
+			val view = views[id] ?: continue
+			if (current["aria-label"] == null) current["aria-labelledby"]?.let { view.contentDescription = textOf(it) }
 		}
 	}
 
@@ -414,9 +526,16 @@ class MarklessHost(
 		val styled = style.assignments[assignment]
 		val s = styled.byId[inst.id] ?: throw MarklessHostError("style export has no node \"${inst.id}\"")
 		if (s.kind != (if (node is Node.Text) "text" else "element")) throw MarklessHostError("style node \"${inst.id}\" is a ${s.kind}")
-		val frame = s.frame ?: throw MarklessHostError("style node \"${inst.id}\" has no frame")
 		val absolute = absolutes[assignment]
-		val (ax, ay) = absolute[s.id] ?: throw MarklessHostError("style node \"${inst.id}\" sits inside a box with no frame")
+		val frame = s.frame
+		val origin = absolute[s.id]
+		// Dragon gives an element it does not render (`display: none`, `[hidden]`), and everything inside it, no frame.
+		if (frame == null || origin == null) {
+			view.visibility = View.GONE
+			return
+		}
+		view.visibility = View.VISIBLE
+		val (ax, ay) = origin
 		val parentId = parentOf(inst)
 		if (node is Node.Text && view is Button) {
 			val (bx, by) = absolute.getValue(parentId!!)
@@ -446,6 +565,7 @@ class MarklessHost(
 		for (inst in built.values.sortedBy { order.getValue(it.node.id) }) {
 			val node = inst.node
 			val view = views.getValue(inst.id)
+			if (view.visibility == View.GONE) continue
 			val frame = styled.byId.getValue(inst.id).frame!!
 			val a = absolute.getValue(inst.id)
 			val at = IntArray(2).also { view.getLocationInWindow(it) }

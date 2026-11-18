@@ -1,0 +1,20 @@
+{
+	"rung": 103,
+	"name": "@markless/ui tabs: one selected item of several, panels shown by hidden",
+	"steps": [
+		{
+			"visible": ["Tabs", "Apple", "Banana", "Cherry", "Apples are red", "Showing a"],
+			"absent": ["Bananas are yellow", "Cherries are dark"]
+		},
+		{
+			"do": { "tap": "Banana" },
+			"visible": ["Bananas are yellow", "Showing b"],
+			"absent": ["Apples are red", "Cherries are dark", "Showing a"]
+		},
+		{
+			"do": { "tap": "Cherry" },
+			"visible": ["Cherries are dark", "Showing c"],
+			"absent": ["Apples are red", "Bananas are yellow", "Showing b"]
+		}
+	]
+}

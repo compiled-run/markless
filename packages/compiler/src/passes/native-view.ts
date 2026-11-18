@@ -11,8 +11,8 @@ import type {
 	NativeViewPayload,
 } from '@markless/serializer';
 import {
+	isNativeStyleStateAttribute,
 	NATIVE_VIEW_VERSION,
-	nativeStyleAttribute,
 	PLATFORM_PIECES_NAMESPACE,
 	PLATFORM_PIECES_PACKAGE,
 } from '@markless/serializer/native-view';
@@ -27,6 +27,7 @@ import {
 	type NativeDeviceObject,
 	type NativeDeviceValue,
 } from '@markless/serializer/native-device';
+import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type {
 	CompilerDiagnostic,
 	SemanticComponentEdge,
@@ -35,6 +36,9 @@ import type {
 	SemanticMarkupChunk,
 	SemanticExpression,
 	SemanticHandlerStatement,
+	SemanticFunctionStatement,
+	SemanticModuleFunction,
+	SemanticSharedDefinition,
 	SourceSpan,
 } from '../artifacts.ts';
 
@@ -46,6 +50,8 @@ export type NativeViewArtifact = {
 	/** The device features the payload uses, in first-use order: what the app's manifests must declare. */
 	readonly features: ReadonlyArray<NativeDeviceFeature>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+	/** Modules the build resolved but was not given an analysis of; the caller analyzes them and builds again. */
+	readonly missingModules?: ReadonlyArray<string>;
 };
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
@@ -80,12 +86,26 @@ const PORTABLE_ELEMENTS = new Set([
 	'a',
 	'img',
 	'audio',
+	'label',
+	'dialog',
 ]);
 
 const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][number]['event']>> = {
 	click: 'activate',
 	input: 'input',
 };
+
+/** Events a phone never fires, so their handlers are left out rather than refused: find-in-page does not exist there. */
+const NOT_ON_PHONES = new Set(['beforematch']);
+
+/**
+ * Events a phone raises only from a hardware keyboard (a touch or the screen reader's cursor moves neither key nor keyboard
+ * focus), except focus and blur on a text field, which the soft keyboard raises. Hosts have no hardware keyboard yet, so these
+ * handlers are left out with a warning that names each one.
+ */
+const KEYBOARD_ONLY = new Set(['keydown', 'keyup', 'focus', 'blur', 'focusin', 'focusout']);
+const TEXT_ENTRY = new Set(['input', 'textarea']);
+export const NATIVE_KEYBOARD_ONLY_CODE = 'MARKLESS_NATIVE_KEYBOARD_ONLY';
 
 type Item =
 	| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number> }
@@ -140,8 +160,42 @@ type Prop =
 	| {
 			readonly kind: 'callback';
 			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
+			readonly parameters: ReadonlyArray<string>;
 			readonly scope: Scope;
 	  };
+
+/** One rendered instance of a `shared()` definition: its cells, handles and methods, resolved for one subtree. */
+type SharedInstance = {
+	readonly definition: SemanticSharedDefinition;
+	readonly module: ModuleFacts;
+	readonly prefix: string;
+	/** The factory's own scope, where its methods run. */
+	scope: Scope;
+	readonly fields: Map<string, Field>;
+	/** Callback slots the widget root filled from its props (`collapsible.onChange = onChange`). */
+	readonly slots: Map<string, Prop>;
+};
+
+/** What `instance.name` is. */
+type Field =
+	| { readonly kind: 'cell'; readonly cell: string }
+	| { readonly kind: 'handle'; readonly key: string; readonly plural: boolean }
+	| {
+			readonly kind: 'method';
+			readonly statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
+			readonly parameters: ReadonlyArray<string>;
+	  }
+	| { readonly kind: 'slot' }
+	| { readonly kind: 'expr'; readonly expression: SemanticExpression | undefined };
+
+/** A name whose members are what a native build reads: a state object split into one cell per field, or a shared instance. */
+type ObjectRef =
+	| {
+			readonly kind: 'fields';
+			readonly cells: ReadonlyMap<string, string>;
+			readonly instance?: SharedInstance;
+	  }
+	| { readonly kind: 'instance'; readonly instance: SharedInstance };
 
 /** What names mean where an expression is: the component whose state it reads, its props, rows' items and parameters. */
 type Scope = {
@@ -156,13 +210,23 @@ type Scope = {
 	/** Prefix of every id this component instance emits (`component-edge:0/` inside a child, empty at the root). */
 	readonly prefix: string;
 	readonly event?: string;
+	/** A click handler's event parameter: only the fields a tap has (`pressed`) may be read. */
+	readonly opaque?: string;
+	/** The element a tap landed on (`event.target`) and the one whose handler runs (`event.currentTarget`). */
+	readonly pressed?: { readonly target: string; readonly currentTarget: string };
 	readonly locals: ReadonlySet<string>;
 	readonly items: ReadonlyMap<string, string>;
 	readonly props: ReadonlyMap<string, Prop>;
-	/** Callback parameters the caller fixes at build time, such as a sheet's `onChange` reading `false` on dismiss. */
-	readonly bound?: ReadonlyMap<string, NativeExpr>;
+	/** Names whose members resolve to cells, handles and methods. */
+	readonly objects: ReadonlyMap<string, ObjectRef>;
+	/** Values bound to a called callback's or method's parameters, such as a sheet's `onChange` reading `false` on dismiss. */
+	readonly args: ReadonlyMap<string, NativeExpr>;
+	/** The shared instances of the subtree being rendered, by definition id. */
+	readonly shared: ReadonlyMap<string, SharedInstance>;
+	/** Props the caller passed that the component does not declare: written where it spreads `{...rest}`. */
+	readonly rest?: ReadonlyArray<readonly [string, NativeExpr]>;
 	/** This instance's device objects by local name (`cam`), each with its payload id. */
-	readonly objects: ReadonlyMap<
+	readonly deviceObjects: ReadonlyMap<
 		string,
 		{ readonly id: string; readonly device: NativeDeviceObject }
 	>;
@@ -179,6 +243,13 @@ type Scope = {
 
 /** A `@try`'s `@catch` as handlers inside its `@try` arm reach it: the cell made the first time one needs it. */
 type HandlerCatch = { readonly cell: () => string; readonly used: () => boolean };
+
+/** A call a handler or async computed makes, by the names it is called through (`['cam', 'takePhoto']`). */
+type DeviceCallSite = {
+	readonly callee: string;
+	readonly calleePath: ReadonlyArray<string>;
+	readonly arguments: ReadonlyArray<SemanticExpression>;
+};
 
 /** Calls every host implements with exact JavaScript meaning (`NativeBuiltin`). */
 const BUILTINS = new Set<string>([
@@ -211,6 +282,92 @@ const METHODS = new Set<string>([
 	'trim',
 ]);
 
+/**
+ * An element as a value while a handler is lowered (a handle, `event.target`): known when the app is built, so element
+ * methods (`contains`, `getAttribute`) are answered then. It never reaches a payload.
+ */
+type ElementValue = { readonly element: string };
+const elementValue = (node: string): NativeExpr => ({ element: node }) as unknown as NativeExpr;
+const elementOf = (expr: NativeExpr | null | undefined): string | undefined =>
+	expr && 'element' in expr ? (expr as unknown as ElementValue).element : undefined;
+/** Elements as JavaScript values while folding, so `===`, `??` and truthiness have their meaning. */
+const ELEMENT_TOKENS = new Map<string, object>();
+const elementToken = (node: string): object => {
+	let token = ELEMENT_TOKENS.get(node);
+	if (!token) ELEMENT_TOKENS.set(node, (token = { node }));
+	return token;
+};
+const tokenElement = new WeakMap<object, string>();
+/** Whether an expression holds an element value anywhere. */
+function mentionsElement(expr: unknown): boolean {
+	if (!expr || typeof expr !== 'object') return false;
+	if ('element' in expr && typeof (expr as ElementValue).element === 'string') return true;
+	return Object.values(expr).some((child) =>
+		Array.isArray(child) ? child.some(mentionsElement) : mentionsElement(child),
+	);
+}
+
+/** The passes of a `for...of` still to run, and the statements after it. */
+type LoopPass = {
+	readonly items: ReadonlyArray<unknown>;
+	readonly name: string;
+	readonly body: ReadonlyArray<SemanticFunctionStatement>;
+	readonly after: ReadonlyArray<SemanticFunctionStatement>;
+};
+
+/** A folded value as an expression again: an element, or JSON as a literal, array or object. */
+function expressionOfValue(value: unknown): NativeExpr | undefined {
+	if (value && typeof value === 'object' && tokenElement.has(value)) return elementValue(tokenElement.get(value)!);
+	if (isScalar(value)) return { literal: value };
+	if (Array.isArray(value)) {
+		const items = value.map(expressionOfValue);
+		return items.every(Boolean) ? { array: items.map((item) => ({ spread: false, value: item! })) } : undefined;
+	}
+	if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+		const entries = Object.entries(value).map(([key, inner]) => [key, expressionOfValue(inner)] as const);
+		return entries.every(([, inner]) => inner) ? { object: entries as (readonly [string, NativeExpr])[] } : undefined;
+	}
+	return undefined;
+}
+
+/** Where a pass of a loop over indices falls off its body without returning: on to the next index. */
+const NEXT_PASS = { literal: null } as NativeExpr;
+
+/** Modifier keys: a tap holds none. */
+const TOUCH_MODIFIERS = new Set(['shiftKey', 'altKey', 'ctrlKey', 'metaKey']);
+
+/** `a.b.c` as written, for naming a call the build refuses. */
+const calleeText = (expression: SemanticExpression): string =>
+	expression.kind === 'read'
+		? expression.name
+		: expression.kind === 'member'
+			? `${calleeText(expression.object)}.${expression.property}`
+			: '(value)';
+
+/** Types whose `typeof` a native value answers exactly; `undefined` and `object` cannot be told apart from null. */
+const EXACT_TYPES = new Set(['string', 'number', 'boolean']);
+
+/** `typeof value === 'string'` (either side, `===` or `!==`) as the tested value and type, when the answer is exact. */
+function typeTestOf(
+	expression: Extract<SemanticExpression, { kind: 'binary' }>,
+): { readonly value: SemanticExpression; readonly type: string } | undefined {
+	if (expression.operator !== '===' && expression.operator !== '!==') return undefined;
+	for (const [operand, other] of [
+		[expression.left, expression.right],
+		[expression.right, expression.left],
+	] as const) {
+		if (
+			operand.kind === 'unary' &&
+			operand.operator === 'typeof' &&
+			other.kind === 'literal' &&
+			typeof other.value === 'string' &&
+			EXACT_TYPES.has(other.value)
+		)
+			return { value: operand.value, type: other.value };
+	}
+	return undefined;
+}
+
 const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
 	for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
 	return a.length - b.length;
@@ -223,8 +380,14 @@ const isPrefix = (prefix: ReadonlyArray<number>, path: ReadonlyArray<number>): b
 export type NativeViewOptions = {
 	/** The page's route when the module is a page: the router's pattern and its param names. */
 	readonly route?: { readonly pattern: string; readonly params: ReadonlyArray<string> };
-	/** The analyses of modules this one imports components from, by import specifier as written. */
-	readonly importedModules?: Readonly<Record<string, SemanticGraphArtifact>>;
+	/**
+	 * Every analyzed module the build can reach, by filename, and how a specifier written in one module resolves to
+	 * another's filename (relative or package). A resolved module with no analysis is reported in `missingModules`.
+	 */
+	readonly modules?: {
+		readonly graphs: ReadonlyMap<string, SemanticGraphArtifact>;
+		readonly resolve: (specifier: string, importer: string) => string | undefined;
+	};
 	/** An app build's routes: links and `navigate()` must name one of them, with its params. */
 	readonly routes?: ReadonlyArray<{
 		readonly pattern: string;
@@ -287,6 +450,24 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 				.filter((entry) => !entry.typeOnly)
 				.map((entry) => [entry.localName, entry]),
 		),
+		componentFacts: new Map(graph.components.map((component) => [component.name, component])),
+		functions: new Map((graph.moduleFunctions ?? []).map((fn) => [fn.name, fn])),
+		bindingsById: new Map(graph.graphBindings.map((binding) => [binding.id, binding])),
+		sharedDefinitions: new Map(
+			graph.sharedDefinitions.map((definition) => [definition.id, definition]),
+		),
+		sharedInstancesByComponent: index(
+			graph.sharedInstances,
+			(instance) => instance.componentName ?? '',
+		),
+		handleBindingsByHost: index(graph.elementHandleBindings, (binding) => binding.hostNodeId),
+		elementBindings: new Map(
+			graph.graphBindings.flatMap((binding) =>
+				binding.kind === 'element' && !binding.sharedDefinitionId
+					? [[`${binding.componentName ?? ''}#${binding.name}`, binding.id] as const]
+					: [],
+			),
+		),
 	};
 }
 
@@ -306,21 +487,186 @@ export function nativeUnsupported(message: string, span?: SourceSpan): CompilerD
 	};
 }
 
+const isScalar = (value: unknown): value is NativeScalar | null =>
+	value === null ||
+	typeof value === 'string' ||
+	typeof value === 'boolean' ||
+	(typeof value === 'number' && Number.isFinite(value));
+
+/** Every cell an expression reads. */
+function cellsOf(expr: NativeExpr, into = new Set<string>()): Set<string> {
+	if ('cell' in expr) into.add(expr.cell);
+	for (const child of Object.values(expr)) {
+		if (Array.isArray(child)) {
+			for (const item of child)
+				if (item && typeof item === 'object')
+					cellsOf((Array.isArray(item) ? item[1] : item) as NativeExpr, into);
+		} else if (child && typeof child === 'object') cellsOf(child as NativeExpr, into);
+	}
+	return into;
+}
+
+const BUILTIN_CALLS: Readonly<Record<string, (...args: never[]) => unknown>> = {
+	String,
+	Number,
+	Boolean,
+	'Math.abs': Math.abs,
+	'Math.floor': Math.floor,
+	'Math.max': Math.max,
+	'Math.min': Math.min,
+	'Math.round': Math.round,
+};
+
+/**
+ * An expression's value at build time, with JavaScript's meaning, when it reads only literals and the cells' initial
+ * values; `undefined` when it reads anything else. A state's first value and a widget root's seeds are made this way.
+ */
+function foldConstant(
+	expr: NativeExpr,
+	initial: (cell: string) => NativeValue | undefined,
+): { readonly value: unknown } | undefined {
+	const fold = (inner: NativeExpr) => foldConstant(inner, initial);
+	if ('literal' in expr) return { value: expr.literal };
+	const element = elementOf(expr);
+	if (element !== undefined) {
+		const token = elementToken(element);
+		tokenElement.set(token, element);
+		return { value: token };
+	}
+	if ('cell' in expr) {
+		const value = initial(expr.cell);
+		return value === undefined ? undefined : { value };
+	}
+	if ('unary' in expr) {
+		const value = fold(expr.value);
+		if (!value) return undefined;
+		const v = value.value as number;
+		return { value: expr.unary === '!' ? !v : expr.unary === '-' ? -v : +v };
+	}
+	if ('binary' in expr) {
+		const left = fold(expr.left);
+		const right = fold(expr.right);
+		if (!left || !right) return undefined;
+		const l = left.value as number;
+		const r = right.value as number;
+		const results: Record<string, () => unknown> = {
+			'+': () => l + r,
+			'-': () => l - r,
+			'*': () => l * r,
+			'/': () => l / r,
+			'%': () => l % r,
+			'===': () => l === r,
+			'!==': () => l !== r,
+			'<': () => l < r,
+			'<=': () => l <= r,
+			'>': () => l > r,
+			'>=': () => l >= r,
+		};
+		return { value: results[expr.binary]!() };
+	}
+	if ('logical' in expr) {
+		const left = fold(expr.left);
+		if (!left) return undefined;
+		const pick =
+			expr.logical === '&&'
+				? !left.value
+				: expr.logical === '||'
+					? Boolean(left.value)
+					: left.value !== null && left.value !== undefined;
+		return pick ? left : fold(expr.right);
+	}
+	if ('if' in expr) {
+		const test = fold(expr.if);
+		return test ? fold(test.value ? expr.whenTrue : expr.whenFalse) : undefined;
+	}
+	if ('template' in expr) {
+		let text = '';
+		for (const part of expr.template) {
+			if (typeof part === 'string') text += part;
+			else {
+				const value = fold(part);
+				if (!value) return undefined;
+				text += String(value.value);
+			}
+		}
+		return { value: text };
+	}
+	if ('object' in expr) {
+		const object: Record<string, unknown> = {};
+		for (const [key, value] of expr.object) {
+			const folded = fold(value);
+			if (!folded) return undefined;
+			object[key] = folded.value;
+		}
+		return { value: object };
+	}
+	if ('array' in expr) {
+		const array: unknown[] = [];
+		for (const item of expr.array) {
+			const folded = fold(item.value);
+			if (!folded) return undefined;
+			if (item.spread) array.push(...(folded.value as unknown[]));
+			else array.push(folded.value);
+		}
+		return { value: array };
+	}
+	if ('member' in expr) {
+		const object = fold(expr.member);
+		if (!object) return undefined;
+		const holder = object.value;
+		if (holder && typeof holder === 'object' && tokenElement.has(holder)) return undefined;
+		if (expr.property === 'length' && (typeof holder === 'string' || Array.isArray(holder)))
+			return { value: holder.length };
+		return holder && typeof holder === 'object' && Object.hasOwn(holder, expr.property)
+			? { value: (holder as Record<string, unknown>)[expr.property] }
+			: undefined;
+	}
+	if ('call' in expr) {
+		const args = expr.arguments.map(fold);
+		if (args.some((arg) => !arg)) return undefined;
+		const call = BUILTIN_CALLS[expr.call];
+		return call
+			? {
+					value: (call as (...values: unknown[]) => unknown)(
+						...args.map((arg) => arg!.value),
+					),
+				}
+			: undefined;
+	}
+	return undefined;
+}
+
 export function createNativeViewPayload(
 	graph: SemanticGraphArtifact,
 	options: NativeViewOptions = {},
 ): NativeViewArtifact {
 	const diagnostics: CompilerDiagnostic[] = [];
+	const missingModules = new Set<string>();
 	const refuse = (message: string, span?: SourceSpan): null => {
 		diagnostics.push(nativeUnsupported(message, span));
 		return null;
 	};
 	const features = new Set<NativeDeviceFeature>();
+	const keyboardOnly = (what: string, span?: SourceSpan) => {
+		diagnostics.push({
+			code: NATIVE_KEYBOARD_ONLY_CODE,
+			severity: 'warning',
+			phase: 'serialization',
+			title: 'A keyboard-only handler is left out of the native build',
+			message: `${what} runs only from a hardware keyboard on a phone; native hosts have none yet, so it is left out`,
+			why: 'A touch or a screen reader moves neither key events nor keyboard focus on iOS and Android.',
+			...(span ? { primarySpan: span } : {}),
+			passId: 'native-view',
+			suggestions: [],
+			docsUrl: `https://markless.dev/errors/${NATIVE_KEYBOARD_ONLY_CODE}`,
+		});
+	};
 	const done = (payload: NativeViewPayload | null): NativeViewArtifact => ({
 		passId: 'native-view',
-		payload: diagnostics.length > 0 ? null : payload,
+		payload: diagnostics.some((diagnostic) => diagnostic.severity === 'error') ? null : payload,
 		features: [...features],
 		diagnostics,
+		...(missingModules.size > 0 ? { missingModules: [...missingModules] } : {}),
 	});
 
 	const root = graph.markup.root;
@@ -330,21 +676,283 @@ export function createNativeViewPayload(
 	const rootChunk = rootModule.chunks.get(root.templateId);
 	if (!rootChunk) return done(refuse('the root template has no markup'));
 
+	const moduleFactsByFile = new Map<string, ModuleFacts>([[graph.filename, rootModule]]);
+	/** The module a specifier written in `importer` names, or undefined (and a request for its analysis) when not given. */
+	const moduleAt = (importer: ModuleFacts, specifier: string): ModuleFacts | undefined => {
+		const file = options.modules?.resolve(specifier, importer.graph.filename);
+		if (file === undefined) return undefined;
+		const known = moduleFactsByFile.get(file);
+		if (known) return known;
+		const analysis = options.modules?.graphs.get(file);
+		if (!analysis) {
+			missingModules.add(file);
+			return undefined;
+		}
+		const facts = moduleFactsOf(analysis);
+		moduleFactsByFile.set(file, facts);
+		return facts;
+	};
+	type Exported =
+		| { readonly kind: 'component'; readonly module: ModuleFacts; readonly component: string }
+		| { readonly kind: 'namespace'; readonly module: ModuleFacts };
+	/** What `name` exported from `module` is, following re-exports (`export * as base`, `export { default as button }`). */
+	const exported = (module: ModuleFacts, name: string, depth = 0): Exported | undefined => {
+		if (depth > 16) return undefined;
+		const own = module.graph.components.find((component) => component.exportName === name);
+		if (own) return { kind: 'component', module, component: own.name };
+		const reexports = module.graph.moduleGraphInterface?.reexports ?? [];
+		const direct = reexports.find((entry) => entry.exportName === name);
+		if (direct) {
+			const target = moduleAt(module, direct.source);
+			if (!target) return undefined;
+			return direct.importedName === '*'
+				? { kind: 'namespace', module: target }
+				: exported(target, direct.importedName, depth + 1);
+		}
+		for (const entry of reexports) {
+			if (entry.exportName !== '*' || entry.source.startsWith('@markless/icons')) continue;
+			const target = moduleAt(module, entry.source);
+			const found = target && exported(target, name, depth + 1);
+			if (found) return found;
+		}
+		return undefined;
+	};
+	/** The component a tag names in `module` (`Stepper`, `base.button`), wherever it is defined. */
+	const componentAt = (
+		module: ModuleFacts,
+		tag: string,
+	): { readonly module: ModuleFacts; readonly component: string } | undefined => {
+		const [local, ...members] = tag.split('.');
+		if (members.length === 0 && module.chunks.has(`template:${local}`))
+			return { module, component: local! };
+		const entry = module.imports.get(local ?? '');
+		if (!entry) return undefined;
+		const source = moduleAt(module, entry.source);
+		if (!source) return undefined;
+		let found: Exported | undefined =
+			entry.kind === 'namespace'
+				? { kind: 'namespace', module: source }
+				: exported(source, entry.importedName ?? 'default');
+		for (const member of members)
+			found = found?.kind === 'namespace' ? exported(found.module, member) : undefined;
+		return found?.kind === 'component' ? found : undefined;
+	};
+
+	type ModuleFunction = { readonly module: ModuleFacts; readonly fn: SemanticModuleFunction };
+	/** The module-level function `name` exported from `module`, following re-exports. */
+	const exportedFunction = (module: ModuleFacts, name: string, depth = 0): ModuleFunction | undefined => {
+		if (depth > 16) return undefined;
+		for (const fn of module.functions.values()) if (fn.exportNames.includes(name)) return { module, fn };
+		const reexports = module.graph.moduleGraphInterface?.reexports ?? [];
+		const direct = reexports.find((entry) => entry.exportName === name);
+		if (direct) {
+			const target = direct.importedName === '*' ? undefined : moduleAt(module, direct.source);
+			return target && exportedFunction(target, direct.importedName, depth + 1);
+		}
+		for (const entry of reexports) {
+			if (entry.exportName !== '*') continue;
+			const target = moduleAt(module, entry.source);
+			const found = target && exportedFunction(target, name, depth + 1);
+			if (found) return found;
+		}
+		return undefined;
+	};
+	/** The function a call by bare name reaches from `module`: one it declares, or a named import of one. */
+	const functionAt = (module: ModuleFacts, name: string): ModuleFunction | undefined => {
+		const own = module.functions.get(name);
+		if (own) return { module, fn: own };
+		const entry = module.imports.get(name);
+		if (entry?.kind !== 'named') return undefined;
+		const source = moduleAt(module, entry.source);
+		return source && exportedFunction(source, entry.importedName ?? name);
+	};
+
 	const cells: NativeViewPayload['cells'][number][] = [];
-	/** A component instance's cells: its own state, named by its prefix, plus its module's top-level state, shared. */
-	const instanceCells = (
+	const cellIndex = new Map<string, number>();
+	const addCell = (cell: NativeViewPayload['cells'][number]) => {
+		if (cellIndex.has(cell.id)) return;
+		cellIndex.set(cell.id, cells.length);
+		cells.push(cell);
+	};
+	const initialOf = (cell: string): NativeValue | undefined => {
+		const index = cellIndex.get(cell);
+		return index === undefined ? undefined : cells[index]!.initial;
+	};
+	const setInitial = (cell: string, value: NativeValue) => {
+		const index = cellIndex.get(cell)!;
+		cells[index] = { ...cells[index]!, initial: value };
+	};
+	/** A state object becomes one cell per field (`press.pressed`), so each field can change, journal and style on its own. */
+	const splitCells = (
+		id: string,
+		name: string,
+		value: Record<string, NativeValue>,
+	): Map<string, string> => {
+		const fields = new Map<string, string>();
+		for (const [field, initial] of Object.entries(value)) {
+			fields.set(field, `${id}.${field}`);
+			addCell({ id: `${id}.${field}`, name: `${name}.${field}`, initial });
+		}
+		return fields;
+	};
+	const isPlainObject = (value: unknown): value is Record<string, NativeValue> =>
+		isNativeValue(value) &&
+		value !== null &&
+		typeof value === 'object' &&
+		!Array.isArray(value);
+
+	/** Cells, handles, methods and slots of one `shared()` instance, named by the component that created it. */
+	const createInstance = (
+		definition: SemanticSharedDefinition,
+		module: ModuleFacts,
+		prefix: string,
+	): SharedInstance => {
+		const owner =
+			[module, ...moduleFactsByFile.values()].find((facts) =>
+				facts.graph.graphBindings.some(
+					(binding) => binding.sharedDefinitionId === definition.id,
+				),
+			) ?? module;
+		const byName = new Map<string, string>();
+		const byBinding = new Map<string, string>();
+		const objects = new Map<string, ObjectRef>();
+		const instance: SharedInstance = {
+			definition,
+			module: owner,
+			prefix,
+			scope: undefined as unknown as Scope,
+			fields: new Map(),
+			slots: new Map(),
+		};
+		const objectFields = new Map<string, Map<string, string>>();
+		for (const binding of owner.graph.graphBindings) {
+			if (binding.sharedDefinitionId !== definition.id || binding.kind !== 'state') continue;
+			const id = `${prefix}${binding.id}`;
+			const value = binding.initialValue;
+			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+				refuse(
+					`shared state \`${binding.name}\` of ${definition.name} needs a JSON initial value known at build time`,
+				);
+				continue;
+			}
+			if (isPlainObject(value)) {
+				const fields = splitCells(id, binding.name, value);
+				objectFields.set(binding.id, fields);
+				objects.set(binding.name, { kind: 'fields', cells: fields, instance });
+			} else {
+				addCell({ id, name: binding.name, initial: value });
+				byName.set(binding.name, id);
+				byBinding.set(binding.id, id);
+			}
+		}
+		for (const property of definition.returnProperties ?? []) {
+			if (property.kind === 'method') {
+				instance.fields.set(property.name, {
+					kind: 'method',
+					statements: property.nativeStatements,
+					parameters: property.parameters ?? [],
+				});
+			} else if (property.kind === 'callback-slot') {
+				instance.fields.set(property.name, { kind: 'slot' });
+			} else {
+				const binding = owner.bindingsById.get(property.graphNodeId);
+				const fields = objectFields.get(property.graphNodeId);
+				if (binding?.kind === 'element')
+					instance.fields.set(property.name, {
+						kind: 'handle',
+						key: `${prefix}${binding.id}`,
+						plural: binding.plural === true,
+					});
+				else if (fields && property.path.length === 1 && fields.has(property.path[0]!))
+					instance.fields.set(property.name, {
+						kind: 'cell',
+						cell: fields.get(property.path[0]!)!,
+					});
+				else if (byBinding.has(property.graphNodeId) && property.path.length === 0)
+					instance.fields.set(property.name, {
+						kind: 'cell',
+						cell: byBinding.get(property.graphNodeId)!,
+					});
+				else if (binding?.kind === 'computed')
+					instance.fields.set(property.name, {
+						kind: 'expr',
+						expression: binding.nativeExpression,
+					});
+			}
+		}
+		instance.scope = {
+			module: owner,
+			component: '',
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props: new Map(),
+			objects,
+			args: new Map(),
+			shared: new Map(),
+			deviceObjects: new Map(),
+		};
+		return instance;
+	};
+
+	/**
+	 * The scope one component instance renders in: its props, its own state (state objects split into cells), the shared
+	 * instances it resolves (reusing the subtree's, or creating them), and the writes its body makes while rendering,
+	 * which set those cells' first values.
+	 */
+	const enterComponent = (
 		module: ModuleFacts,
 		component: string,
 		prefix: string,
-		shared: boolean,
-	) => {
+		props: ReadonlyMap<string, Prop>,
+		shared: ReadonlyMap<string, SharedInstance>,
+		includeModuleState: boolean,
+	): Scope => {
 		const byName = new Map<string, string>();
 		const byBinding = new Map<string, string>();
+		const objects = new Map<string, ObjectRef>();
+		const subtree = new Map(shared);
+		const scope: Scope = {
+			module,
+			component,
+			cells: { byName, byBinding },
+			prefix,
+			locals: new Set(),
+			items: new Map(),
+			props,
+			objects,
+			args: new Map(),
+			shared: subtree,
+			deviceObjects: new Map(),
+		};
+		for (const use of module.sharedInstancesByComponent.get(component) ?? []) {
+			const definition =
+				module.sharedDefinitions.get(use.definitionId) ??
+				[...moduleFactsByFile.values()]
+					.map((facts) => facts.sharedDefinitions.get(use.definitionId))
+					.find(Boolean);
+			if (!definition) {
+				refuse(
+					`${component} uses ${use.definitionName}, whose shared() definition the build did not analyze`,
+				);
+				continue;
+			}
+			if (definition.scope !== 'subtree') {
+				refuse(`${definition.name}: shared() with scope \`${definition.scope ?? 'app'}\``);
+				continue;
+			}
+			const instance =
+				subtree.get(definition.id) ?? createInstance(definition, module, prefix);
+			subtree.set(definition.id, instance);
+			objects.set(use.localName, { kind: 'instance', instance });
+		}
+		const native = module.componentFacts.get(component)?.native;
 		for (const binding of module.graph.graphBindings) {
-			if (binding.kind !== 'state') continue;
+			if (binding.kind !== 'state' || binding.sharedDefinitionId) continue;
 			const moduleLevel = binding.componentName === undefined;
 			if (!moduleLevel && binding.componentName !== component) continue;
-			if (moduleLevel && !shared) {
+			if (moduleLevel && !includeModuleState) {
 				refuse(`top-level state \`${binding.name}\` in an imported module`);
 				continue;
 			}
@@ -355,44 +963,103 @@ export function createNativeViewPayload(
 				continue;
 			}
 			const id = moduleLevel ? binding.id : `${prefix}${binding.id}`;
-			byName.set(binding.name, id);
-			byBinding.set(binding.id, id);
-			if (cells.some((cell) => cell.id === id)) continue;
-			const value = binding.initialValue;
-			if (binding.initialValueKnown !== true || !isNativeValue(value)) {
+			let value: unknown = binding.initialValue;
+			let known = binding.initialValueKnown === true;
+			const initializer = native?.stateInitializers[binding.name];
+			if (!known && initializer) {
+				const lowered = exprOf(
+					initializer,
+					`the first value of \`${binding.name}\``,
+					scope,
+				);
+				const folded = lowered && foldConstant(lowered, initialOf);
+				if (folded && lowered && cellsOf(lowered).size === 0) {
+					value = folded.value;
+					known = true;
+				}
+			}
+			if (!known || !isNativeValue(value)) {
 				refuse(`state \`${binding.name}\` needs a JSON initial value known at build time`);
 				continue;
 			}
-			cells.push({
+			if (isPlainObject(value) && !binding.storage) {
+				objects.set(binding.name, {
+					kind: 'fields',
+					cells: splitCells(id, binding.name, value),
+				});
+				continue;
+			}
+			byName.set(binding.name, id);
+			byBinding.set(binding.id, id);
+			addCell({
 				id,
 				name: binding.name,
 				initial: value,
 				...(binding.storage ? { storage: { key: binding.storage.key } } : {}),
 			});
 		}
-		return { byName, byBinding };
+		for (const statement of native?.renderStatements ?? []) seed(statement, scope);
+		return scope;
 	};
+
+	/** A write a widget root makes while rendering: a cell's first value, or a callback slot filled from a prop. */
+	const seed = (statement: SemanticHandlerStatement, scope: Scope) => {
+		const what = `${scope.component} while rendering`;
+		if (statement.kind !== 'assign' || statement.path?.length !== 1) {
+			refuse(
+				`${what} runs ${statement.kind === 'unsupported' ? statement.construct : `a ${statement.kind} statement`}`,
+			);
+			return;
+		}
+		const object = scope.objects.get(statement.target);
+		const fieldName = statement.path[0]!;
+		const instance = object?.kind === 'instance' ? object.instance : object?.instance;
+		const field = object?.kind === 'fields' ? undefined : instance?.fields.get(fieldName);
+		if (
+			field?.kind === 'slot' ||
+			(object?.kind === 'fields' && instance?.fields.get(fieldName)?.kind === 'slot')
+		) {
+			const value = statement.value;
+			const prop = value.kind === 'read' ? propOf(value.name, scope) : undefined;
+			if (prop?.kind === 'callback') instance!.slots.set(fieldName, prop);
+			else if (!(value.kind === 'read' && isPropName(value.name, scope)))
+				refuse(
+					`${what} fills \`${statement.target}.${fieldName}\` with something other than a callback prop`,
+				);
+			return;
+		}
+		const cell =
+			object?.kind === 'fields'
+				? object.cells.get(fieldName)
+				: field?.kind === 'cell'
+					? field.cell
+					: undefined;
+		if (!cell) {
+			refuse(`${what} writes \`${statement.target}.${fieldName}\`, which is not state`);
+			return;
+		}
+		const lowered = exprOf(
+			statement.value,
+			`${what}, \`${statement.target}.${fieldName}\``,
+			scope,
+		);
+		if (!lowered) return;
+		const folded = foldConstant(lowered, initialOf);
+		if (!folded || cellsOf(lowered).size > 0 || !isNativeValue(folded.value)) {
+			refuse(
+				`${what} sets \`${statement.target}.${fieldName}\` from a value that follows state; pass a fixed value or leave the prop out`,
+			);
+			return;
+		}
+		setInitial(cell, folded.value);
+	};
+
+	const propOf = (name: string, scope: Scope): Prop | undefined =>
+		scope.props.get(scope.module.propNames.get(scope.component)?.get(name) ?? '');
+	const isPropName = (name: string, scope: Scope): boolean =>
+		scope.module.propNames.get(scope.component)?.has(name) === true;
+
 	const cellOf = (name: string, scope: Scope): string | undefined => scope.cells.byName.get(name);
-	const TOP: Scope = {
-		module: rootModule,
-		component: root.componentName,
-		cells: instanceCells(rootModule, root.componentName, '', true),
-		prefix: '',
-		locals: new Set(),
-		items: new Map(),
-		props: new Map<string, Prop>(
-			options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
-		),
-		objects: new Map(),
-	};
-	const importedModuleFacts = new Map<string, ModuleFacts>();
-	const importedFacts = (specifier: string, imported: SemanticGraphArtifact): ModuleFacts => {
-		const known = importedModuleFacts.get(specifier);
-		if (known) return known;
-		const facts = moduleFactsOf(imported);
-		importedModuleFacts.set(specifier, facts);
-		return facts;
-	};
 	const isRouterLink = (scope: Scope, name: string): boolean => {
 		const entry = scope.module.imports.get(name);
 		return entry?.source === '@markless/router' && entry.importedName === 'Link';
@@ -464,13 +1131,29 @@ export function createNativeViewPayload(
 			? `${entry.importedName}.${property}`
 			: undefined;
 	};
+	/** `haptics.tap(...)` or `cam.takePhoto(...)`: a method called on a name, as the device reads it. */
+	const methodCallSite = (expression: SemanticExpression | undefined): DeviceCallSite | null =>
+		expression?.kind === 'method' && expression.object.kind === 'read'
+			? {
+					callee: `${expression.object.name}.${expression.method}`,
+					calleePath: [expression.object.name, expression.method],
+					arguments: expression.arguments,
+				}
+			: null;
+	/** Whether a call site names `@markless/device` or one of this instance's device objects. */
+	const isDeviceCallSite = (site: DeviceCallSite, scope: Scope): boolean => {
+		const [local] = site.calleePath;
+		return (
+			deviceName(site.calleePath, scope) !== undefined ||
+			(local !== undefined && !scope.locals.has(local) && scope.deviceObjects.has(local))
+		);
+	};
 	const importsDevice = (name: string, scope: Scope): boolean =>
 		!scope.locals.has(name) && scope.module.imports.get(name)?.source === DEVICE_MODULE;
 	const deviceValueCell = (name: NativeDeviceValue): string => {
 		const id = `device:${name}`;
 		features.add(DEVICE_VALUES[name].feature);
-		if (!cells.some((cell) => cell.id === id))
-			cells.push({ id, name, initial: DEVICE_VALUES[name].initial, device: name });
+		addCell({ id, name, initial: DEVICE_VALUES[name].initial, device: name });
 		return id;
 	};
 	/** An async computed's value: its task cell's `value`, read only inside the `@try` arm that waits on it. */
@@ -482,10 +1165,10 @@ export function createNativeViewPayload(
 		if (scope.boundary?.arm !== 'try')
 			return refuse(`${what} reads the async value \`${computed.name}\` outside a @try`);
 		const body = computed.nativeExpression;
-		const call = body?.kind === 'await' ? body.value : body;
-		const device = call?.kind === 'call' ? deviceName(call.calleePath, scope) : undefined;
+		const call = methodCallSite(body?.kind === 'await' ? body.value : body);
+		const device = call ? deviceName(call.calleePath, scope) : undefined;
 		if (
-			call?.kind !== 'call' ||
+			!call ||
 			device === undefined ||
 			!isDeviceCall(device) ||
 			!DEVICE_CALLS[device].async
@@ -503,7 +1186,7 @@ export function createNativeViewPayload(
 			);
 			if (!args.every((argument) => argument !== null)) return null;
 			features.add(DEVICE_CALLS[device].feature);
-			cells.push({
+			addCell({
 				id,
 				name: computed.name,
 				initial: { state: 'pending' },
@@ -558,8 +1241,7 @@ export function createNativeViewPayload(
 				`${what} reads \`${local}.${field}\`, which a ${object.device} has no native field for yet`,
 			);
 		const id = `${object.id}:${field}`;
-		if (!cells.some((cell) => cell.id === id))
-			cells.push({
+		addCell({
 				id,
 				name: `${local}.${field}`,
 				initial: DEVICE_VALUES[name].initial,
@@ -568,18 +1250,234 @@ export function createNativeViewPayload(
 			});
 		return id;
 	};
-	const rootObjects = instanceObjects(rootModule, root.componentName, '');
-	(TOP as { objects: Scope['objects'] }).objects = rootObjects.byName;
 	const isDeviceValue = (name: string): name is NativeDeviceValue =>
 		Object.hasOwn(DEVICE_VALUES, name);
 	const isDeviceCall = (name: string): name is NativeDeviceCall =>
 		Object.hasOwn(DEVICE_CALLS, name);
 	const inlining = new Set<string>();
-	const exprOf = (
-		expression: SemanticExpression | undefined,
+	/** `scope` where `name` reads `value`, hiding any outer meaning of that name. */
+	const bindName = (scope: Scope, name: string, value: NativeExpr): Scope => {
+		const objects = new Map(scope.objects);
+		objects.delete(name);
+		return {
+			...scope,
+			args: new Map(scope.args).set(name, value),
+			locals: new Set([...scope.locals].filter((local) => local !== name)),
+			objects,
+			...(scope.event === name ? { event: undefined } : {}),
+		};
+	};
+	/** Set while handlers are lowered, after the whole tree: only then does every handle know the elements it is bound to. */
+	let lateLowering = false;
+	/** Whether the handler being lowered read the element a tap landed on. */
+	let pressedTargetRead = false;
+	const nodeById = () => new Map(nodes.map((node) => [node.id, node]));
+
+	/** A handle read as a value in a handler: its element (null when unbound), or its elements in order when plural. */
+	const handleValue = (key: string, plural: boolean, what: string): NativeExpr | null => {
+		if (!lateLowering) return refuse(`${what} as a value outside a handler`);
+		const bound = boundHandles.get(key) ?? [];
+		const byId = nodeById();
+		if (bound.some((id) => byId.get(id)?.row))
+			return refuse(`${what}, a handle bound inside a @for row`);
+		if (plural) return { array: bound.map((id) => ({ spread: false, value: elementValue(id) })) };
+		if (bound.length > 1) return refuse(`${what}, a handle bound to more than one element`);
+		return bound[0] ? elementValue(bound[0]) : { literal: null };
+	};
+
+	/** Whether `inner` is `outer` or inside it. */
+	const isWithin = (inner: string, outer: string): boolean => {
+		const byId = nodeById();
+		for (let at: string | null | undefined = inner; at; at = byId.get(at)?.parent) if (at === outer) return true;
+		return false;
+	};
+
+	/** An element's attribute as the web writes it (null when absent), from what it was built with or a binding. */
+	const attributeOf = (element: string, name: string): NativeExpr => {
+		const node = nodeById().get(element);
+		if (node?.kind !== 'element') return { literal: null };
+		const binding = node.bindings?.find((one) => 'attribute' in one && one.attribute === name);
+		if (!binding) return { literal: node.attributes?.[name] ?? null };
+		const value = binding.value;
+		const known = buildTime(value);
+		if (known && (isScalar(known.value) || known.value === undefined)) return { literal: marklessAttributeValue(name, known.value) };
+		const spelled = (flag: boolean): NativeExpr => ({ literal: marklessAttributeValue(name, flag) });
+		return {
+			if: { binary: '===', left: value, right: { literal: null } },
+			whenTrue: { literal: null },
+			whenFalse: {
+				if: { binary: '===', left: value, right: { literal: true } },
+				whenTrue: spelled(true),
+				whenFalse: {
+					if: { binary: '===', left: value, right: { literal: false } },
+					whenTrue: spelled(false),
+					whenFalse: { call: 'String', arguments: [value] },
+				},
+			},
+		};
+	};
+
+	/** `contains`, `getAttribute` and `hasAttribute` on an element known when the app is built. */
+	const elementMethod = (
+		element: string,
+		method: string,
+		args: ReadonlyArray<SemanticExpression>,
 		what: string,
 		scope: Scope,
 	): NativeExpr | null => {
+		const [first, ...more] = args;
+		if (method === 'contains' && first && more.length === 0) {
+			const other = exprOf(first, what, scope);
+			if (!other) return null;
+			const inner = elementOf(other);
+			if (inner !== undefined) return { literal: isWithin(inner, element) };
+			if ('literal' in other && other.literal === null) return { literal: false };
+			return refuse(`${what} asks whether an element contains something other than an element`);
+		}
+		if ((method === 'getAttribute' || method === 'hasAttribute') && first?.kind === 'literal' && typeof first.value === 'string' && more.length === 0) {
+			const value = attributeOf(element, first.value);
+			return method === 'getAttribute' ? value : { binary: '!==', left: value, right: { literal: null } };
+		}
+		return refuse(`${what} calls \`.${method}()\` on an element, which has no native meaning yet`);
+	};
+
+	/** Whether `expr` is known when the app is built (no cell, row item or event read), and what it is then. */
+	const buildTime = (expr: NativeExpr): { readonly value: unknown } | undefined =>
+		cellsOf(expr).size === 0 ? foldConstant(expr, () => undefined) : undefined;
+
+	/**
+	 * A module function's return value where it is called: each statement runs with the values of its locals so far, an
+	 * `if` whose test is known when the app is built takes its branch (else both, joined by a conditional), and a loop over
+	 * a list known then runs its body once per item. `loops` holds the passes still to run of the loops being run.
+	 */
+	function evaluateFunction(
+		statements: ReadonlyArray<SemanticFunctionStatement>,
+		what: string,
+		scope: Scope,
+		locals: ReadonlySet<string>,
+		loops: ReadonlyArray<LoopPass> = [],
+		end: NativeExpr = { literal: null },
+	): NativeExpr | null {
+		const [first, ...rest] = statements;
+		if (!first) {
+			const [loop, ...outer] = loops;
+			if (!loop) return end;
+			return runLoop(loop, what, scope, locals, outer, end);
+		}
+		const next = (inner: Scope, names = locals) => evaluateFunction(rest, what, inner, names, loops, end);
+		switch (first.kind) {
+			case 'unsupported':
+				return refuse(`${what} uses ${first.construct}, which needs a script engine`);
+			case 'return':
+				return exprOf(first.value, what, scope);
+			case 'let':
+			case 'set': {
+				if (first.kind === 'set' && !locals.has(first.name))
+					return refuse(`${what} writes \`${first.name}\`, which is not one of its own names`);
+				const value = exprOf(first.value, what, scope);
+				return value && next(bindName(scope, first.name, value), new Set([...locals, first.name]));
+			}
+			case 'push': {
+				const list = locals.has(first.name) ? scope.args.get(first.name) : undefined;
+				if (!list) return refuse(`${what} pushes onto \`${first.name}\`, which is not one of its own names`);
+				const value = exprOf(first.value, what, scope);
+				if (!value) return null;
+				const grown: NativeExpr =
+					'array' in list
+						? { array: [...list.array, { spread: false, value }] }
+						: { array: [{ spread: true, value: list }, { spread: false, value }] };
+				return next(bindName(scope, first.name, grown));
+			}
+			case 'if': {
+				const test = exprOf(first.test, `${what}'s \`if\` test`, scope);
+				if (!test) return null;
+				const known = buildTime(test);
+				if (known)
+					return evaluateFunction([...(known.value ? first.whenTrue : first.whenFalse), ...rest], what, scope, locals, loops, end);
+				const whenTrue = evaluateFunction([...first.whenTrue, ...rest], what, scope, locals, loops, end);
+				const whenFalse = evaluateFunction([...first.whenFalse, ...rest], what, scope, locals, loops, end);
+				return whenTrue && whenFalse && { if: test, whenTrue, whenFalse };
+			}
+			case 'each': {
+				const list = exprOf(first.list, what, scope);
+				if (!list) return null;
+				const known = buildTime(list);
+				if (!known || !Array.isArray(known.value))
+					return refuse(`${what} loops over a list known only while the app runs`);
+				const loop: LoopPass = { items: known.value, name: first.name, body: first.body, after: rest };
+				return runLoop(loop, what, scope, locals, loops, end);
+			}
+			case 'count': {
+				// Over a list known only while the app runs: a body that only returns one value is `some` over the indices.
+				const over = exprOf(first.over, what, scope);
+				if (!over) return null;
+				const index: NativeExpr = { local: first.name };
+				const passes = evaluateFunction(first.body, what, bindName(scope, first.name, index), new Set(), [], NEXT_PASS);
+				if (!passes) return null;
+				const returned = new Set<string>();
+				const exits = (tree: NativeExpr): NativeExpr => {
+					if (tree === NEXT_PASS) return { literal: false };
+					if ('if' in tree && tree !== NEXT_PASS) return { if: tree.if, whenTrue: exits(tree.whenTrue), whenFalse: exits(tree.whenFalse) };
+					returned.add(JSON.stringify(tree));
+					return { literal: true };
+				};
+				const test = exits(passes);
+				const after = next(scope);
+				if (returned.size === 0 || !after) return after;
+				const [value] = [...returned];
+				if (returned.size > 1 || value!.includes(JSON.stringify(index)))
+					return refuse(`${what} returns from a loop over indices a value that depends on where it stopped`);
+				return {
+					if: { method: 'some', target: over, arguments: [{ lambda: [`${first.name}:item`, first.name], body: test }] },
+					whenTrue: JSON.parse(value!) as NativeExpr,
+					whenFalse: after,
+				};
+			}
+		}
+	}
+
+	/** The next pass of a loop (its name bound to the next item), or what follows the loop once no item is left. */
+	function runLoop(
+		loop: LoopPass,
+		what: string,
+		scope: Scope,
+		locals: ReadonlySet<string>,
+		outer: ReadonlyArray<LoopPass>,
+		end: NativeExpr,
+	): NativeExpr | null {
+		const [item, ...more] = loop.items;
+		if (loop.items.length === 0) return evaluateFunction(loop.after, what, scope, locals, outer, end);
+		const value = expressionOfValue(item);
+		if (!value) return refuse(`${what} loops over a list whose items are not JSON or elements`);
+		return evaluateFunction(
+			loop.body,
+			what,
+			bindName(scope, loop.name, value),
+			new Set([...locals, loop.name]),
+			[{ ...loop, items: more }, ...outer],
+			end,
+		);
+	}
+
+	/** Where a module-level function's body is lowered: only its parameters (bound by the caller) and other functions. */
+	const helperScope = (module: ModuleFacts, caller: Scope): Scope => ({
+		module,
+		component: '',
+		cells: { byName: new Map(), byBinding: new Map() },
+		prefix: caller.prefix,
+		locals: new Set(),
+		items: new Map(),
+		props: new Map(),
+		objects: new Map(),
+		args: new Map(),
+		shared: new Map(),
+		deviceObjects: new Map(),
+	});
+	function exprOf(
+		expression: SemanticExpression | undefined,
+		what: string,
+		scope: Scope,
+	): NativeExpr | null {
 		if (!expression) return refuse(`${what} has no expression the compiler recorded`);
 		const all = (list: ReadonlyArray<SemanticExpression>): NativeExpr[] | null => {
 			const lowered = list.map((item) => exprOf(item, what, scope));
@@ -587,10 +1485,11 @@ export function createNativeViewPayload(
 		};
 		switch (expression.kind) {
 			case 'read': {
-				const bound = scope.bound?.get(expression.name);
-				if (bound) return bound;
 				if (scope.locals.has(expression.name)) return { local: expression.name };
-				if (scope.objects.has(expression.name))
+				const bound = scope.args.get(expression.name);
+				if (bound) return bound;
+				if (scope.opaque === expression.name) return refuse(`${what} reads its event`);
+				if (scope.deviceObjects.has(expression.name))
 					return refuse(
 						`${what} reads the device object \`${expression.name}\` as a value; read one of its fields`,
 					);
@@ -628,12 +1527,15 @@ export function createNativeViewPayload(
 					);
 				const repeat = scope.items.get(expression.name);
 				if (repeat) return { item: repeat };
-				const prop = scope.props.get(
-					scope.module.propNames.get(scope.component)?.get(expression.name) ?? '',
-				);
+				const prop = propOf(expression.name, scope);
 				if (prop?.kind === 'value') return prop.expr;
 				if (prop)
 					return refuse(`${what} reads the callback \`${expression.name}\` as a value`);
+				if (isPropName(expression.name, scope)) {
+					const fallback = scope.module.componentFacts.get(scope.component)?.native
+						?.propDefaults[expression.name];
+					return fallback ? exprOf(fallback, what, scope) : { literal: null };
+				}
 				const computed =
 					scope.module.computeds.get(scope.component)?.get(expression.name) ??
 					scope.module.computeds.get('')?.get(expression.name);
@@ -660,20 +1562,41 @@ export function createNativeViewPayload(
 					}
 				}
 				const cell = cellOf(expression.name, scope);
-				return cell
-					? { cell }
-					: refuse(
-							`${what} reads \`${expression.name}\`, which is not state of this component`,
-						);
+				if (cell) return { cell };
+				const ownHandle = scope.module.elementBindings.get(`${scope.component}#${expression.name}`);
+				if (ownHandle) {
+					const binding = scope.module.bindingsById.get(ownHandle);
+					return handleValue(`${scope.prefix}${ownHandle}`, binding?.plural === true, `${what} reads \`${expression.name}\``);
+				}
+				if (scope.objects.has(expression.name))
+					return refuse(
+						`${what} reads \`${expression.name}\` whole; a native build reads its fields`,
+					);
+				return refuse(
+					`${what} reads \`${expression.name}\`, which is not state of this component`,
+				);
 			}
 			case 'literal':
 				return { literal: expression.value };
 			case 'unary': {
+				if (expression.operator === 'typeof')
+					return refuse(
+						`${what} uses \`typeof\` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null`,
+					);
 				const value = exprOf(expression.value, what, scope);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
 			case 'logical': {
+				const typeTest = expression.kind === 'binary' ? typeTestOf(expression) : undefined;
+				if (typeTest) {
+					const value = exprOf(typeTest.value, what, scope);
+					return value && {
+						binary: expression.operator as '===' | '!==',
+						left: { unary: 'typeof', value },
+						right: { literal: typeTest.type },
+					};
+				}
 				const left = exprOf(expression.left, what, scope);
 				const right = exprOf(expression.right, what, scope);
 				if (!left || !right) return null;
@@ -698,6 +1621,42 @@ export function createNativeViewPayload(
 			case 'member': {
 				const holder = expression.object;
 				if (
+					holder.kind === 'read' &&
+					scope.objects.has(holder.name) &&
+					!scope.locals.has(holder.name)
+				) {
+					const object = scope.objects.get(holder.name)!;
+					if (object.kind === 'fields') {
+						const cell = object.cells.get(expression.property);
+						return cell
+							? { cell }
+							: refuse(
+									`${what} reads \`${holder.name}.${expression.property}\`, which is not one of its fields`,
+								);
+					}
+					const field = object.instance.fields.get(expression.property);
+					if (field?.kind === 'cell') return { cell: field.cell };
+					if (field?.kind === 'expr')
+						return exprOf(
+							field.expression,
+							`${object.instance.definition.name}.${expression.property}`,
+							object.instance.scope,
+						);
+					if (field?.kind === 'handle')
+						return handleValue(field.key, field.plural, `${what} reads \`${holder.name}.${expression.property}\``);
+					return refuse(
+						`${what} reads \`${holder.name}.${expression.property}\` as a value`,
+					);
+				}
+				if (holder.kind === 'read' && holder.name === scope.opaque && !scope.args.has(holder.name)) {
+					if (TOUCH_MODIFIERS.has(expression.property)) return { literal: false };
+					if (scope.pressed && (expression.property === 'target' || expression.property === 'currentTarget')) {
+						if (expression.property === 'target') pressedTargetRead = true;
+						return elementValue(scope.pressed[expression.property]);
+					}
+					return refuse(`${what} reads \`${holder.name}.${expression.property}\`, which a tap on a phone does not have`);
+				}
+				if (
 					scope.event !== undefined &&
 					expression.property === 'value' &&
 					holder.kind === 'member' &&
@@ -709,11 +1668,11 @@ export function createNativeViewPayload(
 				if (
 					holder.kind === 'read' &&
 					!scope.locals.has(holder.name) &&
-					scope.objects.has(holder.name)
+					scope.deviceObjects.has(holder.name)
 				) {
 					const cell = objectFieldCell(
 						holder.name,
-						scope.objects.get(holder.name)!,
+						scope.deviceObjects.get(holder.name)!,
 						expression.property,
 						what,
 					);
@@ -740,11 +1699,6 @@ export function createNativeViewPayload(
 				return object && { member: object, property: expression.property };
 			}
 			case 'call': {
-				const device = deviceName(expression.calleePath, scope);
-				if (device !== undefined)
-					return refuse(
-						`${what} calls \`${device}\` inside an expression; call it as a handler statement or as an async computed's body`,
-					);
 				if (!BUILTINS.has(expression.callee))
 					return refuse(
 						`${what} uses a call to \`${expression.callee}\`, which needs a script engine`,
@@ -754,6 +1708,40 @@ export function createNativeViewPayload(
 			}
 			case 'await':
 				return refuse(`${what} uses \`await\`, which needs a script engine`);
+			case 'index': {
+				const of = exprOf(expression.object, what, scope);
+				const at = exprOf(expression.index, what, scope);
+				return of && at && { at, of };
+			}
+			case 'apply': {
+				const name = expression.callee;
+				if (
+					scope.locals.has(name) ||
+					scope.args.has(name) ||
+					scope.items.has(name) ||
+					scope.objects.has(name) ||
+					isPropName(name, scope) ||
+					cellOf(name, scope)
+				)
+					return refuse(`${what} calls \`${name}\`, a value the build cannot call`);
+				const found = functionAt(scope.module, name);
+				if (!found) return refuse(`${what} uses a call to \`${name}\`, which needs a script engine`);
+				const key = `${found.module.graph.filename}#${found.fn.name}`;
+				if (inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
+				const args = all(expression.arguments);
+				if (!args) return null;
+				const { parameters, statements } = found.fn.native;
+				const inner = parameters.reduce<Scope>(
+					(bound, parameter, index) => bindName(bound, parameter, args[index] ?? { literal: null }),
+					helperScope(found.module, scope),
+				);
+				inlining.add(key);
+				try {
+					return evaluateFunction(statements, `the function \`${found.fn.name}\``, inner, new Set(parameters));
+				} finally {
+					inlining.delete(key);
+				}
+			}
 			case 'array': {
 				const items = expression.items.map((item) => {
 					const value = exprOf(item.value, what, scope);
@@ -773,8 +1761,21 @@ export function createNativeViewPayload(
 					: null;
 			}
 			case 'method': {
-				if (!METHODS.has(expression.method))
-					return refuse(`${what} calls \`.${expression.method}()\``);
+				if (!METHODS.has(expression.method)) {
+					const site = methodCallSite(expression);
+					if (site && isDeviceCallSite(site, scope))
+						return refuse(
+							`${what} calls \`${site.callee}\` inside an expression; call it as a handler statement or as an async computed's body`,
+						);
+					const mark = diagnostics.length;
+					const holder = exprOf(expression.object, what, scope);
+					const element = elementOf(holder);
+					if (element === undefined) {
+						diagnostics.length = mark;
+						return refuse(`${what} uses a call to \`${calleeText(expression.object)}.${expression.method}\`, which needs a script engine`);
+					}
+					return elementMethod(element, expression.method, expression.arguments, what, scope);
+				}
 				if (expression.method === 'reverse' && expression.object.kind !== 'array')
 					return refuse(
 						`${what} reverses an array in place; reverse a copy (\`[...list].reverse()\`)`,
@@ -797,17 +1798,66 @@ export function createNativeViewPayload(
 						}
 					: null;
 			}
+			case 'let': {
+				const value = exprOf(expression.value, what, scope);
+				return value && exprOf(expression.body, what, bindName(scope, expression.name, value));
+			}
 			case 'lambda':
 				return refuse(`${what} uses a function value outside a method call`);
 			case 'unsupported':
 				return refuse(`${what} uses ${expression.construct}, which needs a script engine`);
 		}
-	};
+	}
 
-	const bindingsOf = (host: string, scope: Scope): ElementBindings =>
+	/** Attributes whose value is an element handle, by host: lowered to the bound elements' node ids once all are known. */
+	const handleAttributes = (chunk: SemanticMarkupChunk, path: ReadonlyArray<number>) =>
+		chunk.slots.flatMap((slot) =>
+			slot.kind === 'attribute' &&
+			comparePaths(slot.coordinate.path, path) === 0 &&
+			(slot.residue.kind === 'element-handle-id' ||
+				slot.residue.kind === 'element-handle-id-list')
+				? [
+						{
+							name: slot.name,
+							handles:
+								slot.residue.kind === 'element-handle-id'
+									? [slot.residue.handleGraphNodeId]
+									: slot.residue.handleGraphNodeIds,
+						},
+					]
+				: [],
+		);
+	/** Where a handle graph node lives in this build: the shared instance (or component instance) the scope resolved. */
+	const handleKey = (graphNodeId: string, scope: Scope): string | undefined => {
+		const binding = scope.module.bindingsById.get(graphNodeId);
+		if (binding?.sharedDefinitionId) {
+			for (const object of scope.objects.values()) {
+				const instance = object.kind === 'instance' ? object.instance : object.instance;
+				if (instance?.definition.id === binding.sharedDefinitionId)
+					return `${instance.prefix}${graphNodeId}`;
+			}
+			return undefined;
+		}
+		return binding ? `${scope.prefix}${graphNodeId}` : undefined;
+	};
+	const boundHandles = new Map<string, string[]>();
+	const dialogOps: { op: 'dialog'; node: string; method: 'showModal' | 'close' }[] = [];
+	const handleReferences: {
+		readonly node: string;
+		readonly attribute: string;
+		readonly keys: ReadonlyArray<string | undefined>;
+	}[] = [];
+
+	const bindingsOf = (host: string, scope: Scope, skip: ReadonlySet<string>): ElementBindings =>
 		(scope.module.readsByHost.get(host) ?? []).flatMap((read): ElementBindings => {
 			const target = read.target;
 			if (target.kind === 'text') return [];
+			if (target.kind === 'attribute' && skip.has(target.name)) return [];
+			// A button's `value` is the form value its `value` attribute reflects; only a text field shows one.
+			if (target.kind === 'property' && target.name === 'value' && !TEXT_ENTRY.has(scope.module.tagOf.get(host) ?? '')) {
+				const value = exprOf(read.expression, 'the `value` attribute', scope);
+				return value ? [{ attribute: 'value', value }] : [];
+			}
 			if (target.kind === 'property' && target.name === 'value') {
 				const value = exprOf(read.expression, 'the `value` property', scope);
 				return value ? [{ property: 'value' as const, value }] : [];
@@ -855,7 +1905,13 @@ export function createNativeViewPayload(
 	const lowered = new Set<string>();
 
 	const events: NativeViewPayload['events'][number][] = [];
-	const handlers: NativeViewPayload['handlers'][number][] = [];
+	const handlers: { readonly id: string; ops: NativeOp[] }[] = [];
+	const pendingHandlers: {
+		readonly handler: { readonly id: string; ops: NativeOp[] };
+		readonly event: SemanticEvent;
+		readonly scope: Scope;
+		readonly host: string;
+	}[] = [];
 	const loweredEvents = new Set<string>();
 	const lowerChunk = (
 		chunk: SemanticMarkupChunk,
@@ -877,7 +1933,7 @@ export function createNativeViewPayload(
 			})),
 		];
 		for (const slot of chunk.slots) {
-			if (slot.kind === 'attribute') continue;
+			if (slot.kind === 'attribute' || slot.kind === 'spread-attributes') continue;
 			if (slot.kind === 'child-component') {
 				items.push({
 					kind: 'child',
@@ -1017,28 +2073,94 @@ export function createNativeViewPayload(
 					!(element === 'title' && scope.module === rootModule && scope.prefix === '')
 				)
 					refuse(`the <${element}> element`);
-				const attributes = (chunk.attributes ?? []).filter(
-					(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
-				);
-				const bindings = bindingsOf(item.id, scope);
 				const id = scope.prefix + item.id;
+				const spread = chunk.slots.some(
+					(slot) =>
+						slot.kind === 'spread-attributes' &&
+						comparePaths(slot.coordinate.path, item.path) === 0,
+				);
+				const restAttributes: Record<string, string> = {};
+				const restBindings: { attribute: string; value: NativeExpr }[] = [];
+				if (spread) {
+					for (const [name, value] of scope.rest ?? []) {
+						if ('literal' in value) {
+							if (value.literal === null || value.literal === false) continue;
+							restAttributes[name] =
+								value.literal === true ? '' : String(value.literal);
+						} else restBindings.push({ attribute: name, value });
+					}
+				}
+				const staticAttributes = Object.fromEntries(
+					(chunk.attributes ?? [])
+						.filter(
+							(attribute) => comparePaths(attribute.coordinate.path, item.path) === 0,
+						)
+						.map((attribute) => [attribute.name, attribute.value]),
+				);
+				const attributes = { ...restAttributes, ...staticAttributes };
+				if (element === 'dialog' && ('open' in attributes || (scope.module.readsByHost.get(item.id) ?? []).some((read) => read.target.kind === 'attribute' && read.target.name === 'open')))
+					refuse('<dialog open>, which the web shows in the page flow as a non-modal dialog; open it with `showModal()`');
+				const handleAttrs = handleAttributes(chunk, item.path);
+				const own = bindingsOf(
+					item.id,
+					scope,
+					new Set(handleAttrs.map((attribute) => attribute.name)),
+				);
+				const bindings = [
+					...restBindings.filter(
+						(binding) =>
+							!(binding.attribute in staticAttributes) &&
+							!own.some(
+								(other) =>
+									'attribute' in other && other.attribute === binding.attribute,
+							),
+					),
+					...own,
+				];
+				for (const attribute of handleAttrs) {
+					if (attribute.name === 'id') continue;
+					handleReferences.push({
+						node: id,
+						attribute: attribute.name,
+						keys: attribute.handles.map((handle) => handleKey(handle, scope)),
+					});
+				}
+				for (const binding of scope.module.handleBindingsByHost.get(item.id) ?? []) {
+					const handle = binding.nativeHandle;
+					let key: string | undefined;
+					if (handle?.kind === 'member' && handle.object.kind === 'read') {
+						const object = scope.objects.get(handle.object.name);
+						const instance =
+							object?.kind === 'instance' ? object.instance : object?.instance;
+						const field = instance?.fields.get(handle.property);
+						if (field?.kind === 'handle') key = field.key;
+					} else if (handle?.kind === 'read') {
+						const bindingId = scope.module.elementBindings.get(
+							`${scope.component}#${handle.name}`,
+						);
+						if (bindingId) key = `${scope.prefix}${bindingId}`;
+					}
+					if (key) boundHandles.set(key, [...(boundHandles.get(key) ?? []), id]);
+				}
 				nodes.push({
 					kind: 'element',
 					id,
 					element: element ?? '*',
 					parent,
-					...(attributes.length > 0
-						? {
-								attributes: Object.fromEntries(
-									attributes.map((a) => [a.name, a.value]),
-								),
-							}
-						: {}),
+					...(Object.keys(attributes).length > 0 ? { attributes } : {}),
 					...(bindings.length > 0 ? { bindings } : {}),
 					...place,
 				});
 				for (const event of scope.module.eventsByHost.get(item.id) ?? []) {
 					if (scope.module === rootModule) loweredEvents.add(event.id);
+					if (NOT_ON_PHONES.has(event.eventName)) continue;
+					if (KEYBOARD_ONLY.has(event.eventName) && !TEXT_ENTRY.has(element ?? '')) {
+						keyboardOnly(
+							`the ${event.eventName} handler on <${element}> ${id}`,
+							event.handlerSpan,
+						);
+						continue;
+					}
 					const semantic = SEMANTIC_EVENTS[event.eventName];
 					if (!semantic) {
 						refuse(
@@ -1054,9 +2176,10 @@ export function createNativeViewPayload(
 						);
 						continue;
 					}
-					const handler = `handler:${scope.prefix}${event.id}`;
-					events.push({ host: id, event: semantic, handler });
-					handlers.push({ id: handler, ops: handlerOps(event, scope, handler) });
+					const handler = { id: `handler:${scope.prefix}${event.id}`, ops: [] as NativeOp[] };
+					events.push({ host: id, event: semantic, handler: handler.id });
+					handlers.push(handler);
+					pendingHandlers.push({ handler, event, scope, host: id });
 				}
 				continue;
 			}
@@ -1068,26 +2191,15 @@ export function createNativeViewPayload(
 					refuse('`{children}` at the top of a component');
 					continue;
 				}
-				lowerChunk(children.chunk, parent, place, children.scope);
+				lowerChunk(children.chunk, parent, place, {
+					...children.scope,
+					shared: scope.shared,
+				});
 				continue;
 			}
 			if (item.kind === 'child') {
 				close();
 				const edge = scope.module.edgesById.get(item.edge);
-				const imported = edge
-					? scope.module.imports.get(edge.childComponentName)
-					: undefined;
-				const importedModule =
-					imported?.importedName && options.importedModules?.[imported.source]
-						? importedFacts(imported.source, options.importedModules[imported.source]!)
-						: undefined;
-				const childModule = importedModule ?? scope.module;
-				const childComponent = importedModule
-					? imported!.importedName!
-					: (edge?.childComponentName ?? '');
-				const template = importedModule
-					? importedModule.chunks.get(`template:${childComponent}`)
-					: scope.module.chunks.get(item.template);
 				if (!edge) {
 					refuse(`the component call ${item.edge}`);
 					continue;
@@ -1107,7 +2219,7 @@ export function createNativeViewPayload(
 					const el = edge.props.find((prop) => prop.name === 'el');
 					const named = el && 'nativeExpression' in el ? el.nativeExpression : undefined;
 					const object =
-						named?.kind === 'read' ? scope.objects.get(named.name) : undefined;
+						named?.kind === 'read' ? scope.deviceObjects.get(named.name) : undefined;
 					if (
 						!object ||
 						object.device !== deviceElement.device ||
@@ -1189,13 +2301,17 @@ export function createNativeViewPayload(
 					});
 					continue;
 				}
-				if (!template) {
+				const target = componentAt(scope.module, edge.childComponentName);
+				const template = target?.module.chunks.get(`template:${target.component}`);
+				if (!target || !template) {
 					refuse(`<${edge.childComponentName}>, a component from another module`);
 					continue;
 				}
 				const projected = item.projection
 					? scope.module.chunks.get(item.projection)
 					: undefined;
+				// Children a component never renders are dropped, as on the web, so they count as handled.
+				if (item.projection && scope.module === rootModule) lowered.add(item.projection);
 				if (item.projection && !projected) {
 					refuse(`children passed to <${edge.childComponentName}> that have no markup`);
 					continue;
@@ -1203,48 +2319,75 @@ export function createNativeViewPayload(
 				const props = new Map<string, Prop>(
 					projected ? [['children', { kind: 'children', chunk: projected, scope }]] : [],
 				);
+				const declared = new Set(
+					target.module.propNames.get(target.component)?.values() ?? [],
+				);
+				const rest: [string, NativeExpr][] = [];
+				const ownRest = scope.module.componentFacts.get(scope.component)?.native?.restProp;
 				for (const prop of edge.props) {
+					let value: Prop | undefined;
+					if (prop.kind === 'spread' && ownRest !== undefined && prop.source === ownRest) {
+						// `{...rest}` passed on to a part: the props this instance was given and does not declare.
+						for (const [name, expr] of scope.rest ?? [])
+							if (declared.has(name)) props.set(name, { kind: 'value', expr });
+							else rest.push([name, expr]);
+						continue;
+					}
 					if (prop.kind === 'callback') {
-						props.set(prop.name, {
+						value = {
 							kind: 'callback',
 							statements: prop.nativeStatements,
+							parameters: prop.parameters ?? [],
 							scope,
-						});
+						};
 					} else if (prop.kind === 'serializable' && isNativeValue(prop.value)) {
-						props.set(prop.name, {
+						value = {
 							kind: 'value',
-							expr: { literal: prop.value as NativeScalar },
-						});
+							expr: {
+								literal: (isScalar(prop.value) ? prop.value : null) as NativeScalar,
+							},
+						};
+						if (!isScalar(prop.value)) {
+							refuse(
+								`the \`${prop.name}\` prop of <${edge.childComponentName}> is an object or array`,
+							);
+							continue;
+						}
 					} else if (
 						prop.kind === 'graph-reference' &&
 						scope.cells.byBinding.has(prop.graphNodeId) &&
 						prop.path.length === 0
 					) {
-						props.set(prop.name, {
+						value = {
 							kind: 'value',
 							expr: { cell: scope.cells.byBinding.get(prop.graphNodeId)! },
-						});
+						};
 					} else {
 						refuse(`the \`${prop.name}\` prop of <${edge.childComponentName}>`);
+						continue;
 					}
+					if (declared.has(prop.name)) props.set(prop.name, value);
+					else if (value.kind === 'value') rest.push([prop.name, value.expr]);
+					else
+						refuse(
+							`the \`${prop.name}\` callback of <${edge.childComponentName}>, which it only spreads onto an element`,
+						);
 				}
 				const childPrefix = `${scope.prefix}${edge.id}/`;
-				const childObjects = instanceObjects(childModule, childComponent, childPrefix);
+				const childObjects = instanceObjects(target.module, target.component, childPrefix);
 				const first = nodes.length;
-				lowerChunk(template, parent, place, {
-					module: childModule,
-					component: childComponent,
-					cells: instanceCells(
-						childModule,
-						childComponent,
-						childPrefix,
-						childModule === rootModule,
-					),
-					prefix: childPrefix,
-					locals: new Set(),
-					items: new Map(),
+				const childScope = enterComponent(
+					target.module,
+					target.component,
+					childPrefix,
 					props,
-					objects: childObjects.byName,
+					scope.shared,
+					target.module === rootModule,
+				);
+				lowerChunk(template, parent, place, {
+					...childScope,
+					...(rest.length > 0 ? { rest } : {}),
+					deviceObjects: childObjects.byName,
 					...(scope.catches ? { catches: scope.catches } : {}),
 				});
 				childObjects.own(first);
@@ -1306,7 +2449,7 @@ export function createNativeViewPayload(
 				const catches: HandlerCatch = {
 					cell: () => {
 						if (!caught)
-							cells.push({
+							addCell({
 								id: catchCell,
 								name: boundary?.errorName ?? 'error',
 								initial: null,
@@ -1320,6 +2463,7 @@ export function createNativeViewPayload(
 					const armId = item.arms[arm];
 					// No @pending shows nothing while the value is on its way.
 					if (armId === undefined) return;
+					const deferredBefore = pendingHandlers.length;
 					const chunk = scope.module.chunks.get(armId);
 					if (!chunk) return refuse(`the @${arm} arm of ${item.id} has no markup`);
 					lowerChunk(
@@ -1337,6 +2481,10 @@ export function createNativeViewPayload(
 							},
 						},
 					);
+					// The @catch arm reads whether a handler in the @try arm writes its error, so those handlers lower now.
+					if (arm === 'try')
+						for (const { handler, event, scope: at, host } of pendingHandlers.splice(deferredBefore))
+							handler.ops = handlerOps(event, at, handler.id, { target: host, currentTarget: host });
 				});
 				if (tasks.size > 1 || (tasks.size === 0 && !caught)) {
 					refuse(
@@ -1549,32 +2697,32 @@ export function createNativeViewPayload(
 			const [parameter] = onChange.parameters ?? [];
 			const handler = `handler:${id}`;
 			events.push({ host: id, event: 'dismiss', handler });
+			continuations = { base: handler, next: 0 };
+			snapshots = { handler, count: 0 };
 			handlers.push({
 				id: handler,
-				ops: statementOps(
+				ops: lowerStatements(
 					onChange.nativeStatements,
 					parameter === undefined
 						? scope
-						: {
-								...scope,
-								bound: new Map([
-									...(scope.bound ?? []),
-									[parameter, { literal: false }],
-								]),
-							},
+						: { ...scope, args: new Map([...scope.args, [parameter, { literal: false }]]) },
 					`the \`onChange\` of ${what}`,
 					onChange.sourceSpan,
 					0,
-					{ base: handler, next: 0 },
-				),
+				).ops,
 			});
 		}
 	}
 
-	function handlerOps(event: SemanticEvent, scope: Scope, handlerId: string): NativeOp[] {
+	function handlerOps(
+		event: SemanticEvent,
+		scope: Scope,
+		handler: string,
+		pressed?: NonNullable<Scope['pressed']>,
+	): NativeOp[] {
 		const what = `the ${event.eventName} handler`;
-		const eventParameter = event.eventName === 'input' ? event.handlerParameters[0] : undefined;
-		if (event.handlerParameters.length > (eventParameter === undefined ? 0 : 1)) {
+		const [parameter, ...more] = event.handlerParameters;
+		if (more.length > 0) {
 			refuse(`${what} reads its event`, event.handlerSpan);
 			return [];
 		}
@@ -1582,14 +2730,15 @@ export function createNativeViewPayload(
 			refuse(`${what} is defined elsewhere (a named or factory function)`, event.handlerSpan);
 			return [];
 		}
-		return statementOps(
-			event.handlerStatements,
-			eventParameter === undefined ? scope : { ...scope, event: eventParameter },
-			what,
-			event.handlerSpan,
-			0,
-			{ base: handlerId, next: 0 },
-		);
+		const inner: Scope =
+			parameter === undefined
+				? scope
+				: event.eventName === 'input'
+					? { ...scope, event: parameter }
+					: { ...scope, opaque: parameter, ...(pressed ? { pressed } : {}) };
+		snapshots = { handler, count: 0 };
+		continuations = { base: handler, next: 0 };
+		return lowerStatements(event.handlerStatements, inner, what, event.handlerSpan, 0).ops;
 	}
 
 	/** The one device call a statement awaits, and the statement's value with that await replaced by `as`. */
@@ -1597,16 +2746,16 @@ export function createNativeViewPayload(
 		expression: SemanticExpression,
 		as: string,
 	): {
-		readonly call: Extract<SemanticExpression, { kind: 'call' }> | null;
+		readonly call: DeviceCallSite | null;
 		readonly rest: SemanticExpression;
 		readonly count: number;
 	} {
-		let call: Extract<SemanticExpression, { kind: 'call' }> | null = null;
+		let call: DeviceCallSite | null = null;
 		let count = 0;
 		const walk = (node: SemanticExpression): SemanticExpression => {
 			if (node.kind === 'await') {
 				count++;
-				if (node.value.kind === 'call') call = node.value;
+				call = methodCallSite(node.value);
 				return { kind: 'read', name: as };
 			}
 			const copy: Record<string, unknown> = {};
@@ -1644,14 +2793,14 @@ export function createNativeViewPayload(
 
 	/** A device call by its callee: an import's (`haptics.tap`) or a device object's (`cam.takePhoto`). */
 	function deviceCallOf(
-		value: Extract<SemanticExpression, { kind: 'call' }>,
+		value: DeviceCallSite,
 		scope: Scope,
 		what: string,
 		span: SourceSpan | undefined,
 	): { readonly call: NativeDeviceCall; readonly object?: string } | null {
 		const [local, method, ...more] = value.calleePath;
 		const object =
-			local !== undefined && !scope.locals.has(local) ? scope.objects.get(local) : undefined;
+			local !== undefined && !scope.locals.has(local) ? scope.deviceObjects.get(local) : undefined;
 		const device =
 			object && method !== undefined && more.length === 0
 				? `${object.device}.${method}`
@@ -1671,33 +2820,89 @@ export function createNativeViewPayload(
 		return { call: device, ...(object ? { object: object.id } : {}) };
 	}
 
-	function statementOps(
+	/** The handler being lowered, which owns the cells its `const`s are kept in when what they read changes. */
+	let snapshots = { handler: '', count: 0 };
+	/** The handler being lowered's awaited device calls, each continuation named `<base>:after:<n>`. */
+	let continuations = { base: '', next: 0 };
+	/** How many `if` branches deep the statements being lowered are: an awaited call's continuation cannot leave one yet. */
+	let branchDepth = 0;
+
+	/**
+	 * Lowers `run` with each name bound to its value. When the ops it gives may change what a value reads before reading
+	 * it, lowers again with that value kept, as it was here, in a cell of its own that is written first.
+	 */
+	function lowerBound(
+		bindings: ReadonlyArray<readonly [string, NativeExpr]>,
+		run: (values: ReadonlyArray<NativeExpr>) => { readonly ops: NativeOp[]; readonly returns: boolean },
+	): { readonly ops: NativeOp[]; readonly returns: boolean } {
+		const marks = { diagnostics: diagnostics.length, dialogOps: dialogOps.length, cells: cells.length, count: snapshots.count };
+		const first = run(bindings.map(([, value]) => value));
+		const kept = bindings.map(([, value]) => mayChangeBeforeRead(first.ops, cellsOf(value)));
+		if (!kept.includes(true)) return first;
+		diagnostics.length = marks.diagnostics;
+		dialogOps.length = marks.dialogOps;
+		for (const dropped of cells.splice(marks.cells)) cellIndex.delete(dropped.id);
+		snapshots.count = marks.count;
+		const ops: NativeOp[] = [];
+		const values = bindings.map(([name, value], index): NativeExpr => {
+			if (!kept[index]) return value;
+			const cell = `${snapshots.handler}/kept:${snapshots.count++}`;
+			addCell({ id: cell, name, initial: null });
+			ops.push({ op: 'assign', cell, value });
+			return { cell };
+		});
+		const second = run(values);
+		return { ops: [...ops, ...second.ops], returns: second.returns };
+	}
+
+	/** Whether running `ops` may change a cell of `read` before a later op reads it; one assignment reads before it writes. */
+	const mayChangeBeforeRead = (ops: ReadonlyArray<NativeOp>, read: ReadonlySet<string>): boolean =>
+		!(ops.length === 1 && ops[0]!.op === 'assign') && [...writesOf(ops)].some((cell) => read.has(cell));
+
+	/** Cells an op list may write, inside `if` ops and awaited calls' continuations too. */
+	const writesOf = (ops: ReadonlyArray<NativeOp>, into = new Set<string>()): Set<string> => {
+		for (const op of ops) {
+			if (op.op === 'assign') into.add(op.cell);
+			else if (op.op === 'if') {
+				writesOf(op.whenTrue, into);
+				writesOf(op.whenFalse, into);
+			}
+			else if (op.op === 'call' && op.after) writesOf(op.after.ops, into);
+		}
+		return into;
+	};
+
+	/**
+	 * Statements as ops. An `if` is an `if` op; a `return` moves the statements after its `if` into the other branch, so
+	 * nothing after it runs. `returns` says whether the list always returns.
+	 */
+	function lowerStatements(
 		statements: ReadonlyArray<SemanticHandlerStatement>,
 		scope: Scope,
 		what: string,
 		span: SourceSpan | undefined,
 		depth: number,
-		continuations: { readonly base: string; next: number },
-	): NativeOp[] {
+	): { readonly ops: NativeOp[]; readonly returns: boolean } {
 		const ops: NativeOp[] = [];
-		for (const [index, statement] of statements.entries()) {
+		for (let index = 0; index < statements.length; index++) {
+			const statement = statements[index]!;
 			// A statement that awaits a device call: the call, then the rest of the handler as its continuation.
 			const awaited =
 				statement.kind === 'effect' && statement.value.kind === 'await'
 					? splitAwait(statement.value, '')
-					: statement.kind === 'assign' || statement.kind === 'assign-field'
+					: statement.kind === 'assign'
 						? splitAwait(statement.value, `$${continuations.next}`)
 						: null;
 			if (awaited && awaited.count > 0) {
-				if (awaited.count > 1 || !awaited.call) {
+				if (awaited.count > 1 || !awaited.call || branchDepth > 0) {
 					refuse(
-						`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : 'something other than a call'}`,
+						`${what} awaits ${awaited.count > 1 ? 'more than once in one statement' : branchDepth > 0 ? 'inside an `if`' : 'something other than a call'}`,
 						span,
 					);
-					return ops;
+					return { ops, returns: true };
 				}
 				const target = deviceCallOf(awaited.call, scope, what, span);
-				if (!target) return ops;
+				if (!target) return { ops, returns: true };
 				const as = `$${continuations.next}`;
 				const id = `${continuations.base}:after:${continuations.next++}`;
 				const inner: Scope = { ...scope, locals: new Set([...scope.locals, as]) };
@@ -1707,10 +2912,8 @@ export function createNativeViewPayload(
 						: [{ ...statement, value: awaited.rest } as SemanticHandlerStatement]),
 					...statements.slice(index + 1),
 				];
-				const args = awaited.call.arguments.map((argument) =>
-					exprOf(argument, what, scope),
-				);
-				if (!args.every((argument) => argument !== null)) return ops;
+				const args = awaited.call.arguments.map((argument) => exprOf(argument, what, scope));
+				if (!args.every((argument) => argument !== null)) return { ops, returns: true };
 				ops.push({
 					op: 'call',
 					...target,
@@ -1718,104 +2921,249 @@ export function createNativeViewPayload(
 					after: {
 						id,
 						as,
-						ops: statementOps(remaining, inner, what, span, depth, continuations),
+						ops: lowerStatements(remaining, inner, what, span, depth).ops,
 						...(scope.catches ? { catch: scope.catches.cell() } : {}),
 					},
 				});
-				return ops;
+				// What follows the await runs in the continuation, once the call answers.
+				return { ops, returns: true };
 			}
-			ops.push(...statementOp(statement, scope, what, span, depth, continuations));
+			if (statement.kind === 'return') return { ops, returns: true };
+			if (statement.kind === 'const') {
+				const value = exprOf(statement.value, what, scope);
+				if (!value) return { ops, returns: true };
+				const rest = statements.slice(index + 1);
+				const after = lowerBound([[statement.name, value]], ([bound]) =>
+					lowerStatements(rest, bindName(scope, statement.name, bound!), what, span, depth),
+				);
+				ops.push(...after.ops);
+				return { ops, returns: after.returns };
+			}
+			if (statement.kind === 'if') {
+				const test = exprOf(statement.test, `${what}'s \`if\` test`, scope);
+				if (!test) return { ops, returns: true };
+				// A test about elements or a tap's modifier keys is answered when the app is built: only its branch is lowered.
+				const known = mentionsElement(test) || lateLowering ? foldConstant(test, () => undefined) : undefined;
+				if (known) {
+					const taken = [...(known.value ? statement.whenTrue : statement.whenFalse), ...statements.slice(index + 1)];
+					const rest = lowerStatements(taken, scope, what, span, depth);
+					ops.push(...rest.ops);
+					return { ops, returns: rest.returns };
+				}
+				branchDepth++;
+				const then = lowerStatements(statement.whenTrue, scope, what, span, depth);
+				const otherwise = lowerStatements(statement.whenFalse, scope, what, span, depth);
+				branchDepth--;
+				// A branch that returns takes nothing after the `if`; the other branch runs the rest.
+				const rest =
+					then.returns !== otherwise.returns
+						? lowerStatements(statements.slice(index + 1), scope, what, span, depth)
+						: undefined;
+				ops.push({
+					op: 'if',
+					test,
+					whenTrue: rest && !then.returns ? [...then.ops, ...rest.ops] : then.ops,
+					whenFalse:
+						rest && !otherwise.returns
+							? [...otherwise.ops, ...rest.ops]
+							: otherwise.ops,
+				});
+				if (then.returns && otherwise.returns) return { ops, returns: true };
+				if (rest) return { ops, returns: rest.returns };
+				continue;
+			}
+			ops.push(...statementOps(statement, scope, what, span, depth));
 		}
-		return ops;
+		return { ops, returns: false };
 	}
 
-	function statementOp(
-		statement: SemanticHandlerStatement,
+	function statementOps(
+		statement: Exclude<SemanticHandlerStatement, { kind: 'if' } | { kind: 'return' } | { kind: 'const' }>,
 		scope: Scope,
 		what: string,
 		span: SourceSpan | undefined,
 		depth: number,
-		continuations: { readonly base: string; next: number },
 	): NativeOp[] {
-		{
-			if (statement.kind === 'effect') {
-				if (statement.value.kind !== 'call') {
-					refuse(
-						`${what} uses ${statement.value.kind === 'await' ? 'an `await` of something other than a call' : 'an expression statement'}, which needs a script engine`,
-						span,
-					);
-					return [];
-				}
-				const value = statement.value;
-				const target = deviceCallOf(value, scope, what, span);
+		if (statement.kind === 'effect') {
+			refuse(`${what} uses an \`await\` of something other than a device call, which needs a script engine`, span);
+			return [];
+		}
+		// `haptics.tap()` or `cam.flip()` as a statement: a device call.
+		if (statement.kind === 'invoke' && statement.path && statement.path.length > 0) {
+			const site: DeviceCallSite = {
+				callee: [statement.name, ...statement.path].join('.'),
+				calleePath: [statement.name, ...statement.path],
+				arguments: statement.arguments ?? [],
+			};
+			if (isDeviceCallSite(site, scope)) {
+				const target = deviceCallOf(site, scope, what, span);
 				if (!target) return [];
-				const args = value.arguments.map((argument) => exprOf(argument, what, scope));
+				const args = site.arguments.map((argument) => exprOf(argument, what, scope));
 				return args.every((argument) => argument !== null)
 					? [{ op: 'call', ...target, arguments: args as NativeExpr[] }]
 					: [];
 			}
-			if (statement.kind === 'assign-field') {
-				const object = !scope.locals.has(statement.target)
-					? scope.objects.get(statement.target)
-					: undefined;
-				const field = `${object?.device}.${statement.field}`;
-				if (!object || !isDeviceValue(field) || !('writable' in DEVICE_VALUES[field])) {
-					refuse(
-						`${what} writes \`${statement.target}.${statement.field}\`, which is not a setting of a device object`,
-						span,
-					);
-					return [];
-				}
-				const cell = objectFieldCell(statement.target, object, statement.field, what);
-				const value = exprOf(statement.value, what, scope);
-				return cell && value
-					? [
-							{ op: 'assign', cell, value },
-							{
-								op: 'call',
-								call: field as NativeDeviceCall,
-								object: object.id,
-								arguments: [{ cell }],
-							},
-						]
-					: [];
-			}
-			if (statement.kind === 'unsupported') {
-				refuse(`${what} uses ${statement.construct}, which needs a script engine`, span);
+		}
+		// `cam.facing = 'front'`: a write to a setting of a device object.
+		if (
+			statement.kind === 'assign' &&
+			statement.path?.length === 1 &&
+			!scope.locals.has(statement.target) &&
+			scope.deviceObjects.has(statement.target)
+		) {
+			const object = scope.deviceObjects.get(statement.target)!;
+			const fieldName = statement.path[0]!;
+			const field = `${object.device}.${fieldName}`;
+			if (!isDeviceValue(field) || !('writable' in DEVICE_VALUES[field])) {
+				refuse(
+					`${what} writes \`${statement.target}.${fieldName}\`, which is not a setting of a device object`,
+					span,
+				);
 				return [];
 			}
-			if (statement.kind === 'invoke') {
-				const imported = scope.module.imports.get(statement.name);
-				if (imported?.source === '@markless/router' && imported.importedName === 'navigate')
-					return navigateOps(statement.arguments ?? [], what, span);
-				const prop = scope.props.get(
-					scope.module.propNames.get(scope.component)?.get(statement.name) ?? '',
+			const cell = objectFieldCell(statement.target, object, fieldName, what);
+			const value = exprOf(statement.value, what, scope);
+			return cell && value
+				? [
+						{ op: 'assign', cell, value },
+						{
+							op: 'call',
+							call: field as NativeDeviceCall,
+							object: object.id,
+							arguments: [{ cell }],
+						},
+					]
+				: [];
+		}
+		if (statement.kind === 'unsupported') {
+			refuse(`${what} uses ${statement.construct}, which needs a script engine`, span);
+			return [];
+		}
+		if (statement.kind === 'invoke') {
+			const callee = [statement.name, ...(statement.path ?? [])].join('.');
+			const notCallable = () => {
+				refuse(`${what} uses a call to \`${callee}\`, which needs a script engine`, span);
+				return [];
+			};
+			if (depth > 8) return notCallable();
+			const imported = statement.path ? undefined : scope.module.imports.get(statement.name);
+			if (imported?.source === '@markless/router' && imported.importedName === 'navigate')
+				return navigateOps(statement.arguments ?? [], what, span);
+			const command = statement.path?.at(-1);
+			const receiver = statement.path?.slice(0, -1) ?? [];
+			const receiverField =
+				receiver.length === 1
+					? (() => {
+							const object = scope.objects.get(statement.name);
+							return (object?.kind === 'instance' ? object.instance : object?.instance)?.fields.get(receiver[0]!);
+						})()
+					: undefined;
+			const onElement =
+				(command === 'focus' || command === 'scrollIntoView') &&
+				(receiverField?.kind === 'handle' || (receiver.length === 0 && (scope.args.has(statement.name) || !scope.objects.has(statement.name))));
+			if (onElement) {
+				const holder = receiver.reduce<SemanticExpression>(
+					(object, property) => ({ kind: 'member', object, property }),
+					{ kind: 'read', name: statement.name },
 				);
-				if (
-					prop?.kind !== 'callback' ||
-					!prop.statements ||
-					depth > 8 ||
-					statement.arguments
-				) {
-					refuse(
-						`${what} uses a call to \`${statement.name}\`, which needs a script engine`,
-						span,
-					);
+				const mark = diagnostics.length;
+				const target = exprOf(holder, `${what}'s call to \`${callee}\``, scope);
+				const element = elementOf(target);
+				// `focus({ preventScroll })` is the one option a native host keeps; any other option is refused by name.
+				const [options, ...extra] = statement.arguments ?? [];
+				const preventScroll =
+					command === 'focus' && options?.kind === 'object' && extra.length === 0 && options.entries.every(([key, value]) => key === 'preventScroll' && value.kind === 'literal' && typeof value.value === 'boolean')
+						? options.entries.some(([, value]) => value.kind === 'literal' && value.value === true)
+						: undefined;
+				if (element !== undefined && options && preventScroll === undefined) {
+					refuse(`${what} calls \`${callee}()\` with options other than \`{ preventScroll }\`, which no native host takes yet`, span);
 					return [];
 				}
-				return statementOps(
-					prop.statements,
-					prop.scope,
-					what,
-					span,
-					depth + 1,
-					continuations,
-				);
+				if (element !== undefined)
+					return [{ op: 'command', node: element, command: command as 'focus' | 'scrollIntoView', ...(preventScroll ? { preventScroll: true as const } : {}) }];
+				if (target && 'literal' in target && target.literal === null && statement.optional) return [];
+				if (diagnostics.length > mark) return [];
+				return notCallable();
 			}
-			const cell = cellOf(statement.target, scope);
+			let body:
+				| {
+						statements: ReadonlyArray<SemanticHandlerStatement> | undefined;
+						parameters: ReadonlyArray<string>;
+						scope: Scope;
+				  }
+				| undefined;
+			let absent = false;
+			const path = statement.path ?? [];
+			const handle = path.length === 1 ? scope.module.elementBindings.get(`${scope.component}#${statement.name}`) : undefined;
+			if (handle && (path[0] === 'showModal' || path[0] === 'close') && (statement.arguments ?? []).length === 0) {
+				// The node is the element the handle is bound to, known once the whole tree is lowered.
+				const op = { op: 'dialog' as const, node: `${scope.prefix}${handle}`, method: path[0] as 'showModal' | 'close' };
+				dialogOps.push(op);
+				return [op];
+			}
+			if (path.length === 0) {
+				const prop = propOf(statement.name, scope);
+				if (prop?.kind === 'callback') body = prop;
+				else if (!prop && isPropName(statement.name, scope)) absent = true;
+			} else if (path.length === 1) {
+				const object = scope.objects.get(statement.name);
+				const instance = object?.kind === 'instance' ? object.instance : object?.instance;
+				const field = instance?.fields.get(path[0]!);
+				if (field?.kind === 'method')
+					body = {
+						statements: field.statements,
+						parameters: field.parameters,
+						scope: instance!.scope,
+					};
+				else if (field?.kind === 'slot') {
+					const slot = instance!.slots.get(path[0]!);
+					if (slot?.kind === 'callback') body = slot;
+					else absent = true;
+				}
+			}
+			if (absent) {
+				if (statement.optional) return [];
+				refuse(`${what} calls \`${callee}\`, which this instance was not given`, span);
+				return [];
+			}
+			if (!body?.statements) return notCallable();
+			const args = (statement.arguments ?? []).map((argument) =>
+				exprOf(argument, `${what}'s call to \`${callee}\``, scope),
+			);
+			if (args.some((argument) => argument === null)) return [];
+			const { statements, parameters, scope: inner } = body;
+			return lowerBound(
+				parameters.map((name, index) => [name, args[index] ?? { literal: null }] as const),
+				(values) => {
+					const bound = new Map(inner.args);
+					parameters.forEach((name, index) => bound.set(name, values[index]!));
+					return lowerStatements(
+						statements,
+						{ ...inner, args: bound, locals: new Set([...inner.locals].filter((name) => !bound.has(name))) },
+						what,
+						span,
+						depth + 1,
+					);
+				},
+			).ops;
+		}
+		if (statement.path && statement.path.length > 0) {
+			const object = scope.objects.get(statement.target);
+			const field = statement.path.length === 1 ? statement.path[0]! : undefined;
+			const cell =
+				field === undefined
+					? undefined
+					: object?.kind === 'fields'
+						? object.cells.get(field)
+						: object?.kind === 'instance'
+							? (() => {
+									const found = object.instance.fields.get(field);
+									return found?.kind === 'cell' ? found.cell : undefined;
+								})()
+							: undefined;
 			if (!cell) {
 				refuse(
-					`${what} assigns \`${statement.target}\`, which is not state of this component`,
+					`${what} assigns \`${statement.target}.${statement.path.join('.')}\`, which is not a field of state`,
 					span,
 				);
 				return [];
@@ -1823,6 +3171,16 @@ export function createNativeViewPayload(
 			const value = exprOf(statement.value, what, scope);
 			return value ? [{ op: 'assign', cell, value }] : [];
 		}
+		const cell = cellOf(statement.target, scope);
+		if (!cell) {
+			refuse(
+				`${what} assigns \`${statement.target}\`, which is not state of this component`,
+				span,
+			);
+			return [];
+		}
+		const value = exprOf(statement.value, what, scope);
+		return value ? [{ op: 'assign', cell, value }] : [];
 	}
 
 	/** `navigate('/orders/42', { replace: true })`: a path fixed at build time, resolved against the app's routes. */
@@ -1866,6 +3224,20 @@ export function createNativeViewPayload(
 			: [];
 	}
 
+	const rootObjects = instanceObjects(rootModule, root.componentName, '');
+	const TOP: Scope = {
+		...enterComponent(
+			rootModule,
+			root.componentName,
+			'',
+			new Map<string, Prop>(
+				options.route ? [['params', { kind: 'value', expr: { route: 'params' } }]] : [],
+			),
+			new Map(),
+			true,
+		),
+		deviceObjects: rootObjects.byName,
+	};
 	lowerChunk(rootChunk, null, {}, TOP);
 	const titles = nodes.filter((node) => node.kind === 'element' && node.element === 'title');
 	let title: NativeTextPart[] | undefined;
@@ -1888,22 +3260,104 @@ export function createNativeViewPayload(
 		if (!loweredEvents.has(event.id))
 			refuse(`the ${event.eventName} handler on an element this build does not show`);
 
-	const styledCells = new Set<string>();
-	const collectCells = (expr: NativeExpr): void => {
-		if ('cell' in expr) styledCells.add(expr.cell);
-		for (const child of Object.values(expr)) {
-			if (Array.isArray(child))
-				for (const item of child)
-					if (item && typeof item === 'object') collectCells(item as NativeExpr);
-			if (child && typeof child === 'object' && !Array.isArray(child))
-				collectCells(child as NativeExpr);
+	for (const reference of handleReferences) {
+		const ids = reference.keys.flatMap((key) =>
+			key === undefined ? [] : (boundHandles.get(key) ?? []),
+		);
+		if (ids.length === 0) continue;
+		const index = nodes.findIndex(
+			(node) => node.id === reference.node && node.kind === 'element',
+		);
+		const node = nodes[index] as Extract<NativeNode, { kind: 'element' }>;
+		nodes[index] = {
+			...node,
+			bindings: [
+				...(node.bindings ?? []),
+				{ attribute: reference.attribute, value: { literal: ids.join(' ') } },
+			],
+		};
+	}
+
+	// A tap lands on the innermost element that handles it, so a handler that reads `event.target` runs once per element a
+	// part names inside its host (rows, triggers): the containment it asks about is the same for every element within one.
+	lateLowering = true;
+	for (const { handler, event, scope, host } of pendingHandlers) {
+		pressedTargetRead = false;
+		handler.ops = handlerOps(event, scope, handler.id, { target: host, currentTarget: host });
+		if (!pressedTargetRead || SEMANTIC_EVENTS[event.eventName] !== 'activate') continue;
+		const named = new Set([...boundHandles.values()].flat());
+		// What a tap on each element runs; a tap on an element with no handler of its own reaches the nearest one around it.
+		const runs = new Map<string, { readonly id: string; readonly spelled: string }>([
+			[host, { id: handler.id, spelled: JSON.stringify(handler.ops) }],
+		]);
+		const reached = (node: string) => {
+			const byId = nodeById();
+			for (let at = byId.get(node)?.parent; at; at = byId.get(at)?.parent) if (runs.has(at)) return runs.get(at);
+			return undefined;
+		};
+		for (const node of nodes) {
+			if (node.kind !== 'element' || node.id === host || !named.has(node.id) || node.row || !isWithin(node.id, host)) continue;
+			if (events.some((other) => other.host === node.id && other.event === 'activate')) {
+				refuse(`a press on ${node.id} is handled by its own click handler and by the one on ${host}, which reads where it landed`, event.handlerSpan);
+				continue;
+			}
+			const pressed = { target: node.id, currentTarget: host };
+			const marks = { diagnostics: diagnostics.length, cells: cells.length };
+			const rollBack = () => {
+				diagnostics.length = marks.diagnostics;
+				for (const dropped of cells.splice(marks.cells)) cellIndex.delete(dropped.id);
+			};
+			// Lowered as the run it would reach, kept values and all: the same ops mean it needs no handler of its own.
+			const around = reached(node.id);
+			if (around) {
+				const same = JSON.stringify(handlerOps(event, scope, around.id, pressed)) === around.spelled;
+				rollBack();
+				if (same) continue;
+			}
+			const id = `${handler.id}@${node.id}`;
+			const ops = handlerOps(event, scope, id, pressed);
+			// The same refusal once per tapped element says nothing new.
+			const seen = new Set(diagnostics.slice(0, marks.diagnostics).map((diagnostic) => diagnostic.message));
+			diagnostics.splice(marks.diagnostics, diagnostics.length - marks.diagnostics, ...diagnostics.slice(marks.diagnostics).filter((diagnostic) => !seen.has(diagnostic.message)));
+			runs.set(node.id, { id, spelled: JSON.stringify(ops) });
+			events.push({ host: node.id, event: 'activate', handler: id });
+			handlers.push({ id, ops });
 		}
-	};
+		// The host's own run does nothing once the elements in it have theirs: it is not a control then.
+		if (handler.ops.length === 0 && runs.size > 1) {
+			events.splice(events.findIndex((entry) => entry.handler === handler.id), 1);
+			handlers.splice(handlers.indexOf(handler), 1);
+		}
+	}
+	for (const handler of handlers)
+		if (mentionsElement(handler.ops)) refuse(`${handler.id} keeps an element as a value, which a native host has no use for yet`);
+	lateLowering = false;
+
+	for (const op of dialogOps) {
+		const bound = boundHandles.get(op.node) ?? [];
+		const element = bound.length === 1 ? nodes.find((node) => node.id === bound[0]) : undefined;
+		if (element?.kind !== 'element' || element.element !== 'dialog' || element.arm || element.row) {
+			refuse(`\`.${op.method}()\` on a handle that is not bound to exactly one <dialog> outside @if and @for`);
+			continue;
+		}
+		op.node = element.id;
+	}
+
+	// Dragon lays out one style assignment per combination of these: every cell a class reads, and every true/false cell
+	// an attribute Dragon receives per state reads (`[ui-open]`, `[hidden]`).
+	// A cell no handler writes keeps its first value, so it adds no assignment.
+	const written = writesOf(handlers.flatMap((handler) => handler.ops));
+	const styledCells = new Set<string>();
 	for (const node of nodes)
 		if (node.kind === 'element')
-			for (const binding of node.bindings ?? [])
-				if ('attribute' in binding && nativeStyleAttribute(binding.attribute))
-					collectCells(binding.value);
+			for (const binding of node.bindings ?? []) {
+				if (!('attribute' in binding)) continue;
+				if (binding.attribute === 'class') cellsOf(binding.value, styledCells);
+				else if (isNativeStyleStateAttribute(binding.attribute))
+					for (const cell of cellsOf(binding.value))
+						if (written.has(cell) && typeof initialOf(cell) === 'boolean')
+							styledCells.add(cell);
+			}
 
 	return done({
 		version: NATIVE_VIEW_VERSION,

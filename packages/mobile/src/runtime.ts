@@ -33,7 +33,9 @@ export type NativeAction =
 			readonly error: { readonly name: string; readonly message: string };
 	  }
 	/** The platform closed a system sheet (swipe, back, a tap on the dimmed page); it is already closed when this runs. */
-	| { readonly event: 'dismiss'; readonly host: string };
+	| { readonly event: 'dismiss'; readonly host: string }
+	/** The host's back gesture (or Escape) on an open `<dialog>`: it closes, as the browser's cancel does. */
+	| { readonly event: 'cancel'; readonly host: string };
 
 type Value = NativeValue;
 
@@ -56,6 +58,8 @@ export type NativeRuntime = {
 	>;
 	/** Every shown input's bound `value`, as `String(value)`. */
 	readonly properties: () => ReadonlyArray<readonly [node: string, name: 'value', value: string]>;
+	/** Every `<dialog>` and whether it is open in the top layer. */
+	readonly dialogs: () => ReadonlyArray<readonly [node: string, open: boolean]>;
 	/** Every shown branch's chosen arm (null: none). */
 	readonly arms: () => ReadonlyArray<readonly [node: string, index: number | null]>;
 	/** Every shown list's row keys, in order. */
@@ -142,6 +146,12 @@ export function evaluateNativeExpr(
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
+	if ('at' in expr) {
+		const list = evaluate(expr.of);
+		if (!Array.isArray(list)) throw new Error('an index into a value that is not an array');
+		const at = evaluate(expr.at);
+		return typeof at === 'number' && Number.isInteger(at) && at >= 0 && at < list.length ? list[at]! : null;
+	}
 	if ('cell' in expr) return read(expr.cell);
 	if ('literal' in expr) return expr.literal;
 	if ('event' in expr) {
@@ -151,6 +161,7 @@ export function evaluateNativeExpr(
 	}
 	if ('unary' in expr) {
 		const value = evaluate(expr.value);
+		if (expr.unary === 'typeof') return typeof value;
 		return expr.unary === '!'
 			? !value
 			: expr.unary === '-'
@@ -198,14 +209,11 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
-		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
-			return value.length;
-		if (
-			value !== null &&
-			typeof value === 'object' &&
-			!Array.isArray(value) &&
-			Object.hasOwn(value, expr.property)
-		)
+		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
+		const index = Number(expr.property);
+		if (Array.isArray(value) && Number.isInteger(index) && index >= 0 && String(index) === expr.property)
+			return value[index] ?? null;
+		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
@@ -248,6 +256,12 @@ export function createNativeRuntime(
 			}
 	};
 	for (const handler of payload.handlers) collectThen(handler.ops);
+	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
+	const dialogs = new Map<string, boolean>(
+		payload.nodes.flatMap((node): [string, boolean][] =>
+			node.kind === 'element' && node.element === 'dialog' ? [[node.id, false]] : [],
+		),
+	);
 	const branches = new Map(
 		payload.nodes.flatMap((node) => (node.kind === 'branch' ? [[node.id, node] as const] : [])),
 	);
@@ -400,6 +414,7 @@ export function createNativeRuntime(
 		attributes,
 		properties,
 		arms,
+		dialogs: () => [...dialogs],
 		rows,
 		title,
 		sheets,
@@ -439,6 +454,17 @@ export function createNativeRuntime(
 				return change(undefined, undefined, () => {
 					values.set(action.cell, value);
 					return [];
+				});
+			}
+			if (action.event === 'cancel') {
+				const host = action.host;
+				if (dialogs.get(host) !== true) throw new Error(`${host} is not an open dialog`);
+				const cancel = payload.events.find(
+					(candidate) => candidate.host === host && candidate.event === 'cancel',
+				);
+				return change(host, undefined, () => {
+					dialogs.set(host, false);
+					return cancel ? run(handlers.get(cancel.handler) ?? [], undefined, base) : [];
 				});
 			}
 			const { node: host, scope } = scopeOf(action.host);
@@ -492,6 +518,30 @@ export function createNativeRuntime(
 					},
 				];
 			}
+			if (op.op === 'command') {
+				calls.push({
+					op: 'command',
+					node: op.node,
+					command: op.command,
+					...(op.preventScroll ? { preventScroll: true as const } : {}),
+				});
+				continue;
+			}
+			if (op.op === 'dialog') {
+				if (!dialogs.has(op.node)) throw new Error(`${op.node} is not a dialog`);
+				dialogs.set(op.node, op.method === 'showModal');
+				continue;
+			}
+			if (op.op === 'if') {
+				const taken = run(
+					evaluate(op.test, eventValue, scope) ? op.whenTrue : op.whenFalse,
+					eventValue,
+					scope,
+				);
+				if (taken[0]?.op === 'navigate') return taken;
+				calls.push(...taken);
+				continue;
+			}
 			if (op.op === 'call') {
 				calls.push({
 					op: 'call',
@@ -533,6 +583,7 @@ export function createNativeRuntime(
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
 			const beforeTitle = title();
+			const dialogsBefore = new Map(dialogs);
 			const beforeSheets = new Map(sheets());
 			const ownedBefore = new Set(liveObjects());
 			const calls = apply();
@@ -569,6 +620,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				const ids = instances(node).map((instance) => instance.id);
+				const opened = node.kind === 'element' ? dialogs.get(node.id) : undefined;
+				const dialog: NativeJournalEntry[] =
+					opened !== undefined && opened !== dialogsBefore.get(node.id) ? [{ op: 'dialog', node: node.id, open: opened }] : [];
 				if (node.kind === 'text') {
 					return ids.flatMap((id): NativeJournalEntry[] => {
 						const before = beforeTexts.get(id);
@@ -578,7 +632,7 @@ export function createNativeRuntime(
 							: [];
 					});
 				}
-				return ids.flatMap((id) =>
+				return dialog.concat(ids.flatMap((id) =>
 					(node.bindings ?? []).flatMap((binding): NativeJournalEntry[] => {
 						const name = 'attribute' in binding ? binding.attribute : binding.property;
 						const key = `${id}\0${name}`;
@@ -610,7 +664,7 @@ export function createNativeRuntime(
 									},
 								];
 					}),
-				);
+				));
 			});
 			const owned = new Set(liveObjects());
 			const releases = (payload.objects ?? []).flatMap((object): NativeJournalEntry[] =>

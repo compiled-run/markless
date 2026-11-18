@@ -8,6 +8,7 @@ import {
 	type SemanticGraphArtifact,
 	type CompilerDiagnostic,
 	type NativeViewArtifact,
+	type ModuleGraphInterfaceArtifact,
 } from '@markless/compiler';
 import {
 	buildRouteManifestFromFileIds,
@@ -91,7 +92,6 @@ export async function compileNativeComponent(input: {
 		target: input.target ?? 'native',
 		deviceTargetFacts: DEVICE_TARGET_FACTS,
 	});
-	const importedModules: Record<string, SemanticGraphArtifact> = {};
 	const importedStyles: NativeBuild['styles'][number][] = [];
 	const stylesheets = stylesheetsOf(
 		compiled.publicRenderPlan.stylesheetImports,
@@ -99,42 +99,90 @@ export async function compileNativeComponent(input: {
 		input.readStylesheet,
 	);
 	for (const entry of compiled.semanticGraph.moduleImports) {
-		if (entry.typeOnly || !entry.source.startsWith('.') || importedModules[entry.source])
-			continue;
+		if (entry.typeOnly || !entry.source.startsWith('.')) continue;
 		const module = input.readModule?.(entry.source, input.filename);
 		if (!module) continue;
-		importedModules[entry.source] = await buildSemanticGraph({
-			...module,
-			nativeFacts: NATIVE_FACT_COLLECTORS,
-			target: input.target ?? 'native',
-			deviceTargetFacts: DEVICE_TARGET_FACTS,
-		});
 		const plan = (await compileTsrxModule({ ...module, symbols: [] })).publicRenderPlan;
 		importedStyles.push(...plan.styleScopes);
 		stylesheets.push(
 			...stylesheetsOf(plan.stylesheetImports, module.filename, input.readStylesheet),
 		);
 	}
-	const native: NativeViewArtifact = createNativeViewPayload(compiled.semanticGraph, {
-		...(route
-			? { route: { pattern: route.pattern, params: route.params.map((param) => param.name) } }
-			: {}),
-		importedModules,
-		...(input.manifest
-			? {
-					routes: input.manifest.routes.map((entry) => ({
-						pattern: entry.pattern,
-						params: entry.params.map((param) => param.name),
-					})),
-					resolvePath: (path: string) => {
-						const matched = matchRouteManifest(path, input.manifest!);
-						return matched
-							? { pattern: matched.route.pattern, params: { ...matched.params } }
-							: undefined;
-					},
-				}
-			: {}),
-	});
+	const targetFacts = {
+		nativeFacts: NATIVE_FACT_COLLECTORS,
+		target: input.target ?? ('native' as const),
+		deviceTargetFacts: DEVICE_TARGET_FACTS,
+	};
+	// The pass names each module it needs and has no analysis of; analyze those and build again until none is missing.
+	const graphs = new Map<string, SemanticGraphArtifact>([
+		[input.filename, compiled.semanticGraph],
+	]);
+	const read = new Map<string, { readonly filename: string; readonly source: string }>();
+	const resolve = (specifier: string, importer: string): string | undefined => {
+		const module = input.readModule?.(specifier, importer);
+		if (module) read.set(module.filename, module);
+		return module?.filename;
+	};
+	// A module is analyzed with the interfaces of the modules it imports, as the web build links them, so a shared()
+	// definition from another file (`toolbarState()` in toggle) resolves to the same definition there.
+	const interfaces = new Map<string, SemanticGraphArtifact>();
+	const analyze = async (file: string, visiting: Set<string>): Promise<SemanticGraphArtifact> => {
+		const known = interfaces.get(file) ?? graphs.get(file);
+		if (known) return known;
+		const module = read.get(file)!;
+		const importedModuleInterfaces: Record<string, ModuleGraphInterfaceArtifact> = {};
+		const plain = await buildSemanticGraph({ ...module, ...targetFacts });
+		visiting.add(file);
+		for (const entry of plain.moduleImports) {
+			if (entry.typeOnly || !entry.source.startsWith('.')) continue;
+			const dependency = resolve(entry.source, file);
+			if (dependency === undefined || visiting.has(dependency)) continue;
+			importedModuleInterfaces[entry.source] = (
+				await analyze(dependency, visiting)
+			).moduleGraphInterface;
+		}
+		const graph =
+			Object.keys(importedModuleInterfaces).length === 0
+				? plain
+				: await buildSemanticGraph({
+						...module,
+						...targetFacts,
+						importedModuleInterfaces,
+					});
+		interfaces.set(file, graph);
+		return graph;
+	};
+	let native: NativeViewArtifact;
+	for (;;) {
+		native = createNativeViewPayload(compiled.semanticGraph, {
+			...(route
+				? {
+						route: {
+							pattern: route.pattern,
+							params: route.params.map((param) => param.name),
+						},
+					}
+				: {}),
+			modules: { graphs, resolve },
+			...(input.manifest
+				? {
+						routes: input.manifest.routes.map((entry) => ({
+							pattern: entry.pattern,
+							params: entry.params.map((param) => param.name),
+						})),
+						resolvePath: (path: string) => {
+							const matched = matchRouteManifest(path, input.manifest!);
+							return matched
+								? { pattern: matched.route.pattern, params: { ...matched.params } }
+								: undefined;
+						},
+					}
+				: {}),
+		});
+		const missing = (native.missingModules ?? []).filter((file) => !graphs.has(file));
+		if (missing.length === 0) break;
+		for (const file of missing) graphs.set(file, await analyze(file, new Set()));
+	}
 	// A phone build reads only the analysis; what the web's emission passes cannot emit does not bind it.
 	const errors = collectTsrxModuleDiagnostics(compiled).filter(
 		(diagnostic) =>

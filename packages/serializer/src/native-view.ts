@@ -60,7 +60,12 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
-	| { readonly unary: '!' | '-' | '+'; readonly value: NativeExpr }
+	/**
+	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
+	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
+	 * 'number' or 'boolean', where that cannot differ from the web.
+	 */
+	| { readonly unary: '!' | '-' | '+' | 'typeof'; readonly value: NativeExpr }
 	| {
 			readonly binary: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
 			readonly left: NativeExpr;
@@ -73,8 +78,13 @@ export type NativeExpr =
 	  }
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
 	| { readonly template: ReadonlyArray<string | NativeExpr> }
-	/** `length` of a string or array, or an own property of an object; anything else is a runtime error. */
+	/**
+	 * `length` of a string or array, an array's element at an index (`"0"`, `"1"`: null past its end, as `undefined` on
+	 * the web), or an own property of an object; anything else is a runtime error.
+	 */
 	| { readonly member: NativeExpr; readonly property: string }
+	/** An array's element at an index computed while the app runs: null when it is not an integer inside the array. */
+	| { readonly at: NativeExpr; readonly of: NativeExpr }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }
 	| {
@@ -170,7 +180,7 @@ export type NativeNode = NativePlace &
 	);
 
 /** Semantic events: each platform maps one to its own control event (web click, UIKit touchUpInside, Android click). */
-export type NativeEventName = 'activate' | 'input' | 'dismiss';
+export type NativeEventName = 'activate' | 'input' | 'dismiss' | 'cancel';
 
 /** A state write a host runs as data: the cell takes the expression's value, evaluated before the write. */
 export type NativeOp =
@@ -198,6 +208,24 @@ export type NativeOp =
 				readonly catch?: string;
 			};
 	  }
+	/** Runs `whenTrue` when `test` is truthy, else `whenFalse`; the test is evaluated once, before either. */
+	| {
+			readonly op: 'if';
+			readonly test: NativeExpr;
+			readonly whenTrue: ReadonlyArray<NativeOp>;
+			readonly whenFalse: ReadonlyArray<NativeOp>;
+	  }
+	/**
+	 * `dialog.showModal()` or `dialog.close()` on a `<dialog>`'s handle: the host shows the dialog in its top layer, above the
+	 * page, with the page behind inert, or takes it out again.
+	 */
+	| { readonly op: 'dialog'; readonly node: string; readonly method: 'showModal' | 'close' }
+	/**
+	 * `element.focus()` or `element.scrollIntoView()`, after the handler's writes have reached the views. Focus moves as on
+	 * the web (a text field takes the keyboard; anything else the screen reader's cursor) and scrolls the element into view
+	 * unless `preventScroll` (`focus({ preventScroll: true })`).
+	 */
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
 	/**
 	 * Opens the page at `route` (a router pattern such as `/[fruit]`) with these params; ops after it do not run. A param
 	 * is a string fixed at build time or an expression evaluated when the op runs (a row's item inside a list row).
@@ -209,6 +237,9 @@ export type NativeOp =
 			readonly params: Readonly<Record<string, string | NativeExpr>>;
 			readonly replace?: true;
 	  };
+
+/** Element commands a host runs. */
+export type NativeCommand = 'focus' | 'scrollIntoView';
 
 export type NativeViewPayload = {
 	readonly version: typeof NATIVE_VIEW_VERSION;
@@ -275,6 +306,10 @@ export type NativeAppPayload = {
 /** One change a host applies to its retained views after a handler runs. */
 export type NativeJournalEntry =
 	| { readonly op: 'text'; readonly node: string; readonly value: string }
+	/** A `command` op the handler ran, in order, after every other entry: the views show the new state first. */
+	| { readonly op: 'command'; readonly node: string; readonly command: NativeCommand; readonly preventScroll?: true }
+	/** A `<dialog>` opened in the top layer or closed (by an op, or by the host's back gesture as a `cancel`). */
+	| { readonly op: 'dialog'; readonly node: string; readonly open: boolean }
 	/** `value` null removes the attribute; "" is a bare (present) attribute. */
 	| {
 			readonly op: 'attribute';
@@ -329,3 +364,11 @@ export type NativeJournalEntry =
 /** The package and export that name the platform's own pieces (`<native.sheet>`); one place, so the name is cheap to change. */
 export const PLATFORM_PIECES_PACKAGE = DEVICE_MODULE;
 export const PLATFORM_PIECES_NAMESPACE = 'native';
+
+/**
+ * Bound attributes that reach Dragon in every combination of the styled states, besides `class`: the ones a selector keys
+ * state off (`[ui-open]`, `[aria-expanded]`) and `hidden`, whose UA rule Dragon applies. Others (`disabled`, `value`) stay
+ * out of the style input, since Dragon does not model their rendering effect.
+ */
+export const isNativeStyleStateAttribute = (name: string): boolean =>
+	name === 'hidden' || name === 'role' || /^(ui|aria|data)-/.test(name);

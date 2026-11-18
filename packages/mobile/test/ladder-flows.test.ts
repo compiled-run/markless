@@ -45,6 +45,15 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		102,
 		103,
 		104,
+		105,
+		111,
+		112,
+		113,
+		114,
+		101,
+		102,
+		103,
+		104,
 	]);
 	for (const folder of rungFolders())
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);

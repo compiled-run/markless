@@ -1096,6 +1096,9 @@ importers:
       '@markless/core':
         specifier: workspace:*
         version: link:../core
+      '@markless/ui':
+        specifier: workspace:*
+        version: link:../headless/components
 
   packages/router:
     dependencies:

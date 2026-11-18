@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
 import { nativeAppStyle, nativeAppStyleSize, type DragonStyleExport } from '../app-style.ts';
@@ -96,6 +97,20 @@ export function compileRungApp(dir: string) {
 	});
 }
 
+/**
+ * Reads a module a rung imports, relative (`./Stepper.tsrx`) or from a workspace package (`@markless/ui`), resolved as
+ * Node resolves it from the importing file, so the build can lower the components it exports.
+ */
+export function readWorkspaceModule(specifier: string, importer: string) {
+	if (specifier.startsWith('.')) return readRelativeModule(specifier, importer);
+	let file: string;
+	try {
+		file = createRequire(resolve(repoRoot, importer)).resolve(specifier);
+	} catch {
+		return undefined;
+	}
+	return { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') };
+}
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
 /** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
@@ -194,7 +209,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				source: readFileSync(component, 'utf8'),
 				// A rung that is a page compiles as its page file, so the router derives its route.
 				...(expected.route === undefined ? {} : { page: `pages/${expected.route}.tsrx` }),
-				readModule: readRelativeModule,
+				readModule: readWorkspaceModule,
 				...(appConfig.device ? { device: appConfig.device } : {}),
 				target: platform,
 			});

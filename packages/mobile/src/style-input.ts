@@ -1,15 +1,10 @@
 import type { NativeArmPlace, NativeViewPayload } from '@markless/serializer';
-import { nativeStyleAttribute } from '@markless/serializer/native-view';
+import { isNativeStyleStateAttribute } from '@markless/serializer/native-view';
 import { marklessAttributeValue } from '@markless/web/dom-attribute';
 import type { NativeBuild, NativeStylesheet } from './compile.ts';
 import { createNativeRuntime, evaluateNativeExpr, formatNativeValue } from './runtime.ts';
 
 export const NATIVE_STYLE_INPUT_VERSION = 'markless.native-style-input/0';
-
-type NativeStyleByState = {
-	readonly when: Readonly<Record<string, boolean>>;
-	readonly value: string | null;
-};
 
 /** What Markless hands Dragon for one component: its element tree, each text node's first string and its scoped CSS. */
 export type NativeStyleInput = {
@@ -23,10 +18,22 @@ export type NativeStyleInput = {
 				readonly parent: string | null;
 				readonly attributes: Readonly<Record<string, string>>;
 				/** The element's class in every combination of `states`, when a binding sets it; null means no class attribute. */
-				readonly classByState?: ReadonlyArray<NativeStyleByState>;
-				/** Each bound `ui-*` attribute's value in every combination of `states`, as the web writes it (null: absent). */
+				readonly classByState?: ReadonlyArray<{
+					readonly when: Readonly<Record<string, boolean>>;
+					readonly value: string | null;
+				}>;
+				/**
+				 * Each other bound attribute that reads a state, in every combination of `states`, as the web writes it; null
+				 * means the attribute is absent. A bound attribute that reads no state is in `attributes` at its first value.
+				 */
 				readonly attributesByState?: Readonly<
-					Record<string, ReadonlyArray<NativeStyleByState>>
+					Record<
+						string,
+						ReadonlyArray<{
+							readonly when: Readonly<Record<string, boolean>>;
+							readonly value: string | null;
+						}>
+					>
 				>;
 				readonly arm?: NativeArmPlace;
 		  }
@@ -103,45 +110,55 @@ export function nativeStyleInput(
 						...place,
 					},
 				];
-			const byState = (name: string) => {
-				const binding = (node.bindings ?? []).find(
-					(candidate) => 'attribute' in candidate && candidate.attribute === name,
+			const classBinding = (node.bindings ?? []).find(
+				(binding) => 'attribute' in binding && binding.attribute === 'class',
+			);
+			const evaluate = (
+				expr: Parameters<typeof evaluateNativeExpr>[0],
+				when: Record<string, boolean>,
+			) =>
+				evaluateNativeExpr(expr, (cell) =>
+					cell in when
+						? when[cell]!
+						: (payload.cells.find((c) => c.id === cell)?.initial ?? null),
 				);
-				return binding
-					? combinations.map((when) => ({
+			const classByState = classBinding
+				? combinations.map((when) => {
+						const value = evaluate(classBinding.value, when);
+						return {
 							when,
-							value: marklessAttributeValue(
-								name,
-								evaluateNativeExpr(binding.value, (cell) =>
-									cell in when
-										? when[cell]!
-										: (payload.cells.find((c) => c.id === cell)?.initial ??
-											null),
-								),
-							),
-						}))
-					: undefined;
-			};
-			const classByState = byState('class');
-			const styleAttributes = (node.bindings ?? []).flatMap((binding) =>
-				'attribute' in binding &&
-				binding.attribute !== 'class' &&
-				nativeStyleAttribute(binding.attribute)
-					? [binding.attribute]
-					: [],
-			);
-			const attributesByState = Object.fromEntries(
-				styleAttributes.map((name) => [name, byState(name)!]),
-			);
+							value: value === null || value === false ? null : String(value),
+						};
+					})
+				: undefined;
+			const attributes: Record<string, string> = { ...node.attributes };
+			const attributesByState: Record<
+				string,
+				{ when: Record<string, boolean>; value: string | null }[]
+			> = {};
+			for (const binding of node.bindings ?? []) {
+				if (!('attribute' in binding) || !isNativeStyleStateAttribute(binding.attribute))
+					continue;
+				const byState = combinations.map((when) => ({
+					when,
+					value:
+						marklessAttributeValue(binding.attribute, evaluate(binding.value, when)) ??
+						null,
+				}));
+				if (byState.every((entry) => entry.value === byState[0]!.value)) {
+					if (byState[0]!.value !== null)
+						attributes[binding.attribute] = byState[0]!.value;
+				} else attributesByState[binding.attribute] = byState;
+			}
 			return [
 				{
 					kind: 'element',
 					id: node.id,
 					element: node.element,
 					parent: node.parent,
-					attributes: node.attributes ?? {},
+					attributes,
 					...(classByState ? { classByState } : {}),
-					...(styleAttributes.length > 0 ? { attributesByState } : {}),
+					...(Object.keys(attributesByState).length > 0 ? { attributesByState } : {}),
 					...place,
 				},
 			];

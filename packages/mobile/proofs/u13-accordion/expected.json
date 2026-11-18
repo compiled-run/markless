@@ -1,0 +1,95 @@
+{
+	"rung": 113,
+	"name": "@markless/ui accordion: typeof over a value that is a string in one accordion and a list in a multiple one",
+	"steps": [
+		{
+			"visible": [
+				"Help",
+				"Shipping",
+				"Returns",
+				"Colours",
+				"Sizes",
+				"Ships in two days",
+				"Open: none"
+			],
+			"absent": [
+				"Thirty days to return",
+				"Red and blue",
+				"Small and large",
+				"Open: colours",
+				"Open: colours,sizes",
+				"Open: sizes"
+			]
+		},
+		{
+			"do": {
+				"tap": "Returns"
+			},
+			"visible": ["Thirty days to return", "Open: none"],
+			"absent": [
+				"Ships in two days",
+				"Red and blue",
+				"Small and large",
+				"Open: colours",
+				"Open: colours,sizes",
+				"Open: sizes"
+			]
+		},
+		{
+			"do": {
+				"tap": "Returns"
+			},
+			"visible": ["Shipping", "Returns", "Open: none"],
+			"absent": [
+				"Ships in two days",
+				"Thirty days to return",
+				"Red and blue",
+				"Small and large",
+				"Open: colours",
+				"Open: colours,sizes",
+				"Open: sizes"
+			]
+		},
+		{
+			"do": {
+				"tap": "Colours"
+			},
+			"visible": ["Red and blue", "Open: colours"],
+			"absent": [
+				"Ships in two days",
+				"Thirty days to return",
+				"Small and large",
+				"Open: none",
+				"Open: colours,sizes",
+				"Open: sizes"
+			]
+		},
+		{
+			"do": {
+				"tap": "Sizes"
+			},
+			"visible": ["Red and blue", "Small and large", "Open: colours,sizes"],
+			"absent": [
+				"Ships in two days",
+				"Thirty days to return",
+				"Open: none",
+				"Open: colours",
+				"Open: sizes"
+			]
+		},
+		{
+			"do": {
+				"tap": "Colours"
+			},
+			"visible": ["Small and large", "Open: sizes"],
+			"absent": [
+				"Ships in two days",
+				"Thirty days to return",
+				"Red and blue",
+				"Open: none",
+				"Open: colours",
+				"Open: colours,sizes"
+			]
+		}
+	]
+}

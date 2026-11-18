@@ -231,6 +231,54 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 			{ event: 'activate', host: 'h11' },
 		],
 	},
+	{
+		name: 'guards',
+		fixture: 'test/fixtures/Guards.tsrx',
+		actions: [
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'component-edge:0/h2' },
+			{ event: 'activate', host: 'component-edge:0/h1' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h5' },
+		],
+	},
+	{
+		name: 'dialog',
+		fixture: 'proofs/u4-dialog/App.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h2' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'cancel', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h11' },
+		],
+	},
+	{
+		name: 'types',
+		fixture: 'test/fixtures/Types.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h5' },
+			{ event: 'activate', host: 'h6' },
+			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h8' },
+			{ event: 'activate', host: 'h8' },
+		],
+	},
+	{
+		name: 'commands',
+		fixture: 'test/fixtures/Commands.tsrx',
+		actions: [
+			{ event: 'activate', host: 'h3' },
+			{ event: 'input', host: 'h1', value: 'hi' },
+			{ event: 'activate', host: 'h4' },
+		],
+	},
 ];
 
 /** Each committed navigation vector file: a navigation rung's app, the path it opens at and the actions it records. */

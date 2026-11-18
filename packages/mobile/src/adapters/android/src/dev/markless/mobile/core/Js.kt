@@ -101,7 +101,23 @@ object Js {
 		"!" -> JsValue.Bool(!truthy(v))
 		"-" -> JsValue.Num(-toNumber(v))
 		"+" -> JsValue.Num(toNumber(v))
+		"typeof" -> JsValue.Str(typeOf(v))
 		else -> throw MarklessRuntimeError("unknown unary operator \"$op\"")
+	}
+
+	/** `typeof`: null, arrays and objects are all "object". */
+	fun typeOf(v: JsValue): String = when (v) {
+		is JsValue.Num -> "number"
+		is JsValue.Str -> "string"
+		is JsValue.Bool -> "boolean"
+		JsValue.Null, is JsValue.Arr, is JsValue.Obj -> "object"
+	}
+
+	/** An array's element at a canonical index (`"0"`, `"1"`); past the end it is `undefined`, spelled null. */
+	fun element(v: JsValue.Arr, property: String): JsValue? {
+		val index = property.toIntOrNull() ?: return null
+		if (index < 0 || index.toString() != property) return null
+		return v.items.getOrNull(index) ?: JsValue.Null
 	}
 
 	/** Math.round: the nearest integer, halves toward +Infinity, keeping -0 for [-0.5, -0]. */

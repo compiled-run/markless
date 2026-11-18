@@ -162,9 +162,9 @@ export const proofsDir = import.meta.dirname;
 
 export const rungFolders = (): string[] =>
 	readdirSync(proofsDir, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|y\d+)-/.test(entry.name))
+		.filter((entry) => entry.isDirectory() && /^((\d\d|[dp]\d)[a-z]?|[uy]\d+)-/.test(entry.name))
 		.map((entry) => entry.name)
-		.sort();
+		.sort((a, b) => a.localeCompare(b, 'en', { numeric: true }));
 
 /** The navigation ladder: each folder an app (`pages/`) of several routes. */
 export const navRungFolders = (): string[] =>

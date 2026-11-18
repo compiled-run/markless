@@ -14,6 +14,7 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 		if (frames.isNotEmpty()) {
 			for (i in 0 until childCount) {
 				val child = getChildAt(i)
+				if (child.visibility == View.GONE) continue
 				val f = frames[child] ?: throw IllegalStateException("a child of a framed box has no frame")
 				child.measure(MeasureSpec.makeMeasureSpec(f.width(), MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(f.height(), MeasureSpec.EXACTLY))
 			}
@@ -25,6 +26,7 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 		var widest = 0
 		for (i in 0 until childCount) {
 			val child = getChildAt(i)
+			if (child.visibility == View.GONE) continue
 			// Text fields span the stack's width, as platform fields do; everything else takes its content width.
 			child.measure(MeasureSpec.makeMeasureSpec(width, if (child is EditText) MeasureSpec.EXACTLY else MeasureSpec.AT_MOST), MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED))
 			height += child.measuredHeight
@@ -38,6 +40,7 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 		if (frames.isNotEmpty()) {
 			for (i in 0 until childCount) {
 				val child = getChildAt(i)
+				if (child.visibility == View.GONE) continue
 				val f = frames.getValue(child)
 				child.layout(f.left, f.top, f.right, f.bottom)
 			}
@@ -46,6 +49,7 @@ class MarklessBox(context: Context) : FrameLayout(context) {
 		var y = paddingTop
 		for (i in 0 until childCount) {
 			val child = getChildAt(i)
+			if (child.visibility == View.GONE) continue
 			child.layout(paddingLeft, y, paddingLeft + child.measuredWidth, y + child.measuredHeight)
 			y += child.measuredHeight
 		}

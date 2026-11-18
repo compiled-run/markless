@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 320,
+	total: 321,
 	guided: 51,
 	groups: [
 		{
@@ -1658,6 +1658,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'build error',
 					guided: false,
 					words: 'a handler’s code is missing an export markless_resume_dispatch_export_missing a markless build tooling error from @markless/bundler.',
+				},
+				{
+					code: 'MARKLESS_NATIVE_KEYBOARD_ONLY',
+					title: 'A keyboard-only handler is left out of the native build',
+					chip: 'error',
+					kind: 'compile error or warning',
+					guided: false,
+					words: 'a keyboard-only handler is left out of the native build markless_native_keyboard_only a keyboard-only handler is left out of the native build: a markless build error.',
 				},
 				{
 					code: 'MARKLESS_CHILD_SYMBOL_MISSING',

@@ -248,6 +248,32 @@ export function Counter() @{
   nothing. The analyzer records the tests as `SemanticBranchSite.armTestExpressions` (native builds only).
 - Vectors: `choices.json`. Hosts: implement `tests`; nothing else changes (`arm` journal entries as before).
 
+### Additions for @markless/ui families (u-ladder, `cw/native-ui`, 2026-11-17)
+
+- **Ops:** `{ op: 'if', test, whenTrue: [ops], whenFalse: [ops] }`: the test is evaluated once, then one branch runs. `if (...) return;`
+  in a handler lowers to it, the statements after the `if` moving into the branch that does not return. Vector
+  `guards.json`. Both hosts implement it.
+- **Attribute values:** `null` is absent on both hosts, as on the web (the iOS writer wrote it before; `guards.json` pins it).
+- **`hidden`:** present hides the element and its subtree. Stacking layout: the host hides the view and the views after it
+  close up. Styled layout: Dragon gives an element it does not render no frame, and the host hides a view whose export node
+  has `frame: null`.
+- **Relations:** `aria-labelledby`, `aria-describedby`, `aria-controls` and `for` carry space-separated node ids (lowered from
+  `element()` handles). Hosts take a control's label from the text of the `aria-labelledby` elements and its hint from the
+  `aria-describedby` ones, after every journal; a `<label for>` activates its control on tap and is hidden from the screen
+  reader.
+- **Roles:** `role="switch"` with `aria-checked`: iOS toggle-button trait and value `1`/`0`; Android `android.widget.Switch`,
+  checkable, checked. `aria-hidden="true"` hides a subtree from VoiceOver and TalkBack.
+- **Elements:** `label` joins the portable elements. On Android a `button` holding an element is a box that reads as a Button.
+- **Left out, not refused:** `beforematch` handlers (no find-in-page on a phone); `keydown`/`keyup`, and
+  `focus`/`blur`/`focusin`/`focusout` on anything but a text field, with a `MARKLESS_NATIVE_KEYBOARD_ONLY` warning (only a
+  hardware keyboard raises them; hosts have none yet).
+- **Dialogs:** `dialog` is portable. `showModal()`/`close()` on a handle bound to one `<dialog>` lower to
+  `{ op: 'dialog', node, method }`; the journal says `{ op: 'dialog', node, open }`; the action `{ event: 'cancel', host }`
+  closes an open dialog (the host raises it from Android back and the VoiceOver escape gesture). Hosts show an open
+  dialog's own views in a top layer above the page with the page behind inert. Vector `dialog.json`.
+- **Styled cells:** a true/false cell some handler writes is `styled` when any attribute binding reads it, not only `class`;
+  the style input carries those attributes per state (`attributesByState`).
+
 ### Additions for rung 6: keyed lists (pushed 2026-11-17)
 
 - **Values:** a cell's `initial` may be any JSON (`NativeValue`): arrays and objects too.

@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: u2-collapsible
+---
+- launchApp:
+      clearState: true
+- assertVisible: Collapsible
+- assertVisible: Shipping
+- assertVisible: Changes 0
+- assertNotVisible: Ships in two days
+- tapOn: Shipping
+- assertVisible: Ships in two days
+- assertNotVisible: Changes 0
+- assertVisible: Ships in two days
+- assertVisible: Changes 1
+- assertNotVisible: Changes 0
+- tapOn: Shipping
+- assertNotVisible: Ships in two days
+- assertNotVisible: Changes 1
+- assertVisible: Changes 2
+- assertNotVisible: Ships in two days
+- assertNotVisible: Changes 1

@@ -1,0 +1,31 @@
+appId: ${APP_ID}
+name: u3-tabs
+---
+- launchApp:
+      clearState: true
+- assertVisible: Tabs
+- assertVisible: Apple
+- assertVisible: Banana
+- assertVisible: Cherry
+- assertVisible: Apples are red
+- assertVisible: Showing a
+- assertNotVisible: Bananas are yellow
+- assertNotVisible: Cherries are dark
+- tapOn: Banana
+- assertVisible: Bananas are yellow
+- assertNotVisible: Apples are red
+- assertNotVisible: Showing a
+- assertVisible: Bananas are yellow
+- assertVisible: Showing b
+- assertNotVisible: Apples are red
+- assertNotVisible: Cherries are dark
+- assertNotVisible: Showing a
+- tapOn: Cherry
+- assertVisible: Cherries are dark
+- assertNotVisible: Bananas are yellow
+- assertNotVisible: Showing b
+- assertVisible: Cherries are dark
+- assertVisible: Showing c
+- assertNotVisible: Apples are red
+- assertNotVisible: Bananas are yellow
+- assertNotVisible: Showing b

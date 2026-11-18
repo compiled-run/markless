@@ -1,0 +1,20 @@
+appId: ${APP_ID}
+name: u5-toggle
+---
+- launchApp:
+      clearState: true
+- assertVisible: Toggle
+- assertVisible: Wi-Fi
+- assertVisible: Join known networks
+- assertVisible: Wi-Fi is off
+- assertNotVisible: Wi-Fi is on
+- tapOn: Wi-Fi
+- assertVisible: Wi-Fi is on
+- assertNotVisible: Wi-Fi is off
+- assertVisible: Wi-Fi is on
+- assertNotVisible: Wi-Fi is off
+- tapOn: Wi-Fi
+- assertVisible: Wi-Fi is off
+- assertNotVisible: Wi-Fi is on
+- assertVisible: Wi-Fi is off
+- assertNotVisible: Wi-Fi is on

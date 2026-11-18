@@ -52,6 +52,16 @@ sealed interface JournalEntry {
 		override fun toJson() = "{\"op\":\"release\",\"object\":${jsonString(node)}}"
 	}
 
+	/** A `<dialog>` put in the top layer ([open]) or taken out. */
+	data class Dialog(override val node: String, val open: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"dialog\",\"node\":${jsonString(node)},\"open\":$open}"
+	}
+
+	/** A `command` op the handler ran, after every other entry, in order. */
+	data class Command(override val node: String, val command: String, val preventScroll: Boolean) : JournalEntry {
+		override fun toJson() = "{\"op\":\"command\",\"node\":${jsonString(node)},\"command\":${jsonString(command)}${if (preventScroll) ",\"preventScroll\":true" else ""}}"
+	}
+
 	/** Shows arm [index] of a branch (null: none). */
 	data class Arm(override val node: String, val index: Int?) : JournalEntry {
 		override fun toJson() = "{\"op\":\"arm\",\"node\":${jsonString(node)},\"index\":${index ?: "null"}}"
@@ -139,11 +149,17 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 			}
 			is Expr.If -> if (Js.truthy(eval(e.test))) eval(e.whenTrue) else eval(e.whenFalse)
 			is Expr.Template -> JsValue.Str(e.parts.joinToString("") { if (it is String) it else Js.toStr(eval(it as Expr)) })
+			is Expr.At -> {
+				val list = eval(e.list) as? JsValue.Arr ?: throw MarklessRuntimeError("an index into a value that is not an array")
+				val at = (eval(e.index) as? JsValue.Num)?.value
+				if (at == null || at < 0 || at != Math.floor(at) || at >= list.items.size) JsValue.Null else list.items[at.toInt()]
+			}
 			is Expr.Member -> {
 				val v = eval(e.value)
 				when {
 					v is JsValue.Str && e.property == "length" -> JsValue.Num(v.value.length.toDouble())
 					v is JsValue.Arr && e.property == "length" -> JsValue.Num(v.items.size.toDouble())
+					v is JsValue.Arr && Js.element(v, e.property) != null -> Js.element(v, e.property)!!
 					v is JsValue.Obj && e.property in v.fields -> v.fields.getValue(e.property)
 					else -> throw MarklessRuntimeError(".${e.property} of a value that has none")
 				}
@@ -243,6 +259,15 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** Every system sheet and whether its `open` is truthy. */
 	fun sheets(): List<Pair<String, Boolean>> = payload.nodes.filterIsInstance<Node.Sheet>().map { it.id to Js.truthy(evaluate(it.open)) }
 
+	/** Each `<dialog>`'s top-layer state; every dialog mounts closed. */
+	private val dialogs = LinkedHashMap<String, Boolean>().apply {
+		for (n in payload.nodes) if (n is Node.Element && n.element == "dialog") put(n.id, false)
+	}
+
+	fun dialogs(): List<Pair<String, Boolean>> = dialogs.entries.map { it.key to it.value }
+
+	fun isDialogOpen(id: String): Boolean = dialogs[id] == true
+
 	fun handlerFor(host: String, event: EventName): String? = payload.events.firstOrNull { it.host == host && it.event == event }?.handler
 
 	/** The page's `<title>` text, null when it has none. */
@@ -262,6 +287,14 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 	/** Runs the handler for [event] on [host] (a row instance as `<node>@<key>`); an `input` event carries the field's whole text as [value]. */
 	fun dispatch(host: String, event: EventName, value: String? = null): List<JournalEntry> {
 		if ((event == EventName.Input) != (value != null)) throw MarklessRuntimeError("an ${event.wire} event ${if (value == null) "needs" else "carries no"} a value")
+		if (event == EventName.Cancel) {
+			if (dialogs[host] != true) throw MarklessRuntimeError("\"$host\" is not an open dialog")
+			val cancel = handlerFor(host, event)?.let { handlers[it] ?: throw MarklessRuntimeError("unknown handler \"$it\"") }
+			return change(host, null) {
+				dialogs[host] = false
+				cancel?.let { run(it.ops, Scope.EMPTY) } ?: emptyList()
+			}
+		}
 		val (node, scope) = scopeOf(host)
 		val handlerId = handlerFor(node, event) ?: throw MarklessRuntimeError("no ${event.wire} handler on \"$host\"")
 		val handler = handlers[handlerId] ?: throw MarklessRuntimeError("unknown handler \"$handlerId\"")
@@ -300,6 +333,16 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		for (op in ops) when (op) {
 			is Op.Navigate -> return listOf(JournalEntry.Navigate(op.route, op.params.mapValues { Js.toStr(evaluate(it.value, scope)) }, op.replace))
 			is Op.Call -> calls.add(JournalEntry.Call(op.call, op.arguments.map { evaluate(it, scope) }, op.result, op.obj, op.after?.id))
+			is Op.If -> {
+				val taken = run(if (Js.truthy(evaluate(op.test, scope))) op.then else op.otherwise, scope)
+				if (taken.firstOrNull() is JournalEntry.Navigate) return taken
+				calls.addAll(taken)
+			}
+			is Op.Dialog -> {
+				if (op.node !in dialogs) throw MarklessRuntimeError("\"${op.node}\" is not a dialog")
+				dialogs[op.node] = op.open
+			}
+			is Op.Command -> calls.add(JournalEntry.Command(op.node, op.command, op.preventScroll))
 			is Op.Assign -> {
 				val v = evaluate(op.value, scope)
 				values[op.cell] = v
@@ -342,6 +385,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 		val beforeArms = arms().toMap()
 		val beforeRows = rows().toMap()
 		val beforeTitle = title()
+		val dialogsBefore = HashMap(dialogs)
 		val beforeSheets = sheets().toMap()
 		val ownedBefore = liveObjects()
 		val calls = apply()
@@ -365,11 +409,14 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				val b = beforeTexts[inst.id]; val a = afterTexts[inst.id]
 				if (b != null && a != null && a != b) journal.add(JournalEntry.Text(inst.id, a))
 			}
-			is Node.Element -> for (inst in instances(node)) for (binding in node.bindings) {
+			is Node.Element -> for (inst in instances(node)) {
+				dialogs[node.id]?.let { open -> if (open != dialogsBefore[node.id]) journal.add(JournalEntry.Dialog(node.id, open)) }
+				for (binding in node.bindings) {
 				val key = inst.id to binding.name
 				if (binding.property) {
 					if (key in beforeProperties && key in afterProperties && beforeProperties[key] != afterProperties[key]) journal.add(JournalEntry.Property(inst.id, binding.name, afterProperties.getValue(key)))
 				} else if (key in beforeAttributes && key in afterAttributes && beforeAttributes[key] != afterAttributes[key]) journal.add(JournalEntry.Attribute(inst.id, binding.name, afterAttributes[key]))
+				}
 			}
 		}
 		val afterTitle = title()

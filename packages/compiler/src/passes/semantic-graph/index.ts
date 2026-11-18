@@ -8,6 +8,8 @@ import type {
 	SemanticGraphArtifact,
 	SemanticGraphInput,
 	SemanticLocalDeclaration,
+	NativeFactCollectors,
+	SemanticModuleFunction,
 } from '../../artifacts.ts';
 import { applyMarklessAllowDirectives, type SourceSpan } from '../../diagnostics.ts';
 import {
@@ -149,6 +151,7 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		const name = getIdentifierName(declaration.id as AnyNode | undefined);
 		if (name) state.helperFunctions.set(name, declaration);
 	}
+	if (state.nativeFacts) graph.moduleFunctions = moduleFunctionsOf(statements, state.helperFunctions, state.nativeFacts);
 	graph.moduleGraphInterface = collectModuleGraphInterface({ statements, state });
 
 	for (const statement of statements) {
@@ -172,6 +175,16 @@ export function buildSemanticGraphSync(input: SemanticGraphInput): SemanticGraph
 		graph.components.push({
 			name: componentFunction.name,
 			...(exportName ? { exportName } : {}),
+			...(state.nativeFacts
+				? {
+						native: state.nativeFacts.component(
+							componentFunction.node as never,
+							((call: AnyNode, api: 'state') =>
+								getFrameworkApiForCall(call, state.frameworkApiImports) ===
+								api) as never,
+						),
+					}
+				: {}),
 		});
 		const previousComponentName = state.currentComponentName;
 		const previousComponentId = state.currentComponentId;
@@ -545,6 +558,31 @@ function resolveComponentLocalReferences(state: WalkState, bodySpan: SourceSpan)
 			});
 		}
 	}
+}
+
+/** Each top-level function that is not a component, with the names it is exported by, for a native build to inline. */
+function moduleFunctionsOf(
+	statements: ReadonlyArray<AnyNode>,
+	functions: ReadonlyMap<string, AnyNode>,
+	collectors: NativeFactCollectors,
+): SemanticModuleFunction[] {
+	const exportNames = new Map<string, string[]>();
+	for (const statement of statements) {
+		if (statement.type !== 'ExportNamedDeclaration' || statement.source) continue;
+		const declared = getIdentifierName((statement.declaration as AnyNode | undefined)?.id as AnyNode | undefined);
+		if (declared) exportNames.set(declared, [...(exportNames.get(declared) ?? []), declared]);
+		for (const specifier of asNodes(statement.specifiers)) {
+			const local = getIdentifierName(specifier.local as AnyNode | undefined);
+			const exported = specifier.exported as AnyNode | undefined;
+			const name = getIdentifierName(exported) ?? (typeof exported?.value === 'string' ? exported.value : undefined);
+			if (local && name) exportNames.set(local, [...(exportNames.get(local) ?? []), name]);
+		}
+	}
+	return [...functions].map(([name, node]) => ({
+		name,
+		exportNames: exportNames.get(name) ?? [],
+		native: collectors.functionBody(node as never),
+	}));
 }
 
 function mergeComponentLocalDeclarations(state: WalkState): void {

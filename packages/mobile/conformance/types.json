@@ -1,0 +1,491 @@
+{
+	"version": "markless.native-conformance/0",
+	"payload": {
+		"version": "markless.native-view/0",
+		"component": "Types",
+		"cells": [
+			{
+				"id": "state:held",
+				"name": "held",
+				"initial": "a"
+			},
+			{
+				"id": "state:list",
+				"name": "list",
+				"initial": []
+			}
+		],
+		"nodes": [
+			{
+				"kind": "element",
+				"id": "h0",
+				"element": "main",
+				"parent": null
+			},
+			{
+				"kind": "element",
+				"id": "h1",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h1:text0",
+				"parent": "h1",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"Held ",
+								{
+									"if": {
+										"binary": "===",
+										"left": {
+											"unary": "typeof",
+											"value": {
+												"cell": "state:held"
+											}
+										},
+										"right": {
+											"literal": "string"
+										}
+									},
+									"whenTrue": {
+										"literal": "text"
+									},
+									"whenFalse": {
+										"if": {
+											"binary": "!==",
+											"left": {
+												"unary": "typeof",
+												"value": {
+													"cell": "state:held"
+												}
+											},
+											"right": {
+												"literal": "number"
+											}
+										},
+										"whenTrue": {
+											"if": {
+												"binary": "===",
+												"left": {
+													"unary": "typeof",
+													"value": {
+														"cell": "state:held"
+													}
+												},
+												"right": {
+													"literal": "boolean"
+												}
+											},
+											"whenTrue": {
+												"literal": "flag"
+											},
+											"whenFalse": {
+												"logical": "??",
+												"left": {
+													"literal": null
+												},
+												"right": {
+													"literal": "other"
+												}
+											}
+										},
+										"whenFalse": {
+											"literal": "number"
+										}
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h2",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h2:text0",
+				"parent": "h2",
+				"parts": [
+					{
+						"expr": {
+							"if": {
+								"binary": "===",
+								"left": {
+									"unary": "typeof",
+									"value": {
+										"cell": "state:held"
+									}
+								},
+								"right": {
+									"literal": "string"
+								}
+							},
+							"whenTrue": {
+								"literal": "is text"
+							},
+							"whenFalse": {
+								"literal": "not text"
+							}
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h3",
+				"element": "p",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h3:text0",
+				"parent": "h3",
+				"parts": [
+					{
+						"expr": {
+							"template": [
+								"First ",
+								{
+									"logical": "??",
+									"left": {
+										"member": {
+											"cell": "state:list"
+										},
+										"property": "0"
+									},
+									"right": {
+										"literal": "none"
+									}
+								},
+								", second ",
+								{
+									"logical": "??",
+									"left": {
+										"member": {
+											"cell": "state:list"
+										},
+										"property": "1"
+									},
+									"right": {
+										"literal": "none"
+									}
+								},
+								""
+							]
+						}
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h4",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h4:text0",
+				"parent": "h4",
+				"parts": [
+					{
+						"text": "Number"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h5",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h5:text0",
+				"parent": "h5",
+				"parts": [
+					{
+						"text": "Flag"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h6",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h6:text0",
+				"parent": "h6",
+				"parts": [
+					{
+						"text": "List"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h7",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h7:text0",
+				"parent": "h7",
+				"parts": [
+					{
+						"text": "Nothing"
+					}
+				]
+			},
+			{
+				"kind": "element",
+				"id": "h8",
+				"element": "button",
+				"parent": "h0"
+			},
+			{
+				"kind": "text",
+				"id": "h8:text0",
+				"parent": "h8",
+				"parts": [
+					{
+						"text": "Add"
+					}
+				]
+			}
+		],
+		"events": [
+			{
+				"host": "h4",
+				"event": "activate",
+				"handler": "handler:event:0"
+			},
+			{
+				"host": "h5",
+				"event": "activate",
+				"handler": "handler:event:1"
+			},
+			{
+				"host": "h6",
+				"event": "activate",
+				"handler": "handler:event:2"
+			},
+			{
+				"host": "h7",
+				"event": "activate",
+				"handler": "handler:event:3"
+			},
+			{
+				"host": "h8",
+				"event": "activate",
+				"handler": "handler:event:4"
+			}
+		],
+		"handlers": [
+			{
+				"id": "handler:event:0",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:held",
+						"value": {
+							"literal": 1
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:1",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:held",
+						"value": {
+							"literal": true
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:2",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:held",
+						"value": {
+							"array": [
+								{
+									"spread": false,
+									"value": {
+										"literal": "a"
+									}
+								}
+							]
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:3",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:held",
+						"value": {
+							"literal": null
+						}
+					}
+				]
+			},
+			{
+				"id": "handler:event:4",
+				"ops": [
+					{
+						"op": "assign",
+						"cell": "state:list",
+						"value": {
+							"array": [
+								{
+									"spread": true,
+									"value": {
+										"cell": "state:list"
+									}
+								},
+								{
+									"spread": false,
+									"value": {
+										"if": {
+											"binary": "===",
+											"left": {
+												"member": {
+													"cell": "state:list"
+												},
+												"property": "length"
+											},
+											"right": {
+												"literal": 0
+											}
+										},
+										"whenTrue": {
+											"literal": "x"
+										},
+										"whenFalse": {
+											"literal": "y"
+										}
+									}
+								}
+							]
+						}
+					}
+				]
+			}
+		]
+	},
+	"initial": [
+		["h1:text0", "Held text"],
+		["h2:text0", "is text"],
+		["h3:text0", "First none, second none"],
+		["h4:text0", "Number"],
+		["h5:text0", "Flag"],
+		["h6:text0", "List"],
+		["h7:text0", "Nothing"],
+		["h8:text0", "Add"]
+	],
+	"steps": [
+		{
+			"action": {
+				"event": "activate",
+				"host": "h4"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Held number"
+				},
+				{
+					"op": "text",
+					"node": "h2:text0",
+					"value": "not text"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h5"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Held flag"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h6"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h1:text0",
+					"value": "Held other"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h7"
+			},
+			"journal": []
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "First x, second none"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": [
+				{
+					"op": "text",
+					"node": "h3:text0",
+					"value": "First x, second y"
+				}
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "h8"
+			},
+			"journal": []
+		}
+	]
+}

@@ -23,6 +23,8 @@ public indirect enum NativeExpr: Equatable, Sendable {
 	case template([NativeTemplatePart])
 	/// `length` of a string or array, or an own property of an object.
 	case member(NativeExpr, String)
+	/// An array's element at an index computed while the app runs; null when it is not an integer inside the array.
+	case at(NativeExpr, of: NativeExpr)
 	case array([NativeArrayItem])
 	case object([NativeObjectField])
 	case method(NativeMethod, target: NativeExpr, arguments: [NativeExpr])
@@ -45,7 +47,7 @@ public indirect enum NativeExpr: Equatable, Sendable {
 		case let .array(items): return items.flatMap(\.value.cells)
 		case let .object(fields): return fields.flatMap(\.value.cells)
 		case let .method(_, target, arguments): return target.cells + arguments.flatMap(\.cells)
-		case let .binary(_, a, b), let .logical(_, a, b): return a.cells + b.cells
+		case let .binary(_, a, b), let .logical(_, a, b), let .at(a, b): return a.cells + b.cells
 		case let .conditional(test, whenTrue, whenFalse): return test.cells + whenTrue.cells + whenFalse.cells
 		case let .template(parts): return parts.flatMap { if case let .expr(e) = $0 { e.cells } else { [String]() } }
 		case let .call(_, arguments): return arguments.flatMap(\.cells)
@@ -118,6 +120,8 @@ public enum NativeEventName: String, Sendable {
 	case input
 	/// The platform closed a system sheet; it is already closed when the handler runs.
 	case dismiss
+	/// The host's back gesture or Escape on an open `<dialog>`: it closes, as the browser's cancel does.
+	case cancel
 }
 
 public enum NativeOp: Equatable, Sendable {
@@ -129,6 +133,12 @@ public enum NativeOp: Equatable, Sendable {
 	/// A device call (`haptics.tap`), on `object` when it names one; with `result` it settles that task cell, with `then`
 	/// the host answers with `resume` and those ops run with the answer as a local.
 	case call(call: String, object: String?, arguments: [NativeExpr], result: String?, then: NativeContinuation?)
+	/// Runs `then` when `test` is truthy, else `otherwise`; the test is evaluated once, before either.
+	indirect case when(test: NativeExpr, then: [NativeOp], otherwise: [NativeOp])
+	/// `showModal()` (`open`) or `close()` on a `<dialog>`: the host puts it in its top layer or takes it out.
+	case dialog(node: String, open: Bool)
+	/// `focus()` or `scrollIntoView()` on an element, run once the views show the handler's writes.
+	case command(node: String, command: String, preventScroll: Bool)
 }
 
 /// A navigate op's param: a string fixed at build time, or an expression evaluated in the activated element's scope.
@@ -371,6 +381,28 @@ public struct NativeViewPayload: Equatable, Sendable {
 						call: try opField["call"].string(), object: opField.has("object") ? try opField["object"].string() : nil,
 						arguments: try opField["arguments"].array().map(decodeExpr),
 						result: opField.has("result") ? try opField["result"].string() : nil, then: then)
+				case "dialog":
+					let opField = try op.object(["op", "node", "method"])
+					let method = try opField["method"].string()
+					guard method == "showModal" || method == "close" else {
+						throw PayloadError(path: op.path + ".method", reason: "unknown dialog method \"\(method)\"")
+					}
+					return .dialog(node: try opField["node"].string(), open: method == "showModal")
+				case "command":
+					let keys = Set(try op.keys())
+					let opField = try op.object(required: ["op", "node", "command"], optional: ["preventScroll"])
+					let command = try opField["command"].string()
+					guard command == "focus" || command == "scrollIntoView" else {
+						throw PayloadError(path: op.path + ".command", reason: "unknown command \"\(command)\"")
+					}
+					let preventScroll = keys.contains("preventScroll") ? try opField["preventScroll"].bool() : false
+					return .command(node: try opField["node"].string(), command: command, preventScroll: preventScroll)
+				case "if":
+					let opField = try op.object(["op", "test", "whenTrue", "whenFalse"])
+					return .when(
+						test: try decodeExpr(try opField["test"]),
+						then: try opField["whenTrue"].array().map(decodeOp),
+						otherwise: try opField["whenFalse"].array().map(decodeOp))
 				default:
 					throw PayloadError(path: op.path + ".op", reason: "unknown op \"\(name)\"")
 				}
@@ -436,7 +468,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 			guard name == "value" else { throw PayloadError(path: reader.path + ".event", reason: "unknown event read \"\(name)\"") }
 			return .eventValue
 		case ["literal"]: return .literal(try field("literal").scalar())
-		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+"]), try decodeExpr(try field("value")))
+		case ["unary", "value"]: return .unary(try oneOf("unary", ["!", "-", "+", "typeof"]), try decodeExpr(try field("value")))
 		case ["binary", "left", "right"]:
 			return .binary(
 				try oneOf("binary", ["+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">="]),
@@ -453,6 +485,7 @@ public struct NativeViewPayload: Equatable, Sendable {
 				return .expr(try decodeExpr(part))
 			})
 		case ["member", "property"]: return .member(try decodeExpr(try field("member")), try field("property").string())
+		case ["at", "of"]: return .at(try decodeExpr(try field("at")), of: try decodeExpr(try field("of")))
 		case ["array"]:
 			return .array(try field("array").array().map { item in
 				let f = try item.object(["spread", "value"])

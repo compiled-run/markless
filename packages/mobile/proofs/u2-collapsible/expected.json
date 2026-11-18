@@ -1,0 +1,17 @@
+{
+	"rung": 102,
+	"name": "@markless/ui collapsible: open and closed state through ui-* attributes and hidden",
+	"steps": [
+		{ "visible": ["Collapsible", "Shipping", "Changes 0"], "absent": ["Ships in two days"] },
+		{
+			"do": { "tap": "Shipping" },
+			"visible": ["Ships in two days", "Changes 1"],
+			"absent": ["Changes 0"]
+		},
+		{
+			"do": { "tap": "Shipping" },
+			"visible": ["Changes 2"],
+			"absent": ["Ships in two days", "Changes 1"]
+		}
+	]
+}
