@@ -19,9 +19,9 @@ simulator and the emulator through the proof harness). No family source was chan
 | u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
 
-Receipts: one harness run of the fourteen core rungs and u1, u2, u3 and u5, both platforms, `proof passed on iOS and Android`,
-18 of 18 on each
-(`receipts/2026-11-17-ui-{ios,android}-18-rungs.json`, `receipts/2026-11-17-ui-verdict.txt`; simulator `markless-native-ui`,
+Receipts: one harness run of the fourteen core rungs and u1 to u5, both platforms, `proof passed on iOS and Android`,
+19 of 19 on each
+(`receipts/2026-11-17-ui-{ios,android}-19-rungs.json`, `receipts/2026-11-17-ui-verdict.txt`; simulator `markless-native-ui`,
 iPhone 17, iOS 27.2; AVD `markless_native_ui`, API 36); screenshots under
 `packages/mobile/proofs/u<n>-<family>/screenshots/{ios,android}/`. What is a test double: nothing in the device columns
 (real compiler, real hosts, real Dragon export, real simulator and emulator); the reference column is the TypeScript
