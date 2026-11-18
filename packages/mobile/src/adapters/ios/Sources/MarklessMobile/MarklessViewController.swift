@@ -40,6 +40,7 @@ public final class MarklessViewController: UIViewController {
 		payload: Data, style: Data? = nil, fonts: [String: Data] = [:], store: NativeStore = UserDefaultsStore(),
 		device: NativeDevice? = nil, route: String? = MarklessViewController.launchRoute()
 	) throws {
+		FirstFrame.controllerCreated()
 		self.device = device ?? PlatformDevice()
 		self.payload = try NativeViewPayload.decode(payload)
 		self.style = try style.map { try StyleExport.decode($0) }
@@ -67,6 +68,7 @@ public final class MarklessViewController: UIViewController {
 		page: NativeViewPayload, params: [NativeRouteParam], store: NativeStore, style: StyleExport?, fonts: [String: Data],
 		device: NativeDevice
 	) throws {
+		FirstFrame.controllerCreated()
 		self.device = device
 		payload = page
 		self.style = style
@@ -243,6 +245,7 @@ public final class MarklessViewController: UIViewController {
 
 	public override func viewDidLayoutSubviews() {
 		super.viewDidLayoutSubviews()
+		if view.window != nil { FirstFrame.laidOut() }
 		raiseVisible()
 	}
 
