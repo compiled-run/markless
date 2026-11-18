@@ -139,3 +139,13 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(export.notReady?.contains("analysis-only") == true)
 	#expect(export.assignments[0].nodes.contains { $0.isText })
 }
+
+@Test func readsTheSchemeEachAssignmentIsDrawnInAndRefusesAnUnknownOne() throws {
+	let url = try #require(Bundle.module.url(forResource: "Fixtures/ms-text.native-style", withExtension: "json"))
+	let text = String(decoding: try Data(contentsOf: url), as: UTF8.self)
+	let dark = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"dark\",")
+	#expect(dark != text)
+	#expect(try StyleExport.decode(Data(dark.utf8)).assignments.count == 1)
+	let other = text.replacingOccurrences(of: "\"values\": {},", with: "\"values\": {}, \"colorScheme\": \"sepia\",")
+	#expect(throws: PayloadError.self) { try StyleExport.decode(Data(other.utf8)) }
+}

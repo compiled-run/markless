@@ -280,7 +280,11 @@ public struct StyleExport: Sendable {
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
 			assignments = try targetFields["assignments"].array().map { assignment in
-				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground", "pageScroll"])
+				let f = try assignment.object(required: ["values", "nodes"], optional: ["canvas", "bodyBackground", "pageScroll", "colorScheme"])
+				if f.has("colorScheme") {
+					let scheme = try f["colorScheme"].string()
+					guard scheme == "light" || scheme == "dark" else { throw PayloadError(path: assignment.path + ".colorScheme", reason: "colorScheme is light or dark, not \(scheme)") }
+				}
 				pageScrolls.append(f.has("pageScroll") ? try decodeRange(try f["pageScroll"]) : nil)
 				let valuesReader = try f["values"]
 				var values: [String: NativeValue] = [:]
