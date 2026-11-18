@@ -197,3 +197,24 @@ test.each([
 	await third.runtime.dispatch(event);
 	expect(root.__marklessEventOnlyGraph?.get(untouched)).toBe(18);
 });
+
+// A prerendered page's staged graph installs no paint hold, so a press's seed for a joining segment reads what code holds.
+test('a list call on a state born after resume seeds the joining segment with what code holds, inside a press', async () => {
+	const { root, event } = fixture();
+	const first = await resumePrerenderTriggerGroup(
+		inputFor(root, 'first', 'state:first', 0, {
+			symbol: ({ graph }) => graph.write({ graphNodeId: 'state:list', value: ['a'] }),
+		}),
+	);
+	await first.runtime.dispatch(event);
+	const second = await resumePrerenderTriggerGroup(
+		inputFor(root, 'second', 'state:second', 0, {
+			symbol: ({ graph }) => graph.call({ graphNodeId: 'state:list', method: 'push', args: ['b'] }),
+		}),
+	);
+	expect(second.graph.holdPaint).toBeUndefined();
+	expect(second.graph.paintHold).toBeUndefined();
+	await second.runtime.dispatch(event);
+	expect(first.graph.read('state:list')).toEqual(['a', 'b']);
+	expect(second.graph.read('state:list')).toBe(first.graph.read('state:list'));
+});

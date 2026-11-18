@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { createRuntimeGraph as createGraph } from '../src/index.ts';
 import { createAsyncComputedPlane } from '../src/graph-async.ts';
+import { createDerivedReconcilePlane } from '../src/graph-reconcile.ts';
 
 const createRuntimeGraph: typeof createGraph = (input) =>
 	createGraph({ async: createAsyncComputedPlane, ...input });
@@ -157,4 +158,46 @@ test('a value that ran again before a late mark is still left to its own run', a
 	graph.asyncPlane!()!.markEntry('computed:people', true);
 	graph.asyncPlane!()!.refreshAfterWrite(settledAt);
 	expect(people.settles).toHaveLength(2);
+});
+
+test("a handler's failure that lands while another save is out is that value's answer, so the save's refresh keeps it", async () => {
+	const people = scriptedRuns();
+	const count = scriptedRuns();
+	const graph = createRuntimeGraph({
+		reconcile: createDerivedReconcilePlane,
+		cells: [{ graphNodeId: 'state:team', value: 'blue' }],
+		asyncComputed: [
+			{
+				graphNodeId: 'computed:people',
+				dependencies: [{ graphNodeId: 'state:team', path: [] }],
+				key: (read) => read('state:team'),
+				run: people.run,
+			},
+			{
+				graphNodeId: 'computed:count',
+				boundaryGate: true,
+				dependencies: [{ graphNodeId: 'computed:people', path: ['value'] }],
+				key: (read) => read('computed:people', ['value']),
+				run: count.run,
+			},
+		],
+	} as never);
+	graph.read('computed:count', ['status']);
+	people.settles[0]!.resolve(['Ada']);
+	await tick();
+	count.settles[0]!.resolve(1);
+	await tick();
+	const plane = graph.asyncPlane!()!;
+	plane.markEntry('computed:people', true);
+	plane.markEntry('computed:count', true);
+	plane.failHandler('computed:count', new Error('Saving failed'));
+	void plane.refreshAfterWrite(versions(graph, 'computed:people', 'computed:count'));
+	plane.endEntry('computed:people', 'saved');
+	plane.endEntry('computed:count', 'saved');
+	expect(people.settles).toHaveLength(2);
+	people.settles[1]!.resolve(['Ada']);
+	await tick();
+	await graph.flush();
+	expect(count.settles).toHaveLength(1);
+	expect(graph.read('computed:count', [])).toMatchObject({ status: 'rejected', error: new Error('Saving failed') });
 });
