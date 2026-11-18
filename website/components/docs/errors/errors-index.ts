@@ -2,7 +2,7 @@
 import type { ErrorIndex } from './types.ts';
 
 export const errorIndex: ErrorIndex = {
-	total: 319,
+	total: 320,
 	guided: 51,
 	groups: [
 		{
@@ -1434,6 +1434,14 @@ export const errorIndex: ErrorIndex = {
 					kind: 'build error',
 					guided: false,
 					words: 'the browser build failed markless_client_build_failed a markless build tooling error from @markless/bundler.',
+				},
+				{
+					code: 'MARKLESS_CLIENT_BUILD_STALLED',
+					title: 'The browser build stopped making progress',
+					chip: 'error',
+					kind: 'build error',
+					guided: false,
+					words: 'the browser build stopped making progress markless_client_build_stalled a markless build tooling error from @markless/bundler.',
 				},
 				{
 					code: 'MARKLESS_CLIENT_BUILD_PROCESS',

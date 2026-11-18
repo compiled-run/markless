@@ -213,6 +213,7 @@ export const TITLES: Readonly<Record<string, string>> = {
 	MARKLESS_CHILD_SYMBOL_MISSING: 'A linked component is missing a piece',
 	MARKLESS_CLIENT_BUILD_FAILED: 'The browser build failed',
 	MARKLESS_CLIENT_BUILD_PROCESS: 'The browser build’s own process failed',
+	MARKLESS_CLIENT_BUILD_STALLED: 'The browser build stopped making progress',
 	MARKLESS_COMPONENT_EXPORT_NAME_RESERVED: 'A component uses a name Markless reserves',
 	MARKLESS_COMPONENT_PART_AS_PAGE: 'A component part was served as a page',
 	MARKLESS_COMPOSED_DOM_UPDATE_UNMAPPED: 'An update reads a prop with no route',

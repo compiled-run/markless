@@ -3444,6 +3444,27 @@ export const errorEntries: readonly ErrorEntry[] = [
 		moreSources: 0,
 	},
 	{
+		code: 'MARKLESS_CLIENT_BUILD_STALLED',
+		title: 'The browser build stopped making progress',
+		area: 'build',
+		packageName: '@markless/bundler',
+		stage: 'build',
+		severity: 'error',
+		description: 'A Markless build tooling error from @markless/bundler.',
+		printed: [
+			'MARKLESS_CLIENT_BUILD_STALLED: the client build process stopped making progress. For <idleSeconds> s it used no CPU, had no compile or chunk job on a build worker and waited on no request, socket or process<value>, so the build is waiting on something that will never settle. It was stopped; its output so far is printed above.',
+		],
+		structured: false,
+		sources: [
+			{
+				id: 'f0',
+				file: 'packages/bundler/src/vite/separate-client-build.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/bundler/src/vite/separate-client-build.ts',
+			},
+		],
+		moreSources: 0,
+	},
+	{
 		code: 'MARKLESS_COMPILE_BLOCKED',
 		title: 'A .tsrx file has errors, so the build stopped',
 		area: 'build',
