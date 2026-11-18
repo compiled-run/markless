@@ -1,0 +1,35 @@
+appId: ${APP_ID}
+name: 17-into-view
+---
+- launchApp:
+      clearState: true
+- assertVisible: Into view
+- assertVisible: Show target
+- assertVisible: Focus field
+- assertNotVisible: Target paragraph
+- assertNotVisible: Far field
+- tapOn: Show target
+- assertVisible: Target paragraph
+- assertNotVisible: Into view
+- assertNotVisible: Show target
+- assertVisible: Target paragraph
+- assertVisible: Gap 61
+- assertNotVisible: Into view
+- assertNotVisible: Show target
+- assertNotVisible: Gap 50
+- repeat:
+      times: 80
+      while:
+          notVisible: Focus field
+      commands:
+          - swipe:
+                start: 50%, 25%
+                end: 50%, 80%
+- assertNotVisible: Target paragraph
+- assertVisible: Focus field
+- assertNotVisible: Target paragraph
+- tapOn: Focus field
+- assertNotVisible: Focus field
+- assertVisible: Far field
+- assertNotVisible: Focus field
+- assertNotVisible: Into view
