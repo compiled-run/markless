@@ -21,6 +21,9 @@ const USAGE = `usage: node scripts/ci/affected.mjs (--staged | --base [<ref>] | 
   --base [<ref>]    select for everything since the merge base with <ref> (default origin/main):
                     commits, staged and unstaged edits, and untracked files
   --files <path>... select for these repo-relative paths
+  --with-heavy      keep the tests scripts/ci/heavy-tests.json declares (app builds, browser
+                    launches); by default a selection leaves them to the PR's unit job. A runAll
+                    selection always runs every test
   --print           print the selected ${NODE_PROJECT}-project test files, or "ALL: <reason>"
   --json            print the selection as JSON (default)
   --shadow-log      append one line to ${SHADOW_LOG}: the selection, and the unit
@@ -65,16 +68,19 @@ const testsInTree = (paths, { include, exclude }) =>
 			!exclude.some((glob) => matchesGlob(path, glob)),
 	);
 
-async function select(changed) {
+async function select(changed, withHeavy) {
 	const started = performance.now();
 	const [{ graph, buildMs, fileCount }, project] = await Promise.all([
 		loadProjectGraph(repoRoot),
 		nodeProjectTests(),
 	]);
 	const selection = graph.affectedTests(changed, project.files);
+	const heavy = withHeavy ? new Set() : heavyTests();
+	const tests = selection.runAll ? null : selection.tests;
 	return {
 		changed,
-		selected: selection.runAll ? null : selection.tests,
+		selected: tests && tests.filter((test) => !heavy.has(test)),
+		heavyLeftToCi: tests ? tests.filter((test) => heavy.has(test)) : [],
 		runAll: selection.runAll,
 		total: project.files.length,
 		undeclaredTests: graph.testsReachingUndeclaredImports(project.files).length,
@@ -83,6 +89,12 @@ async function select(changed) {
 		graphFiles: fileCount,
 	};
 }
+
+// Tests that build an app or launch a browser run in the PR's unit job; a local selection leaves them out unless asked.
+const heavyTests = () => {
+	const manifest = JSON.parse(readFileSync(join(repoRoot, 'scripts/ci/heavy-tests.json'), 'utf8'));
+	return new Set([...manifest.tests, ...(manifest.declared ?? []).map((entry) => entry.test)]);
+};
 
 const unitResults = (reportPath) => {
 	if (!reportPath || !existsSync(reportPath)) return null;
@@ -287,7 +299,7 @@ else if (flag('--files')) {
 	process.exit(2);
 }
 
-const result = await select(changed);
+const result = await select(changed, flag('--with-heavy'));
 if (flag('--print'))
 	console.log(result.runAll ? `ALL: ${result.runAll}` : result.selected.join('\n'));
 else console.log(JSON.stringify(result));

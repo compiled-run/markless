@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { recordPass, workingTree } from './pass-record.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repoRoot = resolve(
@@ -22,6 +23,8 @@ const USAGE = `usage: node scripts/ci/local.mjs [--list] [--fast | --full] [--jo
                     selects for the diff from the merge base with --base (default origin/main);
                     a config, lockfile, workspace manifest or unclassified change runs every unit test
   --base <ref>      the ref --affected diffs against
+  --with-heavy      --affected also runs the selected tests scripts/ci/heavy-tests.json declares
+                    (app builds, browser launches), which otherwise run only in the PR's unit job
   --full            run every job that can run on this machine; for debugging, since heavy
                     jobs are verified by the pull request's CI run (docs/ci-process.md)
   --job <id>        run only this job (repeatable); overrides --fast/--full
@@ -113,6 +116,7 @@ const parseArgs = (argv) => {
 		dryRun: false,
 		unitSelection: null,
 		affected: false,
+		withHeavy: false,
 		base: 'origin/main',
 	};
 	for (let index = 0; index < argv.length; index += 1) {
@@ -133,6 +137,7 @@ const parseArgs = (argv) => {
 			options.affected = true;
 			options.mode = 'fast';
 		} else if (arg === '--base') options.base = argv[++index];
+		else if (arg === '--with-heavy') options.withHeavy = true;
 		else if (arg === '--help' || arg === '-h') {
 			console.log(USAGE);
 			process.exit(0);
@@ -341,9 +346,10 @@ const readUnitSelection = (path) => {
 		if (selection.runAll) return { files: null, note: `every test: ${selection.runAll}` };
 		if (!Array.isArray(selection.selected))
 			return { files: null, note: 'every test: the selection names no test list' };
+		const heavy = selection.heavyLeftToCi?.length ?? 0;
 		return {
 			files: selection.selected,
-			note: `${selection.selected.length} of ${selection.total} tests the change selects`,
+			note: `${selection.selected.length} of ${selection.total} tests the change selects${heavy ? `; ${heavy} heavy tests it reaches run in the PR's unit job (--with-heavy runs them here)` : ''}`,
 		};
 	} catch (error) {
 		return {
@@ -481,6 +487,19 @@ const runJobs = (workflow, options) => {
 	return results.some((result) => result.status === 'failed') ? 1 : 0;
 };
 
+// Only a pass of the whole fast set on a tree that did not change during the run is recorded.
+const runAndRecord = (workflow, options) => {
+	const recordable = !options.jobs.length && options.mode === 'fast' && !options.dryRun;
+	const before = recordable ? workingTree(repoRoot) : null;
+	const status = runJobs(workflow, options);
+	if (status === 0 && before && workingTree(repoRoot) === before) {
+		const files = options.unitSelection ? readUnitSelection(options.unitSelection).files : null;
+		recordPass(repoRoot, before, files);
+		console.log(`recorded a pass for tree ${before.slice(0, 12)}; committing exactly this tree skips the hook's fast jobs`);
+	}
+	return status;
+};
+
 const forwardedArgs = (argv) => argv.filter((arg) => arg !== '--clean');
 
 const runClean = (argv) => {
@@ -548,11 +567,17 @@ const runLinux = (options) => {
 };
 
 // A failed selection leaves the file empty, which readUnitSelection turns into every unit test.
-const affectedSelection = (base) => {
+const affectedSelection = (base, withHeavy) => {
 	const path = join(mkdtempSync(join(tmpdir(), 'markless-affected-')), 'selection.json');
 	const result = spawnSync(
 		process.execPath,
-		[resolve(repoRoot, 'scripts/ci/affected.mjs'), '--base', base, '--json'],
+		[
+			resolve(repoRoot, 'scripts/ci/affected.mjs'),
+			'--base',
+			base,
+			'--json',
+			...(withHeavy ? ['--with-heavy'] : []),
+		],
 		{ cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 1 << 28 },
 	);
 	writeFileSync(path, result.status === 0 ? result.stdout : '');
@@ -564,11 +589,11 @@ const options = parseArgs(argv);
 if (options.linux) process.exit(runLinux(options));
 if (options.clean) process.exit(runClean(argv));
 if (options.affected && !options.unitSelection && !options.list && !options.dryRun)
-	options.unitSelection = affectedSelection(options.base);
+	options.unitSelection = affectedSelection(options.base, options.withHeavy);
 const workflow = readWorkflow(options.workflow);
 if (options.list) {
 	printList(workflow);
 	const unknown = workflow.jobs.filter((job) => job.mode === 'unknown');
 	process.exit(unknown.length ? 2 : 0);
 }
-process.exit(runJobs(workflow, options));
+process.exit(runAndRecord(workflow, options));
