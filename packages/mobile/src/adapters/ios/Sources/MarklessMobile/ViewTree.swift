@@ -183,6 +183,7 @@ final class ViewTree {
 				layer.bottomAnchor.constraint(equalTo: screen.bottomAnchor),
 				layer.leadingAnchor.constraint(equalTo: screen.leadingAnchor),
 				layer.trailingAnchor.constraint(equalTo: screen.trailingAnchor),
+				// Centred, as the web centres a modal dialog (dialog:modal { inset: 0; margin: auto }) on every platform.
 				view.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
 				view.centerYAnchor.constraint(equalTo: guide.centerYAnchor),
 				view.widthAnchor.constraint(lessThanOrEqualTo: guide.widthAnchor, constant: -32),

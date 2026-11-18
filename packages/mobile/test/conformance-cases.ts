@@ -117,11 +117,11 @@ export const CONFORMANCE_CASES: ReadonlyArray<{
 		fixture: 'proofs/u4-dialog/App.tsrx',
 		actions: [
 			{ event: 'activate', host: 'h2' },
-			{ event: 'activate', host: 'h6' },
-			{ event: 'activate', host: 'h2' },
-			{ event: 'cancel', host: 'h4' },
-			{ event: 'activate', host: 'h2' },
 			{ event: 'activate', host: 'h7' },
+			{ event: 'activate', host: 'h2' },
+			{ event: 'cancel', host: 'h5' },
+			{ event: 'activate', host: 'h4' },
+			{ event: 'activate', host: 'h11' },
 		],
 	},
 ];

@@ -355,6 +355,7 @@ class MarklessHost(
 			view.setBackgroundColor(0xFFFFFFFF.toInt())
 			val pad = (16 * dpr).roundToInt()
 			view.setPadding(pad, pad, pad, pad)
+			// Centred, as the web centres a modal dialog (dialog:modal { inset: 0; margin: auto }) on every platform.
 			layer.addView(view, FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
 			content.addView(layer, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
 			for (i in 0 until content.childCount) content.getChildAt(i).takeIf { it !== layer }?.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS

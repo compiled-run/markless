@@ -1,11 +1,86 @@
 {
 	"rung": 104,
-	"name": "A modal <dialog>: showModal() puts it in the top layer above the page, close() takes it out",
+	"name": "A modal <dialog>: showModal() puts it in the top layer above the page, centred as on the web; close() takes it out",
 	"steps": [
-		{ "visible": ["Dialog", "Delete draft", "Deleted 0"], "absent": ["Delete this draft?", "Keep"] },
-		{ "do": { "tap": "Delete draft" }, "visible": ["Delete this draft?", "Delete", "Keep"] },
-		{ "do": { "tap": "Delete" }, "visible": ["Delete draft", "Deleted 1"], "absent": ["Delete this draft?", "Keep"] },
-		{ "do": { "tap": "Delete draft" }, "visible": ["Delete this draft?", "Keep"] },
-		{ "do": { "tap": "Keep" }, "visible": ["Deleted 1"], "absent": ["Delete this draft?", "Keep"] }
+		{
+			"visible": [
+				"Dialog",
+				"Delete draft",
+				"Deleted 0",
+				"Sign out"
+			],
+			"absent": [
+				"Delete this draft?",
+				"Keep",
+				"Sign out now?"
+			]
+		},
+		{
+			"do": {
+				"tap": "Delete draft"
+			},
+			"visible": [
+				"Delete this draft?",
+				"Delete",
+				"Keep"
+			]
+		},
+		{
+			"do": {
+				"tap": "Delete"
+			},
+			"visible": [
+				"Delete draft",
+				"Deleted 1"
+			],
+			"absent": [
+				"Delete this draft?",
+				"Keep"
+			]
+		},
+		{
+			"do": {
+				"tap": "Delete draft"
+			},
+			"visible": [
+				"Delete this draft?",
+				"Keep"
+			]
+		},
+		{
+			"do": {
+				"tap": "Keep"
+			},
+			"visible": [
+				"Deleted 1"
+			],
+			"absent": [
+				"Delete this draft?",
+				"Keep",
+				"Sign out now?",
+				"Stay"
+			]
+		},
+		{
+			"do": {
+				"tap": "Sign out"
+			},
+			"visible": [
+				"Sign out now?",
+				"Stay"
+			]
+		},
+		{
+			"do": {
+				"tap": "Stay"
+			},
+			"visible": [
+				"Sign out"
+			],
+			"absent": [
+				"Sign out now?",
+				"Stay"
+			]
+		}
 	]
 }

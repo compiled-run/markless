@@ -6,8 +6,10 @@ name: u4-dialog
 - assertVisible: Dialog
 - assertVisible: Delete draft
 - assertVisible: Deleted 0
+- assertVisible: Sign out
 - assertNotVisible: Delete this draft\?
 - assertNotVisible: Keep
+- assertNotVisible: Sign out now\?
 - tapOn: Delete draft
 - assertVisible: Delete this draft\?
 - assertVisible: Keep
@@ -32,3 +34,16 @@ name: u4-dialog
 - assertVisible: Deleted 1
 - assertNotVisible: Delete this draft\?
 - assertNotVisible: Keep
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay
+- tapOn: Sign out
+- assertVisible: Sign out now\?
+- assertVisible: Stay
+- assertVisible: Sign out now\?
+- assertVisible: Stay
+- tapOn: Stay
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay
+- assertVisible: Sign out
+- assertNotVisible: Sign out now\?
+- assertNotVisible: Stay

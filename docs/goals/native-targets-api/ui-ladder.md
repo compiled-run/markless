@@ -71,7 +71,9 @@ title, description, close; `orientation` defaults to vertical), which adds swipe
 `<dialog open>` is refused by name (the web shows it non-modal, in the page flow). Payload, reference runtime and both
 hosts: the `dialog` op, a `{ op: 'dialog', node, open }` journal entry and a `cancel` action that closes it (vector
 `dialog.json`). Hosts: a top layer above the page and the bars holding the dialog's own views (not a system sheet), on
-Chrome's default `::backdrop` tint; the page behind is inert to the screen reader (iOS `accessibilityViewIsModal`,
+Chrome's default `::backdrop` tint, centred as the web centres a modal dialog (a second dialog with `role="alertdialog"`
+shows the same; per the owner's direction no family or `<dialog>` adapts into a bottom sheet on a phone, and the platform's own
+sheet is the separate `system.sheet` work); the page behind is inert to the screen reader (iOS `accessibilityViewIsModal`,
 Android `IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS`); safe-area and keyboard insets pad the layer; Android's back
 gesture (`OnBackInvokedDispatcher`) and VoiceOver's escape gesture close it as a cancel. Proven: the flow on both phones,
 and an extra Android-only Maestro flow (open, `back`, closed with nothing deleted, app still open). Not proven on a device:
@@ -88,6 +90,11 @@ a portable read of "who had focus when this opened", which is new `@markless/cor
 state on purpose (its note: a state write lands too late on the web), which is not data. Recognising that pair as a native
 tap on the backdrop would mean matching the family's code, which the architecture forbids. The family's public API does
 not need to change; these two internals, or the overlay primitive (a reason for a press on the layer itself), do.
+
+**CSS defaults per platform.** None had to differ. `modal` ships no CSS defaults (its placement is the author's on every
+platform); `drawer` ships its bottom-sheet placement in `@layer markless` and keeps it on phones; its `touch-action` and
+`overscroll-behavior` are browser-only and have no effect where the host runs the drag. Markless CSS has no way to say "on a
+phone", and none is needed under the owner's direction.
 
 **u4c drawer (stopped).** Everything modal needs, plus: its shared state's first value is not known at build time (an
 analyzer gap that cascades into most of its refusals), `style={drawer.offset}` (a `style` binding), and the drag.
