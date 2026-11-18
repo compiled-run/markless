@@ -117,6 +117,28 @@ box that reads as a Button; on iOS's stacking layout a control with no text (the
 thumb) gets the 44 pt touch target, since it was 0 by 0 and untappable. The optional `toggle.field` part is refused (`checked` as a property binding on a hidden
 `<input>`); #735's researched default is that it renders nothing on a phone, which is an owner call.
 
+## Handler gaps each proved family hit (against draft #807's handler-boundary study)
+
+#807 counts what lowers on the base branch; this branch adds some of its named extensions. Per family, what it hit and how
+it got past it, with no family source changed:
+
+- **base (button):** if and early return (`if (!press.isToggle) return;`): the `if` op; writing a field of a state object
+  (`press.pressed = ...`): state objects split into one cell per field; calling a function it was given with an argument
+  (`onChange?.(press.pressed)`): the caller's callback inlined with the parameter bound.
+- **collapsible:** inlining a call to its own function (`collapsible.toggle()`): shared() methods carry their bodies and are
+  inlined; a field write on shared state; if and early return; a callback slot filled while rendering; `beforematch`: left
+  out, since a phone has no find-in-page.
+- **tabs:** the same method and field gaps (`tabs.show(tab.value)`), plus a test over the state the branch writes, which is
+  why `if` is an op and not a guarded write; key and focus listeners (roving focus, `nextTriggerToFocus`, `next.focus()`):
+  not passed, left out with a `MARKLESS_NATIVE_KEYBOARD_ONLY` warning, because only a hardware keyboard raises them on a phone.
+- **toggle:** method, field write and callback gaps as above; a shared() definition read from another file (`toolbarState()`):
+  each module analyzed with the interfaces of what it imports.
+- **plain `<dialog>`:** element commands (`dialog.showModal()`, `dialog.close()`): a `dialog` op the hosts run. Other element
+  commands (`focus`, `scrollIntoView`) are not built.
+- **modal and drawer (stopped):** the gaps they hit that this branch did not close are #807's "touch the page" class (the
+  focus-origin expando, a module-level `WeakSet`, `getBoundingClientRect`, per-frame pointer math) and the pointer and
+  `dismiss` events no payload event maps. They are recorded above, not dodged.
+
 ## Accessibility, as the devices report it
 
 Maestro reads label, value, hint, enabled and checked from the accessibility tree but not the role. The flows assert texts
