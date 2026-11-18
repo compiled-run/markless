@@ -19,9 +19,9 @@ simulator and the emulator through the proof harness). No family source was chan
 | u4c | `drawer` (the bottom sheet) | stopped | stopped | stopped | stopped | |
 | u5 | `toggle`: label, switch, thumb, description | pass | pass | pass | pass | none |
 | u11 | `pagination`: root, back and forward, three items with triggers; an author computed with a block body | pass | pass | pass | pass | none |
-| u12 | `buttongroup`: a required single group and a `multiple` one; the family's own helpers `heldValues` and `nextHeld` | pass | pass | see receipt | see receipt | none |
-| u13 | `accordion`: a single accordion and a `multiple` one whose value is a string, then a list (`typeof`) | pass | pass | see receipt | see receipt | none |
-| u14 | `gridlist`: three rows (one disabled), a tap picks the row it landed on (`event.target`) | pass | pass | see receipt | see receipt | none |
+| u12 | `buttongroup`: a required single group and a `multiple` one; the family's own helpers `heldValues` and `nextHeld` | pass | pass | pass | pass | none |
+| u13 | `accordion`: a single accordion and a `multiple` one whose value is a string, then a list (`typeof`) | pass | pass | pass | pass | none |
+| u14 | `gridlist`: three rows (one disabled), a tap picks the row it landed on (`event.target`) | pass | pass | pass | pass | none |
 | u15 | `popover` (trigger, content, title, close): `close` hands focus back with `triggerEl.focus()` | stopped | stopped | stopped | stopped | |
 
 Receipts: one harness run of the fourteen core rungs and u1 to u5, both platforms, `proof passed on iOS and Android`,
@@ -143,6 +143,10 @@ Still refused by name: `let`/`var` declarations, a declaration in a bare `{ }` b
 destructuring with a default, rest or computed key, and in a computed any statement other than `const`, `if` and `return`.
 The app's `label` computed (`const last = shown === 3; if (last) return 'Last page'; return \`Page ${shown}\``) runs on the
 phones; no family's block-bodied computed is free of other blockers yet (most remaining ones use `typeof` or a helper call).
+
+u12 to u14 receipt: the fourteen core rungs, u1 to u5 and u11 to u14 on simulator `markless-ui-nb` (iPhone 17, iOS 27.2)
+and AVD `markless_ui_nb` (API 36, port 5592), 23 of 23 on each, `proof passed on iOS and Android`, on commit a3bdf8baa
+(`receipts/2026-11-17-ui-nb-{ios,android}-23-rungs.json`, `receipts/2026-11-17-ui-nb-verdict.txt`).
 
 **u12 buttongroup (module helpers).** The family calls functions its own module imports (`heldValues`, `nextHeld` from
 `buttongroup-values.ts`). For native builds the analyzer records each top-level non-component `function` of a module

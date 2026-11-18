@@ -1,0 +1,144 @@
+{
+	"version": "markless.proof-report/0",
+	"platform": "android",
+	"rungs": [
+		{
+			"name": "01-static-text",
+			"failure": null,
+			"installSeconds": 1.7331933329999993,
+			"flowSeconds": 5.5641229590000005
+		},
+		{
+			"name": "02-styles",
+			"failure": null,
+			"installSeconds": 0.8394537090000013,
+			"flowSeconds": 8.068638917000003
+		},
+		{
+			"name": "03-counter",
+			"failure": null,
+			"installSeconds": 0.6072329580000005,
+			"flowSeconds": 11.455202499999999
+		},
+		{
+			"name": "04-attributes",
+			"failure": null,
+			"installSeconds": 0.6809470000000001,
+			"flowSeconds": 12.155812624999992
+		},
+		{
+			"name": "05-if",
+			"failure": null,
+			"installSeconds": 0.7455236250000016,
+			"flowSeconds": 13.717021500000003
+		},
+		{
+			"name": "05b-choices",
+			"failure": null,
+			"installSeconds": 0.6774808329999796,
+			"flowSeconds": 22.715041750000005
+		},
+		{
+			"name": "06-keyed-for",
+			"failure": null,
+			"installSeconds": 0.6606112090000242,
+			"flowSeconds": 14.343987250000005
+		},
+		{
+			"name": "07-child-component",
+			"failure": null,
+			"installSeconds": 0.6433388749999868,
+			"flowSeconds": 11.928303209000005
+		},
+		{
+			"name": "07b-imported-component",
+			"failure": null,
+			"installSeconds": 0.7973969999999972,
+			"flowSeconds": 13.098736082999967
+		},
+		{
+			"name": "07c-child-state",
+			"failure": null,
+			"installSeconds": 0.7203050830000429,
+			"flowSeconds": 13.047970874999999
+		},
+		{
+			"name": "07d-children",
+			"failure": null,
+			"installSeconds": 0.7519794999999576,
+			"flowSeconds": 12.255050667000003
+		},
+		{
+			"name": "08-text-input",
+			"failure": null,
+			"installSeconds": 0.6907375829999801,
+			"flowSeconds": 17.698338541000034
+		},
+		{
+			"name": "09-storage",
+			"failure": null,
+			"installSeconds": 0.7067827089999918,
+			"flowSeconds": 19.199284833000043
+		},
+		{
+			"name": "10-url-route",
+			"failure": null,
+			"installSeconds": 0.7195191249999916,
+			"flowSeconds": 9.209710334000004
+		},
+		{
+			"name": "u1-base",
+			"failure": null,
+			"installSeconds": 0.7550934579999885,
+			"flowSeconds": 12.459420375000045
+		},
+		{
+			"name": "u11-pagination",
+			"failure": null,
+			"installSeconds": 0.6588768329999876,
+			"flowSeconds": 20.042862749999973
+		},
+		{
+			"name": "u12-buttongroup",
+			"failure": null,
+			"installSeconds": 0.7353674589999719,
+			"flowSeconds": 43.91631016700005
+		},
+		{
+			"name": "u13-accordion",
+			"failure": null,
+			"installSeconds": 0.5907157499999739,
+			"flowSeconds": 42.45471316599997
+		},
+		{
+			"name": "u14-gridlist",
+			"failure": null,
+			"installSeconds": 0.7404683750000549,
+			"flowSeconds": 18.136898665999993
+		},
+		{
+			"name": "u2-collapsible",
+			"failure": null,
+			"installSeconds": 0.687967874999973,
+			"flowSeconds": 13.727052084000082
+		},
+		{
+			"name": "u3-tabs",
+			"failure": null,
+			"installSeconds": 0.6465056249999906,
+			"flowSeconds": 17.156566583000007
+		},
+		{
+			"name": "u4-dialog",
+			"failure": null,
+			"installSeconds": 0.7012569170000498,
+			"flowSeconds": 29.574205000000074
+		},
+		{
+			"name": "u5-toggle",
+			"failure": null,
+			"installSeconds": 0.7197092910000356,
+			"flowSeconds": 12.479573333000065
+		}
+	]
+}
