@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
-import { compileNativeComponent } from '../compile.ts';
+import { compileNativeApp, compileNativeComponent } from '../compile.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
@@ -30,6 +30,29 @@ export function readRelativeModule(specifier: string, importer: string) {
 		? { filename: relative(repoRoot, file), source: readFileSync(file, 'utf8') }
 		: undefined;
 }
+/** Every page file under `<dir>/pages`, as the router names them (`pages/orders/[id].tsrx`). */
+function pageFiles(dir: string, under = 'pages'): string[] {
+	return readdirSync(join(dir, under), { withFileTypes: true }).flatMap((entry) =>
+		entry.isDirectory()
+			? pageFiles(dir, join(under, entry.name))
+			: entry.name.endsWith('.tsrx')
+				? [join(under, entry.name)]
+				: [],
+	);
+}
+
+/** Compiles a navigation rung's app: every page under `pages/`, with repo-relative filenames as for one-screen rungs. */
+export function compileRungApp(dir: string) {
+	return compileNativeApp({
+		pages: pageFiles(dir).map((page) => ({
+			page,
+			filename: relative(repoRoot, join(dir, page)),
+			source: readFileSync(join(dir, page), 'utf8'),
+		})),
+		readModule: readRelativeModule,
+	});
+}
+
 /** A hand-made payload, only for the harness's own fixture rungs that prove the machinery without the compiler. */
 const HAND_MADE_PAYLOAD = 'payload.json';
 /** Written here for Dragon, which turns it into the style export at proof time (DRAGON_DIR, `../style-export.ts`). */
@@ -108,6 +131,15 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 			);
 			assets.push(...styleAssets(dir, name));
 		}
+	} else if (existsSync(join(dir, 'pages'))) {
+		const build = await compileRungApp(dir);
+		if (!build.payload) {
+			const lines = build.diagnostics.map(
+				(diagnostic) => `  ${diagnostic.page}: ${diagnostic.code}: ${diagnostic.message}`,
+			);
+			throw new Error(`${name}: the app has no native build\n${lines.join('\n')}`);
+		}
+		assets.push([PROOF_PAYLOAD_PATH, new TextEncoder().encode(JSON.stringify(build.payload))]);
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
 		assets.push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);
 	} else {

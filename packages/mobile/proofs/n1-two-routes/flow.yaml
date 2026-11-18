@@ -1,0 +1,66 @@
+appId: ${APP_ID}
+name: n1-two-routes
+---
+- launchApp:
+      clearState: true
+- assertVisible: Start here
+- assertVisible: Taps 0
+- assertVisible: Open about
+- assertNotVisible: About this app
+- assertVisible: Home
+- tapOn: Taps 0
+- assertNotVisible: Taps 0
+- assertVisible: Taps 1
+- assertNotVisible: Taps 0
+- tapOn: Taps 1
+- assertNotVisible: Taps 1
+- assertVisible: Taps 2
+- assertNotVisible: Taps 1
+- tapOn: Open about
+- assertNotVisible: Taps 2
+- assertVisible: About
+- assertVisible: About this app
+- assertVisible: Two routes, one stack\.
+- assertNotVisible: Start here
+- assertNotVisible: Taps 2
+- assertVisible: About
+- swipe:
+      start: 1%, 50%
+      end: 85%, 50%
+      duration: 400
+- assertVisible: Start here
+- assertVisible: Taps 2
+- assertNotVisible: About this app
+- assertVisible: Home
+- assertVisible: Start here
+- assertVisible: Taps 2
+- assertNotVisible: About this app
+- assertVisible: Home
+- tapOn: Open about
+- assertVisible: About this app
+- assertNotVisible: Start here
+- assertNotVisible: Taps 2
+- assertVisible: About
+- assertVisible: About this app
+- assertNotVisible: Start here
+- assertNotVisible: Taps 2
+- assertVisible: About
+- runFlow:
+      when:
+          platform: iOS
+      commands:
+          - tapOn:
+                id: BackButton
+- runFlow:
+      when:
+          platform: Android
+      commands:
+          - pressKey: back
+- assertVisible: Start here
+- assertVisible: Taps 2
+- assertNotVisible: About this app
+- assertVisible: Home
+- assertVisible: Start here
+- assertVisible: Taps 2
+- assertNotVisible: About this app
+- assertVisible: Home

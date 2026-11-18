@@ -6,6 +6,9 @@ export const PROOF_APP_ID_VARIABLE = 'APP_ID';
 
 export const PROOF_APP_NAME = 'Proof';
 
+/** The URL scheme both shells register, so a flow can open the app at a deep link (`markless-proof://app/orders/42`). */
+export const PROOF_URL_SCHEME = 'markless-proof';
+
 /** Where both shells read the build's bytes: inside the iOS bundle, inside the APK's assets. */
 export const PROOF_PAYLOAD_PATH = 'markless/payload.json';
 export const PROOF_STYLE_PATH = 'markless/style.json';

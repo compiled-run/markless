@@ -1,5 +1,7 @@
 package dev.markless.mobile.test
 
+import dev.markless.mobile.core.AppPayload
+import dev.markless.mobile.core.AppRuntime
 import dev.markless.mobile.core.AttributeValue
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Js
@@ -21,6 +23,7 @@ import java.io.File
 import kotlin.system.exitProcess
 
 const val CONFORMANCE_VERSION = "markless.native-conformance/0"
+const val APP_CONFORMANCE_VERSION = "markless.native-app-conformance/0"
 
 private var failures = 0
 private var passes = 0
@@ -44,6 +47,7 @@ private fun field(o: Map<String, Json>, name: String, where: String): Json = o[n
 private fun runVector(file: File) {
 	val vector = Json.parse(file.readBytes()).obj(file.name)
 	val version = field(vector, "version", file.name).str("version")
+	if (version == APP_CONFORMANCE_VERSION) return runAppVector(file, vector)
 	check("${file.name} version", version == CONFORMANCE_VERSION) { "vector version is $version, this test reads $CONFORMANCE_VERSION" }
 	val payload = Payload.decode(field(vector, "payload", file.name))
 	val params = vector["params"]?.obj("params")?.mapValues { (k, v) -> v.str("params.$k") } ?: emptyMap()
@@ -72,6 +76,35 @@ private fun runVector(file: File) {
 		val actual = runtime.dispatch(field(action, "host", "action").str("host"), name, value).joinToString(",", "[", "]") { it.toJson() }
 		val expected = canonical(field(s, "journal", "steps[$n]"))
 		check("${file.name} step $n", actual == expected) { "expected $expected\n  actual   $actual" }
+	}
+}
+
+/** One `markless.native-app-conformance/0` vector: after opening and after each action, the stack's paths, the top screen's title and texts, and the journal. */
+private fun runAppVector(file: File, vector: Map<String, Json>) {
+	val app = AppPayload.decodeOrNull(field(vector, "app", file.name)) ?: throw IllegalStateException("${file.name}: app is a single page payload")
+	val runtime = AppRuntime(app, field(vector, "open", file.name).str("open"))
+	fun look(where: String, expected: Map<String, Json>) {
+		val stack = runtime.screens.joinToString(",", "[", "]") { jsonString(it.path) }
+		check("${file.name} $where stack", stack == canonical(field(expected, "stack", where))) { "expected ${canonical(field(expected, "stack", where))}\n  actual   $stack" }
+		val top = runtime.screens.last().runtime
+		val title = top.title()?.let(::jsonString) ?: "null"
+		check("${file.name} $where title", title == canonical(field(expected, "title", where))) { "expected ${canonical(field(expected, "title", where))}\n  actual   $title" }
+		val texts = top.texts().joinToString(",", "[", "]") { (n, t) -> "[${jsonString(n)},${jsonString(t)}]" }
+		check("${file.name} $where texts", texts == canonical(field(expected, "texts", where))) { "expected ${canonical(field(expected, "texts", where))}\n  actual   $texts" }
+	}
+	look("initial", field(vector, "initial", file.name).obj("initial"))
+	for ((n, step) in field(vector, "steps", file.name).arr("steps").withIndex()) {
+		val s = step.obj("steps[$n]")
+		val action = field(s, "action", "steps[$n]").obj("action")
+		val event = field(action, "event", "action").str("event")
+		val journal = if (event == "back") runtime.back() else {
+			val name = EventName.entries.firstOrNull { it.wire == event } ?: throw IllegalStateException("steps[$n] has unknown event $event")
+			runtime.dispatch(field(action, "host", "action").str("host"), name, action["value"]?.str("action.value"))
+		}
+		val actual = journal.joinToString(",", "[", "]") { it.toJson() }
+		val expected = canonical(field(s, "journal", "steps[$n]"))
+		check("${file.name} step $n journal", actual == expected) { "expected $expected\n  actual   $actual" }
+		look("step $n", s)
 	}
 }
 

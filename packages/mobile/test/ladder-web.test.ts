@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { copyFile, cp, mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -7,9 +8,9 @@ import { launchBrowser } from '../../../scripts/test-utils/browser.ts';
 import { startBuiltServer } from '../../../scripts/test-utils/built-server.ts';
 import { buildFixture } from '../../router/test/support/fixture-build.ts';
 import {
+	allRungFolders,
 	proofsDir,
 	readRung,
-	rungFolders,
 	type LadderRung,
 	type LadderStep,
 } from '../proofs/ladder.ts';
@@ -43,9 +44,14 @@ afterAll(() => browser.close(), 60_000);
 async function serveRung(folder: string, rung: LadderRung): Promise<string> {
 	const root = await mkdtemp(join(tmpdir(), `markless-ladder-${folder}-`));
 	cleanups.push(() => rm(root, { recursive: true, force: true }));
-	const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
-	await mkdir(dirname(page), { recursive: true });
-	await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
+	// A navigation rung is an app of several routes: its pages/ folder is the app's.
+	if (existsSync(join(proofsDir, folder, 'pages'))) {
+		await cp(join(proofsDir, folder, 'pages'), join(root, 'pages'), { recursive: true });
+	} else {
+		const page = join(root, 'pages', `${rung.route ?? 'index'}.tsrx`);
+		await mkdir(dirname(page), { recursive: true });
+		await copyFile(join(proofsDir, folder, 'App.tsrx'), page);
+	}
 	// Components a rung imports live in proofs/lib, which a page reaches as `../lib/...` from pages/ here too.
 	await cp(join(proofsDir, 'lib'), join(root, 'lib'), { recursive: true });
 	await writeFile(join(root, 'document.tsrx'), documentSource);
@@ -81,6 +87,7 @@ async function act(page: Page, step: LadderStep) {
 		await field.fill('');
 		await field.pressSequentially(action.type.text);
 	} else if ('relaunch' in action) await page.reload();
+	else if ('back' in action) await page.goBack();
 	else await page.clock.runFor(action.wait);
 }
 
@@ -99,6 +106,8 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 		const held = await page.getByRole('textbox', { name, exact: true }).inputValue();
 		if (held !== value) failed.push(`field "${name}" holds "${held}"`);
 	}
+	if (step.title !== undefined && (await page.title()) !== step.title)
+		failed.push(`the title is "${await page.title()}"`);
 	if (step.order) {
 		const tops: number[] = [];
 		for (const text of step.order)
@@ -109,7 +118,18 @@ async function mismatches(page: Page, step: LadderStep): Promise<string[]> {
 	return failed;
 }
 
-describe.each(rungFolders())('%s', (folder) => {
+// Where a step says the web differs (`onWeb`), the web is held to what it does instead.
+const onWeb = (step: LadderStep): LadderStep =>
+	step.onWeb
+		? {
+				visible: step.onWeb.visible ?? [],
+				...(step.onWeb.absent ? { absent: step.onWeb.absent } : {}),
+				...(step.onWeb.order ? { order: step.onWeb.order } : {}),
+				...(step.title === undefined ? {} : { title: step.title }),
+			}
+		: step;
+
+describe.each(allRungFolders())('%s', (folder) => {
 	const rung = readRung(folder);
 	let origin = '';
 
@@ -138,8 +158,14 @@ describe.each(rungFolders())('%s', (folder) => {
 				await page.clock.pauseAt(Date.now() + 60_000);
 			for (const [index, step] of rung.steps.entries()) {
 				await act(page, step);
+				if (step.onWeb?.leaves) {
+					await expect
+						.poll(() => new URL(page.url()).origin, { message: `step ${index} leaves` })
+						.not.toBe(origin);
+					break;
+				}
 				await expect
-					.poll(() => mismatches(page, step), {
+					.poll(() => mismatches(page, onWeb(step)), {
 						timeout: 10_000,
 						message: `step ${index}`,
 					})

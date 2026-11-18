@@ -3,7 +3,9 @@ import { join } from 'node:path';
 import { expect, test } from 'vitest';
 import { parseAllDocuments } from 'yaml';
 import {
+	allRungFolders,
 	changeWitness,
+	navRungFolders,
 	proofsDir,
 	readRung,
 	renderFlow,
@@ -19,8 +21,9 @@ test('the ladder has one proof folder per rung, in rung order', () => {
 		expect(existsSync(join(proofsDir, folder, 'App.tsrx'))).toBe(true);
 });
 
-test.each(rungFolders())('%s: flow.yaml is the flow its expected.json describes', (folder) => {
-	const documents = (source: string) => parseAllDocuments(source).map((document) => document.toJS());
+test.each(allRungFolders())('%s: flow.yaml is the flow its expected.json describes', (folder) => {
+	const documents = (source: string) =>
+		parseAllDocuments(source).map((document) => document.toJS());
 	const committed = documents(readFileSync(join(proofsDir, folder, 'flow.yaml'), 'utf8'));
 	expect(committed, 'run `node packages/mobile/proofs/write-flows.ts`').toEqual(
 		documents(renderFlow(folder, readRung(folder))),
@@ -30,7 +33,18 @@ test.each(rungFolders())('%s: flow.yaml is the flow its expected.json describes'
 	expect(commands[0]).toMatchObject({ launchApp: { clearState: true } });
 });
 
-test.each(rungFolders())(
+test('the navigation ladder has one app folder per rung, in rung order', () => {
+	expect(navRungFolders().map((folder) => readRung(folder).rung)).toEqual([
+		'N1',
+		'N2',
+		'N3',
+		'N4',
+	]);
+	for (const folder of navRungFolders())
+		expect(existsSync(join(proofsDir, folder, 'pages'))).toBe(true);
+});
+
+test.each(allRungFolders())(
 	'%s: every action step expects something the screen before it contradicts',
 	(folder) => {
 		const { steps } = readRung(folder);

@@ -1,0 +1,25 @@
+{
+	"rung": "N3",
+	"name": "navigate() from a handler: push, then replace",
+	"steps": [
+		{ "visible": ["Welcome screen ahead", "Sign in"], "title": "Home" },
+		{
+			"do": { "tap": "Sign in" },
+			"visible": ["Signed in", "Continue"],
+			"absent": ["Welcome screen ahead"],
+			"title": "Welcome"
+		},
+		{
+			"do": { "tap": "Continue" },
+			"visible": ["Your dashboard", "The welcome screen was replaced."],
+			"absent": ["Signed in"],
+			"title": "Dashboard"
+		},
+		{
+			"do": { "back": "button" },
+			"visible": ["Welcome screen ahead", "Sign in"],
+			"absent": ["Your dashboard", "Signed in"],
+			"title": "Home"
+		}
+	]
+}

@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { exec } from './exec.ts';
-import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME } from './proof-app.ts';
+import { ANDROID_SHELL_ACTIVITY, PROOF_APP_ID, PROOF_APP_NAME, PROOF_URL_SCHEME } from './proof-app.ts';
 import type { ProofAssets } from './rung.ts';
 import { type AndroidTools, cacheRoot, contentKey, filesUnder } from './tools.ts';
 
@@ -154,10 +154,16 @@ const manifest = () => `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="android.intent.action.VIEW" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.BROWSABLE" />
+				<data android:scheme="${PROOF_URL_SCHEME}" android:host="app" />
 			</intent-filter>
 		</activity>
 	</application>

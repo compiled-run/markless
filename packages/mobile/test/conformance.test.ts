@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
 	compileNativeComponent,
 	createNativeRuntime,
+	nativeAppConformance,
 	nativeConformance,
 	nativeStyleInput,
 } from '../src/index.ts';
-import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { compileRungApp } from '../src/harness/rung.ts';
+import { APP_CONFORMANCE_CASES, CONFORMANCE_CASES } from './conformance-cases.ts';
 
 const fixture = (name: string) =>
 	readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
@@ -44,6 +46,31 @@ describe('native conformance vectors', () => {
 				nativeConformance(payload!, entry.actions, entry.params),
 			);
 		}
+	});
+
+	it('every committed navigation vector file matches a fresh build of its app', async () => {
+		for (const entry of APP_CONFORMANCE_CASES) {
+			const { payload } = await compileRungApp(join(import.meta.dirname, '..', entry.app));
+			expect(committed(`${entry.name}.json`), entry.name).toEqual(
+				nativeAppConformance(payload!, entry.open, entry.actions),
+			);
+		}
+	});
+
+	it('navigation: a row link opens its row, Back shows the list as it was left, replace drops the screen it leaves', () => {
+		const orders = committed('navigation.json') as ReturnType<typeof nativeAppConformance>;
+		expect(orders.steps.map((step) => step.stack)).toEqual([
+			['/orders'],
+			['/orders', '/orders/42'],
+			['/orders'],
+			['/orders', '/orders/108'],
+		]);
+		expect(orders.steps.map((step) => step.title)).toEqual(['Orders', 'Order 42', 'Orders', 'Order 108']);
+		expect(orders.steps[2]!.journal).toEqual([]);
+		const replaced = committed('navigation-replace.json') as ReturnType<typeof nativeAppConformance>;
+		expect(replaced.steps.map((step) => step.stack)).toEqual([['/', '/welcome'], ['/', '/dashboard'], ['/']]);
+		const deep = committed('navigation-deep-link.json') as ReturnType<typeof nativeAppConformance>;
+		expect(deep.initial.stack).toEqual(['/', '/orders', '/orders/42']);
 	});
 
 	it('journals only the text nodes whose string changed, in document order', () => {

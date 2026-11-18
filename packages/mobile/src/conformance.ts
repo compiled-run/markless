@@ -1,4 +1,5 @@
-import type { NativeJournalEntry, NativeViewPayload } from '@markless/serializer';
+import type { NativeAppPayload, NativeJournalEntry, NativeViewPayload } from '@markless/serializer';
+import { createNativeAppRuntime, type NativeAppAction } from './app.ts';
 import { createNativeRuntime, type NativeAction } from './runtime.ts';
 
 export const NATIVE_CONFORMANCE_VERSION = 'markless.native-conformance/0';
@@ -49,5 +50,55 @@ export function nativeConformance(
 		...(initialArms.length > 0 ? { initialArms } : {}),
 		...(initialRows.length > 0 ? { initialRows } : {}),
 		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action) })),
+	};
+}
+
+export const NATIVE_APP_CONFORMANCE_VERSION = 'markless.native-app-conformance/0';
+
+/**
+ * What every host's stack must reproduce for an app: the screens it opens with at `open`, then for each action (a tap
+ * or input on the top screen, or `back`) its journal, the stack after it (paths, bottom first) and what the top screen
+ * shows: its title and texts, which after `back` are the ones the screen was left with.
+ */
+export type NativeAppConformance = {
+	readonly version: typeof NATIVE_APP_CONFORMANCE_VERSION;
+	readonly app: NativeAppPayload;
+	readonly open: string;
+	readonly initial: NativeAppConformanceScreen;
+	readonly steps: ReadonlyArray<
+		{
+			readonly action: NativeAppAction;
+			readonly journal: ReadonlyArray<NativeJournalEntry>;
+		} & NativeAppConformanceScreen
+	>;
+};
+
+type NativeAppConformanceScreen = {
+	readonly stack: ReadonlyArray<string>;
+	readonly title: string | null;
+	readonly texts: ReadonlyArray<readonly [node: string, text: string]>;
+};
+
+export function nativeAppConformance(
+	app: NativeAppPayload,
+	open: string,
+	actions: ReadonlyArray<NativeAppAction>,
+): NativeAppConformance {
+	const runtime = createNativeAppRuntime(app, open);
+	const look = (): NativeAppConformanceScreen => {
+		const screens = runtime.screens();
+		const top = screens.at(-1)!.runtime;
+		return {
+			stack: screens.map((screen) => screen.path),
+			title: top.title(),
+			texts: top.texts(),
+		};
+	};
+	return {
+		version: NATIVE_APP_CONFORMANCE_VERSION,
+		app,
+		open,
+		initial: look(),
+		steps: actions.map((action) => ({ action, journal: runtime.dispatch(action), ...look() })),
 	};
 }

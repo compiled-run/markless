@@ -1,0 +1,393 @@
+{
+	"version": "markless.native-app-conformance/0",
+	"app": {
+		"version": "markless.native-app/0",
+		"routes": [
+			{
+				"pattern": "/",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Shop",
+					"route": {
+						"pattern": "/",
+						"params": []
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Shop front"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0",
+							"element": "a",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0:text0",
+							"parent": "component-edge:0",
+							"parts": [
+								{
+									"text": "See orders"
+								}
+							]
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/orders",
+									"params": {}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Shop"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/orders",
+				"params": [],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Orders",
+					"route": {
+						"pattern": "/orders",
+						"params": []
+					},
+					"cells": [
+						{
+							"id": "state:orders",
+							"name": "orders",
+							"initial": [
+								{
+									"id": "7",
+									"name": "Desk lamp"
+								},
+								{
+									"id": "42",
+									"name": "Oak chair"
+								}
+							]
+						}
+					],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Your orders"
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "ul",
+							"parent": "h0"
+						},
+						{
+							"kind": "repeat",
+							"id": "repeat:0",
+							"parent": "h3",
+							"list": {
+								"cell": "state:orders"
+							},
+							"key": [
+								"id"
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h4",
+							"element": "li",
+							"parent": "h3",
+							"row": "repeat:0"
+						},
+						{
+							"kind": "element",
+							"id": "component-edge:0",
+							"element": "a",
+							"parent": "h4",
+							"row": "repeat:0"
+						},
+						{
+							"kind": "text",
+							"id": "component-edge:0:text0",
+							"parent": "component-edge:0",
+							"parts": [
+								{
+									"expr": {
+										"member": {
+											"item": "repeat:0"
+										},
+										"property": "name"
+									}
+								}
+							],
+							"row": "repeat:0"
+						}
+					],
+					"events": [
+						{
+							"host": "component-edge:0",
+							"event": "activate",
+							"handler": "handler:component-edge:0"
+						}
+					],
+					"handlers": [
+						{
+							"id": "handler:component-edge:0",
+							"ops": [
+								{
+									"op": "navigate",
+									"route": "/orders/[id]",
+									"params": {
+										"id": {
+											"member": {
+												"item": "repeat:0"
+											},
+											"property": "id"
+										}
+									}
+								}
+							]
+						}
+					],
+					"title": [
+						{
+							"text": "Orders"
+						}
+					]
+				}
+			},
+			{
+				"pattern": "/orders/[id]",
+				"params": [
+					"id"
+				],
+				"page": {
+					"version": "markless.native-view/0",
+					"component": "Order",
+					"route": {
+						"pattern": "/orders/[id]",
+						"params": [
+							"id"
+						]
+					},
+					"cells": [],
+					"nodes": [
+						{
+							"kind": "element",
+							"id": "h0",
+							"element": "main",
+							"parent": null
+						},
+						{
+							"kind": "element",
+							"id": "h2",
+							"element": "h1",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h2:text0",
+							"parent": "h2",
+							"parts": [
+								{
+									"text": "Details for order "
+								},
+								{
+									"expr": {
+										"member": {
+											"route": "params"
+										},
+										"property": "id"
+									}
+								}
+							]
+						},
+						{
+							"kind": "element",
+							"id": "h3",
+							"element": "p",
+							"parent": "h0"
+						},
+						{
+							"kind": "text",
+							"id": "h3:text0",
+							"parent": "h3",
+							"parts": [
+								{
+									"text": "Shipped to the address on file."
+								}
+							]
+						}
+					],
+					"events": [],
+					"handlers": [],
+					"title": [
+						{
+							"text": "Order "
+						},
+						{
+							"expr": {
+								"member": {
+									"route": "params"
+								},
+								"property": "id"
+							}
+						}
+					]
+				}
+			}
+		]
+	},
+	"open": "/orders/42",
+	"initial": {
+		"stack": [
+			"/",
+			"/orders",
+			"/orders/42"
+		],
+		"title": "Order 42",
+		"texts": [
+			[
+				"h2:text0",
+				"Details for order 42"
+			],
+			[
+				"h3:text0",
+				"Shipped to the address on file."
+			]
+		]
+	},
+	"steps": [
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/",
+				"/orders"
+			],
+			"title": "Orders",
+			"texts": [
+				[
+					"h2:text0",
+					"Your orders"
+				],
+				[
+					"component-edge:0:text0@7",
+					"Desk lamp"
+				],
+				[
+					"component-edge:0:text0@42",
+					"Oak chair"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "back"
+			},
+			"journal": [],
+			"stack": [
+				"/"
+			],
+			"title": "Shop",
+			"texts": [
+				[
+					"h2:text0",
+					"Shop front"
+				],
+				[
+					"component-edge:0:text0",
+					"See orders"
+				]
+			]
+		},
+		{
+			"action": {
+				"event": "activate",
+				"host": "component-edge:0"
+			},
+			"journal": [
+				{
+					"op": "navigate",
+					"route": "/orders",
+					"params": {}
+				}
+			],
+			"stack": [
+				"/",
+				"/orders"
+			],
+			"title": "Orders",
+			"texts": [
+				[
+					"h2:text0",
+					"Your orders"
+				],
+				[
+					"component-edge:0:text0@7",
+					"Desk lamp"
+				],
+				[
+					"component-edge:0:text0@42",
+					"Oak chair"
+				]
+			]
+		}
+	]
+}

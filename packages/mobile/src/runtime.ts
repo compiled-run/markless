@@ -42,6 +42,8 @@ export type NativeRuntime = {
 	readonly rows: () => ReadonlyArray<readonly [node: string, keys: ReadonlyArray<string>]>;
 	/** Runs the handler bound to the action and returns the journal the host applies. */
 	readonly dispatch: (action: NativeAction) => ReadonlyArray<NativeJournalEntry>;
+	/** The page's `<title>` text, null when it has none. */
+	readonly title: () => string | null;
 };
 
 /** How a value reads in text, as the web writes it (`marklessCsrText`): null is empty, anything else `String(value)`. */
@@ -71,11 +73,13 @@ export function evaluateNativeExpr(
 		return { ...scope.params };
 	}
 	if ('item' in expr) {
-		if (!scope.items.has(expr.item)) throw new Error(`the row item of ${expr.item} read outside its row`);
+		if (!scope.items.has(expr.item))
+			throw new Error(`the row item of ${expr.item} read outside its row`);
 		return scope.items.get(expr.item)!;
 	}
 	if ('local' in expr) {
-		if (!scope.locals.has(expr.local)) throw new Error(`the parameter ${expr.local} read outside its function`);
+		if (!scope.locals.has(expr.local))
+			throw new Error(`the parameter ${expr.local} read outside its function`);
 		return scope.locals.get(expr.local)!;
 	}
 	if ('array' in expr)
@@ -85,7 +89,8 @@ export function evaluateNativeExpr(
 			if (!Array.isArray(value)) throw new Error('a spread of a value that is not an array');
 			return value;
 		});
-	if ('object' in expr) return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
+	if ('object' in expr)
+		return Object.fromEntries(expr.object.map(([key, value]) => [key, evaluate(value)]));
 	if ('lambda' in expr) throw new Error('a function value outside a method call');
 	if ('method' in expr) {
 		const target = evaluate(expr.target);
@@ -95,14 +100,21 @@ export function evaluateNativeExpr(
 						evaluateNativeExpr(argument.body, read, eventValue, {
 							items: scope.items,
 							...(scope.params ? { params: scope.params } : {}),
-							locals: new Map([...scope.locals, ...argument.lambda.map((name, i) => [name, values[i] ?? null] as const)]),
+							locals: new Map([
+								...scope.locals,
+								...argument.lambda.map(
+									(name, i) => [name, values[i] ?? null] as const,
+								),
+							]),
 						})
 				: evaluate(argument),
 		);
 		const method = (target as unknown as Record<string, unknown> | null)?.[expr.method];
 		if ((typeof target !== 'string' && !Array.isArray(target)) || typeof method !== 'function')
 			throw new Error(`.${expr.method}() of a ${target === null ? 'null' : typeof target}`);
-		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as Value | undefined;
+		const result = (method as (...a: unknown[]) => unknown).apply(target, args) as
+			| Value
+			| undefined;
 		if (result === undefined) throw new Error(`.${expr.method}() gave undefined`);
 		return result;
 	}
@@ -162,8 +174,14 @@ export function evaluateNativeExpr(
 			.join('');
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
-		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
-		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
+		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length')
+			return value.length;
+		if (
+			value !== null &&
+			typeof value === 'object' &&
+			!Array.isArray(value) &&
+			Object.hasOwn(value, expr.property)
+		)
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);
 	}
@@ -182,11 +200,15 @@ export function createNativeRuntime(
 	const values = new Map<string, Value>(
 		payload.cells.map((cell) => [
 			cell.id,
-			cell.storage && store.has(cell.storage.key) ? store.get(cell.storage.key)! : cell.initial,
+			cell.storage && store.has(cell.storage.key)
+				? store.get(cell.storage.key)!
+				: cell.initial,
 		]),
 	);
 	const storageKeys = new Map(
-		payload.cells.flatMap((cell) => (cell.storage ? [[cell.id, cell.storage.key] as const] : [])),
+		payload.cells.flatMap((cell) =>
+			cell.storage ? [[cell.id, cell.storage.key] as const] : [],
+		),
 	);
 	const handlers = new Map(payload.handlers.map((handler) => [handler.id, handler.ops]));
 	const branches = new Map(
@@ -217,11 +239,17 @@ export function createNativeRuntime(
 	/** A row's key as hosts and journal entries spell it: `String()` of the item's key path. */
 	const rowsOf = (repeat: Extract<NativeNode, { kind: 'repeat' }>) => {
 		const list = evaluate(repeat.list);
-		if (!Array.isArray(list)) throw new Error(`${repeat.id} lists a value that is not an array`);
+		if (!Array.isArray(list))
+			throw new Error(`${repeat.id} lists a value that is not an array`);
 		return list.map((item) => {
 			let key: Value = item;
 			for (const step of repeat.key) {
-				if (key === null || typeof key !== 'object' || Array.isArray(key) || !Object.hasOwn(key, step))
+				if (
+					key === null ||
+					typeof key !== 'object' ||
+					Array.isArray(key) ||
+					!Object.hasOwn(key, step)
+				)
 					throw new Error(`${repeat.id}: a row has no key at ${repeat.key.join('.')}`);
 				key = (key as Record<string, Value>)[step]!;
 			}
@@ -229,7 +257,9 @@ export function createNativeRuntime(
 		});
 	};
 	/** Every instance of a node now shown: one outside lists, one per row inside one (`<id>@<key>`). */
-	const instances = (node: NativeNode): { readonly id: string; readonly scope: NativeScope }[] => {
+	const instances = (
+		node: NativeNode,
+	): { readonly id: string; readonly scope: NativeScope }[] => {
 		if (!shown(node)) return [];
 		if (!node.row) return [{ id: node.id, scope: base }];
 		const repeat = repeats.get(node.row);
@@ -244,7 +274,11 @@ export function createNativeRuntime(
 			.map((part) =>
 				'text' in part
 					? part.text
-					: formatNativeValue('cell' in part ? read(part.cell) : evaluate(part.expr, undefined, scope)),
+					: formatNativeValue(
+							'cell' in part
+								? read(part.cell)
+								: evaluate(part.expr, undefined, scope),
+						),
 			)
 			.join('');
 
@@ -263,15 +297,27 @@ export function createNativeRuntime(
 				? instances(node).flatMap(({ id, scope }) =>
 						(node.bindings ?? []).flatMap((binding) => {
 							if (!(kind in binding)) return [];
-							const name = 'attribute' in binding ? binding.attribute : binding.property;
-							return [[id, name, write(name, evaluate(binding.value, undefined, scope))] as const];
+							const name =
+								'attribute' in binding ? binding.attribute : binding.property;
+							return [
+								[
+									id,
+									name,
+									write(name, evaluate(binding.value, undefined, scope)),
+								] as const,
+							];
 						}),
 					)
 				: [],
 		);
-	const attributes = () => bound('attribute', (name, value) => marklessAttributeValue(name, value));
+	const attributes = () =>
+		bound('attribute', (name, value) => marklessAttributeValue(name, value));
 	const properties = () =>
-		bound('property', (_name, value) => String(value ?? '')) as (readonly [string, 'value', string])[];
+		bound('property', (_name, value) => String(value ?? '')) as (readonly [
+			string,
+			'value',
+			string,
+		])[];
 	const arms = () =>
 		payload.nodes.flatMap((node) =>
 			node.kind === 'branch' && shown(node) ? [[node.id, armOf(node)] as const] : [],
@@ -282,8 +328,23 @@ export function createNativeRuntime(
 				? [[node.id, rowsOf(node).map((row) => row.key)] as const]
 				: [],
 		);
-	const keyed = <T,>(list: ReadonlyArray<readonly [string, string, T]>) =>
+	const keyed = <T>(list: ReadonlyArray<readonly [string, string, T]>) =>
 		new Map(list.map(([node, name, value]) => [`${node}\0${name}`, value]));
+
+	const title = () => (payload.title ? render(payload.title, base) : null);
+	/** The scope an action's element runs in: a row instance (`h6@42`) reads its row's item. */
+	const scopeOf = (host: string): { node: string; scope: NativeScope } => {
+		const at = host.indexOf('@');
+		if (at < 0) return { node: host, scope: base };
+		const node = host.slice(0, at);
+		const key = host.slice(at + 1);
+		const row = payload.nodes.find((candidate) => candidate.id === node)?.row;
+		const repeat = row ? repeats.get(row) : undefined;
+		const found =
+			repeat && shown(repeat) ? rowsOf(repeat).find((entry) => entry.key === key) : undefined;
+		if (!repeat || !found) throw new Error(`${host} is not a shown row instance`);
+		return { node, scope: { ...base, items: new Map([[repeat.id, found.item]]) } };
+	};
 
 	return {
 		texts,
@@ -291,8 +352,12 @@ export function createNativeRuntime(
 		properties,
 		arms,
 		rows,
+		title,
 		dispatch(action) {
-			const event = payload.events.find((candidate) => candidate.host === action.host && candidate.event === action.event);
+			const { node: host, scope } = scopeOf(action.host);
+			const event = payload.events.find(
+				(candidate) => candidate.host === host && candidate.event === action.event,
+			);
 			if (!event) throw new Error(`no ${action.event} handler on ${action.host}`);
 			const eventValue = action.event === 'input' ? action.value : undefined;
 			const cellsBefore = new Map(values);
@@ -303,9 +368,27 @@ export function createNativeRuntime(
 			if (eventValue !== undefined) beforeProperties.set(`${action.host}\0value`, eventValue);
 			const beforeArms = new Map(arms());
 			const beforeRows = new Map(rows());
+			const beforeTitle = title();
 			for (const op of handlers.get(event.handler) ?? []) {
-				if (op.op === 'navigate') return [{ op: 'navigate', route: op.route, params: op.params }];
-				const value = evaluate(op.value, eventValue);
+				if (op.op === 'navigate') {
+					const params = Object.fromEntries(
+						Object.entries(op.params).map(([name, value]) => [
+							name,
+							typeof value === 'string'
+								? value
+								: String(evaluate(value, eventValue, scope)),
+						]),
+					);
+					return [
+						{
+							op: 'navigate',
+							route: op.route,
+							params,
+							...(op.replace ? { replace: true as const } : {}),
+						},
+					];
+				}
+				const value = evaluate(op.value, eventValue, scope);
 				values.set(op.cell, value);
 				const key = storageKeys.get(op.cell);
 				if (key !== undefined) store.set(key, value);
@@ -330,7 +413,9 @@ export function createNativeRuntime(
 						: [];
 				}
 				if (node.kind === 'branch') {
-					return beforeArms.has(node.id) && afterArms.has(node.id) && beforeArms.get(node.id) !== afterArms.get(node.id)
+					return beforeArms.has(node.id) &&
+						afterArms.has(node.id) &&
+						beforeArms.get(node.id) !== afterArms.get(node.id)
 						? [{ op: 'arm', node: node.id, index: afterArms.get(node.id)! }]
 						: [];
 				}
@@ -349,15 +434,43 @@ export function createNativeRuntime(
 						const name = 'attribute' in binding ? binding.attribute : binding.property;
 						const key = `${id}\0${name}`;
 						const [before, after] =
-							'attribute' in binding ? [beforeAttributes, afterAttributes] : [beforeProperties, afterProperties];
-						if (!before.has(key) || !after.has(key) || before.get(key) === after.get(key)) return [];
+							'attribute' in binding
+								? [beforeAttributes, afterAttributes]
+								: [beforeProperties, afterProperties];
+						if (
+							!before.has(key) ||
+							!after.has(key) ||
+							before.get(key) === after.get(key)
+						)
+							return [];
 						return 'attribute' in binding
-							? [{ op: 'attribute', node: id, name, value: afterAttributes.get(key)! }]
-							: [{ op: 'property', node: id, name: 'value', value: afterProperties.get(key)! }];
+							? [
+									{
+										op: 'attribute',
+										node: id,
+										name,
+										value: afterAttributes.get(key)!,
+									},
+								]
+							: [
+									{
+										op: 'property',
+										node: id,
+										name: 'value',
+										value: afterProperties.get(key)!,
+									},
+								];
 					}),
 				);
 			});
-			return [...styles, ...nodes];
+			const afterTitle = title();
+			return [
+				...styles,
+				...nodes,
+				...(afterTitle !== beforeTitle && afterTitle !== null
+					? [{ op: 'title' as const, value: afterTitle }]
+					: []),
+			];
 		},
 	};
 }
