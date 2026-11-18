@@ -49,6 +49,7 @@
 		"packages/bundler/test/bundle-size-symbol-table.test.ts",
 		"packages/bundler/test/chunk-import-map.test.ts",
 		"packages/bundler/test/compile-cache-size.test.ts",
+		"packages/bundler/test/compiler-warnings.test.ts",
 		"packages/bundler/test/composition-grid-build.test.ts",
 		"packages/bundler/test/computed-chain-growth.test.ts",
 		"packages/bundler/test/dense-async-symbol-table.test.ts",
@@ -222,6 +223,10 @@
 			{
 				"test": "packages/bundler/test/compile-cache-size.test.ts",
 				"why": "reads the compiler's in-process compile cache size from a plugin at buildEnd"
+			},
+			{
+				"test": "packages/bundler/test/compiler-warnings.test.ts",
+				"why": "reads the warnings the build prints through a Vite customLogger written in the test, which cannot cross a process boundary"
 			},
 			{
 				"test": "packages/bundler/test/dense-async-symbol-table.test.ts",

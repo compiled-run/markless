@@ -133,6 +133,8 @@ export interface TransformTsrxModuleResult {
 	map: null;
 	virtualModules: MarklessVirtualModule[];
 	manifest: MarklessTransformManifest;
+	/** Warning diagnostics this compile raised that no `markless-allow` comment suppressed. */
+	compilerWarnings?: ReadonlyArray<CompilerDiagnostic>;
 	moduleGraphInterface: ModuleGraphInterfaceArtifact;
 	interfaceHash: string;
 	moduleImports: SemanticGraphArtifact['moduleImports'];
