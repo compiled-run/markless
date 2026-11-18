@@ -11,6 +11,12 @@ import {
 } from './android.ts';
 import { instrumentFlow } from './flow.ts';
 import {
+	androidHostTests,
+	describeHostTests,
+	iosHostTests,
+	type HostTestOutcome,
+} from './host-tests.ts';
+import {
 	bootSimulator,
 	buildIosShell,
 	installProofApp,
@@ -23,6 +29,7 @@ import { PROOF_REPORT_VERSION, proofVerdict, type ProofReport } from './report.t
 import { loadRung, type ProofRung } from './rung.ts';
 import { verdictCommand } from './verdict.ts';
 import { androidTools, cacheRoot } from './tools.ts';
+import { dragonDir } from '../style-export.ts';
 
 const USAGE = `usage: markless-proof [options] <rung folder>...
        markless-proof verdict <dir>/ios.json <dir>/android.json
@@ -81,8 +88,37 @@ type PlatformOutcome = {
 const seconds = (since: number) => (performance.now() - since) / 1000;
 const fixed = (value: number) => value.toFixed(1);
 
+async function hostTestsCommand(argv: string[]): Promise<number> {
+	const { values } = parseArgs({
+		args: argv,
+		options: {
+			platform: { type: 'string' },
+			simulator: {
+				type: 'string',
+				default: process.env.MARKLESS_PROOF_SIMULATOR ?? 'markless-proof',
+			},
+		},
+	});
+	const hosts = join(mobileDir, 'src', 'adapters');
+	const dragon = existsSync(join(dragonDir(), 'package.json')) ? dragonDir() : undefined;
+	let outcome: HostTestOutcome;
+	if (values.platform === 'ios') {
+		const simulator = await bootSimulator(values.simulator);
+		try {
+			outcome = await iosHostTests(join(hosts, 'ios'), simulator.udid, dragon);
+		} finally {
+			await shutdownSimulator(simulator);
+		}
+	} else if (values.platform === 'android') {
+		outcome = await androidHostTests(join(hosts, 'android', 'src'));
+	} else throw new Error(`host-tests needs --platform ios or android, not ${values.platform}`);
+	console.log(describeHostTests(outcome));
+	return outcome.passed ? 0 : 1;
+}
+
 async function main(argv: string[]): Promise<number> {
 	if (argv[0] === 'verdict') return verdictCommand(argv.slice(1));
+	if (argv[0] === 'host-tests') return hostTestsCommand(argv.slice(1));
 	const { values, positionals } = parseArgs({
 		args: argv,
 		allowPositionals: true,
