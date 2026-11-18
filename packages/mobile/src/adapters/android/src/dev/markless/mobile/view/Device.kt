@@ -201,7 +201,8 @@ class PlatformDevice(private val activity: Activity) : NativeDevice {
 				}
 			}
 			"settings.open" -> {
-				activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)))
+				// Its own task: coming back to the app shows the app, not Settings left inside the app's task.
+				activity.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", activity.packageName, null)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 				settle?.invoke(DeviceOutcome.Value(JsValue.Null))
 			}
 			else -> throw MarklessHostError("this device has no call $name")
