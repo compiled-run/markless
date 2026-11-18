@@ -35,6 +35,15 @@ private func exportText(_ edit: (String) -> String = { $0 }) -> Data { Data(edit
 	#expect(layout.styles.count == decoded.nodes.count)
 }
 
+@Test func acceptsDragonsTextLinesWhichCoreTextDoesNotNeed() throws {
+	let (decoded, texts) = try payload()
+	let lines = "\"lines\": [{ \"top\": 0, \"baseline\": 70, \"runs\": [{ \"face\": \"Ahem\", \"size\": 60, \"glyphs\": [1, 2], \"xs\": [0, 60] }] }],\n     \"text\": \"Counter\""
+	let edited = exportText { $0.replacingOccurrences(of: "\"text\": \"Counter\"", with: lines) }
+	#expect(edited != counterExport)
+	let layout = try StyleExport.decode(edited).resolve(for: decoded, initialTexts: texts, value: noCells)
+	#expect(layout.styles["h1:text0"]?.frame == Frame(x: 0, y: 0, width: 284.953125 / 3, height: 29))
+}
+
 @Test(arguments: [
 	("\"kind\": \"font\"", "\"kind\": \"letter-spacing\"", "unknown style write kind \"letter-spacing\""),
 	("dragon.native-style-export/0", "dragon.native-style-export/2", "unsupported schema"),

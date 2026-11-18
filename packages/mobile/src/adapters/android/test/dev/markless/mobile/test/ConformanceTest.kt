@@ -29,7 +29,9 @@ import dev.markless.mobile.core.obj
 import dev.markless.mobile.core.str
 import dev.markless.mobile.style.BAND_KEY
 import dev.markless.mobile.style.Rgba
+import dev.markless.mobile.style.GlyphRun
 import dev.markless.mobile.style.StyleExport
+import dev.markless.mobile.style.TextLine
 import dev.markless.mobile.style.StyleWrite
 import java.io.File
 import kotlin.system.exitProcess
@@ -239,6 +241,35 @@ private fun dashedBorders(fixtures: File) {
 	}
 	val err = try { StyleExport.decode(text.replace("\"op\": \"dot\"", "\"op\": \"arc\"").toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
 	check("style export refuses an unknown border operation", err?.contains("unknown border operation \"arc\"") == true) { "error was: $err" }
+}
+
+private fun textLines(fixtures: File) {
+	val text = File(fixtures, "u17-borders-dashed.native-style.json").readText()
+	val run = """{ "face": "sha256:ab", "size": 39.37, "glyphs": [65, 1501], "xs": [0, 26.048019409179688] }"""
+	fun withLines(lines: String) = text.replace("\"text\": \"Borders\",", "\"text\": \"Borders\", \"lines\": $lines,")
+	val good = withLines("""[{ "top": -0.1875, "baseline": 37.8125, "runs": [$run] }]""")
+	check("the fixture gains lines", good != text) { "" }
+	val decoded = runCatching { StyleExport.decode(good.toByteArray()) }
+	check("decodes a text node's lines", decoded.isSuccess) { decoded.exceptionOrNull().toString() }
+	decoded.getOrNull()?.let { e ->
+		val lines = e.assignments[0].byId["h1:text0"]?.lines
+		check("a line keeps Dragon's glyphs, xs and baseline", lines == listOf(TextLine(-0.1875, 37.8125, listOf(GlyphRun("sha256:ab", 39.37, listOf(65, 1501), listOf(0.0, 26.048019409179688)))))) { "$lines" }
+		check("a text node without lines has none", e.assignments[0].byId["h2:text0"]?.lines == null) { "${e.assignments[0].byId["h2:text0"]?.lines}" }
+	}
+	fun refusesLines(name: String, changed: String, fragment: String) {
+		val err = try { StyleExport.decode(changed.toByteArray()); null } catch (e: MarklessDecodeError) { e.message }
+		check("style export refuses $name", err != null && err.contains(fragment)) { "error was: $err" }
+	}
+	refusesLines("lines that are not a list", withLines("{}"), "lines must be an array")
+	refusesLines("a line with an unknown field", withLines("""[{ "top": 0, "baseline": 1, "runs": [], "width": 3 }]"""), "unknown field")
+	refusesLines("a line without a baseline", withLines("""[{ "top": 0, "runs": [] }]"""), "baseline")
+	refusesLines("a run with fewer xs than glyphs", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1, 2], "xs": [0] }] }]"""), "one x per glyph")
+	refusesLines("an empty run", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [], "xs": [] }] }]"""), "at least one glyph")
+	refusesLines("a fractional glyph id", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [1.5], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a glyph id past 16 bits", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 10, "glyphs": [70000], "xs": [0] }] }]"""), "not a glyph id")
+	refusesLines("a zero size", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "face": "sha256:ab", "size": 0, "glyphs": [1], "xs": [0] }] }]"""), "not a positive size")
+	refusesLines("a run without a face", withLines("""[{ "top": 0, "baseline": 1, "runs": [{ "size": 10, "glyphs": [1], "xs": [0] }] }]"""), "face")
+	refusesLines("lines on an element", text.replace("\"text\": null,", "\"text\": null, \"lines\": [],"), "only a framed text node has lines")
 }
 
 private fun ops() {
@@ -471,6 +502,7 @@ fun main(args: Array<String>) {
 	appStyle(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	appCanvas(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	dashedBorders(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
+	textLines(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	sheetStyles(File(System.getProperty("markless.fixtures") ?: error("set -Dmarkless.fixtures")))
 	decoderStrictness()
 	val dirs = args.map(::File)

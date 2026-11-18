@@ -63,14 +63,23 @@ internal fun isDark(configuration: Configuration): Boolean =
 /** Looks up a font face by the id a style export names it with (`sha256:<hex>` of the font file). */
 fun interface FontSource {
 	fun typeface(id: String): Typeface
+
+	/** The face as a [android.graphics.fonts.Font], which draws a style export's glyph ids. */
+	fun font(id: String): android.graphics.fonts.Font = throw MarklessHostError("this font source has no glyph font for \"$id\"")
 }
 
 /** Faces bundled as APK assets at `markless-fonts/<hex>.ttf`, the hex of the font file's SHA-256. */
 class AssetFonts(private val context: Context) : FontSource {
 	private val cache = HashMap<String, Typeface>()
 	override fun typeface(id: String): Typeface = cache.getOrPut(id) {
+		Typeface.createFromAsset(context.assets, path(id))
+	}
+	private val faces = HashMap<String, android.graphics.fonts.Font>()
+	override fun font(id: String): android.graphics.fonts.Font = faces.getOrPut(id) { android.graphics.fonts.Font.Builder(context.assets, path(id)).build() }
+
+	private fun path(id: String): String {
 		if (!id.startsWith("sha256:")) throw MarklessHostError("font id \"$id\" is not a sha256 id")
-		Typeface.createFromAsset(context.assets, "markless-fonts/${id.removePrefix("sha256:")}.ttf")
+		return "markless-fonts/${id.removePrefix("sha256:")}.ttf"
 	}
 }
 
@@ -111,6 +120,10 @@ class MarklessHost(
 	private val views = HashMap<String, View>()
 	private val built = HashMap<String, Instance>()
 	private val textViews = HashMap<String, TextView>()
+	/** Each text view that draws Dragon's glyph lines over itself instead of its own text. */
+	private val glyphLines = HashMap<TextView, GlyphLines>()
+	/** Each styled text view's node and its frame origin inside the view, for drawing its lines again when its text changes. */
+	private val lineSources = HashMap<TextView, Pair<StyledNode, Pair<Double, Double>>>()
 	/** Without a style export, text flows in paragraphs (one text view each); with one, Dragon lays out every text node. */
 	private val flow: TextFlow? = if (style == null) TextFlow(payload) else null
 	/** Each shown text instance's current string, which its paragraph view is rendered from. */
@@ -375,7 +388,7 @@ class MarklessHost(
 					if (entry.node !in heldTexts) throw MarklessHostError("journal names text \"${entry.node}\", which is not shown")
 					heldTexts[entry.node] = entry.value
 					render(paragraphOf(entry.node))
-				} else textView(entry.node).text = entry.value
+				} else textView(entry.node).let { it.text = entry.value; drawLines(it) }
 				is JournalEntry.Attribute -> if (flow?.flowing(flow.node(entry.node.substringBefore('@'))) == true) {
 					// A phrase element's attributes (`datetime`, `title`) change nothing its paragraph shows.
 					attrs.getOrPut(entry.node) { HashMap() }.let { if (entry.value == null) it.remove(entry.name) else it[entry.name] = entry.value }
@@ -508,6 +521,10 @@ class MarklessHost(
 			scrollers.remove(inst.id)
 			textViews.remove(inst.id)
 			inert.remove(inst.id)
+			if (inst.node is Node.Text && view is TextView) {
+				hideLines(view)
+				lineSources.remove(view)
+			}
 			if ((inst.node is Node.Text || flow?.flowing(inst.node) == true) && view is Button) continue
 			expanded.remove(view)
 			(view.parent as? ViewGroup)?.let { p ->
@@ -1007,9 +1024,12 @@ class MarklessHost(
 		if (sheet != null) (views.getValue(sheet) as MarklessBox).fixedSize = Math.round(layout.export.viewportWidth * dpr).toInt() to Math.round(maxOf(layout.export.viewportHeight * dpr, layout.contentBottom())).toInt()
 		val (ax, ay) = origin
 		val parentId = parentOf(inst)
+		// The node's frame origin inside its view: a label's inside its button, other text's inside its outward-rounded view.
+		var inView = (ax - Math.floor(ax)) to (ay - Math.floor(ay))
 		if (node is Node.Text && view is Button) {
 			val (bx, by) = absolute.getValue(parentId!!)
 			val box = styled.byId.getValue(parentId).frame!!
+			inView = (ax - bx.roundToInt()) to (ay - by.roundToInt())
 			// The label rounds outward inside the button's rounded box, as other text does: a narrower content box wraps the run.
 			view.setPadding(
 				maxOf(0, Math.floor(ax).toInt() - bx.roundToInt()), maxOf(0, Math.floor(ay).toInt() - by.roundToInt()),
@@ -1030,9 +1050,32 @@ class MarklessHost(
 			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s)
+		if (view is TextView && node is Node.Text) {
+			lineSources[view] = s to inView
+			drawLines(view)
+		}
 		// A box that paints nothing (an empty clip) has no order to keep.
 		val paintsNothing = (view as? MarklessBox)?.clip?.isEmpty == true
 		(view.parent as? MarklessBox)?.order(view, s.writes.filterIsInstance<StyleWrite.PaintOrder>().firstOrNull()?.takeIf { !paintsNothing }?.let { checkSiblingOrderSuffices(s, it, styled); it.bucket * 100_000 + it.rank + 1 } ?: 0)
+	}
+
+	/** Draws Dragon's lines over a text view whose text is still the one Dragon laid out; otherwise the view draws its own text. */
+	private fun drawLines(view: TextView) {
+		val (s, inView) = lineSources[view] ?: return
+		val drawn = glyphLines[view]
+		val lines = s.lines?.takeIf { s.text == view.text.toString() } ?: return hideLines(view)
+		val color = s.writes.filterIsInstance<StyleWrite.TextColor>().lastOrNull()?.color?.argb ?: drawn?.color ?: view.currentTextColor
+		val glyphs = drawn ?: GlyphLines(fonts).also { glyphLines[view] = it; view.overlay.add(it) }
+		val frame = s.frame!!
+		glyphs.setBounds(0, 0, Math.ceil(inView.first + frame.width).toInt(), Math.ceil(inView.second + frame.height).toInt())
+		glyphs.set(lines, inView.first, inView.second, color)
+		view.setTextColor(Color.TRANSPARENT)
+	}
+
+	private fun hideLines(view: TextView) {
+		val drawn = glyphLines.remove(view) ?: return
+		view.overlay.remove(drawn)
+		view.setTextColor(drawn.color)
 	}
 
 	/** After layout: the largest gap, in device px, between any edge of a view's laid-out box (relative to the root) and its Dragon frame. */

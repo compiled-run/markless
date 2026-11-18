@@ -339,7 +339,7 @@ public struct StyleExport: Sendable {
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps", "scrollRange"])
+		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["borderOps", "scrollRange", "lines"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
