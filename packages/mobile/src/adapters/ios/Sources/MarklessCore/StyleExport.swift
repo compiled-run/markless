@@ -24,6 +24,12 @@ public enum StyleWrite: Sendable {
 	case font(family: String, size: Double)
 	case textColor(RGBA)
 	case syntheticBold
+	/// `overflow-x` / `overflow-y` `auto` or `scroll`: the box hosts its children in a scroll view over its padding box.
+	case scrollContainer(x: Bool, y: Bool)
+	/// `scrollbar-width: none`.
+	case scrollIndicatorsHidden
+	/// `overscroll-behavior: none` on an axis.
+	case scrollBounce(x: Bool, y: Bool)
 }
 
 public struct StyleNode: Sendable {
@@ -35,6 +41,8 @@ public struct StyleNode: Sendable {
 	public let frame: Frame?
 	public let borderWidths: (top: Double, right: Double, bottom: Double, left: Double)?
 	public let writes: [StyleWrite]
+	/// Only on a scroll container: its offset range in device px.
+	public let scrollRange: ScrollOffsetRange?
 }
 
 /// A style state of Dragon's export: the cell it follows (by key) and the values it can take.
@@ -59,6 +67,10 @@ public struct StyleExport: Sendable {
 	public let next: [[[Int]]]
 	/// Why Dragon does not call this target shipping output yet; nil when it is `ready`.
 	public let notReady: String?
+	/// Each assignment's page scroll range in device px; nil when Dragon does not decide it (see `pageScrollUndecided`).
+	public let pageScrolls: [ScrollOffsetRange?]
+	/// Dragon's reason, for this target, when it leaves a page scroll range undecided.
+	public let pageScrollUndecided: String?
 
 	/// Reads the target this host renders, by Dragon target name (`ios`) and the backend it must have been lowered for.
 	public static func decode(_ data: Data, target: String = "ios", backend: String = "uikit") throws -> StyleExport {
@@ -108,13 +120,15 @@ public struct StyleExport: Sendable {
 		var initial = 0
 		var assignments: [(values: [String: NativeValue], nodes: [StyleNode])]
 		var next: [[[Int]]] = [[]]
+		var pageScrolls: [ScrollOffsetRange?] = []
 		if perState {
 			states = try targetFields["states"].array().map { state in
 				let f = try state.object(["key", "domain"])
 				return StyleState(key: try f["key"].string(), domain: try f["domain"].array().map { NativeValue(json: $0.value) })
 			}
 			assignments = try targetFields["assignments"].array().map { assignment in
-				let f = try assignment.object(["values", "nodes"])
+				let f = try assignment.object(required: ["values", "nodes"], optional: ["pageScroll"])
+				pageScrolls.append(f.has("pageScroll") ? try decodeRange(try f["pageScroll"]) : nil)
 				let valuesReader = try f["values"]
 				var values: [String: NativeValue] = [:]
 				for key in try valuesReader.keys() { values[key] = NativeValue(json: try valuesReader.field(key).value) }
@@ -133,14 +147,33 @@ public struct StyleExport: Sendable {
 			}
 		} else {
 			assignments = [([:], try checkedNodes(try targetFields["nodes"]))]
+			pageScrolls = [nil]
+		}
+		var pageScrollUndecided: String?
+		if fields.has("warnings") {
+			for warning in try fields["warnings"].array() {
+				let w = try warning.object(["code", "message"])
+				let message = try w["message"].string()
+				if try w["code"].string() == "DRAGON_PAGE_SCROLL_UNDECIDED", message.hasPrefix("\(target): ") {
+					pageScrollUndecided = String(message.dropFirst(target.count + 2))
+				}
+			}
 		}
 		return StyleExport(
 			fonts: fonts, viewport: (try viewport["width"].number(), try viewport["height"].number()),
-			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady)
+			dpr: try targetFields["dpr"].number(), states: states, initial: initial, assignments: assignments, next: next, notReady: notReady,
+			pageScrolls: pageScrolls, pageScrollUndecided: pageScrollUndecided)
+	}
+
+	/// A scroll range, or nil for JSON null.
+	private static func decodeRange(_ reader: Reader) throws -> ScrollOffsetRange? {
+		if reader.isNull { return nil }
+		let r = try reader.object(["minX", "maxX", "minY", "maxY"])
+		return ScrollOffsetRange(minX: try r["minX"].number(), maxX: try r["maxX"].number(), minY: try r["minY"].number(), maxY: try r["maxY"].number())
 	}
 
 	private static func decodeNode(_ node: Reader) throws -> StyleNode {
-		let field = try node.object(["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"])
+		let field = try node.object(required: ["id", "parent", "kind", "native", "text", "frame", "borderWidths", "writes"], optional: ["scrollRange"])
 		let kind = try field["kind"].string()
 		let native = try field["native"].string()
 		var isText = false
@@ -165,7 +198,8 @@ public struct StyleExport: Sendable {
 		return StyleNode(
 			id: try field["id"].string(), parent: try field["parent"].optionalString(), isText: isText, isAnonymous: isAnonymous,
 			text: textReader.isNull ? nil : try textReader.string(), frame: frame, borderWidths: borderWidths,
-			writes: try field["writes"].array().map(decodeWrite))
+			writes: try field["writes"].array().map(decodeWrite),
+			scrollRange: field.has("scrollRange") ? try decodeRange(try field["scrollRange"]) : nil)
 	}
 
 	private static func decodeWrite(_ write: Reader) throws -> StyleWrite {
@@ -213,6 +247,17 @@ public struct StyleExport: Sendable {
 			_ = try f["keys"].array().map { try $0.number() }
 			_ = try f["values"].array().map { try $0.number() }
 			return .syntheticBold
+		case "scroll-container":
+			let f = try write.object(["kind", "x", "y", "key"])
+			try expectKey(f, "dragonScroll.range")
+			return .scrollContainer(x: try f["x"].bool(), y: try f["y"].bool())
+		case "scroll-indicators-hidden":
+			try expectKey(try write.object(["kind", "key"]), "dragonScroll.indicators")
+			return .scrollIndicatorsHidden
+		case "scroll-bounce":
+			let f = try write.object(["kind", "bounceX", "bounceY", "key"])
+			try expectKey(f, "dragonScroll.bounce")
+			return .scrollBounce(x: try f["bounceX"].bool(), y: try f["bounceY"].bool())
 		default:
 			throw PayloadError(path: write.path + ".kind", reason: "unknown style write kind \"\(kind)\"")
 		}

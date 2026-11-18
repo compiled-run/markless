@@ -126,9 +126,10 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	field.sendActions(for: .editingDidEndOnExit)
 	#expect(!field.isFirstResponder)
 	#expect(field.becomeFirstResponder())
-	let gestures = views.root.gestureRecognizers ?? []
-	#expect(gestures.contains { $0 is UIPanGestureRecognizer } && gestures.contains { $0 is UITapGestureRecognizer })
-	#expect(gestures.allSatisfy { !$0.cancelsTouchesInView })
+	// A tap outside the field blurs it, as on the web; a drag scrolls the page and keeps the keyboard up.
+	let gestures = views.page.gestureRecognizers?.filter { $0 is UITapGestureRecognizer } ?? []
+	#expect(gestures.count == 1 && gestures.allSatisfy { !$0.cancelsTouchesInView })
+	#expect(views.root.gestureRecognizers?.isEmpty ?? true)
 	views.keyboard.dismiss()
 	#expect(!field.isFirstResponder)
 	field.text = "Samantha"
@@ -169,8 +170,8 @@ private func tree(_ controller: MarklessViewController) throws -> ViewTree {
 	let after = try #require(controller.tree)
 	#expect(after !== before)
 	#expect(after.labels["h1:text0"]?.text == "Fruit pear")
-	#expect(after.root.superview === controller.view)
-	#expect(before.root.superview == nil)
+	#expect(after.page.superview === controller.view)
+	#expect(before.page.superview == nil)
 	#expect(throws: HostError.self) { try MarklessViewController(payload: vectorPayload("route"), store: MemoryStore(), route: "/apple/seeds") }
 }
 
@@ -246,3 +247,47 @@ private func toggleExport(initial: Int = 0) throws -> (NativeViewPayload, Data) 
 	#expect(throws: HostError.self) { try MarklessViewController(payload: counterPayload(), style: style, fonts: swapped) }
 }
 #endif
+
+/// The counter's payload in a styled export where its main is a 200 point tall scroll container, its button 300 points
+/// down inside it, and the page 1000 points taller than the screen.
+private func scrollingCounterExport() throws -> Data {
+	let node = { (id: String, parent: String?, text: String?, y: Int, height: Int, extra: String) in
+		#"{"id":"\#(id)","parent":\#(parent.map { "\"\($0)\"" } ?? "null"),"kind":"\#(text == nil ? "element" : "text")","native":"\#(text == nil ? "DragonBoxView" : "DragonTextView")","text":\#(text.map { "\"\($0)\"" } ?? "null"),"frame":{"x":0,"y":\#(y),"width":\#(id == "h0" ? 1206 : 300),"height":\#(height)},"borderWidths":\#(text == nil ? #"{"top":0,"right":0,"bottom":0,"left":0}"# : "null"),"writes":[],\#(extra)}"#
+			.replacingOccurrences(of: ",}", with: "}")
+	}
+	let scroller = #""writes":[{"kind":"scroll-container","x":true,"y":true,"key":"dragonScroll.range"}],"scrollRange":{"minX":0,"maxX":0,"minY":0,"maxY":600}"#
+	let nodes = [
+		node("h0", nil, nil, 0, 600, "").replacingOccurrences(of: #""writes":[]"#, with: scroller),
+		node("h1", "h0", nil, 0, 60, ""), node("h1:text0", "h1", "Counter", 0, 60, ""),
+		node("h2", "h0", nil, 900, 60, ""), node("h2:text0", "h2", "Count 0", 0, 60, ""),
+	].joined(separator: ",")
+	return Data(#"""
+		{"schema":"dragon.native-style-export/1","units":"device px; frames relative to the parent box","fonts":[],"targets":{"ios":{"backend":"uikit","viewport":{"width":402,"height":778},"dpr":3,
+		"states":[],"initial":0,"assignments":[{"values":{},"pageScroll":{"minX":0,"maxX":0,"minY":0,"maxY":3000},"nodes":[\#(nodes)]}],"next":[[]]}}}
+		"""#.utf8)
+}
+
+@MainActor @Test func aScrollContainerAndThePageScrollAndBringAnElementIntoView() throws {
+	let controller = try MarklessViewController(payload: counterPayload(), style: try scrollingCounterExport(), store: MemoryStore())
+	let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 402, height: 778))
+	window.rootViewController = controller
+	window.makeKeyAndVisible()
+	controller.view.layoutIfNeeded()
+	let views = try tree(controller)
+	#expect(views.page.contentSize == CGSize(width: 402, height: 778 + 1000))
+	let box = try #require(views.elements["h0"]?.subviews.compactMap { $0 as? UIScrollView }.first)
+	#expect(box.frame == CGRect(x: 0, y: 0, width: 402, height: 200))
+	#expect(box.contentSize == CGSize(width: 402, height: 400))
+	let button = try #require(views.elements["h2"])
+	#expect(button.superview === box)
+	#expect(button.frame == CGRect(x: 0, y: 300, width: 100, height: 20))
+	let inset = views.page.adjustedContentInset.top
+	// scrollIntoView(): the box scrolls to its end (200), and the page brings the button, now 100 points down, to the top.
+	views.bringIntoView(button, block: scrollIntoViewAlign.block, inline: scrollIntoViewAlign.inline)
+	#expect(box.contentOffset.y == 200)
+	#expect(views.page.contentOffset.y + inset == 100)
+	// focus() on a fully shown element scrolls nothing.
+	views.bringIntoView(button, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+	#expect(box.contentOffset.y == 200)
+	#expect(views.page.contentOffset.y + inset == 100)
+}

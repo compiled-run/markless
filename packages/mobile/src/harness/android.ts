@@ -154,7 +154,7 @@ const manifest = () => `<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="${PROOF_APP_ID}" android:versionCode="1" android:versionName="1.0">
 	<uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36" />
 	<application android:label="${PROOF_APP_NAME}" android:hasCode="true">
-		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+		<activity android:name="${ANDROID_SHELL_ACTIVITY}" android:exported="true" android:windowSoftInputMode="adjustResize" android:theme="@android:style/Theme.Material.Light.NoActionBar">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />

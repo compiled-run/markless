@@ -1,0 +1,34 @@
+{
+	"rung": 16,
+	"name": "A text field at the bottom of a scrolling page takes the keyboard and stays in view",
+	"steps": [
+		{
+			"visible": ["Keyboard", "Line 1"],
+			"offScreen": ["Note"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 80],
+					"to": [50, 25],
+					"until": "Note"
+				}
+			},
+			"visible": ["Note"],
+			"offScreen": ["Keyboard"]
+		},
+		{
+			"do": {
+				"type": {
+					"field": "Note",
+					"text": "Hi",
+					"keyboard": "stays"
+				}
+			},
+			"visible": ["Note says Hi"],
+			"fields": {
+				"Note": "Hi"
+			}
+		}
+	]
+}

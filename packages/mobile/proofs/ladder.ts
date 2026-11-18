@@ -5,9 +5,30 @@ import { stringify } from 'yaml';
 /** One person's action between two looks at the screen. Every target is a visible text or an accessible name. */
 export type LadderAction =
 	| { readonly tap: string }
-	| { readonly type: { readonly field: string; readonly text: string } }
+	/** `keyboard: 'stays'` leaves the keyboard up afterwards, as a person still typing does. */
+	| {
+			readonly type: {
+				readonly field: string;
+				readonly text: string;
+				readonly keyboard?: 'stays';
+			};
+	  }
 	| { readonly relaunch: true }
-	| { readonly wait: number };
+	| { readonly wait: number }
+	/**
+	 * A drag across the screen from one point to another, each `[x, y]` in percent of the screen; with `until`, repeated
+	 * (up to 80 times) until that text or accessible name is on screen.
+	 */
+	| {
+			readonly swipe: {
+				readonly from: readonly [number, number];
+				readonly to: readonly [number, number];
+				readonly until?: string;
+			};
+	  };
+
+/** The most swipes a `swipe` with `until` makes before its step's checks fail it. */
+export const SWIPES_UNTIL = 80;
 
 /** What the screen shows after a step's action (or at launch, for the first step). */
 export type LadderStep = {
@@ -16,6 +37,8 @@ export type LadderStep = {
 	readonly visible: readonly string[];
 	/** Texts or accessible names that are not on screen. */
 	readonly absent?: readonly string[];
+	/** Texts or accessible names the page holds but that are scrolled out of sight. */
+	readonly offScreen?: readonly string[];
 	/** Controls, by text or accessible name, that are on screen and cannot be activated. */
 	readonly disabled?: readonly string[];
 	/** Texts that are on screen in this order, top to bottom. */
@@ -55,7 +78,7 @@ const selector = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
  */
 export function changeWitness(previous: LadderStep, step: LadderStep): LadderStep {
 	const wasShown = new Set(previous.visible);
-	const wasAbsent = new Set(previous.absent ?? []);
+	const wasAbsent = new Set([...(previous.absent ?? []), ...(previous.offScreen ?? [])]);
 	const order = step.order?.join('\n') !== previous.order?.join('\n') ? step.order : undefined;
 	const fields = Object.fromEntries(
 		Object.entries(step.fields ?? {}).filter(
@@ -65,6 +88,9 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 	return {
 		visible: step.visible.filter((text) => wasAbsent.has(text)),
 		absent: (step.absent ?? []).filter((text) => wasShown.has(text)),
+		...((step.offScreen ?? []).some((text) => wasShown.has(text)) && {
+			offScreen: (step.offScreen ?? []).filter((text) => wasShown.has(text)),
+		}),
 		...(order && { order }),
 		...(Object.keys(fields).length > 0 && { fields }),
 	};
@@ -73,12 +99,15 @@ export function changeWitness(previous: LadderStep, step: LadderStep): LadderSte
 export const witnessCount = (witness: LadderStep): number =>
 	witness.visible.length +
 	(witness.absent?.length ?? 0) +
+	(witness.offScreen?.length ?? 0) +
 	(witness.order ? 1 : 0) +
 	Object.keys(witness.fields ?? {}).length;
 
 const assertions = (step: LadderStep): unknown[] => [
 	...step.visible.map((text) => ({ assertVisible: selector(text) })),
-	...(step.absent ?? []).map((text) => ({ assertNotVisible: selector(text) })),
+	...[...(step.absent ?? []), ...(step.offScreen ?? [])].map((text) => ({
+		assertNotVisible: selector(text),
+	})),
 	...(step.disabled ?? []).map((text) => ({
 		assertVisible: { text: selector(text), enabled: false },
 	})),
@@ -95,9 +124,23 @@ const actionCommands = (action: LadderAction, step: LadderStep): unknown[] => {
 			{ tapOn: selector(action.type.field) },
 			'eraseText',
 			{ inputText: action.type.text },
-			'hideKeyboard',
+			...(action.type.keyboard === 'stays' ? [] : ['hideKeyboard']),
 		];
 	if ('relaunch' in action) return ['stopApp', 'launchApp'];
+	if ('swipe' in action) {
+		const at = ([x, y]: readonly [number, number]) => `${x}%, ${y}%`;
+		const swipe = { swipe: { start: at(action.swipe.from), end: at(action.swipe.to) } };
+		if (!action.swipe.until) return [swipe];
+		return [
+			{
+				repeat: {
+					times: SWIPES_UNTIL,
+					while: { notVisible: selector(action.swipe.until) },
+					commands: [swipe],
+				},
+			},
+		];
+	}
 	return [
 		{
 			extendedWaitUntil: {

@@ -8,6 +8,7 @@ import dev.markless.mobile.core.arr
 import dev.markless.mobile.core.field
 import dev.markless.mobile.core.num
 import dev.markless.mobile.core.obj
+import dev.markless.mobile.core.ScrollRange
 import dev.markless.mobile.core.str
 
 const val STYLE_EXPORT_SCHEMA_0 = "dragon.native-style-export/0"
@@ -31,12 +32,19 @@ sealed interface StyleWrite {
 	/** [size] in CSS px. */
 	data class Font(val family: String, val size: Double) : StyleWrite
 	data class TextColor(val color: Rgba) : StyleWrite
+	/** `overflow-x` / `overflow-y` `auto` or `scroll`: the box hosts its children in a scroll view over its padding box. */
+	data class ScrollContainer(val x: Boolean, val y: Boolean) : StyleWrite
+	/** `scrollbar-width: none`. */
+	data object ScrollIndicatorsHidden : StyleWrite
+	/** `overscroll-behavior: none` on an axis; Android draws no bounce, so it is read and kept only. */
+	data class ScrollBounce(val x: Boolean, val y: Boolean) : StyleWrite
 }
 
-data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>)
+/** [scrollRange], device px, only on a scroll container. */
+data class StyledNode(val id: String, val parent: String?, val kind: String, val frame: Frame?, val borderWidths: Edges?, val writes: List<StyleWrite>, val scrollRange: ScrollRange? = null)
 
-/** One reachable combination of style states: every node's frame and writes, complete. */
-data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>) {
+/** One reachable combination of style states: every node's frame and writes, complete; [pageScroll] in device px, null when Dragon leaves it undecided. */
+data class Assignment(val values: Map<String, JsValue>, val nodes: List<StyledNode>, val pageScroll: ScrollRange? = null) {
 	val byId: Map<String, StyledNode> = nodes.associateBy { it.id }
 }
 
@@ -46,7 +54,7 @@ data class StyleState(val key: String, val domain: List<JsValue>)
  * One platform's slice of a Dragon style export: per state assignment, frames (device px, relative to the parent box) and
  * lowered writes per node id; [next] is `next[a][s][v]`, the assignment reached by setting state s to its v-th value (-1: none).
  */
-data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>) {
+data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportHeight: Double, val states: List<StyleState>, val initial: Int, val assignments: List<Assignment>, val next: List<List<List<Int>>>, val pageScrollUndecided: String? = null) {
 
 	/** The export state for a payload cell: its key is the cell id, or ends in `#<cell id>`. */
 	fun stateFor(cell: String): Int {
@@ -89,13 +97,22 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			val assignments = t.field("assignments", target).arr("assignments").mapIndexed { a, v ->
 				val o = v.obj("assignments[$a]")
 				val values = o.field("values", "assignments[$a]").obj("values").mapValues { (k, x) -> scalar(x, "assignments[$a].values.$k") }
-				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]") })
+				Assignment(values, o.field("nodes", "assignments[$a]").arr("nodes").mapIndexed { n, x -> node(x, "assignments[$a].nodes[$n]") }, o["pageScroll"]?.let { range(it, "assignments[$a].pageScroll") })
 			}
+			val undecided = root["warnings"]?.arr("warnings")?.map { it.obj("warnings[]") }?.firstOrNull { w ->
+				w.field("code", "warning").str("code") == "DRAGON_PAGE_SCROLL_UNDECIDED" && w.field("message", "warning").str("message").startsWith("$target: ")
+			}?.let { it.getValue("message").str("message").removePrefix("$target: ") }
 			val initial = t.field("initial", target).num("initial").toInt()
 			val next = t.field("next", target).arr("next").map { row -> row.arr("next[]").map { col -> col.arr("next[][]").map { it.num("next[][][]").toInt() } } }
 			if (initial !in assignments.indices) throw MarklessDecodeError("style export initial $initial names no assignment")
 			if (next.size != assignments.size || next.any { r -> r.size != states.size || r.withIndex().any { (si, c) -> c.size != states[si].domain.size || c.any { it != -1 && it !in assignments.indices } } }) throw MarklessDecodeError("style export next table does not match its assignments and states")
-			return StyleExport(dpr, width, height, states, initial, assignments, next)
+			return StyleExport(dpr, width, height, states, initial, assignments, next, undecided)
+		}
+
+		private fun range(v: Json, what: String): ScrollRange? {
+			if (v == Json.Null) return null
+			val o = v.obj(what)
+			return ScrollRange(o.field("minX", what).num("minX"), o.field("maxX", what).num("maxX"), o.field("minY", what).num("minY"), o.field("maxY", what).num("maxY"))
 		}
 
 		private fun node(v: Json, what: String): StyledNode {
@@ -107,7 +124,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 			if (kind !in setOf("element", "text", "anonymous")) throw MarklessDecodeError("$what has unknown node kind \"$kind\"")
 			val bw = o["borderWidths"]?.takeIf { it != Json.Null }?.obj("$what.borderWidths")?.let { Edges(it.field("top", what).num("top"), it.field("right", what).num("right"), it.field("bottom", what).num("bottom"), it.field("left", what).num("left")) }
 			val writes = o.field("writes", what).arr("$what.writes").mapIndexed { n, w -> write(w, "$id writes[$n]") }
-			return StyledNode(id, parent, kind, frame, bw, writes)
+			val scroll = o["scrollRange"]?.let { range(it, "$what.scrollRange") }
+			if ((scroll != null) != writes.any { it is StyleWrite.ScrollContainer }) throw MarklessDecodeError("$what: a scroll range comes with a scroll-container write, and only then")
+			return StyledNode(id, parent, kind, frame, bw, writes, scroll)
 		}
 
 		private fun scalar(v: Json, what: String): JsValue = when (v) {
@@ -145,6 +164,9 @@ data class StyleExport(val dpr: Double, val viewportWidth: Double, val viewportH
 					StyleWrite.Font(f.field("family", what).str("family"), f.field("size", what).num("size"))
 				}
 				"text-color" -> StyleWrite.TextColor(color(o.field("color", what), "$what.color"))
+				"scroll-container" -> StyleWrite.ScrollContainer((o.field("x", what) as? Json.Bool ?: throw MarklessDecodeError("$what.x must be a boolean")).value, (o.field("y", what) as? Json.Bool ?: throw MarklessDecodeError("$what.y must be a boolean")).value)
+				"scroll-indicators-hidden" -> StyleWrite.ScrollIndicatorsHidden
+				"scroll-bounce" -> StyleWrite.ScrollBounce((o.field("bounceX", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceX must be a boolean")).value, (o.field("bounceY", what) as? Json.Bool ?: throw MarklessDecodeError("$what.bounceY must be a boolean")).value)
 				else -> throw MarklessDecodeError("$what has unknown style write kind \"$kind\"")
 			}
 		}

@@ -70,6 +70,19 @@ public final class MarklessViewController: UIViewController {
 		tree?.mount(in: screen)
 	}
 
+	public override func viewDidLoad() {
+		super.viewDidLoad()
+		// As a phone browser does once the keyboard is up: the focused field is scrolled into what the keyboard leaves shown.
+		NotificationCenter.default.addObserver(forName: UIResponder.keyboardDidShowNotification, object: nil, queue: .main) { [weak self] _ in
+			MainActor.assumeIsolated { self?.revealFocusedField() }
+		}
+	}
+
+	private func revealFocusedField() {
+		guard let tree, let field = tree.focusedField else { return }
+		tree.bringIntoView(field, block: focusIntoViewAlign.block, inline: focusIntoViewAlign.inline)
+	}
+
 	public override func viewIsAppearing(_ animated: Bool) {
 		super.viewIsAppearing(animated)
 		if let layout, abs(traitCollection.displayScale - layout.dpr) > 0.001 {
@@ -95,7 +108,7 @@ public final class MarklessViewController: UIViewController {
 	private func navigate(_ route: String, _ params: [NativeRouteParam]) throws {
 		guard payload.route?.pattern == route else { throw HostError("no page for \(route): this payload is \(payload.route?.pattern ?? "not a page")") }
 		runtime = NativeRuntime(payload: payload, store: store, params: params)
-		tree?.root.removeFromSuperview()
+		tree?.page.removeFromSuperview()
 		try buildPage()
 		if isViewLoaded { tree?.mount(in: view) }
 	}

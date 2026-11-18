@@ -16,7 +16,15 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
+import android.widget.ScrollView
 import android.widget.TextView
+import dev.markless.mobile.core.ScrollAlignment
+import dev.markless.mobile.core.ScrollBox
+import dev.markless.mobile.core.ScrollRange
+import dev.markless.mobile.core.ScrollRect
+import dev.markless.mobile.core.scrollIntoView
 import dev.markless.mobile.core.EventName
 import dev.markless.mobile.core.Instance
 import dev.markless.mobile.core.JournalEntry
@@ -68,6 +76,8 @@ class MarklessHost(
 	private val textViews = HashMap<String, TextView>()
 	private var assignment = style?.initial ?: 0
 	private val expanded = HashMap<View, Boolean?>()
+	/** Each scroll container's scroll views (outermost first) and the content box its children sit in. */
+	private val scrollers = HashMap<String, Pair<List<FrameLayout>, MarklessBox>>()
 	private val dpr = context.resources.displayMetrics.density.toDouble()
 	private val absolutes: List<Map<String, Pair<Double, Double>>> = style?.let {
 		if (Math.abs(dpr - it.dpr) > 1e-3) throw MarklessHostError("style export is for pixel ratio ${it.dpr}; this device is $dpr")
@@ -142,7 +152,7 @@ class MarklessHost(
 	private fun rebuild() {
 		removeHidden()
 		buildShown()
-		for (v in views.values.toList()) if (v is MarklessBox) reorder(v)
+		for (v in views.values.toList() + scrollers.values.map { it.second }) if (v is MarklessBox) reorder(v)
 	}
 
 	private fun shownInstances(): List<Instance> = payload.nodes.filter { it is Node.Element || it is Node.Text }.flatMap(runtime::instances)
@@ -153,6 +163,7 @@ class MarklessHost(
 			if (inst.id in live) continue
 			val view = views.remove(inst.id)!!
 			built.remove(inst.id)
+			scrollers.remove(inst.id)
 			textViews.remove(inst.id)
 			if (inst.node is Node.Text && view is Button) continue
 			expanded.remove(view)
@@ -175,7 +186,7 @@ class MarklessHost(
 			built[inst.id] = inst
 			val parentId = parentOf(inst)
 			if (parentId != null && view !== views[parentId]) {
-				val parent = views[parentId] as? MarklessBox ?: throw MarklessHostError("\"${inst.id}\" is inside \"$parentId\", which cannot hold children on Android")
+				val parent = scrollers[parentId]?.second ?: views[parentId] as? MarklessBox ?: throw MarklessHostError("\"${inst.id}\" is inside \"$parentId\", which cannot hold children on Android")
 				parent.addView(view)
 				reorder(parent)
 			}
@@ -238,6 +249,7 @@ class MarklessHost(
 				named(this, inst.id)
 			}
 			"input" -> EditText(context).apply {
+				setOnFocusChangeListener { v, focused -> if (focused) bringIntoView(v, dev.markless.mobile.core.FOCUS_INTO_VIEW) }
 				isSingleLine = true
 				includeFontPadding = false
 				if (style != null) { background = null; setPadding(0, 0, 0, 0) }
@@ -245,6 +257,7 @@ class MarklessHost(
 			}
 			else -> MarklessBox(context).apply { named(this, inst.id, heading = node.element in HEADINGS, control = events[node.id].orEmpty().any { it.event == EventName.Activate }, link = node.element == "a") }
 		}
+		style?.assignments?.get(assignment)?.byId?.get(inst.id)?.let { styled -> scrollContainer(inst.id, view, styled) }
 		views[inst.id] = view
 		for (b in node.bindings) if (b.property) (view as? EditText ?: throw MarklessHostError("\"${node.id}\" binds ${b.name} but is not an input")).setText(runtime.property(b, inst.scope))
 		for (e in events[node.id].orEmpty()) when (e.event) {
@@ -264,6 +277,87 @@ class MarklessHost(
 		for (b in node.bindings) if (!b.property) attribute(inst.id, b.name, runtime.attribute(b, inst.scope))
 		return view
 	}
+
+	/**
+	 * A scroll container gets the platform's scroll views over its padding box: a ScrollView for the block axis, a
+	 * HorizontalScrollView for the inline axis, nested when both have a range. A scroll that reaches the end of a box goes on to
+	 * the page, as the web chains it.
+	 */
+	private fun scrollContainer(id: String, view: View, styled: StyledNode) {
+		val w = styled.writes.filterIsInstance<StyleWrite.ScrollContainer>().singleOrNull() ?: return
+		val box = view as? MarklessBox ?: throw MarklessHostError("\"$id\" is a scroll container but not a box")
+		val range = styled.scrollRange ?: throw MarklessHostError("\"$id\" is a scroll container with no scroll range")
+		if (range.minX != 0.0 || range.minY != 0.0) throw MarklessHostError("\"$id\" has a scroll range starting before 0 (right to left, or a reversed flex box), which is not implemented on Android")
+		val x = w.x && range.maxX > 0
+		val y = w.y && range.maxY > 0
+		val indicators = StyleWrite.ScrollIndicatorsHidden !in styled.writes
+		val vertical = ScrollView(context).apply { isNestedScrollingEnabled = true; isVerticalScrollBarEnabled = indicators; isFillViewport = true }
+		val horizontal = HorizontalScrollView(context).apply { isNestedScrollingEnabled = true; isHorizontalScrollBarEnabled = indicators; isFillViewport = true }
+		val chain: List<FrameLayout> = when {
+			x && y -> listOf(vertical, horizontal)
+			x -> listOf(horizontal)
+			else -> listOf(vertical)
+		}
+		val content = MarklessBox(context)
+		for ((outer, inner) in chain.zipWithNext()) outer.addView(inner, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+		chain.last().addView(content)
+		box.addView(chain.first())
+		scrollers[id] = chain to content
+	}
+
+	/** Puts a scroll container's scroll views over its padding box and sizes its content to the range. */
+	private fun sizeScroller(id: String, box: MarklessBox, s: StyledNode, frame: Rect) {
+		val (chain, content) = scrollers[id] ?: if (s.writes.any { it is StyleWrite.ScrollContainer }) throw MarklessHostError("\"$id\" became a scroll container after it was built") else return
+		val w = s.writes.filterIsInstance<StyleWrite.ScrollContainer>().singleOrNull() ?: throw MarklessHostError("\"$id\" stopped being a scroll container after it was built")
+		val range = s.scrollRange ?: throw MarklessHostError("\"$id\" is a scroll container with no scroll range")
+		val bw = s.borderWidths ?: throw MarklessHostError("\"$id\" is a scroll container with no border widths")
+		val port = Rect(bw.left.roundToInt(), bw.top.roundToInt(), frame.width() - bw.right.roundToInt(), frame.height() - bw.bottom.roundToInt())
+		box.frames[chain.first()] = port
+		content.fixedSize = (port.width() + if (w.x) range.maxX.roundToInt() else 0) to (port.height() + if (w.y) range.maxY.roundToInt() else 0)
+	}
+
+	/**
+	 * Scrolls every scrolling ancestor of [target], innermost first, as Chrome's scrollIntoView() ([dev.markless.mobile.core.SCROLL_INTO_VIEW])
+	 * or focus() ([dev.markless.mobile.core.FOCUS_INTO_VIEW]) does.
+	 */
+	fun bringIntoView(target: View, align: ScrollAlignment) {
+		val chain = generateSequence(target.parent as? View) { it.parent as? View }.filterIsInstance<FrameLayout>().filter { it is ScrollView || it is HorizontalScrollView }.toList()
+		if (chain.isEmpty()) return
+		fun at(v: View) = IntArray(2).also { v.getLocationInWindow(it) }
+		val boxes = chain.mapIndexed { i, s ->
+			val child = s.getChildAt(0)
+			val portW = (s.width - s.paddingLeft - s.paddingRight).toDouble()
+			val portH = (s.height - s.paddingTop - s.paddingBottom).toDouble()
+			val here = at(s)
+			val origin = if (i + 1 < chain.size) at(chain[i + 1].getChildAt(0)).let { o -> (here[0] + s.paddingLeft - o[0]).toDouble() to (here[1] + s.paddingTop - o[1]).toDouble() } else 0.0 to 0.0
+			ScrollBox(ScrollRect(origin.first, origin.second, portW, portH), s.scrollX.toDouble(), s.scrollY.toDouble(), ScrollRange(0.0, maxOf(0.0, child.width - portW), 0.0, maxOf(0.0, child.height - portH)))
+		}
+		val t = at(target)
+		val inner = at(chain.first().getChildAt(0))
+		val offsets = scrollIntoView(boxes, ScrollRect((t[0] - inner[0]).toDouble(), (t[1] - inner[1]).toDouble(), target.width.toDouble(), target.height.toDouble()), align)
+		for ((s, o) in chain.zip(offsets)) s.scrollTo(o.first.roundToInt(), o.second.roundToInt())
+	}
+
+	/**
+	 * The page's scrollable size in px, Dragon's page range over its viewport; null without a style export. A page taller than
+	 * its viewport whose range Dragon leaves undecided is refused, naming Dragon's reason.
+	 */
+	fun pageSize(): Pair<Int, Int>? {
+		val st = style ?: return null
+		val w = (st.viewportWidth * dpr).roundToInt()
+		val h = (st.viewportHeight * dpr).roundToInt()
+		val range = st.assignments[assignment].pageScroll
+		if (range != null) {
+			if (range.minX != 0.0 || range.minY != 0.0 || range.maxX != 0.0) throw MarklessHostError("a page scroll range of $range (wider than the screen, or starting before 0) is not implemented on Android")
+			return w to h + range.maxY.roundToInt()
+		}
+		val f = rootFrame
+		if (f != null && (f.bottom > h + 1 || f.right > w + 1)) throw MarklessHostError("the page is ${f.bottom} px tall on a $h px screen, and Dragon does not decide its scroll range: ${st.pageScrollUndecided ?: "the style export has no page range"}")
+		return w to h
+	}
+
+	/** The text field that has the keyboard, if any. */
+	fun focusedField(): EditText? = views.values.firstOrNull { it is EditText && it.isFocused } as EditText?
 
 	private fun text(node: Node.Text, inst: Instance): View {
 		val parent = views.getValue(parentOf(inst)!!)
@@ -306,14 +400,17 @@ class MarklessHost(
 			val box = styled.byId.getValue(parentId).frame!!
 			view.setPadding((ax - bx).roundToInt(), (ay - by).roundToInt(), (bx + box.width).roundToInt() - (ax + frame.width).roundToInt(), (by + box.height).roundToInt() - (ay + frame.height).roundToInt())
 		} else {
-			val (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
+			var (ox, oy) = parentId?.let { absolute.getValue(it) }?.let { it.first.roundToInt() to it.second.roundToInt() } ?: (0 to 0)
+			// Inside a scroll container, frames count from its padding box, where its content box starts.
+			parentId?.let { scrollers[it] }?.let { styled.byId.getValue(parentId).borderWidths?.let { bw -> ox += bw.left.roundToInt(); oy += bw.top.roundToInt() } }
 			// Text rounds outward: a run a fraction of a pixel narrower than its frame wraps.
 			val rect = if (node is Node.Text) {
 				Rect(Math.floor(ax).toInt() - ox, Math.floor(ay).toInt() - oy, Math.ceil(ax + frame.width).toInt() - ox, Math.ceil(ay + frame.height).toInt() - oy)
 			} else {
 				Rect(ax.roundToInt() - ox, ay.roundToInt() - oy, (ax + frame.width).roundToInt() - ox, (ay + frame.height).roundToInt() - oy)
 			}
-			if (parentId == null) rootFrame = rect else (views.getValue(parentId) as MarklessBox).frames[view] = rect
+			if (parentId == null) rootFrame = rect else (scrollers[parentId]?.second ?: views.getValue(parentId) as MarklessBox).frames[view] = rect
+			if (view is MarklessBox) sizeScroller(inst.id, view, s, rect)
 		}
 		paint(view, s)
 	}
@@ -377,6 +474,7 @@ class MarklessHost(
 				setTextSize(TypedValue.COMPLEX_UNIT_PX, (w.size * dpr).toFloat())
 			}
 			is StyleWrite.TextColor -> (view as? TextView ?: throw MarklessHostError("text colour on \"${s.id}\", which is not text")).setTextColor(w.color.argb)
+			is StyleWrite.ScrollContainer, StyleWrite.ScrollIndicatorsHidden, is StyleWrite.ScrollBounce -> if (s.id !in scrollers) throw MarklessHostError("\"${s.id}\" has scroll writes but no scroll views")
 		}
 		if (s.kind == "text") {
 			if (view !is Button) view.background = null

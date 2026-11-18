@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compileNativeComponent, nativeConformance } from '../src/index.ts';
 import { CONFORMANCE_CASES } from './conformance-cases.ts';
+import { scrollVectors } from '../src/scroll.ts';
+import { SCROLL_CASES } from './scroll-cases.ts';
 
 for (const entry of CONFORMANCE_CASES) {
 	const source = readFileSync(join(import.meta.dirname, '..', entry.fixture), 'utf8');
@@ -19,3 +21,7 @@ for (const entry of CONFORMANCE_CASES) {
 		`${JSON.stringify(nativeConformance(payload, entry.actions, entry.params), null, '\t')}\n`,
 	);
 }
+writeFileSync(
+	new URL('../conformance/scroll/scroll-into-view.json', import.meta.url),
+	`${JSON.stringify(scrollVectors(SCROLL_CASES), null, '\t')}\n`,
+);

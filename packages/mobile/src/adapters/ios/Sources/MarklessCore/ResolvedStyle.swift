@@ -7,11 +7,30 @@ public struct ResolvedStyle: Equatable, Sendable {
 	public var cornerRadius: Double = 0
 	public var font: (family: String, size: Double)?
 	public var textColor: RGBA?
+	/// Set on a scroll container: the axes CSS lets scroll, its offset range in points, and its scroll view's look.
+	public var scroll: ResolvedScroll?
 
 	public static func == (a: ResolvedStyle, b: ResolvedStyle) -> Bool {
 		a.frame == b.frame && a.background == b.background && a.borderWidth == b.borderWidth && a.borderColor == b.borderColor
 			&& a.cornerRadius == b.cornerRadius && a.font?.family == b.font?.family && a.font?.size == b.font?.size
-			&& a.textColor == b.textColor
+			&& a.textColor == b.textColor && a.scroll == b.scroll
+	}
+}
+
+public struct ResolvedScroll: Equatable, Sendable {
+	public var x: Bool
+	public var y: Bool
+	/// Points; a scroll view's content is its padding box grown by `maxX` and `maxY`.
+	public var range: ScrollOffsetRange
+	/// The padding box inside the border box, in points: top, left, bottom, right border widths.
+	public var inset: (top: Double, left: Double, bottom: Double, right: Double)
+	public var indicators = true
+	public var bounceX = true
+	public var bounceY = true
+
+	public static func == (a: ResolvedScroll, b: ResolvedScroll) -> Bool {
+		a.x == b.x && a.y == b.y && a.range == b.range && a.inset == b.inset && a.indicators == b.indicators
+			&& a.bounceX == b.bounceX && a.bounceY == b.bounceY
 	}
 }
 
@@ -26,6 +45,10 @@ public struct StyleLayout: Sendable {
 	public let next: [[[Int]]]
 	public var styles: [String: ResolvedStyle] { assignments[start] }
 	public let viewport: (width: Double, height: Double)
+	/// Each assignment's page scroll range in points; nil when Dragon left it undecided.
+	public let pageScrolls: [ScrollOffsetRange?]
+	/// Why Dragon left the page scroll range undecided, when it says.
+	public let pageScrollUndecided: String?
 	/// Device pixels per point the frames were laid out for; a screen with another scale is refused.
 	public let dpr: Double
 	public let fontFiles: [(id: String, file: String)]
@@ -70,7 +93,8 @@ extension StyleExport {
 				try resolveNodes(assignments[index].nodes, for: payload, initialTexts: index == start ? initialTexts : nil)
 			},
 			start: start, stateCells: stateCells, domains: states.map(\.domain), next: next,
-			viewport: viewport, dpr: dpr, fontFiles: fonts)
+			viewport: viewport, pageScrolls: try pageScrolls.map { try $0.map(points) }, pageScrollUndecided: pageScrollUndecided,
+			dpr: dpr, fontFiles: fonts)
 	}
 
 	private func resolveNodes(
@@ -116,8 +140,17 @@ extension StyleExport {
 
 
 
+	/// A device px range in points; a range that starts before 0 (right to left, a reversed flex box) is not implemented.
+	private func points(_ range: ScrollOffsetRange) throws -> ScrollOffsetRange {
+		guard range.minX == 0, range.minY == 0 else { throw styleError("a scroll range starting before 0 (\(range.minX), \(range.minY)) is not implemented on iOS") }
+		return ScrollOffsetRange(minX: 0, maxX: range.maxX / dpr, minY: 0, maxY: range.maxY / dpr)
+	}
+
 	private func resolve(_ node: StyleNode, _ writes: [StyleWrite]) throws -> ResolvedStyle {
 		var style = ResolvedStyle()
+		var scrollAxes: (x: Bool, y: Bool)?
+		var indicators = true
+		var bounce = (x: true, y: true)
 		style.frame = node.frame.map { Frame(x: $0.x / dpr, y: $0.y / dpr, width: $0.width / dpr, height: $0.height / dpr) }
 		var borderStyles: [String] = []
 		var borderColors: [RGBA] = []
@@ -135,7 +168,20 @@ extension StyleExport {
 			case let .font(family, size): style.font = (family, size)
 			case let .textColor(color): style.textColor = color
 			case .syntheticBold: throw styleError("\(node.id): synthetic-bold is not implemented on iOS")
+			case let .scrollContainer(x, y): scrollAxes = (x, y)
+			case .scrollIndicatorsHidden: indicators = false
+			case let .scrollBounce(x, y): bounce = (x, y)
 			}
+		}
+		if let axes = scrollAxes {
+			guard let range = node.scrollRange else { throw styleError("\(node.id) is a scroll container with no scroll range") }
+			guard let widths = node.borderWidths else { throw styleError("\(node.id) is a scroll container with no border widths") }
+			style.scroll = ResolvedScroll(
+				x: axes.x, y: axes.y, range: try points(range),
+				inset: (widths.top / dpr, widths.left / dpr, widths.bottom / dpr, widths.right / dpr),
+				indicators: indicators, bounceX: bounce.x, bounceY: bounce.y)
+		} else if node.scrollRange != nil || !indicators || bounce != (true, true) {
+			throw styleError("\(node.id) has scroll view writes but no scroll-container write")
 		}
 		if let widths = node.borderWidths {
 			let all = [widths.top, widths.right, widths.bottom, widths.left]

@@ -65,6 +65,8 @@ function walk(
 		if (action && 'relaunch' in action) {
 			runtime = createNativeRuntime(payload, store, params);
 			mount();
+		} else if (action && 'swipe' in action) {
+			// Scrolling changes what is on screen, not what the page holds; the devices and the web judge the screen.
 		} else if (action && !('tap' in action) && !('type' in action))
 			throw new Error(`step ${index}: the payload has no way to ${Object.keys(action)[0]}`);
 		else if (action) {
@@ -131,6 +133,9 @@ function walk(
 		const shown = [...texts.values(), ...labels().map(([, label]) => label)];
 		expect(shown, `step ${index}`).toEqual(expect.arrayContaining([...step.visible]));
 		for (const text of step.absent ?? []) expect(shown, `step ${index}`).not.toContain(text);
+		expect(shown, `step ${index}: scrolled out of sight, still held`).toEqual(
+			expect.arrayContaining([...(step.offScreen ?? [])]),
+		);
 		if (step.order)
 			expect(shown.filter((text) => step.order!.includes(text))).toEqual(step.order);
 		for (const text of step.disabled ?? []) {

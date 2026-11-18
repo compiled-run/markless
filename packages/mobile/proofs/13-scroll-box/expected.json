@@ -1,0 +1,32 @@
+{
+	"rung": 13,
+	"name": "A fixed-height box with overflow-y auto scrolls inside a page that also scrolls",
+	"steps": [
+		{
+			"visible": ["Scroll box", "Box row 1"],
+			"offScreen": ["Box row 30", "Page row 20"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 48],
+					"to": [50, 18],
+					"until": "Box row 30"
+				}
+			},
+			"visible": ["Box row 30", "Scroll box"],
+			"offScreen": ["Page row 20"]
+		},
+		{
+			"do": {
+				"swipe": {
+					"from": [50, 90],
+					"to": [50, 40],
+					"until": "Page row 20"
+				}
+			},
+			"visible": ["Page row 20"],
+			"offScreen": ["Scroll box"]
+		}
+	]
+}
