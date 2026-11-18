@@ -3,7 +3,6 @@ import { box } from '@async/witness';
 const FIXTURE = 'fixtures/vite-nitro';
 const COMPONENT = `${FIXTURE}/components/counter.tsrx`;
 const WAIT = { timeoutMs: 20_000 };
-const PORT = 51731;
 
 export default box(
 	{
@@ -17,9 +16,8 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
-				// A fixed high strict port keeps this box off the owner's dev server
-				// (3000) so a red here can never be someone else's page.
-				server: { ...config.server, port: PORT, strictPort: true },
+				// A port the system picks free: a fixed one can be in use, as another process's outgoing connection.
+				server: { ...config.server, port: 0 },
 			}),
 		});
 

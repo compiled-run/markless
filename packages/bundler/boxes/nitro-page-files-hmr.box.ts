@@ -5,7 +5,6 @@ const FIXTURE = 'fixtures/vite-nitro';
 const COUNTER = `${FIXTURE}/components/counter.tsrx`;
 const NOTES = `${FIXTURE}/pages/notes.tsrx`;
 const WAIT = { timeoutMs: 20_000 };
-const PORT = 51734;
 
 export default box(
 	{
@@ -19,8 +18,8 @@ export default box(
 				...config,
 				root: `${config.root}/${FIXTURE}`,
 				configFile: `${config.root}/${FIXTURE}/vite.config.ts`,
-				// Its own strict port, off the owner's dev server and off the other nitro boxes'.
-				server: { ...config.server, port: PORT, strictPort: true },
+				// A port the system picks free: a fixed one can be in use, as another process's outgoing connection.
+				server: { ...config.server, port: 0 },
 			}),
 		});
 
