@@ -18,6 +18,7 @@ import type {
 	SemanticMarkupChunk,
 	SemanticExpression,
 	SemanticHandlerStatement,
+	SemanticModuleFunction,
 	SemanticSharedDefinition,
 	SourceSpan,
 } from '../artifacts.ts';
@@ -191,6 +192,30 @@ const METHODS = new Set<string>([
 	'reverse', 'toReversed', 'toUpperCase', 'toLowerCase', 'trim',
 ]);
 
+/** Types whose `typeof` a native value answers exactly; `undefined` and `object` cannot be told apart from null. */
+const EXACT_TYPES = new Set(['string', 'number', 'boolean']);
+
+/** `typeof value === 'string'` (either side, `===` or `!==`) as the tested value and type, when the answer is exact. */
+function typeTestOf(
+	expression: Extract<SemanticExpression, { kind: 'binary' }>,
+): { readonly value: SemanticExpression; readonly type: string } | undefined {
+	if (expression.operator !== '===' && expression.operator !== '!==') return undefined;
+	for (const [operand, other] of [
+		[expression.left, expression.right],
+		[expression.right, expression.left],
+	] as const) {
+		if (
+			operand.kind === 'unary' &&
+			operand.operator === 'typeof' &&
+			other.kind === 'literal' &&
+			typeof other.value === 'string' &&
+			EXACT_TYPES.has(other.value)
+		)
+			return { value: operand.value, type: other.value };
+	}
+	return undefined;
+}
+
 const comparePaths = (a: ReadonlyArray<number>, b: ReadonlyArray<number>): number => {
 	for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i]! - b[i]!;
 	return a.length - b.length;
@@ -259,6 +284,7 @@ function moduleFactsOf(graph: SemanticGraphArtifact) {
 			graph.moduleImports.filter((entry) => !entry.typeOnly).map((entry) => [entry.localName, entry]),
 		),
 		componentFacts: new Map(graph.components.map((component) => [component.name, component])),
+		functions: new Map((graph.moduleFunctions ?? []).map((fn) => [fn.name, fn])),
 		bindingsById: new Map(graph.graphBindings.map((binding) => [binding.id, binding])),
 		sharedDefinitions: new Map(
 			graph.sharedDefinitions.map((definition) => [definition.id, definition]),
@@ -530,6 +556,35 @@ export function createNativeViewPayload(
 		for (const member of members)
 			found = found?.kind === 'namespace' ? exported(found.module, member) : undefined;
 		return found?.kind === 'component' ? found : undefined;
+	};
+
+	type ModuleFunction = { readonly module: ModuleFacts; readonly fn: SemanticModuleFunction };
+	/** The module-level function `name` exported from `module`, following re-exports. */
+	const exportedFunction = (module: ModuleFacts, name: string, depth = 0): ModuleFunction | undefined => {
+		if (depth > 16) return undefined;
+		for (const fn of module.functions.values()) if (fn.exportNames.includes(name)) return { module, fn };
+		const reexports = module.graph.moduleGraphInterface?.reexports ?? [];
+		const direct = reexports.find((entry) => entry.exportName === name);
+		if (direct) {
+			const target = direct.importedName === '*' ? undefined : moduleAt(module, direct.source);
+			return target && exportedFunction(target, direct.importedName, depth + 1);
+		}
+		for (const entry of reexports) {
+			if (entry.exportName !== '*') continue;
+			const target = moduleAt(module, entry.source);
+			const found = target && exportedFunction(target, name, depth + 1);
+			if (found) return found;
+		}
+		return undefined;
+	};
+	/** The function a call by bare name reaches from `module`: one it declares, or a named import of one. */
+	const functionAt = (module: ModuleFacts, name: string): ModuleFunction | undefined => {
+		const own = module.functions.get(name);
+		if (own) return { module, fn: own };
+		const entry = module.imports.get(name);
+		if (entry?.kind !== 'named') return undefined;
+		const source = moduleAt(module, entry.source);
+		return source && exportedFunction(source, entry.importedName ?? name);
 	};
 
 	const cells: NativeViewPayload['cells'][number][] = [];
@@ -837,6 +892,19 @@ export function createNativeViewPayload(
 			...(scope.event === name ? { event: undefined } : {}),
 		};
 	};
+	/** Where a module-level function's body is lowered: only its parameters (bound by the caller) and other functions. */
+	const helperScope = (module: ModuleFacts, caller: Scope): Scope => ({
+		module,
+		component: '',
+		cells: { byName: new Map(), byBinding: new Map() },
+		prefix: caller.prefix,
+		locals: new Set(),
+		items: new Map(),
+		props: new Map(),
+		objects: new Map(),
+		args: new Map(),
+		shared: new Map(),
+	});
 	function exprOf(
 		expression: SemanticExpression | undefined,
 		what: string,
@@ -890,11 +958,24 @@ export function createNativeViewPayload(
 			case 'literal':
 				return { literal: expression.value };
 			case 'unary': {
+				if (expression.operator === 'typeof')
+					return refuse(
+						`${what} uses \`typeof\` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null`,
+					);
 				const value = exprOf(expression.value, what, scope);
 				return value && { unary: expression.operator, value };
 			}
 			case 'binary':
 			case 'logical': {
+				const typeTest = expression.kind === 'binary' ? typeTestOf(expression) : undefined;
+				if (typeTest) {
+					const value = exprOf(typeTest.value, what, scope);
+					return value && {
+						binary: expression.operator as '===' | '!==',
+						left: { unary: 'typeof', value },
+						right: { literal: typeTest.type },
+					};
+				}
 				const left = exprOf(expression.left, what, scope);
 				const right = exprOf(expression.right, what, scope);
 				if (!left || !right) return null;
@@ -959,6 +1040,35 @@ export function createNativeViewPayload(
 			case 'call': {
 				const args = all(expression.arguments);
 				return args && { call: expression.callee as NativeBuiltin, arguments: args };
+			}
+			case 'apply': {
+				const name = expression.callee;
+				if (
+					scope.locals.has(name) ||
+					scope.args.has(name) ||
+					scope.items.has(name) ||
+					scope.objects.has(name) ||
+					isPropName(name, scope) ||
+					cellOf(name, scope)
+				)
+					return refuse(`${what} calls \`${name}\`, a value the build cannot call`);
+				const found = functionAt(scope.module, name);
+				if (!found) return refuse(`${what} uses a call to \`${name}\`, which needs a script engine`);
+				const key = `${found.module.graph.filename}#${found.fn.name}`;
+				if (inlining.has(key)) return refuse(`${what} calls \`${name}\` inside itself`);
+				const args = all(expression.arguments);
+				if (!args) return null;
+				const { parameters, body } = found.fn.native;
+				const inner = parameters.reduce<Scope>(
+					(bound, parameter, index) => bindName(bound, parameter, args[index] ?? { literal: null }),
+					helperScope(found.module, scope),
+				);
+				inlining.add(key);
+				try {
+					return exprOf(body, `the function \`${found.fn.name}\``, inner);
+				} finally {
+					inlining.delete(key);
+				}
 			}
 			case 'array': {
 				const items = expression.items.map((item) => {
@@ -1400,8 +1510,16 @@ export function createNativeViewPayload(
 					target.module.propNames.get(target.component)?.values() ?? [],
 				);
 				const rest: [string, NativeExpr][] = [];
+				const ownRest = scope.module.componentFacts.get(scope.component)?.native?.restProp;
 				for (const prop of edge.props) {
 					let value: Prop | undefined;
+					if (prop.kind === 'spread' && ownRest !== undefined && prop.source === ownRest) {
+						// `{...rest}` passed on to a part: the props this instance was given and does not declare.
+						for (const [name, expr] of scope.rest ?? [])
+							if (declared.has(name)) props.set(name, { kind: 'value', expr });
+							else rest.push([name, expr]);
+						continue;
+					}
 					if (prop.kind === 'callback') {
 						value = {
 							kind: 'callback',

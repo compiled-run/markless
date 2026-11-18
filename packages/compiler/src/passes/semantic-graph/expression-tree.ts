@@ -7,7 +7,7 @@ import type {
 	SemanticHandlerStatement,
 } from '../../artifacts.ts';
 
-const UNARY = new Set(['!', '-', '+']);
+const UNARY = new Set(['!', '-', '+', 'typeof']);
 const BINARY = new Set(['+', '-', '*', '/', '%', '===', '!==', '<', '<=', '>', '>=']);
 const LOGICAL = new Set(['&&', '||', '??']);
 const COMPOUND = new Set(['+=', '-=', '*=', '/=', '%=']);
@@ -77,7 +77,7 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 		}
 		case 'UnaryExpression':
 			return typeof node.operator === 'string' && UNARY.has(node.operator)
-				? { kind: 'unary', operator: node.operator as '!' | '-' | '+', value: expressionTreeOf(node.argument as AnyNode) }
+				? { kind: 'unary', operator: node.operator as '!' | '-' | '+' | 'typeof', value: expressionTreeOf(node.argument as AnyNode) }
 				: unsupported(`the \`${String(node.operator)}\` operator`);
 		case 'BinaryExpression':
 			return typeof node.operator === 'string' && BINARY.has(node.operator)
@@ -105,8 +105,13 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				alternate: expressionTreeOf(node.alternate as AnyNode),
 			};
 		case 'MemberExpression': {
-			const property = (node.property as AnyNode | undefined)?.name;
-			return !node.computed && typeof property === 'string'
+			const key = node.property as AnyNode | undefined;
+			const property = node.computed
+				? key?.type === 'Literal' && typeof key.value === 'number' && Number.isInteger(key.value) && key.value >= 0
+					? String(key.value)
+					: undefined
+				: key?.name;
+			return typeof property === 'string'
 				? { kind: 'member', object: expressionTreeOf(node.object as AnyNode), property }
 				: unsupported('a computed member read');
 		}
@@ -124,9 +129,11 @@ export function expressionTreeOf(node: AnyNode | undefined): SemanticExpression 
 				};
 			}
 			const name = calleeName(callee);
-			return name && BUILTINS.has(name)
-				? { kind: 'call', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) }
-				: unsupported(`a call to \`${name ?? 'a computed function'}\``);
+			if (name && BUILTINS.has(name))
+				return { kind: 'call', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) };
+			if (callee?.type === 'Identifier' && name && !asNodes(node.arguments).some((argument) => argument.type === 'SpreadElement'))
+				return { kind: 'apply', callee: name, arguments: asNodes(node.arguments).map(expressionTreeOf) };
+			return unsupported(`a call to \`${name ?? 'a computed function'}\``);
 		}
 		case 'AwaitExpression':
 			return unsupported('`await`');
@@ -342,6 +349,7 @@ function readsName(tree: SemanticExpression, name: string): boolean {
 		case 'member':
 			return readsName(tree.object, name);
 		case 'call':
+		case 'apply':
 			return tree.arguments.some((argument) => readsName(argument, name));
 		case 'method':
 			return readsName(tree.object, name) || tree.arguments.some((argument) => readsName(argument, name));
@@ -399,6 +407,38 @@ function returnChainOf(statements: ReadonlyArray<AnyNode>, after: SemanticExpres
 /** A computed's block body as one tree a native host evaluates. */
 export function computedBodyOf(node: AnyNode): SemanticExpression {
 	return returnChainOf(asNodes(node.body), { kind: 'literal', value: null });
+}
+
+/** A module-level function's parameters and return value as one tree; a defaulted parameter reads `p ?? default`. */
+export function functionBodyOf(node: AnyNode): { parameters: string[]; body: SemanticExpression } {
+	const parameters: string[] = [];
+	const defaults: (readonly [string, SemanticExpression])[] = [];
+	for (const parameter of asNodes(node.params)) {
+		const target = parameter.type === 'AssignmentPattern' ? (parameter.left as AnyNode | undefined) : parameter;
+		if (target?.type !== 'Identifier' || typeof target.name !== 'string')
+			return { parameters, body: unsupported('a function with a pattern or rest parameter') };
+		parameters.push(target.name);
+		if (parameter.type === 'AssignmentPattern')
+			defaults.push([
+				target.name,
+				{
+					kind: 'logical',
+					operator: '??',
+					left: { kind: 'read', name: target.name },
+					right: expressionTreeOf(parameter.right as AnyNode),
+				},
+			]);
+	}
+	const body = node.body as AnyNode | undefined;
+	const value: SemanticExpression = node.async || node.generator
+		? unsupported('an async or generator function')
+		: body?.type === 'BlockStatement'
+			? computedBodyOf(body)
+			: expressionTreeOf(body);
+	return {
+		parameters,
+		body: defaults.reduceRight<SemanticExpression>((inner, [name, fallback]) => ({ kind: 'let', name, value: fallback, body: inner }), value),
+	};
 }
 
 /** A handler's body as statements a native host runs: assignments, calls, `const`, `if` and bare `return`, each value a tree. */
@@ -485,6 +525,7 @@ export function componentNativeFactsOf(
 export const NATIVE_FACT_COLLECTORS: NativeFactCollectors = {
 	expression: expressionTreeOf as NativeFactCollectors['expression'],
 	computedBody: computedBodyOf as NativeFactCollectors['computedBody'],
+	functionBody: functionBodyOf as NativeFactCollectors['functionBody'],
 	handlerStatements: handlerStatementsOf as NativeFactCollectors['handlerStatements'],
 	component: componentNativeFactsOf as unknown as NativeFactCollectors['component'],
 };

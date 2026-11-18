@@ -118,6 +118,7 @@ class Runtime(val payload: Payload, private val store: Store = MemoryStore(), va
 				when {
 					v is JsValue.Str && e.property == "length" -> JsValue.Num(v.value.length.toDouble())
 					v is JsValue.Arr && e.property == "length" -> JsValue.Num(v.items.size.toDouble())
+					v is JsValue.Arr && Js.element(v, e.property) != null -> Js.element(v, e.property)!!
 					v is JsValue.Obj && e.property in v.fields -> v.fields.getValue(e.property)
 					else -> throw MarklessRuntimeError(".${e.property} of a value that has none")
 				}

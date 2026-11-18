@@ -623,4 +623,110 @@ export function Pager() @{
 			['handler:event:1/kept:1', 'next', null],
 		]);
 	});
+
+	it('inlines a module function where an expression calls it, its own module or an imported one, with parameters bound', async () => {
+		const helpers = await buildSemanticGraph({
+			filename: 'src/helpers.ts',
+			source: `export function firstOf(list: readonly string[], fallback = 'none'): string {
+	const first = list[0];
+	if (first === undefined) return fallback;
+	return first;
+}
+function hidden() { return 1; }
+export { hidden as one };`,
+			nativeFacts: NATIVE_FACT_COLLECTORS,
+		});
+		expect(helpers.moduleFunctions?.map((fn) => [fn.name, fn.exportNames, fn.native.parameters])).toEqual([
+			['firstOf', ['firstOf'], ['list', 'fallback']],
+			['hidden', ['one'], []],
+		]);
+		const app = await buildSemanticGraph({
+			filename: 'src/App.tsrx',
+			source: `import { state } from '@markless/core';
+import { firstOf, one } from './helpers.ts';
+function isText(value: unknown): boolean {
+	return typeof value === 'string';
+}
+export function Picks() @{
+	let list = state<readonly string[]>([]);
+	<p>{firstOf(list)} {String(isText(list[0]))} {one()}</p>
+}`,
+			nativeFacts: NATIVE_FACT_COLLECTORS,
+		});
+		const { payload, diagnostics } = createNativeViewPayload(app, {
+			modules: {
+				graphs: new Map([['src/helpers.ts', helpers]]),
+				resolve: (specifier) => (specifier === './helpers.ts' ? 'src/helpers.ts' : undefined),
+			},
+		});
+		expect(diagnostics).toEqual([]);
+		const first = { member: { cell: 'state:list' }, property: '0' };
+		expect(payload?.nodes.find((node) => node.kind === 'text')).toMatchObject({
+			parts: [
+				{
+					expr: {
+						if: { binary: '===', left: first, right: { literal: null } },
+						whenTrue: { logical: '??', left: { literal: null }, right: { literal: 'none' } },
+						whenFalse: first,
+					},
+				},
+				{ text: ' ' },
+				{
+					expr: {
+						call: 'String',
+						arguments: [{ binary: '===', left: { unary: 'typeof', value: first }, right: { literal: 'string' } }],
+					},
+				},
+				{ text: ' ' },
+				{ expr: { literal: 1 } },
+			],
+		});
+	});
+
+	it('names a module function, call or typeof it cannot inline', async () => {
+		const { payload, diagnostics } = await nativeView(`import { state } from '@markless/core';
+function total(list: readonly number[]): number {
+	let sum = 0;
+	for (const item of list) sum += item;
+	return sum;
+}
+function again(count: number): number {
+	return count > 0 ? again(count - 1) : 0;
+}
+function Badge({ format }: { readonly format: number }) @{
+	<b>{format(1)}</b>
+}
+export function Odd() @{
+	let held = state<unknown>(null);
+	<main>
+		<p>{total([1])} {again(1)} {typeof held === 'undefined' ? 'none' : 'some'}</p>
+		<Badge format={2} />
+	</main>
+}`);
+		expect(payload).toBeNull();
+		expect(diagnostics.map((d) => d.message)).toEqual([
+			'the function `total` uses a `let` declaration, which needs a script engine',
+			'the function `again` calls `again` inside itself',
+			"a text expression uses `typeof` other than compared with 'string', 'number' or 'boolean'; a native value does not tell undefined from null",
+			'a text expression calls `format`, a value the build cannot call',
+		]);
+	});
+
+	it('passes the props a widget root spreads on to its part: declared ones as props, the rest onto its element', async () => {
+		const { payload, diagnostics } = await nativeView(`function Box({ tone, children, ...rest }: { readonly tone?: string; readonly children?: unknown }) @{
+	<div {...rest} data-tone={tone}>{children}</div>
+}
+function Root({ children, ...rest }: { readonly children?: unknown }) @{
+	<Box {...rest}>{children}</Box>
+}
+export function App() @{
+	<Root tone="calm" aria-label="Group">Hi</Root>
+}`);
+		expect(diagnostics).toEqual([]);
+		expect(payload?.nodes[0]).toMatchObject({
+			element: 'div',
+			attributes: { 'aria-label': 'Group' },
+			bindings: [{ attribute: 'data-tone', value: { literal: 'calm' } }],
+		});
+	});
 });

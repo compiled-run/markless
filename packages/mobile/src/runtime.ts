@@ -120,6 +120,7 @@ export function evaluateNativeExpr(
 	}
 	if ('unary' in expr) {
 		const value = evaluate(expr.value);
+		if (expr.unary === 'typeof') return typeof value;
 		return expr.unary === '!'
 			? !value
 			: expr.unary === '-'
@@ -168,6 +169,9 @@ export function evaluateNativeExpr(
 	if ('member' in expr) {
 		const value = evaluate(expr.member);
 		if ((typeof value === 'string' || Array.isArray(value)) && expr.property === 'length') return value.length;
+		const index = Number(expr.property);
+		if (Array.isArray(value) && Number.isInteger(index) && index >= 0 && String(index) === expr.property)
+			return value[index] ?? null;
 		if (value !== null && typeof value === 'object' && !Array.isArray(value) && Object.hasOwn(value, expr.property))
 			return (value as Record<string, Value>)[expr.property]!;
 		throw new Error(`.${expr.property} of a value that has none`);

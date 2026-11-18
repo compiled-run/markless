@@ -189,7 +189,7 @@ data class Payload(
 			Expr.EventValue -> emptyList()
 		}
 
-		private val UNARY = setOf("!", "-", "+")
+		private val UNARY = setOf("!", "-", "+", "typeof")
 		private val BINARY = setOf("+", "-", "*", "/", "%", "===", "!==", "<", "<=", ">", ">=")
 		private val LOGICAL = setOf("&&", "||", "??")
 		private val METHODS = setOf("filter", "map", "findIndex", "some", "every", "includes", "indexOf", "join", "concat", "slice", "reverse", "toReversed", "toUpperCase", "toLowerCase", "trim")

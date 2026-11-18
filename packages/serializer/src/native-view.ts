@@ -46,7 +46,12 @@ export type NativeBuiltin =
 export type NativeExpr =
 	| { readonly cell: string }
 	| { readonly literal: NativeScalar | null }
-	| { readonly unary: '!' | '-' | '+'; readonly value: NativeExpr }
+	/**
+	 * `typeof` gives JavaScript's answer for a JSON value: 'string', 'number', 'boolean', or 'object' for an array, an
+	 * object and null. A native value spells `undefined` as null, so the compiler emits it only compared with 'string',
+	 * 'number' or 'boolean', where that cannot differ from the web.
+	 */
+	| { readonly unary: '!' | '-' | '+' | 'typeof'; readonly value: NativeExpr }
 	| {
 			readonly binary: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
 			readonly left: NativeExpr;
@@ -55,7 +60,10 @@ export type NativeExpr =
 	| { readonly logical: '&&' | '||' | '??'; readonly left: NativeExpr; readonly right: NativeExpr }
 	| { readonly if: NativeExpr; readonly whenTrue: NativeExpr; readonly whenFalse: NativeExpr }
 	| { readonly template: ReadonlyArray<string | NativeExpr> }
-	/** `length` of a string or array, or an own property of an object; anything else is a runtime error. */
+	/**
+	 * `length` of a string or array, an array's element at an index (`"0"`, `"1"`: null past its end, as `undefined` on
+	 * the web), or an own property of an object; anything else is a runtime error.
+	 */
 	| { readonly member: NativeExpr; readonly property: string }
 	| { readonly array: ReadonlyArray<{ readonly spread: boolean; readonly value: NativeExpr }> }
 	| { readonly object: ReadonlyArray<readonly [string, NativeExpr]> }

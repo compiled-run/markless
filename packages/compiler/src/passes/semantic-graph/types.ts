@@ -3,6 +3,7 @@ import type { SourceSpan } from '../../diagnostics.ts';
 import type {
 	NativeFactCollectors,
 	SemanticComponent,
+	SemanticModuleFunction,
 	SemanticComponentPropDeclaration,
 	SemanticComponentEdge,
 	SemanticBehavior,
@@ -53,6 +54,7 @@ export type MutableSemanticGraphArtifact = {
 	passId: 'tsrx-semantic-graph';
 	filename: string;
 	moduleId: string;
+	moduleFunctions?: SemanticModuleFunction[];
 	components: SemanticComponent[];
 	componentPropBindings: SemanticComponentPropDeclaration[];
 	componentEdges: SemanticComponentEdge[];

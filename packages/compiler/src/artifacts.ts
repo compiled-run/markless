@@ -59,6 +59,8 @@ export type NativeFactCollectors = {
 	readonly expression: (node: never) => SemanticExpression;
 	/** A computed's block body (its statements) as one tree. */
 	readonly computedBody: (node: never) => SemanticExpression;
+	/** A module-level function's parameters and body as one tree. */
+	readonly functionBody: (node: never) => SemanticModuleFunction['native'];
 	readonly handlerStatements: (
 		node: never,
 	) => ReadonlyArray<SemanticHandlerStatement> | undefined;
@@ -1208,11 +1210,23 @@ export type SemanticGraphAlias = {
 	readonly sourceSpan?: SourceSpan;
 };
 
+/** A top-level `function` of a module: what a native build inlines where an expression calls it. */
+export type SemanticModuleFunction = {
+	readonly name: string;
+	/** The names other modules import it by (`export function`, `export { name as alias }`). */
+	readonly exportNames: ReadonlyArray<string>;
+	readonly native: {
+		readonly parameters: ReadonlyArray<string>;
+		/** Its return value as a tree over its parameters: `const` is a `let`, `if` a conditional, falling off the end `undefined`. */
+		readonly body: SemanticExpression;
+	};
+};
+
 /** A value as a tree a native host evaluates with JavaScript meaning; names are the component's bindings. */
 export type SemanticExpression =
 	| { readonly kind: 'read'; readonly name: string }
 	| { readonly kind: 'literal'; readonly value: string | number | boolean | null }
-	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+'; readonly value: SemanticExpression }
+	| { readonly kind: 'unary'; readonly operator: '!' | '-' | '+' | 'typeof'; readonly value: SemanticExpression }
 	| {
 			readonly kind: 'binary';
 			readonly operator: '+' | '-' | '*' | '/' | '%' | '===' | '!==' | '<' | '<=' | '>' | '>=';
@@ -1234,6 +1248,8 @@ export type SemanticExpression =
 	| { readonly kind: 'template'; readonly parts: ReadonlyArray<string | SemanticExpression> }
 	| { readonly kind: 'member'; readonly object: SemanticExpression; readonly property: string }
 	| { readonly kind: 'call'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
+	/** A call to a function by its bare name that is not a builtin: a module-level function, this module's or an imported one. */
+	| { readonly kind: 'apply'; readonly callee: string; readonly arguments: ReadonlyArray<SemanticExpression> }
 	| {
 			readonly kind: 'array';
 			readonly items: ReadonlyArray<{ readonly spread: boolean; readonly value: SemanticExpression }>;
@@ -1718,6 +1734,8 @@ export type SemanticGraphArtifact = {
 	readonly elementRosterCounts?: ReadonlyArray<SemanticElementRosterCount>;
 	readonly localBindings: ReadonlyArray<SemanticLocalBinding>;
 	readonly localDeclarations: ReadonlyArray<SemanticLocalDeclaration>;
+	/** The module's top-level functions that are not components, for native builds only (`nativeFacts`). */
+	readonly moduleFunctions?: ReadonlyArray<SemanticModuleFunction>;
 	readonly aliases: ReadonlyArray<SemanticGraphAlias>;
 	readonly stateReads: ReadonlyArray<SemanticStateRead>;
 	readonly templateReads: ReadonlyArray<SemanticTemplateRead>;

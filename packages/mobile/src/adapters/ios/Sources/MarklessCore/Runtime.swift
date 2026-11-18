@@ -162,6 +162,7 @@ public final class NativeRuntime {
 			switch op {
 			case "!": return .bool(!value.isTruthy)
 			case "-": return .number(-value.primitive.number)
+			case "typeof": return .string(value.typeName)
 			default: return .number(value.primitive.number)
 			}
 		case let .binary(op, left, right): return try evaluateBinary(op, evaluate(left), evaluate(right))
@@ -185,6 +186,9 @@ public final class NativeRuntime {
 			switch value {
 			case let .string(text) where property == "length": return .number(Double(text.utf16.count))
 			case let .array(array) where property == "length": return .number(Double(array.items.count))
+			case let .array(array):
+				// An index past the end is `undefined` on the web, which a native value spells null.
+				if let index = Int(property), index >= 0, String(index) == property { return index < array.items.count ? array.items[index] : .null }
 			case let .object(object): if let found = object.get(property) { return found }
 			default: break
 			}

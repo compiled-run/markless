@@ -93,6 +93,16 @@ public enum NativeValue: Equatable, Sendable {
 		}
 	}
 
+	/// JavaScript's `typeof value`: null, arrays and objects are all "object".
+	public var typeName: String {
+		switch self {
+		case .number: return "number"
+		case .string: return "string"
+		case .bool: return "boolean"
+		case .null, .array, .object: return "object"
+		}
+	}
+
 	/// ToPrimitive for operators: arrays and objects read as their string.
 	var primitive: NativeValue {
 		switch self {

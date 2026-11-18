@@ -81,9 +81,16 @@ async function act(page: Page, step: LadderStep) {
 	const action = step.do;
 	if (!action) return;
 	if ('tap' in action) {
-		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone.
+		// A text that is also a control's accessible name (a label and the switch it names) taps the control, as on a phone;
+		// a button named by its own text comes first, over a region its heading also names.
+		const button = page.getByRole('button', { name: action.tap, exact: true });
 		const named = page.getByLabel(action.tap, { exact: true });
-		await ((await named.count()) === 1 ? named : shown(page, action.tap)).click();
+		await ((await button.count()) === 1
+			? button
+			: (await named.count()) === 1
+				? named
+				: shown(page, action.tap)
+		).click();
 	} else if ('type' in action) {
 		const field = page.getByRole('textbox', { name: action.type.field, exact: true });
 		await field.fill('');
