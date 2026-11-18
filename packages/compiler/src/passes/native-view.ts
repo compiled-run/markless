@@ -27,6 +27,8 @@ export type NativeViewArtifact = {
 	readonly passId: 'native-view';
 	readonly payload: NativeViewPayload | null;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+	/** Where each element node of the payload is written, by node id, for build errors that name an element. */
+	readonly elementSources: ReadonlyMap<string, { readonly element: string; readonly span?: SourceSpan }>;
 };
 
 type ElementBindings = NonNullable<Extract<NativeNode, { kind: 'element' }>['bindings']>;
@@ -67,7 +69,7 @@ const SEMANTIC_EVENTS: Readonly<Record<string, NativeViewPayload['events'][numbe
 };
 
 type Item =
-	| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number> }
+	| { readonly kind: 'host'; readonly id: string; readonly path: ReadonlyArray<number>; readonly span?: SourceSpan }
 	| { readonly kind: 'part'; readonly part: NativeTextPart; readonly path: ReadonlyArray<number> }
 	| {
 			readonly kind: 'branch';
@@ -214,10 +216,12 @@ export function createNativeViewPayload(
 		});
 		return null;
 	};
+	const elementSources = new Map<string, { readonly element: string; readonly span?: SourceSpan }>();
 	const done = (payload: NativeViewPayload | null): NativeViewArtifact => ({
 		passId: 'native-view',
 		payload: diagnostics.length > 0 ? null : payload,
 		diagnostics,
+		elementSources,
 	});
 
 	const root = graph.markup.root;
@@ -478,6 +482,7 @@ export function createNativeViewPayload(
 				kind: 'host',
 				id: host.hostNodeId,
 				path: host.coordinate.path,
+				...(host.sourceSpan ? { span: host.sourceSpan } : {}),
 			})),
 			...(chunk.texts ?? []).map((text): Item => ({
 				kind: 'part',
@@ -599,6 +604,7 @@ export function createNativeViewPayload(
 				);
 				const bindings = bindingsOf(item.id, scope);
 				const id = scope.prefix + item.id;
+				elementSources.set(id, { element: element ?? '*', ...(item.span ? { span: item.span } : {}) });
 				nodes.push({
 					kind: 'element',
 					id,

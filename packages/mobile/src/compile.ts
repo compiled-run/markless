@@ -16,6 +16,8 @@ export type NativeBuild = {
 	/** The component's scoped CSS as the compiler compiled it for web; Dragon compiles the same text for each platform. */
 	readonly styles: ReadonlyArray<{ readonly scopeId: string; readonly cssText: string }>;
 	readonly diagnostics: ReadonlyArray<CompilerDiagnostic>;
+	/** Each payload element's tag and where it is written, by node id, for build errors that name an element. */
+	readonly elementSources: NativeViewArtifact['elementSources'];
 };
 
 /** Compiles one `.tsrx` module through the real compiler, then lowers its analysis to the native view payload. */
@@ -57,5 +59,6 @@ export async function compileNativeComponent(input: {
 		payload: errors.length > 0 ? null : native.payload,
 		styles: compiled.publicRenderPlan.styleScopes,
 		diagnostics: [...errors, ...native.diagnostics],
+		elementSources: native.elementSources,
 	};
 }

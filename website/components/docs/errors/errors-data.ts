@@ -7819,7 +7819,7 @@ export const errorEntries: readonly ErrorEntry[] = [
 		description:
 			'This component cannot be built for a native target yet: a Markless build error.',
 		printed: [
-			'MARKLESS_NATIVE_UNSUPPORTED: This component cannot be built for a native target yet',
+			"MARKLESS_NATIVE_UNSUPPORTED: <filename>: the page's scroll range cannot be decided because of <element> (<nodeId>) on <value>: <detail>",
 			'Native hosts build retained views from compiler facts and run handlers as data; this construct has no native lowering yet.',
 			'https://markless.dev/errors/MARKLESS_NATIVE_UNSUPPORTED',
 		],
@@ -7830,6 +7830,11 @@ export const errorEntries: readonly ErrorEntry[] = [
 				id: 'f0',
 				file: 'packages/compiler/src/passes/native-view.ts',
 				url: 'https://github.com/compiled-run/markless/blob/main/packages/compiler/src/passes/native-view.ts',
+			},
+			{
+				id: 'f1',
+				file: 'packages/mobile/src/page-scroll.ts',
+				url: 'https://github.com/compiled-run/markless/blob/main/packages/mobile/src/page-scroll.ts',
 			},
 		],
 		moreSources: 0,

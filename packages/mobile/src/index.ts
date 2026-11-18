@@ -1,4 +1,5 @@
 export { compileNativeComponent, type NativeBuild } from './compile.ts';
+export { pageScrollDiagnostics } from './page-scroll.ts';
 export {
 	NATIVE_CONFORMANCE_VERSION,
 	nativeConformance,

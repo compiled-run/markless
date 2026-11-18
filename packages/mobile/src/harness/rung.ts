@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import type { LadderRung } from '../../proofs/ladder.ts';
-import { compileNativeComponent } from '../compile.ts';
+import { compileNativeComponent, type NativeBuild } from '../compile.ts';
+import { pageScrollDiagnostics } from '../page-scroll.ts';
 import { dragonDir, dragonStyleExport } from '../style-export.ts';
 import { nativeStyleInput } from '../style-input.ts';
 import { readProofExpected } from './expected.ts';
@@ -40,7 +41,7 @@ type StyleExportFonts = {
 };
 
 /** The style export and every font face it names, checked against the face's `sha256:` id. */
-function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
+function styleAssets(dir: string, name: string, build: NativeBuild, filename: string): Array<[string, Uint8Array]> {
 	const dragon = dragonDir();
 	let bytes: Uint8Array;
 	try {
@@ -50,8 +51,12 @@ function styleAssets(dir: string, name: string): Array<[string, Uint8Array]> {
 			`${name}: the component has styles, and its style export could not be made: ${(error as Error).message}`,
 		);
 	}
+	const exported = JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts & Parameters<typeof pageScrollDiagnostics>[0];
+	const unscrollable = pageScrollDiagnostics(exported, build, filename);
+	if (unscrollable.length > 0)
+		throw new Error(`${name}: ${COMPONENT_FILE} has no native build\n${unscrollable.map((d) => `  ${d.code}: ${d.message}`).join('\n')}`);
 	const assets: Array<[string, Uint8Array]> = [[PROOF_STYLE_PATH, bytes]];
-	const fonts = (JSON.parse(new TextDecoder().decode(bytes)) as StyleExportFonts).fonts ?? [];
+	const fonts = exported.fonts ?? [];
 	for (const font of fonts) {
 		const file = resolve(dragon, font.file);
 		if (!existsSync(file)) {
@@ -106,7 +111,7 @@ export async function loadRung(dir: string): Promise<ProofRung> {
 				join(dir, STYLE_INPUT),
 				`${JSON.stringify(nativeStyleInput(build.payload, build.styles), null, '\t')}\n`,
 			);
-			assets.push(...styleAssets(dir, name));
+			assets.push(...styleAssets(dir, name, build, relative(repoRoot, component)));
 		}
 	} else if (existsSync(join(dir, HAND_MADE_PAYLOAD))) {
 		assets.push([PROOF_PAYLOAD_PATH, readFileSync(join(dir, HAND_MADE_PAYLOAD))]);

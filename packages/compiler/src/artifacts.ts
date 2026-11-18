@@ -1611,6 +1611,8 @@ export type SemanticMarkupChunk = {
 		readonly hostNodeId: string;
 		readonly tagName: string;
 		readonly coordinate: { readonly kind: 'child-index'; readonly path: ReadonlyArray<number> };
+		/** Where the element is written; collected only for native builds, which name it in build errors. */
+		readonly sourceSpan?: SourceSpan;
 	}>;
 	readonly slots: ReadonlyArray<SemanticMarkupSlot>;
 	/** Static text nodes at their child-index positions, for hosts that build views instead of parsing HTML; absent when none. */
